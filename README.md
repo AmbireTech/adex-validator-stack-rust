@@ -18,8 +18,8 @@ GET `/channel/list` - get a list of all channels - TODO
 ## Testing setup
 
 ### Rust setup
-
-Currently requires `rustup override set nightly-2019-04-07` as `futures-preview` fails to build
+- Requires `nightly 2019-04-07`, as `futures-preview` fails to build.
+We've setup `rust-toolchain` but you can manually override it as well with `rustup override set nightly-2019-04-07`.
 
 #### Linux
 - The crate `openssl-sys` requires `libssl-dev` and `pkg-config` for Ubuntu.
