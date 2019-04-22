@@ -1,6 +1,6 @@
 use serde_derive::*;
-use crate::bignum::BigNum;
-use crate::validator::ValidatorDesc;
+use crate::domain::BigNum;
+use crate::domain::ValidatorDesc;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all="camelCase")]

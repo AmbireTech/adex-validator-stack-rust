@@ -1,6 +1,6 @@
 use regex::Regex;
 use hyper::{Request, Body};
-use crate::channel::Channel;
+use crate::domain::Channel;
 
 pub struct Path {
     matcher: Regex,
