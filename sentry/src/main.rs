@@ -1,10 +1,6 @@
 #![feature(async_await, await_macro, futures_api)]
 use std::net::SocketAddr;
 use futures::future::{FutureExt, TryFutureExt};
-use futures_legacy::future::Future;
-use futures_legacy::stream::Stream;
-use hyper::{Body, Request, Response};
-use hyper::header::{CONTENT_LENGTH, CONTENT_TYPE};
 use hyper::server::Server;
 use hyper::service::service_fn;
 use tokio::await;

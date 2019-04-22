@@ -1,16 +1,18 @@
 use futures::Future;
+use futures::future::{FutureExt, TryFutureExt};
 use futures::future::ok;
 use hyper::{Body, Method, Request, Response};
 use hyper::header::{CONTENT_LENGTH, CONTENT_TYPE};
 use regex::Regex;
 use tokio::await;
-use futures::future::{FutureExt, TryFutureExt};
 
 use crate::domain::Channel;
+use crate::handler::channel::ChannelListHandler;
 
 pub struct Path {
     matcher: Regex,
-    method: Method,
+    pub path: String,
+    pub method: Method,
 }
 
 impl Path {
@@ -20,11 +22,12 @@ impl Path {
         regex.push_str("$");
         Path {
             matcher: Regex::new(&regex).unwrap(),
-            method
+            path: regex,
+            method,
         }
     }
 
-    pub fn is_match(&self, method: &Method, path: &str) -> bool {
+    pub fn is_match(&self, method: Method, path: &str) -> bool {
         if self.method == method && self.matcher.is_match(path) {
             true
         } else {
@@ -41,47 +44,22 @@ pub enum SentryRequest {
 
 impl SentryRequest {
     pub async fn from_request(request: Request<Body>) -> Result<Response<Body>, hyper::Error> {
-        let routes = vec![
-            ("/channel/list".to_string(), Method::GET, channel_list),
-        ];
+        // handle error
+        let path_and_query = request.uri().path_and_query().unwrap();
+        let path = Path::new(request.method().clone(), path_and_query.path());
 
-        let found_route = routes.iter().find_map(|(ref path_str, ref method, handler)| {
-            let path = Path::new(method.clone(), path_str);
+        if path.is_match(Method::GET, "/channel/list") {
+            return Ok(await!(ChannelListHandler::handle(path, request)));
+        }
 
-            let uri = request.uri().path_and_query().unwrap();
-            if path.is_match(request.method(), uri.path()) {
-                Some((path, *handler))
-            } else {
-                None
-            }
-        });
 
-        let response = match found_route {
-            Some((path, handler)) => {
-                let fut_response = handler(path, request);
-
-                let response: Response<Body> = await!(fut_response);
-                response
-
-//                Response::builder()
-//                    .header(CONTENT_LENGTH, 3 as u64)
-//                    .header(CONTENT_TYPE, "text/plain")
-//                    .status(200)
-//                    .body(Body::from("abs"))
-//                    .expect("Failed to construct the response")
-            },
-            None => {
-                let not_found = "404 Not found";
-                Response::builder()
-                    .header(CONTENT_LENGTH, not_found.len() as u64)
-                    .header(CONTENT_TYPE, "text/plain")
-                    .status(404)
-                    .body(Body::from(not_found))
-                    .expect("Failed to construct the response")
-            }
-        };
-
-        Ok(response)
+        let not_found = "404 Not found";
+        Ok(Response::builder()
+            .header(CONTENT_LENGTH, not_found.len() as u64)
+            .header(CONTENT_TYPE, "text/plain")
+            .status(404)
+            .body(Body::from(not_found))
+            .expect("Failed to construct the response"))
     }
 }
 
