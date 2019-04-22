@@ -9,7 +9,7 @@ name = "sentry"
 path = "src/lib.rs"
 
 [dependencies]
-futures-preview = { version = "0.3.0-alpha.13", features = ["compat", "io-compat"] }
+futures-preview = { version = "=0.3.0-alpha.13", features = ["compat", "io-compat"] }
 futures_legacy = { version = "0.1", package = "futures" }
 tokio = { version = "0.1", features = ["async-await-preview"] }
 num-bigint = { version = "0.2", features = ["serde"] }

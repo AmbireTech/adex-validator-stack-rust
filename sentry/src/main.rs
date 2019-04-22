@@ -8,24 +8,15 @@ use hyper::header::{CONTENT_LENGTH, CONTENT_TYPE};
 use hyper::server::Server;
 use hyper::service::service_fn;
 use tokio::await;
+use sentry::request::SentryRequest;
 
 const DEFAULT_PORT: u16 = 8005;
-
-async fn serve_req(req: Request<Body>) -> Result<Response<Body>, hyper::Error> {
-
-    let body = "Sample";
-    Ok(Response::builder()
-        .header(CONTENT_LENGTH, body.len() as u64)
-        .header(CONTENT_TYPE, "text/plain")
-        .body(Body::from(body))
-        .expect("Failed to construct the response"))
-}
 
 async fn run_server(addr: SocketAddr) {
     println!("Listening on http://{}", addr);
 
     let serve_future =
-        Server::bind(&addr).serve(|| service_fn(|req| serve_req(req).boxed().compat()));
+        Server::bind(&addr).serve(|| service_fn(|req| SentryRequest::from_request(req).boxed().compat()));
 
     if let Err(e) = await!(serve_future) {
         eprintln!("server error: {}", e);
