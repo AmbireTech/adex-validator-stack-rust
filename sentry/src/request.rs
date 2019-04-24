@@ -30,11 +30,7 @@ impl Path {
     }
 
     pub fn is_match(&self, method: Method, path: &str) -> bool {
-        if self.method == method && self.matcher.is_match(path) {
-            true
-        } else {
-            false
-        }
+        self.method == method && self.matcher.is_match(path)
     }
 }
 
@@ -46,10 +42,7 @@ pub enum SentryRequest {
 
 impl SentryRequest {
     pub async fn from_request(mut client: Client, request: Request<Body>) -> Result<Response<Body>, hyper::Error> {
-
-        // @TODO: handle error
-        let path_and_query = request.uri().path_and_query().unwrap();
-        let path = Path::new(request.method().clone(), path_and_query.path());
+        let path = Path::new(request.method().clone(), request.uri().path());
 
         if path.is_match(Method::GET, "/channel/list") {
             let mut channel_repository = PostgresChannelRepository::new(&mut client);
@@ -67,17 +60,4 @@ impl SentryRequest {
             .body(Body::from(not_found))
             .expect("Failed to construct the response"))
     }
-}
-
-pub fn channel_list(path: Path, request: Request<Body>) -> Box<Future<Output=Result<Response<Body>, hyper::Error>>> {
-    let not_found = "Found";
-
-    let response = Response::builder()
-        .header(CONTENT_LENGTH, not_found.len() as u64)
-        .header(CONTENT_TYPE, "text/plain")
-        .status(200)
-        .body(Body::from(not_found))
-        .expect("Failed to construct the response");
-
-    Box::new(ok(response))
 }
