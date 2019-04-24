@@ -9,14 +9,19 @@ name = "sentry"
 path = "src/lib.rs"
 
 [dependencies]
+# Async support
 futures-preview = { version = "=0.3.0-alpha.13", features = ["compat", "io-compat"] }
 futures_legacy = { version = "0.1", package = "futures" }
 tokio = { version = "0.1", features = ["async-await-preview"] }
-num-bigint = { version = "0.2", features = ["serde"] }
+# Server
 regex = "1"
 hyper = "0.12"
-hyper-tls = "0.3"
+# (De)Serialization
 serde = "^1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
-postgres = "0.15"
+# Database
+postgres = { version = "=0.16.0-rc.1", features = ["with-chrono-0_4"] }
+# Domain
+num-bigint = { version = "0.2", features = ["serde"] }
+chrono = { version = "0.4", features = ["serde"] }
