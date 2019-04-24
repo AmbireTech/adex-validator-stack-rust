@@ -1,11 +1,13 @@
-use futures::Future;
-use futures::future::{FutureExt, TryFutureExt};
+use futures::future::{Future, FutureExt, TryFutureExt};
 use futures::future::ok;
+use futures_legacy::future::Future as LegacyFuture;
 use hyper::{Body, Method, Request, Response};
 use hyper::header::{CONTENT_LENGTH, CONTENT_TYPE};
+use postgres::Client;
 use regex::Regex;
 use tokio::await;
 
+use crate::database::channel::PostgresChannelRepository;
 use crate::domain::Channel;
 use crate::handler::channel::ChannelListHandler;
 
@@ -43,13 +45,17 @@ pub enum SentryRequest {
 }
 
 impl SentryRequest {
-    pub async fn from_request(request: Request<Body>) -> Result<Response<Body>, hyper::Error> {
-        // handle error
+    pub async fn from_request(mut client: Client, request: Request<Body>) -> Result<Response<Body>, hyper::Error> {
+
+        // @TODO: handle error
         let path_and_query = request.uri().path_and_query().unwrap();
         let path = Path::new(request.method().clone(), path_and_query.path());
 
         if path.is_match(Method::GET, "/channel/list") {
-            return Ok(await!(ChannelListHandler::handle(path, request)));
+            let mut channel_repository = PostgresChannelRepository::new(&mut client);
+            let mut channel_list_handler = ChannelListHandler::new(&mut channel_repository);
+
+            return Ok(await!(channel_list_handler.handle(path, request)));
         }
 
 
