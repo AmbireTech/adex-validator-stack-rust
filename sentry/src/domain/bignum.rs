@@ -1,11 +1,12 @@
-use serde::{Deserializer, Deserialize, Serializer};
-use serde_derive::*;
-use num_bigint::BigUint;
 use std::str::FromStr;
+
+use num_bigint::BigUint;
+use serde::{Deserialize, Deserializer, Serializer};
+use serde_derive::*;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BigNum(
-    #[serde(deserialize_with="biguint_from_str", serialize_with="biguint_to_str")]
+    #[serde(deserialize_with = "biguint_from_str", serialize_with = "biguint_to_str")]
     BigUint
 );
 
