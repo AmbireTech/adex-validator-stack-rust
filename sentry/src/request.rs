@@ -42,9 +42,10 @@ impl SentryRequest {
     pub async fn from_request(db_pool: DbPool, request: Request<Body>) -> Result<Response<Body>, ApplicationError> {
         let path = Path::new(request.method().clone(), request.uri().path());
 
+        let channel_repository = PostgresChannelRepository::new(db_pool.clone());
+
         if path.is_match(Method::GET, "/channel/list") {
-            let mut channel_repository = PostgresChannelRepository::new(db_pool.clone());
-            let mut channel_list_handler = ChannelListHandler::new(&mut channel_repository);
+            let channel_list_handler = ChannelListHandler::new(&channel_repository);
 
             return Ok(await!(channel_list_handler.handle(path, request)));
         }

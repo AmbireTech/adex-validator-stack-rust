@@ -6,17 +6,17 @@ use crate::database::channel::PostgresChannelRepository;
 use crate::request::Path;
 
 pub struct ChannelListHandler<'a> {
-    channel_repository: &'a mut PostgresChannelRepository,
+    channel_repository: &'a PostgresChannelRepository,
 }
 
 impl<'a> ChannelListHandler<'a> {
-    pub fn new(channel_repository: &'a mut PostgresChannelRepository) -> Self {
+    pub fn new(channel_repository: &'a PostgresChannelRepository) -> Self {
         Self { channel_repository }
     }
 }
 
 impl<'a> ChannelListHandler<'a> {
-    pub async fn handle(&mut self, path: Path, request: Request<Body>) -> Response<Body> {
+    pub async fn handle(&self, _path: Path, _request: Request<Body>) -> Response<Body> {
         let channels = await!(self.channel_repository.list_as()).unwrap();
         let json = serde_json::to_string(&channels).unwrap();
 
