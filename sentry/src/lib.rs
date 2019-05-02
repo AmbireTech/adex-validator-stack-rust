@@ -1,5 +1,6 @@
-#![feature(async_await, await_macro, futures_api)]
+#![feature(async_await, await_macro)]
 
+pub mod application;
 pub mod request;
 pub mod domain;
 pub mod handler;
