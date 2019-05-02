@@ -5,4 +5,3 @@ pub use validator::ValidatorDesc;
 mod bignum;
 mod channel;
 mod validator;
-
