@@ -10,7 +10,8 @@ use futures_legacy::lazy as old_lazy;
 use futures_legacy::Future as OldFuture;
 use try_future::try_future;
 
-use sentry::request::SentryRequest;
+use sentry::application::request::SentryRequest;
+use sentry::application::request::request_router;
 use sentry::application::error::ApplicationError;
 
 const DEFAULT_PORT: u16 = 8005;
@@ -64,7 +65,7 @@ fn database_pool(database_url: String) -> impl OldFuture<Item=bb8::Pool<bb8_post
 
 pub async fn request_entrypoint(
     request: hyper::Request<hyper::Body>,
-    db_pool: sentry::database::DbPool,
+    db_pool: sentry::infrastructure::persistence::DbPool,
     _addr: std::net::SocketAddr,
 ) -> Result<hyper::Response<hyper::Body>, http::Error> {
     let fut = request.headers()
@@ -75,10 +76,12 @@ pub async fn request_entrypoint(
         .and_then(move |host| {
             let _host: String = try_future!(host.to_str().map_err(|_| ApplicationError::InvalidHostValue).map(|s| s.to_owned()));
             // into() will make it into TryFuture
-            SentryRequest::from_request(db_pool, request).boxed().compat().into()
+            request_router(request).boxed().compat().into()
         })
+        .and_then(|sentry_request| SentryRequest::handle(db_pool, sentry_request).boxed().compat())
         .or_else(|err| err.as_response())
         .compat();
 
     await!(fut)
 }
+

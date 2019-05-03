@@ -1,5 +1,6 @@
 #[derive(Debug)]
 pub enum ApplicationError {
+    NotFound,
     NoHost,
     InvalidHostValue,
     NoRedirectFound,
@@ -11,11 +12,12 @@ impl ApplicationError {
         hyper::Response::builder()
             .status(match self {
                 ApplicationError::NoHost | ApplicationError::InvalidHostValue => hyper::StatusCode::BAD_REQUEST,
-                ApplicationError::NoRedirectFound => hyper::StatusCode::NOT_FOUND,
+                ApplicationError::NoRedirectFound | ApplicationError::NotFound => hyper::StatusCode::NOT_FOUND,
                 ApplicationError::InternalError => hyper::StatusCode::INTERNAL_SERVER_ERROR,
             })
             .body(
                 match self {
+                    ApplicationError::NotFound => "Route Not Found",
                     ApplicationError::NoHost => "Missing Host header",
                     ApplicationError::InvalidHostValue => "Invalid Host header",
                     ApplicationError::NoRedirectFound => "No redirect found for that host",

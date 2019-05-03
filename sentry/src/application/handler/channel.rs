@@ -1,9 +1,8 @@
-use hyper::{Body, Request, Response};
+use hyper::{Body, Response};
 use hyper::header::{CONTENT_LENGTH, CONTENT_TYPE};
 use tokio::await;
 
-use crate::database::channel::PostgresChannelRepository;
-use crate::request::Path;
+use crate::infrastructure::persistence::channel::PostgresChannelRepository;
 
 pub struct ChannelListHandler<'a> {
     channel_repository: &'a PostgresChannelRepository,
@@ -16,8 +15,8 @@ impl<'a> ChannelListHandler<'a> {
 }
 
 impl<'a> ChannelListHandler<'a> {
-    pub async fn handle(&self, _path: Path, _request: Request<Body>) -> Response<Body> {
-        let channels = await!(self.channel_repository.list_as()).unwrap();
+    pub async fn handle(&self) -> Response<Body> {
+        let channels = await!(self.channel_repository.list()).unwrap();
         let json = serde_json::to_string(&channels).unwrap();
 
         let response = Response::builder()
