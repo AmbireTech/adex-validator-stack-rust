@@ -21,7 +21,6 @@ impl PostgresChannelRepository {
         let fut = self.db_pool
             .run(move |mut conn| {
                 conn.prepare("SELECT channel_id, creator, deposit_asset, deposit_amount, valid_until FROM channels")
-//                    .map_err(|err| try_future!(Err((err, conn))))
                     .then(move |res| match res {
                         Ok(stmt) => {
                             conn
