@@ -3,7 +3,7 @@ use tokio::await;
 
 use crate::application::error::ApplicationError;
 use crate::application::handler::channel::ChannelListHandler;
-use crate::application::http::route::{RequestPath, RoutePath};
+use crate::infrastructure::http::route::{RequestPath, RoutePath};
 use crate::infrastructure::persistence::channel::PostgresChannelRepository;
 use crate::infrastructure::persistence::DbPool;
 
