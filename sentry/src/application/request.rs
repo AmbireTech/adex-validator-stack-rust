@@ -21,7 +21,7 @@ impl SentryRequest {
             SentryRequest::ChannelList => {
                 let channel_list_handler = ChannelListHandler::new(&channel_repository);
 
-                return Ok(await!(channel_list_handler.handle()));
+                Ok(await!(channel_list_handler.handle()))
             }
         }
     }
