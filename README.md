@@ -30,3 +30,7 @@ We've setup `rust-toolchain` but you can manually override it as well with `rust
 
 - `$HOME/docker/volumes/postgres` - your local storage for postgres (persist the data when we remove the container)
 - `POSTGRES_PASSWORD=docker` - the password of `postgres` user
+
+### Run Sentry Rest API
+
+`DATABASE_URL=postgresql://postgres:docker@localhost:5432/sentry cargo run`

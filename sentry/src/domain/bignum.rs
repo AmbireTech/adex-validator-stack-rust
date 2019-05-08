@@ -1,8 +1,7 @@
 use std::str::FromStr;
 
 use num_bigint::BigUint;
-use serde::{Deserialize, Deserializer, Serializer};
-use serde_derive::*;
+use serde::{Serialize, Deserialize, Deserializer, Serializer};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BigNum(
