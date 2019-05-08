@@ -1,4 +1,4 @@
-use serde_derive::*;
+use serde::{Serialize, Deserialize};
 
 use crate::domain::BigNum;
 

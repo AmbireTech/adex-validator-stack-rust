@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use serde_derive::*;
+use serde::{Serialize, Deserialize};
 
 //use crate::domain::BigNum;
 use crate::domain::ValidatorDesc;
