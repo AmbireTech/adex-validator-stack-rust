@@ -4,7 +4,6 @@ use std::net::SocketAddr;
 
 use futures::future::{FutureExt, TryFutureExt};
 use futures_legacy::Future;
-use futures_legacy::lazy as old_lazy;
 use tokio::await;
 use tokio_tcp::TcpListener;
 use tower_web::ServiceBuilder;
@@ -26,7 +25,7 @@ pub fn main() {
 
     println!("Listening on http://{}", addr);
 
-    tokio::run(old_lazy(move || bootstrap(database_url, addr).unit_error().boxed().compat()))
+    tokio::run(bootstrap(database_url, addr).unit_error().boxed().compat())
 }
 
 async fn bootstrap(database_url: String, addr: SocketAddr) {
