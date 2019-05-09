@@ -1,12 +1,10 @@
 use futures::future::{FutureExt, TryFutureExt};
-
 use futures_legacy::Future;
 use tokio::await;
 use tower_web::{derive_resource_impl, impl_web};
 
-use channel_list::ChannelListHandler;
-use channel_list::ChannelListResponse;
-use channel_create::ChannelInput;
+use channel_create::{ChannelCreateHandler, ChannelInput, ChannelCreateResponse};
+use channel_list::{ChannelListHandler, ChannelListResponse};
 
 use crate::infrastructure::persistence::channel::PostgresChannelRepository;
 use crate::infrastructure::persistence::DbPool;
@@ -23,9 +21,12 @@ impl_web! {
     impl ChannelResource {
         #[post("/channel")]
         #[content_type("application/json")]
-        async fn create_channel(&self, body: ChannelInput) -> String {
-            // @TODO: Create Channel in Database
-            serde_json::to_string(&body).unwrap()
+        async fn create_channel(&self, body: ChannelInput) -> ChannelCreateResponse {
+            let channel_repository = PostgresChannelRepository::new(self.db_pool.clone());
+
+            let handler = ChannelCreateHandler::new(&channel_repository);
+
+            await!(handler.handle(body).boxed().compat()).unwrap()
         }
 
         #[get("/channel/list")]
