@@ -3,12 +3,13 @@
 use std::net::SocketAddr;
 
 use futures::future::{FutureExt, TryFutureExt};
-use futures_legacy::Future;
+use futures::compat::Future01CompatExt;
 use tokio::await;
 use tokio_tcp::TcpListener;
 use tower_web::ServiceBuilder;
 
 use sentry::application::resource::channel::ChannelResource;
+use sentry::infrastructure::persistence::DbPool;
 
 const DEFAULT_PORT: u16 = 8005;
 
@@ -29,7 +30,8 @@ pub fn main() {
 }
 
 async fn bootstrap(database_url: String, addr: SocketAddr) {
-    let db_pool = await!(database_pool(database_url)).unwrap();
+    // @TODO: Error handling
+    let db_pool = await!(database_pool(database_url)).expect("Database connection failed");
 
     let listener = TcpListener::bind(&addr).expect("Wrong address provided");
 
@@ -41,12 +43,12 @@ async fn bootstrap(database_url: String, addr: SocketAddr) {
     await!(server).expect("Server error");
 }
 
-fn database_pool(database_url: String) -> impl Future<Item=bb8::Pool<bb8_postgres::PostgresConnectionManager<tokio_postgres::NoTls>>, Error=tokio_postgres::Error> {
+async fn database_pool(database_url: String) -> Result<DbPool, tokio_postgres::Error> {
     let postgres_connection = bb8_postgres::PostgresConnectionManager::new(
         database_url,
         tokio_postgres::NoTls,
     );
 
-    bb8::Pool::builder().build(postgres_connection)
+    await!(bb8::Pool::builder().build(postgres_connection).compat())
 }
 
