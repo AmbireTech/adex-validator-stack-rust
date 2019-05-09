@@ -6,7 +6,6 @@ use futures::future::{FutureExt, TryFutureExt};
 use futures::compat::Future01CompatExt;
 use futures_legacy::future::IntoFuture;
 use tokio::await;
-use futures_legacy::lazy as old_lazy;
 use futures_legacy::Future as OldFuture;
 use try_future::try_future;
 
@@ -27,7 +26,7 @@ fn main() {
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
 
-    tokio::run(old_lazy(move || bootstrap(database_url, addr).unit_error().boxed().compat() ))
+    tokio::run(bootstrap(database_url, addr).unit_error().boxed().compat() )
 }
 
 async fn bootstrap(database_url: String, addr: SocketAddr) {
@@ -36,6 +35,7 @@ async fn bootstrap(database_url: String, addr: SocketAddr) {
     // create a service that will wrap the clone of the DB Pool and then serves the request
     let make_service = hyper::service::make_service_fn(
         move |addr_stream: &hyper::server::conn::AddrStream| {
+            // @TODO use [enclose!](https://crates.io/crates/enclose)
             let db_pool = db_pool.clone();
             let ip_addr = addr_stream.remote_addr();
 
