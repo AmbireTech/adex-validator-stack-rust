@@ -1,8 +1,9 @@
-use crate::bignum::BigNum;
-use serde_derive::*;
+use serde::{Serialize, Deserialize};
+
+use crate::domain::BigNum;
 
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all="camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct ValidatorDesc {
     id: String,
     url: String,
