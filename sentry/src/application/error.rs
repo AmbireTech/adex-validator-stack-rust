@@ -8,6 +8,7 @@ pub enum ApplicationError {
 }
 
 impl ApplicationError {
+    // @TODO: Error handling https://github.com/AdExNetwork/adex-validator-stack-rust/issues/7
     pub fn as_response(&self) -> Result<hyper::Response<hyper::Body>, http::Error> {
         hyper::Response::builder()
             .status(match self {
