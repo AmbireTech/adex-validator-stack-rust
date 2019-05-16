@@ -2,7 +2,7 @@ use std::sync::{Arc, RwLock};
 
 use futures::future::{err, FutureExt, ok};
 
-use crate::domain::{Channel, ChannelRepository, RepositoryError};
+use crate::domain::{Channel, ChannelRepository};
 use crate::domain::RepositoryFuture;
 
 pub struct MemoryChannelRepository {
@@ -25,7 +25,7 @@ impl ChannelRepository for MemoryChannelRepository {
 
                 ok(channels)
             }
-            Err(error) => err(RepositoryError::from(error))
+            Err(error) => err(error.into())
         };
 
         res_fut.boxed()
@@ -38,7 +38,7 @@ impl ChannelRepository for MemoryChannelRepository {
 
                 ok(())
             }
-            Err(error) => err(RepositoryError::from(error))
+            Err(error) => err(error.into())
         };
 
         create_fut.boxed()
