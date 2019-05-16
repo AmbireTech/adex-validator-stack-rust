@@ -1,17 +1,16 @@
 use tokio::await;
 
-use crate::domain::Channel;
-use crate::infrastructure::persistence::channel::PostgresChannelRepository;
+use crate::domain::{Channel, ChannelRepository};
 
 use super::ChannelCreateResponse;
 use super::ChannelInput;
 
 pub struct ChannelCreateHandler<'a> {
-    channel_repository: &'a PostgresChannelRepository,
+    channel_repository: &'a dyn ChannelRepository
 }
 
 impl<'a> ChannelCreateHandler<'a> {
-    pub fn new(channel_repository: &'a PostgresChannelRepository) -> Self {
+    pub fn new(channel_repository: &'a ChannelRepository) -> Self {
         Self { channel_repository }
     }
 }
@@ -29,7 +28,7 @@ impl<'a> ChannelCreateHandler<'a> {
         };
 
         // @TODO: Insert into database
-        let success = await!(self.channel_repository.insert(channel)).is_ok();
+        let success = await!(self.channel_repository.create(channel)).is_ok();
 
         Ok(ChannelCreateResponse { success })
     }
