@@ -3,6 +3,8 @@ use std::fmt;
 
 use bb8::RunError;
 
+use crate::domain::RepositoryError;
+
 #[derive(Debug)]
 pub enum PostgresPersistenceError {
     UserError(tokio_postgres::Error),
@@ -26,5 +28,20 @@ impl From<RunError<tokio_postgres::Error>> for PostgresPersistenceError {
             RunError::TimedOut => PostgresPersistenceError::TimedOut,
             RunError::User(error) => PostgresPersistenceError::UserError(error)
         }
+    }
+}
+
+impl From<RunError<tokio_postgres::Error>> for RepositoryError {
+    fn from(run_error: RunError<tokio_postgres::Error>) -> Self {
+        let postgres_error = match run_error {
+            RunError::TimedOut => PostgresPersistenceError::TimedOut,
+            RunError::User(error) => PostgresPersistenceError::UserError(error)
+        };
+
+        RepositoryError::PersistenceError(
+            Box::new(
+                postgres_error
+            )
+        )
     }
 }
