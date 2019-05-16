@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::domain::{RepositoryFuture, ValidatorDesc};
 use crate::domain::bignum::BigNum;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Channel {
     pub id: String,

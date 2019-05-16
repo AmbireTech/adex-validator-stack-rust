@@ -3,7 +3,7 @@ use std::str::FromStr;
 use num_bigint::BigUint;
 use serde::{Serialize, Deserialize, Deserializer, Serializer};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BigNum(
     #[serde(deserialize_with = "biguint_from_str", serialize_with = "biguint_to_str")]
     BigUint

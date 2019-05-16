@@ -5,7 +5,7 @@ use std::pin::Pin;
 use futures::Future;
 
 pub use bignum::BigNum;
-pub use channel::{Channel, ChannelSpec};
+pub use channel::{Channel, ChannelSpec, ChannelRepository};
 pub use validator::ValidatorDesc;
 
 mod bignum;
