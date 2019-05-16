@@ -1,15 +1,15 @@
 use tokio::await;
 
-use crate::infrastructure::persistence::channel::PostgresChannelRepository;
+use crate::domain::ChannelRepository;
 
 use super::ChannelListResponse;
 
 pub struct ChannelListHandler<'a> {
-    channel_repository: &'a PostgresChannelRepository,
+    channel_repository: &'a dyn ChannelRepository,
 }
 
 impl<'a> ChannelListHandler<'a> {
-    pub fn new(channel_repository: &'a PostgresChannelRepository) -> Self {
+    pub fn new(channel_repository: &'a ChannelRepository) -> Self {
         Self { channel_repository }
     }
 }

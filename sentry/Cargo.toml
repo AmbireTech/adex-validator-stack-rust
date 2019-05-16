@@ -10,10 +10,10 @@ path = "src/lib.rs"
 
 [dependencies]
 # Futures
-futures-preview = { version = "=0.3.0-alpha.14", features = ["compat", "io-compat"] }
+futures-preview = { version = "=0.3.0-alpha.16", features = ["compat", "io-compat"] }
 futures_legacy = { version = "0.1", package = "futures" }
 # Concurrency
-tokio = { version = "=0.1.19", features = ["async-await-preview"] }
+tokio = { version = "=0.1.19" }
 tokio-tcp = "0.1.3"
 # Database
 tokio-postgres = { version = "=0.4.0-rc.2", features = ["with-chrono-0_4"] }
