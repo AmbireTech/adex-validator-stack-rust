@@ -1,5 +1,4 @@
 use std::error;
-use std::error::Error;
 use std::fmt;
 use std::pin::Pin;
 
@@ -30,7 +29,7 @@ impl error::Error for DomainError {
 
 #[derive(Debug)]
 pub enum RepositoryError {
-    PersistenceError(Box<dyn Error + Send>),
+    PersistenceError(Box<dyn error::Error + Send>),
     AlreadyExists,
 }
 
