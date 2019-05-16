@@ -1,7 +1,9 @@
 use std::sync::{Arc, RwLock};
 
-use crate::domain::RepositoryFuture;
+use futures::future::{FutureExt, ok};
+
 use crate::domain::{Channel, ChannelRepository};
+use crate::domain::RepositoryFuture;
 
 pub struct MemoryChannelRepository {
     records: Arc<RwLock<Vec<Channel>>>,
@@ -17,22 +19,16 @@ impl MemoryChannelRepository {
 
 impl ChannelRepository for MemoryChannelRepository {
     fn list(&self) -> RepositoryFuture<Vec<Channel>> {
-        Box::pin(
-            futures::future::ok(
-                // @TODO: instead of Unwrap, unwrap it in a RepositoryError
-                self.records.read().unwrap().iter().map(|channel| channel.clone()).collect()
-            )
-        )
+        // @TODO: instead of Unwrap, unwrap it in a RepositoryError
+        let list = self.records.read().unwrap().iter().map(|channel| channel.clone()).collect();
+
+        ok(list).boxed()
     }
 
     fn create(&self, channel: Channel) -> RepositoryFuture<()> {
         // @TODO: instead of Unwrap, unwrap it in a RepositoryError
         &self.records.write().unwrap().push(channel);
 
-        Box::pin(
-            futures::future::ok(
-                ()
-            )
-        )
+        ok(()).boxed()
     }
 }
