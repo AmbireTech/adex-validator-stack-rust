@@ -5,7 +5,7 @@ use futures_legacy::Stream as OldStream;
 use try_future::try_future;
 
 use crate::application::error::ApplicationError;
-use crate::domain::Channel;
+use crate::domain::{Channel, RepositoryError};
 use crate::infrastructure::persistence::DbPool;
 
 pub struct PostgresChannelRepository {
@@ -17,7 +17,7 @@ impl PostgresChannelRepository {
         Self { db_pool }
     }
 
-    pub async fn list(&self) -> Result<Vec<Channel>, ApplicationError> {
+    pub async fn list(&self) -> Result<Vec<Channel>, RepositoryError> {
         let fut = self.db_pool
             .run(move |mut conn| {
                 conn.prepare("SELECT channel_id, creator, deposit_asset, deposit_amount, valid_until FROM channels")
@@ -60,7 +60,7 @@ impl PostgresChannelRepository {
     }
 }
 
-fn handle_internal_error(err: &dyn std::fmt::Debug) -> ApplicationError {
+fn handle_internal_error(err: &dyn std::fmt::Debug) -> RepositoryError {
     eprintln!("Internal error: {:?}", err);
-    ApplicationError::InternalError
+    RepositoryError::PersistenceError
 }
