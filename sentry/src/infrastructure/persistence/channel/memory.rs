@@ -1,10 +1,9 @@
 use std::sync::{Arc, RwLock};
 
-use futures::future::{FutureExt, ok, err};
+use futures::future::{err, FutureExt, ok};
 
 use crate::domain::{Channel, ChannelRepository, RepositoryError};
 use crate::domain::RepositoryFuture;
-use crate::infrastructure::persistence::memory::MemoryPersistenceError;
 
 pub struct MemoryChannelRepository {
     records: Arc<RwLock<Vec<Channel>>>,
@@ -25,14 +24,8 @@ impl ChannelRepository for MemoryChannelRepository {
                 let channels = reader.iter().map(|channel| channel.clone()).collect();
 
                 ok(channels)
-            },
-            Err(error) => err(
-                RepositoryError::PersistenceError(
-                    Box::new(
-                        MemoryPersistenceError::from(error)
-                    )
-                )
-            )
+            }
+            Err(error) => err(RepositoryError::from(error))
         };
 
         res_fut.boxed()
@@ -44,14 +37,8 @@ impl ChannelRepository for MemoryChannelRepository {
                 writer.push(channel);
 
                 ok(())
-            },
-            Err(error) => err(
-                RepositoryError::PersistenceError(
-                    Box::new(
-                        MemoryPersistenceError::from(error)
-                    )
-                )
-            )
+            }
+            Err(error) => err(RepositoryError::from(error))
         };
 
         create_fut.boxed()
