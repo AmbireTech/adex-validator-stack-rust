@@ -1,3 +1,4 @@
+use bb8::RunError;
 use futures::compat::Future01CompatExt;
 use futures::future::FutureExt;
 use futures_legacy::Future as OldFuture;
@@ -7,6 +8,7 @@ use try_future::try_future;
 
 use crate::domain::{Channel, ChannelRepository, RepositoryError, RepositoryFuture};
 use crate::infrastructure::persistence::DbPool;
+use crate::infrastructure::persistence::postgres::PostgresPersistenceError;
 
 pub struct PostgresChannelRepository {
     db_pool: DbPool,
@@ -52,7 +54,7 @@ impl ChannelRepository for PostgresChannelRepository {
                         Ok((channels, conn))
                     })
             })
-            .map_err(|err| handle_internal_error(&err));
+            .map_err(|err| handle_internal_error(err));
 
         fut.compat().boxed()
     }
@@ -62,7 +64,12 @@ impl ChannelRepository for PostgresChannelRepository {
     }
 }
 
-fn handle_internal_error(err: &dyn std::fmt::Debug) -> RepositoryError {
-    eprintln!("Internal error: {:?}", err);
-    RepositoryError::PersistenceError
+fn handle_internal_error(err: RunError<tokio_postgres::Error>) -> RepositoryError {
+    eprintln!("Internal error: {:?}", &err);
+
+    RepositoryError::PersistenceError(
+        Box::new(
+            PostgresPersistenceError::from(err)
+        )
+    )
 }

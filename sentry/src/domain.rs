@@ -1,11 +1,12 @@
 use std::error;
+use std::error::Error;
 use std::fmt;
 use std::pin::Pin;
 
 use futures::Future;
 
 pub use bignum::BigNum;
-pub use channel::{Channel, ChannelSpec, ChannelRepository};
+pub use channel::{Channel, ChannelRepository, ChannelSpec};
 pub use validator::ValidatorDesc;
 
 mod bignum;
@@ -17,7 +18,7 @@ pub struct DomainError;
 
 impl fmt::Display for DomainError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Domain error",)
+        write!(f, "Domain error", )
     }
 }
 
@@ -29,7 +30,7 @@ impl error::Error for DomainError {
 
 #[derive(Debug)]
 pub enum RepositoryError {
-    PersistenceError,
+    PersistenceError(Box<dyn Error + Send>),
     AlreadyExists,
 }
 

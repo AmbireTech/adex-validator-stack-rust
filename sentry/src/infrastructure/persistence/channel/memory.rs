@@ -1,9 +1,10 @@
 use std::sync::{Arc, RwLock};
 
-use futures::future::{FutureExt, ok};
+use futures::future::{FutureExt, ok, err};
 
-use crate::domain::{Channel, ChannelRepository};
+use crate::domain::{Channel, ChannelRepository, RepositoryError};
 use crate::domain::RepositoryFuture;
+use crate::infrastructure::persistence::memory::MemoryPersistenceError;
 
 pub struct MemoryChannelRepository {
     records: Arc<RwLock<Vec<Channel>>>,
@@ -19,16 +20,40 @@ impl MemoryChannelRepository {
 
 impl ChannelRepository for MemoryChannelRepository {
     fn list(&self) -> RepositoryFuture<Vec<Channel>> {
-        // @TODO: instead of Unwrap, unwrap it in a RepositoryError
-        let list = self.records.read().unwrap().iter().map(|channel| channel.clone()).collect();
+        let res_fut = match self.records.read() {
+            Ok(reader) => {
+                let channels = reader.iter().map(|channel| channel.clone()).collect();
 
-        ok(list).boxed()
+                ok(channels)
+            },
+            Err(error) => err(
+                RepositoryError::PersistenceError(
+                    Box::new(
+                        MemoryPersistenceError::from(error)
+                    )
+                )
+            )
+        };
+
+        res_fut.boxed()
     }
 
     fn create(&self, channel: Channel) -> RepositoryFuture<()> {
-        // @TODO: instead of Unwrap, unwrap it in a RepositoryError
-        &self.records.write().unwrap().push(channel);
+        let create_fut = match self.records.write() {
+            Ok(mut writer) => {
+                writer.push(channel);
 
-        ok(()).boxed()
+                ok(())
+            },
+            Err(error) => err(
+                RepositoryError::PersistenceError(
+                    Box::new(
+                        MemoryPersistenceError::from(error)
+                    )
+                )
+            )
+        };
+
+        create_fut.boxed()
     }
 }
