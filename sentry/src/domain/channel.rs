@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-//use crate::domain::BigNum;
+use crate::domain::bignum::BigNum;
 use crate::domain::ValidatorDesc;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -10,8 +10,7 @@ pub struct Channel {
     pub id: String,
     pub creator: String,
     pub deposit_asset: String,
-    pub deposit_amount: i64,
-    // @TODO: use BigNum and implement toSql
+    pub deposit_amount: BigNum,
     pub valid_until: DateTime<Utc>,
 //    pub spec: ChannelSpec,
 }

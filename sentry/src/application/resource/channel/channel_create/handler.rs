@@ -1,5 +1,6 @@
 use tokio::await;
 
+use crate::domain::Channel;
 use crate::infrastructure::persistence::channel::PostgresChannelRepository;
 
 use super::ChannelCreateResponse;
@@ -16,11 +17,20 @@ impl<'a> ChannelCreateHandler<'a> {
 }
 
 impl<'a> ChannelCreateHandler<'a> {
-    pub async fn handle(&self, _channel_input: ChannelInput) -> Result<ChannelCreateResponse, ()> {
+    pub async fn handle(&self, channel_input: ChannelInput) -> Result<ChannelCreateResponse, ()> {
         // @TODO: Creating Channel Validation
 
-        // @TODO: Insert into database
+        let channel = Channel {
+            id: channel_input.id,
+            creator: channel_input.creator,
+            deposit_asset: channel_input.deposit_asset,
+            deposit_amount: channel_input.deposit_amount,
+            valid_until: channel_input.valid_until,
+        };
 
-        Ok(ChannelCreateResponse { success: true })
+        // @TODO: Insert into database
+        let success = await!(self.channel_repository.insert(channel)).is_ok();
+
+        Ok(ChannelCreateResponse { success })
     }
 }

@@ -9,6 +9,12 @@ pub struct BigNum(
     BigUint
 );
 
+impl BigNum {
+    pub fn new(num: BigUint) -> Result<Self, super::DomainError> {
+        Ok(Self(num))
+    }
+}
+
 fn biguint_from_str<'de, D>(deserializer: D) -> Result<BigUint, D::Error>
     where
         D: Deserializer<'de>,

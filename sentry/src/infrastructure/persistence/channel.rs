@@ -1,12 +1,12 @@
 use futures::compat::Future01CompatExt;
 use futures_legacy::Future as OldFuture;
+use futures_legacy::future::IntoFuture;
 use futures_legacy::Stream as OldStream;
 use try_future::try_future;
 
 use crate::application::error::ApplicationError;
-use crate::infrastructure::persistence::DbPool;
 use crate::domain::Channel;
-use futures_legacy::future::IntoFuture;
+use crate::infrastructure::persistence::DbPool;
 
 pub struct PostgresChannelRepository {
     db_pool: DbPool,
@@ -53,6 +53,10 @@ impl PostgresChannelRepository {
             .map_err(|err| handle_internal_error(&err));
 
         await!(fut.compat()).map_err(|err| handle_internal_error(&err))
+    }
+
+    pub async fn insert(&self, channel: Channel) -> Result<Channel, ApplicationError> {
+        Ok(channel)
     }
 }
 
