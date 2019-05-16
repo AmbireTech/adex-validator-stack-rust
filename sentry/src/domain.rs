@@ -1,5 +1,8 @@
 use std::error;
 use std::fmt;
+use std::pin::Pin;
+
+use futures::Future;
 
 pub use bignum::BigNum;
 pub use channel::{Channel, ChannelSpec};
@@ -9,7 +12,7 @@ mod bignum;
 mod channel;
 mod validator;
 
-#[derive(Debug, )]
+#[derive(Debug)]
 pub struct DomainError;
 
 impl fmt::Display for DomainError {
@@ -23,3 +26,11 @@ impl error::Error for DomainError {
         None
     }
 }
+
+#[derive(Debug)]
+pub enum RepositoryError {
+    PersistenceError,
+    AlreadyExists,
+}
+
+pub type RepositoryFuture<T> = Pin<Box<Future<Output=Result<T, RepositoryError>> + Send>>;

@@ -1,8 +1,8 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+use crate::domain::{RepositoryFuture, ValidatorDesc};
 use crate::domain::bignum::BigNum;
-use crate::domain::ValidatorDesc;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -19,4 +19,10 @@ pub struct Channel {
 #[serde(rename_all = "camelCase")]
 pub struct ChannelSpec {
     validators: Vec<ValidatorDesc>,
+}
+
+pub trait ChannelRepository: Send + Sync {
+    fn list(&self) -> RepositoryFuture<Vec<Channel>>;
+
+    fn create(&self, channel: Channel) -> RepositoryFuture<()>;
 }
