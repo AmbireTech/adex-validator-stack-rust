@@ -2,7 +2,7 @@ use std::error;
 use std::fmt;
 use std::sync::{PoisonError, RwLockReadGuard, RwLockWriteGuard};
 
-use crate::domain::RepositoryError;
+use crate::domain::{RepositoryError, IOError};
 
 #[derive(Debug)]
 pub enum MemoryPersistenceError {
@@ -11,6 +11,7 @@ pub enum MemoryPersistenceError {
 }
 
 impl error::Error for MemoryPersistenceError {}
+impl IOError for MemoryPersistenceError {}
 
 impl fmt::Display for MemoryPersistenceError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

@@ -3,7 +3,7 @@ use std::fmt;
 
 use bb8::RunError;
 
-use crate::domain::RepositoryError;
+use crate::domain::{RepositoryError, IOError};
 
 #[derive(Debug)]
 pub enum PostgresPersistenceError {
@@ -12,6 +12,7 @@ pub enum PostgresPersistenceError {
 }
 
 impl error::Error for PostgresPersistenceError {}
+impl IOError for PostgresPersistenceError {}
 
 impl fmt::Display for PostgresPersistenceError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

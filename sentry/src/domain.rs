@@ -27,9 +27,13 @@ impl error::Error for DomainError {
     }
 }
 
+pub trait IOError: error::Error + Send {}
+
 #[derive(Debug)]
 pub enum RepositoryError {
-    PersistenceError(Box<dyn error::Error + Send>),
+    /// An error with the underlying implementation occurred
+    PersistenceError(Box<dyn IOError>),
+    /// when Primary key already exist
     AlreadyExists,
 }
 
