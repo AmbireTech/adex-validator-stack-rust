@@ -22,15 +22,6 @@ impl fmt::Display for PostgresPersistenceError {
     }
 }
 
-impl From<RunError<tokio_postgres::Error>> for PostgresPersistenceError {
-    fn from(run_error: RunError<tokio_postgres::Error>) -> Self {
-        match run_error {
-            RunError::TimedOut => PostgresPersistenceError::TimedOut,
-            RunError::User(error) => PostgresPersistenceError::UserError(error)
-        }
-    }
-}
-
 impl From<RunError<tokio_postgres::Error>> for RepositoryError {
     fn from(run_error: RunError<tokio_postgres::Error>) -> Self {
         let postgres_error = match run_error {
