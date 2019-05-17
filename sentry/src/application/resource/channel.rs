@@ -24,7 +24,7 @@ impl_web! {
         #[content_type("application/json")]
         async fn create_channel(&self, body: ChannelInput) -> ChannelCreateResponse {
             let channel_repository = PostgresChannelRepository::new(self.db_pool.clone());
-//            let channel_repository = MemoryChannelRepository::new(None);
+            let _memory_channel_repository = MemoryChannelRepository::new(None);
 
             let handler = ChannelCreateHandler::new(&channel_repository);
 

@@ -5,7 +5,7 @@ use futures_legacy::future::IntoFuture;
 use futures_legacy::Stream as OldStream;
 use try_future::try_future;
 
-use crate::domain::{Channel, ChannelRepository, RepositoryError, RepositoryFuture};
+use crate::domain::{Channel, ChannelRepository, RepositoryFuture};
 use crate::infrastructure::persistence::DbPool;
 
 pub struct PostgresChannelRepository {
@@ -52,17 +52,12 @@ impl ChannelRepository for PostgresChannelRepository {
                         Ok((channels, conn))
                     })
             })
-            .map_err(|err| handle_internal_error(&err));
+            .map_err(|err| err.into());
 
         fut.compat().boxed()
     }
 
-    fn create(&self, channel: Channel) -> RepositoryFuture<()> {
+    fn save(&self, _channel: Channel) -> RepositoryFuture<()> {
         futures::future::ok(()).boxed()
     }
-}
-
-fn handle_internal_error(err: &dyn std::fmt::Debug) -> RepositoryError {
-    eprintln!("Internal error: {:?}", err);
-    RepositoryError::PersistenceError
 }

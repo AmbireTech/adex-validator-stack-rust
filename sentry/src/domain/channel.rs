@@ -24,5 +24,5 @@ pub struct ChannelSpec {
 pub trait ChannelRepository: Send + Sync {
     fn list(&self) -> RepositoryFuture<Vec<Channel>>;
 
-    fn create(&self, channel: Channel) -> RepositoryFuture<()>;
+    fn save(&self, channel: Channel) -> RepositoryFuture<()>;
 }

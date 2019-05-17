@@ -1,6 +1,6 @@
 use std::sync::{Arc, RwLock};
 
-use futures::future::{FutureExt, ok};
+use futures::future::{err, FutureExt, ok};
 
 use crate::domain::{Channel, ChannelRepository};
 use crate::domain::RepositoryFuture;
@@ -19,16 +19,28 @@ impl MemoryChannelRepository {
 
 impl ChannelRepository for MemoryChannelRepository {
     fn list(&self) -> RepositoryFuture<Vec<Channel>> {
-        // @TODO: instead of Unwrap, unwrap it in a RepositoryError
-        let list = self.records.read().unwrap().iter().map(|channel| channel.clone()).collect();
+        let res_fut = match self.records.read() {
+            Ok(reader) => {
+                let channels = reader.iter().map(|channel| channel.clone()).collect();
 
-        ok(list).boxed()
+                ok(channels)
+            }
+            Err(error) => err(error.into())
+        };
+
+        res_fut.boxed()
     }
 
-    fn create(&self, channel: Channel) -> RepositoryFuture<()> {
-        // @TODO: instead of Unwrap, unwrap it in a RepositoryError
-        &self.records.write().unwrap().push(channel);
+    fn save(&self, channel: Channel) -> RepositoryFuture<()> {
+        let create_fut = match self.records.write() {
+            Ok(mut writer) => {
+                writer.push(channel);
 
-        ok(()).boxed()
+                ok(())
+            }
+            Err(error) => err(error.into())
+        };
+
+        create_fut.boxed()
     }
 }
