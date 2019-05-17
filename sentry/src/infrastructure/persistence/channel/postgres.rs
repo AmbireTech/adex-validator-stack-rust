@@ -61,7 +61,7 @@ impl ChannelRepository for PostgresChannelRepository {
         futures::future::ok(()).boxed()
     }
 
-    fn find(&self, _channel_id: String) -> RepositoryFuture<Option<Channel>> {
+    fn find(&self, _channel_id: &String) -> RepositoryFuture<Option<Channel>> {
         futures::future::ok(None).boxed()
     }
 }

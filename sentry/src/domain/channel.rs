@@ -26,5 +26,5 @@ pub trait ChannelRepository: Send + Sync {
 
     fn save(&self, channel: Channel) -> RepositoryFuture<()>;
 
-    fn find(&self, channel_id: String) -> RepositoryFuture<Option<Channel>>;
+    fn find(&self, channel_id: &String) -> RepositoryFuture<Option<Channel>>;
 }
