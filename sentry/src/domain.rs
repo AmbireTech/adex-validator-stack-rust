@@ -4,9 +4,9 @@ use std::pin::Pin;
 
 use futures::Future;
 
-pub use bignum::BigNum;
-pub use channel::{Channel, ChannelRepository, ChannelSpec};
-pub use validator::ValidatorDesc;
+pub use self::bignum::BigNum;
+pub use self::channel::{Channel, ChannelRepository, ChannelSpec};
+pub use self::validator::ValidatorDesc;
 
 mod bignum;
 mod channel;
