@@ -9,7 +9,7 @@ pub use self::channel::{Channel, ChannelRepository, ChannelSpec};
 pub use self::validator::ValidatorDesc;
 
 mod bignum;
-mod channel;
+pub(crate) mod channel;
 mod validator;
 
 #[derive(Debug)]
