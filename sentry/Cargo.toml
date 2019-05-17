@@ -34,4 +34,4 @@ num-bigint = { version = "0.2", features = ["serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 
 [dev-dependencies]
-fake = "1.3"
+fake = { version = "1.3", features = ["chrono"] }
