@@ -32,6 +32,7 @@ impl ChannelRepository for MemoryChannelRepository {
     }
 
     fn save(&self, channel: Channel) -> RepositoryFuture<()> {
+
         let create_fut = match self.records.write() {
             Ok(mut writer) => {
                 writer.push(channel);
@@ -42,5 +43,9 @@ impl ChannelRepository for MemoryChannelRepository {
         };
 
         create_fut.boxed()
+    }
+
+    fn find(&self, _channel_id: String) -> RepositoryFuture<Option<Channel>> {
+        ok(None).boxed()
     }
 }

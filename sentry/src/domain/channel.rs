@@ -25,4 +25,6 @@ pub trait ChannelRepository: Send + Sync {
     fn list(&self) -> RepositoryFuture<Vec<Channel>>;
 
     fn save(&self, channel: Channel) -> RepositoryFuture<()>;
+
+    fn find(&self, channel_id: String) -> RepositoryFuture<Option<Channel>>;
 }
