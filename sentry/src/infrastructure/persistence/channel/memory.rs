@@ -31,7 +31,7 @@ impl ChannelRepository for MemoryChannelRepository {
         res_fut.boxed()
     }
 
-    fn create(&self, channel: Channel) -> RepositoryFuture<()> {
+    fn save(&self, channel: Channel) -> RepositoryFuture<()> {
         let create_fut = match self.records.write() {
             Ok(mut writer) => {
                 writer.push(channel);

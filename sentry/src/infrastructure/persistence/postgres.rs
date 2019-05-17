@@ -30,7 +30,7 @@ impl From<RunError<tokio_postgres::Error>> for RepositoryError {
             RunError::User(error) => PostgresPersistenceError::UserError(error)
         };
 
-        RepositoryError::PersistenceError(
+        RepositoryError::IOError(
             Box::new(
                 postgres_error
             )

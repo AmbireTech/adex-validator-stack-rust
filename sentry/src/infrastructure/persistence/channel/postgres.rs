@@ -57,7 +57,7 @@ impl ChannelRepository for PostgresChannelRepository {
         fut.compat().boxed()
     }
 
-    fn create(&self, _channel: Channel) -> RepositoryFuture<()> {
+    fn save(&self, _channel: Channel) -> RepositoryFuture<()> {
         futures::future::ok(()).boxed()
     }
 }

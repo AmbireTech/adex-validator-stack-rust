@@ -26,7 +26,7 @@ impl fmt::Display for MemoryPersistenceError {
 
 impl<T> From<PoisonError<RwLockReadGuard<'_, T>>> for RepositoryError {
     fn from(_: PoisonError<RwLockReadGuard<T>>) -> Self {
-        RepositoryError::PersistenceError(
+        RepositoryError::IOError(
             Box::new(
                 MemoryPersistenceError::ReadingError
             )
@@ -36,7 +36,7 @@ impl<T> From<PoisonError<RwLockReadGuard<'_, T>>> for RepositoryError {
 
 impl<T> From<PoisonError<RwLockWriteGuard<'_, T>>> for RepositoryError {
     fn from(_: PoisonError<RwLockWriteGuard<T>>) -> Self {
-        RepositoryError::PersistenceError(
+        RepositoryError::IOError(
             Box::new(
                 MemoryPersistenceError::WritingError
             )

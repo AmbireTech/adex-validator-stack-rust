@@ -28,7 +28,7 @@ impl<'a> ChannelCreateHandler<'a> {
         };
 
         // @TODO: Insert into database
-        let success = await!(self.channel_repository.create(channel)).is_ok();
+        let success = await!(self.channel_repository.save(channel)).is_ok();
 
         Ok(ChannelCreateResponse { success })
     }
