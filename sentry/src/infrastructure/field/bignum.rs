@@ -2,7 +2,7 @@ use std::error::Error;
 use std::str::FromStr;
 
 use num_bigint::BigUint;
-use tokio_postgres::types::{FromSql, Type};
+use tokio_postgres::types::{FromSql, Type, ToSql, IsNull};
 
 use crate::domain::BigNum;
 
@@ -19,5 +19,22 @@ impl<'a> FromSql<'a> for BigNum {
             Type::TEXT | Type::VARCHAR => true,
             _ => false,
         }
+    }
+}
+
+impl ToSql for BigNum {
+    fn to_sql(&self, ty: &Type, w: &mut Vec<u8>) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+        <String as ToSql>::to_sql(&self.0.to_str_radix(10), ty, w)
+    }
+
+    fn accepts(ty: &Type) -> bool {
+        match *ty {
+            Type::TEXT | Type::VARCHAR => true,
+            _ => false,
+        }
+    }
+
+    fn to_sql_checked(&self, ty: &Type, out: &mut Vec<u8>) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+        <String as ToSql>::to_sql_checked(&self.0.to_str_radix(10), ty, out)
     }
 }

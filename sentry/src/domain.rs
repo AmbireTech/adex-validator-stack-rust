@@ -4,6 +4,7 @@ use std::pin::Pin;
 
 use futures::Future;
 
+pub use self::asset::Asset;
 pub use self::bignum::BigNum;
 pub use self::channel::{Channel, ChannelRepository, ChannelSpec};
 pub use self::validator::ValidatorDesc;
@@ -11,6 +12,7 @@ pub use self::validator::ValidatorDesc;
 mod bignum;
 pub(crate) mod channel;
 mod validator;
+mod asset;
 
 #[derive(Debug)]
 pub struct DomainError;
@@ -32,10 +34,10 @@ pub trait IOError: error::Error + Send {}
 #[derive(Debug)]
 pub enum RepositoryError {
     /// An error with the underlying implementation occurred
-    IOError(Box<dyn IOError>),
+    IO(Box<dyn IOError>),
     /// Error handling save errors, like Primary key already exists and etc.
     /// @TODO: Add and underlying implementation for this error
-    UserError,
+    User,
 }
 
 pub type RepositoryFuture<T> = Pin<Box<Future<Output=Result<T, RepositoryError>> + Send>>;

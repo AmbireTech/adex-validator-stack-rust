@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::domain::{RepositoryFuture, ValidatorDesc};
+use crate::domain::{Asset, RepositoryFuture, ValidatorDesc};
 use crate::domain::bignum::BigNum;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -9,7 +9,7 @@ use crate::domain::bignum::BigNum;
 pub struct Channel {
     pub id: String,
     pub creator: String,
-    pub deposit_asset: String,
+    pub deposit_asset: Asset,
     pub deposit_amount: BigNum,
     pub valid_until: DateTime<Utc>,
 //    pub spec: ChannelSpec,
@@ -28,37 +28,28 @@ pub trait ChannelRepository: Send + Sync {
 
     fn find(&self, channel_id: &String) -> RepositoryFuture<Option<Channel>>;
 }
+
 #[cfg(test)]
 pub(crate) mod fixtures {
+    use std::convert::TryFrom;
+
     use chrono::{DateTime, Utc};
-    use chrono::offset::TimeZone;
     use fake::faker::*;
-    use fake::faker::Chrono;
-    use fake::helper::take_one;
-    use num_bigint::BigUint;
 
     use crate::domain::{BigNum, Channel};
+    use crate::domain::asset::fixtures::get_asset;
+    use crate::test_util;
 
     pub fn get_channel(channel_id: &str) -> Channel {
-        let deposit_assets = ["DAI", "BGN", "EUR", "USD", "ADX", "BTC", "LIT", "ETH"];
-        let rand_deposit: u32 = <Faker as Number>::between(100, 5000);
-        let deposit_amount = BigNum::new(BigUint::from(rand_deposit)).expect("BigNum error when creating from random number");
-
-        let valid_until_between = (
-            Utc.ymd(2010, 4, 20).and_hms(11, 11, 11),
-            Utc::now()
-        );
-
-        let valid_until: DateTime<Utc> = <Faker as Chrono>::between(
-            None,
-            &valid_until_between.0.to_rfc3339(),
-            &valid_until_between.1.to_rfc3339(),
-        ).parse().expect("Whoops, DateTime<Utc> should be created from Fake...");
+        let deposit_amount = BigNum::try_from(<Faker as Number>::between(100_u32, 5000_u32)).expect("BigNum error when creating from random number");
+        let valid_until: DateTime<Utc> = test_util::time::datetime_between(&Utc::now(), None);
+        let creator = <Faker as Name>::name();
+        let deposit_asset = get_asset();
 
         Channel {
             id: channel_id.to_string(),
-            creator: <Faker as Name>::name(),
-            deposit_asset: take_one(&deposit_assets).to_string(),
+            creator,
+            deposit_asset,
             deposit_amount,
             valid_until,
         }

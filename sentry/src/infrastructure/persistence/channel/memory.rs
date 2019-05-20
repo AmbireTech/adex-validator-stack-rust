@@ -44,7 +44,7 @@ impl ChannelRepository for MemoryChannelRepository {
         };
 
         if channel_found.is_some() {
-            return err(RepositoryError::UserError).boxed();
+            return err(RepositoryError::User).boxed();
         }
 
         let create_fut = match self.records.write() {
@@ -149,7 +149,7 @@ mod test {
 
             let error = await!(repository.save(same_channel_id)).expect_err("It shouldn't be possible to save the same channel_id");
             match error {
-                RepositoryError::UserError => {},
+                RepositoryError::User => {},
                 _ => panic!("Expected UserError"),
             }
         })
