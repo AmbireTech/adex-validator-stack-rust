@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::domain::{RepositoryFuture, ValidatorDesc};
+use crate::domain::{Asset, RepositoryFuture, ValidatorDesc};
 use crate::domain::bignum::BigNum;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -9,7 +9,7 @@ use crate::domain::bignum::BigNum;
 pub struct Channel {
     pub id: String,
     pub creator: String,
-    pub deposit_asset: String,
+    pub deposit_asset: Asset,
     pub deposit_amount: BigNum,
     pub valid_until: DateTime<Utc>,
 //    pub spec: ChannelSpec,
@@ -49,7 +49,7 @@ pub(crate) mod fixtures {
         Channel {
             id: channel_id.to_string(),
             creator: <Faker as Name>::name(),
-            deposit_asset: take_one(&deposit_assets).to_string(),
+            deposit_asset: take_one(&deposit_assets).into(),
             deposit_amount,
             valid_until,
         }

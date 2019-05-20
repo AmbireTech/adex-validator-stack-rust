@@ -4,6 +4,7 @@ use std::pin::Pin;
 
 use futures::Future;
 
+pub use self::asset::Asset;
 pub use self::bignum::BigNum;
 pub use self::channel::{Channel, ChannelRepository, ChannelSpec};
 pub use self::validator::ValidatorDesc;
@@ -11,6 +12,7 @@ pub use self::validator::ValidatorDesc;
 mod bignum;
 pub(crate) mod channel;
 mod validator;
+mod asset;
 
 #[derive(Debug)]
 pub struct DomainError;
