@@ -35,21 +35,21 @@ pub(crate) mod fixtures {
 
     use chrono::{DateTime, Utc};
     use fake::faker::*;
-    use fake::helper::take_one;
 
     use crate::domain::{BigNum, Channel};
+    use crate::domain::asset::fixtures::get_asset;
     use crate::test_util;
 
     pub fn get_channel(channel_id: &str) -> Channel {
-        let deposit_assets = ["DAI", "BGN", "EUR", "USD", "ADX", "BTC", "LIT", "ETH"];
         let deposit_amount = BigNum::try_from(<Faker as Number>::between(100_u32, 5000_u32)).expect("BigNum error when creating from random number");
-
         let valid_until: DateTime<Utc> = test_util::time::datetime_between(&Utc::now(), None);
+        let creator = <Faker as Name>::name();
+        let deposit_asset = get_asset();
 
         Channel {
             id: channel_id.to_string(),
-            creator: <Faker as Name>::name(),
-            deposit_asset: take_one(&deposit_assets).into(),
+            creator,
+            deposit_asset,
             deposit_amount,
             valid_until,
         }
