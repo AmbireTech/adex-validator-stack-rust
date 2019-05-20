@@ -28,31 +28,23 @@ pub trait ChannelRepository: Send + Sync {
 
     fn find(&self, channel_id: &String) -> RepositoryFuture<Option<Channel>>;
 }
+
 #[cfg(test)]
 pub(crate) mod fixtures {
+    use std::convert::TryFrom;
+
     use chrono::{DateTime, Utc};
     use fake::faker::*;
     use fake::helper::take_one;
-    use num_bigint::BigUint;
 
     use crate::domain::{BigNum, Channel};
-    use time::Duration;
+    use crate::test_util;
 
     pub fn get_channel(channel_id: &str) -> Channel {
         let deposit_assets = ["DAI", "BGN", "EUR", "USD", "ADX", "BTC", "LIT", "ETH"];
-        let rand_deposit: u32 = <Faker as Number>::between(100, 5000);
-        let deposit_amount = BigNum::new(BigUint::from(rand_deposit)).expect("BigNum error when creating from random number");
+        let deposit_amount = BigNum::try_from(<Faker as Number>::between(100_u32, 5000_u32)).expect("BigNum error when creating from random number");
 
-        let valid_until_between = (
-            Utc::now(),
-            Utc::now() + Duration::days(365),
-        );
-
-        let valid_until: DateTime<Utc> = <Faker as Chrono>::between(
-            None,
-            &valid_until_between.0.to_rfc3339(),
-            &valid_until_between.1.to_rfc3339(),
-        ).parse().expect("Whoops, DateTime<Utc> should be created from Fake...");
+        let valid_until: DateTime<Utc> = test_util::time::datetime_between(&Utc::now(), None);
 
         Channel {
             id: channel_id.to_string(),
