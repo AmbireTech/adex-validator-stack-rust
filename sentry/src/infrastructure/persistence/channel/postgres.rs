@@ -58,10 +58,10 @@ impl ChannelRepository for PostgresChannelRepository {
     }
 
     fn save(&self, _channel: Channel) -> RepositoryFuture<()> {
-        futures::future::ok(()).boxed()
+        unimplemented!("save() for Postgres still needs to be implemented")
     }
 
     fn find(&self, _channel_id: &String) -> RepositoryFuture<Option<Channel>> {
-        futures::future::ok(None).boxed()
+        unimplemented!("find() for Postgres still needs to be implemented")
     }
 }
