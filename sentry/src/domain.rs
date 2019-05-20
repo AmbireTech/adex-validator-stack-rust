@@ -32,10 +32,10 @@ pub trait IOError: error::Error + Send {}
 #[derive(Debug)]
 pub enum RepositoryError {
     /// An error with the underlying implementation occurred
-    IOError(Box<dyn IOError>),
+    IO(Box<dyn IOError>),
     /// Error handling save errors, like Primary key already exists and etc.
     /// @TODO: Add and underlying implementation for this error
-    UserError,
+    User,
 }
 
 pub type RepositoryFuture<T> = Pin<Box<Future<Output=Result<T, RepositoryError>> + Send>>;

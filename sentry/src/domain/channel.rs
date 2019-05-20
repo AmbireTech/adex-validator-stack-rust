@@ -31,13 +31,12 @@ pub trait ChannelRepository: Send + Sync {
 #[cfg(test)]
 pub(crate) mod fixtures {
     use chrono::{DateTime, Utc};
-    use chrono::offset::TimeZone;
     use fake::faker::*;
-    use fake::faker::Chrono;
     use fake::helper::take_one;
     use num_bigint::BigUint;
 
     use crate::domain::{BigNum, Channel};
+    use time::Duration;
 
     pub fn get_channel(channel_id: &str) -> Channel {
         let deposit_assets = ["DAI", "BGN", "EUR", "USD", "ADX", "BTC", "LIT", "ETH"];
@@ -45,8 +44,8 @@ pub(crate) mod fixtures {
         let deposit_amount = BigNum::new(BigUint::from(rand_deposit)).expect("BigNum error when creating from random number");
 
         let valid_until_between = (
-            Utc.ymd(2010, 4, 20).and_hms(11, 11, 11),
-            Utc::now()
+            Utc::now(),
+            Utc::now() + Duration::days(365),
         );
 
         let valid_until: DateTime<Utc> = <Faker as Chrono>::between(

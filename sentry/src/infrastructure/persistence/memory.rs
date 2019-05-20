@@ -6,8 +6,8 @@ use crate::domain::{RepositoryError, IOError};
 
 #[derive(Debug)]
 pub enum MemoryPersistenceError {
-    ReadingError,
-    WritingError,
+    Reading,
+    Writing,
 }
 
 impl error::Error for MemoryPersistenceError {}
@@ -16,8 +16,8 @@ impl IOError for MemoryPersistenceError {}
 impl fmt::Display for MemoryPersistenceError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let error_type = match *self {
-            MemoryPersistenceError::ReadingError => "reading",
-            MemoryPersistenceError::WritingError => "writing",
+            MemoryPersistenceError::Reading => "reading",
+            MemoryPersistenceError::Writing => "writing",
         };
 
         write!(f, "Error occurred when trying to acquire lock for: {}", error_type)
@@ -26,9 +26,9 @@ impl fmt::Display for MemoryPersistenceError {
 
 impl<T> From<PoisonError<RwLockReadGuard<'_, T>>> for RepositoryError {
     fn from(_: PoisonError<RwLockReadGuard<T>>) -> Self {
-        RepositoryError::IOError(
+        RepositoryError::IO(
             Box::new(
-                MemoryPersistenceError::ReadingError
+                MemoryPersistenceError::Reading
             )
         )
     }
@@ -36,9 +36,9 @@ impl<T> From<PoisonError<RwLockReadGuard<'_, T>>> for RepositoryError {
 
 impl<T> From<PoisonError<RwLockWriteGuard<'_, T>>> for RepositoryError {
     fn from(_: PoisonError<RwLockWriteGuard<T>>) -> Self {
-        RepositoryError::IOError(
+        RepositoryError::IO(
             Box::new(
-                MemoryPersistenceError::WritingError
+                MemoryPersistenceError::Writing
             )
         )
     }
