@@ -16,7 +16,7 @@ impl<'a> FromSql<'a> for Asset {
 
 impl ToSql for Asset {
     fn to_sql(&self, ty: &Type, w: &mut Vec<u8>) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-        <String as ToSql>::to_sql(&self.into(), ty, w)
+        <String as ToSql>::to_sql(&self.0, ty, w)
     }
 
     fn accepts(ty: &Type) -> bool {
@@ -24,6 +24,6 @@ impl ToSql for Asset {
     }
 
     fn to_sql_checked(&self, ty: &Type, out: &mut Vec<u8>) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-        <String as ToSql>::to_sql_checked(&self.into(), ty, out)
+        <String as ToSql>::to_sql_checked(&self.0, ty, out)
     }
 }
