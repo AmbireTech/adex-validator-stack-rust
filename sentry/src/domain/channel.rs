@@ -1,7 +1,8 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
-use crate::domain::{Asset, RepositoryFuture, ValidatorDesc};
+use crate::domain::{Asset, DomainError, RepositoryFuture, ValidatorDesc};
 use crate::domain::bignum::BigNum;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -12,17 +13,63 @@ pub struct Channel {
     pub deposit_asset: Asset,
     pub deposit_amount: BigNum,
     pub valid_until: DateTime<Utc>,
-//    pub spec: ChannelSpec,
+    pub spec: ChannelSpec,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ChannelSpec {
-    validators: Vec<ValidatorDesc>,
+    // TODO: Use a ChannelSpecId?
+    pub id: Uuid,
+    pub validators: Vec<ValidatorDesc>,
+}
+
+pub struct ChannelListParams {
+    /// page to show, should be >= 1
+    pub page: u32,
+    /// channels limit per page, should be >= 1
+    pub limit: u32,
+    /// filters `valid_until` to be `>= valid_until_ge`
+    pub valid_until_ge: DateTime<Utc>,
+    /// filters the channels containing a specific validator if provided
+    // @TODO: use a ValidatorName struct, to have a better control of having a valid ValidatorName at this point
+    pub validator: Option<String>,
+    /// Ensures that this struct can only be created by calling `new()`
+    _secret: (),
+}
+
+impl ChannelListParams {
+    pub fn new(valid_until_ge: DateTime<Utc>, limit: u32, page: u32, validator: Option<String>) -> Result<Self, DomainError> {
+        if page < 1 {
+            return Err(DomainError::InvalidArgument("Page should be >= 1".to_string()));
+        }
+
+        if limit < 1 {
+            return Err(DomainError::InvalidArgument("Limit should be >= 1".to_string()));
+        }
+
+        let validator = validator
+            .and_then(|s| {
+                if s.is_empty() {
+                    return None;
+                }
+
+                Some(s)
+            });
+
+        Ok(Self {
+            valid_until_ge,
+            page,
+            limit,
+            validator,
+            _secret: (),
+        })
+    }
 }
 
 pub trait ChannelRepository: Send + Sync {
-    fn list(&self, valid_until_ge: DateTime<Utc>, page: u32, limit: u32) -> RepositoryFuture<Vec<Channel>>;
+    /// Returns a list of channels, based on the passed Parameters for this method
+    fn list(&self, params: &ChannelListParams) -> RepositoryFuture<Vec<Channel>>;
 
     fn save(&self, channel: Channel) -> RepositoryFuture<()>;
 
@@ -35,10 +82,14 @@ pub(crate) mod fixtures {
 
     use chrono::{DateTime, Utc};
     use fake::faker::*;
+    use uuid::Uuid;
 
-    use crate::domain::{BigNum, Channel};
     use crate::domain::asset::fixtures::get_asset;
+    use crate::domain::BigNum;
+    use crate::domain::validator::fixtures::get_validators;
     use crate::test_util;
+
+    use super::{Channel, ChannelSpec};
 
     pub fn get_channel(channel_id: &str, valid_until: &Option<DateTime<Utc>>) -> Channel {
         let deposit_amount = BigNum::try_from(<Faker as Number>::between(100_u32, 5000_u32)).expect("BigNum error when creating from random number");
@@ -52,6 +103,7 @@ pub(crate) mod fixtures {
             deposit_asset,
             deposit_amount,
             valid_until,
+            spec: get_channel_spec(Uuid::new_v4(), 3),
         }
     }
 
@@ -65,5 +117,12 @@ pub(crate) mod fixtures {
                 get_channel(&channel_id, &valid_until)
             })
             .collect()
+    }
+
+    pub fn get_channel_spec(id: Uuid, validators_count: usize) -> ChannelSpec {
+        ChannelSpec {
+            id,
+            validators: get_validators(validators_count, Some(&id.to_string())),
+        }
     }
 }
