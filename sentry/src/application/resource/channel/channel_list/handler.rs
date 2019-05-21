@@ -18,7 +18,7 @@ impl<'a> ChannelListHandler<'a> {
 
 impl<'a> ChannelListHandler<'a> {
     pub async fn handle(&self, page: u32, validator: Option<String>) -> Result<ChannelListResponse, ()> {
-        let channel_list_params = ChannelListParams::new(Utc::now(), page, self.limit_per_page, validator)
+        let channel_list_params = ChannelListParams::new(Utc::now(), self.limit_per_page, page, validator)
             .expect("Params should be generated from valid data.");
 
         let list_fut = self.channel_repository.list(&channel_list_params);
