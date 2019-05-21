@@ -11,7 +11,7 @@ pub use self::validator::ValidatorDesc;
 
 mod bignum;
 pub(crate) mod channel;
-mod validator;
+pub(crate) mod validator;
 mod asset;
 
 #[derive(Debug)]

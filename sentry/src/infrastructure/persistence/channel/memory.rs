@@ -27,17 +27,31 @@ impl ChannelRepository for MemoryChannelRepository {
             Ok(reader) => {
                 let channels = reader
                     .iter()
-                    .filter_map(|channel| match channel.valid_until >= params.valid_until_ge {
-                        true => Some(channel.clone()),
-                        false => None,
+                    .filter_map(|channel| {
+                        let valid_until_filter = channel.valid_until >= params.valid_until_ge;
+
+                        let validator_filter_passed = match &params.validator {
+                            Some(validator_id) => {
+                                // check if there is any validator in the current
+                                // `channel.spec.validators` that has the same `id`
+                                channel.spec.validators.iter().any(|validator| &validator.id == validator_id)
+                            }
+                            // if None -> the current channel has passed, since we don't need to filter by anything
+                            None => true,
+                        };
+
+                        match (valid_until_filter, validator_filter_passed) {
+                            (true, true) => Some(channel.clone()),
+                            (_, _) => None,
+                        }
                     })
                     .skip(skip_results)
                     .take(take)
                     .collect();
 
                 ok(channels)
-            }
-            Err(error) => err(error.into())
+            },
+            Err(error) => err(error.into()),
         };
 
         res_fut.boxed()
@@ -95,9 +109,11 @@ impl ChannelRepository for MemoryChannelRepository {
 mod test {
     use chrono::Utc;
     use time::Duration;
+    use uuid::Uuid;
 
     use crate::domain::{Channel, ChannelListParams, ChannelRepository, RepositoryError};
     use crate::domain::channel::fixtures::*;
+    use crate::domain::validator::fixtures::*;
 
     use super::MemoryChannelRepository;
 
@@ -110,7 +126,7 @@ mod test {
             let params = ChannelListParams::new(valid_until_ge, 10, 1, None).unwrap();
             assert_eq!(0, await!(empty_init.list(&params)).expect("Empty initial list").len());
 
-            let channels = [get_channel("channel 1", &None), get_channel("channel 2", &None)];
+            let channels = [get_channel("channel 1", &None, None), get_channel("channel 2", &None, None)];
             // this shouldn't change the order in any way
             let some_init = MemoryChannelRepository::new(Some(&channels));
 
@@ -180,17 +196,18 @@ mod test {
             let valid_until_ge = Utc::now();
 
             let channels = [
-                get_channel("channel 1", &None),
-                get_channel("channel 2 yesterday", &valid_until_yesterday),
-                get_channel("channel 3", &None),
-                get_channel("channel 4 yesterday", &valid_until_yesterday),
-                get_channel("channel 5", &None),
+                get_channel("channel 1", &None, None),
+                get_channel("channel 2 yesterday", &valid_until_yesterday, None),
+                get_channel("channel 3", &None, None),
+                get_channel("channel 4 yesterday", &valid_until_yesterday, None),
+                get_channel("channel 5", &None, None),
             ];
 
             let repository = MemoryChannelRepository::new(Some(&channels));
 
             let params = ChannelListParams::new(valid_until_ge, 10, 1, None).unwrap();
             let list_channels = await!(repository.list(&params)).expect("Should list all channels");
+
             assert_eq!(3, list_channels.len());
 
             assert_eq!(&"channel 1", &list_channels[0].id);
@@ -200,16 +217,50 @@ mod test {
     }
 
     #[test]
+    fn listing_channels_can_handles_validator_filtration_and_keeps_valid_until_filtration() {
+        futures::executor::block_on(async {
+            let valid_until_yesterday = Some(Utc::now() - Duration::days(1));
+            // create the valid_until_ge, before creating the channels,
+            // as they might otherwise have valid_until < valid_until_ge
+            let valid_until_ge = Utc::now();
+
+            let validators = vec![
+                get_validator("validator-1"),
+                get_validator("validator-2"),
+            ];
+            let validators_opt = ValidatorsOption::Some(validators);
+            let channel_2_spec = get_channel_spec(Uuid::new_v4(), validators_opt.clone());
+            let channel_5_spec = get_channel_spec(Uuid::new_v4(), validators_opt.clone());
+
+            let channels = [
+                get_channel("channel 1", &None, None),
+                get_channel("channel 2 yesterday", &valid_until_yesterday, Some(channel_2_spec)),
+                get_channel("channel 3", &None, None),
+                get_channel("channel 4 yesterday", &valid_until_yesterday, None),
+                get_channel("channel 5", &None, Some(channel_5_spec)),
+            ];
+
+            let repository = MemoryChannelRepository::new(Some(&channels));
+
+            let params = ChannelListParams::new(valid_until_ge, 10, 1, Some("validator-1".to_string())).unwrap();
+            let list_channels = await!(repository.list(&params)).expect("Should list all channels");
+
+            assert_eq!(1, list_channels.len());
+            assert_eq!(&"channel 5", &list_channels[0].id);
+        })
+    }
+
+    #[test]
     fn saves_channels() {
         futures::executor::block_on(async {
             let valid_until_ge = Utc::now() - Duration::days(1);
 
-            let channels = [get_channel("XYZ", &None)];
+            let channels = [get_channel("XYZ", &None, None)];
 
             let some_init = MemoryChannelRepository::new(Some(&channels));
 
             // get a 2nd channel to save
-            let new_channel = get_channel("ABC", &None);
+            let new_channel = get_channel("ABC", &None, None);
 
             // save the 2nd channel
             // this shouldn't change the order in any way
@@ -223,7 +274,7 @@ mod test {
             assert_eq!("ABC", last_channel.id);
 
             // get a 3rd channel to save
-            let new_channel = get_channel("DEF", &None);
+            let new_channel = get_channel("DEF", &None, None);
 
             // save the 2nd channel
             // this shouldn't change the order in any way
@@ -240,11 +291,11 @@ mod test {
     #[test]
     fn saving_the_same_channel_id_should_error() {
         futures::executor::block_on(async {
-            let channels = [get_channel("ABC", &None)];
+            let channels = [get_channel("ABC", &None, None)];
 
             let repository = MemoryChannelRepository::new(Some(&channels));
 
-            let same_channel_id = get_channel("ABC", &None);
+            let same_channel_id = get_channel("ABC", &None, None);
 
             let error = await!(repository.save(same_channel_id)).expect_err("It shouldn't be possible to save the same channel_id");
 
