@@ -40,7 +40,7 @@ pub(crate) mod fixtures {
     use crate::domain::asset::fixtures::get_asset;
     use crate::test_util;
 
-    pub fn get_channel(channel_id: &str, valid_until: Option<DateTime<Utc>>) -> Channel {
+    pub fn get_channel(channel_id: &str, valid_until: &Option<DateTime<Utc>>) -> Channel {
         let deposit_amount = BigNum::try_from(<Faker as Number>::between(100_u32, 5000_u32)).expect("BigNum error when creating from random number");
         let valid_until: DateTime<Utc> = valid_until.unwrap_or(test_util::time::datetime_between(&Utc::now(), None));
         let creator = <Faker as Name>::name();
@@ -62,7 +62,7 @@ pub(crate) mod fixtures {
                 let valid_until = valid_until_ge.and_then(|ref dt| Some(test_util::time::datetime_between(dt, None)));
                 let channel_id = format!("channel {}", c);
 
-                get_channel(&channel_id, valid_until)
+                get_channel(&channel_id, &valid_until)
             })
             .collect()
     }
