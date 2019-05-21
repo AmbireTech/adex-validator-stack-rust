@@ -40,7 +40,7 @@ impl_web! {
 
             let handler = ChannelListHandler::new(10, &channel_repository);
 
-            await!(handler.handle(query_string.page()).boxed().compat()).unwrap()
+            await!(handler.handle(query_string.page(), query_string.validator()).boxed().compat()).unwrap()
         }
     }
 }

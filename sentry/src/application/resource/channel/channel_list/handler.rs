@@ -17,8 +17,8 @@ impl<'a> ChannelListHandler<'a> {
 }
 
 impl<'a> ChannelListHandler<'a> {
-    pub async fn handle(&self, page: u32) -> Result<ChannelListResponse, ()> {
-        // @TODO: pass the correct page from Query and use the application limit per page
+    pub async fn handle(&self, page: u32, _validator: Option<String>) -> Result<ChannelListResponse, ()> {
+        // @TODO: pass validator to `list()` once we implement the search in Repository.
         let list_fut = self.channel_repository.list(Utc::now(), page, self.limit_per_page);
         // @TODO: Proper error handling
         let channels = await!(list_fut).unwrap();
