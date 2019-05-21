@@ -96,7 +96,7 @@ impl ChannelRepository for MemoryChannelRepository {
 mod test {
     use crate::domain::{Channel, RepositoryError};
     use crate::domain::channel::ChannelRepository;
-    use crate::domain::channel::fixtures::get_channel;
+    use crate::domain::channel::fixtures::*;
     use crate::infrastructure::persistence::channel::MemoryChannelRepository;
     use chrono::Utc;
     use time::Duration;
@@ -126,14 +126,7 @@ mod test {
         futures::executor::block_on(async {
             let valid_until_ge = Utc::now() - Duration::days(1);
 
-            let channels = [
-                get_channel("channel 1", None),
-                get_channel("channel 2", None),
-                get_channel("channel 3", None),
-                get_channel("channel 4", None),
-                get_channel("channel 5", None),
-                get_channel("channel 6", None),
-            ];
+            let channels = get_channels(6, Some(valid_until_ge));
 
             let repository = MemoryChannelRepository::new(Some(&channels));
             assert_eq!(3, await!(repository.list(valid_until_ge, 1, 3)).unwrap().len());
