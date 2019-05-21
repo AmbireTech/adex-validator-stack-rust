@@ -22,7 +22,7 @@ pub struct ChannelSpec {
 }
 
 pub trait ChannelRepository: Send + Sync {
-    fn list(&self) -> RepositoryFuture<Vec<Channel>>;
+    fn list(&self, valid_until_ge: DateTime<Utc>, page: u32, limit: u32) -> RepositoryFuture<Vec<Channel>>;
 
     fn save(&self, channel: Channel) -> RepositoryFuture<()>;
 
@@ -40,9 +40,9 @@ pub(crate) mod fixtures {
     use crate::domain::asset::fixtures::get_asset;
     use crate::test_util;
 
-    pub fn get_channel(channel_id: &str) -> Channel {
+    pub fn get_channel(channel_id: &str, valid_until: Option<DateTime<Utc>>) -> Channel {
         let deposit_amount = BigNum::try_from(<Faker as Number>::between(100_u32, 5000_u32)).expect("BigNum error when creating from random number");
-        let valid_until: DateTime<Utc> = test_util::time::datetime_between(&Utc::now(), None);
+        let valid_until: DateTime<Utc> = valid_until.unwrap_or(test_util::time::datetime_between(&Utc::now(), None));
         let creator = <Faker as Name>::name();
         let deposit_asset = get_asset();
 
