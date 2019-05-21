@@ -7,6 +7,7 @@ use try_future::try_future;
 
 use crate::domain::{Channel, ChannelRepository, RepositoryFuture};
 use crate::infrastructure::persistence::DbPool;
+use chrono::{DateTime, Utc};
 
 pub struct PostgresChannelRepository {
     db_pool: DbPool,
@@ -19,7 +20,7 @@ impl PostgresChannelRepository {
 }
 
 impl ChannelRepository for PostgresChannelRepository {
-    fn list(&self) -> RepositoryFuture<Vec<Channel>> {
+    fn list(&self, _valid_until_ge: DateTime<Utc>, _page: u32, _limit: u32) -> RepositoryFuture<Vec<Channel>> {
         let fut = self.db_pool
             .run(move |mut conn| {
                 conn.prepare("SELECT channel_id, creator, deposit_asset, deposit_amount, valid_until FROM channels")

@@ -1,5 +1,6 @@
 use std::sync::{Arc, RwLock};
 
+use chrono::{DateTime, Utc};
 use futures::future::{err, FutureExt, ok};
 
 use crate::domain::{Channel, ChannelRepository, RepositoryError, RepositoryFuture};
@@ -17,10 +18,23 @@ impl MemoryChannelRepository {
 }
 
 impl ChannelRepository for MemoryChannelRepository {
-    fn list(&self) -> RepositoryFuture<Vec<Channel>> {
+    fn list(&self, valid_until_ge: DateTime<Utc>, page: u32, limit: u32) -> RepositoryFuture<Vec<Channel>> {
+        // 1st page, start from 0
+        let skip_results = ((page - 1) * limit) as usize;
+        // take `limit` results
+        let take = limit as usize;
+
         let res_fut = match self.records.read() {
             Ok(reader) => {
-                let channels = reader.iter().map(|channel| channel.clone()).collect();
+                let channels = reader
+                    .iter()
+                    .filter_map(|channel| match channel.valid_until >= valid_until_ge {
+                        true => Some(channel.clone()),
+                        false => None,
+                    })
+                    .skip(skip_results)
+                    .take(take)
+                    .collect();
 
                 ok(channels)
             }
@@ -82,20 +96,24 @@ impl ChannelRepository for MemoryChannelRepository {
 mod test {
     use crate::domain::{Channel, RepositoryError};
     use crate::domain::channel::ChannelRepository;
-    use crate::domain::channel::fixtures::get_channel;
+    use crate::domain::channel::fixtures::*;
     use crate::infrastructure::persistence::channel::MemoryChannelRepository;
+    use chrono::Utc;
+    use time::Duration;
 
     #[test]
     fn initializes_with_channels_and_lists_channels() {
         futures::executor::block_on(async {
-            let empty_init = MemoryChannelRepository::new(None);
-            assert_eq!(0, await!(empty_init.list()).unwrap().len());
+            let valid_until_ge = Utc::now() - Duration::days(1);
 
-            let channels = [get_channel("channel 1"), get_channel("channel 2")];
+            let empty_init = MemoryChannelRepository::new(None);
+            assert_eq!(0, await!(empty_init.list(valid_until_ge, 1, 10)).unwrap().len());
+
+            let channels = [get_channel("channel 1", &None), get_channel("channel 2", &None)];
             // this shouldn't change the order in any way
             let some_init = MemoryChannelRepository::new(Some(&channels));
 
-            let channels_list: Vec<Channel> = await!(some_init.list()).expect("List the initial 2 channels");
+            let channels_list: Vec<Channel> = await!(some_init.list(valid_until_ge, 1, 10)).expect("List the initial 2 channels");
             assert_eq!(2, channels_list.len());
 
             let last_channel = channels_list.last().expect("There should be a last Channel (total: 2)");
@@ -104,33 +122,106 @@ mod test {
     }
 
     #[test]
+    fn listing_channels_can_handle_page_and_limit() {
+        futures::executor::block_on(async {
+            let valid_until_ge = Utc::now() - Duration::days(1);
+
+            // using Utc::now() will assure that the channels always have >= valid_until_ge DateTime
+            let channels = get_channels(6, Some(Utc::now()));
+
+            let repository = MemoryChannelRepository::new(Some(&channels));
+
+            // check if we will get all channels, using a limit > channels count
+            let all_channels = await!(repository.list(valid_until_ge, 1, 10)).expect("Should list all channels");
+            assert_eq!(6, all_channels.len());
+
+            // also check if we are getting the correct last channel for the page
+            assert_eq!(&"channel 6", &all_channels[5].id);
+
+            // check if we will get the first 4 channels on page 1, if the limit is 4
+            let first_page_three_channels = await!(repository.list(valid_until_ge, 1, 4)).unwrap();
+            assert_eq!(4, first_page_three_channels.len());
+
+            // also check if we are getting the correct last channel for the page
+            assert_eq!(&"channel 4", &first_page_three_channels[3].id);
+
+            // if we have 5 per page & we are on page 2, one is left
+            let one_channel_on_page = await!(repository.list(valid_until_ge, 2, 5)).unwrap();
+            assert_eq!(1, one_channel_on_page.len());
+
+            // also check if we are getting the last channel for the page
+            assert_eq!(&"channel 6", &one_channel_on_page[0].id);
+
+            // if we are out of bound, sort of speak - we have 6 channels, limit 6, so we have only 1 page
+            // we should get 0 channels on page 2
+            assert_eq!(0, await!(repository.list(valid_until_ge, 2, 6)).unwrap().len());
+
+            // if we have limit 2 and we are on page 2, we should get 2 channels back
+            let two_channels_on_page = await!(repository.list(valid_until_ge, 2, 2)).unwrap();
+            assert_eq!(2, two_channels_on_page.len());
+
+            assert_eq!(&"channel 3", &two_channels_on_page[0].id);
+            assert_eq!(&"channel 4", &two_channels_on_page[1].id);
+        })
+    }
+
+    #[test]
+    fn listing_channels_can_handle_valid_until_filtration() {
+        futures::executor::block_on(async {
+            let valid_until_yesterday = Some(Utc::now() - Duration::days(1));
+            // create the valid_until_ge, before creating the channels,
+            // as they might otherwise have valid_until < valid_until_ge
+            let valid_until_ge = Utc::now();
+
+            let channels = [
+                get_channel("channel 1", &None),
+                get_channel("channel 2 yesterday", &valid_until_yesterday),
+                get_channel("channel 3", &None),
+                get_channel("channel 4 yesterday", &valid_until_yesterday),
+                get_channel("channel 5", &None),
+            ];
+
+            let repository = MemoryChannelRepository::new(Some(&channels));
+
+            let list_channels = await!(repository.list(valid_until_ge, 1, 10)).expect("Should list all channels");
+            assert_eq!(3, list_channels.len());
+
+            assert_eq!(&"channel 1", &list_channels[0].id);
+            assert_eq!(&"channel 3", &list_channels[1].id);
+            assert_eq!(&"channel 5", &list_channels[2].id);
+        })
+    }
+
+    #[test]
     fn saves_channels() {
         futures::executor::block_on(async {
-            let channels = [get_channel("XYZ")];
+            let valid_until_ge = Utc::now() - Duration::days(1);
+
+            let channels = [get_channel("XYZ", &None)];
 
             let some_init = MemoryChannelRepository::new(Some(&channels));
 
             // get a 2nd channel to save
-            let new_channel = get_channel("ABC");
+            let new_channel = get_channel("ABC", &None);
 
             // save the 2nd channel
             // this shouldn't change the order in any way
             await!(some_init.save(new_channel)).expect("Saving 2nd new channel");
 
-            let channels_list: Vec<Channel> = await!(some_init.list()).expect("List the 2 total channels");
+            let channels_list: Vec<Channel> = await!(some_init.list(valid_until_ge, 1, 10)).expect("List the 2 total channels");
             assert_eq!(2, channels_list.len());
 
             let last_channel = channels_list.last().expect("There should be a last Channel (total: 2)");
             assert_eq!("ABC", last_channel.id);
 
             // get a 3rd channel to save
-            let new_channel = get_channel("DEF");
+            let new_channel = get_channel("DEF", &None);
 
             // save the 2nd channel
             // this shouldn't change the order in any way
             await!(some_init.save(new_channel)).expect("Saving 3rd new channel");
 
-            let channels_list: Vec<Channel> = await!(some_init.list()).expect("List the 3 total channels");
+            let channels_list: Vec<Channel> = await!(some_init.list(valid_until_ge, 1, 10)).expect("List the 3 total channels");
             assert_eq!(3, channels_list.len());
 
             let last_channel = channels_list.last().expect("There should be a last Channel (total: 3)");
@@ -141,15 +232,16 @@ mod test {
     #[test]
     fn saving_the_same_channel_id_should_error() {
         futures::executor::block_on(async {
-            let channels = [get_channel("ABC")];
+            let channels = [get_channel("ABC", &None)];
 
             let repository = MemoryChannelRepository::new(Some(&channels));
 
-            let same_channel_id = get_channel("ABC");
+            let same_channel_id = get_channel("ABC", &None);
 
             let error = await!(repository.save(same_channel_id)).expect_err("It shouldn't be possible to save the same channel_id");
+
             match error {
-                RepositoryError::User => {},
+                RepositoryError::User => {}
                 _ => panic!("Expected UserError"),
             }
         })
