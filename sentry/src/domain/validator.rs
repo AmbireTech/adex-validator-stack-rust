@@ -5,9 +5,9 @@ use crate::domain::BigNum;
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ValidatorDesc {
-    id: String,
-    url: String,
-    fee: BigNum,
+    pub id: String,
+    pub url: String,
+    pub fee: BigNum,
 }
 
 #[cfg(test)]
