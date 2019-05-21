@@ -4,8 +4,9 @@ use futures_legacy::Future as OldFuture;
 use futures_legacy::future::IntoFuture;
 use futures_legacy::Stream as OldStream;
 use try_future::try_future;
+use uuid::Uuid;
 
-use crate::domain::{Channel, ChannelListParams, ChannelRepository, RepositoryFuture};
+use crate::domain::{Channel, ChannelListParams, ChannelRepository, ChannelSpec, RepositoryFuture};
 use crate::infrastructure::persistence::DbPool;
 
 pub struct PostgresChannelRepository {
@@ -47,6 +48,10 @@ impl ChannelRepository for PostgresChannelRepository {
                                 deposit_asset: row.get("deposit_asset"),
                                 deposit_amount: row.get("deposit_amount"),
                                 valid_until: row.get("valid_until"),
+                                spec: ChannelSpec {
+                                    id: Uuid::new_v4(),
+                                    validators: vec![],
+                                },
                             }
                         }).collect();
 

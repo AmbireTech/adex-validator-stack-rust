@@ -1,6 +1,7 @@
 use tokio::await;
+use uuid::Uuid;
 
-use crate::domain::{Channel, ChannelRepository};
+use crate::domain::{Channel, ChannelRepository, ChannelSpec};
 
 use super::ChannelCreateResponse;
 use super::ChannelInput;
@@ -25,6 +26,10 @@ impl<'a> ChannelCreateHandler<'a> {
             deposit_asset: channel_input.deposit_asset,
             deposit_amount: channel_input.deposit_amount,
             valid_until: channel_input.valid_until,
+            spec: ChannelSpec {
+                id: Uuid::new_v4(),
+                validators: vec![],
+            },
         };
 
         // @TODO: Insert into database

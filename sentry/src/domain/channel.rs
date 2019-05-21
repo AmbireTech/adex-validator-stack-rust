@@ -13,15 +13,15 @@ pub struct Channel {
     pub deposit_asset: Asset,
     pub deposit_amount: BigNum,
     pub valid_until: DateTime<Utc>,
-//    pub spec: ChannelSpec,
+    pub spec: ChannelSpec,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ChannelSpec {
     // TODO: Use a ChannelSpecId?
-    id: Uuid,
-    validators: Vec<ValidatorDesc>,
+    pub id: Uuid,
+    pub validators: Vec<ValidatorDesc>,
 }
 
 pub struct ChannelListParams {
@@ -103,6 +103,7 @@ pub(crate) mod fixtures {
             deposit_asset,
             deposit_amount,
             valid_until,
+            spec: get_channel_spec(Uuid::new_v4(), 3),
         }
     }
 
