@@ -59,10 +59,10 @@ impl ChannelListQuery {
         }
     }
 
-    pub fn validator(&self) -> Option<&String> {
+    pub fn validator(&self) -> Option<String> {
         self
             .validator
-            .as_ref()
+            .to_owned()
             .and_then(|s| {
                 if s.is_empty() {
                     return None;

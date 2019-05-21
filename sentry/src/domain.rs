@@ -6,7 +6,7 @@ use futures::Future;
 
 pub use self::asset::Asset;
 pub use self::bignum::BigNum;
-pub use self::channel::{Channel, ChannelRepository, ChannelSpec};
+pub use self::channel::{Channel, ChannelListParams, ChannelRepository, ChannelSpec};
 pub use self::validator::ValidatorDesc;
 
 mod bignum;
@@ -15,7 +15,9 @@ mod validator;
 mod asset;
 
 #[derive(Debug)]
-pub struct DomainError;
+pub enum DomainError {
+    InvalidArgument(String),
+}
 
 impl fmt::Display for DomainError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

@@ -1,9 +1,9 @@
+use chrono::Utc;
 use tokio::await;
 
-use crate::domain::ChannelRepository;
+use crate::domain::{ChannelListParams, ChannelRepository};
 
 use super::ChannelListResponse;
-use chrono::Utc;
 
 pub struct ChannelListHandler<'a> {
     limit_per_page: u32,
@@ -17,9 +17,12 @@ impl<'a> ChannelListHandler<'a> {
 }
 
 impl<'a> ChannelListHandler<'a> {
-    pub async fn handle(&self, page: u32, _validator: Option<String>) -> Result<ChannelListResponse, ()> {
+    pub async fn handle(&self, page: u32, validator: Option<String>) -> Result<ChannelListResponse, ()> {
+        let channel_list_params = ChannelListParams::new(Utc::now(), page, self.limit_per_page, validator)
+            .expect("Params should be generated from valid data.");
+
         // @TODO: pass validator to `list()` once we implement the search in Repository.
-        let list_fut = self.channel_repository.list(Utc::now(), page, self.limit_per_page);
+        let list_fut = self.channel_repository.list(channel_list_params);
         // @TODO: Proper error handling
         let channels = await!(list_fut).unwrap();
 

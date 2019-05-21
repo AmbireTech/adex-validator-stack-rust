@@ -1,9 +1,8 @@
 use std::sync::{Arc, RwLock};
 
-use chrono::{DateTime, Utc};
 use futures::future::{err, FutureExt, ok};
 
-use crate::domain::{Channel, ChannelRepository, RepositoryError, RepositoryFuture};
+use crate::domain::{Channel, ChannelListParams, ChannelRepository, RepositoryError, RepositoryFuture};
 
 pub struct MemoryChannelRepository {
     records: Arc<RwLock<Vec<Channel>>>,
@@ -18,17 +17,17 @@ impl MemoryChannelRepository {
 }
 
 impl ChannelRepository for MemoryChannelRepository {
-    fn list(&self, valid_until_ge: DateTime<Utc>, page: u32, limit: u32) -> RepositoryFuture<Vec<Channel>> {
+    fn list(&self, params: ChannelListParams) -> RepositoryFuture<Vec<Channel>> {
         // 1st page, start from 0
-        let skip_results = ((page - 1) * limit) as usize;
+        let skip_results = ((params.page - 1) * params.limit) as usize;
         // take `limit` results
-        let take = limit as usize;
+        let take = params.limit as usize;
 
         let res_fut = match self.records.read() {
             Ok(reader) => {
                 let channels = reader
                     .iter()
-                    .filter_map(|channel| match channel.valid_until >= valid_until_ge {
+                    .filter_map(|channel| match channel.valid_until >= params.valid_until_ge {
                         true => Some(channel.clone()),
                         false => None,
                     })
@@ -94,12 +93,13 @@ impl ChannelRepository for MemoryChannelRepository {
 
 #[cfg(test)]
 mod test {
+    use chrono::Utc;
+    use time::Duration;
+
     use crate::domain::{Channel, RepositoryError};
     use crate::domain::channel::ChannelRepository;
     use crate::domain::channel::fixtures::*;
     use crate::infrastructure::persistence::channel::MemoryChannelRepository;
-    use chrono::Utc;
-    use time::Duration;
 
     #[test]
     fn initializes_with_channels_and_lists_channels() {
