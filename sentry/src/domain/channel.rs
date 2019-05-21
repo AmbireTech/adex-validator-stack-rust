@@ -65,7 +65,8 @@ impl ChannelListParams {
 }
 
 pub trait ChannelRepository: Send + Sync {
-    fn list(&self, params: ChannelListParams) -> RepositoryFuture<Vec<Channel>>;
+    /// Returns a list of channels, based on the passed Parameters for this method
+    fn list(&self, params: &ChannelListParams) -> RepositoryFuture<Vec<Channel>>;
 
     fn save(&self, channel: Channel) -> RepositoryFuture<()>;
 

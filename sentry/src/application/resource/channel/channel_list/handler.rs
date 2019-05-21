@@ -21,8 +21,7 @@ impl<'a> ChannelListHandler<'a> {
         let channel_list_params = ChannelListParams::new(Utc::now(), page, self.limit_per_page, validator)
             .expect("Params should be generated from valid data.");
 
-        // @TODO: pass validator to `list()` once we implement the search in Repository.
-        let list_fut = self.channel_repository.list(channel_list_params);
+        let list_fut = self.channel_repository.list(&channel_list_params);
         // @TODO: Proper error handling
         let channels = await!(list_fut).unwrap();
 

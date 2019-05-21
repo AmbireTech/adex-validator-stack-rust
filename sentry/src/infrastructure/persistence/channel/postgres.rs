@@ -20,7 +20,7 @@ impl PostgresChannelRepository {
 
 impl ChannelRepository for PostgresChannelRepository {
     // @TODO: use params to filter channels accordingly
-    fn list(&self, _params: ChannelListParams) -> RepositoryFuture<Vec<Channel>> {
+    fn list(&self, _params: &ChannelListParams) -> RepositoryFuture<Vec<Channel>> {
         let fut = self.db_pool
             .run(move |mut conn| {
                 conn.prepare("SELECT channel_id, creator, deposit_asset, deposit_amount, valid_until FROM channels")
