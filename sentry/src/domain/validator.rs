@@ -14,7 +14,6 @@ pub struct ValidatorDesc {
 pub(crate) mod fixtures {
     use std::convert::TryFrom;
 
-    use chrono::{DateTime, Utc};
     use fake::faker::*;
 
     use crate::domain::BigNum;

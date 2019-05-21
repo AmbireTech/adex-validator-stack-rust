@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::domain::{Asset, DomainError, RepositoryFuture, ValidatorDesc};
 use crate::domain::bignum::BigNum;
@@ -18,6 +19,8 @@ pub struct Channel {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ChannelSpec {
+    // TODO: Use a ChannelSpecId?
+    id: Uuid,
     validators: Vec<ValidatorDesc>,
 }
 
@@ -79,10 +82,14 @@ pub(crate) mod fixtures {
 
     use chrono::{DateTime, Utc};
     use fake::faker::*;
+    use uuid::Uuid;
 
-    use crate::domain::{BigNum, Channel};
     use crate::domain::asset::fixtures::get_asset;
+    use crate::domain::BigNum;
+    use crate::domain::validator::fixtures::get_validators;
     use crate::test_util;
+
+    use super::{Channel, ChannelSpec};
 
     pub fn get_channel(channel_id: &str, valid_until: &Option<DateTime<Utc>>) -> Channel {
         let deposit_amount = BigNum::try_from(<Faker as Number>::between(100_u32, 5000_u32)).expect("BigNum error when creating from random number");
@@ -109,5 +116,12 @@ pub(crate) mod fixtures {
                 get_channel(&channel_id, &valid_until)
             })
             .collect()
+    }
+
+    pub fn get_channel_spec(id: Uuid, validators_count: usize) -> ChannelSpec {
+        ChannelSpec {
+            id,
+            validators: get_validators(validators_count, Some(&id.to_string())),
+        }
     }
 }
