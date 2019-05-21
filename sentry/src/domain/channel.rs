@@ -54,4 +54,16 @@ pub(crate) mod fixtures {
             valid_until,
         }
     }
+
+    pub fn get_channels(count: usize, valid_until_ge: Option<DateTime<Utc>>) -> Vec<Channel> {
+        (1..=count)
+            .map(|c| {
+                // if we have a valid_until_ge, use it to generate a valid_util for each channel
+                let valid_until = valid_until_ge.and_then(|ref dt| Some(test_util::time::datetime_between(dt, None)));
+                let channel_id = format!("channel {}", c);
+
+                get_channel(&channel_id, valid_until)
+            })
+            .collect()
+    }
 }
