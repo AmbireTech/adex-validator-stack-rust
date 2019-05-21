@@ -126,10 +126,45 @@ mod test {
         futures::executor::block_on(async {
             let valid_until_ge = Utc::now() - Duration::days(1);
 
-            let channels = get_channels(6, Some(valid_until_ge));
+            // using Utc::now() will assure that the channels always have >= valid_until_ge DateTime
+            let channels = get_channels(6, Some(Utc::now()));
 
             let repository = MemoryChannelRepository::new(Some(&channels));
-            assert_eq!(3, await!(repository.list(valid_until_ge, 1, 3)).unwrap().len());
+
+            // check if we will get all channels, using a limit > channels count
+            let all_channels = await!(repository.list(valid_until_ge, 1, 10)).expect("Should list all channels");
+            assert_eq!(6, all_channels.len());
+
+            // also check if we are getting the correct last channel for the page
+            let last_channel = all_channels.last().unwrap();
+            assert_eq!(&"channel 6", &last_channel.id);
+
+            // check if we will get the first 4 channels on page 1, if the limit is 4
+            let first_page_three_channels = await!(repository.list(valid_until_ge, 1, 4)).unwrap();
+            assert_eq!(4, first_page_three_channels.len());
+
+            // also check if we are getting the correct last channel for the page
+            let last_channel = first_page_three_channels.last().unwrap();
+            assert_eq!(&"channel 4", &last_channel.id);
+
+            // if we have 5 per page & we are on page 2, one is left
+            let one_channel_on_page = await!(repository.list(valid_until_ge, 2, 5)).unwrap();
+            assert_eq!(1, one_channel_on_page.len());
+
+            // also check if we are getting the last channel for the page
+            let last_channel = one_channel_on_page.last().unwrap();
+            assert_eq!(&"channel 6", &last_channel.id);
+
+            // if we are out of bound, sort of speak - we have 6 channels, limit 6, so we have only 1 page
+            // we should get 0 channels on page 2
+            assert_eq!(0, await!(repository.list(valid_until_ge, 2, 6)).unwrap().len());
+
+            // if we have limit 2 and we are on page 2, we should get 2 channels back
+            let two_channels_on_page = await!(repository.list(valid_until_ge, 2, 2)).unwrap();
+            assert_eq!(2, two_channels_on_page.len());
+
+            assert_eq!(&"channel 3", &two_channels_on_page.first().unwrap().id);
+            assert_eq!(&"channel 4", &two_channels_on_page.last().unwrap().id);
         })
     }
 
