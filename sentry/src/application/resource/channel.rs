@@ -15,6 +15,7 @@ mod channel_create;
 #[derive(Clone, Debug)]
 pub struct ChannelResource {
     pub db_pool: DbPool,
+    pub channel_list_limit: u32,
 }
 
 impl_web! {
@@ -36,7 +37,7 @@ impl_web! {
             let _channel_repository = PostgresChannelRepository::new(self.db_pool.clone());
             let channel_repository = MemoryChannelRepository::new(None);
 
-            let handler = ChannelListHandler::new(10, &channel_repository);
+            let handler = ChannelListHandler::new(self.channel_list_limit, &channel_repository);
 
             await!(handler.handle(query_string.page(), query_string.validator()).boxed().compat()).unwrap()
         }

@@ -1,17 +1,28 @@
 #![feature(async_await, await_macro)]
 
+use std::convert::TryFrom;
+use std::env::Vars;
 use std::net::SocketAddr;
 
-use futures::future::{FutureExt, TryFutureExt};
 use futures::compat::Future01CompatExt;
+use futures::future::{FutureExt, TryFutureExt};
+use lazy_static::lazy_static;
 use tokio::await;
 use tokio_tcp::TcpListener;
 use tower_web::ServiceBuilder;
 
 use sentry::application::resource::channel::ChannelResource;
+use sentry::domain::DomainError;
 use sentry::infrastructure::persistence::DbPool;
 
 const DEFAULT_PORT: u16 = 8005;
+
+lazy_static! {
+    static ref CONFIG: Config = {
+        dotenv::dotenv().ok();
+        Config::try_from(std::env::vars()).expect("Config failed")
+    };
+}
 
 pub fn main() {
     // @TODO: Define and use a CLI for setting sentry options
@@ -37,7 +48,7 @@ async fn bootstrap(database_url: String, addr: SocketAddr) {
 
     // A service builder is used to configure our service.
     let server = ServiceBuilder::new()
-        .resource(ChannelResource { db_pool: db_pool.clone() })
+        .resource(ChannelResource { db_pool: db_pool.clone(), channel_list_limit: CONFIG.channel_list_limit })
         .serve(listener.incoming());
 
     await!(server).expect("Server error");
@@ -52,3 +63,28 @@ async fn database_pool(database_url: String) -> Result<DbPool, tokio_postgres::E
     await!(bb8::Pool::builder().build(postgres_connection).compat())
 }
 
+#[derive(Debug, Clone, Copy)]
+struct Config {
+    pub channel_list_limit: u32,
+}
+
+impl TryFrom<Vars> for Config {
+    type Error = sentry::domain::DomainError;
+
+    fn try_from(mut vars: Vars) -> Result<Self, Self::Error> {
+        let limit = vars
+            .find_map(|(key, value)| {
+                match key == "CHANNEL_LIST_LIMIT" {
+                    true => Some(value),
+                    false => None,
+                }
+            })
+            .ok_or(DomainError::InvalidArgument("CHANNEL_LIST_LIMIT evn. variable was not passed".to_string()))
+            .and_then(|value| {
+                value.parse::<u32>()
+                    .map_err(|_| DomainError::InvalidArgument("CHANNEL_LIST_LIMIT is not a u32 value".to_string()))
+            });
+
+        Ok(Self { channel_list_limit: limit? })
+    }
+}
