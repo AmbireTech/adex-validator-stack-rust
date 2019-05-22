@@ -14,6 +14,14 @@ pub(crate) mod channel;
 pub(crate) mod validator;
 mod asset;
 
+#[cfg(test)]
+/// re-exports all the fixtures in one module
+pub(crate) mod fixtures {
+    pub use super::asset::fixtures::*;
+    pub use super::channel::fixtures::*;
+    pub use super::validator::fixtures::*;
+}
+
 #[derive(Debug)]
 pub enum DomainError {
     InvalidArgument(String),
