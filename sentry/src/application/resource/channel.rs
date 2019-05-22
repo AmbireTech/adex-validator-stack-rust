@@ -1,9 +1,7 @@
 use futures::future::{FutureExt, TryFutureExt};
 use futures_legacy::Future;
 use tokio::await;
-use tower_web::{derive_resource_impl, impl_web};
-// @TODO: Figure out how to import only the Extract derive
-use tower_web::*;
+use tower_web::{derive_resource_impl, Deserialize, Extract, impl_web};
 
 use channel_create::{ChannelCreateHandler, ChannelCreateResponse, ChannelInput};
 use channel_list::{ChannelListHandler, ChannelListResponse};
