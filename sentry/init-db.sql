@@ -1,3 +1,6 @@
+/**
+    WARNING: this file is out of date!
+*/
 CREATE TABLE channels
 (
     channel_id     VARCHAR(255)             NOT NULL,
