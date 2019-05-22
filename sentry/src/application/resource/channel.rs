@@ -1,9 +1,7 @@
 use futures::future::{FutureExt, TryFutureExt};
 use futures_legacy::Future;
 use tokio::await;
-use tower_web::{derive_resource_impl, impl_web};
-// @TODO: Figure out how to import only the Extract derive
-use tower_web::*;
+use tower_web::{derive_resource_impl, Deserialize, Extract, impl_web};
 
 use channel_create::{ChannelCreateHandler, ChannelCreateResponse, ChannelInput};
 use channel_list::{ChannelListHandler, ChannelListResponse};
@@ -17,6 +15,7 @@ mod channel_create;
 #[derive(Clone, Debug)]
 pub struct ChannelResource {
     pub db_pool: DbPool,
+    pub channel_list_limit: u32,
 }
 
 impl_web! {
@@ -38,7 +37,7 @@ impl_web! {
             let _channel_repository = PostgresChannelRepository::new(self.db_pool.clone());
             let channel_repository = MemoryChannelRepository::new(None);
 
-            let handler = ChannelListHandler::new(10, &channel_repository);
+            let handler = ChannelListHandler::new(self.channel_list_limit, &channel_repository);
 
             await!(handler.handle(query_string.page(), query_string.validator()).boxed().compat()).unwrap()
         }

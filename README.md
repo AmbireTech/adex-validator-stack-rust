@@ -18,7 +18,8 @@ GET `/channel/list` - get a list of all channels - TODO
 ## Testing setup
 
 ### Rust setup
-- Requires `nightly 2019-04-07`, as `futures-preview` fails to build.
+
+- Requires `nightly 2019-05-08`, because of the new syntax for `await` and our `tower-web` dependency fails to build.
 We've setup `rust-toolchain` but you can manually override it as well with `rustup override set nightly-2019-04-07`.
 
 #### Linux
@@ -33,4 +34,9 @@ We've setup `rust-toolchain` but you can manually override it as well with `rust
 
 ### Run Sentry Rest API
 
-`DATABASE_URL=postgresql://postgres:docker@localhost:5432/sentry cargo run`
+`DATABASE_URL=postgresql://postgres:docker@localhost:5432/sentry cargo run --bin sentry`
+
+#### Environment variables:
+**NOTE: For development & testing purposes we use `.env` file to define values for those environment variables.**
+
+- `CHANNEL_LIST_LIMIT` - the limit per page for listing channels from the `/channel/list` request.
