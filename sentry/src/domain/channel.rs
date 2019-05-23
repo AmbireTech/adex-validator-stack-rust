@@ -15,6 +15,18 @@ pub struct ChannelId {
 impl TryFrom<&str> for ChannelId {
     type Error = DomainError;
 
+    /// Tries to create a ChannelId from &str
+    /// which should be 32 bytes length.
+    /// Example:
+    ///
+    /// ```
+    /// use std::convert::TryFrom;
+    /// use sentry::domain::channel::ChannelId;
+    ///
+    /// let bytes: [u8; 32] = [49, 50, 51, 52, 53, 54, 55, 56, 57, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 48, 49, 50];
+    ///
+    /// assert_eq!(ChannelId { id: bytes }, ChannelId::try_from("12345678901234567890123456789012").unwrap())
+    /// ```
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let bytes = value.as_bytes();
         if bytes.len() != 32 {
