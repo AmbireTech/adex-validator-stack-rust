@@ -1,9 +1,31 @@
+use std::convert::TryFrom;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::domain::{Asset, DomainError, RepositoryFuture, ValidatorDesc};
 use crate::domain::bignum::BigNum;
+
+#[derive(PartialEq, Eq, Debug, Copy, Clone)]
+pub struct ChannelId {
+    pub id: [u8; 32],
+}
+
+impl TryFrom<&str> for ChannelId {
+    type Error = DomainError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let bytes = value.as_bytes();
+        if bytes.len() != 32 {
+            return Err(DomainError::InvalidArgument("The value of the id should have exactly 32 bytes".to_string()));
+        }
+        let mut id = [0; 32];
+        id.copy_from_slice(&bytes[..32]);
+
+        Ok(Self { id })
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
