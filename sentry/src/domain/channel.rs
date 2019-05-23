@@ -97,6 +97,11 @@ pub trait ChannelRepository: Send + Sync {
 
     fn find(&self, channel_id: &String) -> RepositoryFuture<Option<Channel>>;
 }
+
 #[cfg(test)]
 #[path = "./channel_fixtures.rs"]
 pub(crate) mod fixtures;
+
+#[cfg(test)]
+#[path = "./channel_test.rs"]
+mod test;
