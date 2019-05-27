@@ -1,6 +1,5 @@
 use chrono::Utc;
 use time::Duration;
-use uuid::Uuid;
 
 use crate::domain::{Channel, ChannelListParams, ChannelRepository, RepositoryError};
 use crate::domain::fixtures::*;
@@ -119,8 +118,8 @@ fn listing_channels_can_handles_validator_filtration_and_keeps_valid_until_filtr
             get_validator("validator-2"),
         ];
         let validators_opt = ValidatorsOption::Some(validators);
-        let channel_2_spec = get_channel_spec(Uuid::new_v4(), validators_opt.clone());
-        let channel_5_spec = get_channel_spec(Uuid::new_v4(), validators_opt.clone());
+        let channel_2_spec = get_channel_spec("channel 2", validators_opt.clone());
+        let channel_5_spec = get_channel_spec("channel 5", validators_opt.clone());
 
         let channels = [
             get_channel("channel 1", &None, None),

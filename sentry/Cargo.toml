@@ -29,11 +29,11 @@ tower-web = { branch = "macro-fixes-for-2018-edition", git = "https://github.com
 # (De)Serialization
 serde = { version = "^1.0", features = ['derive'] }
 serde_json = "1.0"
+serde_hex = { git = "https://github.com/forrest-marshall/serde-hex", package = "serde-hex" }
 # Utils
 try_future = "0.1.3"
 # Domain
 num-bigint = { version = "0.2", features = ["serde"] }
-uuid = { version = "0.7", features = ["serde", "v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 time = "0.1.42"
 [dev-dependencies]
