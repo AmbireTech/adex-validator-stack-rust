@@ -7,7 +7,7 @@ use uuid::Uuid;
 use crate::domain::{Asset, DomainError, RepositoryFuture, ValidatorDesc};
 use crate::domain::bignum::BigNum;
 
-#[derive(PartialEq, Eq, Debug, Copy, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Copy, Clone)]
 pub struct ChannelId {
     pub id: [u8; 32],
 }
@@ -17,6 +17,7 @@ impl TryFrom<&str> for ChannelId {
 
     /// Tries to create a ChannelId from &str
     /// which should be 32 bytes length.
+    ///
     /// Example:
     ///
     /// ```
@@ -39,10 +40,16 @@ impl TryFrom<&str> for ChannelId {
     }
 }
 
+impl PartialEq<ChannelId> for &str {
+    fn eq(&self, channel_id: &ChannelId) -> bool {
+        self.as_bytes() == channel_id.id
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Channel {
-    pub id: String,
+    pub id: ChannelId,
     pub creator: String,
     pub deposit_asset: Asset,
     pub deposit_amount: BigNum,
@@ -107,7 +114,7 @@ pub trait ChannelRepository: Send + Sync {
 
     fn save(&self, channel: Channel) -> RepositoryFuture<()>;
 
-    fn find(&self, channel_id: &String) -> RepositoryFuture<Option<Channel>>;
+    fn find(&self, channel_id: &ChannelId) -> RepositoryFuture<Option<Channel>>;
 }
 
 #[cfg(test)]

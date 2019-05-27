@@ -24,7 +24,7 @@ fn initializes_with_channels_and_lists_channels() {
         assert_eq!(2, channels_list.len());
 
         let last_channel = channels_list.last().expect("There should be a last Channel (total: 2)");
-        assert_eq!("channel 2", last_channel.id);
+        assert_eq!(get_channel_id("channel 2"), last_channel.id);
     })
 }
 
@@ -44,7 +44,7 @@ fn listing_channels_can_handle_page_and_limit() {
         assert_eq!(6, all_channels.len());
 
         // also check if we are getting the correct last channel for the page
-        assert_eq!(&"channel 6", &all_channels[5].id);
+        assert_eq!(&get_channel_id("channel 6"), &all_channels[5].id);
 
         // check if we will get the first 4 channels on page 1, if the limit is 4
         let params = ChannelListParams::new(valid_until_ge, 4, 1, None).unwrap();
@@ -52,7 +52,7 @@ fn listing_channels_can_handle_page_and_limit() {
         assert_eq!(4, first_page_three_channels.len());
 
         // also check if we are getting the correct last channel for the page
-        assert_eq!(&"channel 4", &first_page_three_channels[3].id);
+        assert_eq!(&get_channel_id("channel 4"), &first_page_three_channels[3].id);
 
         // if we have 5 per page & we are on page 2, one is left
         let params = ChannelListParams::new(valid_until_ge, 5, 2, None).unwrap();
@@ -60,7 +60,7 @@ fn listing_channels_can_handle_page_and_limit() {
         assert_eq!(1, one_channel_on_page.len());
 
         // also check if we are getting the last channel for the page
-        assert_eq!(&"channel 6", &one_channel_on_page[0].id);
+        assert_eq!(&get_channel_id("channel 6"), &one_channel_on_page[0].id);
 
         // if we are out of bound, sort of speak - we have 6 channels, limit 6, so we have only 1 page
         // we should get 0 channels on page 2
@@ -72,8 +72,8 @@ fn listing_channels_can_handle_page_and_limit() {
         let two_channels_on_page = await!(repository.list(&params)).unwrap();
         assert_eq!(2, two_channels_on_page.len());
 
-        assert_eq!(&"channel 3", &two_channels_on_page[0].id);
-        assert_eq!(&"channel 4", &two_channels_on_page[1].id);
+        assert_eq!(&get_channel_id("channel 3"), &two_channels_on_page[0].id);
+        assert_eq!(&get_channel_id("channel 4"), &two_channels_on_page[1].id);
     })
 }
 
@@ -100,9 +100,9 @@ fn listing_channels_can_handle_valid_until_filtration() {
 
         assert_eq!(3, list_channels.len());
 
-        assert_eq!(&"channel 1", &list_channels[0].id);
-        assert_eq!(&"channel 3", &list_channels[1].id);
-        assert_eq!(&"channel 5", &list_channels[2].id);
+        assert_eq!(&get_channel_id("channel 1"), &list_channels[0].id);
+        assert_eq!(&get_channel_id("channel 3"), &list_channels[1].id);
+        assert_eq!(&get_channel_id("channel 5"), &list_channels[2].id);
     })
 }
 
@@ -136,7 +136,7 @@ fn listing_channels_can_handles_validator_filtration_and_keeps_valid_until_filtr
         let list_channels = await!(repository.list(&params)).expect("Should list all channels");
 
         assert_eq!(1, list_channels.len());
-        assert_eq!(&"channel 5", &list_channels[0].id);
+        assert_eq!(&get_channel_id("channel 5"), &list_channels[0].id);
     })
 }
 
@@ -161,7 +161,7 @@ fn saves_channels() {
         assert_eq!(2, channels_list.len());
 
         let last_channel = channels_list.last().expect("There should be a last Channel (total: 2)");
-        assert_eq!("ABC", last_channel.id);
+        assert_eq!(get_channel_id("ABC"), last_channel.id);
 
         // get a 3rd channel to save
         let new_channel = get_channel("DEF", &None, None);
@@ -174,7 +174,7 @@ fn saves_channels() {
         assert_eq!(3, channels_list.len());
 
         let last_channel = channels_list.last().expect("There should be a last Channel (total: 3)");
-        assert_eq!("DEF", last_channel.id);
+        assert_eq!(get_channel_id("DEF"), last_channel.id);
     })
 }
 

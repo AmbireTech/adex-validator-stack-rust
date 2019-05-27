@@ -10,9 +10,26 @@ use crate::domain::validator::fixtures::get_validators;
 use crate::domain::ValidatorDesc;
 use crate::test_util;
 
-use super::{Channel, ChannelSpec};
+use super::{Channel, ChannelId, ChannelSpec};
 
-pub fn get_channel(channel_id: &str, valid_until: &Option<DateTime<Utc>>, spec: Option<ChannelSpec>) -> Channel {
+/// It will get the length of channel_id bytes and will fill enough bytes in front
+/// If > 32 bytes &str is passed it will `panic!`
+pub fn get_channel_id(channel_id: &str) -> ChannelId {
+    let channel_id_bytes = channel_id.as_bytes();
+    if channel_id_bytes.len() > 32 {
+        panic!("The passed &str should be <= 32 bytes");
+    }
+
+    let mut id: [u8; 32] = [b'0'; 32];
+    for (index, byte) in id[32 - channel_id.len()..].iter_mut().enumerate() {
+        *byte = channel_id_bytes[index];
+    }
+
+    ChannelId { id }
+}
+
+pub fn get_channel(id: &str, valid_until: &Option<DateTime<Utc>>, spec: Option<ChannelSpec>) -> Channel {
+    let id = get_channel_id(id);
     let deposit_amount = BigNum::try_from(<Faker as Number>::between(100_u32, 5000_u32)).expect("BigNum error when creating from random number");
     let valid_until: DateTime<Utc> = valid_until.unwrap_or(test_util::time::datetime_between(&Utc::now(), None));
     let creator = <Faker as Name>::name();
@@ -20,7 +37,7 @@ pub fn get_channel(channel_id: &str, valid_until: &Option<DateTime<Utc>>, spec: 
     let spec = spec.unwrap_or(get_channel_spec(Uuid::new_v4(), ValidatorsOption::Count(3)));
 
     Channel {
-        id: channel_id.to_string(),
+        id,
         creator,
         deposit_asset,
         deposit_amount,

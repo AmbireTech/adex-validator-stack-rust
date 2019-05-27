@@ -6,7 +6,7 @@ use futures::Future;
 
 pub use self::asset::Asset;
 pub use self::bignum::BigNum;
-pub use self::channel::{Channel, ChannelListParams, ChannelRepository, ChannelSpec};
+pub use self::channel::{Channel, ChannelId, ChannelListParams, ChannelRepository, ChannelSpec};
 pub use self::validator::ValidatorDesc;
 
 pub mod bignum;

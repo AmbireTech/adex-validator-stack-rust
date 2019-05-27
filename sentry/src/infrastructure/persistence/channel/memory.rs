@@ -2,7 +2,7 @@ use std::sync::{Arc, RwLock};
 
 use futures::future::{err, FutureExt, ok};
 
-use crate::domain::{Channel, ChannelListParams, ChannelRepository, RepositoryError, RepositoryFuture};
+use crate::domain::{Channel, ChannelId, ChannelListParams, ChannelRepository, RepositoryError, RepositoryFuture};
 
 #[cfg(test)]
 #[path = "./memory_test.rs"]
@@ -90,7 +90,7 @@ impl ChannelRepository for MemoryChannelRepository {
         create_fut.boxed()
     }
 
-    fn find(&self, channel_id: &String) -> RepositoryFuture<Option<Channel>> {
+    fn find(&self, channel_id: &ChannelId) -> RepositoryFuture<Option<Channel>> {
         let res_fut = match self.records.read() {
             Ok(reader) => {
                 let found_channel = reader.iter().find_map(|channel| {
