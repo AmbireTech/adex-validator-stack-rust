@@ -22,3 +22,18 @@ fn compares_channel_ids() {
     assert_eq!(first, first_copy, "ChannelId and it's copy should be equal to each other");
     assert_eq!(first, second, "ChannelId and it's clone should be equal to each other");
 }
+
+#[test]
+fn serialize_and_deserialize_channel_id() {
+    let channel_id_str = "01234567890123456789012345678901";
+    let channel_id = ChannelId::try_from(channel_id_str).unwrap();
+    let serialized = serde_json::to_string(&channel_id).unwrap();
+
+    // with Hex value of `01234567890123456789012345678901`
+    let expected_json = r#""0x3031323334353637383930313233343536373839303132333435363738393031""#;
+
+    assert_eq!(expected_json, serialized);
+
+    let from_hex: ChannelId = serde_json::from_str(expected_json).unwrap();
+    assert_eq!(from_hex, channel_id);
+}

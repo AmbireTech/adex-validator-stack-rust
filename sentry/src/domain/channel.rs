@@ -2,13 +2,16 @@ use std::convert::TryFrom;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_hex::{SerHex, StrictPfx};
 use uuid::Uuid;
 
 use crate::domain::{Asset, DomainError, RepositoryFuture, ValidatorDesc};
 use crate::domain::bignum::BigNum;
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Copy, Clone)]
+#[serde(transparent)]
 pub struct ChannelId {
+    #[serde(with = "SerHex::<StrictPfx>")]
     pub id: [u8; 32],
 }
 
