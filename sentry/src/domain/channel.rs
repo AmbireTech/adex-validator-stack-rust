@@ -3,7 +3,6 @@ use std::convert::TryFrom;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_hex::{SerHex, StrictPfx};
-use uuid::Uuid;
 
 use crate::domain::{Asset, DomainError, RepositoryFuture, ValidatorDesc};
 use crate::domain::bignum::BigNum;
@@ -63,8 +62,7 @@ pub struct Channel {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ChannelSpec {
-    // TODO: Use a ChannelSpecId?
-    pub id: Uuid,
+    // TODO: Add the rest of the fields Issue #24
     pub validators: Vec<ValidatorDesc>,
 }
 

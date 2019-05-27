@@ -2,7 +2,6 @@ use std::convert::TryFrom;
 
 use chrono::{DateTime, Utc};
 use fake::faker::*;
-use uuid::Uuid;
 
 use crate::domain::asset::fixtures::get_asset;
 use crate::domain::BigNum;
@@ -29,15 +28,15 @@ pub fn get_channel_id(channel_id: &str) -> ChannelId {
 }
 
 pub fn get_channel(id: &str, valid_until: &Option<DateTime<Utc>>, spec: Option<ChannelSpec>) -> Channel {
-    let id = get_channel_id(id);
+    let channel_id = get_channel_id(id);
     let deposit_amount = BigNum::try_from(<Faker as Number>::between(100_u32, 5000_u32)).expect("BigNum error when creating from random number");
     let valid_until: DateTime<Utc> = valid_until.unwrap_or(test_util::time::datetime_between(&Utc::now(), None));
     let creator = <Faker as Name>::name();
     let deposit_asset = get_asset();
-    let spec = spec.unwrap_or(get_channel_spec(Uuid::new_v4(), ValidatorsOption::Count(3)));
+    let spec = spec.unwrap_or(get_channel_spec(id, ValidatorsOption::Count(3)));
 
     Channel {
-        id,
+        id: channel_id,
         creator,
         deposit_asset,
         deposit_amount,
@@ -66,12 +65,12 @@ pub enum ValidatorsOption {
     None,
 }
 
-pub fn get_channel_spec(id: Uuid, validators_option: ValidatorsOption) -> ChannelSpec {
+pub fn get_channel_spec(prefix: &str, validators_option: ValidatorsOption) -> ChannelSpec {
     let validators = match validators_option {
-        ValidatorsOption::Count(count) => get_validators(count, Some(&id.to_string())),
+        ValidatorsOption::Count(count) => get_validators(count, Some(prefix)),
         ValidatorsOption::Some(validators) => validators,
         ValidatorsOption::None => vec![],
     };
 
-    ChannelSpec { id, validators }
+    ChannelSpec { validators }
 }
