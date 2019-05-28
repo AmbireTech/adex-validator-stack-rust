@@ -1,11 +1,13 @@
 use std::convert::TryFrom;
 
 use chrono::{DateTime, Utc};
+use chrono::serde::ts_milliseconds;
 use serde::{Deserialize, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 
-use crate::domain::{Asset, DomainError, RepositoryFuture, ValidatorDesc};
+use crate::domain::{AdUnit, Asset, DomainError, EventSubmission, RepositoryFuture, TargetingTag, ValidatorDesc};
 use crate::domain::bignum::BigNum;
+use crate::util::serde::ts_milliseconds_option;
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Copy, Clone)]
 #[serde(transparent)]
@@ -55,6 +57,7 @@ pub struct Channel {
     pub creator: String,
     pub deposit_asset: Asset,
     pub deposit_amount: BigNum,
+    #[serde(with = "ts_milliseconds")]
     pub valid_until: DateTime<Utc>,
     pub spec: ChannelSpec,
 }
@@ -63,7 +66,40 @@ pub struct Channel {
 #[serde(rename_all = "camelCase")]
 pub struct ChannelSpec {
     // TODO: Add the rest of the fields Issue #24
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    // TODO: Make a custom ser/deser 2 validators(leader, follower) array
     pub validators: Vec<ValidatorDesc>,
+    /// Maximum payment per impression
+    pub max_per_impression: BigNum,
+    /// Minimum payment offered per impression
+    pub min_per_impression: BigNum,
+    /// An array of TargetingTag (optional)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub targeting: Vec<TargetingTag>,
+    /// Minimum targeting score (optional)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_targeting_score: Option<u64>,
+    /// EventSubmission object, applies to event submission (POST /channel/:id/events)
+    pub event_submission: EventSubmission,
+    /// A millisecond timestamp of when the campaign was created
+    #[serde(with = "ts_milliseconds")]
+    pub created: DateTime<Utc>,
+    /// A millisecond timestamp representing the time you want this campaign to become active (optional)
+    /// Used by the AdViewManager
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "ts_milliseconds_option")]
+    pub active_from: Option<DateTime<Utc>>,
+    /// A random number to ensure the campaignSpec hash is unique
+    pub nonce: BigNum,
+    /// A millisecond timestamp of when the campaign should enter a withdraw period
+    /// (no longer accept any events other than CHANNEL_CLOSE)
+    /// A sane value should be lower than channel.validUntil * 1000 and higher than created
+    /// It's recommended to set this at least one month prior to channel.validUntil * 1000
+    #[serde(with = "ts_milliseconds")]
+    pub withdraw_period_start: DateTime<Utc>,
+    /// An array of AdUnit (optional)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ad_units: Vec<AdUnit>,
 }
 
 pub struct ChannelListParams {
@@ -91,12 +127,9 @@ impl ChannelListParams {
         }
 
         let validator = validator
-            .and_then(|s| {
-                if s.is_empty() {
-                    return None;
-                }
-
-                Some(s)
+            .and_then(|s| match s.is_empty() {
+                true => None,
+                false => Some(s),
             });
 
         Ok(Self {

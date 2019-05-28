@@ -71,6 +71,20 @@ pub fn get_channel_spec(prefix: &str, validators_option: ValidatorsOption) -> Ch
         ValidatorsOption::Some(validators) => validators,
         ValidatorsOption::None => vec![],
     };
+    use crate::domain::EventSubmission;
 
-    ChannelSpec { validators }
+    ChannelSpec {
+        validators,
+        title: Some("Title".to_string()),
+        max_per_impression: BigNum::try_from(1).unwrap(),
+        min_per_impression: BigNum::try_from(1).unwrap(),
+        targeting: Vec::new(),
+        min_targeting_score: Some(0),
+        event_submission: EventSubmission {},
+        created: Utc::now(),
+        active_from: Some(Utc::now()),
+        nonce: BigNum::try_from(0).unwrap(),
+        withdraw_period_start: Utc::now(),
+        ad_units: Vec::new(),
+    }
 }
