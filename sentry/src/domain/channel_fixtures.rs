@@ -72,13 +72,15 @@ pub fn get_channel_spec(prefix: &str, validators_option: ValidatorsOption) -> Ch
         ValidatorsOption::None => vec![],
     };
     use crate::domain::EventSubmission;
-    let title_string = Some(<Faker as Name>::title_descriptor().to_string());
+    use test_util::take_one;
 
-    let title = test_util::take_one(&[&title_string, &None]).to_owned();
+    let title_string = Some(<Faker as Lorem>::sentence(3, 4));
+
+    let title = take_one(&[&title_string, &None]).to_owned();
     let max_per_impression = BigNum::try_from(<Faker as Number>::between(250_u32, 500_u32)).expect("BigNum error when creating from random number");
     let min_per_impression = BigNum::try_from(<Faker as Number>::between(1_u32, 250_u32)).expect("BigNum error when creating from random number");
     let nonce = BigNum::try_from(<Faker as Number>::between(100_000_000_u32, 999_999_999_u32)).expect("BigNum error when creating from random number");
-    let min_targeting_score = test_util::take_one(&[&None, &Some(<Faker as Number>::between(1, 500))]).to_owned();
+    let min_targeting_score = take_one(&[&None, &Some(<Faker as Number>::between(1, 500))]).to_owned();
 
     ChannelSpec {
         validators,
