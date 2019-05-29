@@ -27,6 +27,7 @@ pub mod event_submission;
 pub mod fixtures {
     pub use super::asset::fixtures::*;
     pub use super::channel::fixtures::*;
+    pub use super::identifier::fixtures::*;
     pub use super::validator::fixtures::*;
 }
 
