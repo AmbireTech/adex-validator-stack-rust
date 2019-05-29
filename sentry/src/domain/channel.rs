@@ -5,7 +5,7 @@ use chrono::serde::ts_milliseconds;
 use serde::{Deserialize, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 
-use crate::domain::{AdUnit, Asset, DomainError, EventSubmission, RepositoryFuture, TargetingTag, ValidatorDesc};
+use crate::domain::{AdUnit, Asset, DomainError, EventSubmission, Identifier, RepositoryFuture, TargetingTag, ValidatorDesc};
 use crate::domain::bignum::BigNum;
 use crate::util::serde::ts_milliseconds_option;
 
@@ -54,7 +54,7 @@ impl PartialEq<ChannelId> for &str {
 #[serde(rename_all = "camelCase")]
 pub struct Channel {
     pub id: ChannelId,
-    pub creator: String,
+    pub creator: Identifier,
     pub deposit_asset: Asset,
     pub deposit_amount: BigNum,
     #[serde(with = "ts_milliseconds")]

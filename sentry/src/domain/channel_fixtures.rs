@@ -3,9 +3,8 @@ use std::convert::TryFrom;
 use chrono::{DateTime, Utc};
 use fake::faker::*;
 
-use crate::domain::asset::fixtures::get_asset;
 use crate::domain::BigNum;
-use crate::domain::validator::fixtures::get_validators;
+use crate::domain::fixtures::{get_asset, get_identifier, get_validators};
 use crate::domain::ValidatorDesc;
 use crate::test_util;
 
@@ -31,7 +30,8 @@ pub fn get_channel(id: &str, valid_until: &Option<DateTime<Utc>>, spec: Option<C
     let channel_id = get_channel_id(id);
     let deposit_amount = BigNum::try_from(<Faker as Number>::between(100_u32, 5000_u32)).expect("BigNum error when creating from random number");
     let valid_until: DateTime<Utc> = valid_until.unwrap_or(test_util::time::datetime_between(&Utc::now(), None));
-    let creator = <Faker as Name>::name();
+    // for now use a Fake first name
+    let creator = get_identifier(&<Faker as Name>::first_name());
     let deposit_asset = get_asset();
     let spec = spec.unwrap_or(get_channel_spec(id, ValidatorsOption::Count(3)));
 
