@@ -1,4 +1,44 @@
 use serde::{Deserialize, Serialize};
 
+use crate::domain::DomainError;
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct TargetingTag {}
+pub struct TargetingTag {
+    pub tag: String,
+    pub score: u8,
+    _secret: (),
+}
+
+impl TargetingTag {
+    /// score should be between 0 and 100
+    pub fn new(tag: String, score: u8) -> Result<Self, DomainError> {
+        if score > 100 {
+            return Err(DomainError::InvalidArgument("score should be between 0 >= x <= 100".to_string()));
+        }
+
+        Ok(Self { tag, score, _secret: () })
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod fixtures {
+    use fake::faker::*;
+
+    use super::TargetingTag;
+
+    pub fn get_targeting_tag(tag: String) -> TargetingTag {
+        let score = <Faker as Number>::between(0, 100);
+
+        TargetingTag::new(tag, score).expect("TargetingTag error when creating from fixture")
+    }
+
+    pub fn get_targeting_tags(count: usize) -> Vec<TargetingTag> {
+        (1..=count)
+            .map(|c| {
+                let tag_name = format!("tag {}", c);
+
+                get_targeting_tag(tag_name)
+            })
+            .collect()
+    }
+}

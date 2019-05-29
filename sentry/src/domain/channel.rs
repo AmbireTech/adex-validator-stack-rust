@@ -65,7 +65,6 @@ pub struct Channel {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ChannelSpec {
-    // TODO: Add the rest of the fields Issue #24
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
     // TODO: Make a custom ser/deser 2 validators(leader, follower) array
@@ -110,7 +109,6 @@ pub struct ChannelListParams {
     /// filters `valid_until` to be `>= valid_until_ge`
     pub valid_until_ge: DateTime<Utc>,
     /// filters the channels containing a specific validator if provided
-    // @TODO: use a ValidatorName struct, to have a better control of having a valid ValidatorName at this point
     pub validator: Option<String>,
     /// Ensures that this struct can only be created by calling `new()`
     _secret: (),
