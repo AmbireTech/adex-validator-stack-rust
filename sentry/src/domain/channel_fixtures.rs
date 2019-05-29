@@ -5,7 +5,7 @@ use fake::faker::*;
 
 use crate::domain::asset::fixtures::get_asset;
 use crate::domain::BigNum;
-use crate::domain::validator::fixtures::get_validators;
+use crate::domain::fixtures::{get_targeting_tags, get_validators};
 use crate::domain::ValidatorDesc;
 use crate::test_util;
 
@@ -87,8 +87,7 @@ pub fn get_channel_spec(prefix: &str, validators_option: ValidatorsOption) -> Ch
         title,
         max_per_impression,
         min_per_impression,
-        // @TODO: `TargetingTag`s fixtures issue #26
-        targeting: Vec::new(),
+        targeting: get_targeting_tags(<Faker as Number>::between(0, 5)),
         min_targeting_score,
         // @TODO: `EventSubmission` fixture issue #27
         event_submission: EventSubmission {},
