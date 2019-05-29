@@ -5,7 +5,8 @@ use crate::domain::BigNum;
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ValidatorDesc {
-    pub id: String,
+    // @TODO: UserId issue #36
+    pub addr: String,
     pub url: String,
     pub fee: BigNum,
 }
@@ -25,7 +26,7 @@ pub(crate) mod fixtures {
         let url = format!("http://{}-validator-url.com/validator", validator_id);
 
         ValidatorDesc {
-            id: validator_id.to_string(),
+            addr: validator_id.to_string(),
             url,
             fee,
         }

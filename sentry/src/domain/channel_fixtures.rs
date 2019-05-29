@@ -71,6 +71,31 @@ pub fn get_channel_spec(prefix: &str, validators_option: ValidatorsOption) -> Ch
         ValidatorsOption::Some(validators) => validators,
         ValidatorsOption::None => vec![],
     };
+    use crate::domain::EventSubmission;
+    use test_util::take_one;
 
-    ChannelSpec { validators }
+    let title_string = Some(<Faker as Lorem>::sentence(3, 4));
+
+    let title = take_one(&[&title_string, &None]).to_owned();
+    let max_per_impression = BigNum::try_from(<Faker as Number>::between(250_u32, 500_u32)).expect("BigNum error when creating from random number");
+    let min_per_impression = BigNum::try_from(<Faker as Number>::between(1_u32, 250_u32)).expect("BigNum error when creating from random number");
+    let nonce = BigNum::try_from(<Faker as Number>::between(100_000_000_u32, 999_999_999_u32)).expect("BigNum error when creating from random number");
+    let min_targeting_score = take_one(&[&None, &Some(<Faker as Number>::between(1, 500))]).to_owned();
+
+    ChannelSpec {
+        validators,
+        title,
+        max_per_impression,
+        min_per_impression,
+        // @TODO: `TargetingTag`s fixtures issue #26
+        targeting: Vec::new(),
+        min_targeting_score,
+        // @TODO: `EventSubmission` fixture issue #27
+        event_submission: EventSubmission {},
+        created: Utc::now(),
+        active_from: Some(Utc::now()),
+        nonce,
+        withdraw_period_start: Utc::now(),
+        ad_units: Vec::new(),
+    }
 }

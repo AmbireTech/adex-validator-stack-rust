@@ -4,15 +4,21 @@ use std::pin::Pin;
 
 use futures::Future;
 
+pub use self::ad_unit::AdUnit;
 pub use self::asset::Asset;
 pub use self::bignum::BigNum;
 pub use self::channel::{Channel, ChannelId, ChannelListParams, ChannelRepository, ChannelSpec};
+pub use self::event_submission::EventSubmission;
+pub use self::targeting_tag::TargetingTag;
 pub use self::validator::ValidatorDesc;
 
 pub mod bignum;
 pub mod channel;
 pub mod validator;
 pub mod asset;
+pub mod targeting_tag;
+pub mod ad_unit;
+pub mod event_submission;
 
 #[cfg(test)]
 /// re-exports all the fixtures in one module
