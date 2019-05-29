@@ -9,9 +9,11 @@ pub use self::asset::Asset;
 pub use self::bignum::BigNum;
 pub use self::channel::{Channel, ChannelId, ChannelListParams, ChannelRepository, ChannelSpec};
 pub use self::event_submission::EventSubmission;
+pub use self::identifier::Identifier;
 pub use self::targeting_tag::TargetingTag;
 pub use self::validator::ValidatorDesc;
 
+pub mod identifier;
 pub mod bignum;
 pub mod channel;
 pub mod validator;
