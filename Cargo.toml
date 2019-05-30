@@ -2,4 +2,5 @@
 
 members = [
     "sentry",
+    "domain",
 ]
