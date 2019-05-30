@@ -1,10 +1,11 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::domain::DomainError;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TargetingTag {
     pub tag: String,
+    #[serde(deserialize_with = "score_deserialize")]
     pub score: u8,
     _secret: (),
 }
@@ -17,6 +18,17 @@ impl TargetingTag {
         }
 
         Ok(Self { tag, score, _secret: () })
+    }
+}
+
+pub fn score_deserialize<'de, D>(deserializer: D) -> Result<u8, D::Error>
+    where D: Deserializer<'de>
+{
+    let score_unchecked: u8 = u8::deserialize(deserializer)?;
+
+    match score_unchecked > 100 {
+        true => Err(serde::de::Error::custom("Score should be between 0 >= x <= 100")),
+        false => Ok(score_unchecked),
     }
 }
 
