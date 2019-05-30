@@ -1,6 +1,6 @@
 use serde::{Deserialize, Deserializer, Serialize};
 
-use crate::domain::DomainError;
+use crate::DomainError;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TargetingTag {
@@ -32,8 +32,8 @@ pub fn score_deserialize<'de, D>(deserializer: D) -> Result<u8, D::Error>
     }
 }
 
-#[cfg(test)]
-pub(crate) mod fixtures {
+#[cfg(any(test, feature = "fixtures"))]
+pub mod fixtures {
     use fake::faker::*;
 
     use super::TargetingTag;

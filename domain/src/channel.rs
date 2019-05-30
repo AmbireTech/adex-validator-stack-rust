@@ -5,8 +5,8 @@ use chrono::serde::{ts_milliseconds, ts_seconds};
 use serde::{Deserialize, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 
-use crate::domain::{AdUnit, Asset, DomainError, EventSubmission, RepositoryFuture, TargetingTag, ValidatorDesc};
-use crate::domain::bignum::BigNum;
+use crate::{AdUnit, Asset, DomainError, EventSubmission, RepositoryFuture, TargetingTag, ValidatorDesc};
+use crate::bignum::BigNum;
 use crate::util::serde::ts_milliseconds_option;
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Copy, Clone)]
@@ -149,9 +149,9 @@ pub trait ChannelRepository: Send + Sync {
     fn find(&self, channel_id: &ChannelId) -> RepositoryFuture<Option<Channel>>;
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "fixtures"))]
 #[path = "./channel_fixtures.rs"]
-pub(crate) mod fixtures;
+pub mod fixtures;
 
 #[cfg(test)]
 #[path = "./channel_test.rs"]

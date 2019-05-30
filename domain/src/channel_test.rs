@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
 
-use crate::domain::channel::ChannelId;
+use crate::channel::ChannelId;
 
 #[test]
 fn coverts_str_to_channel_id() {

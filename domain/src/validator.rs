@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::domain::BigNum;
+use crate::BigNum;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -10,13 +10,13 @@ pub struct ValidatorDesc {
     pub fee: BigNum,
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "fixtures"))]
 pub(crate) mod fixtures {
     use std::convert::TryFrom;
 
     use fake::faker::*;
 
-    use crate::domain::BigNum;
+    use crate::BigNum;
 
     use super::ValidatorDesc;
 
