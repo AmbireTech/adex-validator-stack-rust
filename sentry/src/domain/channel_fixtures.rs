@@ -91,7 +91,7 @@ pub fn get_channel_spec(prefix: &str, validators_option: ValidatorsOption) -> Ch
         targeting: Vec::new(),
         min_targeting_score,
         // @TODO: `EventSubmission` fixture issue #27
-        event_submission: EventSubmission {},
+        event_submission: EventSubmission { allow: vec![] },
         created: Utc::now(),
         active_from: Some(Utc::now()),
         nonce,
