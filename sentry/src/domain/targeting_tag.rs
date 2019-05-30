@@ -7,7 +7,7 @@ pub struct TargetingTag {
     pub tag: String,
     #[serde(deserialize_with = "score_deserialize")]
     pub score: u8,
-    _secret: (),
+//    _secret: (),
 }
 
 impl TargetingTag {
@@ -17,7 +17,7 @@ impl TargetingTag {
             return Err(DomainError::InvalidArgument("score should be between 0 >= x <= 100".to_string()));
         }
 
-        Ok(Self { tag, score, _secret: () })
+        Ok(Self { tag, score /* _secret: ()*/ })
     }
 }
 
