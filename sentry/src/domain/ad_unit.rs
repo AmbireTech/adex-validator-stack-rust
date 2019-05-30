@@ -3,6 +3,7 @@ use chrono::serde::ts_milliseconds;
 use serde::{Deserialize, Serialize};
 
 use crate::domain::TargetingTag;
+use crate::util::serde::ts_milliseconds_option;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -23,13 +24,15 @@ pub struct AdUnit {
     media_url: String,
     /// MIME type of the media, possible values at the moment are: image/jpeg, image/png
     media_mime: String,
-    /// the advertised URL
+    /// Advertised URL
     target_url: String,
-    /// an array of TargetingTag, optional
+    /// Array of TargetingTag
     targeting: Vec<TargetingTag>,
-    /// optional, Number; minimum targeting score
+    /// Number; minimum targeting score (optional)
     min_targeting_score: Option<u8>,
-    /// an array of TargetingTag, meant for discovery between publishers/advertisers
+    /// Array of TargetingTag (optional)
+    /// meant for discovery between publishers/advertisers
+    #[serde(default)]
     tags: Vec<TargetingTag>,
     /// user address from the session
     owner: String,
@@ -37,13 +40,14 @@ pub struct AdUnit {
     #[serde(with = "ts_milliseconds")]
     created: DateTime<Utc>,
     /// the name of the unit used in platform UI
-    title: String,
+    title: Option<String>,
     /// arbitrary text used in platform UI
-    description: String,
+    description: Option<String>,
     /// user can change it - used for filtering in platform UI
+    #[serde(default)]
     archived: bool,
     /// UTC timestamp in milliseconds, changed every time modifiable property is changed
-    #[serde(with = "ts_milliseconds")]
-    modified: DateTime<Utc>,
+    #[serde(default, with = "ts_milliseconds_option")]
+    modified: Option<DateTime<Utc>>,
 
 }
