@@ -38,7 +38,7 @@ impl ChannelRepository for MemoryChannelRepository {
                             Some(validator_id) => {
                                 // check if there is any validator in the current
                                 // `channel.spec.validators` that has the same `id`
-                                channel.spec.validators.iter().any(|validator| &validator.addr == validator_id)
+                                channel.spec.validators.iter().any(|validator| &validator.id == validator_id)
                             }
                             // if None -> the current channel has passed, since we don't need to filter by anything
                             None => true,
