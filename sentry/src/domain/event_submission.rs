@@ -19,6 +19,7 @@ pub struct Rule {
 #[serde(rename_all = "camelCase")]
 pub struct RateLimit {
     /// "ip", "uid"
+    #[serde(rename = "type")]
     pub limit_type: String,
     /// in milliseconds
     #[serde(rename = "timeframe")]
