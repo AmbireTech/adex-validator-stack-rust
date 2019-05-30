@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tower_web::Extract;
 
-use crate::domain::{Asset, BigNum, ChannelId, ChannelSpec};
+use domain::{Asset, BigNum, ChannelId, ChannelSpec};
 
 #[derive(Extract, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]

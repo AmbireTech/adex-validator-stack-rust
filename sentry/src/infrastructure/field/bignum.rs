@@ -1,10 +1,8 @@
+use domain::BigNum;
+use num_bigint::BigUint;
 use std::error::Error;
 use std::str::FromStr;
-
-use num_bigint::BigUint;
-use tokio_postgres::types::{FromSql, Type, ToSql, IsNull};
-
-use crate::domain::BigNum;
+use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
 impl<'a> FromSql<'a> for BigNum {
     fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<BigNum, Box<dyn Error + Sync + Send>> {

@@ -3,11 +3,13 @@ use futures::future::FutureExt;
 use futures_legacy::Future as OldFuture;
 use futures_legacy::future::IntoFuture;
 use futures_legacy::Stream as OldStream;
+
+use domain::{Channel, ChannelListParams, ChannelRepository, ChannelSpec, RepositoryFuture};
 use try_future::try_future;
 use uuid::Uuid;
 
-use crate::domain::{Channel, ChannelListParams, ChannelRepository, ChannelSpec, RepositoryFuture};
 use crate::infrastructure::persistence::DbPool;
+use crate::infrastructure::persistence::postgres::PostgresPersistenceError;
 
 pub struct PostgresChannelRepository {
     db_pool: DbPool,
@@ -58,7 +60,7 @@ impl ChannelRepository for PostgresChannelRepository {
                         Ok((channels, conn))
                     })
             })
-            .map_err(|err| err.into());
+            .map_err(|err| PostgresRepositoryError::from(err).into());
 
         fut.compat().boxed()
     }

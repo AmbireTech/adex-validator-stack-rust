@@ -6,13 +6,13 @@ use std::net::SocketAddr;
 
 use futures::compat::Future01CompatExt;
 use futures::future::{FutureExt, TryFutureExt};
-use lazy_static::lazy_static;
 use tokio::await;
 use tokio_tcp::TcpListener;
 use tower_web::ServiceBuilder;
 
+use domain::DomainError;
+use lazy_static::lazy_static;
 use sentry::application::resource::channel::ChannelResource;
-use sentry::domain::DomainError;
 use sentry::infrastructure::persistence::DbPool;
 
 const DEFAULT_PORT: u16 = 8005;
@@ -69,7 +69,7 @@ struct Config {
 }
 
 impl TryFrom<Vars> for Config {
-    type Error = sentry::domain::DomainError;
+    type Error = domain::DomainError;
 
     fn try_from(mut vars: Vars) -> Result<Self, Self::Error> {
         let limit = vars

@@ -2,7 +2,7 @@ use std::error;
 use std::fmt;
 use std::sync::{PoisonError, RwLockReadGuard, RwLockWriteGuard};
 
-use crate::domain::{RepositoryError, IOError};
+use domain::{IOError, RepositoryError};
 
 #[derive(Debug)]
 pub enum MemoryPersistenceError {
@@ -24,22 +24,22 @@ impl fmt::Display for MemoryPersistenceError {
     }
 }
 
-impl<T> From<PoisonError<RwLockReadGuard<'_, T>>> for RepositoryError {
+impl<T> From<PoisonError<RwLockReadGuard<'_, T>>> for MemoryPersistenceError {
     fn from(_: PoisonError<RwLockReadGuard<T>>) -> Self {
-        RepositoryError::IO(
-            Box::new(
-                MemoryPersistenceError::Reading
-            )
-        )
+        MemoryPersistenceError::Reading
     }
 }
 
-impl<T> From<PoisonError<RwLockWriteGuard<'_, T>>> for RepositoryError {
+impl<T> From<PoisonError<RwLockWriteGuard<'_, T>>> for MemoryPersistenceError {
     fn from(_: PoisonError<RwLockWriteGuard<T>>) -> Self {
+        MemoryPersistenceError::Writing
+    }
+}
+
+impl Into<RepositoryError> for MemoryPersistenceError {
+    fn into(self) -> RepositoryError {
         RepositoryError::IO(
-            Box::new(
-                MemoryPersistenceError::Writing
-            )
+            Box::new(self)
         )
     }
 }
