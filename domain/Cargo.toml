@@ -6,7 +6,6 @@ edition = "2018"
 
 [features]
 fixtures = ["fake", "rand"]
-memory = []
 postgres = ["tokio-postgres"]
 
 [dependencies]
