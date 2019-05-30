@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 
 use chrono::{DateTime, Utc};
-use chrono::serde::ts_milliseconds;
+use chrono::serde::{ts_milliseconds, ts_seconds};
 use serde::{Deserialize, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 
@@ -57,7 +57,7 @@ pub struct Channel {
     pub creator: String,
     pub deposit_asset: Asset,
     pub deposit_amount: BigNum,
-    #[serde(with = "ts_milliseconds")]
+    #[serde(with = "ts_seconds")]
     pub valid_until: DateTime<Utc>,
     pub spec: ChannelSpec,
 }
