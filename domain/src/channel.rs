@@ -26,7 +26,7 @@ impl TryFrom<&str> for ChannelId {
     ///
     /// ```
     /// use std::convert::TryFrom;
-    /// use sentry::domain::channel::ChannelId;
+    /// use domain::channel::ChannelId;
     ///
     /// let bytes: [u8; 32] = [49, 50, 51, 52, 53, 54, 55, 56, 57, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 48, 49, 50];
     ///
