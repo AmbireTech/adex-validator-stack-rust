@@ -2,6 +2,7 @@ use std::convert::TryFrom;
 
 use chrono::{DateTime, Utc};
 use chrono::serde::{ts_milliseconds, ts_seconds};
+use hex::FromHex;
 use serde::{Deserialize, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 
@@ -19,8 +20,7 @@ pub struct ChannelId {
 impl TryFrom<&str> for ChannelId {
     type Error = DomainError;
 
-    /// Tries to create a ChannelId from &str
-    /// which should be 32 bytes length.
+    /// Tries to create a ChannelId from &str, which should be 32 bytes length.
     ///
     /// Example:
     ///
@@ -30,13 +30,46 @@ impl TryFrom<&str> for ChannelId {
     ///
     /// let bytes: [u8; 32] = [49, 50, 51, 52, 53, 54, 55, 56, 57, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 48, 49, 50];
     ///
-    /// assert_eq!(ChannelId { id: bytes }, ChannelId::try_from("0x12345678901234567890123456789012").unwrap())
+    /// assert_eq!(ChannelId { id: bytes }, ChannelId::try_from("12345678901234567890123456789012").unwrap())
     /// ```
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let bytes = value.trim_start_matches("0x").as_bytes();
+        let bytes = value.as_bytes();
         if bytes.len() != 32 {
             return Err(DomainError::InvalidArgument("The value of the id should have exactly 32 bytes".to_string()));
         }
+        let mut id = [0; 32];
+        id.copy_from_slice(&bytes[..32]);
+
+        Ok(Self { id })
+    }
+}
+
+impl ChannelId {
+    /// Creates a ChannelId from a string hex with or without `0x` prefix.
+    /// The bytes should be 32 after decoding.
+    ///
+    /// Example:
+    ///
+    /// ```
+    /// use domain::ChannelId;
+    ///
+    /// let hex_string = "0x061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088";
+    ///
+    /// let from_hex = domain::ChannelId::try_from_hex(hex_string).expect("This should be valid hex string");
+    ///
+    /// let expected_channel_id = ChannelId{ id: [6, 29, 94, 42, 103, 208, 169, 161, 15, 28, 115, 43, 202, 18, 166, 118, 216, 63, 121, 102, 58, 57, 111, 125, 135, 179, 227, 11, 155, 65, 16, 136]};
+    /// assert_eq!(expected_channel_id, from_hex)
+    /// ```
+    pub fn try_from_hex(hex: &str) -> Result<Self, DomainError> {
+        let s = hex.trim_start_matches("0x");
+
+        let bytes: Vec<u8> = Vec::from_hex(s).map_err(|err| DomainError::InvalidArgument(err.to_string()))?;
+        if bytes.len() != 32 {
+            return Err(DomainError::InvalidArgument("The value of the id should have exactly 32 bytes".to_string()));
+        }
+
+        println!("{:?}", bytes);
+
         let mut id = [0; 32];
         id.copy_from_slice(&bytes[..32]);
 
