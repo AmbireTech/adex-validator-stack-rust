@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 
 use chrono::{DateTime, Utc};
 use chrono::serde::{ts_milliseconds, ts_seconds};
-use hex::FromHex;
+use hex::{FromHex, ToHex};
 use serde::{Deserialize, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 
@@ -15,6 +15,29 @@ use crate::util::serde::ts_milliseconds_option;
 pub struct ChannelId {
     #[serde(with = "SerHex::<StrictPfx>")]
     pub id: [u8; 32],
+}
+
+impl ToString for ChannelId {
+    /// Converts a ChannelId to hex string with prefix
+    ///
+    /// Example:
+    /// ```
+    /// use domain::ChannelId;
+    ///
+    /// let hex_string = "0x061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088";
+    /// let channel_id = ChannelId::try_from_hex(&hex_string).expect("Should be a valid hex string already");
+    ///
+    /// assert_eq!("0x061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088", channel_id.to_string());
+    /// ```
+    fn to_string(&self) -> String {
+        let mut prefixed = "0x".to_string();
+
+        let mut hex_string = String::new();
+
+        self.id.write_hex(&mut hex_string).unwrap();
+        prefixed.push_str(&hex_string);
+        prefixed
+    }
 }
 
 impl TryFrom<&str> for ChannelId {
