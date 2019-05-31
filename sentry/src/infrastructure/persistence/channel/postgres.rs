@@ -8,8 +8,11 @@ use tokio_postgres::types::Json;
 use domain::{Channel, ChannelId, ChannelListParams, ChannelRepository, ChannelSpec, RepositoryFuture};
 use try_future::try_future;
 
-use crate::infrastructure::field::asset::AssetPg;
-use crate::infrastructure::field::bignum::BigNumPg;
+use crate::infrastructure::field::{
+    asset::AssetPg,
+    bignum::BigNumPg,
+    channel_id::ChannelIdPg,
+};
 use crate::infrastructure::persistence::DbPool;
 use crate::infrastructure::persistence::postgres::PostgresPersistenceError;
 
@@ -47,8 +50,7 @@ impl ChannelRepository for PostgresChannelRepository {
                         let channels = rows.iter().map(|row| {
                             let spec: ChannelSpec = row.get::<_, Json<ChannelSpec>>("spec").0;
                             Channel {
-                                // @TODO: Fix this mess by creating a FromSql & ToSql
-                                id: ChannelId::try_from_hex(row.get::<_, &str>("channel_id")).unwrap(),
+                                id: row.get::<_, ChannelIdPg>("channel_id").into(),
                                 creator: row.get("creator"),
                                 deposit_asset: row.get::<_, AssetPg>("deposit_asset").into(),
                                 deposit_amount: row.get::<_, BigNumPg>("deposit_amount").into(),
