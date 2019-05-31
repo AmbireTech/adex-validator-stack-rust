@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Asset(pub(crate) String);
+pub struct Asset(String);
 
 impl From<String> for Asset {
     fn from(asset: String) -> Self {
@@ -15,7 +15,13 @@ impl From<&str> for Asset {
     }
 }
 
-#[cfg(test)]
+impl Into<String> for Asset {
+    fn into(self) -> String {
+        self.0
+    }
+}
+
+#[cfg(any(test, feature = "fixtures"))]
 pub(crate) mod fixtures {
     use fake::helper::take_one;
 

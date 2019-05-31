@@ -4,6 +4,9 @@ use std::pin::Pin;
 
 use futures::Future;
 
+#[cfg(any(test, feature = "fixtures"))]
+pub use util::tests as test_util;
+
 pub use self::ad_unit::AdUnit;
 pub use self::asset::Asset;
 pub use self::bignum::BigNum;
@@ -19,9 +22,10 @@ pub mod asset;
 pub mod targeting_tag;
 pub mod ad_unit;
 pub mod event_submission;
+pub mod util;
 
-#[cfg(test)]
 /// re-exports all the fixtures in one module
+#[cfg(any(test, feature = "fixtures"))]
 pub mod fixtures {
     pub use super::asset::fixtures::*;
     pub use super::channel::fixtures::*;

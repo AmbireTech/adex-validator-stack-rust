@@ -2,11 +2,12 @@ use std::convert::TryFrom;
 
 use chrono::{DateTime, Utc};
 use chrono::serde::{ts_milliseconds, ts_seconds};
+use hex::{FromHex, ToHex};
 use serde::{Deserialize, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 
-use crate::domain::{AdUnit, Asset, DomainError, EventSubmission, RepositoryFuture, TargetingTag, ValidatorDesc};
-use crate::domain::bignum::BigNum;
+use crate::{AdUnit, Asset, DomainError, EventSubmission, RepositoryFuture, TargetingTag, ValidatorDesc};
+use crate::bignum::BigNum;
 use crate::util::serde::ts_milliseconds_option;
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Copy, Clone)]
@@ -16,17 +17,39 @@ pub struct ChannelId {
     pub id: [u8; 32],
 }
 
+impl ToString for ChannelId {
+    /// Converts a ChannelId to hex string with prefix
+    ///
+    /// Example:
+    /// ```
+    /// use domain::ChannelId;
+    ///
+    /// let hex_string = "0x061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088";
+    /// let channel_id = ChannelId::try_from_hex(&hex_string).expect("Should be a valid hex string already");
+    ///
+    /// assert_eq!("0x061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088", channel_id.to_string());
+    /// ```
+    fn to_string(&self) -> String {
+        let mut prefixed = "0x".to_string();
+
+        let mut hex_string = String::new();
+
+        self.id.write_hex(&mut hex_string).unwrap();
+        prefixed.push_str(&hex_string);
+        prefixed
+    }
+}
+
 impl TryFrom<&str> for ChannelId {
     type Error = DomainError;
 
-    /// Tries to create a ChannelId from &str
-    /// which should be 32 bytes length.
+    /// Tries to create a ChannelId from &str, which should be 32 bytes length.
     ///
     /// Example:
     ///
     /// ```
     /// use std::convert::TryFrom;
-    /// use sentry::domain::channel::ChannelId;
+    /// use domain::channel::ChannelId;
     ///
     /// let bytes: [u8; 32] = [49, 50, 51, 52, 53, 54, 55, 56, 57, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 48, 49, 50];
     ///
@@ -37,6 +60,37 @@ impl TryFrom<&str> for ChannelId {
         if bytes.len() != 32 {
             return Err(DomainError::InvalidArgument("The value of the id should have exactly 32 bytes".to_string()));
         }
+        let mut id = [0; 32];
+        id.copy_from_slice(&bytes[..32]);
+
+        Ok(Self { id })
+    }
+}
+
+impl ChannelId {
+    /// Creates a ChannelId from a string hex with or without `0x` prefix.
+    /// The bytes should be 32 after decoding.
+    ///
+    /// Example:
+    ///
+    /// ```
+    /// use domain::ChannelId;
+    ///
+    /// let hex_string = "0x061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088";
+    ///
+    /// let from_hex = domain::ChannelId::try_from_hex(hex_string).expect("This should be valid hex string");
+    ///
+    /// let expected_channel_id = ChannelId{ id: [6, 29, 94, 42, 103, 208, 169, 161, 15, 28, 115, 43, 202, 18, 166, 118, 216, 63, 121, 102, 58, 57, 111, 125, 135, 179, 227, 11, 155, 65, 16, 136]};
+    /// assert_eq!(expected_channel_id, from_hex)
+    /// ```
+    pub fn try_from_hex(hex: &str) -> Result<Self, DomainError> {
+        let s = hex.trim_start_matches("0x");
+
+        let bytes: Vec<u8> = Vec::from_hex(s).map_err(|err| DomainError::InvalidArgument(err.to_string()))?;
+        if bytes.len() != 32 {
+            return Err(DomainError::InvalidArgument("The value of the id should have exactly 32 bytes".to_string()));
+        }
+
         let mut id = [0; 32];
         id.copy_from_slice(&bytes[..32]);
 
@@ -149,9 +203,9 @@ pub trait ChannelRepository: Send + Sync {
     fn find(&self, channel_id: &ChannelId) -> RepositoryFuture<Option<Channel>>;
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "fixtures"))]
 #[path = "./channel_fixtures.rs"]
-pub(crate) mod fixtures;
+pub mod fixtures;
 
 #[cfg(test)]
 #[path = "./channel_test.rs"]

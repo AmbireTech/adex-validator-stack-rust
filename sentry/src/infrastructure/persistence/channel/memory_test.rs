@@ -1,8 +1,8 @@
 use chrono::Utc;
 use time::Duration;
 
-use crate::domain::{Channel, ChannelListParams, ChannelRepository, RepositoryError};
-use crate::domain::fixtures::*;
+use domain::{Channel, ChannelListParams, ChannelRepository, RepositoryError};
+use domain::fixtures::*;
 
 use super::MemoryChannelRepository;
 

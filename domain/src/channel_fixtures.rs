@@ -3,11 +3,11 @@ use std::convert::TryFrom;
 use chrono::{DateTime, Utc};
 use fake::faker::*;
 
-use crate::domain::asset::fixtures::get_asset;
-use crate::domain::BigNum;
-use crate::domain::fixtures::{get_targeting_tags, get_validators};
-use crate::domain::ValidatorDesc;
+use crate::asset::fixtures::get_asset;
+use crate::BigNum;
+use crate::fixtures::{get_targeting_tags, get_validators};
 use crate::test_util;
+use crate::ValidatorDesc;
 
 use super::{Channel, ChannelId, ChannelSpec};
 
@@ -71,7 +71,7 @@ pub fn get_channel_spec(prefix: &str, validators_option: ValidatorsOption) -> Ch
         ValidatorsOption::Some(validators) => validators,
         ValidatorsOption::None => vec![],
     };
-    use crate::domain::EventSubmission;
+    use crate::EventSubmission;
     use test_util::take_one;
 
     let title_string = Some(<Faker as Lorem>::sentence(3, 4));

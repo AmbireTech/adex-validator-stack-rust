@@ -1,18 +1,37 @@
+use std::convert::TryFrom;
+use std::error::Error;
 use std::str::FromStr;
 
 use num_bigint::BigUint;
-use serde::{Serialize, Deserialize, Deserializer, Serializer};
-use std::convert::TryFrom;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BigNum(
     #[serde(deserialize_with = "biguint_from_str", serialize_with = "biguint_to_str")]
-    pub(crate) BigUint
+    BigUint
 );
 
 impl BigNum {
     pub fn new(num: BigUint) -> Result<Self, super::DomainError> {
         Ok(Self(num))
+    }
+}
+
+impl TryFrom<&str> for BigNum {
+    type Error = super::DomainError;
+
+    fn try_from(num: &str) -> Result<Self, Self::Error> {
+        let big_uint = BigUint::from_str(&num).map_err(|err| {
+            super::DomainError::InvalidArgument(err.description().to_string())
+        })?;
+
+        Ok(Self(big_uint))
+    }
+}
+
+impl ToString for BigNum {
+    fn to_string(&self) -> String {
+        self.0.to_str_radix(10)
     }
 }
 

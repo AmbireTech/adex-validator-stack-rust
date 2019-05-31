@@ -3,7 +3,7 @@ use std::fmt;
 
 use bb8::RunError;
 
-use crate::domain::{RepositoryError, IOError};
+use domain::{IOError, RepositoryError};
 
 #[derive(Debug)]
 pub enum PostgresPersistenceError {
@@ -23,17 +23,19 @@ impl fmt::Display for PostgresPersistenceError {
     }
 }
 
-impl From<RunError<tokio_postgres::Error>> for RepositoryError {
+impl From<RunError<tokio_postgres::Error>> for PostgresPersistenceError {
     fn from(run_error: RunError<tokio_postgres::Error>) -> Self {
-        let postgres_error = match run_error {
+        match run_error {
             RunError::TimedOut => PostgresPersistenceError::TimedOut,
             RunError::User(error) => PostgresPersistenceError::UserError(error)
-        };
+        }
+    }
+}
 
+impl Into<RepositoryError> for PostgresPersistenceError {
+    fn into(self) -> RepositoryError {
         RepositoryError::IO(
-            Box::new(
-                postgres_error
-            )
+            Box::new(self)
         )
     }
 }

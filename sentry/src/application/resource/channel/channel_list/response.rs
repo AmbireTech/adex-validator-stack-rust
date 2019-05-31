@@ -1,7 +1,7 @@
 use serde::Serialize;
 use tower_web::Response;
 
-use crate::domain::Channel;
+use domain::Channel;
 
 #[derive(Debug, Response)]
 pub struct ChannelListResponse {

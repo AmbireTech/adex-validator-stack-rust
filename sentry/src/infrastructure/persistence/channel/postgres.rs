@@ -3,11 +3,18 @@ use futures::future::FutureExt;
 use futures_legacy::Future as OldFuture;
 use futures_legacy::future::IntoFuture;
 use futures_legacy::Stream as OldStream;
-use try_future::try_future;
-use uuid::Uuid;
+use tokio_postgres::types::Json;
 
-use crate::domain::{Channel, ChannelListParams, ChannelRepository, ChannelSpec, RepositoryFuture};
+use domain::{Channel, ChannelId, ChannelListParams, ChannelRepository, ChannelSpec, RepositoryFuture};
+use try_future::try_future;
+
+use crate::infrastructure::field::{
+    asset::AssetPg,
+    bignum::BigNumPg,
+    channel_id::ChannelIdPg,
+};
 use crate::infrastructure::persistence::DbPool;
+use crate::infrastructure::persistence::postgres::PostgresPersistenceError;
 
 pub struct PostgresChannelRepository {
     db_pool: DbPool,
@@ -24,7 +31,7 @@ impl ChannelRepository for PostgresChannelRepository {
     fn list(&self, _params: &ChannelListParams) -> RepositoryFuture<Vec<Channel>> {
         let fut = self.db_pool
             .run(move |mut conn| {
-                conn.prepare("SELECT channel_id, creator, deposit_asset, deposit_amount, valid_until FROM channels")
+                conn.prepare("SELECT channel_id, creator, deposit_asset, deposit_amount, valid_until, spec FROM channels")
                     .then(move |res| match res {
                         Ok(stmt) => {
                             conn
@@ -40,25 +47,22 @@ impl ChannelRepository for PostgresChannelRepository {
                         Err(err) => try_future!(Err((err, conn))),
                     })
                     .and_then(|(rows, conn)| {
-                        // @TODO: Add the ChannelSpecs hydration
                         let channels = rows.iter().map(|row| {
+                            let spec: ChannelSpec = row.get::<_, Json<ChannelSpec>>("spec").0;
                             Channel {
-                                id: row.get("channel_id"),
+                                id: row.get::<_, ChannelIdPg>("channel_id").into(),
                                 creator: row.get("creator"),
-                                deposit_asset: row.get("deposit_asset"),
-                                deposit_amount: row.get("deposit_amount"),
+                                deposit_asset: row.get::<_, AssetPg>("deposit_asset").into(),
+                                deposit_amount: row.get::<_, BigNumPg>("deposit_amount").into(),
                                 valid_until: row.get("valid_until"),
-                                spec: ChannelSpec {
-                                    id: Uuid::new_v4(),
-                                    validators: vec![],
-                                },
+                                spec,
                             }
                         }).collect();
 
                         Ok((channels, conn))
                     })
             })
-            .map_err(|err| err.into());
+            .map_err(|err| PostgresPersistenceError::from(err).into());
 
         fut.compat().boxed()
     }
@@ -67,7 +71,7 @@ impl ChannelRepository for PostgresChannelRepository {
         unimplemented!("save() for Postgres still needs to be implemented")
     }
 
-    fn find(&self, _channel_id: &String) -> RepositoryFuture<Option<Channel>> {
+    fn find(&self, _channel_id: &ChannelId) -> RepositoryFuture<Option<Channel>> {
         unimplemented!("find() for Postgres still needs to be implemented")
     }
 }

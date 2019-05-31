@@ -2,7 +2,9 @@ use std::sync::{Arc, RwLock};
 
 use futures::future::{err, FutureExt, ok};
 
-use crate::domain::{Channel, ChannelId, ChannelListParams, ChannelRepository, RepositoryError, RepositoryFuture};
+use domain::{Channel, ChannelId, ChannelListParams, ChannelRepository, RepositoryError, RepositoryFuture};
+
+use crate::infrastructure::persistence::memory::MemoryPersistenceError;
 
 #[cfg(test)]
 #[path = "./memory_test.rs"]
@@ -55,7 +57,7 @@ impl ChannelRepository for MemoryChannelRepository {
 
                 ok(channels)
             },
-            Err(error) => err(error.into()),
+            Err(error) => err(MemoryPersistenceError::from(error).into()),
         };
 
         res_fut.boxed()
@@ -71,7 +73,7 @@ impl ChannelRepository for MemoryChannelRepository {
                     }
                 })
             }
-            Err(error) => return err(error.into()).boxed(),
+            Err(error) => return err(MemoryPersistenceError::from(error).into()).boxed(),
         };
 
         if channel_found.is_some() {
@@ -84,7 +86,7 @@ impl ChannelRepository for MemoryChannelRepository {
 
                 ok(())
             }
-            Err(error) => err(error.into())
+            Err(error) => err(MemoryPersistenceError::from(error).into())
         };
 
         create_fut.boxed()
@@ -102,7 +104,7 @@ impl ChannelRepository for MemoryChannelRepository {
 
                 ok(found_channel)
             }
-            Err(error) => err(error.into()),
+            Err(error) => err(MemoryPersistenceError::from(error).into()),
         };
 
         res_fut.boxed()

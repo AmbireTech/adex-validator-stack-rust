@@ -1,6 +1,6 @@
 use tokio::await;
 
-use crate::domain::{Channel, ChannelRepository};
+use domain::{Channel, ChannelRepository};
 
 use super::ChannelCreateResponse;
 use super::ChannelInput;
