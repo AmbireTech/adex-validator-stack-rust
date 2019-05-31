@@ -30,10 +30,10 @@ impl TryFrom<&str> for ChannelId {
     ///
     /// let bytes: [u8; 32] = [49, 50, 51, 52, 53, 54, 55, 56, 57, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 48, 49, 50];
     ///
-    /// assert_eq!(ChannelId { id: bytes }, ChannelId::try_from("12345678901234567890123456789012").unwrap())
+    /// assert_eq!(ChannelId { id: bytes }, ChannelId::try_from("0x12345678901234567890123456789012").unwrap())
     /// ```
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let bytes = value.as_bytes();
+        let bytes = value.trim_start_matches("0x").as_bytes();
         if bytes.len() != 32 {
             return Err(DomainError::InvalidArgument("The value of the id should have exactly 32 bytes".to_string()));
         }
