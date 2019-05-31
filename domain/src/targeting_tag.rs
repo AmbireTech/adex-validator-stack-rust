@@ -5,19 +5,21 @@ use crate::DomainError;
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TargetingTag {
     pub tag: String,
-    #[serde(deserialize_with = "score_deserialize")]
-    pub score: u8,
-//    _secret: (),
+    pub score: Score,
 }
 
-impl TargetingTag {
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(transparent)]
+pub struct Score(#[serde(deserialize_with = "score_deserialize")] u8);
+
+impl Score {
     /// score should be between 0 and 100
-    pub fn new(tag: String, score: u8) -> Result<Self, DomainError> {
+    fn new(score: u8) -> Result<Self, DomainError> {
         if score > 100 {
             return Err(DomainError::InvalidArgument("score should be between 0 >= x <= 100".to_string()));
         }
 
-        Ok(Self { tag, score /* _secret: ()*/ })
+        Ok(Self(score))
     }
 }
 
@@ -36,12 +38,10 @@ pub fn score_deserialize<'de, D>(deserializer: D) -> Result<u8, D::Error>
 pub mod fixtures {
     use fake::faker::*;
 
-    use super::TargetingTag;
+    use super::{Score, TargetingTag};
 
     pub fn get_targeting_tag(tag: String) -> TargetingTag {
-        let score = <Faker as Number>::between(0, 100);
-
-        TargetingTag::new(tag, score).expect("TargetingTag error when creating from fixture")
+        TargetingTag { tag, score: get_score(None) }
     }
 
     pub fn get_targeting_tags(count: usize) -> Vec<TargetingTag> {
@@ -52,5 +52,11 @@ pub mod fixtures {
                 get_targeting_tag(tag_name)
             })
             .collect()
+    }
+
+    pub fn get_score(score: Option<u8>) -> Score {
+        let score = score.unwrap_or(<Faker as Number>::between(0, 100));
+
+        Score::new(score).expect("Score was unable to be created")
     }
 }
