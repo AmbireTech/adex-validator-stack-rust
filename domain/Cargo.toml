@@ -6,7 +6,6 @@ edition = "2018"
 
 [features]
 fixtures = ["fake", "rand"]
-postgres = ["tokio-postgres"]
 
 [dependencies]
 # Futures
@@ -23,3 +22,4 @@ time = "0.1.42"
 fake = { version = "^1.3", features = ["chrono"], optional = true }
 rand = { version = "^0.6", optional = true }
 tokio-postgres = { version = "=0.4.0-rc.2", features = ["with-chrono-0_4"], optional = true }
+faster-hex = "0.3.1"

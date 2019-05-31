@@ -38,6 +38,6 @@ chrono = { version = "0.4", features = ["serde"] }
 time = "0.1.42"
 domain = { version = "0.1", path = "../domain" }
 [dev-dependencies]
-domain = { version = "0.1", path = "../domain", features = ["fixtures", "postgres"] }
+domain = { version = "0.1", path = "../domain", features = ["fixtures"] }
 fake = { version = "^1.3", features = ["chrono"] }
 rand = "^0.6"
