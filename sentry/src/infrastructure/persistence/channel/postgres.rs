@@ -44,14 +44,11 @@ impl ChannelRepository for PostgresChannelRepository {
                         Err(err) => try_future!(Err((err, conn))),
                     })
                     .and_then(|(rows, conn)| {
-                        use std::convert::TryInto;
-
-                        // @TODO: Add the ChannelSpecs hydration
                         let channels = rows.iter().map(|row| {
                             let spec: ChannelSpec = row.get::<_, Json<ChannelSpec>>("spec").0;
                             Channel {
                                 // @TODO: Fix this mess by creating a FromSql & ToSql
-                                id: row.get::<_, &str>("channel_id").try_into().unwrap(),
+                                id: ChannelId::try_from_hex(row.get::<_, &str>("channel_id")).unwrap(),
                                 creator: row.get("creator"),
                                 deposit_asset: row.get::<_, AssetPg>("deposit_asset").into(),
                                 deposit_amount: row.get::<_, BigNumPg>("deposit_amount").into(),
