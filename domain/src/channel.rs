@@ -91,8 +91,6 @@ impl ChannelId {
             return Err(DomainError::InvalidArgument("The value of the id should have exactly 32 bytes".to_string()));
         }
 
-        println!("{:?}", bytes);
-
         let mut id = [0; 32];
         id.copy_from_slice(&bytes[..32]);
 
