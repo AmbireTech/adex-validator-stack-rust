@@ -24,9 +24,9 @@ impl BigNum {
     }
 }
 
-impl Sum<BigNum> for BigNum {
-    fn sum<I: Iterator<Item = BigNum>>(iter: I) -> Self {
-        let sum_uint = iter.map(|big_num| big_num.0).sum();
+impl<'a> Sum<&'a BigNum> for BigNum {
+    fn sum<I: Iterator<Item = &'a BigNum>>(iter: I) -> Self {
+        let sum_uint = iter.map(|big_num| &big_num.0).sum();
 
         Self(sum_uint)
     }
