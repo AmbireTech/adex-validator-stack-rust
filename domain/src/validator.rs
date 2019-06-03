@@ -12,8 +12,6 @@ pub struct ValidatorDesc {
 
 #[cfg(any(test, feature = "fixtures"))]
 pub(crate) mod fixtures {
-    use std::convert::TryFrom;
-
     use fake::faker::*;
 
     use crate::BigNum;
@@ -21,8 +19,7 @@ pub(crate) mod fixtures {
     use super::ValidatorDesc;
 
     pub fn get_validator(validator_id: &str) -> ValidatorDesc {
-        let fee = BigNum::try_from(<Faker as Number>::between(1_u32, 13_u32))
-            .expect("BigNum error when creating from random number");
+        let fee = BigNum::from(<Faker as Number>::between(1, 13));
         let url = format!("http://{}-validator-url.com/validator", validator_id);
 
         ValidatorDesc {

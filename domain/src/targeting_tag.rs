@@ -14,6 +14,7 @@ pub struct Score(#[serde(deserialize_with = "score_deserialize")] u8);
 
 impl Score {
     /// score should be between 0 and 100
+    #[allow(dead_code)]
     fn new(score: u8) -> Result<Self, DomainError> {
         if score > 100 {
             return Err(DomainError::InvalidArgument(
