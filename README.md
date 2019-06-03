@@ -1,4 +1,4 @@
-# adex-validator-stack-rust
+# Adex Validator Stack in Rust [![Build Status](https://travis-ci.com/AdExNetwork/adex-validator-stack-rust.svg?token=TBKq9g6p9sWDrzNyX4kC&branch=master)](https://travis-ci.com/AdExNetwork/adex-validator-stack-rust)
 
 Rust implementation of the Validator Stack
 
@@ -20,7 +20,7 @@ GET `/channel/list` - get a list of all channels - TODO
 ### Rust setup
 
 - Requires `nightly 2019-05-08`, because of the new syntax for `await` and our `tower-web` dependency fails to build.
-We've setup `rust-toolchain` but you can manually override it as well with `rustup override set nightly-2019-04-07`.
+We've setup `rust-toolchain` but you can manually override it as well with `rustup override set nightly-2019-05-08`.
 
 #### Linux
 - The crate `openssl-sys` requires `libssl-dev` and `pkg-config` for Ubuntu.
