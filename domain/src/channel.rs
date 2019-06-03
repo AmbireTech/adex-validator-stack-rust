@@ -1,16 +1,16 @@
 use std::convert::TryFrom;
 
-use chrono::serde::{ts_milliseconds, ts_seconds};
 use chrono::{DateTime, Utc};
+use chrono::serde::{ts_milliseconds, ts_seconds};
 use hex::FromHex;
 use serde::{Deserialize, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 
+use crate::{
+    AdUnit, Asset, DomainError, EventSubmission, TargetingTag, ValidatorDesc,
+};
 use crate::bignum::BigNum;
 use crate::util::serde::ts_milliseconds_option;
-use crate::{
-    AdUnit, Asset, DomainError, EventSubmission, RepositoryFuture, TargetingTag, ValidatorDesc,
-};
 
 #[cfg(feature = "repositories")]
 pub use self::repository::ChannelRepository;
