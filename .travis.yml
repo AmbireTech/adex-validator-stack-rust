@@ -1,0 +1,17 @@
+language: rust
+rust:
+  - nightly-2019-05-08
+cache: cargo
+matrix:
+  fast_finish: true
+install:
+  - cargo install --force cargo-make
+  - rustup component add rustfmt
+  - rustup component add clippy
+before_script:
+  - cargo make check-format
+  - cargo make check-clippy
+script:
+  - cargo build --verbose --all
+  - cargo test --verbose --all
+  - cargo test --verbose --all --all-features
