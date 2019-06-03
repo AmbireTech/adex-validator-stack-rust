@@ -3,13 +3,11 @@ use std::error::Error;
 use std::iter::Sum;
 use std::str::FromStr;
 
-use derive_more::{Add, Div, Mul, Sub};
 use num_bigint::BigUint;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::ops::{Div, Mul};
 
-#[derive(
-    Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Mul, Div, Add, Sub,
-)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BigNum(
     #[serde(
         deserialize_with = "biguint_from_str",
@@ -22,11 +20,55 @@ impl BigNum {
     pub fn new(num: BigUint) -> Result<Self, super::DomainError> {
         Ok(Self(num))
     }
+
+    pub fn div_floor(&self, other: &Self) -> Self {
+        use num::integer::Integer;
+
+        Self(self.0.div_floor(&other.0))
+    }
+
+    pub fn to_f64(&self) -> Option<f64> {
+        use num::traits::cast::ToPrimitive;
+
+        self.0.to_f64()
+    }
+
+    pub fn to_u64(&self) -> Option<u64> {
+        use num::traits::cast::ToPrimitive;
+
+        self.0.to_u64()
+    }
+}
+
+impl Div<&BigNum> for &BigNum {
+    type Output = BigNum;
+
+    fn div(self, rhs: &BigNum) -> Self::Output {
+        let big_uint = &self.0 / &rhs.0;
+        BigNum(big_uint.to_owned())
+    }
+}
+
+impl Mul<&BigNum> for &BigNum {
+    type Output = BigNum;
+
+    fn mul(self, rhs: &BigNum) -> Self::Output {
+        let big_uint = &self.0 * &rhs.0;
+        BigNum(big_uint.to_owned())
+    }
 }
 
 impl<'a> Sum<&'a BigNum> for BigNum {
     fn sum<I: Iterator<Item = &'a BigNum>>(iter: I) -> Self {
         let sum_uint = iter.map(|big_num| &big_num.0).sum();
+
+        Self(sum_uint)
+    }
+}
+
+impl Sum<BigNum> for BigNum {
+    fn sum<I: Iterator<Item = BigNum>>(iter: I) -> Self {
+        let sum_uint = iter.map(|big_num| big_num.0).sum();
 
         Self(sum_uint)
     }
@@ -49,11 +91,9 @@ impl ToString for BigNum {
     }
 }
 
-impl TryFrom<u32> for BigNum {
-    type Error = super::DomainError;
-
-    fn try_from(value: u32) -> Result<Self, Self::Error> {
-        BigNum::new(BigUint::from(value))
+impl From<u64> for BigNum {
+    fn from(value: u64) -> Self {
+        BigNum(BigUint::from(value))
     }
 }
 

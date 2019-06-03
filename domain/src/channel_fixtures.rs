@@ -1,5 +1,3 @@
-use std::convert::TryFrom;
-
 use chrono::{DateTime, Utc};
 use fake::faker::*;
 
@@ -33,8 +31,7 @@ pub fn get_channel(
     spec: Option<ChannelSpec>,
 ) -> Channel {
     let channel_id = get_channel_id(id);
-    let deposit_amount = BigNum::try_from(<Faker as Number>::between(100_u32, 5000_u32))
-        .expect("BigNum error when creating from random number");
+    let deposit_amount = BigNum::from(<Faker as Number>::between(100, 5000));
     let valid_until: DateTime<Utc> =
         valid_until.unwrap_or(test_util::time::datetime_between(&Utc::now(), None));
     let creator = <Faker as Name>::name();
@@ -84,12 +81,9 @@ pub fn get_channel_spec(prefix: &str, validators_option: ValidatorsOption) -> Ch
     let title_string = Some(<Faker as Lorem>::sentence(3, 4));
 
     let title = take_one(&[&title_string, &None]).to_owned();
-    let max_per_impression = BigNum::try_from(<Faker as Number>::between(250_u32, 500_u32))
-        .expect("BigNum error when creating from random number");
-    let min_per_impression = BigNum::try_from(<Faker as Number>::between(1_u32, 250_u32))
-        .expect("BigNum error when creating from random number");
-    let nonce = BigNum::try_from(<Faker as Number>::between(100_000_000_u32, 999_999_999_u32))
-        .expect("BigNum error when creating from random number");
+    let max_per_impression = BigNum::from(<Faker as Number>::between(250, 500));
+    let min_per_impression = BigNum::from(<Faker as Number>::between(1, 250));
+    let nonce = BigNum::from(<Faker as Number>::between(100_000_000, 999_999_999));
     let min_targeting_score =
         take_one(&[&None, &Some(<Faker as Number>::between(1, 500))]).to_owned();
 
