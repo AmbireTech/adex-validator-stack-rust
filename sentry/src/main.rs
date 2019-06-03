@@ -74,10 +74,7 @@ impl TryFrom<Vars> for Config {
 
     fn try_from(mut vars: Vars) -> Result<Self, Self::Error> {
         let limit = vars
-            .find_map(|(key, value)| match key == "CHANNEL_LIST_LIMIT" {
-                true => Some(value),
-                false => None,
-            })
+            .find_map(|(key, value)| if key == "CHANNEL_LIST_LIMIT" { Some(value) } else { None })
             .ok_or(DomainError::InvalidArgument(
                 "CHANNEL_LIST_LIMIT evn. variable was not passed".to_string(),
             ))

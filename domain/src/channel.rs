@@ -195,10 +195,7 @@ impl ChannelListParams {
             ));
         }
 
-        let validator = validator.and_then(|s| match s.is_empty() {
-            true => None,
-            false => Some(s),
-        });
+        let validator = validator.and_then(|s| if s.is_empty() { None } else { Some(s) });
 
         Ok(Self {
             valid_until_ge,

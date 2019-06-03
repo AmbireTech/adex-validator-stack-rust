@@ -4,9 +4,9 @@ use chrono::{DateTime, Utc};
 use fake::faker::*;
 
 use crate::asset::fixtures::get_asset;
+use crate::BigNum;
 use crate::fixtures::{get_targeting_tags, get_validators};
 use crate::test_util;
-use crate::BigNum;
 use crate::ValidatorDesc;
 
 use super::{Channel, ChannelId, ChannelSpec};
@@ -39,7 +39,7 @@ pub fn get_channel(
         valid_until.unwrap_or(test_util::time::datetime_between(&Utc::now(), None));
     let creator = <Faker as Name>::name();
     let deposit_asset = get_asset();
-    let spec = spec.unwrap_or(get_channel_spec(id, ValidatorsOption::Count(3)));
+    let spec = spec.unwrap_or_else(|| get_channel_spec(id, ValidatorsOption::Count(3)));
 
     Channel {
         id: channel_id,

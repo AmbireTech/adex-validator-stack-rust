@@ -1,6 +1,6 @@
 use std::sync::{Arc, RwLock};
 
-use futures::future::{err, ok, FutureExt};
+use futures::future::{err, FutureExt, ok};
 
 use domain::{
     Channel, ChannelId, ChannelListParams, ChannelRepository, RepositoryError, RepositoryFuture,
@@ -73,12 +73,13 @@ impl ChannelRepository for MemoryChannelRepository {
 
     fn save(&self, channel: Channel) -> RepositoryFuture<()> {
         let channel_found = match self.records.read() {
-            Ok(reader) => reader
-                .iter()
-                .find_map(|current| match &channel.id == &current.id {
-                    true => Some(()),
-                    false => None,
-                }),
+            Ok(reader) => reader.iter().find_map(|current| {
+                if channel.id == current.id {
+                    Some(())
+                } else {
+                    None
+                }
+            }),
             Err(error) => return err(MemoryPersistenceError::from(error).into()).boxed(),
         };
 
@@ -101,13 +102,13 @@ impl ChannelRepository for MemoryChannelRepository {
     fn find(&self, channel_id: &ChannelId) -> RepositoryFuture<Option<Channel>> {
         let res_fut = match self.records.read() {
             Ok(reader) => {
-                let found_channel =
-                    reader
-                        .iter()
-                        .find_map(|channel| match &channel.id == channel_id {
-                            true => Some(channel.clone()),
-                            false => None,
-                        });
+                let found_channel = reader.iter().find_map(|channel| {
+                    if &channel.id == channel_id {
+                        Some(channel.clone())
+                    } else {
+                        None
+                    }
+                });
 
                 ok(found_channel)
             }

@@ -1,7 +1,7 @@
 use futures::future::{FutureExt, TryFutureExt};
 use futures_legacy::Future;
 use tokio::await;
-use tower_web::{derive_resource_impl, impl_web, Deserialize, Extract};
+use tower_web::{derive_resource_impl, Deserialize, Extract, impl_web};
 
 use channel_create::{ChannelCreateHandler, ChannelCreateResponse, ChannelInput};
 use channel_list::{ChannelListHandler, ChannelListResponse};
@@ -21,6 +21,7 @@ pub struct ChannelResource {
 }
 
 impl_web! {
+    #[allow(clippy::needless_lifetimes)]
     impl ChannelResource {
         #[post("/channel")]
         #[content_type("application/json")]

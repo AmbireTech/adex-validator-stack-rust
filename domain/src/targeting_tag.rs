@@ -31,11 +31,12 @@ where
 {
     let score_unchecked: u8 = u8::deserialize(deserializer)?;
 
-    match score_unchecked > 100 {
-        true => Err(serde::de::Error::custom(
+    if score_unchecked > 100 {
+        Err(serde::de::Error::custom(
             "Score should be between 0 >= x <= 100",
-        )),
-        false => Ok(score_unchecked),
+        ))
+    } else {
+        Ok(score_unchecked)
     }
 }
 
@@ -63,7 +64,7 @@ pub mod fixtures {
     }
 
     pub fn get_score(score: Option<u8>) -> Score {
-        let score = score.unwrap_or(<Faker as Number>::between(0, 100));
+        let score = score.unwrap_or_else(|| <Faker as Number>::between(0, 100));
 
         Score::new(score).expect("Score was unable to be created")
     }
