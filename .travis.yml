@@ -1,7 +1,6 @@
 language: rust
 rust:
   - nightly-2019-05-08
-cache: cargo
 env:
   global:
     - CARGO_MAKE_RUN_CHECK_FORMAT="true"
