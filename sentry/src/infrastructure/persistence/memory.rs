@@ -20,7 +20,11 @@ impl fmt::Display for MemoryPersistenceError {
             MemoryPersistenceError::Writing => "writing",
         };
 
-        write!(f, "Error occurred when trying to acquire lock for: {}", error_type)
+        write!(
+            f,
+            "Error occurred when trying to acquire lock for: {}",
+            error_type
+        )
     }
 }
 
@@ -38,8 +42,6 @@ impl<T> From<PoisonError<RwLockWriteGuard<'_, T>>> for MemoryPersistenceError {
 
 impl Into<RepositoryError> for MemoryPersistenceError {
     fn into(self) -> RepositoryError {
-        RepositoryError::IO(
-            Box::new(self)
-        )
+        RepositoryError::IO(Box::new(self))
     }
 }

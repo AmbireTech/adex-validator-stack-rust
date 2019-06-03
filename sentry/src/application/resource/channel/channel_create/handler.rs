@@ -6,7 +6,7 @@ use super::ChannelCreateResponse;
 use super::ChannelInput;
 
 pub struct ChannelCreateHandler<'a> {
-    channel_repository: &'a dyn ChannelRepository
+    channel_repository: &'a dyn ChannelRepository,
 }
 
 impl<'a> ChannelCreateHandler<'a> {

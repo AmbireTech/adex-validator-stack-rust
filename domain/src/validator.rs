@@ -21,7 +21,8 @@ pub(crate) mod fixtures {
     use super::ValidatorDesc;
 
     pub fn get_validator(validator_id: &str) -> ValidatorDesc {
-        let fee = BigNum::try_from(<Faker as Number>::between(1_u32, 13_u32)).expect("BigNum error when creating from random number");
+        let fee = BigNum::try_from(<Faker as Number>::between(1_u32, 13_u32))
+            .expect("BigNum error when creating from random number");
         let url = format!("http://{}-validator-url.com/validator", validator_id);
 
         ValidatorDesc {

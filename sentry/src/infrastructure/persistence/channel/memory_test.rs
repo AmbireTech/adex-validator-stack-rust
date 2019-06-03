@@ -1,8 +1,8 @@
 use chrono::Utc;
 use time::Duration;
 
-use domain::{Channel, ChannelListParams, ChannelRepository, RepositoryError};
 use domain::fixtures::*;
+use domain::{Channel, ChannelListParams, ChannelRepository, RepositoryError};
 
 use super::MemoryChannelRepository;
 
@@ -13,16 +13,27 @@ fn initializes_with_channels_and_lists_channels() {
 
         let empty_init = MemoryChannelRepository::new(None);
         let params = ChannelListParams::new(valid_until_ge, 10, 1, None).unwrap();
-        assert_eq!(0, await!(empty_init.list(&params)).expect("Empty initial list").len());
+        assert_eq!(
+            0,
+            await!(empty_init.list(&params))
+                .expect("Empty initial list")
+                .len()
+        );
 
-        let channels = [get_channel("channel 1", &None, None), get_channel("channel 2", &None, None)];
+        let channels = [
+            get_channel("channel 1", &None, None),
+            get_channel("channel 2", &None, None),
+        ];
         // this shouldn't change the order in any way
         let some_init = MemoryChannelRepository::new(Some(&channels));
 
-        let channels_list: Vec<Channel> = await!(some_init.list(&params)).expect("List the initial 2 channels");
+        let channels_list: Vec<Channel> =
+            await!(some_init.list(&params)).expect("List the initial 2 channels");
         assert_eq!(2, channels_list.len());
 
-        let last_channel = channels_list.last().expect("There should be a last Channel (total: 2)");
+        let last_channel = channels_list
+            .last()
+            .expect("There should be a last Channel (total: 2)");
         assert_eq!(get_channel_id("channel 2"), last_channel.id);
     })
 }
@@ -51,7 +62,10 @@ fn listing_channels_can_handle_page_and_limit() {
         assert_eq!(4, first_page_three_channels.len());
 
         // also check if we are getting the correct last channel for the page
-        assert_eq!(&get_channel_id("channel 4"), &first_page_three_channels[3].id);
+        assert_eq!(
+            &get_channel_id("channel 4"),
+            &first_page_three_channels[3].id
+        );
 
         // if we have 5 per page & we are on page 2, one is left
         let params = ChannelListParams::new(valid_until_ge, 5, 2, None).unwrap();
@@ -113,17 +127,18 @@ fn listing_channels_can_handles_validator_filtration_and_keeps_valid_until_filtr
         // as they might otherwise have valid_until < valid_until_ge
         let valid_until_ge = Utc::now();
 
-        let validators = vec![
-            get_validator("validator-1"),
-            get_validator("validator-2"),
-        ];
+        let validators = vec![get_validator("validator-1"), get_validator("validator-2")];
         let validators_opt = ValidatorsOption::Some(validators);
         let channel_2_spec = get_channel_spec("channel 2", validators_opt.clone());
         let channel_5_spec = get_channel_spec("channel 5", validators_opt.clone());
 
         let channels = [
             get_channel("channel 1", &None, None),
-            get_channel("channel 2 yesterday", &valid_until_yesterday, Some(channel_2_spec)),
+            get_channel(
+                "channel 2 yesterday",
+                &valid_until_yesterday,
+                Some(channel_2_spec),
+            ),
             get_channel("channel 3", &None, None),
             get_channel("channel 4 yesterday", &valid_until_yesterday, None),
             get_channel("channel 5", &None, Some(channel_5_spec)),
@@ -131,7 +146,8 @@ fn listing_channels_can_handles_validator_filtration_and_keeps_valid_until_filtr
 
         let repository = MemoryChannelRepository::new(Some(&channels));
 
-        let params = ChannelListParams::new(valid_until_ge, 10, 1, Some("validator-1".to_string())).unwrap();
+        let params =
+            ChannelListParams::new(valid_until_ge, 10, 1, Some("validator-1".to_string())).unwrap();
         let list_channels = await!(repository.list(&params)).expect("Should list all channels");
 
         assert_eq!(1, list_channels.len());
@@ -156,10 +172,13 @@ fn saves_channels() {
         await!(some_init.save(new_channel)).expect("Saving 2nd new channel");
 
         let params = ChannelListParams::new(valid_until_ge, 10, 1, None).unwrap();
-        let channels_list: Vec<Channel> = await!(some_init.list(&params)).expect("List the 2 total channels");
+        let channels_list: Vec<Channel> =
+            await!(some_init.list(&params)).expect("List the 2 total channels");
         assert_eq!(2, channels_list.len());
 
-        let last_channel = channels_list.last().expect("There should be a last Channel (total: 2)");
+        let last_channel = channels_list
+            .last()
+            .expect("There should be a last Channel (total: 2)");
         assert_eq!(get_channel_id("ABC"), last_channel.id);
 
         // get a 3rd channel to save
@@ -169,10 +188,13 @@ fn saves_channels() {
         // this shouldn't change the order in any way
         await!(some_init.save(new_channel)).expect("Saving 3rd new channel");
 
-        let channels_list: Vec<Channel> = await!(some_init.list(&params)).expect("List the 3 total channels");
+        let channels_list: Vec<Channel> =
+            await!(some_init.list(&params)).expect("List the 3 total channels");
         assert_eq!(3, channels_list.len());
 
-        let last_channel = channels_list.last().expect("There should be a last Channel (total: 3)");
+        let last_channel = channels_list
+            .last()
+            .expect("There should be a last Channel (total: 3)");
         assert_eq!(get_channel_id("DEF"), last_channel.id);
     })
 }
@@ -186,7 +208,8 @@ fn saving_the_same_channel_id_should_error() {
 
         let same_channel_id = get_channel("ABC", &None, None);
 
-        let error = await!(repository.save(same_channel_id)).expect_err("It shouldn't be possible to save the same channel_id");
+        let error = await!(repository.save(same_channel_id))
+            .expect_err("It shouldn't be possible to save the same channel_id");
 
         match error {
             RepositoryError::User => {}

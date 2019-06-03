@@ -1,16 +1,18 @@
 use futures::future::{FutureExt, TryFutureExt};
 use futures_legacy::Future;
 use tokio::await;
-use tower_web::{derive_resource_impl, Deserialize, Extract, impl_web};
+use tower_web::{derive_resource_impl, impl_web, Deserialize, Extract};
 
 use channel_create::{ChannelCreateHandler, ChannelCreateResponse, ChannelInput};
 use channel_list::{ChannelListHandler, ChannelListResponse};
 
-use crate::infrastructure::persistence::channel::{MemoryChannelRepository, PostgresChannelRepository};
+use crate::infrastructure::persistence::channel::{
+    MemoryChannelRepository, PostgresChannelRepository,
+};
 use crate::infrastructure::persistence::DbPool;
 
-mod channel_list;
 mod channel_create;
+mod channel_list;
 
 #[derive(Clone, Debug)]
 pub struct ChannelResource {
@@ -19,6 +21,7 @@ pub struct ChannelResource {
 }
 
 impl_web! {
+    #[allow(clippy::needless_lifetimes)]
     impl ChannelResource {
         #[post("/channel")]
         #[content_type("application/json")]
@@ -59,15 +62,12 @@ impl ChannelListQuery {
     }
 
     pub fn validator(&self) -> Option<String> {
-        self
-            .validator
-            .to_owned()
-            .and_then(|s| {
-                if s.is_empty() {
-                    return None;
-                }
+        self.validator.to_owned().and_then(|s| {
+            if s.is_empty() {
+                return None;
+            }
 
-                Some(s)
-            })
+            Some(s)
+        })
     }
 }

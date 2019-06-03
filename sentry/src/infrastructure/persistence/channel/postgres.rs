@@ -1,20 +1,18 @@
 use futures::compat::Future01CompatExt;
 use futures::future::FutureExt;
-use futures_legacy::Future as OldFuture;
 use futures_legacy::future::IntoFuture;
+use futures_legacy::Future as OldFuture;
 use futures_legacy::Stream as OldStream;
 use tokio_postgres::types::Json;
 
-use domain::{Channel, ChannelId, ChannelListParams, ChannelRepository, ChannelSpec, RepositoryFuture};
+use domain::{
+    Channel, ChannelId, ChannelListParams, ChannelRepository, ChannelSpec, RepositoryFuture,
+};
 use try_future::try_future;
 
-use crate::infrastructure::field::{
-    asset::AssetPg,
-    bignum::BigNumPg,
-    channel_id::ChannelIdPg,
-};
-use crate::infrastructure::persistence::DbPool;
+use crate::infrastructure::field::{asset::AssetPg, bignum::BigNumPg, channel_id::ChannelIdPg};
 use crate::infrastructure::persistence::postgres::PostgresPersistenceError;
+use crate::infrastructure::persistence::DbPool;
 
 pub struct PostgresChannelRepository {
     db_pool: DbPool,

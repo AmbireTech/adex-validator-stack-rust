@@ -16,7 +16,9 @@ impl Score {
     /// score should be between 0 and 100
     fn new(score: u8) -> Result<Self, DomainError> {
         if score > 100 {
-            return Err(DomainError::InvalidArgument("score should be between 0 >= x <= 100".to_string()));
+            return Err(DomainError::InvalidArgument(
+                "score should be between 0 >= x <= 100".to_string(),
+            ));
         }
 
         Ok(Self(score))
@@ -24,13 +26,17 @@ impl Score {
 }
 
 pub fn score_deserialize<'de, D>(deserializer: D) -> Result<u8, D::Error>
-    where D: Deserializer<'de>
+where
+    D: Deserializer<'de>,
 {
     let score_unchecked: u8 = u8::deserialize(deserializer)?;
 
-    match score_unchecked > 100 {
-        true => Err(serde::de::Error::custom("Score should be between 0 >= x <= 100")),
-        false => Ok(score_unchecked),
+    if score_unchecked > 100 {
+        Err(serde::de::Error::custom(
+            "Score should be between 0 >= x <= 100",
+        ))
+    } else {
+        Ok(score_unchecked)
     }
 }
 
@@ -41,7 +47,10 @@ pub mod fixtures {
     use super::{Score, TargetingTag};
 
     pub fn get_targeting_tag(tag: String) -> TargetingTag {
-        TargetingTag { tag, score: get_score(None) }
+        TargetingTag {
+            tag,
+            score: get_score(None),
+        }
     }
 
     pub fn get_targeting_tags(count: usize) -> Vec<TargetingTag> {
@@ -55,7 +64,7 @@ pub mod fixtures {
     }
 
     pub fn get_score(score: Option<u8>) -> Score {
-        let score = score.unwrap_or(<Faker as Number>::between(0, 100));
+        let score = score.unwrap_or_else(|| <Faker as Number>::between(0, 100));
 
         Score::new(score).expect("Score was unable to be created")
     }

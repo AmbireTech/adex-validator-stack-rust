@@ -4,9 +4,9 @@ use chrono::{DateTime, Utc};
 use fake::faker::*;
 
 use crate::asset::fixtures::get_asset;
-use crate::BigNum;
 use crate::fixtures::{get_targeting_tags, get_validators};
 use crate::test_util;
+use crate::BigNum;
 use crate::ValidatorDesc;
 
 use super::{Channel, ChannelId, ChannelSpec};
@@ -27,13 +27,19 @@ pub fn get_channel_id(channel_id: &str) -> ChannelId {
     ChannelId { id }
 }
 
-pub fn get_channel(id: &str, valid_until: &Option<DateTime<Utc>>, spec: Option<ChannelSpec>) -> Channel {
+pub fn get_channel(
+    id: &str,
+    valid_until: &Option<DateTime<Utc>>,
+    spec: Option<ChannelSpec>,
+) -> Channel {
     let channel_id = get_channel_id(id);
-    let deposit_amount = BigNum::try_from(<Faker as Number>::between(100_u32, 5000_u32)).expect("BigNum error when creating from random number");
-    let valid_until: DateTime<Utc> = valid_until.unwrap_or(test_util::time::datetime_between(&Utc::now(), None));
+    let deposit_amount = BigNum::try_from(<Faker as Number>::between(100_u32, 5000_u32))
+        .expect("BigNum error when creating from random number");
+    let valid_until: DateTime<Utc> =
+        valid_until.unwrap_or(test_util::time::datetime_between(&Utc::now(), None));
     let creator = <Faker as Name>::name();
     let deposit_asset = get_asset();
-    let spec = spec.unwrap_or(get_channel_spec(id, ValidatorsOption::Count(3)));
+    let spec = spec.unwrap_or_else(|| get_channel_spec(id, ValidatorsOption::Count(3)));
 
     Channel {
         id: channel_id,
@@ -49,7 +55,8 @@ pub fn get_channels(count: usize, valid_until_ge: Option<DateTime<Utc>>) -> Vec<
     (1..=count)
         .map(|c| {
             // if we have a valid_until_ge, use it to generate a valid_util for each channel
-            let valid_until = valid_until_ge.and_then(|ref dt| Some(test_util::time::datetime_between(dt, None)));
+            let valid_until =
+                valid_until_ge.and_then(|ref dt| Some(test_util::time::datetime_between(dt, None)));
             let channel_id = format!("channel {}", c);
 
             get_channel(&channel_id, &valid_until, None)
@@ -77,10 +84,14 @@ pub fn get_channel_spec(prefix: &str, validators_option: ValidatorsOption) -> Ch
     let title_string = Some(<Faker as Lorem>::sentence(3, 4));
 
     let title = take_one(&[&title_string, &None]).to_owned();
-    let max_per_impression = BigNum::try_from(<Faker as Number>::between(250_u32, 500_u32)).expect("BigNum error when creating from random number");
-    let min_per_impression = BigNum::try_from(<Faker as Number>::between(1_u32, 250_u32)).expect("BigNum error when creating from random number");
-    let nonce = BigNum::try_from(<Faker as Number>::between(100_000_000_u32, 999_999_999_u32)).expect("BigNum error when creating from random number");
-    let min_targeting_score = take_one(&[&None, &Some(<Faker as Number>::between(1, 500))]).to_owned();
+    let max_per_impression = BigNum::try_from(<Faker as Number>::between(250_u32, 500_u32))
+        .expect("BigNum error when creating from random number");
+    let min_per_impression = BigNum::try_from(<Faker as Number>::between(1_u32, 250_u32))
+        .expect("BigNum error when creating from random number");
+    let nonce = BigNum::try_from(<Faker as Number>::between(100_000_000_u32, 999_999_999_u32))
+        .expect("BigNum error when creating from random number");
+    let min_targeting_score =
+        take_one(&[&None, &Some(<Faker as Number>::between(1, 500))]).to_owned();
 
     ChannelSpec {
         validators,

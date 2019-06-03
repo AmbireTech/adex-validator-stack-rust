@@ -39,7 +39,11 @@ impl ToSql for AssetPg {
         <String as ToSql>::accepts(ty)
     }
 
-    fn to_sql_checked(&self, ty: &Type, out: &mut Vec<u8>) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+    fn to_sql_checked(
+        &self,
+        ty: &Type,
+        out: &mut Vec<u8>,
+    ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
         let string = self.to_string();
 
         <String as ToSql>::to_sql_checked(&string, ty, out)
