@@ -1,6 +1,6 @@
 use std::sync::{Arc, RwLock};
 
-use futures::future::{err, FutureExt, ok};
+use futures::future::{err, ok, FutureExt};
 
 use domain::{
     Channel, ChannelId, ChannelListParams, ChannelRepository, RepositoryError, RepositoryFuture,

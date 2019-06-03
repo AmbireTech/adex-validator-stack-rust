@@ -4,9 +4,9 @@ use chrono::{DateTime, Utc};
 use fake::faker::*;
 
 use crate::asset::fixtures::get_asset;
-use crate::BigNum;
 use crate::fixtures::{get_targeting_tags, get_validators};
 use crate::test_util;
+use crate::BigNum;
 use crate::ValidatorDesc;
 
 use super::{Channel, ChannelId, ChannelSpec};
