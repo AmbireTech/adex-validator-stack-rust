@@ -12,6 +12,9 @@ use crate::{
     AdUnit, Asset, DomainError, EventSubmission, RepositoryFuture, TargetingTag, ValidatorDesc,
 };
 
+#[cfg(feature = "repositories")]
+pub use self::repository::ChannelRepository;
+
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Copy, Clone)]
 #[serde(transparent)]
 pub struct ChannelId {
@@ -207,13 +210,20 @@ impl ChannelListParams {
     }
 }
 
-pub trait ChannelRepository: Send + Sync {
-    /// Returns a list of channels, based on the passed Parameters for this method
-    fn list(&self, params: &ChannelListParams) -> RepositoryFuture<Vec<Channel>>;
+#[cfg(feature = "repositories")]
+pub mod repository {
+    use crate::RepositoryFuture;
 
-    fn save(&self, channel: Channel) -> RepositoryFuture<()>;
+    use super::*;
 
-    fn find(&self, channel_id: &ChannelId) -> RepositoryFuture<Option<Channel>>;
+    pub trait ChannelRepository: Send + Sync {
+        /// Returns a list of channels, based on the passed Parameters for this method
+        fn list(&self, params: &ChannelListParams) -> RepositoryFuture<Vec<Channel>>;
+
+        fn save(&self, channel: Channel) -> RepositoryFuture<()>;
+
+        fn find(&self, channel_id: &ChannelId) -> RepositoryFuture<Option<Channel>>;
+    }
 }
 
 #[cfg(any(test, feature = "fixtures"))]

@@ -1,8 +1,5 @@
 use std::error;
 use std::fmt;
-use std::pin::Pin;
-
-use futures::Future;
 
 #[cfg(any(test, feature = "fixtures"))]
 pub use util::tests as test_util;
@@ -10,8 +7,12 @@ pub use util::tests as test_util;
 pub use self::ad_unit::AdUnit;
 pub use self::asset::Asset;
 pub use self::bignum::BigNum;
-pub use self::channel::{Channel, ChannelId, ChannelListParams, ChannelRepository, ChannelSpec};
+pub use self::channel::{Channel, ChannelId, ChannelListParams, ChannelSpec};
+#[cfg(feature = "repositories")]
+pub use self::channel::ChannelRepository;
 pub use self::event_submission::EventSubmission;
+#[cfg(feature = "repositories")]
+pub use self::repository::*;
 pub use self::targeting_tag::TargetingTag;
 pub use self::validator::ValidatorDesc;
 
@@ -50,15 +51,22 @@ impl error::Error for DomainError {
     }
 }
 
-pub trait IOError: error::Error + Send {}
+#[cfg(feature = "repositories")]
+pub mod repository {
+    use std::pin::Pin;
 
-#[derive(Debug)]
-pub enum RepositoryError {
-    /// An error with the underlying implementation occurred
-    IO(Box<dyn IOError>),
-    /// Error handling save errors, like Primary key already exists and etc.
-    /// @TODO: Add and underlying implementation for this error
-    User,
+    use futures::Future;
+
+    pub trait IOError: std::error::Error + Send {}
+
+    #[derive(Debug)]
+    pub enum RepositoryError {
+        /// An error with the underlying implementation occurred
+        IO(Box<dyn IOError>),
+        /// Error handling save errors, like Primary key already exists and etc.
+        /// @TODO: Add and underlying implementation for this error
+        User,
+    }
+
+    pub type RepositoryFuture<T> = Pin<Box<Future<Output = Result<T, RepositoryError>> + Send>>;
 }
-
-pub type RepositoryFuture<T> = Pin<Box<Future<Output = Result<T, RepositoryError>> + Send>>;
