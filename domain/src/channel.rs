@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 
 use chrono::{DateTime, Utc};
 use chrono::serde::{ts_milliseconds, ts_seconds};
-use hex::{FromHex, ToHex};
+use hex::FromHex;
 use serde::{Deserialize, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 
