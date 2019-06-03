@@ -30,13 +30,7 @@ impl ToString for ChannelId {
     /// assert_eq!("0x061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088", channel_id.to_string());
     /// ```
     fn to_string(&self) -> String {
-        let mut prefixed = "0x".to_string();
-
-        let mut hex_string = String::new();
-
-        self.id.write_hex(&mut hex_string).unwrap();
-        prefixed.push_str(&hex_string);
-        prefixed
+        SerHex::<StrictPfx>::into_hex(&self.id).unwrap()
     }
 }
 
