@@ -1,9 +1,2 @@
 [tasks.clippy]
-description = "Runs clippy code linter."
-category = "Test"
-dependencies = [
-    "install-clippy"
-]
-command = "cargo"
 args = ["clippy", "--all-features", "--", "-D", "warnings"]
-
