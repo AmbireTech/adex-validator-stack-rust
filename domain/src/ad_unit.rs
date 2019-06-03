@@ -9,7 +9,7 @@ use crate::util::serde::ts_milliseconds_option;
 #[serde(rename_all = "camelCase")]
 pub struct AdUnit {
     /// valid ipfs hash of spec props below
-    ipfs: String,
+    pub ipfs: String,
     /// the type of the ad unit
     /// currently, possible values are:
     /// legacy_300x250, legacy_250x250, legacy_240x400, legacy_336x280,
@@ -19,35 +19,35 @@ pub struct AdUnit {
     /// legacy_120x600, legacy_300x600
     /// see IAB ad unit guidelines and iab_flex_{adUnitName} (see IAB's new ad portfolio and PDF)
     #[serde(rename = "type")]
-    ad_type: String,
+    pub ad_type: String,
     /// a URL to the resource (usually PNG); must use the ipfs:// protocol, to guarantee data immutability
-    media_url: String,
+    pub media_url: String,
     /// MIME type of the media, possible values at the moment are: image/jpeg, image/png
-    media_mime: String,
+    pub media_mime: String,
     /// Advertised URL
-    target_url: String,
+    pub target_url: String,
     /// Array of TargetingTag
-    targeting: Vec<TargetingTag>,
+    pub targeting: Vec<TargetingTag>,
     /// Number; minimum targeting score (optional)
-    min_targeting_score: Option<u8>,
+    pub min_targeting_score: Option<u8>,
     /// Array of TargetingTag (optional)
     /// meant for discovery between publishers/advertisers
     #[serde(default)]
-    tags: Vec<TargetingTag>,
+    pub tags: Vec<TargetingTag>,
     /// user address from the session
-    owner: String,
+    pub owner: String,
     /// number, UTC timestamp in milliseconds, used as nonce for escaping duplicated spec ipfs hashes
     #[serde(with = "ts_milliseconds")]
-    created: DateTime<Utc>,
+    pub created: DateTime<Utc>,
     /// the name of the unit used in platform UI
-    title: Option<String>,
+    pub title: Option<String>,
     /// arbitrary text used in platform UI
-    description: Option<String>,
+    pub description: Option<String>,
     /// user can change it - used for filtering in platform UI
     #[serde(default)]
-    archived: bool,
+    pub archived: bool,
     /// UTC timestamp in milliseconds, changed every time modifiable property is changed
     #[serde(default, with = "ts_milliseconds_option")]
-    modified: Option<DateTime<Utc>>,
+    pub modified: Option<DateTime<Utc>>,
 
 }
