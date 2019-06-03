@@ -1,5 +1,6 @@
 use std::convert::TryFrom;
 use std::error::Error;
+use std::iter::Sum;
 use std::str::FromStr;
 
 use derive_more::{Add, Div, Mul, Sub};
@@ -18,6 +19,14 @@ pub struct BigNum(
 impl BigNum {
     pub fn new(num: BigUint) -> Result<Self, super::DomainError> {
         Ok(Self(num))
+    }
+}
+
+impl Sum<BigNum> for BigNum {
+    fn sum<I: Iterator<Item = BigNum>>(iter: I) -> Self {
+        let sum_uint = iter.map(|big_num| big_num.0).sum();
+
+        Self(sum_uint)
     }
 }
 
