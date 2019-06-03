@@ -1,7 +1,7 @@
+pub(crate) use self::handler::ChannelCreateHandler;
 pub(crate) use self::input::ChannelInput;
 pub(crate) use self::response::ChannelCreateResponse;
-pub(crate) use self::handler::ChannelCreateHandler;
 
+mod handler;
 mod input;
 mod response;
-mod handler;

@@ -21,11 +21,10 @@ impl ToString for &ChannelIdPg {
 
 impl<'a> FromSql<'a> for ChannelIdPg {
     fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<ChannelIdPg, Box<dyn Error + Sync + Send>> {
-        <String as FromSql>::from_sql(ty, raw)
-            .map(|string| {
-                let channel_id = ChannelId::try_from_hex(&string)?;
-                Ok(ChannelIdPg(channel_id))
-            })?
+        <String as FromSql>::from_sql(ty, raw).map(|string| {
+            let channel_id = ChannelId::try_from_hex(&string)?;
+            Ok(ChannelIdPg(channel_id))
+        })?
     }
 
     fn accepts(ty: &Type) -> bool {
@@ -43,7 +42,11 @@ impl ToSql for ChannelIdPg {
         <String as ToSql>::accepts(ty)
     }
 
-    fn to_sql_checked(&self, ty: &Type, out: &mut Vec<u8>) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+    fn to_sql_checked(
+        &self,
+        ty: &Type,
+        out: &mut Vec<u8>,
+    ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
         let string = self.to_string();
 
         <String as ToSql>::to_sql_checked(&string, ty, out)

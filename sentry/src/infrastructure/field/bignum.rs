@@ -44,7 +44,11 @@ impl ToSql for BigNumPg {
         }
     }
 
-    fn to_sql_checked(&self, ty: &Type, out: &mut Vec<u8>) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+    fn to_sql_checked(
+        &self,
+        ty: &Type,
+        out: &mut Vec<u8>,
+    ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
         <String as ToSql>::to_sql_checked(&self.0.to_string(), ty, out)
     }
 }

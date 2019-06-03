@@ -15,14 +15,14 @@ pub use self::event_submission::EventSubmission;
 pub use self::targeting_tag::TargetingTag;
 pub use self::validator::ValidatorDesc;
 
+pub mod ad_unit;
+pub mod asset;
 pub mod bignum;
 pub mod channel;
-pub mod validator;
-pub mod asset;
-pub mod targeting_tag;
-pub mod ad_unit;
 pub mod event_submission;
+pub mod targeting_tag;
 pub mod util;
+pub mod validator;
 
 /// re-exports all the fixtures in one module
 #[cfg(any(test, feature = "fixtures"))]
@@ -40,7 +40,7 @@ pub enum DomainError {
 
 impl fmt::Display for DomainError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Domain error", )
+        write!(f, "Domain error",)
     }
 }
 
@@ -61,4 +61,4 @@ pub enum RepositoryError {
     User,
 }
 
-pub type RepositoryFuture<T> = Pin<Box<Future<Output=Result<T, RepositoryError>> + Send>>;
+pub type RepositoryFuture<T> = Pin<Box<Future<Output = Result<T, RepositoryError>> + Send>>;

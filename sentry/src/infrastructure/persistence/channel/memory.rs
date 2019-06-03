@@ -1,8 +1,10 @@
 use std::sync::{Arc, RwLock};
 
-use futures::future::{err, FutureExt, ok};
+use futures::future::{err, ok, FutureExt};
 
-use domain::{Channel, ChannelId, ChannelListParams, ChannelRepository, RepositoryError, RepositoryFuture};
+use domain::{
+    Channel, ChannelId, ChannelListParams, ChannelRepository, RepositoryError, RepositoryFuture,
+};
 
 use crate::infrastructure::persistence::memory::MemoryPersistenceError;
 
@@ -18,7 +20,9 @@ impl MemoryChannelRepository {
     pub fn new(initial_channels: Option<&[Channel]>) -> Self {
         let memory_channels = initial_channels.unwrap_or(&[]).to_vec();
 
-        Self { records: Arc::new(RwLock::new(memory_channels)) }
+        Self {
+            records: Arc::new(RwLock::new(memory_channels)),
+        }
     }
 }
 
@@ -40,7 +44,11 @@ impl ChannelRepository for MemoryChannelRepository {
                             Some(validator_id) => {
                                 // check if there is any validator in the current
                                 // `channel.spec.validators` that has the same `id`
-                                channel.spec.validators.iter().any(|validator| &validator.id == validator_id)
+                                channel
+                                    .spec
+                                    .validators
+                                    .iter()
+                                    .any(|validator| &validator.id == validator_id)
                             }
                             // if None -> the current channel has passed, since we don't need to filter by anything
                             None => true,
@@ -56,7 +64,7 @@ impl ChannelRepository for MemoryChannelRepository {
                     .collect();
 
                 ok(channels)
-            },
+            }
             Err(error) => err(MemoryPersistenceError::from(error).into()),
         };
 
@@ -65,14 +73,12 @@ impl ChannelRepository for MemoryChannelRepository {
 
     fn save(&self, channel: Channel) -> RepositoryFuture<()> {
         let channel_found = match self.records.read() {
-            Ok(reader) => {
-                reader.iter().find_map(|current| {
-                    match &channel.id == &current.id {
-                        true => Some(()),
-                        false => None
-                    }
-                })
-            }
+            Ok(reader) => reader
+                .iter()
+                .find_map(|current| match &channel.id == &current.id {
+                    true => Some(()),
+                    false => None,
+                }),
             Err(error) => return err(MemoryPersistenceError::from(error).into()).boxed(),
         };
 
@@ -86,7 +92,7 @@ impl ChannelRepository for MemoryChannelRepository {
 
                 ok(())
             }
-            Err(error) => err(MemoryPersistenceError::from(error).into())
+            Err(error) => err(MemoryPersistenceError::from(error).into()),
         };
 
         create_fut.boxed()
@@ -95,12 +101,13 @@ impl ChannelRepository for MemoryChannelRepository {
     fn find(&self, channel_id: &ChannelId) -> RepositoryFuture<Option<Channel>> {
         let res_fut = match self.records.read() {
             Ok(reader) => {
-                let found_channel = reader.iter().find_map(|channel| {
-                    match &channel.id == channel_id {
-                        true => Some(channel.clone()),
-                        false => None
-                    }
-                });
+                let found_channel =
+                    reader
+                        .iter()
+                        .find_map(|channel| match &channel.id == channel_id {
+                            true => Some(channel.clone()),
+                            false => None,
+                        });
 
                 ok(found_channel)
             }

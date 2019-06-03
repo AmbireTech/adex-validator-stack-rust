@@ -48,17 +48,18 @@ async fn bootstrap(database_url: String, addr: SocketAddr) {
 
     // A service builder is used to configure our service.
     let server = ServiceBuilder::new()
-        .resource(ChannelResource { db_pool: db_pool.clone(), channel_list_limit: CONFIG.channel_list_limit })
+        .resource(ChannelResource {
+            db_pool: db_pool.clone(),
+            channel_list_limit: CONFIG.channel_list_limit,
+        })
         .serve(listener.incoming());
 
     await!(server).expect("Server error");
 }
 
 async fn database_pool(database_url: String) -> Result<DbPool, tokio_postgres::Error> {
-    let postgres_connection = bb8_postgres::PostgresConnectionManager::new(
-        database_url,
-        tokio_postgres::NoTls,
-    );
+    let postgres_connection =
+        bb8_postgres::PostgresConnectionManager::new(database_url, tokio_postgres::NoTls);
 
     await!(bb8::Pool::builder().build(postgres_connection).compat())
 }
@@ -73,18 +74,23 @@ impl TryFrom<Vars> for Config {
 
     fn try_from(mut vars: Vars) -> Result<Self, Self::Error> {
         let limit = vars
-            .find_map(|(key, value)| {
-                match key == "CHANNEL_LIST_LIMIT" {
-                    true => Some(value),
-                    false => None,
-                }
+            .find_map(|(key, value)| match key == "CHANNEL_LIST_LIMIT" {
+                true => Some(value),
+                false => None,
             })
-            .ok_or(DomainError::InvalidArgument("CHANNEL_LIST_LIMIT evn. variable was not passed".to_string()))
+            .ok_or(DomainError::InvalidArgument(
+                "CHANNEL_LIST_LIMIT evn. variable was not passed".to_string(),
+            ))
             .and_then(|value| {
-                value.parse::<u32>()
-                    .map_err(|_| DomainError::InvalidArgument("CHANNEL_LIST_LIMIT is not a u32 value".to_string()))
+                value.parse::<u32>().map_err(|_| {
+                    DomainError::InvalidArgument(
+                        "CHANNEL_LIST_LIMIT is not a u32 value".to_string(),
+                    )
+                })
             });
 
-        Ok(Self { channel_list_limit: limit? })
+        Ok(Self {
+            channel_list_limit: limit?,
+        })
     }
 }

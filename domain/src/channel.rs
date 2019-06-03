@@ -1,14 +1,16 @@
 use std::convert::TryFrom;
 
-use chrono::{DateTime, Utc};
 use chrono::serde::{ts_milliseconds, ts_seconds};
+use chrono::{DateTime, Utc};
 use hex::FromHex;
 use serde::{Deserialize, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 
-use crate::{AdUnit, Asset, DomainError, EventSubmission, RepositoryFuture, TargetingTag, ValidatorDesc};
 use crate::bignum::BigNum;
 use crate::util::serde::ts_milliseconds_option;
+use crate::{
+    AdUnit, Asset, DomainError, EventSubmission, RepositoryFuture, TargetingTag, ValidatorDesc,
+};
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Copy, Clone)]
 #[serde(transparent)]
@@ -52,7 +54,9 @@ impl TryFrom<&str> for ChannelId {
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let bytes = value.as_bytes();
         if bytes.len() != 32 {
-            return Err(DomainError::InvalidArgument("The value of the id should have exactly 32 bytes".to_string()));
+            return Err(DomainError::InvalidArgument(
+                "The value of the id should have exactly 32 bytes".to_string(),
+            ));
         }
         let mut id = [0; 32];
         id.copy_from_slice(&bytes[..32]);
@@ -80,9 +84,12 @@ impl ChannelId {
     pub fn try_from_hex(hex: &str) -> Result<Self, DomainError> {
         let s = hex.trim_start_matches("0x");
 
-        let bytes: Vec<u8> = Vec::from_hex(s).map_err(|err| DomainError::InvalidArgument(err.to_string()))?;
+        let bytes: Vec<u8> =
+            Vec::from_hex(s).map_err(|err| DomainError::InvalidArgument(err.to_string()))?;
         if bytes.len() != 32 {
-            return Err(DomainError::InvalidArgument("The value of the id should have exactly 32 bytes".to_string()));
+            return Err(DomainError::InvalidArgument(
+                "The value of the id should have exactly 32 bytes".to_string(),
+            ));
         }
 
         let mut id = [0; 32];
@@ -134,7 +141,11 @@ pub struct ChannelSpec {
     pub created: DateTime<Utc>,
     /// A millisecond timestamp representing the time you want this campaign to become active (optional)
     /// Used by the AdViewManager
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "ts_milliseconds_option")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "ts_milliseconds_option"
+    )]
     pub active_from: Option<DateTime<Utc>>,
     /// A random number to ensure the campaignSpec hash is unique
     pub nonce: BigNum,
@@ -163,20 +174,28 @@ pub struct ChannelListParams {
 }
 
 impl ChannelListParams {
-    pub fn new(valid_until_ge: DateTime<Utc>, limit: u32, page: u32, validator: Option<String>) -> Result<Self, DomainError> {
+    pub fn new(
+        valid_until_ge: DateTime<Utc>,
+        limit: u32,
+        page: u32,
+        validator: Option<String>,
+    ) -> Result<Self, DomainError> {
         if page < 1 {
-            return Err(DomainError::InvalidArgument("Page should be >= 1".to_string()));
+            return Err(DomainError::InvalidArgument(
+                "Page should be >= 1".to_string(),
+            ));
         }
 
         if limit < 1 {
-            return Err(DomainError::InvalidArgument("Limit should be >= 1".to_string()));
+            return Err(DomainError::InvalidArgument(
+                "Limit should be >= 1".to_string(),
+            ));
         }
 
-        let validator = validator
-            .and_then(|s| match s.is_empty() {
-                true => None,
-                false => Some(s),
-            });
+        let validator = validator.and_then(|s| match s.is_empty() {
+            true => None,
+            false => Some(s),
+        });
 
         Ok(Self {
             valid_until_ge,
