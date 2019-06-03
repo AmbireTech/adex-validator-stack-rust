@@ -7,7 +7,7 @@ use derive_more::{Add, Div, Mul, Sub};
 use num_bigint::BigUint;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-#[derive(Serialize, Deserialize, Debug, Clone, Mul, Div, Add, Sub)]
+#[derive(Serialize, Deserialize, Debug, Clone, Mul, Div, Add, Sub, Ord)]
 pub struct BigNum(
     #[serde(
         deserialize_with = "biguint_from_str",
