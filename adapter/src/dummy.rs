@@ -8,7 +8,7 @@ pub struct DummyAdapter {
 impl SanityChecker for DummyAdapter {}
 
 impl Adapter for DummyAdapter {
-    fn whoami(&self) -> &String {
+    fn whoami(&self) -> &str {
         &self.whoami
     }
 }
