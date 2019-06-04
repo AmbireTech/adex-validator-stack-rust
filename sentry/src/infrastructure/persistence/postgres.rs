@@ -15,7 +15,7 @@ impl error::Error for PostgresPersistenceError {}
 impl IOError for PostgresPersistenceError {}
 
 impl fmt::Display for PostgresPersistenceError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             PostgresPersistenceError::UserError(ref error) => {
                 write!(f, "User error occurred: {}", error)

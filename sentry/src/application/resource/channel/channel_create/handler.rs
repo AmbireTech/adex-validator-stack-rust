@@ -10,7 +10,7 @@ pub struct ChannelCreateHandler<'a> {
 }
 
 impl<'a> ChannelCreateHandler<'a> {
-    pub fn new(channel_repository: &'a ChannelRepository) -> Self {
+    pub fn new(channel_repository: &'a dyn ChannelRepository) -> Self {
         Self { channel_repository }
     }
 }

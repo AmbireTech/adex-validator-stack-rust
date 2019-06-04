@@ -1,3 +1,4 @@
+#![deny(rust_2018_idioms)]
 use std::error;
 use std::fmt;
 
@@ -40,13 +41,13 @@ pub enum DomainError {
 }
 
 impl fmt::Display for DomainError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Domain error",)
     }
 }
 
 impl error::Error for DomainError {
-    fn cause(&self) -> Option<&error::Error> {
+    fn cause(&self) -> Option<&dyn error::Error> {
         None
     }
 }
@@ -68,5 +69,5 @@ pub mod repository {
         User,
     }
 
-    pub type RepositoryFuture<T> = Pin<Box<Future<Output = Result<T, RepositoryError>> + Send>>;
+    pub type RepositoryFuture<T> = Pin<Box<dyn Future<Output = Result<T, RepositoryError>> + Send>>;
 }
