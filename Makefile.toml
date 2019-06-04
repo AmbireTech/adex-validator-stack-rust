@@ -3,3 +3,14 @@ CARGO_MAKE_EXTEND_WORKSPACE_MAKEFILE = "true"
 
 [tasks.clippy]
 args = ["clippy", "--all-features", "--", "-D", "warnings"]
+
+
+[tasks.dev-test-flow]
+dependencies = [
+    "format-flow",
+    "clippy",
+    "pre-build",
+    "build",
+    "post-build",
+    "test-flow",
+]
