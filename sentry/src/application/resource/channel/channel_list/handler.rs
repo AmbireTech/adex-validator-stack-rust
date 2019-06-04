@@ -11,7 +11,7 @@ pub struct ChannelListHandler<'a> {
 }
 
 impl<'a> ChannelListHandler<'a> {
-    pub fn new(limit_per_page: u32, channel_repository: &'a ChannelRepository) -> Self {
+    pub fn new(limit_per_page: u32, channel_repository: &'a dyn ChannelRepository) -> Self {
         Self {
             limit_per_page,
             channel_repository,
