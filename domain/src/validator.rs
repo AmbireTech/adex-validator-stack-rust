@@ -11,7 +11,7 @@ pub struct ValidatorDesc {
 }
 
 #[cfg(any(test, feature = "fixtures"))]
-pub(crate) mod fixtures {
+pub mod fixtures {
     use fake::faker::*;
 
     use crate::BigNum;
