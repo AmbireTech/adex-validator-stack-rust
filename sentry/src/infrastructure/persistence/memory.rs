@@ -14,7 +14,7 @@ impl error::Error for MemoryPersistenceError {}
 impl IOError for MemoryPersistenceError {}
 
 impl fmt::Display for MemoryPersistenceError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let error_type = match *self {
             MemoryPersistenceError::Reading => "reading",
             MemoryPersistenceError::Writing => "writing",
@@ -29,13 +29,13 @@ impl fmt::Display for MemoryPersistenceError {
 }
 
 impl<T> From<PoisonError<RwLockReadGuard<'_, T>>> for MemoryPersistenceError {
-    fn from(_: PoisonError<RwLockReadGuard<T>>) -> Self {
+    fn from(_: PoisonError<RwLockReadGuard<'_, T>>) -> Self {
         MemoryPersistenceError::Reading
     }
 }
 
 impl<T> From<PoisonError<RwLockWriteGuard<'_, T>>> for MemoryPersistenceError {
-    fn from(_: PoisonError<RwLockWriteGuard<T>>) -> Self {
+    fn from(_: PoisonError<RwLockWriteGuard<'_, T>>) -> Self {
         MemoryPersistenceError::Writing
     }
 }
