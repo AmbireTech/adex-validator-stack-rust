@@ -3,6 +3,9 @@
 [[package]]
 name = "adapter"
 version = "0.1.0"
+dependencies = [
+ "domain 0.1.0",
+]
 
 [[package]]
 name = "adler32"
