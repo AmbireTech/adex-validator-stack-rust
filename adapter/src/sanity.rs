@@ -2,7 +2,7 @@ use domain::Channel;
 use std::{error, fmt};
 
 pub trait SanityChecker {
-    fn check(adapter_address: &String, channel: &Channel) -> Result<(), SanityError> {
+    fn check(adapter_address: &str, channel: &Channel) -> Result<(), SanityError> {
         let channel_has_adapter = channel.spec.validators.find(adapter_address);
 
         if channel_has_adapter.is_some() {
