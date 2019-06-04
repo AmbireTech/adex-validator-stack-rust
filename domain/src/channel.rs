@@ -123,8 +123,7 @@ pub struct Channel {
 pub struct ChannelSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
-    // TODO: Make a custom ser/deser 2 validators(leader, follower) array
-    pub validators: Vec<ValidatorDesc>,
+    pub validators: SpecValidators,
     /// Maximum payment per impression
     pub max_per_impression: BigNum,
     /// Minimum payment offered per impression
@@ -159,6 +158,55 @@ pub struct ChannelSpec {
     /// An array of AdUnit (optional)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ad_units: Vec<AdUnit>,
+}
+
+pub enum SpecValidator<'a> {
+    Leader(&'a ValidatorDesc),
+    Follower(&'a ValidatorDesc),
+    None,
+}
+
+impl<'a> SpecValidator<'a> {
+    pub fn is_some(&self) -> bool {
+        match &self {
+            SpecValidator::None => false,
+            _ => true,
+        }
+    }
+
+    pub fn is_none(&self) -> bool {
+        !self.is_some()
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(transparent)]
+pub struct SpecValidators([ValidatorDesc; 2]);
+
+impl SpecValidators {
+    pub fn leader(&self) -> &ValidatorDesc {
+        &self.0[0]
+    }
+
+    pub fn follower(&self) -> &ValidatorDesc {
+        &self.0[1]
+    }
+
+    pub fn find(&self, validator_id: &String) -> SpecValidator<'_> {
+        if &&self.leader().id == &validator_id {
+            SpecValidator::Leader(&self.leader())
+        } else if &&self.follower().id == &validator_id {
+            SpecValidator::Follower(&self.follower())
+        } else {
+            SpecValidator::None
+        }
+    }
+}
+
+impl From<[ValidatorDesc; 2]> for SpecValidators {
+    fn from(slice: [ValidatorDesc; 2]) -> Self {
+        Self(slice)
+    }
 }
 
 pub struct ChannelListParams {
