@@ -3,14 +3,9 @@ use std::{error, fmt};
 
 pub trait SanityChecker {
     fn check(adapter_address: &String, channel: &Channel) -> Result<(), SanityError> {
-        let channel_has_adapter = channel
-            .spec
-            .validators
-            .iter()
-            .find(|&validator| &validator.id.to_lowercase() == &adapter_address.to_lowercase())
-            .is_some();
+        let channel_has_adapter = channel.spec.validators.find(adapter_address);
 
-        if channel_has_adapter {
+        if channel_has_adapter.is_some() {
             Ok(())
         } else {
             Err(SanityError {})
@@ -35,9 +30,7 @@ impl error::Error for SanityError {
 
 #[cfg(test)]
 mod test {
-    use domain::fixtures::{
-        get_channel, get_channel_spec, get_validator, get_validators, ValidatorsOption,
-    };
+    use domain::fixtures::{get_channel, get_channel_spec, get_validator};
 
     use super::*;
 
@@ -53,10 +46,9 @@ mod test {
 
     #[test]
     fn sanity_check_allows_channels_with_current_adapter() {
-        let mut validators = get_validators(2, None);
-        validators.push(get_validator("my validator"));
+        let spec_validators = [get_validator("validator 1"), get_validator("my validator")].into();
 
-        let spec = get_channel_spec("spec", ValidatorsOption::Some(validators));
+        let spec = get_channel_spec("spec", Some(spec_validators));
 
         let channel = get_channel("channel_1", &None, Some(spec));
 
