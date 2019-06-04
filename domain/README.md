@@ -8,6 +8,15 @@ using Postgres, some sort of Memory implementation and etc.
 
 ### Features:
 
+#### Repositories
+
+If the usage of this crate, requires not only (de)serialization, but also retrieving or storing
+the objects in any way (database, API calls, memory and etc.) you would need this feature, as it defines
+the Repository traits that should be implemented, as a common interface, for handling such operations.
+
+The trait `RepositoryFuture` with a generic `RepositoryError` is used as the common return type for
+repository methods.
+
 #### Fixtures
 
 For testing purposes there are set of fixtures found under the `fixtures` module,
