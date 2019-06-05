@@ -1,9 +1,9 @@
 use chrono::Utc;
 use time::Duration;
 
-use domain::{Channel, ChannelListParams, ChannelRepository, RepositoryError};
 use domain::channel::SpecValidators;
 use domain::fixtures::*;
+use domain::{Channel, ChannelListParams, ChannelRepository, RepositoryError};
 
 use super::MemoryChannelRepository;
 
@@ -132,7 +132,7 @@ fn listing_channels_can_handles_validator_filtration_and_keeps_valid_until_filtr
             get_validator("validator-1", None),
             get_validator("validator-2", None),
         ]
-            .into();
+        .into();
         let channel_2_spec = get_channel_spec("channel 2", Some(validators.clone()));
         let channel_5_spec = get_channel_spec("channel 5", Some(validators));
 
