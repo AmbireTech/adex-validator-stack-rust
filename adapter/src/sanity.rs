@@ -105,7 +105,8 @@ impl error::Error for SanityError {
 mod test {
     use time::Duration;
 
-    use domain::fixtures::get_channel;
+    use domain::channel::fixtures::get_channel_spec;
+    use domain::fixtures::{get_channel, get_validator};
 
     use crate::adapter::ConfigBuilder;
 
@@ -229,8 +230,8 @@ mod test {
     fn sanity_check_disallows_validator_fee_less_than_minimum_fee() {
         let channel = get_channel("channel_1", &None, None);
 
-        // as identity use the leader, otherwise we won't pass the AdapterNotIncluded check
         let leader = channel.spec.validators.leader();
+        // as identity use the leader, otherwise we won't pass the AdapterNotIncluded check
         let identity = leader.id.clone();
         let config = ConfigBuilder::new(&identity)
             // set the minimum deposit to the `leader.fee + 1`
@@ -241,5 +242,28 @@ mod test {
             Err(SanityError::MinimumValidatorFeeNotMet),
             DummySanityChecker::check(&config, &channel)
         )
+    }
+
+    #[test]
+    fn sanity_check_allows_for_valid_values() {
+        let validators = [
+            get_validator("my leader", Some(10.into())),
+            get_validator("my follower", Some(15.into())),
+        ];
+        let spec = get_channel_spec("channel_1", Some(validators.into()));
+        let channel = get_channel("channel_1", &None, Some(spec));
+
+        // as identity use the leader, otherwise we won't pass the AdapterNotIncluded check
+        let config = ConfigBuilder::new("my leader")
+            .set_validators_whitelist(&["my leader", "my follower"])
+            .set_creators_whitelist(&[&channel.creator])
+            .set_assets_whitelist(&[channel.deposit_asset.clone()])
+            // set the minimum deposit to the `channel.deposit_amount - 1`
+            .set_minimum_deposit(&channel.deposit_amount - &1.into())
+            // set the minimum fee to the `leader.fee - 1`, i.e. `10 - 1 = 9`
+            .set_minimum_fee(9.into())
+            .build();
+
+        assert!(DummySanityChecker::check(&config, &channel).is_ok())
     }
 }
