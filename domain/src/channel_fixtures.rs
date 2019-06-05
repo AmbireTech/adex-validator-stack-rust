@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use fake::faker::*;
+use time::Duration;
 
 use crate::asset::fixtures::get_asset;
 use crate::fixtures::{get_targeting_tags, get_validator};
@@ -31,8 +32,10 @@ pub fn get_channel(
 ) -> Channel {
     let channel_id = get_channel_id(id);
     let deposit_amount = BigNum::from(<Faker as Number>::between(100, 5000));
-    let valid_until: DateTime<Utc> =
-        valid_until.unwrap_or(test_util::time::datetime_between(&Utc::now(), None));
+    let valid_until: DateTime<Utc> = valid_until.unwrap_or_else(|| {
+        let future_from = Utc::now() + Duration::days(7);
+        test_util::time::datetime_between(&future_from, None)
+    });
     let creator = <Faker as Name>::name();
     let deposit_asset = get_asset();
     let spec = spec.unwrap_or_else(|| get_channel_spec(id, None));
