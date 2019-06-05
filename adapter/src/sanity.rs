@@ -1,20 +1,93 @@
-use domain::Channel;
 use std::{error, fmt};
 
-pub trait SanityChecker {
-    fn check(adapter_address: &str, channel: &Channel) -> Result<(), SanityError> {
-        let channel_has_adapter = channel.spec.validators.find(adapter_address);
+use chrono::Utc;
 
-        if channel_has_adapter.is_some() {
-            Ok(())
-        } else {
-            Err(SanityError {})
+use domain::channel::{SpecValidator, SpecValidators};
+use domain::{Asset, Channel};
+
+use crate::adapter::Config;
+
+pub trait SanityChecker {
+    fn check(config: &Config, channel: &Channel) -> Result<(), SanityError> {
+        let adapter_channel_validator = match channel.spec.validators.find(&config.identity) {
+            // check if the channel validators include our adapter identity
+            SpecValidator::None => return Err(SanityError::AdapterNotIncluded),
+            SpecValidator::Leader(validator) | SpecValidator::Follower(validator) => validator,
+        };
+
+        if channel.valid_until < Utc::now() {
+            return Err(SanityError::PassedValidUntil);
         }
+
+        if !all_validators_listed(&channel.spec.validators, &config.validators_whitelist) {
+            return Err(SanityError::UnlistedValidator);
+        }
+
+        if !creator_listed(&channel, &config.creators_whitelist) {
+            return Err(SanityError::UnlistedCreator);
+        }
+
+        if !asset_listed(&channel, &config.assets_whitelist) {
+            return Err(SanityError::UnlistedAsset);
+        }
+
+        if channel.deposit_amount < config.minimal_deposit {
+            return Err(SanityError::MinimumDepositNotMet);
+        }
+
+        if adapter_channel_validator.fee < config.minimal_fee {
+            return Err(SanityError::MinimumValidatorFeeNotMet);
+        }
+
+        Ok(())
     }
 }
 
-#[derive(Debug)]
-pub struct SanityError {}
+fn all_validators_listed(validators: &SpecValidators, whitelist: &[String]) -> bool {
+    if whitelist.is_empty() {
+        true
+    } else {
+        let found_validators = whitelist
+            .iter()
+            .filter(|&allowed| {
+                allowed == &validators.leader().id || allowed == &validators.follower().id
+            })
+            // this will ensure that if we find the 2 validators earlier
+            // we don't go over the other values of the whitelist
+            .take(2);
+        // the found validators should be exactly 2, if they are not, then 1 or 2 are missing
+        found_validators.count() == 2
+    }
+}
+
+fn creator_listed(channel: &Channel, whitelist: &[String]) -> bool {
+    // if the list is empty, return true, as we don't have a whitelist to restrict us to
+    // or if we have a list, check if it includes the `channel.creator`
+    whitelist.is_empty() || whitelist.iter().any(|allowed| allowed == &channel.creator)
+}
+
+fn asset_listed(channel: &Channel, whitelist: &[Asset]) -> bool {
+    // if the list is empty, return true, as we don't have a whitelist to restrict us to
+    // or if we have a list, check if it includes the `channel.deposit_asset`
+    whitelist.is_empty()
+        || whitelist
+            .iter()
+            .any(|allowed| allowed == &channel.deposit_asset)
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum SanityError {
+    /// When the Adapter address is not listed in the `channel.spec.validators`
+    /// which in terms means, that the adapter shouldn't handle this Channel
+    AdapterNotIncluded,
+    /// when `channel.valid_until` has passed (< now), the channel should be handled
+    PassedValidUntil,
+    UnlistedValidator,
+    UnlistedCreator,
+    UnlistedAsset,
+    MinimumDepositNotMet,
+    MinimumValidatorFeeNotMet,
+}
 
 impl fmt::Display for SanityError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -30,7 +103,11 @@ impl error::Error for SanityError {
 
 #[cfg(test)]
 mod test {
-    use domain::fixtures::{get_channel, get_channel_spec, get_validator};
+    use time::Duration;
+
+    use domain::fixtures::get_channel;
+
+    use crate::adapter::ConfigBuilder;
 
     use super::*;
 
@@ -40,18 +117,128 @@ mod test {
     #[test]
     fn sanity_check_disallows_channels_without_current_adapter() {
         let channel = get_channel("channel_1", &None, None);
-
-        assert!(DummySanityChecker::check(&"non_existent_validator".to_string(), &channel).is_err())
+        let config = ConfigBuilder::new("non_existent_validator").build();
+        assert_eq!(
+            Err(SanityError::AdapterNotIncluded),
+            DummySanityChecker::check(&config, &channel)
+        )
     }
 
     #[test]
-    fn sanity_check_allows_channels_with_current_adapter() {
-        let spec_validators = [get_validator("validator 1"), get_validator("my validator")].into();
+    fn sanity_check_disallows_channels_with_passed_valid_until() {
+        let passed_valid_until = Utc::now() - Duration::seconds(1);
+        let channel = get_channel("channel_1", &Some(passed_valid_until), None);
 
-        let spec = get_channel_spec("spec", Some(spec_validators));
+        let identity = channel.spec.validators.leader().id.clone();
+        let config = ConfigBuilder::new(&identity).build();
 
-        let channel = get_channel("channel_1", &None, Some(spec));
+        assert_eq!(
+            Err(SanityError::PassedValidUntil),
+            DummySanityChecker::check(&config, &channel)
+        )
+    }
 
-        assert!(DummySanityChecker::check(&"my validator".to_string(), &channel).is_ok())
+    #[test]
+    fn sanity_check_disallows_channels_with_unlisted_in_whitelist_validators() {
+        let channel = get_channel("channel_1", &None, None);
+
+        // as identity use the leader, otherwise we won't pass the AdapterNotIncluded check
+        let identity = channel.spec.validators.leader().id.clone();
+        let config = ConfigBuilder::new(&identity)
+            .set_validators_whitelist(&["my validator"])
+            .build();
+
+        // make sure we don't use the leader or follower validators as a whitelisted validator
+        assert_ne!(
+            &identity, "my validator",
+            "The whitelisted validator and the leader have the same id"
+        );
+        assert_ne!(
+            &channel.spec.validators.follower().id,
+            "my validator",
+            "The whitelisted validator and the follower have the same id"
+        );
+
+        assert_eq!(
+            Err(SanityError::UnlistedValidator),
+            DummySanityChecker::check(&config, &channel)
+        )
+    }
+
+    #[test]
+    fn sanity_check_disallows_channels_with_unlisted_creator() {
+        let channel = get_channel("channel_1", &None, None);
+
+        // as identity use the leader, otherwise we won't pass the AdapterNotIncluded check
+        let identity = channel.spec.validators.leader().id.clone();
+        let config = ConfigBuilder::new(&identity)
+            .set_creators_whitelist(&["creator"])
+            .build();
+
+        assert_ne!(
+            &channel.creator, "creator",
+            "The channel creator should be different than the whitelisted creator"
+        );
+
+        assert_eq!(
+            Err(SanityError::UnlistedCreator),
+            DummySanityChecker::check(&config, &channel)
+        )
+    }
+
+    #[test]
+    fn sanity_check_disallows_channels_with_unlisted_asset() {
+        let channel = get_channel("channel_1", &None, None);
+
+        // as identity use the leader, otherwise we won't pass the AdapterNotIncluded check
+        let identity = channel.spec.validators.leader().id.clone();
+        let config = ConfigBuilder::new(&identity)
+            .set_assets_whitelist(&["ASSET".into()])
+            .build();
+
+        assert_ne!(
+            &channel.deposit_asset,
+            &"ASSET".into(),
+            "The channel deposit_asset should be different than the whitelisted asset"
+        );
+
+        assert_eq!(
+            Err(SanityError::UnlistedAsset),
+            DummySanityChecker::check(&config, &channel)
+        )
+    }
+
+    #[test]
+    fn sanity_check_checks_minimum_deposit() {
+        let channel = get_channel("channel_1", &None, None);
+
+        // as identity use the leader, otherwise we won't pass the AdapterNotIncluded check
+        let identity = channel.spec.validators.leader().id.clone();
+        let config = ConfigBuilder::new(&identity)
+            // set the minimum deposit to the `channel.deposit_amount + 1`
+            .set_minimum_deposit(&channel.deposit_amount + &1.into())
+            .build();
+
+        assert_eq!(
+            Err(SanityError::MinimumDepositNotMet),
+            DummySanityChecker::check(&config, &channel)
+        )
+    }
+
+    #[test]
+    fn sanity_check_checks_minimum_fee() {
+        let channel = get_channel("channel_1", &None, None);
+
+        // as identity use the leader, otherwise we won't pass the AdapterNotIncluded check
+        let identity = channel.spec.validators.leader().id.clone();
+        let config = ConfigBuilder::new(&identity)
+            // set the minimum deposit to the `channel.deposit_amount + 1`
+            .set_minimum_deposit(&channel.deposit_amount + &1.into())
+            .build();
+
+        assert_eq!(
+            Err(SanityError::MinimumDepositNotMet),
+            DummySanityChecker::check(&config, &channel)
+        )
     }
 }
