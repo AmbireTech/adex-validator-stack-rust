@@ -209,7 +209,7 @@ mod test {
     }
 
     #[test]
-    fn sanity_check_checks_minimum_deposit() {
+    fn sanity_check_disallows_channel_deposit_less_than_minimum_deposit() {
         let channel = get_channel("channel_1", &None, None);
 
         // as identity use the leader, otherwise we won't pass the AdapterNotIncluded check
@@ -226,18 +226,19 @@ mod test {
     }
 
     #[test]
-    fn sanity_check_checks_minimum_fee() {
+    fn sanity_check_disallows_validator_fee_less_than_minimum_fee() {
         let channel = get_channel("channel_1", &None, None);
 
         // as identity use the leader, otherwise we won't pass the AdapterNotIncluded check
-        let identity = channel.spec.validators.leader().id.clone();
+        let leader = channel.spec.validators.leader();
+        let identity = leader.id.clone();
         let config = ConfigBuilder::new(&identity)
-            // set the minimum deposit to the `channel.deposit_amount + 1`
-            .set_minimum_deposit(&channel.deposit_amount + &1.into())
+            // set the minimum deposit to the `leader.fee + 1`
+            .set_minimum_fee(&leader.fee + &1.into())
             .build();
 
         assert_eq!(
-            Err(SanityError::MinimumDepositNotMet),
+            Err(SanityError::MinimumValidatorFeeNotMet),
             DummySanityChecker::check(&config, &channel)
         )
     }
