@@ -70,8 +70,8 @@ pub fn get_channel_spec(prefix: &str, validators_option: Option<SpecValidators>)
     let validators = match validators_option {
         Some(validators) => validators,
         None => [
-            get_validator(&format!("{} leader", prefix)),
-            get_validator(&format!("{} follower", prefix)),
+            get_validator(&format!("{} leader", prefix), None),
+            get_validator(&format!("{} follower", prefix), None),
         ]
         .into(),
     };

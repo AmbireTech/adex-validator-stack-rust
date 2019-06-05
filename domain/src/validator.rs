@@ -18,8 +18,8 @@ pub mod fixtures {
 
     use super::ValidatorDesc;
 
-    pub fn get_validator(validator_id: &str) -> ValidatorDesc {
-        let fee = BigNum::from(<Faker as Number>::between(1, 13));
+    pub fn get_validator(validator_id: &str, fee: Option<BigNum>) -> ValidatorDesc {
+        let fee = fee.unwrap_or_else(|| BigNum::from(<Faker as Number>::between(1, 13)));
         let url = format!("http://{}-validator-url.com/validator", validator_id);
 
         ValidatorDesc {
@@ -35,7 +35,7 @@ pub mod fixtures {
             .map(|c| {
                 let validator_id = format!("{}validator-{}", prefix, c + 1);
 
-                get_validator(&validator_id)
+                get_validator(&validator_id, None)
             })
             .collect()
     }

@@ -1,11 +1,11 @@
 use chrono::Utc;
 use time::Duration;
 
-use domain::fixtures::*;
 use domain::{Channel, ChannelListParams, ChannelRepository, RepositoryError};
+use domain::channel::SpecValidators;
+use domain::fixtures::*;
 
 use super::MemoryChannelRepository;
-use domain::channel::SpecValidators;
 
 #[test]
 fn initializes_with_channels_and_lists_channels() {
@@ -128,8 +128,11 @@ fn listing_channels_can_handles_validator_filtration_and_keeps_valid_until_filtr
         // as they might otherwise have valid_until < valid_until_ge
         let valid_until_ge = Utc::now();
 
-        let validators: SpecValidators =
-            [get_validator("validator-1"), get_validator("validator-2")].into();
+        let validators: SpecValidators = [
+            get_validator("validator-1", None),
+            get_validator("validator-2", None),
+        ]
+            .into();
         let channel_2_spec = get_channel_spec("channel 2", Some(validators.clone()));
         let channel_5_spec = get_channel_spec("channel 5", Some(validators));
 
