@@ -1,14 +1,14 @@
-use crate::adapter::Adapter;
+use crate::adapter::{Adapter, Config};
 use crate::sanity::SanityChecker;
 
 pub struct DummyAdapter {
-    pub whoami: String,
+    pub config: Config,
 }
 
 impl SanityChecker for DummyAdapter {}
 
 impl Adapter for DummyAdapter {
-    fn whoami(&self) -> &str {
-        &self.whoami
+    fn config(&self) -> &Config {
+        &self.config
     }
 }
