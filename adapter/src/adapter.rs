@@ -2,6 +2,10 @@ use domain::{Asset, BigNum, Channel};
 
 use crate::sanity::SanityChecker;
 
+pub enum AdapterError<'a> {
+    Authentication(&'a str),
+}
+
 pub trait Adapter: SanityChecker {
     fn config(&self) -> &Config;
 
@@ -14,6 +18,9 @@ pub trait Adapter: SanityChecker {
 
     /// Verify, based on the signature & state_root, that the signer is the same
     fn verify(&self, signer: &str, state_root: &str, signature: &str) -> bool;
+
+    /// Gets authentication for specific validator
+    fn get_auth(&self, validator: &str) -> Result<String, AdapterError<'_>>;
 }
 
 pub struct Config {
