@@ -1,7 +1,9 @@
+use std::collections::HashMap;
+
+use hex::encode;
+
 use crate::adapter::{Adapter, AdapterError, Config};
 use crate::sanity::SanityChecker;
-use hex::encode;
-use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct DummyParticipant {
@@ -67,6 +69,30 @@ impl Adapter for DummyAdapter<'_> {
         }
     }
 
+    /// Finds the auth. token in the HashMap of DummyParticipants if exists
+    /// Example:
+    ///
+    /// ```
+    /// use std::collections::HashMap;
+    /// use adapter::dummy::{DummyParticipant, DummyAdapter};
+    /// use adapter::{ConfigBuilder, Adapter};
+    ///
+    /// let mut participants = HashMap::new();
+    /// participants.insert(
+    ///    "identity_key",
+    ///    DummyParticipant {
+    ///        identity: "identity".to_string(),
+    ///        token: "token".to_string(),
+    ///    },
+    /// );
+    ///
+    ///let adapter = DummyAdapter {
+    ///    config: ConfigBuilder::new("identity").build(),
+    ///    participants,
+    ///};
+    ///
+    ///assert_eq!(Ok("token".to_string()), adapter.get_auth("identity"));
+    /// ```
     fn get_auth(&self, validator: &str) -> Result<String, AdapterError<'_>> {
         match self
             .participants
@@ -81,8 +107,9 @@ impl Adapter for DummyAdapter<'_> {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use crate::adapter::ConfigBuilder;
+
+    use super::*;
 
     #[test]
     fn dummy_adapter_sings_state_root_and_verifies_it() {
@@ -129,24 +156,5 @@ mod test {
             AdapterError::Authentication("Identity not found"),
             adapter.get_auth("non-existing").unwrap_err()
         );
-    }
-
-    #[test]
-    fn get_auth_with_existing_participator() {
-        let mut participants = HashMap::new();
-        participants.insert(
-            "identity_key",
-            DummyParticipant {
-                identity: "identity".to_string(),
-                token: "token".to_string(),
-            },
-        );
-
-        let adapter = DummyAdapter {
-            config: ConfigBuilder::new("identity").build(),
-            participants,
-        };
-
-        assert_eq!(Ok("token".to_string()), adapter.get_auth("identity"));
     }
 }
