@@ -8,6 +8,12 @@ pub trait Adapter: SanityChecker {
     fn validate_channel(&self, channel: &Channel) -> bool {
         Self::check(&self.config(), &channel).is_ok()
     }
+
+    /// Signs the provided state_root
+    fn sign(&self, state_root: &str) -> String;
+
+    /// Verify, based on the signature & state_root, that the signer is the same
+    fn verify(&self, signer: &str, state_root: &str, signature: &str) -> bool;
 }
 
 pub struct Config {
