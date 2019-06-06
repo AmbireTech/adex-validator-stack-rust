@@ -14,6 +14,7 @@ domain = {path = "../domain"}
 chrono = "0.4"
 time = "0.1.42"
 # To/From Hex
+# @TODO: Move this to the `dummy-adapter` feature if we use it only there!
 hex = "0.3.2"
 [dev-dependencies]
 domain = {path = "../domain", features = ["fixtures"]}
