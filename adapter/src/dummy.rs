@@ -1,38 +1,24 @@
 use crate::adapter::{Adapter, AdapterError, Config};
 use crate::sanity::SanityChecker;
 use hex::encode;
-use std::collections::HashSet;
-use std::hash::{Hash, Hasher};
+use std::collections::HashMap;
 
-#[derive(Eq, Debug)]
+#[derive(Debug)]
 pub struct DummyParticipant {
     pub identity: String,
     pub token: String,
 }
 
-impl PartialEq for DummyParticipant {
-    fn eq(&self, other: &Self) -> bool {
-        self.identity == other.identity || self.token == other.token
-    }
-}
-
-impl Hash for DummyParticipant {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.identity.hash(state);
-        self.token.hash(state);
-    }
-}
-
-pub struct DummyAdapter {
+pub struct DummyAdapter<'a> {
     pub config: Config,
     /// Dummy participants which will be used for
     /// Creator, Validator Leader, Validator Follower and etc.
-    pub participants: HashSet<DummyParticipant>,
+    pub participants: HashMap<&'a str, DummyParticipant>,
 }
 
-impl SanityChecker for DummyAdapter {}
+impl SanityChecker for DummyAdapter<'_> {}
 
-impl Adapter for DummyAdapter {
+impl Adapter for DummyAdapter<'_> {
     fn config(&self) -> &Config {
         &self.config
     }
@@ -42,10 +28,10 @@ impl Adapter for DummyAdapter {
     /// ```
     /// use adapter::{ConfigBuilder, Adapter};
     /// use adapter::dummy::DummyAdapter;
-    /// use std::collections::HashSet;
+    /// use std::collections::HashMap;
     ///
     /// let config = ConfigBuilder::new("identity").build();
-    /// let adapter = DummyAdapter { config, participants: HashSet::new() };
+    /// let adapter = DummyAdapter { config, participants: HashMap::new() };
     ///
     /// let actual = adapter.sign("abcdefghijklmnopqrstuvwxyz012345");
     /// let expected = "Dummy adapter signature for 6162636465666768696a6b6c6d6e6f707172737475767778797a303132333435 by identity";
@@ -64,10 +50,10 @@ impl Adapter for DummyAdapter {
     /// ```
     /// use adapter::{ConfigBuilder, Adapter};
     /// use adapter::dummy::DummyAdapter;
-    /// use std::collections::HashSet;
+    /// use std::collections::HashMap;
     ///
     /// let config = ConfigBuilder::new("identity").build();
-    /// let adapter = DummyAdapter { config, participants: HashSet::new() };
+    /// let adapter = DummyAdapter { config, participants: HashMap::new() };
     ///
     /// let signature = "Dummy adapter signature for 6162636465666768696a6b6c6d6e6f707172737475767778797a303132333435 by identity";
     /// assert!(adapter.verify("identity", "doesn't matter", signature) )
@@ -85,9 +71,9 @@ impl Adapter for DummyAdapter {
         match self
             .participants
             .iter()
-            .find(|&participant| participant.identity == validator)
+            .find(|&(_, participant)| participant.identity == validator)
         {
-            Some(participant) => Ok(participant.token.to_string()),
+            Some((_, participant)) => Ok(participant.token.to_string()),
             None => Err(AdapterError::Authentication("Identity not found")),
         }
     }
@@ -99,11 +85,11 @@ mod test {
     use crate::adapter::ConfigBuilder;
 
     #[test]
-    fn sings_state_root_and_verifies_it() {
+    fn dummy_adapter_sings_state_root_and_verifies_it() {
         let config = ConfigBuilder::new("identity").build();
         let adapter = DummyAdapter {
             config,
-            participants: HashSet::new(),
+            participants: HashMap::new(),
         };
 
         let expected_signature = "Dummy adapter signature for 6162636465666768696a6b6c6d6e6f707172737475767778797a303132333435 by identity";
@@ -112,5 +98,55 @@ mod test {
         assert_eq!(expected_signature, &actual_signature);
 
         assert!(adapter.verify("identity", "doesn't matter", &actual_signature))
+    }
+
+    #[test]
+    fn get_auth_with_empty_participators() {
+        let adapter = DummyAdapter {
+            config: ConfigBuilder::new("identity").build(),
+            participants: HashMap::new(),
+        };
+
+        assert_eq!(
+            AdapterError::Authentication("Identity not found"),
+            adapter.get_auth("non-existing").unwrap_err()
+        );
+
+        let mut participants = HashMap::new();
+        participants.insert(
+            "identity_key",
+            DummyParticipant {
+                identity: "identity".to_string(),
+                token: "token".to_string(),
+            },
+        );
+        let adapter = DummyAdapter {
+            config: ConfigBuilder::new("identity").build(),
+            participants,
+        };
+
+        assert_eq!(
+            AdapterError::Authentication("Identity not found"),
+            adapter.get_auth("non-existing").unwrap_err()
+        );
+    }
+
+    #[test]
+    fn get_auth_with_existing_participator() {
+        let mut participants = HashMap::new();
+        participants.insert(
+            "identity_key",
+            DummyParticipant {
+                identity: "identity".to_string(),
+                token: "token".to_string(),
+            },
+        );
+
+        let adapter = DummyAdapter {
+            config: ConfigBuilder::new("identity").build(),
+            participants,
+        };
+
+        assert_eq!(Ok("token".to_string()), adapter.get_auth("identity"));
     }
 }

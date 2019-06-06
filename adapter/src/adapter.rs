@@ -2,6 +2,7 @@ use domain::{Asset, BigNum, Channel};
 
 use crate::sanity::SanityChecker;
 
+#[derive(Debug, Eq, PartialEq)]
 pub enum AdapterError<'a> {
     Authentication(&'a str),
 }
