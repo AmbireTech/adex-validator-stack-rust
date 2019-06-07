@@ -4,7 +4,7 @@ use hex::encode;
 
 use crate::adapter::{Adapter, AdapterError, AdapterFuture, Config};
 use crate::sanity::SanityChecker;
-use futures::future::{ok, FutureExt};
+use futures::future::{err, ok, FutureExt};
 
 #[derive(Debug)]
 pub struct DummyParticipant {
@@ -78,6 +78,7 @@ impl Adapter for DummyAdapter<'_> {
     }
 
     /// Finds the auth. token in the HashMap of DummyParticipants if exists
+    ///
     /// Example:
     ///
     /// ```
@@ -85,33 +86,37 @@ impl Adapter for DummyAdapter<'_> {
     /// use adapter::dummy::{DummyParticipant, DummyAdapter};
     /// use adapter::{ConfigBuilder, Adapter};
     ///
-    /// let mut participants = HashMap::new();
-    /// participants.insert(
-    ///    "identity_key",
-    ///    DummyParticipant {
-    ///        identity: "identity".to_string(),
-    ///        token: "token".to_string(),
-    ///    },
-    /// );
+    /// futures::executor::block_on(async {
+    ///    let mut participants = HashMap::new();
+    ///    participants.insert(
+    ///        "identity_key",
+    ///        DummyParticipant {
+    ///            identity: "identity".to_string(),
+    ///            token: "token".to_string(),
+    ///        },
+    ///    );
     ///
-    ///let adapter = DummyAdapter {
-    ///    config: ConfigBuilder::new("identity").build(),
-    ///    participants,
-    ///};
+    ///    let adapter = DummyAdapter {
+    ///        config: ConfigBuilder::new("identity").build(),
+    ///        participants,
+    ///    };
     ///
-    ///assert_eq!(Ok("token".to_string()), adapter.get_auth("identity"));
+    ///    assert_eq!(Ok("token".to_string()), await!(adapter.get_auth("identity")));
+    /// });
     /// ```
-    fn get_auth(&self, validator: &str) -> Result<String, AdapterError> {
-        match self
+    fn get_auth(&self, validator: &str) -> AdapterFuture<String> {
+        let participant = self
             .participants
             .iter()
-            .find(|&(_, participant)| participant.identity == validator)
-        {
-            Some((_, participant)) => Ok(participant.token.to_string()),
-            None => Err(AdapterError::Authentication(
+            .find(|&(_, participant)| participant.identity == validator);
+        let future = match participant {
+            Some((_, participant)) => ok(participant.token.to_string()),
+            None => err(AdapterError::Authentication(
                 "Identity not found".to_string(),
             )),
-        }
+        };
+
+        future.boxed()
     }
 }
 
@@ -140,37 +145,43 @@ mod test {
                 await!(adapter.verify("identity", "doesn't matter", &actual_signature));
 
             assert_eq!(Ok(true), is_verified);
-        })
+        });
     }
 
     #[test]
     fn get_auth_with_empty_participators() {
-        let adapter = DummyAdapter {
-            config: ConfigBuilder::new("identity").build(),
-            participants: HashMap::new(),
-        };
+        futures::executor::block_on(async {
+            let adapter = DummyAdapter {
+                config: ConfigBuilder::new("identity").build(),
+                participants: HashMap::new(),
+            };
 
-        assert_eq!(
-            AdapterError::Authentication("Identity not found".to_string()),
-            adapter.get_auth("non-existing").unwrap_err()
-        );
+            assert_eq!(
+                Err(AdapterError::Authentication(
+                    "Identity not found".to_string()
+                )),
+                await!(adapter.get_auth("non-existing"))
+            );
 
-        let mut participants = HashMap::new();
-        participants.insert(
-            "identity_key",
-            DummyParticipant {
-                identity: "identity".to_string(),
-                token: "token".to_string(),
-            },
-        );
-        let adapter = DummyAdapter {
-            config: ConfigBuilder::new("identity").build(),
-            participants,
-        };
+            let mut participants = HashMap::new();
+            participants.insert(
+                "identity_key",
+                DummyParticipant {
+                    identity: "identity".to_string(),
+                    token: "token".to_string(),
+                },
+            );
+            let adapter = DummyAdapter {
+                config: ConfigBuilder::new("identity").build(),
+                participants,
+            };
 
-        assert_eq!(
-            AdapterError::Authentication("Identity not found".to_string()),
-            adapter.get_auth("non-existing").unwrap_err()
-        );
+            assert_eq!(
+                Err(AdapterError::Authentication(
+                    "Identity not found".to_string()
+                )),
+                await!(adapter.get_auth("non-existing"))
+            );
+        });
     }
 }

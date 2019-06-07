@@ -25,7 +25,7 @@ pub trait Adapter: SanityChecker {
     fn verify(&self, signer: &str, state_root: &str, signature: &str) -> AdapterFuture<bool>;
 
     /// Gets authentication for specific validator
-    fn get_auth(&self, validator: &str) -> Result<String, AdapterError>;
+    fn get_auth(&self, validator: &str) -> AdapterFuture<String>;
 }
 
 pub struct Config {
