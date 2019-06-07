@@ -58,7 +58,7 @@ impl Adapter for DummyAdapter<'_> {
     /// let adapter = DummyAdapter { config, participants: HashMap::new() };
     ///
     /// let signature = "Dummy adapter signature for 6162636465666768696a6b6c6d6e6f707172737475767778797a303132333435 by identity";
-    /// assert!(adapter.verify("identity", "doesn't matter", signature) )
+    /// assert!(adapter.verify("identity", "doesn't matter", signature));
     /// ```
     fn verify(&self, signer: &str, _state_root: &str, signature: &str) -> bool {
         // select the `identity` and compare it to the signer
