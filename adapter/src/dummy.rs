@@ -2,8 +2,9 @@ use std::collections::HashMap;
 
 use hex::encode;
 
-use crate::adapter::{Adapter, AdapterError, Config};
+use crate::adapter::{Adapter, AdapterError, AdapterFuture, Config};
 use crate::sanity::SanityChecker;
+use futures::future::{ok, FutureExt};
 
 #[derive(Debug)]
 pub struct DummyParticipant {
@@ -32,19 +33,22 @@ impl Adapter for DummyAdapter<'_> {
     /// use adapter::dummy::DummyAdapter;
     /// use std::collections::HashMap;
     ///
-    /// let config = ConfigBuilder::new("identity").build();
-    /// let adapter = DummyAdapter { config, participants: HashMap::new() };
+    /// futures::executor::block_on(async {
+    ///     let config = ConfigBuilder::new("identity").build();
+    ///     let adapter = DummyAdapter { config, participants: HashMap::new() };
     ///
-    /// let actual = adapter.sign("abcdefghijklmnopqrstuvwxyz012345");
-    /// let expected = "Dummy adapter signature for 6162636465666768696a6b6c6d6e6f707172737475767778797a303132333435 by identity";
-    /// assert_eq!(expected, &actual);
+    ///     let actual = await!(adapter.sign("abcdefghijklmnopqrstuvwxyz012345")).unwrap();
+    ///     let expected = "Dummy adapter signature for 6162636465666768696a6b6c6d6e6f707172737475767778797a303132333435 by identity";
+    ///     assert_eq!(expected, &actual);
+    /// });
     /// ```
-    fn sign(&self, state_root: &str) -> String {
-        format!(
+    fn sign(&self, state_root: &str) -> AdapterFuture<String> {
+        let signature = format!(
             "Dummy adapter signature for {} by {}",
             encode(&state_root),
             &self.config.identity
-        )
+        );
+        ok(signature).boxed()
     }
 
     /// Example:
@@ -54,19 +58,23 @@ impl Adapter for DummyAdapter<'_> {
     /// use adapter::dummy::DummyAdapter;
     /// use std::collections::HashMap;
     ///
-    /// let config = ConfigBuilder::new("identity").build();
-    /// let adapter = DummyAdapter { config, participants: HashMap::new() };
+    /// futures::executor::block_on(async {
+    ///     let config = ConfigBuilder::new("identity").build();
+    ///     let adapter = DummyAdapter { config, participants: HashMap::new() };
     ///
-    /// let signature = "Dummy adapter signature for 6162636465666768696a6b6c6d6e6f707172737475767778797a303132333435 by identity";
-    /// assert!(adapter.verify("identity", "doesn't matter", signature));
+    ///     let signature = "Dummy adapter signature for 6162636465666768696a6b6c6d6e6f707172737475767778797a303132333435 by identity";
+    ///     assert_eq!(Ok(true), await!(adapter.verify("identity", "doesn't matter", signature)));
+    /// });
     /// ```
-    fn verify(&self, signer: &str, _state_root: &str, signature: &str) -> bool {
+    fn verify(&self, signer: &str, _state_root: &str, signature: &str) -> AdapterFuture<bool> {
         // select the `identity` and compare it to the signer
         // for empty string this will return array with 1 element - an empty string `[""]`
-        match signature.rsplit(' ').take(1).next() {
+        let is_same = match signature.rsplit(' ').take(1).next() {
             Some(from) => from == signer,
             None => false,
-        }
+        };
+
+        ok(is_same).boxed()
     }
 
     /// Finds the auth. token in the HashMap of DummyParticipants if exists
@@ -93,14 +101,16 @@ impl Adapter for DummyAdapter<'_> {
     ///
     ///assert_eq!(Ok("token".to_string()), adapter.get_auth("identity"));
     /// ```
-    fn get_auth(&self, validator: &str) -> Result<String, AdapterError<'_>> {
+    fn get_auth(&self, validator: &str) -> Result<String, AdapterError> {
         match self
             .participants
             .iter()
             .find(|&(_, participant)| participant.identity == validator)
         {
             Some((_, participant)) => Ok(participant.token.to_string()),
-            None => Err(AdapterError::Authentication("Identity not found")),
+            None => Err(AdapterError::Authentication(
+                "Identity not found".to_string(),
+            )),
         }
     }
 }
@@ -113,18 +123,24 @@ mod test {
 
     #[test]
     fn dummy_adapter_sings_state_root_and_verifies_it() {
-        let config = ConfigBuilder::new("identity").build();
-        let adapter = DummyAdapter {
-            config,
-            participants: HashMap::new(),
-        };
+        futures::executor::block_on(async {
+            let config = ConfigBuilder::new("identity").build();
+            let adapter = DummyAdapter {
+                config,
+                participants: HashMap::new(),
+            };
 
-        let expected_signature = "Dummy adapter signature for 6162636465666768696a6b6c6d6e6f707172737475767778797a303132333435 by identity";
-        let actual_signature = adapter.sign("abcdefghijklmnopqrstuvwxyz012345");
+            let expected_signature = "Dummy adapter signature for 6162636465666768696a6b6c6d6e6f707172737475767778797a303132333435 by identity";
+            let actual_signature = await!(adapter.sign("abcdefghijklmnopqrstuvwxyz012345"))
+                .expect("Signing shouldn't fail");
 
-        assert_eq!(expected_signature, &actual_signature);
+            assert_eq!(expected_signature, &actual_signature);
 
-        assert!(adapter.verify("identity", "doesn't matter", &actual_signature))
+            let is_verified =
+                await!(adapter.verify("identity", "doesn't matter", &actual_signature));
+
+            assert_eq!(Ok(true), is_verified);
+        })
     }
 
     #[test]
@@ -135,7 +151,7 @@ mod test {
         };
 
         assert_eq!(
-            AdapterError::Authentication("Identity not found"),
+            AdapterError::Authentication("Identity not found".to_string()),
             adapter.get_auth("non-existing").unwrap_err()
         );
 
@@ -153,7 +169,7 @@ mod test {
         };
 
         assert_eq!(
-            AdapterError::Authentication("Identity not found"),
+            AdapterError::Authentication("Identity not found".to_string()),
             adapter.get_auth("non-existing").unwrap_err()
         );
     }
