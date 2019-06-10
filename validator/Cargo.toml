@@ -10,6 +10,8 @@ path = "src/lib.rs"
 
 [dependencies]
 # Domain
-domain = { version = "0.1", path = "../domain", features = ["repositories"] }
+domain = { version = "0.1", path = "../domain" }
 # Futures
 futures-preview = { version = "=0.3.0-alpha.16", features = ["compat", "io-compat"] }
+# API client
+reqwest = "0.9.18"
