@@ -8,6 +8,6 @@ env:
     - CARGO_MAKE_RUN_CLIPPY="true"
 matrix:
   fast_finish: true
-install:
-  - if [[ $(cargo list | grep -c make) == 0 ]]; then cargo install --debug cargo-make ; else echo "Cargo make already installed, continuing..."; fi
+script:
+  - which cargo-make || cargo install cargo-make
   - cargo make ci-flow

@@ -1,13 +1,13 @@
 use chrono::{DateTime, Utc};
 use fake::faker::*;
+use time::Duration;
 
 use crate::asset::fixtures::get_asset;
-use crate::fixtures::{get_targeting_tags, get_validators};
+use crate::fixtures::{get_targeting_tags, get_validator};
 use crate::test_util;
 use crate::BigNum;
-use crate::ValidatorDesc;
 
-use super::{Channel, ChannelId, ChannelSpec};
+use super::{Channel, ChannelId, ChannelSpec, SpecValidators};
 
 /// It will get the length of channel_id bytes and will fill enough bytes in front
 /// If > 32 bytes &str is passed it will `panic!`
@@ -32,11 +32,13 @@ pub fn get_channel(
 ) -> Channel {
     let channel_id = get_channel_id(id);
     let deposit_amount = BigNum::from(<Faker as Number>::between(100, 5000));
-    let valid_until: DateTime<Utc> =
-        valid_until.unwrap_or(test_util::time::datetime_between(&Utc::now(), None));
+    let valid_until: DateTime<Utc> = valid_until.unwrap_or_else(|| {
+        let future_from = Utc::now() + Duration::days(7);
+        test_util::time::datetime_between(&future_from, None)
+    });
     let creator = <Faker as Name>::name();
     let deposit_asset = get_asset();
-    let spec = spec.unwrap_or_else(|| get_channel_spec(id, ValidatorsOption::Count(3)));
+    let spec = spec.unwrap_or_else(|| get_channel_spec(id, None));
 
     Channel {
         id: channel_id,
@@ -61,22 +63,18 @@ pub fn get_channels(count: usize, valid_until_ge: Option<DateTime<Utc>>) -> Vec<
         .collect()
 }
 
-#[derive(Clone)]
-#[allow(dead_code)]
-pub enum ValidatorsOption {
-    Count(usize),
-    Some(Vec<ValidatorDesc>),
-    None,
-}
-
-pub fn get_channel_spec(prefix: &str, validators_option: ValidatorsOption) -> ChannelSpec {
-    let validators = match validators_option {
-        ValidatorsOption::Count(count) => get_validators(count, Some(prefix)),
-        ValidatorsOption::Some(validators) => validators,
-        ValidatorsOption::None => vec![],
-    };
+pub fn get_channel_spec(prefix: &str, validators_option: Option<SpecValidators>) -> ChannelSpec {
     use crate::EventSubmission;
     use test_util::take_one;
+
+    let validators = match validators_option {
+        Some(validators) => validators,
+        None => [
+            get_validator(&format!("{} leader", prefix), None),
+            get_validator(&format!("{} follower", prefix), None),
+        ]
+        .into(),
+    };
 
     let title_string = Some(<Faker as Lorem>::sentence(3, 4));
 

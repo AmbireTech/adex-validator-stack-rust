@@ -1,11 +1,11 @@
 use std::convert::TryFrom;
 use std::error::Error;
 use std::iter::Sum;
+use std::ops::{Add, Div, Mul, Sub};
 use std::str::FromStr;
 
 use num_bigint::BigUint;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::ops::{Div, Mul};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BigNum(
@@ -37,6 +37,24 @@ impl BigNum {
         use num::traits::cast::ToPrimitive;
 
         self.0.to_u64()
+    }
+}
+
+impl Add<&BigNum> for &BigNum {
+    type Output = BigNum;
+
+    fn add(self, rhs: &BigNum) -> Self::Output {
+        let big_uint = &self.0 + &rhs.0;
+        BigNum(big_uint.to_owned())
+    }
+}
+
+impl Sub<&BigNum> for &BigNum {
+    type Output = BigNum;
+
+    fn sub(self, rhs: &BigNum) -> Self::Output {
+        let big_uint = &self.0 - &rhs.0;
+        BigNum(big_uint.to_owned())
     }
 }
 
