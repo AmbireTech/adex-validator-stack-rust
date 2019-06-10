@@ -1,0 +1,13 @@
+[package]
+name = "validator"
+version = "0.1.0"
+authors = ["Lachezar Lechev <lachezar@adex.network>"]
+edition = "2018"
+
+[lib]
+name = "validator"
+path = "src/lib.rs"
+
+[dependencies]
+# Domain
+domain = { version = "0.1", path = "../domain", features = ["repositories"] }
