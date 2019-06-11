@@ -16,3 +16,6 @@ futures-preview = { version = "=0.3.0-alpha.16", features = ["compat", "io-compa
 futures_legacy = { version = "0.1", package = "futures" }
 # API client
 reqwest = "0.9.18"
+# (De)Serialization
+serde = { version = "^1.0", features = ['derive'] }
+serde_json = "1.0"
