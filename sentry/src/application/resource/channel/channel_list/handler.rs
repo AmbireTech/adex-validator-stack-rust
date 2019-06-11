@@ -1,7 +1,7 @@
 use chrono::Utc;
 use tokio::await;
 
-use domain::{ChannelListParams, ChannelRepository};
+use crate::domain::channel::{ChannelListParams, ChannelRepository};
 
 use super::ChannelListResponse;
 

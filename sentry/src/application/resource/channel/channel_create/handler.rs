@@ -1,6 +1,7 @@
 use tokio::await;
 
-use domain::{Channel, ChannelRepository};
+use crate::domain::channel::ChannelRepository;
+use domain::Channel;
 
 use super::ChannelCreateResponse;
 use super::ChannelInput;
@@ -28,7 +29,7 @@ impl<'a> ChannelCreateHandler<'a> {
             spec: channel_input.spec,
         };
 
-        let success = await!(self.channel_repository.save(channel)).is_ok();
+        let success = await!(self.channel_repository.create(channel)).is_ok();
 
         Ok(ChannelCreateResponse { success })
     }

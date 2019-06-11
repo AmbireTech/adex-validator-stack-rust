@@ -2,4 +2,5 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
 pub mod application;
+pub mod domain;
 pub mod infrastructure;
