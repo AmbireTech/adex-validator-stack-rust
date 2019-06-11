@@ -1,4 +1,4 @@
-use domain::{BigNum, Channel, ChannelId, RepositoryFuture};
+use domain::{Channel, RepositoryFuture};
 
 pub trait ChannelRepository: Send + Sync {
     /// Returns list of all channels, based on the passed validator identity
