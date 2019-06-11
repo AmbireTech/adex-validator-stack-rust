@@ -4,14 +4,15 @@ use tokio::await;
 use crate::domain::channel::{ChannelListParams, ChannelRepository};
 
 use super::ChannelListResponse;
+use std::sync::Arc;
 
-pub struct ChannelListHandler<'a> {
+pub struct ChannelListHandler {
     limit_per_page: u32,
-    channel_repository: &'a dyn ChannelRepository,
+    channel_repository: Arc<dyn ChannelRepository>,
 }
 
-impl<'a> ChannelListHandler<'a> {
-    pub fn new(limit_per_page: u32, channel_repository: &'a dyn ChannelRepository) -> Self {
+impl ChannelListHandler {
+    pub fn new(limit_per_page: u32, channel_repository: Arc<dyn ChannelRepository>) -> Self {
         Self {
             limit_per_page,
             channel_repository,
@@ -19,7 +20,8 @@ impl<'a> ChannelListHandler<'a> {
     }
 }
 
-impl<'a> ChannelListHandler<'a> {
+impl ChannelListHandler {
+    #[allow(clippy::needless_lifetimes)]
     pub async fn handle(
         &self,
         page: u32,

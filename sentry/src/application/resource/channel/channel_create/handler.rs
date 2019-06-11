@@ -5,18 +5,20 @@ use domain::Channel;
 
 use super::ChannelCreateResponse;
 use super::ChannelInput;
+use std::sync::Arc;
 
-pub struct ChannelCreateHandler<'a> {
-    channel_repository: &'a dyn ChannelRepository,
+pub struct ChannelCreateHandler {
+    channel_repository: Arc<dyn ChannelRepository>,
 }
 
-impl<'a> ChannelCreateHandler<'a> {
-    pub fn new(channel_repository: &'a dyn ChannelRepository) -> Self {
+impl ChannelCreateHandler {
+    pub fn new(channel_repository: Arc<dyn ChannelRepository>) -> Self {
         Self { channel_repository }
     }
 }
 
-impl<'a> ChannelCreateHandler<'a> {
+impl ChannelCreateHandler {
+    #[allow(clippy::needless_lifetimes)]
     pub async fn handle(&self, channel_input: ChannelInput) -> Result<ChannelCreateResponse, ()> {
         // @TODO: Creating Channel Validation
 
