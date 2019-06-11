@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use chrono::{DateTime, Utc};
 
 use domain::{Channel, RepositoryFuture};
@@ -47,7 +49,7 @@ impl ChannelListParams {
     }
 }
 
-pub trait ChannelRepository: Send + Sync {
+pub trait ChannelRepository: Debug + Send + Sync {
     /// Returns a list of channels, based on the passed Parameters for this method
     fn list(&self, params: &ChannelListParams) -> RepositoryFuture<Vec<Channel>>;
 

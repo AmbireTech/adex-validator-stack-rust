@@ -13,6 +13,7 @@ use crate::infrastructure::field::{asset::AssetPg, bignum::BigNumPg, channel_id:
 use crate::infrastructure::persistence::postgres::PostgresPersistenceError;
 use crate::infrastructure::persistence::DbPool;
 
+#[derive(Debug)]
 pub struct PostgresChannelRepository {
     db_pool: DbPool,
 }

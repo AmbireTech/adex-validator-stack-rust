@@ -10,6 +10,7 @@ use domain::{Channel, ChannelId, RepositoryError, RepositoryFuture};
 #[path = "./memory_test.rs"]
 mod memory_test;
 
+#[derive(Debug)]
 pub struct MemoryChannelRepository {
     records: Arc<RwLock<Vec<Channel>>>,
 }
