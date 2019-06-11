@@ -15,7 +15,7 @@ pub struct ApiChannelRepository {
 
 impl ChannelRepository for ApiChannelRepository {
     fn all(&self, identity: &str) -> RepositoryFuture<Vec<Channel>> {
-        let list_page_url = |page: u64| {
+        let list_page_url = |page: u32| {
             format!(
                 "http://localhost:8005/channel/list?validator={}&page={}",
                 identity, page
