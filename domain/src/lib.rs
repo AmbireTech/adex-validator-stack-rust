@@ -9,9 +9,7 @@ pub use util::tests as test_util;
 pub use self::ad_unit::AdUnit;
 pub use self::asset::Asset;
 pub use self::bignum::BigNum;
-#[cfg(feature = "repositories")]
-pub use self::channel::ChannelRepository;
-pub use self::channel::{Channel, ChannelId, ChannelListParams, ChannelSpec};
+pub use self::channel::{Channel, ChannelId, ChannelSpec, SpecValidators};
 pub use self::event_submission::EventSubmission;
 #[cfg(feature = "repositories")]
 pub use self::repository::*;

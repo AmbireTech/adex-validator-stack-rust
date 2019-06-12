@@ -10,9 +10,6 @@ use crate::bignum::BigNum;
 use crate::util::serde::ts_milliseconds_option;
 use crate::{AdUnit, Asset, DomainError, EventSubmission, TargetingTag, ValidatorDesc};
 
-#[cfg(feature = "repositories")]
-pub use self::repository::ChannelRepository;
-
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Copy, Clone)]
 #[serde(transparent)]
 pub struct ChannelId {
@@ -206,66 +203,6 @@ impl SpecValidators {
 impl From<[ValidatorDesc; 2]> for SpecValidators {
     fn from(slice: [ValidatorDesc; 2]) -> Self {
         Self(slice)
-    }
-}
-
-pub struct ChannelListParams {
-    /// page to show, should be >= 1
-    pub page: u32,
-    /// channels limit per page, should be >= 1
-    pub limit: u32,
-    /// filters `valid_until` to be `>= valid_until_ge`
-    pub valid_until_ge: DateTime<Utc>,
-    /// filters the channels containing a specific validator if provided
-    pub validator: Option<String>,
-    /// Ensures that this struct can only be created by calling `new()`
-    _secret: (),
-}
-
-impl ChannelListParams {
-    pub fn new(
-        valid_until_ge: DateTime<Utc>,
-        limit: u32,
-        page: u32,
-        validator: Option<String>,
-    ) -> Result<Self, DomainError> {
-        if page < 1 {
-            return Err(DomainError::InvalidArgument(
-                "Page should be >= 1".to_string(),
-            ));
-        }
-
-        if limit < 1 {
-            return Err(DomainError::InvalidArgument(
-                "Limit should be >= 1".to_string(),
-            ));
-        }
-
-        let validator = validator.and_then(|s| if s.is_empty() { None } else { Some(s) });
-
-        Ok(Self {
-            valid_until_ge,
-            page,
-            limit,
-            validator,
-            _secret: (),
-        })
-    }
-}
-
-#[cfg(feature = "repositories")]
-pub mod repository {
-    use crate::RepositoryFuture;
-
-    use super::*;
-
-    pub trait ChannelRepository: Send + Sync {
-        /// Returns a list of channels, based on the passed Parameters for this method
-        fn list(&self, params: &ChannelListParams) -> RepositoryFuture<Vec<Channel>>;
-
-        fn save(&self, channel: Channel) -> RepositoryFuture<()>;
-
-        fn find(&self, channel_id: &ChannelId) -> RepositoryFuture<Option<Channel>>;
     }
 }
 

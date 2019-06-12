@@ -5,15 +5,15 @@ use futures_legacy::Future as OldFuture;
 use futures_legacy::Stream as OldStream;
 use tokio_postgres::types::Json;
 
-use domain::{
-    Channel, ChannelId, ChannelListParams, ChannelRepository, ChannelSpec, RepositoryFuture,
-};
+use domain::{Channel, ChannelId, ChannelSpec, RepositoryFuture};
 use try_future::try_future;
 
+use crate::domain::channel::{ChannelListParams, ChannelRepository};
 use crate::infrastructure::field::{asset::AssetPg, bignum::BigNumPg, channel_id::ChannelIdPg};
 use crate::infrastructure::persistence::postgres::PostgresPersistenceError;
 use crate::infrastructure::persistence::DbPool;
 
+#[derive(Debug)]
 pub struct PostgresChannelRepository {
     db_pool: DbPool,
 }
@@ -65,11 +65,11 @@ impl ChannelRepository for PostgresChannelRepository {
         fut.compat().boxed()
     }
 
-    fn save(&self, _channel: Channel) -> RepositoryFuture<()> {
-        unimplemented!("save() for Postgres still needs to be implemented")
-    }
-
     fn find(&self, _channel_id: &ChannelId) -> RepositoryFuture<Option<Channel>> {
         unimplemented!("find() for Postgres still needs to be implemented")
+    }
+
+    fn create(&self, _channel: Channel) -> RepositoryFuture<()> {
+        unimplemented!("create() for Postgres still needs to be implemented")
     }
 }

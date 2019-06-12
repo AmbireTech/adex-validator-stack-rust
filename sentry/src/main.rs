@@ -13,7 +13,11 @@ use tower_web::ServiceBuilder;
 use domain::DomainError;
 use lazy_static::lazy_static;
 use sentry::application::resource::channel::ChannelResource;
+use sentry::infrastructure::persistence::channel::{
+    MemoryChannelRepository, PostgresChannelRepository,
+};
 use sentry::infrastructure::persistence::DbPool;
+use std::sync::Arc;
 
 const DEFAULT_PORT: u16 = 8005;
 
@@ -46,11 +50,14 @@ async fn bootstrap(database_url: String, addr: SocketAddr) {
 
     let listener = TcpListener::bind(&addr).expect("Wrong address provided");
 
+    let channel_repository = Arc::new(MemoryChannelRepository::new(None));
+    let _channel_repository = Arc::new(PostgresChannelRepository::new(db_pool.clone()));
+
     // A service builder is used to configure our service.
     let server = ServiceBuilder::new()
         .resource(ChannelResource {
-            db_pool: db_pool.clone(),
             channel_list_limit: CONFIG.channel_list_limit,
+            channel_repository: channel_repository.clone(),
         })
         .serve(listener.incoming());
 

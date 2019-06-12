@@ -6,18 +6,16 @@ use tower_web::{derive_resource_impl, impl_web, Deserialize, Extract};
 use channel_create::{ChannelCreateHandler, ChannelCreateResponse, ChannelInput};
 use channel_list::{ChannelListHandler, ChannelListResponse};
 
-use crate::infrastructure::persistence::channel::{
-    MemoryChannelRepository, PostgresChannelRepository,
-};
-use crate::infrastructure::persistence::DbPool;
+use crate::domain::channel::ChannelRepository;
+use std::sync::Arc;
 
 mod channel_create;
 mod channel_list;
 
 #[derive(Clone, Debug)]
 pub struct ChannelResource {
-    pub db_pool: DbPool,
     pub channel_list_limit: u32,
+    pub channel_repository: Arc<dyn ChannelRepository>,
 }
 
 impl_web! {
@@ -26,10 +24,8 @@ impl_web! {
         #[post("/channel")]
         #[content_type("application/json")]
         async fn create_channel(&self, body: ChannelInput) -> ChannelCreateResponse {
-            let _channel_repository = PostgresChannelRepository::new(self.db_pool.clone());
-            let channel_repository = MemoryChannelRepository::new(None);
 
-            let handler = ChannelCreateHandler::new(&channel_repository);
+            let handler = ChannelCreateHandler::new(self.channel_repository.clone());
 
             await!(handler.handle(body).boxed().compat()).unwrap()
         }
@@ -37,10 +33,7 @@ impl_web! {
         #[get("/channel/list")]
         #[content_type("application/json")]
         async fn channel_list(&self, query_string: ChannelListQuery) -> ChannelListResponse {
-            let _channel_repository = PostgresChannelRepository::new(self.db_pool.clone());
-            let channel_repository = MemoryChannelRepository::new(None);
-
-            let handler = ChannelListHandler::new(self.channel_list_limit, &channel_repository);
+            let handler = ChannelListHandler::new(self.channel_list_limit, self.channel_repository.clone());
 
             await!(handler.handle(query_string.page(), query_string.validator()).boxed().compat()).unwrap()
         }

@@ -2,16 +2,15 @@ use std::sync::{Arc, RwLock};
 
 use futures::future::{err, ok, FutureExt};
 
-use domain::{
-    Channel, ChannelId, ChannelListParams, ChannelRepository, RepositoryError, RepositoryFuture,
-};
-
+use crate::domain::channel::{ChannelListParams, ChannelRepository};
 use crate::infrastructure::persistence::memory::MemoryPersistenceError;
+use domain::{Channel, ChannelId, RepositoryError, RepositoryFuture};
 
 #[cfg(test)]
 #[path = "./memory_test.rs"]
 mod memory_test;
 
+#[derive(Debug)]
 pub struct MemoryChannelRepository {
     records: Arc<RwLock<Vec<Channel>>>,
 }
@@ -67,7 +66,26 @@ impl ChannelRepository for MemoryChannelRepository {
         res_fut.boxed()
     }
 
-    fn save(&self, channel: Channel) -> RepositoryFuture<()> {
+    fn find(&self, channel_id: &ChannelId) -> RepositoryFuture<Option<Channel>> {
+        let res_fut = match self.records.read() {
+            Ok(reader) => {
+                let found_channel = reader.iter().find_map(|channel| {
+                    if &channel.id == channel_id {
+                        Some(channel.clone())
+                    } else {
+                        None
+                    }
+                });
+
+                ok(found_channel)
+            }
+            Err(error) => err(MemoryPersistenceError::from(error).into()),
+        };
+
+        res_fut.boxed()
+    }
+
+    fn create(&self, channel: Channel) -> RepositoryFuture<()> {
         let channel_found = match self.records.read() {
             Ok(reader) => reader.iter().find_map(|current| {
                 if channel.id == current.id {
@@ -93,24 +111,5 @@ impl ChannelRepository for MemoryChannelRepository {
         };
 
         create_fut.boxed()
-    }
-
-    fn find(&self, channel_id: &ChannelId) -> RepositoryFuture<Option<Channel>> {
-        let res_fut = match self.records.read() {
-            Ok(reader) => {
-                let found_channel = reader.iter().find_map(|channel| {
-                    if &channel.id == channel_id {
-                        Some(channel.clone())
-                    } else {
-                        None
-                    }
-                });
-
-                ok(found_channel)
-            }
-            Err(error) => err(MemoryPersistenceError::from(error).into()),
-        };
-
-        res_fut.boxed()
     }
 }
