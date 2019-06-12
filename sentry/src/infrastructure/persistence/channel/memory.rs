@@ -36,29 +36,27 @@ impl ChannelRepository for MemoryChannelRepository {
             Ok(reader) => {
                 let channels = reader
                     .iter()
-                    .filter_map(|channel| {
-                        let valid_until_filter = channel.valid_until >= params.valid_until_ge;
-
-                        let validator_filter_passed = match &params.validator {
-                            Some(validator_id) => {
-                                // check if there is any validator in the current
-                                // `channel.spec.validators` that has the same `id`
-                                channel.spec.validators.find(&validator_id).is_some()
-                            }
-                            // if None -> the current channel has passed, since we don't need to filter by anything
-                            None => true,
-                        };
-
-                        match (valid_until_filter, validator_filter_passed) {
-                            (true, true) => Some(channel.clone()),
-                            (_, _) => None,
-                        }
-                    })
+                    .filter_map(|channel| list_filter(&params, channel))
                     .skip(skip_results)
                     .take(take)
                     .collect();
-
                 ok(channels)
+            }
+            Err(error) => err(MemoryPersistenceError::from(error).into()),
+        };
+
+        res_fut.boxed()
+    }
+
+    fn list_count(&self, params: &ChannelListParams) -> RepositoryFuture<usize> {
+        let res_fut = match self.records.read() {
+            Ok(reader) => {
+                let filtered_count = reader
+                    .iter()
+                    .filter_map(|channel| list_filter(&params, channel))
+                    .count();
+                let pages = (filtered_count as f64 / params.limit as f64).ceil() as usize;
+                ok(pages)
             }
             Err(error) => err(MemoryPersistenceError::from(error).into()),
         };
@@ -111,5 +109,24 @@ impl ChannelRepository for MemoryChannelRepository {
         };
 
         create_fut.boxed()
+    }
+}
+
+fn list_filter(params: &ChannelListParams, channel: &Channel) -> Option<Channel> {
+    let valid_until_filter = channel.valid_until >= params.valid_until_ge;
+
+    let validator_filter_passed = match &params.validator {
+        Some(validator_id) => {
+            // check if there is any validator in the current
+            // `channel.spec.validators` that has the same `id`
+            channel.spec.validators.find(&validator_id).is_some()
+        }
+        // if None -> the current channel has passed, since we don't need to filter by anything
+        None => true,
+    };
+
+    match (valid_until_filter, validator_filter_passed) {
+        (true, true) => Some(channel.clone()),
+        (_, _) => None,
     }
 }

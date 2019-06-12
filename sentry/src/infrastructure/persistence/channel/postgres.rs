@@ -65,6 +65,10 @@ impl ChannelRepository for PostgresChannelRepository {
         fut.compat().boxed()
     }
 
+    fn list_count(&self, _params: &ChannelListParams) -> RepositoryFuture<usize> {
+        unimplemented!()
+    }
+
     fn find(&self, _channel_id: &ChannelId) -> RepositoryFuture<Option<Channel>> {
         unimplemented!("find() for Postgres still needs to be implemented")
     }

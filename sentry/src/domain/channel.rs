@@ -53,6 +53,8 @@ pub trait ChannelRepository: Debug + Send + Sync {
     /// Returns a list of channels, based on the passed Parameters for this method
     fn list(&self, params: &ChannelListParams) -> RepositoryFuture<Vec<Channel>>;
 
+    fn list_count(&self, params: &ChannelListParams) -> RepositoryFuture<usize>;
+
     fn find(&self, channel_id: &ChannelId) -> RepositoryFuture<Option<Channel>>;
 
     fn create(&self, channel: Channel) -> RepositoryFuture<()>;
