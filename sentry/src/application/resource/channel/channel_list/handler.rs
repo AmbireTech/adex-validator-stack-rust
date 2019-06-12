@@ -34,7 +34,12 @@ impl ChannelListHandler {
         let list_fut = self.channel_repository.list(&channel_list_params);
         // @TODO: Proper error handling
         let channels = await!(list_fut).unwrap();
+        let channels_count =
+            await!(self.channel_repository.list_count(&channel_list_params)).unwrap();
 
-        Ok(ChannelListResponse { channels })
+        Ok(ChannelListResponse {
+            channels,
+            total_pages: channels_count,
+        })
     }
 }
