@@ -48,14 +48,14 @@ impl ChannelRepository for MemoryChannelRepository {
         res_fut.boxed()
     }
 
-    fn list_count(&self, params: &ChannelListParams) -> RepositoryFuture<usize> {
+    fn list_count(&self, params: &ChannelListParams) -> RepositoryFuture<u64> {
         let res_fut = match self.records.read() {
             Ok(reader) => {
                 let filtered_count = reader
                     .iter()
                     .filter_map(|channel| list_filter(&params, channel))
                     .count();
-                let pages = (filtered_count as f64 / params.limit as f64).ceil() as usize;
+                let pages = (filtered_count as f64 / f64::from(params.limit)).ceil() as u64;
                 ok(pages)
             }
             Err(error) => err(MemoryPersistenceError::from(error).into()),

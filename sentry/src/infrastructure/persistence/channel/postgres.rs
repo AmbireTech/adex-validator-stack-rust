@@ -65,8 +65,34 @@ impl ChannelRepository for PostgresChannelRepository {
         fut.compat().boxed()
     }
 
-    fn list_count(&self, _params: &ChannelListParams) -> RepositoryFuture<usize> {
-        unimplemented!()
+    fn list_count(&self, _params: &ChannelListParams) -> RepositoryFuture<u64> {
+        let fut = self
+            .db_pool
+            .run(move |mut conn| {
+                conn.prepare("SELECT COUNT(channel_id) FROM channels")
+                    .then(move |res| match res {
+                        Ok(stmt) => conn
+                            .query(&stmt, &[])
+                            .collect()
+                            .into_future()
+                            .then(|res| match res {
+                                Ok(rows) => Ok((rows, conn)),
+                                Err(err) => Err((err, conn)),
+                            })
+                            .into(),
+                        Err(err) => try_future!(Err((err, conn))),
+                    })
+                    .and_then(|(rows, conn)| {
+                        let count = rows[0]
+                            .get::<_, &str>(0)
+                            .parse::<u64>()
+                            .expect("Not possible to have that many rows");
+                        Ok((count, conn))
+                    })
+            })
+            .map_err(|err| PostgresPersistenceError::from(err).into());
+
+        fut.compat().boxed()
     }
 
     fn find(&self, _channel_id: &ChannelId) -> RepositoryFuture<Option<Channel>> {
