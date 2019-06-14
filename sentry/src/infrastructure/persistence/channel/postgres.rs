@@ -1,9 +1,8 @@
 use futures::compat::Future01CompatExt;
 use futures::future::FutureExt;
-use futures_legacy::future::IntoFuture;
 use futures_legacy::Future as OldFuture;
-use futures_legacy::Stream as OldStream;
 use tokio_postgres::types::Json;
+use tokio_postgres::Row;
 
 use domain::{Channel, ChannelId, ChannelSpec, RepositoryFuture};
 use try_future::try_future;
@@ -12,6 +11,7 @@ use crate::domain::channel::{ChannelListParams, ChannelRepository};
 use crate::infrastructure::field::{asset::AssetPg, bignum::BigNumPg, channel_id::ChannelIdPg};
 use crate::infrastructure::persistence::postgres::PostgresPersistenceError;
 use crate::infrastructure::persistence::DbPool;
+use crate::infrastructure::util::bb8::query_result;
 
 #[derive(Debug)]
 pub struct PostgresChannelRepository {
@@ -31,31 +31,11 @@ impl ChannelRepository for PostgresChannelRepository {
             .run(move |mut conn| {
                 conn.prepare("SELECT channel_id, creator, deposit_asset, deposit_amount, valid_until, spec FROM channels")
                     .then(move |res| match res {
-                        Ok(stmt) => {
-                            conn
-                                .query(&stmt, &[])
-                                .collect()
-                                .into_future()
-                                .then(|res| match res {
-                                    Ok(rows) => Ok((rows, conn)),
-                                    Err(err) => Err((err, conn)),
-                                })
-                                .into()
-                        }
+                        Ok(stmt) => query_result(conn.query(&stmt, &[]), conn),
                         Err(err) => try_future!(Err((err, conn))),
                     })
                     .and_then(|(rows, conn)| {
-                        let channels = rows.iter().map(|row| {
-                            let spec: ChannelSpec = row.get::<_, Json<ChannelSpec>>("spec").0;
-                            Channel {
-                                id: row.get::<_, ChannelIdPg>("channel_id").into(),
-                                creator: row.get("creator"),
-                                deposit_asset: row.get::<_, AssetPg>("deposit_asset").into(),
-                                deposit_amount: row.get::<_, BigNumPg>("deposit_amount").into(),
-                                valid_until: row.get("valid_until"),
-                                spec,
-                            }
-                        }).collect();
+                        let channels = rows.iter().map(|row| channel_map(row)).collect();
 
                         Ok((channels, conn))
                     })
@@ -69,17 +49,9 @@ impl ChannelRepository for PostgresChannelRepository {
         let fut = self
             .db_pool
             .run(move |mut conn| {
-                conn.prepare("SELECT COUNT(channel_id) FROM channels")
+                conn.prepare("SELECT COUNT(channel_id)::TEXT FROM channels")
                     .then(move |res| match res {
-                        Ok(stmt) => conn
-                            .query(&stmt, &[])
-                            .collect()
-                            .into_future()
-                            .then(|res| match res {
-                                Ok(rows) => Ok((rows, conn)),
-                                Err(err) => Err((err, conn)),
-                            })
-                            .into(),
+                        Ok(stmt) => query_result(conn.query(&stmt, &[]), conn),
                         Err(err) => try_future!(Err((err, conn))),
                     })
                     .and_then(|(rows, conn)| {
@@ -87,6 +59,7 @@ impl ChannelRepository for PostgresChannelRepository {
                             .get::<_, &str>(0)
                             .parse::<u64>()
                             .expect("Not possible to have that many rows");
+
                         Ok((count, conn))
                     })
             })
@@ -101,5 +74,17 @@ impl ChannelRepository for PostgresChannelRepository {
 
     fn create(&self, _channel: Channel) -> RepositoryFuture<()> {
         unimplemented!("create() for Postgres still needs to be implemented")
+    }
+}
+
+fn channel_map(row: &Row) -> Channel {
+    let spec: ChannelSpec = row.get::<_, Json<ChannelSpec>>("spec").0;
+    Channel {
+        id: row.get::<_, ChannelIdPg>("channel_id").into(),
+        creator: row.get("creator"),
+        deposit_asset: row.get::<_, AssetPg>("deposit_asset").into(),
+        deposit_amount: row.get::<_, BigNumPg>("deposit_amount").into(),
+        valid_until: row.get("valid_until"),
+        spec,
     }
 }
