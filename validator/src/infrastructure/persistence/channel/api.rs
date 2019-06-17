@@ -40,6 +40,8 @@ impl ChannelRepository for ApiChannelRepository {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct AllResponse {
     pub channels: Vec<Channel>,
+    pub total_pages: u64,
 }
