@@ -46,6 +46,7 @@ fn main() {
         leader: Leader {},
         follower: Follower {},
         channel_repository,
+        identity: "0x2892f6C41E0718eeeDd49D98D648C789668cA67d".to_string(),
     };
 
     let worker = InfiniteWorker { tick_worker };
