@@ -55,7 +55,7 @@ impl error::Error for DomainError {
 pub mod repository {
     use std::pin::Pin;
 
-    use futures::{Future, Stream};
+    use futures::Future;
 
     pub trait IOError: std::error::Error + Send {}
 
@@ -69,6 +69,4 @@ pub mod repository {
     }
 
     pub type RepositoryFuture<T> = Pin<Box<dyn Future<Output = Result<T, RepositoryError>> + Send>>;
-
-    pub type RepositoryStream<T> = Pin<Box<dyn Stream<Item = Result<T, RepositoryError>> + Send>>;
 }
