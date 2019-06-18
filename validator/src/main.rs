@@ -12,7 +12,7 @@ fn main() {
             client: Client::new(),
         };
 
-        let mut all_channels = await!(repo.all("0x2892f6C41E0718eeeDd49D98D648C789668cA67d"));
+        let all_channels = await!(repo.all("0x2892f6C41E0718eeeDd49D98D648C789668cA67d"));
 
         match all_channels {
             Ok(channel) => println!("{:#?}", channel),

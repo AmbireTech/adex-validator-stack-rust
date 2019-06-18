@@ -1,4 +1,9 @@
+use std::iter::once;
+use std::sync::Arc;
+
 use futures::compat::Future01CompatExt;
+use futures::future::{ok, try_join_all};
+use futures::{FutureExt, TryFutureExt};
 use futures_legacy::Future as LegacyFuture;
 use reqwest::r#async::{Client, Response};
 use serde::Deserialize;
@@ -7,26 +12,20 @@ use domain::{Channel, RepositoryFuture};
 
 use crate::domain::channel::ChannelRepository;
 use crate::infrastructure::persistence::api::ApiPersistenceError;
-use futures::future::{ok, try_join_all};
-use futures::{FutureExt, TryFutureExt};
-use std::iter::once;
-use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct ApiChannelRepository {
     pub client: Client,
 }
 
-impl ChannelRepository for ApiChannelRepository {
-    fn all(&self, identity: &str) -> RepositoryFuture<Vec<Channel>> {
-        let identity = Arc::new(identity.to_string());
-        let first_page = self
-            .client
+impl ApiChannelRepository {
+    fn fetch_page(&self, page: u64, identity: &str) -> RepositoryFuture<ChannelAllResponse> {
+        self.client
             // call Sentry and fetch first page, where validator = identity
             .get(
                 format!(
                     "http://localhost:8005/channel/list?validator={}&page={}",
-                    identity.clone(),
-                    1
+                    identity, page
                 )
                 .as_str(),
             )
@@ -34,38 +33,38 @@ impl ChannelRepository for ApiChannelRepository {
             .and_then(|mut res: Response| res.json::<ChannelAllResponse>())
             // @TODO: Error handling
             .map_err(|_error| ApiPersistenceError::Reading.into())
-            .compat();
+            .compat()
+            .boxed()
+    }
+}
+
+impl ChannelRepository for ApiChannelRepository {
+    fn all(&self, identity: &str) -> RepositoryFuture<Vec<Channel>> {
+        let identity = Arc::new(identity.to_string());
+        let handle = self.clone();
+
+        let first_page = handle.fetch_page(1, &identity.clone());
 
         // call Sentry again and concat all the Channels in Future
         // fetching them until no more Channels are returned
-        let client = self.client.clone();
         first_page
             .and_then(move |response| {
-                let futures = ok(response.channels).boxed();
+                let first_page_future = ok(response.channels).boxed();
 
                 if response.total_pages < 2 {
-                    futures
+                    first_page_future
                 } else {
+                    let identity = identity.clone();
                     let futures = (2..=response.total_pages)
                         .map(|page| {
-                            client
-                                .get(
-                                    format!(
-                                        "http://localhost:8005/channel/list?validator={}&page={}",
-                                        identity.clone(),
-                                        page
-                                    )
-                                    .as_str(),
-                                )
-                                .send()
-                                .and_then(move |mut res: Response| res.json::<ChannelAllResponse>())
-                                // @TODO: Error handling
-                                .map_err(|_error| ApiPersistenceError::Reading.into())
-                                .map(|response| response.channels)
-                                .compat()
+                            handle
+                                .fetch_page(page, &identity)
+                                .map(|response_result| {
+                                    response_result.and_then(|response| Ok(response.channels))
+                                })
                                 .boxed()
                         })
-                        .chain(once(futures));
+                        .chain(once(first_page_future));
 
                     try_join_all(futures)
                         .map(|result_all| {
