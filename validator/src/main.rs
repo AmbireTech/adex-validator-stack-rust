@@ -11,10 +11,15 @@ fn main() {
         let repo = validator::infrastructure::persistence::channel::api::ApiChannelRepository {
             client: Client::new(),
         };
-        println!(
-            "{:#?}",
-            await!(repo.all("0x2892f6C41E0718eeeDd49D98D648C789668cA67d"))
-        );
+
+        let mut all_channels = await!(repo.all("0x2892f6C41E0718eeeDd49D98D648C789668cA67d"));
+
+        match all_channels {
+            Ok(channel) => println!("{:#?}", channel),
+            Err(error) => eprintln!("Error occurred: {:#?}", error),
+        }
+
+        ()
     };
 
     tokio::run(future.unit_error().boxed().compat());
