@@ -19,9 +19,9 @@ lazy_static! {
         dotenv::dotenv().ok();
 
         let ticks_wait_time = std::env::var("VALIDATOR_TICKS_WAIT_TIME")
-                .unwrap()
-                .parse()
-                .unwrap();
+            .unwrap()
+            .parse()
+            .unwrap();
         Config {
             ticks_wait_time: Duration::from_millis(ticks_wait_time),
             sentry_url: std::env::var("VALIDATOR_SENTRY_URL")
