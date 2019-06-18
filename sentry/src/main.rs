@@ -82,19 +82,19 @@ impl TryFrom<Vars> for Config {
     fn try_from(mut vars: Vars) -> Result<Self, Self::Error> {
         let limit = vars
             .find_map(|(key, value)| {
-                if key == "CHANNEL_LIST_LIMIT" {
+                if key == "SENTRY_CHANNEL_LIST_LIMIT" {
                     Some(value)
                 } else {
                     None
                 }
             })
             .ok_or(DomainError::InvalidArgument(
-                "CHANNEL_LIST_LIMIT evn. variable was not passed".to_string(),
+                "SENTRY_CHANNEL_LIST_LIMIT evn. variable was not passed".to_string(),
             ))
             .and_then(|value| {
                 value.parse::<u32>().map_err(|_| {
                     DomainError::InvalidArgument(
-                        "CHANNEL_LIST_LIMIT is not a u32 value".to_string(),
+                        "SENTRY_CHANNEL_LIST_LIMIT is not a u32 value".to_string(),
                     )
                 })
             });
