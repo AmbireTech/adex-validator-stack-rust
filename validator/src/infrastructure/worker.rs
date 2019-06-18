@@ -1,7 +1,13 @@
+pub use self::infinite::InfiniteWorker;
+pub use self::single::TickWorker;
+
 pub mod single {
+    use std::sync::Arc;
+
+    use futures::future::FutureExt;
+
     use crate::domain::channel::ChannelRepository;
-    use crate::infrastructure::persistence::channel::api::ApiChannelRepository;
-    use crate::infrastructure::sentry::SentryApi;
+    use crate::domain::{Worker, WorkerFuture};
     use crate::infrastructure::validator::follower::Follower;
     use crate::infrastructure::validator::leader::Leader;
 
@@ -9,17 +15,15 @@ pub mod single {
     pub struct TickWorker {
         pub leader: Leader,
         pub follower: Follower,
-        pub sentry: SentryApi,
+        pub channel_repository: Arc<dyn ChannelRepository>,
     }
 
     /// Single tick worker
     impl TickWorker {
         pub async fn tick(self) -> Result<(), ()> {
-            let repo = ApiChannelRepository {
-                sentry: self.sentry.clone(),
-            };
-
-            let all_channels = await!(repo.all("0x2892f6C41E0718eeeDd49D98D648C789668cA67d"));
+            let all_channels = await!(self
+                .channel_repository
+                .all("0x2892f6C41E0718eeeDd49D98D648C789668cA67d"));
 
             match all_channels {
                 Ok(channel) => println!("{:#?}", channel),
@@ -29,16 +33,23 @@ pub mod single {
             Ok(())
         }
     }
+
+    impl Worker for TickWorker {
+        fn run(&self) -> WorkerFuture {
+            self.clone().tick().boxed()
+        }
+    }
 }
 pub mod infinite {
-    use crate::infrastructure::sentry::SentryApi;
-    use crate::infrastructure::worker::single::TickWorker;
-    use futures::compat::Future01CompatExt;
-    use futures::future::join;
-    use reqwest::r#async::Client;
     use std::ops::Add;
     use std::time::{Duration, Instant};
+
+    use futures::compat::Future01CompatExt;
+    use futures::future::{join, FutureExt};
     use tokio::timer::Delay;
+
+    use crate::domain::{Worker, WorkerFuture};
+    use crate::infrastructure::worker::TickWorker;
 
     #[derive(Clone)]
     pub struct InfiniteWorker {
@@ -48,11 +59,6 @@ pub mod infinite {
     /// Infinite tick worker
     impl InfiniteWorker {
         pub async fn infinite(self) -> Result<(), ()> {
-            let sentry = SentryApi {
-                client: Client::new(),
-                //                sentry_url: CONFIG.sentry_url.clone(),
-                sentry_url: "http://localhost:8005".to_string(),
-            };
             let handle = self.clone();
             loop {
                 let future = handle.clone().tick_worker.tick();
@@ -63,6 +69,12 @@ pub mod infinite {
 
                 await!(joined);
             }
+        }
+    }
+
+    impl Worker for InfiniteWorker {
+        fn run(&self) -> WorkerFuture {
+            self.clone().infinite().boxed()
         }
     }
 }
