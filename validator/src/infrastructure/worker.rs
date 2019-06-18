@@ -30,7 +30,7 @@ pub mod single {
             match all_channels {
                 Ok(channels) => {
                     for channel in channels {
-                        await!(self.handle_channel(channel)).unwrap();
+                        await!(self.clone().handle_channel(channel)).unwrap();
                     }
                 }
                 Err(error) => eprintln!("Error occurred: {:#?}", error),
@@ -39,8 +39,8 @@ pub mod single {
             Ok(())
         }
 
-        async fn handle_channel(&self, channel: Channel) -> Result<(), ()> {
-            let channel_id = channel.id.clone();
+        async fn handle_channel(self, channel: Channel) -> Result<(), ()> {
+            let channel_id = channel.id;
 
             match &channel.spec.validators.find(&self.identity) {
                 SpecValidator::Leader(_) => {
