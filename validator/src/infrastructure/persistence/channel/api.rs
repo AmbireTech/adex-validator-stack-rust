@@ -1,12 +1,4 @@
-use std::iter::once;
-use std::sync::Arc;
-
-use futures::compat::Future01CompatExt;
-use futures::future::{ok, try_join_all};
 use futures::{FutureExt, TryFutureExt};
-use futures_legacy::Future as LegacyFuture;
-use reqwest::r#async::{Client, Response};
-use serde::Deserialize;
 
 use domain::{Channel, RepositoryFuture};
 
@@ -25,14 +17,8 @@ impl ChannelRepository for ApiChannelRepository {
         self.sentry
             .clone()
             .all_channels(Some(identity.to_string()))
+            // @TODO: Error handling
             .map_err(|_error| ApiPersistenceError::Reading.into())
             .boxed()
     }
-}
-
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct ChannelAllResponse {
-    pub channels: Vec<Channel>,
-    pub total_pages: u64,
 }

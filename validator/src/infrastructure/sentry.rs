@@ -4,6 +4,7 @@ use futures::future::{ok, try_join_all, FutureExt, TryFutureExt};
 use futures::Future;
 use futures_legacy::Future as LegacyFuture;
 use reqwest::r#async::{Client, Response};
+use reqwest::Error;
 use serde::Deserialize;
 use std::iter::once;
 
@@ -18,7 +19,7 @@ impl SentryApi {
     pub fn all_channels(
         &self,
         validator: Option<String>,
-    ) -> impl Future<Output = Result<Vec<Channel>, reqwest::Error>> {
+    ) -> impl Future<Output = Result<Vec<Channel>, Error>> {
         let first_page = self.clone().fetch_page(1, validator.clone());
 
         // call Sentry again and concat all the Channels in Future
