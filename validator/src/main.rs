@@ -17,9 +17,7 @@ fn main() {
         match all_channels {
             Ok(channel) => println!("{:#?}", channel),
             Err(error) => eprintln!("Error occurred: {:#?}", error),
-        }
-
-        ()
+        };
     };
 
     tokio::run(future.unit_error().boxed().compat());
