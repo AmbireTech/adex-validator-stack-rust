@@ -1,5 +1,8 @@
-use futures::Future;
 use std::pin::Pin;
+
+use futures::Future;
+
+use domain::Channel;
 
 pub type ValidatorFuture<T> = Pin<Box<dyn Future<Output = Result<T, ValidatorError>> + Send>>;
 
@@ -9,5 +12,5 @@ pub enum ValidatorError {
 }
 
 pub trait Validator {
-    fn tick() -> ValidatorFuture<()>;
+    fn tick(&self, channel: Channel) -> ValidatorFuture<()>;
 }
