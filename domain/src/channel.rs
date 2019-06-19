@@ -1,4 +1,5 @@
 use std::convert::TryFrom;
+use std::fmt;
 
 use chrono::serde::{ts_milliseconds, ts_seconds};
 use chrono::{DateTime, Utc};
@@ -17,7 +18,7 @@ pub struct ChannelId {
     pub id: [u8; 32],
 }
 
-impl ToString for ChannelId {
+impl fmt::Display for ChannelId {
     /// Converts a ChannelId to hex string with prefix
     ///
     /// Example:
@@ -26,11 +27,12 @@ impl ToString for ChannelId {
     ///
     /// let hex_string = "0x061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088";
     /// let channel_id = ChannelId::try_from_hex(&hex_string).expect("Should be a valid hex string already");
-    ///
-    /// assert_eq!("0x061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088", channel_id.to_string());
+    /// let channel_hex_string = format!("{}", channel_id);
+    /// assert_eq!("0x061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088", &channel_hex_string);
     /// ```
-    fn to_string(&self) -> String {
-        SerHex::<StrictPfx>::into_hex(&self.id).unwrap()
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        let hex_string = SerHex::<StrictPfx>::into_hex(&self.id).unwrap();
+        write!(f, "{}", hex_string)
     }
 }
 

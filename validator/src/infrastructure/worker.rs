@@ -3,24 +3,26 @@ pub use self::single::TickWorker;
 
 pub mod single {
     use std::sync::Arc;
+    use std::time::Duration;
 
-    use futures::future::FutureExt;
+    use futures::compat::Future01CompatExt;
+    use futures::future::{FutureExt, TryFutureExt};
+    use tokio::util::FutureExt as TokioFutureExt;
 
-    use domain::channel::SpecValidator;
-    use domain::Channel;
+    use domain::{Channel, SpecValidator};
 
-    use crate::domain::channel::ChannelRepository;
-    use crate::domain::validator::Validator;
-    use crate::domain::{Worker, WorkerFuture};
-    use crate::infrastructure::validator::follower::Follower;
-    use crate::infrastructure::validator::leader::Leader;
+    use crate::domain::{ChannelRepository, Validator, Worker, WorkerFuture};
+    use crate::infrastructure::validator::{Follower, Leader};
 
     #[derive(Clone)]
     pub struct TickWorker {
         pub leader: Leader,
         pub follower: Follower,
         pub channel_repository: Arc<dyn ChannelRepository>,
+        // @TODO: use the adapter(maybe?) instead of repeating the identity
         pub identity: String,
+        // @TODO: Pass configuration by which this can be set
+        pub validation_tick_timeout: Duration,
     }
 
     /// Single tick worker
@@ -45,15 +47,33 @@ pub mod single {
 
             match &channel.spec.validators.find(&self.identity) {
                 SpecValidator::Leader(_) => {
-                    self.leader.tick(channel);
-                    eprintln!("Channel {} handled as __Leader__", channel_id.to_string());
+                    let tick_future = self.leader.tick(channel);
+
+                    let tick_result = await!(tick_future
+                        .compat()
+                        .timeout(self.validation_tick_timeout)
+                        .compat());
+
+                    match tick_result {
+                        Ok(_) => println!("Channel {} handled as __Leader__", channel_id),
+                        Err(_) => eprintln!("Channel {} Timed out", channel_id),
+                    }
                 }
                 SpecValidator::Follower(_) => {
-                    self.follower.tick(channel);
-                    eprintln!("Channel {} handled as __Follower__", channel_id.to_string());
+                    let tick_future = self.follower.tick(channel);
+
+                    let tick_result = await!(tick_future
+                        .compat()
+                        .timeout(self.validation_tick_timeout)
+                        .compat());
+
+                    match tick_result {
+                        Ok(_) => println!("Channel {} handled as __Follower__", channel_id),
+                        Err(_) => eprintln!("Channel {} Timed out", channel_id),
+                    }
                 }
                 SpecValidator::None => {
-                    eprintln!("Channel {} is not validated by us", channel_id.to_string());
+                    eprintln!("Channel {} is not validated by us", channel_id);
                 }
             };
 
