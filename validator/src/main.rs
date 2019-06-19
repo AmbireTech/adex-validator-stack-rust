@@ -14,7 +14,14 @@ lazy_static! {
             .unwrap()
             .parse()
             .unwrap();
+
+        let validation_tick_timeout = std::env::var("VALIDATOR_VALIDATION_TICK_TIMEOUT")
+            .unwrap()
+            .parse()
+            .unwrap();
+
         Config {
+            validation_tick_timeout: Duration::from_millis(validation_tick_timeout),
             ticks_wait_time: Duration::from_millis(ticks_wait_time),
             sentry_url: std::env::var("VALIDATOR_SENTRY_URL")
                 .unwrap()
@@ -89,6 +96,7 @@ fn run(is_single_tick: bool, adapter: impl Adapter) {
         follower: Follower {},
         channel_repository,
         identity: adapter.config().identity.to_string(),
+        validation_tick_timeout: CONFIG.validation_tick_timeout,
     };
 
     if !is_single_tick {
@@ -118,6 +126,7 @@ fn run(is_single_tick: bool, adapter: impl Adapter) {
 }
 
 struct Config {
+    pub validation_tick_timeout: Duration,
     pub ticks_wait_time: Duration,
     pub sentry_url: String,
 }
