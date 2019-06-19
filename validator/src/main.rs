@@ -2,17 +2,9 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
 
-use futures::future::{FutureExt, TryFutureExt};
-use reqwest::r#async::Client;
-
+use adapter::Adapter;
 use lazy_static::lazy_static;
-use std::sync::Arc;
 use std::time::Duration;
-use validator::domain::worker::Worker;
-use validator::infrastructure::persistence::channel::api::ApiChannelRepository;
-use validator::infrastructure::sentry::SentryApi;
-use validator::infrastructure::validator::{Follower, Leader};
-use validator::infrastructure::worker::{InfiniteWorker, TickWorker};
 
 lazy_static! {
     static ref CONFIG: Config = {
@@ -33,25 +25,96 @@ lazy_static! {
 }
 
 fn main() {
+    use adapter::dummy::DummyAdapter;
+    use adapter::ConfigBuilder;
+    use clap::{App, Arg, SubCommand};
+    use std::collections::HashMap;
+
+    let matches = App::new("Validator worker")
+        .version("0.2")
+        .arg(
+            Arg::with_name("single-tick")
+                .short("s")
+                .help("Runs the validator in single-tick mode"),
+        )
+        .subcommand(
+            SubCommand::with_name("dummy")
+                .about("Runs the validator with the Dummy adapter")
+                .arg(
+                    Arg::with_name("IDENTITY")
+                        .help("The dummy identity to be used for the validator")
+                        .required(true)
+                        .index(1),
+                ),
+        )
+        .get_matches();
+
+    let is_single_tick = matches.is_present("single-tick");
+
+    let adapter = match matches.subcommand_matches("dummy") {
+        Some(dummy_matches) => {
+            let identity = dummy_matches.value_of("IDENTITY").unwrap();
+
+            DummyAdapter {
+                config: ConfigBuilder::new(identity).build(),
+                participants: HashMap::default(),
+            }
+        }
+        None => panic!("We don't have any other adapters implemented yet!"),
+    };
+
+    run(is_single_tick, adapter);
+}
+
+fn run(is_single_tick: bool, adapter: impl Adapter) {
+    use futures::future::{FutureExt, TryFutureExt};
+    use reqwest::r#async::Client;
+
+    use std::sync::Arc;
+    use validator::domain::worker::Worker;
+    use validator::infrastructure::persistence::channel::api::ApiChannelRepository;
+    use validator::infrastructure::sentry::SentryApi;
+    use validator::infrastructure::validator::{Follower, Leader};
+    use validator::infrastructure::worker::{InfiniteWorker, TickWorker};
+
     let sentry = SentryApi {
         client: Client::new(),
         sentry_url: CONFIG.sentry_url.clone(),
     };
 
-    let channel_repository = Arc::new(ApiChannelRepository {
-        sentry: sentry.clone(),
-    });
+    let channel_repository = Arc::new(ApiChannelRepository { sentry });
 
     let tick_worker = TickWorker {
         leader: Leader {},
         follower: Follower {},
         channel_repository,
-        identity: "0x2892f6C41E0718eeeDd49D98D648C789668cA67d".to_string(),
+        identity: adapter.config().identity.to_string(),
     };
 
-    let worker = InfiniteWorker { tick_worker };
+    if !is_single_tick {
+        let worker = InfiniteWorker {
+            tick_worker,
+            ticks_wait_time: CONFIG.ticks_wait_time,
+        };
 
-    tokio::run(worker.run().boxed().compat());
+        tokio::run(
+            async move {
+                await!(worker.run()).unwrap();
+            }
+                .unit_error()
+                .boxed()
+                .compat(),
+        );
+    } else {
+        tokio::run(
+            async move {
+                await!(tick_worker.run()).unwrap();
+            }
+                .unit_error()
+                .boxed()
+                .compat(),
+        );
+    }
 }
 
 struct Config {

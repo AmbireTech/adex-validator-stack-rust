@@ -6,13 +6,14 @@ pub mod single {
 
     use futures::future::FutureExt;
 
+    use domain::channel::SpecValidator;
+    use domain::Channel;
+
     use crate::domain::channel::ChannelRepository;
     use crate::domain::validator::Validator;
     use crate::domain::{Worker, WorkerFuture};
     use crate::infrastructure::validator::follower::Follower;
     use crate::infrastructure::validator::leader::Leader;
-    use domain::channel::SpecValidator;
-    use domain::Channel;
 
     #[derive(Clone)]
     pub struct TickWorker {
@@ -80,6 +81,7 @@ pub mod infinite {
     #[derive(Clone)]
     pub struct InfiniteWorker {
         pub tick_worker: TickWorker,
+        pub ticks_wait_time: Duration,
     }
 
     /// Infinite tick worker
@@ -88,8 +90,7 @@ pub mod infinite {
             let handle = self.clone();
             loop {
                 let future = handle.clone().tick_worker.tick();
-                //                let tick_future = Delay::new(Instant::now().add(CONFIG.ticks_wait_time));
-                let tick_future = Delay::new(Instant::now().add(Duration::from_millis(5000)));
+                let tick_future = Delay::new(Instant::now().add(self.ticks_wait_time));
 
                 let joined = join(future, tick_future.compat());
 
