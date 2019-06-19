@@ -6,13 +6,14 @@ pub mod single {
 
     use futures::future::FutureExt;
 
+    use domain::channel::SpecValidator;
+    use domain::Channel;
+
     use crate::domain::channel::ChannelRepository;
     use crate::domain::validator::Validator;
     use crate::domain::{Worker, WorkerFuture};
     use crate::infrastructure::validator::follower::Follower;
     use crate::infrastructure::validator::leader::Leader;
-    use domain::channel::SpecValidator;
-    use domain::Channel;
 
     #[derive(Clone)]
     pub struct TickWorker {
