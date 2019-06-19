@@ -92,7 +92,10 @@ fn run(is_single_tick: bool, adapter: impl Adapter) {
     };
 
     if !is_single_tick {
-        let worker = InfiniteWorker { tick_worker };
+        let worker = InfiniteWorker {
+            tick_worker,
+            ticks_wait_time: CONFIG.ticks_wait_time,
+        };
 
         tokio::run(
             async move {
