@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use futures::future::{err, FutureExt, ok};
+use futures::future::{err, ok, FutureExt};
 use hex::encode;
 
 use domain::validator::message::State;
@@ -36,18 +36,18 @@ impl Adapter for DummyAdapter<'_> {
     /// Example:
     ///
     /// ```
+    /// # futures::executor::block_on(async {
     /// use adapter::{ConfigBuilder, Adapter};
     /// use adapter::dummy::DummyAdapter;
     /// use std::collections::HashMap;
     ///
-    /// futures::executor::block_on(async {
-    ///     let config = ConfigBuilder::new("identity").build();
-    ///     let adapter = DummyAdapter { config, participants: HashMap::new() };
+    /// let config = ConfigBuilder::new("identity").build();
+    /// let adapter = DummyAdapter { config, participants: HashMap::new() };
     ///
-    ///     let actual = await!(adapter.sign("abcdefghijklmnopqrstuvwxyz012345")).unwrap();
-    ///     let expected = "Dummy adapter signature for 6162636465666768696a6b6c6d6e6f707172737475767778797a303132333435 by identity";
-    ///     assert_eq!(expected, &actual);
-    /// });
+    /// let actual = await!(adapter.sign("abcdefghijklmnopqrstuvwxyz012345")).unwrap();
+    /// let expected = "Dummy adapter signature for 6162636465666768696a6b6c6d6e6f707172737475767778797a303132333435 by identity";
+    /// assert_eq!(expected, &actual);
+    /// # });
     /// ```
     fn sign(&self, state_root: &str) -> AdapterFuture<String> {
         let signature = format!(
@@ -61,17 +61,17 @@ impl Adapter for DummyAdapter<'_> {
     /// Example:
     ///
     /// ```
+    /// # futures::executor::block_on(async {
     /// use adapter::{ConfigBuilder, Adapter};
     /// use adapter::dummy::DummyAdapter;
     /// use std::collections::HashMap;
     ///
-    /// futures::executor::block_on(async {
-    ///     let config = ConfigBuilder::new("identity").build();
-    ///     let adapter = DummyAdapter { config, participants: HashMap::new() };
+    /// let config = ConfigBuilder::new("identity").build();
+    /// let adapter = DummyAdapter { config, participants: HashMap::new() };
     ///
-    ///     let signature = "Dummy adapter signature for 6162636465666768696a6b6c6d6e6f707172737475767778797a303132333435 by identity";
-    ///     assert_eq!(Ok(true), await!(adapter.verify("identity", "doesn't matter", signature)));
-    /// });
+    /// let signature = "Dummy adapter signature for 6162636465666768696a6b6c6d6e6f707172737475767778797a303132333435 by identity";
+    /// assert_eq!(Ok(true), await!(adapter.verify("identity", "doesn't matter", signature)));
+    /// # });
     /// ```
     fn verify(
         &self,
@@ -94,27 +94,27 @@ impl Adapter for DummyAdapter<'_> {
     /// Example:
     ///
     /// ```
+    /// # futures::executor::block_on(async {
     /// use std::collections::HashMap;
     /// use adapter::dummy::{DummyParticipant, DummyAdapter};
     /// use adapter::{ConfigBuilder, Adapter};
     ///
-    /// futures::executor::block_on(async {
-    ///    let mut participants = HashMap::new();
-    ///    participants.insert(
-    ///        "identity_key",
-    ///        DummyParticipant {
-    ///            identity: "identity".to_string(),
-    ///            token: "token".to_string(),
-    ///        },
-    ///    );
+    /// let mut participants = HashMap::new();
+    /// participants.insert(
+    ///     "identity_key",
+    ///     DummyParticipant {
+    ///         identity: "identity".to_string(),
+    ///         token: "token".to_string(),
+    ///     },
+    /// );
     ///
-    ///    let adapter = DummyAdapter {
-    ///        config: ConfigBuilder::new("identity").build(),
-    ///        participants,
-    ///    };
+    /// let adapter = DummyAdapter {
+    ///     config: ConfigBuilder::new("identity").build(),
+    ///     participants,
+    /// };
     ///
-    ///    assert_eq!(Ok("token".to_string()), await!(adapter.get_auth("identity")));
-    /// });
+    /// assert_eq!(Ok("token".to_string()), await!(adapter.get_auth("identity")));
+    /// # });
     /// ```
     fn get_auth(&self, validator: &str) -> AdapterFuture<String> {
         let participant = self
