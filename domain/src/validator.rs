@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+pub use message::{Message, State};
+
 use crate::BigNum;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -8,6 +10,46 @@ pub struct ValidatorDesc {
     pub id: String,
     pub url: String,
     pub fee: BigNum,
+}
+
+pub mod message {
+    use chrono::{DateTime, Utc};
+    use serde::{Deserialize, Serialize};
+
+    use crate::BalancesMap;
+
+    pub trait State {
+        type Signature;
+        type StateRoot;
+    }
+
+    #[derive(Serialize, Deserialize, Debug)]
+    #[serde(tag = "type")]
+    pub enum Message<S: State> {
+        #[serde(rename_all = "camelCase")]
+        ApproveState {
+            state_root: S::StateRoot,
+            signature: S::Signature,
+            is_healthy: bool,
+        },
+        #[serde(rename_all = "camelCase")]
+        NewState {
+            state_root: S::StateRoot,
+            signature: S::Signature,
+            balances: BalancesMap,
+        },
+        #[serde(rename_all = "camelCase")]
+        Heartbeat {
+            signature: S::Signature,
+            timestamp: DateTime<Utc>,
+        },
+        #[serde(rename_all = "camelCase")]
+        Accounting {
+            last_ev_aggr: DateTime<Utc>,
+            balances_pre_fees: BalancesMap,
+            balances: BalancesMap,
+        },
+    }
 }
 
 #[cfg(any(test, feature = "fixtures"))]
