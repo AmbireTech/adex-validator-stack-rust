@@ -7,7 +7,7 @@ use hex::FromHex;
 use serde::{Deserialize, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 
-use crate::bignum::BigNum;
+use crate::big_num::BigNum;
 use crate::util::serde::ts_milliseconds_option;
 use crate::{AdUnit, Asset, DomainError, EventSubmission, TargetingTag, ValidatorDesc};
 
