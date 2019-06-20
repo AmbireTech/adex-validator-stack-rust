@@ -28,8 +28,8 @@ pub trait Adapter: SanityChecker + State {
     fn verify(
         &self,
         signer: &str,
-        state_root: Self::StateRoot,
-        signature: Self::Signature,
+        state_root: &Self::StateRoot,
+        signature: &Self::Signature,
     ) -> AdapterFuture<bool>;
 
     /// Gets authentication for specific validator

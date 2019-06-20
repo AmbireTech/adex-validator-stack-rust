@@ -23,12 +23,12 @@ pub struct DummyAdapter<'a> {
 
 impl SanityChecker for DummyAdapter<'_> {}
 
-impl<'a> State for DummyAdapter<'a> {
-    type Signature = &'a str;
-    type StateRoot = &'a str;
+impl State for DummyAdapter<'_> {
+    type Signature = String;
+    type StateRoot = String;
 }
 
-impl Adapter for DummyAdapter<'_> {
+impl<'a> Adapter for DummyAdapter<'a> {
     fn config(&self) -> &Config {
         &self.config
     }
@@ -70,14 +70,14 @@ impl Adapter for DummyAdapter<'_> {
     /// let adapter = DummyAdapter { config, participants: HashMap::new() };
     ///
     /// let signature = "Dummy adapter signature for 6162636465666768696a6b6c6d6e6f707172737475767778797a303132333435 by identity";
-    /// assert_eq!(Ok(true), await!(adapter.verify("identity", "doesn't matter", signature)));
+    /// assert_eq!(Ok(true), await!(adapter.verify("identity", &"doesn't matter".to_string(), &signature.to_string())));
     /// # });
     /// ```
     fn verify(
         &self,
         signer: &str,
-        _state_root: Self::StateRoot,
-        signature: Self::Signature,
+        _state_root: &Self::StateRoot,
+        signature: &Self::Signature,
     ) -> AdapterFuture<bool> {
         // select the `identity` and compare it to the signer
         // for empty string this will return array with 1 element - an empty string `[""]`
@@ -153,8 +153,11 @@ mod test {
 
             assert_eq!(expected_signature, &actual_signature);
 
-            let is_verified =
-                await!(adapter.verify("identity", "doesn't matter", &actual_signature));
+            let is_verified = await!(adapter.verify(
+                "identity",
+                &"doesn't matter".to_string(),
+                &actual_signature.to_string()
+            ));
 
             assert_eq!(Ok(true), is_verified);
         });
