@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 
+use futures::future::{err, FutureExt, ok};
 use hex::encode;
+
+use domain::validator::message::State;
 
 use crate::adapter::{Adapter, AdapterError, AdapterFuture, Config};
 use crate::sanity::SanityChecker;
-use futures::future::{err, ok, FutureExt};
 
 #[derive(Debug)]
 pub struct DummyParticipant {
@@ -20,6 +22,11 @@ pub struct DummyAdapter<'a> {
 }
 
 impl SanityChecker for DummyAdapter<'_> {}
+
+impl<'a> State for DummyAdapter<'a> {
+    type Signature = &'a str;
+    type StateRoot = &'a str;
+}
 
 impl Adapter for DummyAdapter<'_> {
     fn config(&self) -> &Config {
@@ -66,7 +73,12 @@ impl Adapter for DummyAdapter<'_> {
     ///     assert_eq!(Ok(true), await!(adapter.verify("identity", "doesn't matter", signature)));
     /// });
     /// ```
-    fn verify(&self, signer: &str, _state_root: &str, signature: &str) -> AdapterFuture<bool> {
+    fn verify(
+        &self,
+        signer: &str,
+        _state_root: Self::StateRoot,
+        signature: Self::Signature,
+    ) -> AdapterFuture<bool> {
         // select the `identity` and compare it to the signer
         // for empty string this will return array with 1 element - an empty string `[""]`
         let is_same = match signature.rsplit(' ').take(1).next() {

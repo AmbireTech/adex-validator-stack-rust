@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-pub use message::{Message, State};
+pub use message::Message;
 
 use crate::BigNum;
 

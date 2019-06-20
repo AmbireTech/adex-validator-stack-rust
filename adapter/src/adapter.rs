@@ -1,8 +1,11 @@
+use std::pin::Pin;
+
+use futures::{Future, FutureExt};
+
+use domain::validator::message::State;
 use domain::{Asset, BigNum, Channel};
 
 use crate::sanity::SanityChecker;
-use futures::{Future, FutureExt};
-use std::pin::Pin;
 
 pub type AdapterFuture<T> = Pin<Box<dyn Future<Output = Result<T, AdapterError>> + Send>>;
 
@@ -11,7 +14,7 @@ pub enum AdapterError {
     Authentication(String),
 }
 
-pub trait Adapter: SanityChecker {
+pub trait Adapter: SanityChecker + State {
     fn config(&self) -> &Config;
 
     fn validate_channel(&self, channel: &Channel) -> AdapterFuture<bool> {
@@ -22,7 +25,12 @@ pub trait Adapter: SanityChecker {
     fn sign(&self, state_root: &str) -> AdapterFuture<String>;
 
     /// Verify, based on the signature & state_root, that the signer is the same
-    fn verify(&self, signer: &str, state_root: &str, signature: &str) -> AdapterFuture<bool>;
+    fn verify(
+        &self,
+        signer: &str,
+        state_root: Self::StateRoot,
+        signature: Self::Signature,
+    ) -> AdapterFuture<bool>;
 
     /// Gets authentication for specific validator
     fn get_auth(&self, validator: &str) -> AdapterFuture<String>;
