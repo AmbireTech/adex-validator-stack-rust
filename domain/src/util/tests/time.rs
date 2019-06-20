@@ -25,7 +25,5 @@ pub fn past_datetime(from: Option<&DateTime<Utc>>) -> DateTime<Utc> {
 
     let from = from.unwrap_or(&default_from);
 
-    <Faker as Chrono>::between(None, &from.to_rfc3339(), &to.to_rfc3339())
-        .parse()
-        .expect("Whoops, DateTime<Utc> should be created from Fake...")
+    datetime_between(&from, Some(&to))
 }
