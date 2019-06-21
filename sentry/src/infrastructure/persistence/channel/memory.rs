@@ -96,6 +96,7 @@ impl ChannelRepository for MemoryChannelRepository {
         };
 
         if channel_found.is_some() {
+            // @TODO: Implement an AlreadyExist Error
             return err(RepositoryError::User).boxed();
         }
 
