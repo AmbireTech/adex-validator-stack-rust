@@ -877,6 +877,14 @@ version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "memory-repository"
+version = "0.1.0"
+dependencies = [
+ "domain 0.1.0",
+ "futures-preview 0.3.0-alpha.16 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "mime"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
