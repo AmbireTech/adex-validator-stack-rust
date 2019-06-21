@@ -11,8 +11,8 @@ pub mod single {
 
     use domain::{Channel, SpecValidator};
 
+    use crate::application::validator::{Follower, Leader};
     use crate::domain::{ChannelRepository, Validator, Worker, WorkerFuture};
-    use crate::infrastructure::validator::{Follower, Leader};
 
     #[derive(Clone)]
     pub struct TickWorker {
