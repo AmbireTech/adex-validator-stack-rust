@@ -28,18 +28,27 @@ impl<S: Clone> MemoryRepository<S> {
         // take `limit` results
         let take = limit as usize;
 
-        match self.records.read() {
-            Ok(reader) => {
-                let results = reader
+        self.records
+            .read()
+            .map(|reader| {
+                reader
                     .iter()
                     .filter_map(|record| filter(record))
                     .skip(skip_results)
                     .take(take)
-                    .collect();
-                Ok(results)
-            }
-            Err(error) => Err(MemoryRepositoryError::from(error)),
-        }
+                    .collect()
+            })
+            .map_err(|error| MemoryRepositoryError::from(error))
+    }
+
+    pub fn list_all<F>(&self, filter: F) -> Result<Vec<S>, MemoryRepositoryError>
+    where
+        F: Fn(&S) -> Option<S>,
+    {
+        self.records
+            .read()
+            .map(|reader| reader.iter().filter_map(|record| filter(record)).collect())
+            .map_err(|error| MemoryRepositoryError::from(error))
     }
 
     pub fn has(&self, record: &S) -> Result<bool, MemoryRepositoryError> {
