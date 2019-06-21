@@ -7,7 +7,7 @@ use crate::domain::validator::repository::MessageRepository;
 pub struct MemoryValidatorRepository {}
 
 impl MessageRepository for MemoryValidatorRepository {
-    fn add<S: State>(_message: Message<S>) -> RepositoryFuture<()> {
+    fn add<S: State>(&self, _message: Message<S>) -> RepositoryFuture<()> {
         unimplemented!()
     }
 }

@@ -23,6 +23,6 @@ pub mod repository {
     use domain::RepositoryFuture;
 
     pub trait MessageRepository {
-        fn add<S: State>(message: Message<S>) -> RepositoryFuture<()>;
+        fn add<S: State>(&self, message: Message<S>) -> RepositoryFuture<()>;
     }
 }
