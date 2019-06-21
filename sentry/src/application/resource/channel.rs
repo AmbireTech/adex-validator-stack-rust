@@ -12,7 +12,7 @@ use std::sync::Arc;
 mod channel_create;
 mod channel_list;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct ChannelResource {
     pub channel_list_limit: u32,
     pub channel_repository: Arc<dyn ChannelRepository>,
