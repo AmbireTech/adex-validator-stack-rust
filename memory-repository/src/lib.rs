@@ -8,23 +8,23 @@ use domain::{IOError, RepositoryError};
 
 pub struct MemoryRepository<S: Clone> {
     records: Arc<RwLock<Vec<S>>>,
-    cmp: Box<dyn Fn(&S, &S) -> bool>,
+    cmp: Arc<dyn Fn(&S, &S) -> bool + Send + Sync>,
 }
 
 impl<S: Clone> MemoryRepository<S> {
-    pub fn new(initial_records: &[S], cmp: Box<dyn Fn(&S, &S) -> bool>) -> Self {
+    pub fn new(initial_records: &[S], cmp: Arc<dyn Fn(&S, &S) -> bool + Send + Sync>) -> Self {
         Self {
             records: Arc::new(RwLock::new(initial_records.to_vec())),
             cmp,
         }
     }
 
-    pub fn list<F>(&self, limit: u64, page: u64, filter: F) -> Result<Vec<S>, MemoryRepositoryError>
+    pub fn list<F>(&self, limit: u32, page: u64, filter: F) -> Result<Vec<S>, MemoryRepositoryError>
     where
         F: Fn(&S) -> Option<S>,
     {
         // 1st page, start from 0
-        let skip_results = ((page - 1) * limit) as usize;
+        let skip_results = ((page - 1) * limit as u64) as usize;
         // take `limit` results
         let take = limit as usize;
 
@@ -129,7 +129,7 @@ mod test {
     #[test]
     fn init_add_has_list_testing() {
         let dummy_one = Dummy(1);
-        let repo = MemoryRepository::new(&[dummy_one], Box::new(|lhs, rhs| lhs.0 == rhs.0));
+        let repo = MemoryRepository::new(&[dummy_one], Arc::new(|lhs, rhs| lhs.0 == rhs.0));
 
         // get a list of all records should return 1
         assert_eq!(
@@ -168,7 +168,7 @@ mod test {
         let dummy_one = Dummy(1);
         let dummy_two = Dummy(2);
         let repo =
-            MemoryRepository::new(&[dummy_one, dummy_two], Box::new(|lhs, rhs| lhs.0 == rhs.0));
+            MemoryRepository::new(&[dummy_one, dummy_two], Arc::new(|lhs, rhs| lhs.0 == rhs.0));
 
         // get a list with limit 10 should return 2 records
         assert_eq!(
