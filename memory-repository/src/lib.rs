@@ -1,5 +1,6 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
+
 use std::error;
 use std::fmt;
 use std::sync::{Arc, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
@@ -172,7 +173,7 @@ mod test {
     }
 
     #[test]
-    fn listing_multiple_pages_and_filtering() {
+    fn list_multiple_pages_filtering_and_list_all() {
         let dummy_filter = |x: &Dummy| Some(*x);
         let dummy_one = Dummy(1);
         let dummy_two = Dummy(2);
@@ -211,5 +212,11 @@ mod test {
             .expect("No error should happen here");
 
         assert_eq!(vec![dummy_one, dummy_two], filtered_result);
+
+        let list_all = repo
+            .list_all(dummy_filter)
+            .expect("No error should happen here");
+
+        assert_eq!(3, list_all.len())
     }
 }
