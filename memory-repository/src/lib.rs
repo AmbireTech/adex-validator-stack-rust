@@ -4,10 +4,6 @@ use std::sync::{Arc, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use domain::{IOError, RepositoryError};
 
-pub trait ExistCmp<S> {
-    fn exist(current: &S, rhs: &S) -> bool;
-}
-
 pub struct MemoryRepository<S: Clone> {
     records: Arc<RwLock<Vec<S>>>,
     cmp: Box<dyn Fn(&S, &S) -> bool>,
