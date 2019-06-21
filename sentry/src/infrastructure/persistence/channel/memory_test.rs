@@ -174,7 +174,7 @@ fn saves_channels() {
 
         // save the 2nd channel
         // this shouldn't change the order in any way
-        await!(some_init.create(new_channel)).expect("Saving 2nd new channel");
+        await!(some_init.add(new_channel)).expect("Saving 2nd new channel");
 
         let params = ChannelListParams::new(valid_until_ge, 10, 1, None).unwrap();
         let channels_list: Vec<Channel> =
@@ -191,7 +191,7 @@ fn saves_channels() {
 
         // save the 2nd channel
         // this shouldn't change the order in any way
-        await!(some_init.create(new_channel)).expect("Saving 3rd new channel");
+        await!(some_init.add(new_channel)).expect("Saving 3rd new channel");
 
         let channels_list: Vec<Channel> =
             await!(some_init.list(&params)).expect("List the 3 total channels");
@@ -213,7 +213,7 @@ fn saving_the_same_channel_id_should_error() {
 
         let same_channel_id = get_channel("ABC", &None, None);
 
-        let error = await!(repository.create(same_channel_id))
+        let error = await!(repository.add(same_channel_id))
             .expect_err("It shouldn't be possible to save the same channel_id");
 
         match error {

@@ -57,5 +57,5 @@ pub trait ChannelRepository: Debug + Send + Sync {
 
     fn find(&self, channel_id: &ChannelId) -> RepositoryFuture<Option<Channel>>;
 
-    fn create(&self, channel: Channel) -> RepositoryFuture<()>;
+    fn add(&self, channel: Channel) -> RepositoryFuture<()>;
 }
