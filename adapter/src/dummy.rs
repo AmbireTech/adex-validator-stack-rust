@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 
+use futures::future::{err, ok, FutureExt};
 use hex::encode;
+
+use domain::validator::message::State;
 
 use crate::adapter::{Adapter, AdapterError, AdapterFuture, Config};
 use crate::sanity::SanityChecker;
-use futures::future::{err, ok, FutureExt};
 
 #[derive(Debug)]
 pub struct DummyParticipant {
@@ -21,7 +23,12 @@ pub struct DummyAdapter<'a> {
 
 impl SanityChecker for DummyAdapter<'_> {}
 
-impl Adapter for DummyAdapter<'_> {
+impl State for DummyAdapter<'_> {
+    type Signature = String;
+    type StateRoot = String;
+}
+
+impl<'a> Adapter for DummyAdapter<'a> {
     fn config(&self) -> &Config {
         &self.config
     }
@@ -29,18 +36,18 @@ impl Adapter for DummyAdapter<'_> {
     /// Example:
     ///
     /// ```
+    /// # futures::executor::block_on(async {
     /// use adapter::{ConfigBuilder, Adapter};
     /// use adapter::dummy::DummyAdapter;
     /// use std::collections::HashMap;
     ///
-    /// futures::executor::block_on(async {
-    ///     let config = ConfigBuilder::new("identity").build();
-    ///     let adapter = DummyAdapter { config, participants: HashMap::new() };
+    /// let config = ConfigBuilder::new("identity").build();
+    /// let adapter = DummyAdapter { config, participants: HashMap::new() };
     ///
-    ///     let actual = await!(adapter.sign("abcdefghijklmnopqrstuvwxyz012345")).unwrap();
-    ///     let expected = "Dummy adapter signature for 6162636465666768696a6b6c6d6e6f707172737475767778797a303132333435 by identity";
-    ///     assert_eq!(expected, &actual);
-    /// });
+    /// let actual = await!(adapter.sign("abcdefghijklmnopqrstuvwxyz012345")).unwrap();
+    /// let expected = "Dummy adapter signature for 6162636465666768696a6b6c6d6e6f707172737475767778797a303132333435 by identity";
+    /// assert_eq!(expected, &actual);
+    /// # });
     /// ```
     fn sign(&self, state_root: &str) -> AdapterFuture<String> {
         let signature = format!(
@@ -54,19 +61,24 @@ impl Adapter for DummyAdapter<'_> {
     /// Example:
     ///
     /// ```
+    /// # futures::executor::block_on(async {
     /// use adapter::{ConfigBuilder, Adapter};
     /// use adapter::dummy::DummyAdapter;
     /// use std::collections::HashMap;
     ///
-    /// futures::executor::block_on(async {
-    ///     let config = ConfigBuilder::new("identity").build();
-    ///     let adapter = DummyAdapter { config, participants: HashMap::new() };
+    /// let config = ConfigBuilder::new("identity").build();
+    /// let adapter = DummyAdapter { config, participants: HashMap::new() };
     ///
-    ///     let signature = "Dummy adapter signature for 6162636465666768696a6b6c6d6e6f707172737475767778797a303132333435 by identity";
-    ///     assert_eq!(Ok(true), await!(adapter.verify("identity", "doesn't matter", signature)));
-    /// });
+    /// let signature = "Dummy adapter signature for 6162636465666768696a6b6c6d6e6f707172737475767778797a303132333435 by identity";
+    /// assert_eq!(Ok(true), await!(adapter.verify("identity", &"doesn't matter".to_string(), &signature.to_string())));
+    /// # });
     /// ```
-    fn verify(&self, signer: &str, _state_root: &str, signature: &str) -> AdapterFuture<bool> {
+    fn verify(
+        &self,
+        signer: &str,
+        _state_root: &Self::StateRoot,
+        signature: &Self::Signature,
+    ) -> AdapterFuture<bool> {
         // select the `identity` and compare it to the signer
         // for empty string this will return array with 1 element - an empty string `[""]`
         let is_same = match signature.rsplit(' ').take(1).next() {
@@ -82,27 +94,27 @@ impl Adapter for DummyAdapter<'_> {
     /// Example:
     ///
     /// ```
+    /// # futures::executor::block_on(async {
     /// use std::collections::HashMap;
     /// use adapter::dummy::{DummyParticipant, DummyAdapter};
     /// use adapter::{ConfigBuilder, Adapter};
     ///
-    /// futures::executor::block_on(async {
-    ///    let mut participants = HashMap::new();
-    ///    participants.insert(
-    ///        "identity_key",
-    ///        DummyParticipant {
-    ///            identity: "identity".to_string(),
-    ///            token: "token".to_string(),
-    ///        },
-    ///    );
+    /// let mut participants = HashMap::new();
+    /// participants.insert(
+    ///     "identity_key",
+    ///     DummyParticipant {
+    ///         identity: "identity".to_string(),
+    ///         token: "token".to_string(),
+    ///     },
+    /// );
     ///
-    ///    let adapter = DummyAdapter {
-    ///        config: ConfigBuilder::new("identity").build(),
-    ///        participants,
-    ///    };
+    /// let adapter = DummyAdapter {
+    ///     config: ConfigBuilder::new("identity").build(),
+    ///     participants,
+    /// };
     ///
-    ///    assert_eq!(Ok("token".to_string()), await!(adapter.get_auth("identity")));
-    /// });
+    /// assert_eq!(Ok("token".to_string()), await!(adapter.get_auth("identity")));
+    /// # });
     /// ```
     fn get_auth(&self, validator: &str) -> AdapterFuture<String> {
         let participant = self
@@ -141,8 +153,11 @@ mod test {
 
             assert_eq!(expected_signature, &actual_signature);
 
-            let is_verified =
-                await!(adapter.verify("identity", "doesn't matter", &actual_signature));
+            let is_verified = await!(adapter.verify(
+                "identity",
+                &"doesn't matter".to_string(),
+                &actual_signature.to_string()
+            ));
 
             assert_eq!(Ok(true), is_verified);
         });

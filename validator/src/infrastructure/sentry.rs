@@ -20,18 +20,19 @@ impl SentryApi {
         &self,
         validator: Option<String>,
     ) -> impl Future<Output = Result<Vec<Channel>, Error>> {
+        // call Sentry and fetch first page, where validator = identity
         let first_page = self.clone().fetch_page(1, validator.clone());
 
-        // call Sentry again and concat all the Channels in Future
-        // fetching them until no more Channels are returned
         let handle = self.clone();
         first_page
             .and_then(move |response| {
                 let first_page_future = ok(response.channels).boxed();
 
                 if response.total_pages < 2 {
+                    // if there is only 1 page, return the results
                     first_page_future
                 } else {
+                    // call Sentry again for the rest of tha pages
                     let futures = (2..=response.total_pages)
                         .map(|page| {
                             handle
@@ -68,7 +69,6 @@ impl SentryApi {
 
         let future = self
             .client
-            // call Sentry and fetch first page, where validator = identity
             .get(format!("{}/channel/list?{}", self.sentry_url, query.join("&")).as_str())
             .send()
             .and_then(|mut res: Response| res.json::<ChannelAllResponse>());
