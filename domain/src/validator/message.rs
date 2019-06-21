@@ -125,7 +125,7 @@ pub mod fixtures {
 
         Accounting {
             last_event_aggregate,
-            pre_fees: pre_fees.unwrap_or_else(|| BalancesMap::default()),
+            pre_fees: pre_fees.unwrap_or_else(BalancesMap::default),
             balances,
         }
     }
