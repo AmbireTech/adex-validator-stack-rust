@@ -42,12 +42,12 @@ impl_web! {
 
 #[derive(Extract)]
 struct ChannelListQuery {
-    page: Option<u32>,
+    page: Option<u64>,
     validator: Option<String>,
 }
 
 impl ChannelListQuery {
-    pub fn page(&self) -> u32 {
+    pub fn page(&self) -> u64 {
         match self.page {
             Some(page) if page >= 1 => page,
             _ => 1,

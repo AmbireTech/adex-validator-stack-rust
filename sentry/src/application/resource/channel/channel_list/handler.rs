@@ -24,7 +24,7 @@ impl ChannelListHandler {
     #[allow(clippy::needless_lifetimes)]
     pub async fn handle(
         &self,
-        page: u32,
+        page: u64,
         validator: Option<String>,
     ) -> Result<ChannelListResponse, ()> {
         let channel_list_params =

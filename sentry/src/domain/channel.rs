@@ -1,5 +1,3 @@
-use std::fmt::Debug;
-
 use chrono::{DateTime, Utc};
 
 use domain::{Channel, RepositoryFuture};
@@ -7,7 +5,7 @@ use domain::{ChannelId, DomainError};
 
 pub struct ChannelListParams {
     /// page to show, should be >= 1
-    pub page: u32,
+    pub page: u64,
     /// channels limit per page, should be >= 1
     pub limit: u32,
     /// filters `valid_until` to be `>= valid_until_ge`
@@ -22,7 +20,7 @@ impl ChannelListParams {
     pub fn new(
         valid_until_ge: DateTime<Utc>,
         limit: u32,
-        page: u32,
+        page: u64,
         validator: Option<String>,
     ) -> Result<Self, DomainError> {
         if page < 1 {

@@ -5,47 +5,41 @@ use futures::future::{err, ok, FutureExt};
 use crate::domain::channel::{ChannelListParams, ChannelRepository};
 use crate::infrastructure::persistence::memory::MemoryPersistenceError;
 use domain::{Channel, ChannelId, RepositoryError, RepositoryFuture};
+use memory_repository::MemoryRepository;
 
 #[cfg(test)]
 #[path = "./memory_test.rs"]
 mod memory_test;
 
-#[derive(Debug)]
 pub struct MemoryChannelRepository {
     records: Arc<RwLock<Vec<Channel>>>,
+    inner: MemoryRepository<Channel>,
 }
 
 impl MemoryChannelRepository {
     pub fn new(initial_channels: Option<&[Channel]>) -> Self {
         let memory_channels = initial_channels.unwrap_or(&[]).to_vec();
 
+        let cmp: Arc<dyn Fn(&Channel, &Channel) -> bool + Send + Sync> =
+            Arc::new(|left, right| left.id == right.id);
+
         Self {
             records: Arc::new(RwLock::new(memory_channels)),
+            inner: MemoryRepository::new(&[], cmp),
         }
     }
 }
 
 impl ChannelRepository for MemoryChannelRepository {
     fn list(&self, params: &ChannelListParams) -> RepositoryFuture<Vec<Channel>> {
-        // 1st page, start from 0
-        let skip_results = ((params.page - 1) * params.limit) as usize;
-        // take `limit` results
-        let take = params.limit as usize;
+        let result = self
+            .inner
+            .list(params.limit, params.page, |channel| {
+                list_filter(&params, channel)
+            })
+            .map_err(|error| error.into());
 
-        let res_fut = match self.records.read() {
-            Ok(reader) => {
-                let channels = reader
-                    .iter()
-                    .filter_map(|channel| list_filter(&params, channel))
-                    .skip(skip_results)
-                    .take(take)
-                    .collect();
-                ok(channels)
-            }
-            Err(error) => err(MemoryPersistenceError::from(error).into()),
-        };
-
-        res_fut.boxed()
+        futures::future::ready(result).boxed()
     }
 
     fn list_count(&self, params: &ChannelListParams) -> RepositoryFuture<u64> {

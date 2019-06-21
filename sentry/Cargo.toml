@@ -13,6 +13,7 @@ path = "src/lib.rs"
 chrono = { version = "0.4", features = ["serde"] }
 time = "0.1.42"
 domain = { version = "0.1", path = "../domain", features = ["repositories"] }
+memory-repository = { version = "0.1", path = "../memory-repository" }
 # Futures
 futures-preview = { version = "=0.3.0-alpha.16", features = ["compat", "io-compat"] }
 futures_legacy = { version = "0.1", package = "futures" }
