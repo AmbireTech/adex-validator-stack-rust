@@ -1,3 +1,5 @@
+#![deny(rust_2018_idioms)]
+#![deny(clippy::all)]
 use std::error;
 use std::fmt;
 use std::sync::{Arc, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
