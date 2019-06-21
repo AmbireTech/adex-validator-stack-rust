@@ -31,7 +31,7 @@ impl ChannelCreateHandler {
             spec: channel_input.spec,
         };
 
-        let success = await!(self.channel_repository.create(channel)).is_ok();
+        let success = await!(self.channel_repository.add(channel)).is_ok();
 
         Ok(ChannelCreateResponse { success })
     }

@@ -11,8 +11,8 @@ pub mod single {
 
     use domain::{Channel, SpecValidator};
 
+    use crate::application::validator::{Follower, Leader};
     use crate::domain::{ChannelRepository, Validator, Worker, WorkerFuture};
-    use crate::infrastructure::validator::{Follower, Leader};
 
     #[derive(Clone)]
     pub struct TickWorker {
@@ -95,8 +95,8 @@ pub mod infinite {
     use futures::future::{join, FutureExt};
     use tokio::timer::Delay;
 
+    use crate::application::worker::TickWorker;
     use crate::domain::{Worker, WorkerFuture};
-    use crate::infrastructure::worker::TickWorker;
 
     #[derive(Clone)]
     pub struct InfiniteWorker {

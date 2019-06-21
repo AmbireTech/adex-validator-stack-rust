@@ -72,7 +72,7 @@ impl ChannelRepository for PostgresChannelRepository {
         unimplemented!("find() for Postgres still needs to be implemented")
     }
 
-    fn create(&self, _channel: Channel) -> RepositoryFuture<()> {
+    fn add(&self, _channel: Channel) -> RepositoryFuture<()> {
         unimplemented!("create() for Postgres still needs to be implemented")
     }
 }

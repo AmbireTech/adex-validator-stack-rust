@@ -2,9 +2,10 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
 
+use std::time::Duration;
+
 use adapter::Adapter;
 use lazy_static::lazy_static;
-use std::time::Duration;
 
 lazy_static! {
     static ref CONFIG: Config = {
@@ -78,11 +79,11 @@ fn run(is_single_tick: bool, adapter: impl Adapter) {
     use reqwest::r#async::Client;
 
     use std::sync::Arc;
+    use validator::application::validator::{Follower, Leader};
+    use validator::application::worker::{InfiniteWorker, TickWorker};
     use validator::domain::worker::Worker;
     use validator::infrastructure::persistence::channel::api::ApiChannelRepository;
     use validator::infrastructure::sentry::SentryApi;
-    use validator::infrastructure::validator::{Follower, Leader};
-    use validator::infrastructure::worker::{InfiniteWorker, TickWorker};
 
     let sentry = SentryApi {
         client: Client::new(),

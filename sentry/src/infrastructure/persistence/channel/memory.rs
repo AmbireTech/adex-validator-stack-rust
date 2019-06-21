@@ -83,7 +83,7 @@ impl ChannelRepository for MemoryChannelRepository {
         res_fut.boxed()
     }
 
-    fn create(&self, channel: Channel) -> RepositoryFuture<()> {
+    fn add(&self, channel: Channel) -> RepositoryFuture<()> {
         let channel_found = match self.records.read() {
             Ok(reader) => reader.iter().find_map(|current| {
                 if channel.id == current.id {
