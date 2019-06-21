@@ -80,10 +80,10 @@ fn run(is_single_tick: bool, adapter: impl Adapter) {
 
     use std::sync::Arc;
     use validator::application::validator::{Follower, Leader};
+    use validator::application::worker::{InfiniteWorker, TickWorker};
     use validator::domain::worker::Worker;
     use validator::infrastructure::persistence::channel::api::ApiChannelRepository;
     use validator::infrastructure::sentry::SentryApi;
-    use validator::application::worker::{InfiniteWorker, TickWorker};
 
     let sentry = SentryApi {
         client: Client::new(),
