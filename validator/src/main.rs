@@ -83,7 +83,7 @@ fn run(is_single_tick: bool, adapter: impl Adapter) {
     use validator::domain::worker::Worker;
     use validator::infrastructure::persistence::channel::api::ApiChannelRepository;
     use validator::infrastructure::sentry::SentryApi;
-    use validator::infrastructure::worker::{InfiniteWorker, TickWorker};
+    use validator::application::worker::{InfiniteWorker, TickWorker};
 
     let sentry = SentryApi {
         client: Client::new(),

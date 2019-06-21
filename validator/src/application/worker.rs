@@ -95,8 +95,8 @@ pub mod infinite {
     use futures::future::{join, FutureExt};
     use tokio::timer::Delay;
 
+    use crate::application::worker::TickWorker;
     use crate::domain::{Worker, WorkerFuture};
-    use crate::infrastructure::worker::TickWorker;
 
     #[derive(Clone)]
     pub struct InfiniteWorker {
