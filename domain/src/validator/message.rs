@@ -13,17 +13,15 @@ pub trait State {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub enum Message<S: State> {
-    #[serde(rename_all = "camelCase")]
     ApproveState(ApproveState<S>),
-    #[serde(rename_all = "camelCase")]
     NewState(NewState<S>),
-    #[serde(rename_all = "camelCase")]
+    RejectState(RejectState),
     Heartbeat(Heartbeat<S>),
-    #[serde(rename_all = "camelCase")]
     Accounting(Accounting),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct ApproveState<S: State> {
     state_root: S::StateRoot,
     signature: S::Signature,
@@ -31,6 +29,7 @@ pub struct ApproveState<S: State> {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct NewState<S: State> {
     state_root: S::StateRoot,
     signature: S::Signature,
@@ -38,17 +37,20 @@ pub struct NewState<S: State> {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct RejectState {
     reason: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct Heartbeat<S: State> {
     signature: S::Signature,
     timestamp: DateTime<Utc>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct Accounting {
     #[serde(rename = "last_ev_aggr")]
     last_event_aggregate: DateTime<Utc>,
@@ -64,6 +66,14 @@ pub mod fixtures {
     use crate::test_util::time::past_datetime;
 
     use super::*;
+
+    #[derive(Serialize, Deserialize, Debug)]
+    pub struct DummyState {}
+
+    impl State for DummyState {
+        type Signature = String;
+        type StateRoot = String;
+    }
 
     pub fn get_approve_state<S: State>(
         state_root: S::StateRoot,
