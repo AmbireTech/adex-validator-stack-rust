@@ -7,13 +7,13 @@ use std::sync::{Arc, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use domain::{IOError, RepositoryError};
 
-pub struct MemoryRepository<S: Clone> {
+pub struct MemoryRepository<S: Clone, V> {
     records: Arc<RwLock<Vec<S>>>,
-    cmp: Arc<dyn Fn(&S, &S) -> bool + Send + Sync>,
+    cmp: Arc<dyn Fn(&S, &V) -> bool + Send + Sync>,
 }
 
-impl<S: Clone> MemoryRepository<S> {
-    pub fn new(initial_records: &[S], cmp: Arc<dyn Fn(&S, &S) -> bool + Send + Sync>) -> Self {
+impl<S: Clone, V> MemoryRepository<S, V> {
+    pub fn new(initial_records: &[S], cmp: Arc<dyn Fn(&S, &V) -> bool + Send + Sync>) -> Self {
         Self {
             records: Arc::new(RwLock::new(initial_records.to_vec())),
             cmp,
@@ -52,18 +52,30 @@ impl<S: Clone> MemoryRepository<S> {
             .map_err(|error| MemoryRepositoryError::from(error))
     }
 
-    pub fn has(&self, record: &S) -> Result<bool, MemoryRepositoryError> {
+    pub fn has(&self, cmp_value: &V) -> Result<bool, MemoryRepositoryError> {
         match self.records.read() {
             Ok(reader) => {
-                let result = reader.iter().find(|current| (self.cmp)(current, record));
+                let result = reader.iter().find(|current| (self.cmp)(current, cmp_value));
                 Ok(result.is_some())
             }
             Err(error) => Err(MemoryRepositoryError::from(error)),
         }
     }
 
-    pub fn add(&self, record: S) -> Result<(), MemoryRepositoryError> {
-        if self.has(&record)? {
+    pub fn find(&self, cmp_value: &V) -> Result<Option<S>, MemoryRepositoryError> {
+        self.records
+            .read()
+            .map(|reader| {
+                reader
+                    .iter()
+                    .find(|current| (self.cmp)(current, cmp_value))
+                    .map(|found| found.clone())
+            })
+            .map_err(|error| MemoryRepositoryError::from(error))
+    }
+
+    pub fn add(&self, cmp_value: &V, record: S) -> Result<(), MemoryRepositoryError> {
+        if self.has(cmp_value)? {
             Err(MemoryRepositoryError::AlreadyExists)
         } else {
             match self.records.write() {
@@ -139,7 +151,8 @@ mod test {
     #[test]
     fn init_add_has_list_testing() {
         let dummy_one = Dummy(1);
-        let repo = MemoryRepository::new(&[dummy_one], Arc::new(|lhs, rhs| lhs.0 == rhs.0));
+        let cmp = Arc::new(|lhs: &Dummy, rhs: &Dummy| lhs == rhs);
+        let repo = MemoryRepository::new(&[dummy_one], cmp);
 
         // get a list of all records should return 1
         assert_eq!(
@@ -161,13 +174,13 @@ mod test {
 
         assert_eq!(
             Ok(()),
-            repo.add(dummy_two),
+            repo.add(&dummy_two, dummy_two),
             "Adding new record should succeed"
         );
 
         assert_eq!(
             MemoryRepositoryError::AlreadyExists,
-            repo.add(dummy_two)
+            repo.add(&dummy_two, dummy_two)
                 .expect_err("Adding the same record again should fail")
         );
     }
@@ -177,8 +190,8 @@ mod test {
         let dummy_filter = |x: &Dummy| Some(*x);
         let dummy_one = Dummy(1);
         let dummy_two = Dummy(2);
-        let repo =
-            MemoryRepository::new(&[dummy_one, dummy_two], Arc::new(|lhs, rhs| lhs.0 == rhs.0));
+        let cmp = Arc::new(|lhs: &Dummy, rhs: &Dummy| lhs == rhs);
+        let repo = MemoryRepository::new(&[dummy_one, dummy_two], cmp);
 
         // get a list with limit 10 should return 2 records
         assert_eq!(
@@ -203,7 +216,9 @@ mod test {
         assert_eq!(dummy_two, dummy_two_result[0]);
 
         // get a list filtering out Dummy > 2
-        repo.add(Dummy(3)).expect("The Dummy(3) should be added");
+        let dummy_three = Dummy(3);
+        repo.add(&dummy_three, dummy_three)
+            .expect("The Dummy(3) should be added");
 
         assert_eq!(3, repo.list(10, 1, dummy_filter).unwrap().len());
 
