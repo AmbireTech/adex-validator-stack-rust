@@ -12,6 +12,7 @@ path = "src/lib.rs"
 # Domain
 domain = { version = "0.1", path = "../domain", features = ["repositories"] }
 adapter = { version = "0.1", path = "../adapter", features = ["dummy-adapter"] }
+memory-repository = { version = "0.1", path = "../memory-repository" }
 # Futures
 futures-preview = { version = "=0.3.0-alpha.16", features = ["compat", "io-compat"] }
 futures_legacy = { version = "0.1", package = "futures" }
