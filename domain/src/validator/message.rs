@@ -83,6 +83,7 @@ pub struct RejectState {
 #[serde(rename_all = "camelCase")]
 pub struct Heartbeat<S: State> {
     signature: S::Signature,
+    state_root: S::StateRoot,
     timestamp: DateTime<Utc>,
 }
 
