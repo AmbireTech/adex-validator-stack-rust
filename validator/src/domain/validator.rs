@@ -22,7 +22,7 @@ pub mod repository {
     use domain::validator::Message;
     use domain::RepositoryFuture;
 
-    pub trait MessageRepository {
-        fn add<S: State>(&self, message: Message<S>) -> RepositoryFuture<()>;
+    pub trait MessageRepository<S: State> {
+        fn add(&self, message: Message<S>) -> RepositoryFuture<()>;
     }
 }
