@@ -33,7 +33,7 @@ impl ChannelRepository for MemoryChannelRepository {
             .list(params.limit, params.page, |channel| {
                 list_filter(&params, channel)
             })
-            .map_err(|error| error.into());
+            .map_err(Into::into);
 
         ready(result).boxed()
     }
@@ -46,23 +46,20 @@ impl ChannelRepository for MemoryChannelRepository {
                 let filtered_count = channels.len();
                 (filtered_count as f64 / f64::from(params.limit)).ceil() as u64
             })
-            .map_err(|error| error.into());
+            .map_err(Into::into);
 
         ready(result).boxed()
     }
 
     fn find(&self, channel_id: &ChannelId) -> RepositoryFuture<Option<Channel>> {
-        let result = self.inner.find(channel_id).map_err(|error| error.into());
+        let result = self.inner.find(channel_id).map_err(Into::into);
 
         ready(result).boxed()
     }
 
     fn add(&self, channel: Channel) -> RepositoryFuture<()> {
-        let channel_id = channel.id.clone();
-        let result = self
-            .inner
-            .add(&channel_id, channel)
-            .map_err(|error| error.into());
+        let channel_id = channel.id;
+        let result = self.inner.add(&channel_id, channel).map_err(Into::into);
 
         ready(result).boxed()
     }
