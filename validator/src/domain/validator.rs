@@ -18,11 +18,18 @@ pub trait Validator {
 }
 
 pub mod repository {
-    use domain::validator::message::State;
-    use domain::validator::Message;
-    use domain::RepositoryFuture;
+    use domain::validator::message::{MessageType, State};
+    use domain::validator::{Message, ValidatorId};
+    use domain::{ChannelId, RepositoryFuture};
 
     pub trait MessageRepository<S: State> {
-        fn add(&self, message: Message<S>) -> RepositoryFuture<()>;
+        fn add(&self, channel_id: ChannelId, message: Message<S>) -> RepositoryFuture<()>;
+
+        fn latest(
+            &self,
+            channel_id: ChannelId,
+            from: ValidatorId,
+            types: Option<&[&MessageType]>,
+        ) -> RepositoryFuture<Option<Message<S>>>;
     }
 }
