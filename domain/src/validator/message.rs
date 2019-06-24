@@ -6,11 +6,11 @@ use serde::{Deserialize, Serialize};
 use crate::BalancesMap;
 
 pub trait State {
-    type Signature: DeserializeOwned + Serialize + Debug;
-    type StateRoot: DeserializeOwned + Serialize + Debug;
+    type Signature: DeserializeOwned + Serialize + Debug + Clone;
+    type StateRoot: DeserializeOwned + Serialize + Debug + Clone;
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "type")]
 pub enum Message<S: State> {
     ApproveState(ApproveState<S>),
@@ -20,7 +20,7 @@ pub enum Message<S: State> {
     Accounting(Accounting),
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ApproveState<S: State> {
     state_root: S::StateRoot,
@@ -28,7 +28,7 @@ pub struct ApproveState<S: State> {
     is_healthy: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct NewState<S: State> {
     state_root: S::StateRoot,
@@ -36,20 +36,20 @@ pub struct NewState<S: State> {
     balances: BalancesMap,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct RejectState {
     reason: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Heartbeat<S: State> {
     signature: S::Signature,
     timestamp: DateTime<Utc>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Accounting {
     #[serde(rename = "last_ev_aggr")]
