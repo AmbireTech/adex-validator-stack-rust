@@ -13,6 +13,15 @@ pub struct MemoryRepository<S: Clone, V> {
 }
 
 impl<S: Clone, V> MemoryRepository<S, V> {
+    /// The `cmp` function is used for `find`, `add` and `has`, where there
+    /// is need to see if the record already exist based on a value. For example:
+    /// If you have an Id field, this will be your value, and since you need to check
+    /// if the new_record.id == record_in_storage_id, then you can do that with
+    /// `|&record, id| record.id == id`. If you don't have this kind of constraints, like
+    /// when you don't have ids or you don't want to check for repeating records (i.e. you
+    /// have an even store of some sort) you can use something like:
+    /// `|&record, should_match| should_match` and in `add` for example, always invoke it with
+    /// `false`
     pub fn new(initial_records: &[S], cmp: Arc<dyn Fn(&S, &V) -> bool + Send + Sync>) -> Self {
         Self {
             records: Arc::new(RwLock::new(initial_records.to_vec())),
@@ -25,7 +34,7 @@ impl<S: Clone, V> MemoryRepository<S, V> {
         F: Fn(&S) -> Option<S>,
     {
         // 1st page, start from 0
-        let skip_results = ((page - 1) * limit as u64) as usize;
+        let skip_results = ((page - 1) * u64::from(limit)) as usize;
         // take `limit` results
         let take = limit as usize;
 
@@ -39,7 +48,7 @@ impl<S: Clone, V> MemoryRepository<S, V> {
                     .take(take)
                     .collect()
             })
-            .map_err(|error| MemoryRepositoryError::from(error))
+            .map_err(MemoryRepositoryError::from)
     }
 
     pub fn list_all<F>(&self, filter: F) -> Result<Vec<S>, MemoryRepositoryError>
@@ -49,7 +58,7 @@ impl<S: Clone, V> MemoryRepository<S, V> {
         self.records
             .read()
             .map(|reader| reader.iter().filter_map(|record| filter(record)).collect())
-            .map_err(|error| MemoryRepositoryError::from(error))
+            .map_err(MemoryRepositoryError::from)
     }
 
     pub fn has(&self, cmp_value: &V) -> Result<bool, MemoryRepositoryError> {
@@ -69,9 +78,9 @@ impl<S: Clone, V> MemoryRepository<S, V> {
                 reader
                     .iter()
                     .find(|current| (self.cmp)(current, cmp_value))
-                    .map(|found| found.clone())
+                    .map(Clone::clone)
             })
-            .map_err(|error| MemoryRepositoryError::from(error))
+            .map_err(MemoryRepositoryError::from)
     }
 
     pub fn add(&self, cmp_value: &V, record: S) -> Result<(), MemoryRepositoryError> {
