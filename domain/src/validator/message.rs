@@ -1,16 +1,17 @@
+use std::fmt;
+
 use chrono::{DateTime, Utc};
 use serde::de::DeserializeOwned;
-use serde::export::fmt::Debug;
 use serde::{Deserialize, Serialize};
 
 use crate::BalancesMap;
 
 pub trait State {
-    type Signature: DeserializeOwned + Serialize + Debug + Clone;
-    type StateRoot: DeserializeOwned + Serialize + Debug + Clone;
+    type Signature: DeserializeOwned + Serialize + fmt::Debug + Clone;
+    type StateRoot: DeserializeOwned + Serialize + fmt::Debug + Clone;
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
 pub enum Message<S: State> {
     ApproveState(ApproveState<S>),
@@ -19,6 +20,42 @@ pub enum Message<S: State> {
     Heartbeat(Heartbeat<S>),
     Accounting(Accounting),
 }
+
+impl<S: State> Message<S> {
+    pub fn is_type(&self, message_type: &MessageType) -> bool {
+        assert!(ALL_TYPES.contains(&message_type));
+
+        let self_message_type = match self {
+            Message::ApproveState(_) => &TYPE_APPROVE,
+            Message::NewState(_) => &TYPE_NEW,
+            Message::RejectState(_) => &TYPE_REJECT,
+            Message::Heartbeat(_) => &TYPE_HEARTBEAT,
+            Message::Accounting(_) => &TYPE_ACCOUNTING,
+        };
+
+        self_message_type == message_type
+    }
+
+    pub fn is_types(&self, types: &[&MessageType]) -> bool {
+        types.iter().any(|&m_type| self.is_type(m_type))
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct MessageType(&'static str);
+
+pub const TYPE_APPROVE: MessageType = MessageType("approve");
+pub const TYPE_NEW: MessageType = MessageType("new");
+pub const TYPE_REJECT: MessageType = MessageType("reject");
+pub const TYPE_HEARTBEAT: MessageType = MessageType("heartbeat");
+pub const TYPE_ACCOUNTING: MessageType = MessageType("accounting");
+pub const ALL_TYPES: [&MessageType; 5] = [
+    &TYPE_APPROVE,
+    &TYPE_NEW,
+    &TYPE_REJECT,
+    &TYPE_HEARTBEAT,
+    &TYPE_ACCOUNTING,
+];
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
