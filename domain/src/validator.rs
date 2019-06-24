@@ -6,6 +6,10 @@ use crate::BigNum;
 
 pub mod message;
 
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(transparent)]
+pub struct ValidatorId(String);
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ValidatorDesc {
