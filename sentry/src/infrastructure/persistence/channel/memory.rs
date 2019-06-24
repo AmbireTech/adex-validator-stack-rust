@@ -1,114 +1,67 @@
-use std::sync::{Arc, RwLock};
+use futures::future::{ready, FutureExt};
 
-use futures::future::{err, ok, FutureExt};
+use domain::{Channel, ChannelId, RepositoryFuture};
+use memory_repository::MemoryRepository;
 
 use crate::domain::channel::{ChannelListParams, ChannelRepository};
-use crate::infrastructure::persistence::memory::MemoryPersistenceError;
-use domain::{Channel, ChannelId, RepositoryError, RepositoryFuture};
+use std::sync::Arc;
 
 #[cfg(test)]
 #[path = "./memory_test.rs"]
 mod memory_test;
 
-#[derive(Debug)]
 pub struct MemoryChannelRepository {
-    records: Arc<RwLock<Vec<Channel>>>,
+    inner: MemoryRepository<Channel, ChannelId>,
 }
 
 impl MemoryChannelRepository {
     pub fn new(initial_channels: Option<&[Channel]>) -> Self {
-        let memory_channels = initial_channels.unwrap_or(&[]).to_vec();
+        let initial_channels = initial_channels.unwrap_or(&[]).to_vec();
+        let cmp: Arc<dyn Fn(&Channel, &ChannelId) -> bool + Send + Sync> =
+            Arc::new(|left, right| &left.id == right);
 
         Self {
-            records: Arc::new(RwLock::new(memory_channels)),
+            inner: MemoryRepository::new(&initial_channels, cmp),
         }
     }
 }
 
 impl ChannelRepository for MemoryChannelRepository {
     fn list(&self, params: &ChannelListParams) -> RepositoryFuture<Vec<Channel>> {
-        // 1st page, start from 0
-        let skip_results = ((params.page - 1) * params.limit) as usize;
-        // take `limit` results
-        let take = params.limit as usize;
+        let result = self
+            .inner
+            .list(params.limit, params.page, |channel| {
+                list_filter(&params, channel)
+            })
+            .map_err(Into::into);
 
-        let res_fut = match self.records.read() {
-            Ok(reader) => {
-                let channels = reader
-                    .iter()
-                    .filter_map(|channel| list_filter(&params, channel))
-                    .skip(skip_results)
-                    .take(take)
-                    .collect();
-                ok(channels)
-            }
-            Err(error) => err(MemoryPersistenceError::from(error).into()),
-        };
-
-        res_fut.boxed()
+        ready(result).boxed()
     }
 
     fn list_count(&self, params: &ChannelListParams) -> RepositoryFuture<u64> {
-        let res_fut = match self.records.read() {
-            Ok(reader) => {
-                let filtered_count = reader
-                    .iter()
-                    .filter_map(|channel| list_filter(&params, channel))
-                    .count();
-                let pages = (filtered_count as f64 / f64::from(params.limit)).ceil() as u64;
-                ok(pages)
-            }
-            Err(error) => err(MemoryPersistenceError::from(error).into()),
-        };
+        let result = self
+            .inner
+            .list_all(|channel| list_filter(&params, channel))
+            .map(|channels| {
+                let filtered_count = channels.len();
+                (filtered_count as f64 / f64::from(params.limit)).ceil() as u64
+            })
+            .map_err(Into::into);
 
-        res_fut.boxed()
+        ready(result).boxed()
     }
 
     fn find(&self, channel_id: &ChannelId) -> RepositoryFuture<Option<Channel>> {
-        let res_fut = match self.records.read() {
-            Ok(reader) => {
-                let found_channel = reader.iter().find_map(|channel| {
-                    if &channel.id == channel_id {
-                        Some(channel.clone())
-                    } else {
-                        None
-                    }
-                });
+        let result = self.inner.find(channel_id).map_err(Into::into);
 
-                ok(found_channel)
-            }
-            Err(error) => err(MemoryPersistenceError::from(error).into()),
-        };
-
-        res_fut.boxed()
+        ready(result).boxed()
     }
 
     fn add(&self, channel: Channel) -> RepositoryFuture<()> {
-        let channel_found = match self.records.read() {
-            Ok(reader) => reader.iter().find_map(|current| {
-                if channel.id == current.id {
-                    Some(())
-                } else {
-                    None
-                }
-            }),
-            Err(error) => return err(MemoryPersistenceError::from(error).into()).boxed(),
-        };
+        let channel_id = channel.id;
+        let result = self.inner.add(&channel_id, channel).map_err(Into::into);
 
-        if channel_found.is_some() {
-            return err(RepositoryError::User).boxed();
-        }
-
-        let create_fut = match self.records.write() {
-            Ok(mut writer) => {
-                writer.push(channel);
-
-                ok(())
-            }
-            Err(error) => err(MemoryPersistenceError::from(error).into()),
-        };
-
-        create_fut.boxed()
+        ready(result).boxed()
     }
 }
 

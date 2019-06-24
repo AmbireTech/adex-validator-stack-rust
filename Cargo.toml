@@ -5,4 +5,5 @@ members = [
     "domain",
     "sentry",
     "validator",
+    "memory-repository",
 ]
