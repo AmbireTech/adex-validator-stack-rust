@@ -27,7 +27,7 @@ pub struct MemoryMessage {
 pub struct MemoryMessageRepository {
     inner: MemoryRepository<MemoryMessage, bool>,
     /// This ValidatorId will be used for the `add` method
-    /// as this is usually will be handled by SentryApi by a Auth header
+    /// as this is usually will be handled by SentryApi and the Auth header
     self_validator_id: ValidatorId,
 }
 
