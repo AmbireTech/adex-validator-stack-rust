@@ -6,12 +6,24 @@ use domain::validator::message::State;
 use domain::{Asset, BigNum, Channel};
 
 use crate::sanity::SanityChecker;
+use std::error::Error;
+use std::fmt;
 
 pub type AdapterFuture<T> = Pin<Box<dyn Future<Output = Result<T, AdapterError>> + Send>>;
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum AdapterError {
     Authentication(String),
+}
+
+impl Error for AdapterError {}
+
+impl fmt::Display for AdapterError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AdapterError::Authentication(error) => write!(f, "Authentication error: {}", error),
+        }
+    }
 }
 
 pub trait Adapter: SanityChecker + State {
@@ -22,7 +34,7 @@ pub trait Adapter: SanityChecker + State {
     }
 
     /// Signs the provided state_root
-    fn sign(&self, state_root: &str) -> AdapterFuture<String>;
+    fn sign(&self, state_root: &Self::StateRoot) -> AdapterFuture<Self::Signature>;
 
     /// Verify, based on the signature & state_root, that the signer is the same
     fn verify(

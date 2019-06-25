@@ -44,12 +44,12 @@ impl<'a> Adapter for DummyAdapter<'a> {
     /// let config = ConfigBuilder::new("identity").build();
     /// let adapter = DummyAdapter { config, participants: HashMap::new() };
     ///
-    /// let actual = await!(adapter.sign("abcdefghijklmnopqrstuvwxyz012345")).unwrap();
+    /// let actual = await!(adapter.sign(&"abcdefghijklmnopqrstuvwxyz012345".to_string())).unwrap();
     /// let expected = "Dummy adapter signature for 6162636465666768696a6b6c6d6e6f707172737475767778797a303132333435 by identity";
     /// assert_eq!(expected, &actual);
     /// # });
     /// ```
-    fn sign(&self, state_root: &str) -> AdapterFuture<String> {
+    fn sign(&self, state_root: &Self::StateRoot) -> AdapterFuture<Self::Signature> {
         let signature = format!(
             "Dummy adapter signature for {} by {}",
             encode(&state_root),
@@ -148,8 +148,9 @@ mod test {
             };
 
             let expected_signature = "Dummy adapter signature for 6162636465666768696a6b6c6d6e6f707172737475767778797a303132333435 by identity";
-            let actual_signature = await!(adapter.sign("abcdefghijklmnopqrstuvwxyz012345"))
-                .expect("Signing shouldn't fail");
+            let actual_signature =
+                await!(adapter.sign(&"abcdefghijklmnopqrstuvwxyz012345".to_string()))
+                    .expect("Signing shouldn't fail");
 
             assert_eq!(expected_signature, &actual_signature);
 
