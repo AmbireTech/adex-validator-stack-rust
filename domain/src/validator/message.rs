@@ -82,9 +82,12 @@ pub struct RejectState {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Heartbeat<S: State> {
-    signature: S::Signature,
-    state_root: S::StateRoot,
-    timestamp: DateTime<Utc>,
+    pub signature: S::Signature,
+    pub state_root: S::StateRoot,
+    pub timestamp: DateTime<Utc>,
+    // we always want to create heartbeat with Timestamp NOW, so add a hidden field
+    // and force the creation of Heartbeat always to be from the `new()` method
+    _secret: (),
 }
 
 impl<S: State> Heartbeat<S> {
@@ -93,6 +96,7 @@ impl<S: State> Heartbeat<S> {
             signature,
             state_root,
             timestamp: Utc::now(),
+            _secret: (),
         }
     }
 }
@@ -161,6 +165,7 @@ pub mod fixtures {
             state_root,
             signature,
             timestamp: past_datetime(None),
+            _secret: (),
         }
     }
 
