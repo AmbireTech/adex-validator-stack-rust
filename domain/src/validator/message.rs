@@ -87,6 +87,16 @@ pub struct Heartbeat<S: State> {
     timestamp: DateTime<Utc>,
 }
 
+impl<S: State> Heartbeat<S> {
+    pub fn new(signature: S::Signature, state_root: S::StateRoot) -> Self {
+        Self {
+            signature,
+            state_root,
+            timestamp: Utc::now(),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Accounting {
@@ -143,8 +153,12 @@ pub mod fixtures {
         }
     }
 
-    pub fn get_heartbeat<S: State>(signature: S::Signature) -> Heartbeat<S> {
+    pub fn get_heartbeat<S: State>(
+        state_root: S::StateRoot,
+        signature: S::Signature,
+    ) -> Heartbeat<S> {
         Heartbeat {
+            state_root,
             signature,
             timestamp: past_datetime(None),
         }
