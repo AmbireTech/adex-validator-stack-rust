@@ -58,7 +58,8 @@ mod test {
 
             let state_root = "my dummy StateRoot".to_string();
 
-            let adapter_signature = await!(factory.adapter.sign(&state_root)).expect("Adapter should sign the StateRoot");
+            let adapter_signature = await!(factory.adapter.sign(&state_root))
+                .expect("Adapter should sign the StateRoot");
             let heartbeat =
                 await!(factory.create(state_root)).expect("Heartbeat should be created");
 
