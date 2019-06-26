@@ -8,7 +8,11 @@ Components:
 
 * Domain crate
 * Sentry - check the list of [opened issues](https://github.com/AdExNetwork/adex-validator-stack-rust/issues?q=is:open is:issue project:AdExNetwork/adex-validator-stack-rust/1)
-* Validator worker - TODO
+* Validator worker - The validator worker(`Leader` or `Follower`) that validates/proposes new states.
+* memory-repository - Generic helper crate for creating InMemory repositories for testing.
+* adapter - Adapter trait for `sign`, `verify` and `validate_channel` with Dummy implementation for testing.
+
+**Note:** Please refer to the README.md of the component for a more detailed overview of it.
 
 ## Domain
 Contains all the Domain `Aggregates`, `Entities`, `Value Objects`, interfaces (traits) and `Domain Error`.
@@ -18,23 +22,19 @@ All the structs have defined (de)serialization. The also have incorporated domai
 `TargetingTag.score` (the `Score` struct) should be with a value between `0` and `100`.
 This means that once we have a `Score` object, we are guaranteed to have a valid object everywhere.
 
-The `Repository` traits are meant for retrieving the underlying object types, this includes implementations with
-Databases (like `Postgres` for `Sentry`), API calls (for the `Validator` to fetch the objects from `Sentry`),
-memory (for testing) and etc.
+The `Repository` traits are meant to help you create the correct abstractions in the underlying application,
+as every application has different requirements for the way and things it will fetch.
 
-## Sentry: API
+## Sentry & Validator worker
 
-#### Do not require authentication, can be cached:
-
-The API documentation can be found on the [adex-validator](https://github.com/AdExNetwork/adex-validator/blob/master/docs/api.md).
-Currently implemented endpoints:
-
-- POST `/channel` - creates a new channel
-- GET `/channel/list` - get a list of all channels
-
-## Validator worker
-
-TODO
+Split into 3 layer - Domain, Infrastructure & Application.
+- Domain - the domain objects/structs that are defining the business rules and constraints.
+- Infrastructure - specific implementations of e.g. Repositories, Logging and etc.
+like `Memory__Repository`, `Api__Repository` and so on.
+- Application - all the application specific logic, which means services, structs and etc. that use the Domain and it's
+traits to achieve the task at hand. For example: In sentry we have the `resource`s, there we define the
+`channel_create`. Which handles the request, validates it and uses the `ChannelRepository` trait to
+`add` the new Channel and returns the appropriate Response. It is not however limited to Request -> Response.
 
 ## Testing setup
 
@@ -63,4 +63,9 @@ We've setup `rust-toolchain` but you can manually override it as well with `rust
 
 **NOTE: For development & testing purposes we use `.env` file to define values for those environment variables.**
 
-- `CHANNEL_LIST_LIMIT` - the limit per page for listing channels from the `/channel/list` request.
+- `SENTRY_CHANNEL_LIST_LIMIT` - the limit per page for listing channels from the `/channel/list` request.
+
+- `VALIDATOR_TICKS_WAIT_TIME` - The time for a whole cycle(tick) of the validator worker to get & loop channels,
+validate and send statuses and etc.
+- `VALIDATOR_SENTRY_URL` - The url of the Sentry API that should be used
+- `VALIDATOR_VALIDATION_TICK_TIMEOUT` - The maximum time for validation of a single channel as a `Leader` or `Follower`
