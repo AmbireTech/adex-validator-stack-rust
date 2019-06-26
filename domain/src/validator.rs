@@ -1,14 +1,25 @@
+use std::convert::TryFrom;
+
 use serde::{Deserialize, Serialize};
 
 pub use message::Message;
 
-use crate::BigNum;
+use crate::{BigNum, DomainError};
 
 pub mod message;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(transparent)]
 pub struct ValidatorId(String);
+
+impl TryFrom<&str> for ValidatorId {
+    type Error = DomainError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        // @TODO: Should we have some constrains(like valid hex string starting with `0x`)? If not this should be just `From`.
+        Ok(Self(value.to_string()))
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
