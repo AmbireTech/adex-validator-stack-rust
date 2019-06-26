@@ -15,7 +15,7 @@ pub use self::event_submission::EventSubmission;
 #[cfg(feature = "repositories")]
 pub use self::repository::*;
 pub use self::targeting_tag::TargetingTag;
-pub use self::validator::ValidatorDesc;
+pub use self::validator::{ValidatorDesc, ValidatorId};
 
 pub mod ad_unit;
 pub mod asset;
@@ -58,6 +58,8 @@ pub mod repository {
     use std::pin::Pin;
 
     use futures::Future;
+    use std::error::Error;
+    use std::fmt;
 
     pub trait IOError: std::error::Error + Send {}
 
@@ -68,6 +70,17 @@ pub mod repository {
         /// Error handling save errors, like Primary key already exists and etc.
         /// @TODO: Add and underlying implementation for this error
         User,
+    }
+
+    impl Error for RepositoryError {}
+
+    impl fmt::Display for RepositoryError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match self {
+                RepositoryError::User => write!(f, "User error: TODO"),
+                RepositoryError::IO(error) => write!(f, "IO error: {}", error),
+            }
+        }
     }
 
     pub type RepositoryFuture<T> = Pin<Box<dyn Future<Output = Result<T, RepositoryError>> + Send>>;
