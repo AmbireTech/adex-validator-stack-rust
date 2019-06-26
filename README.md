@@ -57,15 +57,37 @@ We've setup `rust-toolchain` but you can manually override it as well with `rust
 
 `DATABASE_URL=postgresql://postgres:docker@localhost:5432/sentry cargo run --bin sentry`
 
+### Run Validator Worker
+
+`cargo run --bin validator`
+
+For the available options:
+
+`cargo run --bin validator -- --help`
+
 #### Environment variables:
 
+**NOTE: Currently we use `.env` file to define values for those environment variables.
+We need to see if we want configuration files per binary instead.**
+
+##### Sentry: 
 - `DATABASE_URL` - The url of the Postgres database used for production.
-
-**NOTE: For development & testing purposes we use `.env` file to define values for those environment variables.**
-
 - `SENTRY_CHANNEL_LIST_LIMIT` - the limit per page for listing channels from the `/channel/list` request.
 
+##### Validator:
 - `VALIDATOR_TICKS_WAIT_TIME` - The time for a whole cycle(tick) of the validator worker to get & loop channels,
 validate and send statuses and etc.
 - `VALIDATOR_SENTRY_URL` - The url of the Sentry API that should be used
 - `VALIDATOR_VALIDATION_TICK_TIMEOUT` - The maximum time for validation of a single channel as a `Leader` or `Follower`
+
+## Development environment
+
+We use [cargo-make](https://github.com/sagiegurari/cargo-make) for running the checks and build project locally
+as well as on CI. For a complete list of out-of-the-box commands you can check
+[Makefile.stable.toml](https://github.com/sagiegurari/cargo-make/blob/master/src/lib/Makefile.stable.toml).
+
+Locally it's enough to ensure that `cargo make` command (it will execute the default dev. command) is passing.
+It will run `rustfmt` for you, it will fail on `clippy` warnings and it will run all the tests.
+
+You can related to the [Makefile.stable.toml](https://github.com/sagiegurari/cargo-make/blob/master/src/lib/Makefile.stable.toml)
+for more commands and cargo-make as a whole.
