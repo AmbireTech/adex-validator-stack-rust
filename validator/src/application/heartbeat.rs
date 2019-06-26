@@ -1,38 +1,94 @@
+use std::convert::TryFrom;
 use std::error::Error;
 use std::fmt;
 
 use adapter::{Adapter, AdapterError};
-use domain::validator::message::{Heartbeat, State};
+use domain::validator::message::{Heartbeat, Message, State, TYPE_HEARTBEAT};
+use domain::{Channel, ChannelId, RepositoryError, ValidatorId};
+
+use crate::domain::MessageRepository;
 
 pub struct HeartbeatFactory<A: Adapter + State> {
     adapter: A,
 }
 
 #[derive(Debug)]
-pub enum HeartbeatFactoryError {
+pub enum HeartbeatError {
     Adapter(AdapterError),
+    Repository(RepositoryError),
+    /// When the Channel deposit has been exhausted
+    ChannelExhausted(ChannelId),
+    /// When the required time for the Heartbeat delay hasn't passed
+    NotYetTime,
 }
 
-impl Error for HeartbeatFactoryError {}
+impl Error for HeartbeatError {}
 
-impl fmt::Display for HeartbeatFactoryError {
+impl fmt::Display for HeartbeatError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            HeartbeatFactoryError::Adapter(error) => write!(f, "Adapter error: {}", error),
+            HeartbeatError::Adapter(error) => write!(f, "Adapter error: {}", error),
+            HeartbeatError::Repository(error) => write!(f, "Repository error: {}", error),
+            HeartbeatError::ChannelExhausted(channel_id) => {
+                write!(f, "Channel {} exhausted", channel_id)
+            }
+            HeartbeatError::NotYetTime => write!(f, "It's not time for the heartbeat yet"),
         }
     }
 }
 
 impl<A: Adapter + State> HeartbeatFactory<A> {
-    #[allow(clippy::needless_lifetimes)]
-    pub async fn create(
-        &self,
-        state_root: A::StateRoot,
-    ) -> Result<Heartbeat<A>, HeartbeatFactoryError> {
-        let signature =
-            await!(self.adapter.sign(&state_root)).map_err(HeartbeatFactoryError::Adapter)?;
+    pub async fn create(&self, state_root: A::StateRoot) -> Result<Heartbeat<A>, HeartbeatError> {
+        let signature = await!(self.adapter.sign(&state_root)).map_err(HeartbeatError::Adapter)?;
 
         Ok(Heartbeat::new(signature, state_root))
+    }
+}
+
+pub struct HeartbeatSender<A: Adapter + State> {
+    message_repository: Box<dyn MessageRepository<A>>,
+    adapter: A,
+    factory: HeartbeatFactory<A>,
+    // @TODO: Add config value for Heartbeat send frequency
+}
+
+impl<A: Adapter + State> HeartbeatSender<A> {
+    // @TODO: remove this `state_root` as it was added to make the code compile
+    pub async fn conditional_send(
+        &self,
+        channel: Channel,
+        state_root: A::StateRoot,
+    ) -> Result<(), HeartbeatError> {
+        // get latest Heartbeat message from repo
+        // TODO: Handle this error, removing this ValidatorId from here
+        let validator = ValidatorId::try_from(self.adapter.config().identity.as_str()).unwrap();
+        let latest_future =
+            self.message_repository
+                .latest(channel.id, validator, Some(&[&TYPE_HEARTBEAT]));
+        let _latest_heartbeat = await!(latest_future)
+            .map_err(HeartbeatError::Repository)?
+            .map(|heartbeat_msg| match heartbeat_msg {
+                Message::Heartbeat(h) => h,
+                _ => panic!("The repository returned a non-Heartbeat message"),
+            });
+
+        // if it doesn't exist or the Passed time is greater than the Timer Time
+        // @TODO: Check if it's time for a new heartbeat
+
+        // @TODO: Figure out where the channel `is_exhausted` should be located and handled.
+        // check if channel is not exhausted
+
+        // call the HeartbeatFactory
+        // @TODO: Create Heartbeat by the HeartbeatFactory
+        // @TODO: Remove the invocation of this state_root, should be generated somehow!
+        let heartbeat = await!(self.factory.create(state_root))?;
+
+        // `add()` the heartbeat with the Repository
+        // @TODO: Call the repository
+        await!(self
+            .message_repository
+            .add(channel.id, Message::Heartbeat(heartbeat)))
+        .map_err(HeartbeatError::Repository)
     }
 }
 
@@ -40,11 +96,12 @@ impl<A: Adapter + State> HeartbeatFactory<A> {
 mod test {
     use std::collections::HashMap;
 
+    use chrono::Utc;
+
     use adapter::dummy::DummyAdapter;
     use adapter::ConfigBuilder;
 
     use super::*;
-    use chrono::Utc;
 
     #[test]
     fn creates_heartbeat() {
