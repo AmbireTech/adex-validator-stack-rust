@@ -20,6 +20,7 @@ pub enum HeartbeatError {
     ChannelExhausted(ChannelId),
     /// When the required time for the Heartbeat delay hasn't passed
     NotYetTime,
+    User(String),
 }
 
 impl Error for HeartbeatError {}
@@ -33,6 +34,7 @@ impl fmt::Display for HeartbeatError {
                 write!(f, "Channel {} exhausted", channel_id)
             }
             HeartbeatError::NotYetTime => write!(f, "It's not time for the heartbeat yet"),
+            HeartbeatError::User(err_string) => write!(f, "User error: {}", err_string),
         }
     }
 }
@@ -68,9 +70,12 @@ impl<A: Adapter + State> HeartbeatSender<A> {
         let _latest_heartbeat = await!(latest_future)
             .map_err(HeartbeatError::Repository)?
             .map(|heartbeat_msg| match heartbeat_msg {
-                Message::Heartbeat(h) => h,
-                _ => panic!("The repository returned a non-Heartbeat message"),
-            });
+                Message::Heartbeat(h) => Ok(h),
+                _ => Err(HeartbeatError::User(
+                    "The repository returned a non-Heartbeat message".to_string(),
+                )),
+            })
+            .transpose()?;
 
         // if it doesn't exist or the Passed time is greater than the Timer Time
         // @TODO: Check if it's time for a new heartbeat
@@ -79,7 +84,6 @@ impl<A: Adapter + State> HeartbeatSender<A> {
         // check if channel is not exhausted
 
         // call the HeartbeatFactory
-        // @TODO: Create Heartbeat by the HeartbeatFactory
         // @TODO: Remove the invocation of this state_root, should be generated somehow!
         let heartbeat = await!(self.factory.create(state_root))?;
 
