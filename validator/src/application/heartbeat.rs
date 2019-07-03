@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 use std::error::Error;
 use std::fmt;
 
-use adapter::{Adapter, AdapterError};
+use adapter::{Adapter, AdapterError, BalanceRoot, ChannelId as AdapterChannelId};
 use domain::validator::message::{Heartbeat, Message, State, TYPE_HEARTBEAT};
 use domain::{Channel, ChannelId, RepositoryError, ValidatorId};
 
@@ -55,15 +55,10 @@ pub struct HeartbeatSender<A: Adapter + State> {
 }
 
 impl<A: Adapter + State> HeartbeatSender<A> {
-    // @TODO: remove this `state_root` as it was added to make the code compile
-    pub async fn conditional_send(
-        &self,
-        channel: Channel,
-        state_root: A::StateRoot,
-    ) -> Result<(), HeartbeatError> {
+    pub async fn conditional_send(&self, channel: Channel) -> Result<(), HeartbeatError> {
         // get latest Heartbeat message from repo
         // TODO: Handle this error, removing this ValidatorId from here
-        let validator = ValidatorId::try_from(self.adapter.config().identity.as_str()).unwrap();
+        let validator = ValidatorId::try_from(self.adapter.config().identity.as_ref()).unwrap();
         let latest_future =
             self.message_repository
                 .latest(channel.id, validator, Some(&[&TYPE_HEARTBEAT]));
@@ -83,12 +78,15 @@ impl<A: Adapter + State> HeartbeatSender<A> {
         // @TODO: Figure out where the channel `is_exhausted` should be located and handled.
         // check if channel is not exhausted
 
+        let adapter_channel_id = AdapterChannelId(channel.id.bytes);
+        // @TODO: Use the appropriate BalanceRoot
+        let adapter_balance_root = BalanceRoot(*b"12345678901234567890123456789012");
+        let signable_state_root = A::signable_state_root(adapter_channel_id, adapter_balance_root);
         // call the HeartbeatFactory
         // @TODO: Remove the invocation of this state_root, should be generated somehow!
-        let heartbeat = await!(self.factory.create(state_root))?;
+        let heartbeat = await!(self.factory.create(signable_state_root.0))?;
 
         // `add()` the heartbeat with the Repository
-        // @TODO: Call the repository
         await!(self
             .message_repository
             .add(channel.id, Message::Heartbeat(heartbeat)))
@@ -117,7 +115,7 @@ mod test {
 
             let factory = HeartbeatFactory { adapter };
 
-            let state_root = "my dummy StateRoot".to_string();
+            let state_root = "my dummy StateRoot".into();
 
             let adapter_signature = await!(factory.adapter.sign(&state_root))
                 .expect("Adapter should sign the StateRoot");
