@@ -1,4 +1,6 @@
-use crate::adapter::{Adapter, AdapterError, AdapterFuture, Config, BalanceRoot, ChannelId, SignableStateRoot};
+use crate::adapter::{
+    Adapter, AdapterError, AdapterFuture, BalanceRoot, ChannelId, Config, SignableStateRoot,
+};
 use crate::sanity::SanityChecker;
 
 use futures::future::{err, ok, FutureExt};

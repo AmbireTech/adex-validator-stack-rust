@@ -22,7 +22,7 @@ pub fn get_channel_id(channel_id: &str) -> ChannelId {
         *byte = channel_id_bytes[index];
     }
 
-    ChannelId { id }
+    ChannelId { bytes: id }
 }
 
 pub fn get_channel(

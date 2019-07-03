@@ -15,7 +15,7 @@ use crate::{AdUnit, Asset, DomainError, EventSubmission, TargetingTag, Validator
 #[serde(transparent)]
 pub struct ChannelId {
     #[serde(with = "SerHex::<StrictPfx>")]
-    pub id: [u8; 32],
+    pub bytes: [u8; 32],
 }
 
 impl fmt::Display for ChannelId {
@@ -31,7 +31,7 @@ impl fmt::Display for ChannelId {
     /// assert_eq!("0x061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088", &channel_hex_string);
     /// ```
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        let hex_string = SerHex::<StrictPfx>::into_hex(&self.id).unwrap();
+        let hex_string = SerHex::<StrictPfx>::into_hex(&self.bytes).unwrap();
         write!(f, "{}", hex_string)
     }
 }
@@ -47,9 +47,9 @@ impl TryFrom<&str> for ChannelId {
     /// use std::convert::TryFrom;
     /// use domain::channel::ChannelId;
     ///
-    /// let bytes: [u8; 32] = [49, 50, 51, 52, 53, 54, 55, 56, 57, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 48, 49, 50];
+    /// let bytes: [u8; 32] = *b"12345678901234567890123456789012";
     ///
-    /// assert_eq!(ChannelId { id: bytes }, ChannelId::try_from("12345678901234567890123456789012").unwrap())
+    /// assert_eq!(ChannelId { bytes }, ChannelId::try_from("12345678901234567890123456789012").unwrap())
     /// ```
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let bytes = value.as_bytes();
@@ -61,7 +61,7 @@ impl TryFrom<&str> for ChannelId {
         let mut id = [0; 32];
         id.copy_from_slice(&bytes[..32]);
 
-        Ok(Self { id })
+        Ok(Self { bytes: id })
     }
 }
 
@@ -78,7 +78,7 @@ impl ChannelId {
     ///
     /// let from_hex = domain::ChannelId::try_from_hex(hex_string).expect("This should be valid hex string");
     ///
-    /// let expected_channel_id = ChannelId{ id: [6, 29, 94, 42, 103, 208, 169, 161, 15, 28, 115, 43, 202, 18, 166, 118, 216, 63, 121, 102, 58, 57, 111, 125, 135, 179, 227, 11, 155, 65, 16, 136]};
+    /// let expected_channel_id = ChannelId{ bytes: [6, 29, 94, 42, 103, 208, 169, 161, 15, 28, 115, 43, 202, 18, 166, 118, 216, 63, 121, 102, 58, 57, 111, 125, 135, 179, 227, 11, 155, 65, 16, 136]};
     /// assert_eq!(expected_channel_id, from_hex)
     /// ```
     pub fn try_from_hex(hex: &str) -> Result<Self, DomainError> {
@@ -95,13 +95,13 @@ impl ChannelId {
         let mut id = [0; 32];
         id.copy_from_slice(&bytes[..32]);
 
-        Ok(Self { id })
+        Ok(Self { bytes: id })
     }
 }
 
 impl PartialEq<ChannelId> for &str {
     fn eq(&self, channel_id: &ChannelId) -> bool {
-        self.as_bytes() == channel_id.id
+        self.as_bytes() == channel_id.bytes
     }
 }
 
