@@ -183,6 +183,10 @@ impl<'a> SpecValidator<'a> {
 pub struct SpecValidators([ValidatorDesc; 2]);
 
 impl SpecValidators {
+    pub fn new(leader: ValidatorDesc, follower: ValidatorDesc) -> Self {
+        Self([leader, follower])
+    }
+
     pub fn leader(&self) -> &ValidatorDesc {
         &self.0[0]
     }
