@@ -1,18 +1,22 @@
 # `Domain` crate for validator/sentry stack
 
 This crate is meant to hold all Domain structures required for both the Validator and Sentry.
-It defines all the structs(Entities, Value Objects and etc.) and Repository traits and Domain errors.
+It defines all the structs(Entities, Value Objects and etc.), Domain errors and the generic Repository
+types and Errors.
 It also defines the serialization and deserialization of them.
-The actual implementations of Repositories is left to the underlying usage, whether it is
-using Postgres, some sort of Memory implementation and etc.
+
+The Repository traits and the actual implementations of them is left to the underlying usage.
+The traits can have different interfaces based on the requirements of the application and can have
+different implementation based on the needs, whether this is: Postgres, InMemory, RestAPI and etc. implementations.
 
 ### Features:
 
 #### Repositories
 
 If the usage of this crate, requires not only (de)serialization, but also retrieving or storing
-the objects in any way (database, API calls, memory and etc.) you would need this feature, as it defines
-the Repository traits that should be implemented, as a common interface, for handling such operations.
+the objects in any way (database, API calls, memory and etc.) you would need this feature, to use
+the generic types and traits to define the underling Repository interfaces for the domain objects
+and implementations.
 
 The trait `RepositoryFuture` with a generic `RepositoryError` is used as the common return type for
 repository methods.
@@ -26,7 +30,8 @@ There is also the `domain::test_util` module that gives you some handy functions
 for usage in tests:
 
 - `take_one` which gives you a random element from a slice.
-
+- `time::datetime_between`
+- `time::past_datetime`
 
 ### Utils
 
