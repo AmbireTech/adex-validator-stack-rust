@@ -1,6 +1,6 @@
 use futures::{FutureExt, TryFutureExt};
 
-use domain::{Channel, RepositoryFuture};
+use domain::{Channel, RepositoryFuture, ValidatorId};
 
 use crate::domain::channel::ChannelRepository;
 use crate::infrastructure::persistence::api::ApiPersistenceError;
@@ -12,10 +12,10 @@ pub struct ApiChannelRepository {
 }
 
 impl ChannelRepository for ApiChannelRepository {
-    fn all(&self, identity: &str) -> RepositoryFuture<Vec<Channel>> {
+    fn all(&self, identity: &ValidatorId) -> RepositoryFuture<Vec<Channel>> {
         self.sentry
             .clone()
-            .all_channels(Some(identity.to_string()))
+            .all_channels(Some(identity))
             // @TODO: Error handling
             .map_err(|_error| ApiPersistenceError::Reading.into())
             .boxed()

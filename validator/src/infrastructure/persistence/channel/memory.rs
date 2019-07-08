@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use futures::future::{ready, FutureExt};
 
-use domain::{Channel, ChannelId, RepositoryFuture, SpecValidator};
+use domain::{Channel, ChannelId, RepositoryFuture, SpecValidator, ValidatorId};
 use memory_repository::MemoryRepository;
 
 use crate::domain::channel::ChannelRepository;
@@ -23,13 +23,14 @@ impl MemoryChannelRepository {
 }
 
 impl ChannelRepository for MemoryChannelRepository {
-    fn all(&self, identity: &str) -> RepositoryFuture<Vec<Channel>> {
-        let list = self
-            .inner
-            .list_all(|channel| match channel.spec.validators.find(identity) {
-                SpecValidator::Leader(_) | SpecValidator::Follower(_) => Some(channel.clone()),
-                SpecValidator::None => None,
-            });
+    fn all(&self, identity: &ValidatorId) -> RepositoryFuture<Vec<Channel>> {
+        let list =
+            self.inner.list_all(
+                |channel| match channel.spec.validators.find(identity.as_ref()) {
+                    SpecValidator::Leader(_) | SpecValidator::Follower(_) => Some(channel.clone()),
+                    SpecValidator::None => None,
+                },
+            );
 
         ready(list.map_err(Into::into)).boxed()
     }
@@ -37,17 +38,20 @@ impl ChannelRepository for MemoryChannelRepository {
 
 #[cfg(test)]
 mod test {
-    use domain::fixtures::{get_channel, get_channel_id, get_channel_spec, get_validator};
-    use domain::SpecValidators;
+    use std::convert::TryFrom;
+
+    use domain::fixtures::{
+        get_channel, get_channel_id, get_channel_spec, get_validator, ValidatorsOption,
+    };
+    use domain::ValidatorId;
 
     use super::*;
-    use domain::channel::fixtures::ValidatorsOption;
 
     #[test]
     fn find_all_channels_with_the_passed_identity_and_skips_the_rest() {
         futures::executor::block_on(async {
-            let identity = "Lookup identity";
-            let validator_1 = get_validator(identity, None);
+            let identity = ValidatorId::try_from("Lookup identity").unwrap();
+            let validator_1 = get_validator(&identity, None);
             let validator_2 = get_validator("Second", None);
             let channel_1_spec = get_channel_spec(ValidatorsOption::Pair {
                 leader: validator_1.clone(),

@@ -2,6 +2,7 @@ pub use self::infinite::InfiniteWorker;
 pub use self::single::TickWorker;
 
 pub mod single {
+    use std::convert::TryFrom;
     use std::sync::Arc;
     use std::time::Duration;
 
@@ -9,7 +10,7 @@ pub mod single {
     use futures::future::{FutureExt, TryFutureExt};
     use tokio::util::FutureExt as TokioFutureExt;
 
-    use domain::{Channel, SpecValidator};
+    use domain::{Channel, SpecValidator, ValidatorId};
 
     use crate::application::validator::{Follower, Leader};
     use crate::domain::{ChannelRepository, Validator, Worker, WorkerFuture};
@@ -28,7 +29,10 @@ pub mod single {
     /// Single tick worker
     impl TickWorker {
         pub async fn tick(self) -> Result<(), ()> {
-            let all_channels = await!(self.channel_repository.all(&self.identity));
+            // @TODO: Update once we figure out if ValidatorId can fail from a &str
+            let validator_id = ValidatorId::try_from(self.identity.as_str())
+                .expect("ValidatorId doesn't have a failing case right now");
+            let all_channels = await!(self.channel_repository.all(&validator_id));
 
             match all_channels {
                 Ok(channels) => {
