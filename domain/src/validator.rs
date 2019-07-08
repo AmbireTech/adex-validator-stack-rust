@@ -1,4 +1,5 @@
 use std::convert::TryFrom;
+use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
@@ -21,6 +22,18 @@ impl TryFrom<&str> for ValidatorId {
     }
 }
 
+impl AsRef<str> for ValidatorId {
+    fn as_ref(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl fmt::Display for ValidatorId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ValidatorDesc {
@@ -38,12 +51,15 @@ pub mod fixtures {
 
     use super::ValidatorDesc;
 
-    pub fn get_validator(validator_id: &str, fee: Option<BigNum>) -> ValidatorDesc {
+    pub fn get_validator<V: AsRef<str>>(validator_id: V, fee: Option<BigNum>) -> ValidatorDesc {
         let fee = fee.unwrap_or_else(|| BigNum::from(<Faker as Number>::between(1, 13)));
-        let url = format!("http://{}-validator-url.com/validator", validator_id);
+        let url = format!(
+            "http://{}-validator-url.com/validator",
+            validator_id.as_ref()
+        );
 
         ValidatorDesc {
-            id: validator_id.to_string(),
+            id: validator_id.as_ref().to_string(),
             url,
             fee,
         }

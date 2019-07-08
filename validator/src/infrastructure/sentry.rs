@@ -1,4 +1,4 @@
-use domain::Channel;
+use domain::{Channel, ValidatorId};
 use futures::compat::Future01CompatExt;
 use futures::future::{ok, try_join_all, FutureExt, TryFutureExt};
 use futures::Future;
@@ -18,8 +18,9 @@ pub struct SentryApi {
 impl SentryApi {
     pub fn all_channels(
         &self,
-        validator: Option<String>,
+        validator: Option<&ValidatorId>,
     ) -> impl Future<Output = Result<Vec<Channel>, Error>> {
+        let validator = validator.cloned();
         // call Sentry and fetch first page, where validator = identity
         let first_page = self.clone().fetch_page(1, validator.clone());
 
@@ -59,7 +60,7 @@ impl SentryApi {
     async fn fetch_page(
         self,
         page: u64,
-        validator: Option<String>,
+        validator: Option<ValidatorId>,
     ) -> Result<ChannelAllResponse, reqwest::Error> {
         let mut query = vec![format!("page={}", page)];
 

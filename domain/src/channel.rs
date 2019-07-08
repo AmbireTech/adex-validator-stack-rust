@@ -30,7 +30,7 @@ impl fmt::Display for ChannelId {
     /// let channel_hex_string = format!("{}", channel_id);
     /// assert_eq!("0x061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088", &channel_hex_string);
     /// ```
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let hex_string = SerHex::<StrictPfx>::into_hex(&self.bytes).unwrap();
         write!(f, "{}", hex_string)
     }
@@ -183,6 +183,10 @@ impl<'a> SpecValidator<'a> {
 pub struct SpecValidators([ValidatorDesc; 2]);
 
 impl SpecValidators {
+    pub fn new(leader: ValidatorDesc, follower: ValidatorDesc) -> Self {
+        Self([leader, follower])
+    }
+
     pub fn leader(&self) -> &ValidatorDesc {
         &self.0[0]
     }

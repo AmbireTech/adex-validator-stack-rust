@@ -105,7 +105,7 @@ impl error::Error for SanityError {
 mod test {
     use time::Duration;
 
-    use domain::channel::fixtures::get_channel_spec;
+    use domain::channel::fixtures::{get_channel_spec, ValidatorsOption};
     use domain::fixtures::{get_channel, get_validator};
 
     use crate::adapter::ConfigBuilder;
@@ -250,7 +250,7 @@ mod test {
             get_validator("my leader", Some(10.into())),
             get_validator("my follower", Some(15.into())),
         ];
-        let spec = get_channel_spec("channel_1", Some(validators.into()));
+        let spec = get_channel_spec(ValidatorsOption::SpecValidators(validators.into()));
         let channel = get_channel("channel_1", &None, Some(spec));
 
         // as identity use the leader, otherwise we won't pass the AdapterNotIncluded check

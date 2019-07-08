@@ -134,8 +134,8 @@ fn listing_channels_can_handles_validator_filtration_and_keeps_valid_until_filtr
             get_validator("validator-2", None),
         ]
         .into();
-        let channel_2_spec = get_channel_spec("channel 2", Some(validators.clone()));
-        let channel_5_spec = get_channel_spec("channel 5", Some(validators));
+        let channel_2_spec = get_channel_spec(ValidatorsOption::SpecValidators(validators.clone()));
+        let channel_5_spec = get_channel_spec(ValidatorsOption::SpecValidators(validators));
 
         let channels = [
             get_channel("channel 1", &None, None),
