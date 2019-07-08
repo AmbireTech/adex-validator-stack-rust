@@ -7,10 +7,7 @@ fn coverts_str_to_channel_id() {
     let channel_id = ChannelId::try_from("12345678901234567890123456789012")
         .expect("Should create ChannelId from &str with 32 len numeric value");
 
-    assert_eq!(
-        "12345678901234567890123456789012".as_bytes(),
-        &channel_id.id
-    );
+    assert_eq!(b"12345678901234567890123456789012", &channel_id.bytes);
 
     assert!(
         ChannelId::try_from("1234567890123456789012345678901").is_err(),

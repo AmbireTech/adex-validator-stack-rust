@@ -1,18 +1,67 @@
-use std::collections::HashMap;
+use crate::adapter::{
+    Adapter, AdapterError, AdapterFuture, BalanceRoot, ChannelId, Config, SignableStateRoot,
+};
+use crate::sanity::SanityChecker;
 
 use futures::future::{err, ok, FutureExt};
 use hex::encode;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fmt;
 
 use domain::validator::message::State;
-
-use crate::adapter::{Adapter, AdapterError, AdapterFuture, Config};
-use crate::sanity::SanityChecker;
 
 #[derive(Debug)]
 pub struct DummyParticipant {
     pub identity: String,
     pub token: String,
 }
+
+pub trait Hexable: AsRef<[u8]> {
+    fn to_hex(&self) -> String {
+        format!("0x{}", encode(&self))
+    }
+}
+
+impl Hexable for ChannelId {}
+impl Hexable for BalanceRoot {}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DummySignature(pub String);
+
+impl fmt::Display for DummySignature {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl<S: Into<String>> From<S> for DummySignature {
+    fn from(value: S) -> Self {
+        Self(value.into())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DummyStateRoot(pub String);
+
+impl fmt::Display for DummyStateRoot {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl<S: Into<String>> From<S> for DummyStateRoot {
+    fn from(value: S) -> Self {
+        Self(value.into())
+    }
+}
+
+impl AsRef<[u8]> for DummyStateRoot {
+    fn as_ref(&self) -> &[u8] {
+        &self.0.as_ref()
+    }
+}
+impl Hexable for DummyStateRoot {}
 
 pub struct DummyAdapter<'a> {
     pub config: Config,
@@ -24,8 +73,8 @@ pub struct DummyAdapter<'a> {
 impl SanityChecker for DummyAdapter<'_> {}
 
 impl State for DummyAdapter<'_> {
-    type Signature = String;
-    type StateRoot = String;
+    type Signature = DummySignature;
+    type StateRoot = DummyStateRoot;
 }
 
 impl<'a> Adapter for DummyAdapter<'a> {
@@ -38,24 +87,24 @@ impl<'a> Adapter for DummyAdapter<'a> {
     /// ```
     /// # futures::executor::block_on(async {
     /// use adapter::{ConfigBuilder, Adapter};
-    /// use adapter::dummy::DummyAdapter;
+    /// use adapter::dummy::{DummyAdapter, DummySignature};
     /// use std::collections::HashMap;
     ///
     /// let config = ConfigBuilder::new("identity").build();
     /// let adapter = DummyAdapter { config, participants: HashMap::new() };
     ///
-    /// let actual = await!(adapter.sign(&"abcdefghijklmnopqrstuvwxyz012345".to_string())).unwrap();
-    /// let expected = "Dummy adapter signature for 6162636465666768696a6b6c6d6e6f707172737475767778797a303132333435 by identity";
-    /// assert_eq!(expected, &actual);
+    /// let actual = await!(adapter.sign(&"abcdefghijklmnopqrstuvwxyz012345".into())).unwrap();
+    /// let expected = "Dummy adapter signature for 0x6162636465666768696a6b6c6d6e6f707172737475767778797a303132333435 by identity";
+    /// assert_eq!(DummySignature::from(expected), actual);
     /// # });
     /// ```
     fn sign(&self, state_root: &Self::StateRoot) -> AdapterFuture<Self::Signature> {
         let signature = format!(
             "Dummy adapter signature for {} by {}",
-            encode(&state_root),
+            state_root.to_hex(),
             &self.config.identity
         );
-        ok(signature).boxed()
+        ok(signature.into()).boxed()
     }
 
     /// Example:
@@ -69,8 +118,8 @@ impl<'a> Adapter for DummyAdapter<'a> {
     /// let config = ConfigBuilder::new("identity").build();
     /// let adapter = DummyAdapter { config, participants: HashMap::new() };
     ///
-    /// let signature = "Dummy adapter signature for 6162636465666768696a6b6c6d6e6f707172737475767778797a303132333435 by identity";
-    /// assert_eq!(Ok(true), await!(adapter.verify("identity", &"doesn't matter".to_string(), &signature.to_string())));
+    /// let signature = "Dummy adapter signature for 0x6162636465666768696a6b6c6d6e6f707172737475767778797a303132333435 by identity";
+    /// assert_eq!(Ok(true), await!(adapter.verify("identity", &"doesn't matter".into(), &signature.into())));
     /// # });
     /// ```
     fn verify(
@@ -81,7 +130,7 @@ impl<'a> Adapter for DummyAdapter<'a> {
     ) -> AdapterFuture<bool> {
         // select the `identity` and compare it to the signer
         // for empty string this will return array with 1 element - an empty string `[""]`
-        let is_same = match signature.rsplit(' ').take(1).next() {
+        let is_same = match signature.0.rsplit(' ').take(1).next() {
             Some(from) => from == signer,
             None => false,
         };
@@ -130,6 +179,19 @@ impl<'a> Adapter for DummyAdapter<'a> {
 
         future.boxed()
     }
+
+    fn signable_state_root(
+        channel_id: ChannelId,
+        balance_root: BalanceRoot,
+    ) -> SignableStateRoot<Self::StateRoot> {
+        let state_root = format!(
+            "Signable State Root for Adapter channel id {} with balance root {}",
+            channel_id.to_hex(),
+            balance_root.to_hex()
+        );
+
+        SignableStateRoot(state_root.into())
+    }
 }
 
 #[cfg(test)]
@@ -147,17 +209,16 @@ mod test {
                 participants: HashMap::new(),
             };
 
-            let expected_signature = "Dummy adapter signature for 6162636465666768696a6b6c6d6e6f707172737475767778797a303132333435 by identity";
-            let actual_signature =
-                await!(adapter.sign(&"abcdefghijklmnopqrstuvwxyz012345".to_string()))
-                    .expect("Signing shouldn't fail");
+            let expected_signature = "Dummy adapter signature for 0x6162636465666768696a6b6c6d6e6f707172737475767778797a303132333435 by identity";
+            let actual_signature = await!(adapter.sign(&"abcdefghijklmnopqrstuvwxyz012345".into()))
+                .expect("Signing shouldn't fail");
 
-            assert_eq!(expected_signature, &actual_signature);
+            assert_eq!(DummySignature::from(expected_signature), actual_signature);
 
             let is_verified = await!(adapter.verify(
                 "identity",
-                &"doesn't matter".to_string(),
-                &actual_signature.to_string()
+                &"doesn't matter".into(),
+                &actual_signature.into()
             ));
 
             assert_eq!(Ok(true), is_verified);

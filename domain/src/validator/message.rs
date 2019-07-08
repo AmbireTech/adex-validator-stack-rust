@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use crate::BalancesMap;
 
 pub trait State {
-    type Signature: DeserializeOwned + Serialize + fmt::Debug + Clone;
-    type StateRoot: DeserializeOwned + Serialize + fmt::Debug + Clone;
+    type Signature: DeserializeOwned + Serialize + fmt::Display + fmt::Debug + Clone;
+    type StateRoot: DeserializeOwned + Serialize + fmt::Display + fmt::Debug + Clone;
 }
 
 #[derive(Serialize, Deserialize, Clone)]

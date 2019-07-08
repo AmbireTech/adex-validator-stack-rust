@@ -9,6 +9,22 @@ use crate::sanity::SanityChecker;
 use std::error::Error;
 use std::fmt;
 
+pub struct ChannelId(pub [u8; 32]);
+impl AsRef<[u8]> for ChannelId {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+pub struct BalanceRoot(pub [u8; 32]);
+impl AsRef<[u8]> for BalanceRoot {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+pub struct SignableStateRoot<T: fmt::Display>(pub T);
+
 pub type AdapterFuture<T> = Pin<Box<dyn Future<Output = Result<T, AdapterError>> + Send>>;
 
 #[derive(Debug, Eq, PartialEq)]
@@ -46,6 +62,11 @@ pub trait Adapter: SanityChecker + State {
 
     /// Gets authentication for specific validator
     fn get_auth(&self, validator: &str) -> AdapterFuture<String>;
+
+    fn signable_state_root(
+        channel_id: ChannelId,
+        balance_root: BalanceRoot,
+    ) -> SignableStateRoot<Self::StateRoot>;
 }
 
 pub struct Config {
