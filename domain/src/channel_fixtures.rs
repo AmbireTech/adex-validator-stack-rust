@@ -38,7 +38,11 @@ pub fn get_channel(
     });
     let creator = <Faker as Name>::name();
     let deposit_asset = get_asset();
-    let spec = spec.unwrap_or_else(|| get_channel_spec(id, None));
+    let spec = spec.unwrap_or_else(|| {
+        get_channel_spec(ValidatorsOption::Generate {
+            validators_prefix: id,
+        })
+    });
 
     Channel {
         id: channel_id,
@@ -63,26 +67,27 @@ pub fn get_channels(count: usize, valid_until_ge: Option<DateTime<Utc>>) -> Vec<
         .collect()
 }
 
-pub enum ValidatorsOption {
-    Provide {
+pub enum ValidatorsOption<'a> {
+    Pair {
         leader: ValidatorDesc,
         follower: ValidatorDesc,
     },
+    SpecValidators(SpecValidators),
     Generate {
-        validators_prefix: String,
+        validators_prefix: &'a str,
     },
 }
 
-// @TODO: Remove the `prefix` and use ValidatorsOption instead
-pub fn get_channel_spec(prefix: &str, validators_option: Option<SpecValidators>) -> ChannelSpec {
+pub fn get_channel_spec(validators_option: ValidatorsOption<'_>) -> ChannelSpec {
     use crate::EventSubmission;
     use test_util::take_one;
 
     let validators = match validators_option {
-        Some(validators) => validators,
-        None => [
-            get_validator(&format!("{} leader", prefix), None),
-            get_validator(&format!("{} follower", prefix), None),
+        ValidatorsOption::Pair { leader, follower } => [leader, follower].into(),
+        ValidatorsOption::SpecValidators(spec_validators) => spec_validators,
+        ValidatorsOption::Generate { validators_prefix } => [
+            get_validator(&format!("{} leader", validators_prefix), None),
+            get_validator(&format!("{} follower", validators_prefix), None),
         ]
         .into(),
     };

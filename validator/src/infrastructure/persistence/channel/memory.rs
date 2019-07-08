@@ -41,6 +41,7 @@ mod test {
     use domain::SpecValidators;
 
     use super::*;
+    use domain::channel::fixtures::ValidatorsOption;
 
     #[test]
     fn find_all_channels_with_the_passed_identity_and_skips_the_rest() {
@@ -48,21 +49,16 @@ mod test {
             let identity = "Lookup identity";
             let validator_1 = get_validator(identity, None);
             let validator_2 = get_validator("Second", None);
-            let channel_1_spec = get_channel_spec(
-                "doesn't matter",
-                Some(SpecValidators::new(
-                    validator_1.clone(),
-                    validator_2.clone(),
-                )),
-            );
-            let channel_3_spec = get_channel_spec(
-                "doesn't matter",
-                // switch leader & follower
-                Some(SpecValidators::new(
-                    validator_2.clone(),
-                    validator_1.clone(),
-                )),
-            );
+            let channel_1_spec = get_channel_spec(ValidatorsOption::Pair {
+                leader: validator_1.clone(),
+                follower: validator_2.clone(),
+            });
+
+            // switch leader & follower
+            let channel_3_spec = get_channel_spec(ValidatorsOption::Pair {
+                leader: validator_2.clone(),
+                follower: validator_1.clone(),
+            });
             let channels = vec![
                 get_channel("channel 1", &None, Some(channel_1_spec)),
                 get_channel("channel 2", &None, None),
