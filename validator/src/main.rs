@@ -82,7 +82,9 @@ fn run(is_single_tick: bool, adapter: impl Adapter) {
     use validator::application::validator::{Follower, Leader};
     use validator::application::worker::{InfiniteWorker, TickWorker};
     use validator::domain::worker::Worker;
-    use validator::infrastructure::persistence::channel::api::ApiChannelRepository;
+    use validator::infrastructure::persistence::channel::{
+        ApiChannelRepository, MemoryChannelRepository,
+    };
     use validator::infrastructure::sentry::SentryApi;
 
     let sentry = SentryApi {
@@ -90,7 +92,8 @@ fn run(is_single_tick: bool, adapter: impl Adapter) {
         sentry_url: CONFIG.sentry_url.clone(),
     };
 
-    let channel_repository = Arc::new(ApiChannelRepository { sentry });
+    let _channel_repository = Arc::new(ApiChannelRepository { sentry });
+    let channel_repository = Arc::new(MemoryChannelRepository::new(&[]));
 
     let tick_worker = TickWorker {
         leader: Leader {},
