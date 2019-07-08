@@ -27,8 +27,8 @@ pub mod repository {
 
         fn latest(
             &self,
-            channel_id: ChannelId,
-            from: ValidatorId,
+            channel_id: &ChannelId,
+            from: &ValidatorId,
             types: Option<&[&MessageType]>,
         ) -> RepositoryFuture<Option<Message<S>>>;
     }
