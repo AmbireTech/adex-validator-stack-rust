@@ -6,7 +6,6 @@ use crate::domain::channel::ChannelRepository;
 use crate::infrastructure::persistence::api::ApiPersistenceError;
 use crate::infrastructure::sentry::SentryApi;
 
-#[derive(Clone)]
 // @TODO: make pub(crate)
 pub struct ApiChannelRepository {
     pub sentry: SentryApi,
