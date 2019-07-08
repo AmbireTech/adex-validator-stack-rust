@@ -7,7 +7,7 @@ use crate::fixtures::{get_targeting_tags, get_validator};
 use crate::test_util;
 use crate::BigNum;
 
-use super::{Channel, ChannelId, ChannelSpec, SpecValidators};
+use super::{Channel, ChannelId, ChannelSpec, SpecValidators, ValidatorDesc};
 
 /// It will get the length of channel_id bytes and will fill enough bytes in front
 /// If > 32 bytes &str is passed it will `panic!`
@@ -63,6 +63,17 @@ pub fn get_channels(count: usize, valid_until_ge: Option<DateTime<Utc>>) -> Vec<
         .collect()
 }
 
+pub enum ValidatorsOption {
+    Provide {
+        leader: ValidatorDesc,
+        follower: ValidatorDesc,
+    },
+    Generate {
+        validators_prefix: String,
+    },
+}
+
+// @TODO: Remove the `prefix` and use ValidatorsOption instead
 pub fn get_channel_spec(prefix: &str, validators_option: Option<SpecValidators>) -> ChannelSpec {
     use crate::EventSubmission;
     use test_util::take_one;
