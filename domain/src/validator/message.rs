@@ -60,23 +60,23 @@ pub const ALL_TYPES: [&MessageType; 5] = [
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ApproveState<S: State> {
-    state_root: S::StateRoot,
-    signature: S::Signature,
-    is_healthy: bool,
+    pub state_root: S::StateRoot,
+    pub signature: S::Signature,
+    pub is_healthy: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct NewState<S: State> {
-    state_root: S::StateRoot,
-    signature: S::Signature,
-    balances: BalancesMap,
+    pub state_root: S::StateRoot,
+    pub signature: S::Signature,
+    pub balances: BalancesMap,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct RejectState {
-    reason: String,
+    pub reason: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -105,10 +105,10 @@ impl<S: State> Heartbeat<S> {
 #[serde(rename_all = "camelCase")]
 pub struct Accounting {
     #[serde(rename = "last_ev_aggr")]
-    last_event_aggregate: DateTime<Utc>,
+    pub last_event_aggregate: DateTime<Utc>,
     #[serde(rename = "balances_pre_fees")]
-    pre_fees: BalancesMap,
-    balances: BalancesMap,
+    pub pre_fees: BalancesMap,
+    pub balances: BalancesMap,
 }
 
 #[cfg(any(test, feature = "fixtures"))]

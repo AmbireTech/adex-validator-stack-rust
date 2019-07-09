@@ -62,7 +62,7 @@ impl<A: Adapter + State> HeartbeatSender<A> {
         let validator = ValidatorId::try_from(self.adapter.config().identity.as_ref()).unwrap();
         let latest_future =
             self.message_repository
-                .latest(channel.id, validator, Some(&[&TYPE_HEARTBEAT]));
+                .latest(&channel.id, &validator, Some(&[&TYPE_HEARTBEAT]));
         let latest_heartbeat = await!(latest_future)
             .map_err(HeartbeatError::Repository)?
             .map(|heartbeat_msg| match heartbeat_msg {
