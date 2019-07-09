@@ -6,4 +6,5 @@ members = [
     "sentry",
     "validator",
     "memory-repository",
+    "merkle-tree",
 ]
