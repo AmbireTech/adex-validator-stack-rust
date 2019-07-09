@@ -186,6 +186,4 @@ pub mod fixtures {
             balances,
         }
     }
-
-    // @TODO: Create a random Message fixture fn
 }

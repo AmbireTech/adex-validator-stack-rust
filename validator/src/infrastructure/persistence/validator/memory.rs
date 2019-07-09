@@ -20,8 +20,8 @@ impl State for MemoryState {
 #[derive(Clone)]
 pub struct MemoryMessage {
     pub message: Message<MemoryState>,
-    pub channel_id: ChannelId,
-    pub validator_id: ValidatorId,
+    pub channel: ChannelId,
+    pub owner: ValidatorId,
 }
 
 pub struct MemoryMessageRepository {
@@ -46,8 +46,8 @@ impl MessageRepository<MemoryState> for MemoryMessageRepository {
     fn add(&self, channel_id: ChannelId, message: Message<MemoryState>) -> RepositoryFuture<()> {
         let message = MemoryMessage {
             message,
-            channel_id,
-            validator_id: self.self_validator_id.clone(),
+            channel: channel_id,
+            owner: self.self_validator_id.clone(),
         };
         // this should never match against the new record, that's why always pass false.
         ready(self.inner.add(&false, message).map_err(Into::into)).boxed()
@@ -65,8 +65,8 @@ impl MessageRepository<MemoryState> for MemoryMessageRepository {
         let latest = self
             .inner
             .list_all(|mem_msg| {
-                let is_from = &mem_msg.validator_id == from;
-                let is_channel_id = &mem_msg.channel_id == channel_id;
+                let is_from = &mem_msg.owner == from;
+                let is_channel_id = &mem_msg.channel == channel_id;
                 // if there are no types provided, it should match every type, i.e. default `true` for `None`
                 let is_in_types = types.map_or(true, |message_types| {
                     mem_msg.message.is_types(message_types)
@@ -88,9 +88,22 @@ mod test {
     use std::convert::TryFrom;
 
     use domain::fixtures::get_channel_id;
-    use domain::validator::message::fixtures::get_reject_state;
+    use domain::validator::message::fixtures::{get_heartbeat, get_reject_state};
 
     use super::*;
+    use domain::validator::message::TYPE_REJECT;
+
+    fn get_reject_memory_message(
+        channel: &ChannelId,
+        owner: &ValidatorId,
+        reject_reason: Option<String>,
+    ) -> MemoryMessage {
+        MemoryMessage {
+            channel: channel.clone(),
+            owner: owner.clone(),
+            message: Message::RejectState(get_reject_state(reject_reason)),
+        }
+    }
 
     #[test]
     fn adds_message_with_the_self_validator_id() {
@@ -98,7 +111,6 @@ mod test {
             let validator_id = ValidatorId::try_from("identity").expect("ValidatorId failed");
             let repo = MemoryMessageRepository::new(&[], validator_id.clone());
 
-            // @TODO: Replace with random Message fixture fn
             let message = get_reject_state(None);
             let channel_id = get_channel_id("channel id");
 
@@ -111,13 +123,13 @@ mod test {
                 .expect("Listing all Messages failed");
 
             assert_eq!(1, list_all.len());
-            assert_eq!(validator_id, list_all[0].validator_id);
-            assert_eq!(channel_id, list_all[0].channel_id);
+            assert_eq!(validator_id, list_all[0].owner);
+            assert_eq!(channel_id, list_all[0].channel);
         })
     }
 
     #[test]
-    fn gets_latest_message_from_this_self_validator_id() {
+    fn getting_latest_message_with_self_validator_id() {
         futures::executor::block_on(async {
             let validator_id = ValidatorId::try_from("identity").expect("ValidatorId failed");
             let channel_id = get_channel_id("channel id");
@@ -138,6 +150,79 @@ mod test {
             match latest_any.expect("There was no latest message returned") {
                 Message::RejectState(reject_state) => assert_eq!("my reason", reject_state.reason),
                 _ => panic!("A Reject state message was not returned as latest message!"),
+            }
+        })
+    }
+
+    #[test]
+    fn getting_latest_message_filters_by_from() {
+        futures::executor::block_on(async {
+            let self_validator_id = ValidatorId::try_from("identity").expect("ValidatorId failed");
+            let channel = get_channel_id("channel id");
+
+            let from =
+                ValidatorId::try_from("another validator").expect("ValidatorId for form failed");
+            let init_message = get_reject_memory_message(&channel, &self_validator_id, None);
+
+            let repo = MemoryMessageRepository::new(&[init_message], self_validator_id.clone());
+
+            let result =
+                await!(repo.latest(&channel, &from, None)).expect("Fetching latest message failed");
+
+            assert!(
+                result.is_none(),
+                "A latest message was found, even though it has different ValidatorId"
+            );
+        })
+    }
+
+    #[test]
+    fn getting_latest_message_filters_by_channel_id() {
+        futures::executor::block_on(async {
+            let self_validator_id = ValidatorId::try_from("identity").expect("ValidatorId failed");
+            let channel = get_channel_id("channel 1");
+            let from_channel = get_channel_id("channel 2");
+
+            let init_message = get_reject_memory_message(&channel, &self_validator_id, None);
+
+            let repo = MemoryMessageRepository::new(&[init_message], self_validator_id.clone());
+
+            let result = await!(repo.latest(&from_channel, &self_validator_id, None))
+                .expect("Fetching latest message failed");
+
+            assert!(
+                result.is_none(),
+                "A latest message was found, even though it has different ChannelId"
+            );
+        })
+    }
+
+    #[test]
+    fn getting_latest_message_filters_by_types() {
+        futures::executor::block_on(async {
+            let self_validator_id = ValidatorId::try_from("identity").expect("ValidatorId failed");
+            let channel = get_channel_id("channel 1");
+
+            let init_messages = [
+                get_reject_memory_message(&channel, &self_validator_id, Some("reason".to_string())),
+                MemoryMessage {
+                    message: Message::Heartbeat(get_heartbeat::<MemoryState>(
+                        "state".to_string(),
+                        "signature".to_string(),
+                    )),
+                    channel: channel.clone(),
+                    owner: self_validator_id.clone(),
+                },
+            ];
+
+            let repo = MemoryMessageRepository::new(&init_messages, self_validator_id.clone());
+
+            let result = await!(repo.latest(&channel, &self_validator_id, Some(&[&TYPE_REJECT])))
+                .expect("Fetching latest message failed");
+
+            match result.expect("There was no latest message returned") {
+                Message::RejectState(reject_state) => assert_eq!("reason", reject_state.reason),
+                _ => panic!("Filtering by type didn't return the expected RejectState message!"),
             }
         })
     }
