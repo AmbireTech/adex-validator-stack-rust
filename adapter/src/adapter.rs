@@ -23,6 +23,12 @@ impl AsRef<[u8]> for BalanceRoot {
     }
 }
 
+impl From<&[u8; 32]> for BalanceRoot {
+    fn from(bytes: &[u8; 32]) -> Self {
+        Self(bytes.to_owned())
+    }
+}
+
 pub struct SignableStateRoot<T: fmt::Display>(pub T);
 
 pub type AdapterFuture<T> = Pin<Box<dyn Future<Output = Result<T, AdapterError>> + Send>>;
