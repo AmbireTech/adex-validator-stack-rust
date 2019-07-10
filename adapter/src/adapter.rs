@@ -25,7 +25,7 @@ impl AsRef<[u8]> for BalanceRoot {
 
 impl From<&[u8; 32]> for BalanceRoot {
     fn from(bytes: &[u8; 32]) -> Self {
-        Self(bytes.to_owned())
+        Self(*bytes)
     }
 }
 

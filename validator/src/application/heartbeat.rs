@@ -1,13 +1,13 @@
-use chrono::{Duration, Utc};
+use chrono::{DateTime, Duration, TimeZone, Utc};
 use std::convert::TryFrom;
 use std::error::Error;
 use std::fmt;
 
-use adapter::{Adapter, AdapterError, BalanceRoot, ChannelId as AdapterChannelId};
+use adapter::{Adapter, AdapterError, ChannelId as AdapterChannelId};
 use domain::validator::message::{Heartbeat, Message, State, TYPE_HEARTBEAT};
 use domain::{Channel, ChannelId, RepositoryError, ValidatorId};
 
-use crate::domain::MessageRepository;
+use crate::domain::{MerkleTree, MessageRepository};
 
 pub struct HeartbeatFactory<A: Adapter + State> {
     adapter: A,
@@ -48,6 +48,22 @@ impl<A: Adapter + State> HeartbeatFactory<A> {
     }
 }
 
+struct HeartbeatRootTimestamp<Tz: TimeZone>(DateTime<Tz>);
+
+// @TODO: Write a test & probably better naming of the Struct!
+impl<Tz: TimeZone> Into<[u8; 32]> for HeartbeatRootTimestamp<Tz> {
+    fn into(self) -> [u8; 32] {
+        let timestamp_be = &self.0.timestamp_millis().to_be_bytes()[2..];
+        let mut bytes = [0_u8; 32];
+
+        for (index, byte) in bytes[26..32].iter_mut().enumerate() {
+            *byte = timestamp_be[index];
+        }
+
+        bytes
+    }
+}
+
 pub struct HeartbeatSender<A: Adapter + State> {
     message_repository: Box<dyn MessageRepository<A>>,
     adapter: A,
@@ -85,9 +101,12 @@ impl<A: Adapter + State> HeartbeatSender<A> {
         // check if channel is not exhausted
 
         let adapter_channel_id = AdapterChannelId(channel.id.bytes);
-        // @TODO: Use the appropriate BalanceRoot
-        let adapter_balance_root = BalanceRoot(*b"12345678901234567890123456789012");
-        let signable_state_root = A::signable_state_root(adapter_channel_id, adapter_balance_root);
+        let timestamp = HeartbeatRootTimestamp(Utc::now());
+        let merkle_tree_root = &MerkleTree::new(vec![timestamp.into()]).root();
+
+        let adapter_balance_root = merkle_tree_root.into();
+        let signable_state_root =
+            A::signable_state_root(adapter_channel_id, adapter_balance_root);
         // call the HeartbeatFactory and create the new Heartbeat
         let heartbeat = await!(self.factory.create(signable_state_root.0))?;
 
