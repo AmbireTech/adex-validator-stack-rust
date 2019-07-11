@@ -105,8 +105,7 @@ impl<A: Adapter + State> HeartbeatSender<A> {
         let merkle_tree_root = &MerkleTree::new(vec![timestamp.into()]).root();
 
         let adapter_balance_root = merkle_tree_root.into();
-        let signable_state_root =
-            A::signable_state_root(adapter_channel_id, adapter_balance_root);
+        let signable_state_root = A::signable_state_root(adapter_channel_id, adapter_balance_root);
         // call the HeartbeatFactory and create the new Heartbeat
         let heartbeat = await!(self.factory.create(signable_state_root.0))?;
 
