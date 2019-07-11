@@ -9,3 +9,5 @@ edition = "2018"
 [dependencies]
 merkletree = "0.6.0"
 sha3 = "0.8.2"
+[dev-dependencies]
+hex = "0.3.2"
