@@ -91,10 +91,11 @@ impl<A: Adapter + State> HeartbeatSender<A> {
         // call the HeartbeatFactory and create the new Heartbeat
         let heartbeat = await!(self.factory.create(signable_state_root.0))?;
 
+        // @TODO: Issue #93 - this should propagate the message to all validators!
         // `add()` the heartbeat with the Repository
         await!(self
             .message_repository
-            .add(channel.id, Message::Heartbeat(heartbeat)))
+            .add(&channel.id, &validator, Message::Heartbeat(heartbeat)))
         .map_err(HeartbeatError::Repository)
     }
 
