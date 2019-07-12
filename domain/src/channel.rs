@@ -212,6 +212,15 @@ impl From<[ValidatorDesc; 2]> for SpecValidators {
     }
 }
 
+impl<'a> IntoIterator for &'a SpecValidators {
+    type Item = &'a ValidatorDesc;
+    type IntoIter = ::std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        vec![self.leader(), self.follower()].into_iter()
+    }
+}
+
 #[cfg(any(test, feature = "fixtures"))]
 #[path = "./channel_fixtures.rs"]
 pub mod fixtures;

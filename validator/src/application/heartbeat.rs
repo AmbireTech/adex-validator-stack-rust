@@ -9,7 +9,7 @@ use domain::{Channel, ChannelId, RepositoryError, ValidatorId};
 
 use crate::domain::MessageRepository;
 
-pub struct HeartbeatFactory<A: Adapter + State> {
+pub struct HeartbeatFactory<A: Adapter> {
     adapter: A,
 }
 
@@ -40,22 +40,22 @@ impl fmt::Display for HeartbeatError {
     }
 }
 
-impl<A: Adapter + State> HeartbeatFactory<A> {
-    pub async fn create(&self, state_root: A::StateRoot) -> Result<Heartbeat<A>, HeartbeatError> {
+impl<A: Adapter> HeartbeatFactory<A> {
+    pub async fn create(&self, state_root: <A::State as State>::StateRoot) -> Result<Heartbeat<A::State>, HeartbeatError> {
         let signature = await!(self.adapter.sign(&state_root)).map_err(HeartbeatError::Adapter)?;
 
         Ok(Heartbeat::new(signature, state_root))
     }
 }
 
-pub struct HeartbeatSender<A: Adapter + State> {
-    message_repository: Box<dyn MessageRepository<A>>,
+pub struct HeartbeatSender<A: Adapter> {
+    message_repository: Box<dyn MessageRepository<A::State>>,
     adapter: A,
     factory: HeartbeatFactory<A>,
     // @TODO: Add config value for Heartbeat send frequency
 }
 
-impl<A: Adapter + State> HeartbeatSender<A> {
+impl<A: Adapter> HeartbeatSender<A> {
     pub async fn conditional_send(&self, channel: Channel) -> Result<(), HeartbeatError> {
         // get latest Heartbeat message from repo
         // TODO: Handle this error, removing this ValidatorId from here
@@ -75,7 +75,7 @@ impl<A: Adapter + State> HeartbeatSender<A> {
 
         // if it doesn't exist or the Passed time is greater than the Timer Time
         match latest_heartbeat.as_ref() {
-            Some(heartbeat) if !self.is_heartbeat_time(&heartbeat) => {
+            Some(heartbeat) if !self.is_heartbeat_time(heartbeat) => {
                 return Err(HeartbeatError::NotYetTime)
             }
             _ => (),
@@ -99,7 +99,7 @@ impl<A: Adapter + State> HeartbeatSender<A> {
         .map_err(HeartbeatError::Repository)
     }
 
-    fn is_heartbeat_time(&self, latest_heartbeat: &Heartbeat<A>) -> bool {
+    fn is_heartbeat_time(&self, latest_heartbeat: &Heartbeat<A::State>) -> bool {
         // @TODO: Use the configuration value for the duration!
         latest_heartbeat.timestamp - Utc::now() >= Duration::seconds(10)
     }

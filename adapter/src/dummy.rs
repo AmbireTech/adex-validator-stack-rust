@@ -63,6 +63,13 @@ impl AsRef<[u8]> for DummyStateRoot {
 }
 impl Hexable for DummyStateRoot {}
 
+#[derive(Clone)]
+pub struct DummyState {}
+impl State for DummyState {
+    type Signature = DummySignature;
+    type StateRoot = DummyStateRoot;
+}
+
 pub struct DummyAdapter<'a> {
     pub config: Config,
     /// Dummy participants which will be used for
@@ -72,12 +79,9 @@ pub struct DummyAdapter<'a> {
 
 impl SanityChecker for DummyAdapter<'_> {}
 
-impl State for DummyAdapter<'_> {
-    type Signature = DummySignature;
-    type StateRoot = DummyStateRoot;
-}
-
 impl<'a> Adapter for DummyAdapter<'a> {
+    type State = DummyState;
+
     fn config(&self) -> &Config {
         &self.config
     }
@@ -98,7 +102,7 @@ impl<'a> Adapter for DummyAdapter<'a> {
     /// assert_eq!(DummySignature::from(expected), actual);
     /// # });
     /// ```
-    fn sign(&self, state_root: &Self::StateRoot) -> AdapterFuture<Self::Signature> {
+    fn sign(&self, state_root: &<Self::State as State>::StateRoot) -> AdapterFuture<<Self::State as State>::Signature> {
         let signature = format!(
             "Dummy adapter signature for {} by {}",
             state_root.to_hex(),
@@ -125,8 +129,8 @@ impl<'a> Adapter for DummyAdapter<'a> {
     fn verify(
         &self,
         signer: &str,
-        _state_root: &Self::StateRoot,
-        signature: &Self::Signature,
+        _state_root: &<Self::State as State>::StateRoot,
+        signature: &<Self::State as State>::Signature,
     ) -> AdapterFuture<bool> {
         // select the `identity` and compare it to the signer
         // for empty string this will return array with 1 element - an empty string `[""]`
@@ -183,7 +187,7 @@ impl<'a> Adapter for DummyAdapter<'a> {
     fn signable_state_root(
         channel_id: ChannelId,
         balance_root: BalanceRoot,
-    ) -> SignableStateRoot<Self::StateRoot> {
+    ) -> SignableStateRoot<<Self::State as State>::StateRoot> {
         let state_root = format!(
             "Signable State Root for Adapter channel id {} with balance root {}",
             channel_id.to_hex(),
