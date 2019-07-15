@@ -41,7 +41,10 @@ impl fmt::Display for HeartbeatError {
 }
 
 impl<A: Adapter> HeartbeatFactory<A> {
-    pub async fn create(&self, state_root: <A::State as State>::StateRoot) -> Result<Heartbeat<A::State>, HeartbeatError> {
+    pub async fn create(
+        &self,
+        state_root: <A::State as State>::StateRoot,
+    ) -> Result<Heartbeat<A::State>, HeartbeatError> {
         let signature = await!(self.adapter.sign(&state_root)).map_err(HeartbeatError::Adapter)?;
 
         Ok(Heartbeat::new(signature, state_root))

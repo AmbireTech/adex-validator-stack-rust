@@ -47,7 +47,7 @@ impl MessageRepository<MemoryState> for MemoryMessageRepository {
     ) -> RepositoryFuture<()> {
         let message = MemoryMessage {
             message,
-            channel: channel.clone(),
+            channel: *channel,
             owner: validator.clone(),
         };
         // this should never match against the new record, that's why always pass false.
@@ -143,8 +143,7 @@ mod test {
                 .expect("Adding the initial message failed");
 
             let new_message = Message::RejectState(get_reject_state(Some("my reason".to_string())));
-            await!(repo.add(&channel, &validator, new_message))
-                .expect("Adding a message failed");
+            await!(repo.add(&channel, &validator, new_message)).expect("Adding a message failed");
 
             let latest_any = await!(repo.latest(&channel, &validator, None))
                 .expect("Getting latest Message failed");

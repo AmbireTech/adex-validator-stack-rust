@@ -102,7 +102,10 @@ impl<'a> Adapter for DummyAdapter<'a> {
     /// assert_eq!(DummySignature::from(expected), actual);
     /// # });
     /// ```
-    fn sign(&self, state_root: &<Self::State as State>::StateRoot) -> AdapterFuture<<Self::State as State>::Signature> {
+    fn sign(
+        &self,
+        state_root: &<Self::State as State>::StateRoot,
+    ) -> AdapterFuture<<Self::State as State>::Signature> {
         let signature = format!(
             "Dummy adapter signature for {} by {}",
             state_root.to_hex(),
