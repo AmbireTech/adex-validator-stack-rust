@@ -46,6 +46,7 @@ impl From<RepositoryError> for PropagationError {
 }
 
 impl<S: State> MessagePropagator<S> {
+    // @TODO: Make sure we have information for logging the results for particular Validator
     pub async fn propagate<'a>(
         &'a self,
         channel: &'a Channel,
