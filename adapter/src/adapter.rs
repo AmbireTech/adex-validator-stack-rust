@@ -42,7 +42,9 @@ impl fmt::Display for AdapterError {
     }
 }
 
-pub trait Adapter: SanityChecker + State {
+pub trait Adapter: SanityChecker {
+    type State: State;
+
     fn config(&self) -> &Config;
 
     fn validate_channel(&self, channel: &Channel) -> AdapterFuture<bool> {
@@ -50,14 +52,17 @@ pub trait Adapter: SanityChecker + State {
     }
 
     /// Signs the provided state_root
-    fn sign(&self, state_root: &Self::StateRoot) -> AdapterFuture<Self::Signature>;
+    fn sign(
+        &self,
+        state_root: &<Self::State as State>::StateRoot,
+    ) -> AdapterFuture<<Self::State as State>::Signature>;
 
     /// Verify, based on the signature & state_root, that the signer is the same
     fn verify(
         &self,
         signer: &str,
-        state_root: &Self::StateRoot,
-        signature: &Self::Signature,
+        state_root: &<Self::State as State>::StateRoot,
+        signature: &<Self::State as State>::Signature,
     ) -> AdapterFuture<bool>;
 
     /// Gets authentication for specific validator
@@ -66,9 +71,10 @@ pub trait Adapter: SanityChecker + State {
     fn signable_state_root(
         channel_id: ChannelId,
         balance_root: BalanceRoot,
-    ) -> SignableStateRoot<Self::StateRoot>;
+    ) -> SignableStateRoot<<Self::State as State>::StateRoot>;
 }
 
+#[derive(Clone)]
 pub struct Config {
     pub identity: String,
     pub validators_whitelist: Vec<String>,

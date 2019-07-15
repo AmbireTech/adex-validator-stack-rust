@@ -23,11 +23,16 @@ pub mod repository {
     use domain::{ChannelId, RepositoryFuture};
 
     pub trait MessageRepository<S: State> {
-        fn add(&self, channel_id: ChannelId, message: Message<S>) -> RepositoryFuture<()>;
+        fn add(
+            &self,
+            channel: &ChannelId,
+            validator: &ValidatorId,
+            message: Message<S>,
+        ) -> RepositoryFuture<()>;
 
         fn latest(
             &self,
-            channel_id: &ChannelId,
+            channel: &ChannelId,
             from: &ValidatorId,
             types: Option<&[&MessageType]>,
         ) -> RepositoryFuture<Option<Message<S>>>;

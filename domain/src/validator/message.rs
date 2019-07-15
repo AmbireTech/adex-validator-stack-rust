@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::BalancesMap;
 
-pub trait State {
+pub trait State: Clone {
     type Signature: DeserializeOwned + Serialize + fmt::Display + fmt::Debug + Clone;
     type StateRoot: DeserializeOwned + Serialize + fmt::Display + fmt::Debug + Clone;
 }
@@ -119,7 +119,7 @@ pub mod fixtures {
 
     use super::*;
 
-    #[derive(Serialize, Deserialize, Debug)]
+    #[derive(Serialize, Deserialize, Debug, Clone)]
     pub struct DummyState {}
 
     impl State for DummyState {
