@@ -7,6 +7,7 @@ use adapter::{Adapter, AdapterError, BalanceRoot, ChannelId as AdapterChannelId}
 use domain::validator::message::{Heartbeat, Message, State, TYPE_HEARTBEAT};
 use domain::{Channel, ChannelId, RepositoryError, ValidatorId};
 
+use crate::application::MessagePropagator;
 use crate::domain::MessageRepository;
 
 pub struct HeartbeatFactory<A: Adapter> {
@@ -55,6 +56,7 @@ pub struct HeartbeatSender<A: Adapter> {
     message_repository: Box<dyn MessageRepository<A::State>>,
     adapter: A,
     factory: HeartbeatFactory<A>,
+    propagator: MessagePropagator<A::State>,
     // @TODO: Add config value for Heartbeat send frequency
 }
 
@@ -94,12 +96,13 @@ impl<A: Adapter> HeartbeatSender<A> {
         // call the HeartbeatFactory and create the new Heartbeat
         let heartbeat = await!(self.factory.create(signable_state_root.0))?;
 
-        // @TODO: Issue #93 - this should propagate the message to all validators!
-        // `add()` the heartbeat with the Repository
+        // Propagate the message to all Validators
+        // @TODO: Log errors
         await!(self
-            .message_repository
-            .add(&channel.id, &validator, Message::Heartbeat(heartbeat)))
-        .map_err(HeartbeatError::Repository)
+            .propagator
+            .propagate(&channel, Message::Heartbeat(heartbeat)));
+
+        Ok(())
     }
 
     fn is_heartbeat_time(&self, latest_heartbeat: &Heartbeat<A::State>) -> bool {
