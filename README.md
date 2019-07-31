@@ -7,7 +7,7 @@ Reference implementation of the [AdEx validator stack](https://github.com/adexne
 Components:
 
 * Domain crate
-* Sentry - check the list of [opened issues](https://github.com/AdExNetwork/adex-validator-stack-rust/issues?q=is:open is:issue project:AdExNetwork/adex-validator-stack-rust/1)
+* Sentry - check the list of [opened issues](https://github.com/AdExNetwork/adex-validator-stack-rust/issues?q=is:open+is:issue+project:AdExNetwork/adex-validator-stack-rust/1)
 * Validator worker - The validator worker(`Leader` or `Follower`) that validates/proposes new states.
 * memory-repository - Generic helper crate for creating InMemory repositories for testing.
 * adapter - Adapter trait for `sign`, `verify` and `validate_channel` with Dummy implementation for testing.
