@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 use std::error::Error;
 use std::iter::Sum;
-use std::ops::{Add, Div, Mul, Sub};
+use std::ops::{Add, AddAssign, Div, Mul, Sub};
 use std::str::FromStr;
 
 use num_bigint::BigUint;
@@ -46,6 +46,12 @@ impl Add<&BigNum> for &BigNum {
     fn add(self, rhs: &BigNum) -> Self::Output {
         let big_uint = &self.0 + &rhs.0;
         BigNum(big_uint.to_owned())
+    }
+}
+
+impl AddAssign<&BigNum> for BigNum {
+    fn add_assign(&mut self, rhs: &BigNum) {
+        self.0 += &rhs.0
     }
 }
 
