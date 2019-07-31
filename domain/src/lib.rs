@@ -39,6 +39,7 @@ pub mod fixtures {
 #[derive(Debug)]
 pub enum DomainError {
     InvalidArgument(String),
+    RuleViolation(String),
 }
 
 impl fmt::Display for DomainError {
