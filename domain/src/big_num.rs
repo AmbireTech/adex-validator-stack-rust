@@ -5,10 +5,14 @@ use std::ops::{Add, AddAssign, Div, Mul, Sub};
 use std::str::FromStr;
 
 use num::rational::Ratio;
+use num::Integer;
 use num_bigint::BigUint;
+use num_derive::{Num, NumOps, One, Zero};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, NumOps, One, Zero, Num,
+)]
 pub struct BigNum(
     #[serde(
         deserialize_with = "biguint_from_str",
@@ -23,8 +27,6 @@ impl BigNum {
     }
 
     pub fn div_floor(&self, other: &Self) -> Self {
-        use num::integer::Integer;
-
         Self(self.0.div_floor(&other.0))
     }
 
@@ -40,8 +42,48 @@ impl BigNum {
         self.0.to_u64()
     }
 
-    pub fn ratio(&self, denom: &Self) -> Ratio<BigUint> {
+    pub fn ratio(&self, denom: &Self) -> Ratio<BigNum> {
         Ratio::new(self.0.clone().into(), denom.0.clone().into())
+    }
+}
+
+impl Integer for BigNum {
+    fn div_floor(&self, other: &Self) -> Self {
+        self.0.div_floor(&other.0).into()
+    }
+
+    fn mod_floor(&self, other: &Self) -> Self {
+        self.0.mod_floor(&other.0).into()
+    }
+
+    fn gcd(&self, other: &Self) -> Self {
+        self.0.gcd(&other.0).into()
+    }
+
+    fn lcm(&self, other: &Self) -> Self {
+        self.0.lcm(&other.0).into()
+    }
+
+    fn divides(&self, other: &Self) -> bool {
+        self.0.divides(&other.0)
+    }
+
+    fn is_multiple_of(&self, other: &Self) -> bool {
+        self.0.is_multiple_of(&other.0)
+    }
+
+    fn is_even(&self) -> bool {
+        self.0.is_even()
+    }
+
+    fn is_odd(&self) -> bool {
+        !self.is_even()
+    }
+
+    fn div_rem(&self, other: &Self) -> (Self, Self) {
+        let (quotient, remainder) = self.0.div_rem(&other.0);
+
+        (quotient.into(), remainder.into())
     }
 }
 
@@ -113,29 +155,19 @@ impl<'a> Sum<&'a BigNum> for BigNum {
     }
 }
 
-impl Sum<BigNum> for BigNum {
-    fn sum<I: Iterator<Item = BigNum>>(iter: I) -> Self {
-        let sum_uint = iter.map(|big_num| big_num.0).sum();
+impl Mul<&Ratio<BigNum>> for &BigNum {
+    type Output = BigNum;
 
-        Self(sum_uint)
+    fn mul(self, rhs: &Ratio<BigNum>) -> Self::Output {
+        self / rhs.denom() * rhs.numer()
     }
 }
 
-impl Mul<&Ratio<BigUint>> for &BigNum {
+impl Mul<&Ratio<BigNum>> for BigNum {
     type Output = BigNum;
 
-    fn mul(self, rhs: &Ratio<BigUint>) -> Self::Output {
-        let big_uint: BigUint = &self.0 / rhs.denom() * rhs.numer();
-        BigNum(big_uint)
-    }
-}
-
-impl Mul<&Ratio<BigUint>> for BigNum {
-    type Output = BigNum;
-
-    fn mul(self, rhs: &Ratio<BigUint>) -> Self::Output {
-        let big_uint = &self.0 / rhs.denom() * rhs.numer();
-        BigNum(big_uint.to_owned())
+    fn mul(self, rhs: &Ratio<BigNum>) -> Self::Output {
+        self / rhs.denom() * rhs.numer()
     }
 }
 
@@ -158,7 +190,13 @@ impl ToString for BigNum {
 
 impl From<u64> for BigNum {
     fn from(value: u64) -> Self {
-        BigNum(BigUint::from(value))
+        Self(BigUint::from(value))
+    }
+}
+
+impl From<BigUint> for BigNum {
+    fn from(value: BigUint) -> Self {
+        Self(value)
     }
 }
 

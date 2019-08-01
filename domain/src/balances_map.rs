@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{BigNum, Channel, DomainError, ValidatorDesc};
-use num::{rational::Ratio, BigUint};
+use num::rational::Ratio;
 
 type InnerBTreeMap = BTreeMap<String, BigNum>;
 
@@ -40,7 +40,7 @@ impl BalancesMap {
     fn distribute_fee<'a>(
         mut balances: InnerBTreeMap,
         rounding_error: BigNum,
-        fee_ratio: Ratio<BigUint>,
+        fee_ratio: Ratio<BigNum>,
         validators: impl Iterator<Item = &'a ValidatorDesc>,
     ) -> InnerBTreeMap {
         for (index, validator) in validators.enumerate() {
@@ -75,9 +75,9 @@ struct Distribution {
     /// Deposit - Validators fee
     pub to_distribute: BigNum,
     /// The ratio that is (Deposit - TotalValidatorFee) / Deposit
-    pub ratio: Ratio<BigUint>,
+    pub ratio: Ratio<BigNum>,
     /// Total Distributed / Deposit
-    pub fee_ratio: Ratio<BigUint>,
+    pub fee_ratio: Ratio<BigNum>,
     _secret: (),
 }
 
