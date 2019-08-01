@@ -41,10 +41,6 @@ impl BigNum {
 
         self.0.to_u64()
     }
-
-    pub fn ratio(&self, denom: &Self) -> Ratio<BigNum> {
-        Ratio::new(self.0.clone().into(), denom.0.clone().into())
-    }
 }
 
 impl Integer for BigNum {

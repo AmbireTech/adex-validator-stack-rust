@@ -104,8 +104,8 @@ impl Distribution {
 
         let to_distribute = &deposit - &total_validators_fee;
 
-        let ratio = to_distribute.ratio(&deposit);
-        let fee_ratio = total_distributed.ratio(&deposit);
+        let ratio = Ratio::new(to_distribute.clone(), deposit.clone());
+        let fee_ratio = Ratio::new(total_distributed.clone(), deposit.clone());
 
         Ok(Self {
             deposit,
