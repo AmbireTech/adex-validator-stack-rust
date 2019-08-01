@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{BigNum, Channel, DomainError, ValidatorDesc};
+use num::{rational::Ratio, BigUint};
 
 type InnerBTreeMap = BTreeMap<String, BigNum>;
 
@@ -39,7 +40,7 @@ impl BalancesMap {
     fn distribute_fee<'a>(
         mut balances: InnerBTreeMap,
         rounding_error: BigNum,
-        fee_ratio: BigNum,
+        fee_ratio: Ratio<BigUint>,
         validators: impl Iterator<Item = &'a ValidatorDesc>,
     ) -> InnerBTreeMap {
         for (index, validator) in validators.enumerate() {
@@ -64,6 +65,7 @@ impl BalancesMap {
     }
 }
 
+#[derive(Debug)]
 struct Distribution {
     pub deposit: BigNum,
     /// Total Distributed is the sum of all balances in the BalancesMap
@@ -73,9 +75,9 @@ struct Distribution {
     /// Deposit - Validators fee
     pub to_distribute: BigNum,
     /// The ratio that is (Deposit - TotalValidatorFee) / Deposit
-    pub ratio: BigNum,
+    pub ratio: Ratio<BigUint>,
     /// Total Distributed / Deposit
-    pub fee_ratio: BigNum,
+    pub fee_ratio: Ratio<BigUint>,
     _secret: (),
 }
 
@@ -101,8 +103,9 @@ impl Distribution {
         }
 
         let to_distribute = &deposit - &total_validators_fee;
-        let ratio = &to_distribute / &deposit;
-        let fee_ratio = &total_distributed / &deposit;
+
+        let ratio = to_distribute.ratio(&deposit);
+        let fee_ratio = total_distributed.ratio(&deposit);
 
         Ok(Self {
             deposit,
@@ -209,6 +212,54 @@ mod test {
             channel.deposit_amount = 100_000.into();
 
             channel
+        }
+    }
+
+    mod applying_fee_correctly {
+        use super::*;
+
+        fn setup_balances_after_fee(tree: InnerBTreeMap) -> BalancesMap {
+            let leader = get_validator("one", Some(50.into()));
+            let follower = get_validator("two", Some(50.into()));
+
+            let spec = get_channel_spec(ValidatorsOption::Pair { leader, follower });
+            let mut channel = get_channel("apply fees", &None, Some(spec));
+            channel.deposit_amount = 10_000.into();
+
+            let balances_map = BalancesMap(tree);
+
+            let balances_after_fee = balances_map
+                .apply_fees(&channel)
+                .expect("Calculation of fees failed");
+
+            balances_after_fee
+        }
+
+        #[test]
+        fn case_1_partially_distributed() {
+            let tree = vec![
+                ("a".to_string(), 1000.into()),
+                ("b".to_string(), 1200.into()),
+            ]
+            .into_iter()
+            .collect();
+
+            let expected_tree: InnerBTreeMap = vec![
+                ("a".to_string(), 990.into()),
+                ("b".to_string(), 1188.into()),
+                ("one".to_string(), 11.into()),
+                ("two".into(), 11.into()),
+            ]
+            .into_iter()
+            .collect();
+
+            let balances_after_fee = setup_balances_after_fee(tree).0;
+            let actual_sum: BigNum = balances_after_fee.iter().map(|(_, v)| v).sum();
+
+            assert_eq!(
+                expected_tree.iter().map(|(_, value)| value).sum::<BigNum>(),
+                actual_sum
+            );
         }
     }
 
