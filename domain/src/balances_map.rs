@@ -155,11 +155,10 @@ mod test {
 
         #[test]
         fn case_1_three_values() {
-            // some semi-randomly created trees
             let tree: InnerBTreeMap = vec![
-                ("a".to_string(), BigNum::from(1001)),
-                ("b".to_string(), BigNum::from(3124)),
-                ("c".to_string(), BigNum::from(122)),
+                ("a".to_string(), 1001.into()),
+                ("b".to_string(), 3124.into()),
+                ("c".to_string(), 122.into()),
             ]
             .into_iter()
             .collect();
@@ -169,11 +168,10 @@ mod test {
 
         #[test]
         fn case_2_three_simple_values() {
-            // some semi-randomly created trees
             let tree: InnerBTreeMap = vec![
                 ("a".to_string(), 1.into()),
-                ("b".to_string(), BigNum::from(2)),
-                ("c".to_string(), BigNum::from(3)),
+                ("b".to_string(), 2.into()),
+                ("c".to_string(), 3.into()),
             ]
             .into_iter()
             .collect();
@@ -183,7 +181,6 @@ mod test {
 
         #[test]
         fn case_3_one_value() {
-            // some semi-randomly created trees
             let tree: InnerBTreeMap = vec![("a".to_string(), BigNum::from(1))]
                 .into_iter()
                 .collect();
@@ -193,27 +190,52 @@ mod test {
 
         #[test]
         fn case_4_two_values() {
-            // some semi-randomly created trees
             let tree: InnerBTreeMap = vec![
-                ("a".to_string(), BigNum::from(1)),
-                ("b".to_string(), BigNum::from(99_999)),
+                ("a".to_string(), 1.into()),
+                ("b".to_string(), 99_999.into()),
             ]
             .into_iter()
             .collect();
 
             assert_eq!(setup_balances_map(&tree).0, tree);
         }
+
+        fn get_zero_fee_channel() -> Channel {
+            let leader = get_validator("one", Some(0.into()));
+            let follower = get_validator("two", Some(0.into()));
+
+            let spec = get_channel_spec(ValidatorsOption::Pair { leader, follower });
+            let mut channel = get_channel("zero fees", &None, Some(spec));
+            channel.deposit_amount = 100_000.into();
+
+            channel
+        }
     }
 
-    fn get_zero_fee_channel() -> Channel {
-        let leader = get_validator("one", Some(0.into()));
-        let follower = get_validator("two", Some(0.into()));
+    #[test]
+    fn errors_when_fees_larger_that_deposit() {
+        let tree: InnerBTreeMap = vec![("a".to_string(), 10.into()), ("b".to_string(), 10.into())]
+            .into_iter()
+            .collect();
 
+        let leader = get_validator("one", Some(600.into()));
+        let follower = get_validator("two", Some(600.into()));
         let spec = get_channel_spec(ValidatorsOption::Pair { leader, follower });
         let mut channel = get_channel("zero fees", &None, Some(spec));
-        channel.deposit_amount = 100_000.into();
+        channel.deposit_amount = 1_000.into();
 
-        channel
+        let balances_map = BalancesMap(tree.clone());
+
+        let domain_error = balances_map
+            .apply_fees(&channel)
+            .expect_err("Should be DomainError not allow fees sum to exceed the deposit");
+
+        assert_eq!(
+            DomainError::RuleViolation(
+                "total fees <= deposit: fee constraint violated".to_string()
+            ),
+            domain_error
+        )
     }
 
 }
