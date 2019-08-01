@@ -4,6 +4,7 @@ use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, Mul, Sub};
 use std::str::FromStr;
 
+use num::rational::Ratio;
 use num_bigint::BigUint;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -37,6 +38,10 @@ impl BigNum {
         use num::traits::cast::ToPrimitive;
 
         self.0.to_u64()
+    }
+
+    pub fn ratio(&self, denom: &Self) -> Ratio<BigUint> {
+        Ratio::new(self.0.clone().into(), denom.0.clone().into())
     }
 }
 
@@ -73,7 +78,25 @@ impl Div<&BigNum> for &BigNum {
     }
 }
 
+impl Div<&BigNum> for BigNum {
+    type Output = BigNum;
+
+    fn div(self, rhs: &BigNum) -> Self::Output {
+        let big_uint = &self.0 / &rhs.0;
+        BigNum(big_uint.to_owned())
+    }
+}
+
 impl Mul<&BigNum> for &BigNum {
+    type Output = BigNum;
+
+    fn mul(self, rhs: &BigNum) -> Self::Output {
+        let big_uint = &self.0 * &rhs.0;
+        BigNum(big_uint.to_owned())
+    }
+}
+
+impl Mul<&BigNum> for BigNum {
     type Output = BigNum;
 
     fn mul(self, rhs: &BigNum) -> Self::Output {
@@ -95,6 +118,24 @@ impl Sum<BigNum> for BigNum {
         let sum_uint = iter.map(|big_num| big_num.0).sum();
 
         Self(sum_uint)
+    }
+}
+
+impl Mul<&Ratio<BigUint>> for &BigNum {
+    type Output = BigNum;
+
+    fn mul(self, rhs: &Ratio<BigUint>) -> Self::Output {
+        let big_uint: BigUint = &self.0 / rhs.denom() * rhs.numer();
+        BigNum(big_uint)
+    }
+}
+
+impl Mul<&Ratio<BigUint>> for BigNum {
+    type Output = BigNum;
+
+    fn mul(self, rhs: &Ratio<BigUint>) -> Self::Output {
+        let big_uint = &self.0 / rhs.denom() * rhs.numer();
+        BigNum(big_uint.to_owned())
     }
 }
 
