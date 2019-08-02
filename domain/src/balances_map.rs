@@ -238,15 +238,15 @@ mod test {
         #[test]
         fn case_1_partially_distributed() {
             let tree = vec![
-                ("a".to_string(), 1000.into()),
-                ("b".to_string(), 1200.into()),
+                ("a".to_string(), 1_000.into()),
+                ("b".to_string(), 1_200.into()),
             ]
             .into_iter()
             .collect();
 
             let expected_tree: InnerBTreeMap = vec![
                 ("a".to_string(), 990.into()),
-                ("b".to_string(), 1188.into()),
+                ("b".to_string(), 1_188.into()),
                 ("one".to_string(), 11.into()),
                 ("two".into(), 11.into()),
             ]
@@ -260,6 +260,71 @@ mod test {
                 expected_tree.iter().map(|(_, value)| value).sum::<BigNum>(),
                 actual_sum
             );
+            assert_eq!(expected_tree, balances_after_fee);
+        }
+
+        #[test]
+        fn case_2_partially_distributed_with_validator_in_the_input_tree() {
+            let tree = vec![
+                ("a".to_string(), 100.into()),
+                ("b".to_string(), 2_000.into()),
+                ("one".to_string(), 200.into()),
+            ]
+            .into_iter()
+            .collect();
+
+            let expected_tree: InnerBTreeMap = vec![
+                ("a".to_string(), 99.into()),
+                ("b".to_string(), 1_980.into()),
+                ("one".to_string(), 209.into()),
+                ("two".into(), 11.into()),
+            ]
+            .into_iter()
+            .collect();
+
+            let balances_after_fee = setup_balances_after_fee(tree).0;
+            let actual_sum: BigNum = balances_after_fee.iter().map(|(_, v)| v).sum();
+
+            assert_eq!(
+                expected_tree.iter().map(|(_, value)| value).sum::<BigNum>(),
+                actual_sum
+            );
+            assert_eq!(expected_tree, balances_after_fee);
+        }
+
+        #[test]
+        /// also testing the rounding error correction
+        fn case_3_fully_distributed() {
+            let tree = vec![
+                ("a".to_string(), 105.into()),
+                ("b".to_string(), 195.into()),
+                ("c".to_string(), 700.into()),
+                ("d".to_string(), 5_000.into()),
+                ("e".to_string(), 4_000.into()),
+            ]
+            .into_iter()
+            .collect();
+
+            let expected_tree: InnerBTreeMap = vec![
+                ("a".to_string(), 103.into()),
+                ("b".to_string(), 193.into()),
+                ("c".to_string(), 693.into()),
+                ("d".to_string(), 4_950.into()),
+                ("e".to_string(), 3_960.into()),
+                ("one".to_string(), 51.into()),
+                ("two".to_string(), 50.into()),
+            ]
+            .into_iter()
+            .collect();
+
+            let balances_after_fee = setup_balances_after_fee(tree).0;
+            let actual_sum: BigNum = balances_after_fee.iter().map(|(_, v)| v).sum();
+
+            assert_eq!(
+                expected_tree.iter().map(|(_, value)| value).sum::<BigNum>(),
+                actual_sum
+            );
+            assert_eq!(expected_tree, balances_after_fee);
         }
     }
 
@@ -286,7 +351,7 @@ mod test {
                 "total fees <= deposit: fee constraint violated".to_string()
             ),
             domain_error
-        )
+        );
     }
 
 }
