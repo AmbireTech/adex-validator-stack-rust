@@ -54,7 +54,7 @@ impl BalancesMap {
 
             if fee_rounded > 0.into() {
                 let entry = balances
-                    .entry(validator.id.clone())
+                    .entry(validator.id.clone().into())
                     .or_insert_with(|| 0.into());
 
                 *entry += &fee_rounded;

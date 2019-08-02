@@ -54,13 +54,13 @@ impl ChannelListQuery {
         }
     }
 
-    pub fn validator(&self) -> Option<String> {
-        self.validator.to_owned().and_then(|s| {
+    pub fn validator(&self) -> Option<&str> {
+        self.validator.as_ref().and_then(|s| {
             if s.is_empty() {
                 return None;
             }
 
-            Some(s)
+            Some(s.as_str())
         })
     }
 }

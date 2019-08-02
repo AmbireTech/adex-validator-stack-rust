@@ -49,7 +49,11 @@ pub mod single {
         async fn handle_channel(self, channel: Channel) -> Result<(), ()> {
             let channel_id = channel.id;
 
-            match &channel.spec.validators.find(&self.identity) {
+            // @TODO: Update once we figure out if ValidatorId can fail from a &str
+            let validator_id = ValidatorId::try_from(self.identity.as_str())
+                .expect("ValidatorId doesn't have a failing case right now");
+
+            match &channel.spec.validators.find(&validator_id) {
                 SpecValidator::Leader(_) => {
                     let tick_future = self.leader.tick(channel);
 

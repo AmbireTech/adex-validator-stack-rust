@@ -1,7 +1,8 @@
 use chrono::{DateTime, Utc};
 
-use domain::{Channel, RepositoryFuture};
+use domain::{Channel, RepositoryFuture, ValidatorId};
 use domain::{ChannelId, DomainError};
+use std::convert::TryFrom;
 
 pub struct ChannelListParams {
     /// page to show, should be >= 1
@@ -11,7 +12,7 @@ pub struct ChannelListParams {
     /// filters `valid_until` to be `>= valid_until_ge`
     pub valid_until_ge: DateTime<Utc>,
     /// filters the channels containing a specific validator if provided
-    pub validator: Option<String>,
+    pub validator: Option<ValidatorId>,
     /// Ensures that this struct can only be created by calling `new()`
     _secret: (),
 }
@@ -21,7 +22,7 @@ impl ChannelListParams {
         valid_until_ge: DateTime<Utc>,
         limit: u32,
         page: u64,
-        validator: Option<String>,
+        validator: Option<&str>,
     ) -> Result<Self, DomainError> {
         if page < 1 {
             return Err(DomainError::InvalidArgument(
@@ -35,7 +36,10 @@ impl ChannelListParams {
             ));
         }
 
-        let validator = validator.and_then(|s| if s.is_empty() { None } else { Some(s) });
+        let validator = validator
+            .and_then(|s| if s.is_empty() { None } else { Some(s) })
+            .map(ValidatorId::try_from)
+            .transpose()?;
 
         Ok(Self {
             valid_until_ge,

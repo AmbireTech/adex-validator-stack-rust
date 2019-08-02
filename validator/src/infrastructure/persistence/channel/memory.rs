@@ -24,13 +24,12 @@ impl MemoryChannelRepository {
 
 impl ChannelRepository for MemoryChannelRepository {
     fn all(&self, identity: &ValidatorId) -> RepositoryFuture<Vec<Channel>> {
-        let list =
-            self.inner.list_all(
-                |channel| match channel.spec.validators.find(identity.as_ref()) {
-                    SpecValidator::Leader(_) | SpecValidator::Follower(_) => Some(channel.clone()),
-                    SpecValidator::None => None,
-                },
-            );
+        let list = self
+            .inner
+            .list_all(|channel| match channel.spec.validators.find(identity) {
+                SpecValidator::Leader(_) | SpecValidator::Follower(_) => Some(channel.clone()),
+                SpecValidator::None => None,
+            });
 
         ready(list.map_err(Into::into)).boxed()
     }
