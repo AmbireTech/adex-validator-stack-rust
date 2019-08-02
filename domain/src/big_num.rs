@@ -1,13 +1,18 @@
 use std::convert::TryFrom;
 use std::error::Error;
 use std::iter::Sum;
-use std::ops::{Add, Div, Mul, Sub};
+use std::ops::{Add, AddAssign, Div, Mul, Sub};
 use std::str::FromStr;
 
+use num::rational::Ratio;
+use num::Integer;
 use num_bigint::BigUint;
+use num_derive::{Num, NumOps, One, Zero};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, NumOps, One, Zero, Num,
+)]
 pub struct BigNum(
     #[serde(
         deserialize_with = "biguint_from_str",
@@ -22,8 +27,6 @@ impl BigNum {
     }
 
     pub fn div_floor(&self, other: &Self) -> Self {
-        use num::integer::Integer;
-
         Self(self.0.div_floor(&other.0))
     }
 
@@ -40,12 +43,58 @@ impl BigNum {
     }
 }
 
+impl Integer for BigNum {
+    fn div_floor(&self, other: &Self) -> Self {
+        self.0.div_floor(&other.0).into()
+    }
+
+    fn mod_floor(&self, other: &Self) -> Self {
+        self.0.mod_floor(&other.0).into()
+    }
+
+    fn gcd(&self, other: &Self) -> Self {
+        self.0.gcd(&other.0).into()
+    }
+
+    fn lcm(&self, other: &Self) -> Self {
+        self.0.lcm(&other.0).into()
+    }
+
+    fn divides(&self, other: &Self) -> bool {
+        self.0.divides(&other.0)
+    }
+
+    fn is_multiple_of(&self, other: &Self) -> bool {
+        self.0.is_multiple_of(&other.0)
+    }
+
+    fn is_even(&self) -> bool {
+        self.0.is_even()
+    }
+
+    fn is_odd(&self) -> bool {
+        !self.is_even()
+    }
+
+    fn div_rem(&self, other: &Self) -> (Self, Self) {
+        let (quotient, remainder) = self.0.div_rem(&other.0);
+
+        (quotient.into(), remainder.into())
+    }
+}
+
 impl Add<&BigNum> for &BigNum {
     type Output = BigNum;
 
     fn add(self, rhs: &BigNum) -> Self::Output {
         let big_uint = &self.0 + &rhs.0;
         BigNum(big_uint.to_owned())
+    }
+}
+
+impl AddAssign<&BigNum> for BigNum {
+    fn add_assign(&mut self, rhs: &BigNum) {
+        self.0 += &rhs.0
     }
 }
 
@@ -67,7 +116,25 @@ impl Div<&BigNum> for &BigNum {
     }
 }
 
+impl Div<&BigNum> for BigNum {
+    type Output = BigNum;
+
+    fn div(self, rhs: &BigNum) -> Self::Output {
+        let big_uint = &self.0 / &rhs.0;
+        BigNum(big_uint.to_owned())
+    }
+}
+
 impl Mul<&BigNum> for &BigNum {
+    type Output = BigNum;
+
+    fn mul(self, rhs: &BigNum) -> Self::Output {
+        let big_uint = &self.0 * &rhs.0;
+        BigNum(big_uint.to_owned())
+    }
+}
+
+impl Mul<&BigNum> for BigNum {
     type Output = BigNum;
 
     fn mul(self, rhs: &BigNum) -> Self::Output {
@@ -84,11 +151,21 @@ impl<'a> Sum<&'a BigNum> for BigNum {
     }
 }
 
-impl Sum<BigNum> for BigNum {
-    fn sum<I: Iterator<Item = BigNum>>(iter: I) -> Self {
-        let sum_uint = iter.map(|big_num| big_num.0).sum();
+impl Mul<&Ratio<BigNum>> for &BigNum {
+    type Output = BigNum;
 
-        Self(sum_uint)
+    fn mul(self, rhs: &Ratio<BigNum>) -> Self::Output {
+        // perform multiplication first!
+        (self * rhs.numer()) / rhs.denom()
+    }
+}
+
+impl Mul<&Ratio<BigNum>> for BigNum {
+    type Output = BigNum;
+
+    fn mul(self, rhs: &Ratio<BigNum>) -> Self::Output {
+        // perform multiplication first!
+        (self * rhs.numer()) / rhs.denom()
     }
 }
 
@@ -111,7 +188,13 @@ impl ToString for BigNum {
 
 impl From<u64> for BigNum {
     fn from(value: u64) -> Self {
-        BigNum(BigUint::from(value))
+        Self(BigUint::from(value))
+    }
+}
+
+impl From<BigUint> for BigNum {
+    fn from(value: BigUint) -> Self {
+        Self(value)
     }
 }
 
@@ -128,4 +211,18 @@ where
     S: Serializer,
 {
     serializer.serialize_str(&num.to_str_radix(10))
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn bignum_mul_by_ratio() {
+        let big_num: BigNum = 50.into();
+        let ratio: Ratio<BigNum> = (23.into(), 100.into()).into();
+
+        let expected: BigNum = 11.into();
+        assert_eq!(expected, &big_num * &ratio);
+    }
 }

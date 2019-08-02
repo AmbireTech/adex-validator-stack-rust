@@ -36,9 +36,10 @@ pub mod fixtures {
     pub use super::validator::fixtures::*;
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum DomainError {
     InvalidArgument(String),
+    RuleViolation(String),
 }
 
 impl fmt::Display for DomainError {
