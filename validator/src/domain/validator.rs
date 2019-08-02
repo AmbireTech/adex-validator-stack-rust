@@ -18,15 +18,16 @@ pub trait Validator {
 }
 
 pub mod repository {
-    use domain::validator::message::{MessageType, State};
-    use domain::validator::{Message, ValidatorId};
-    use domain::{ChannelId, RepositoryFuture};
+    use domain::validator::message::{Message, MessageType, State};
+    use domain::{ChannelId, RepositoryFuture, ValidatorDesc, ValidatorId};
 
     pub trait MessageRepository<S: State> {
+        /// Adds a Message to the passed Validator
+        /// Accepts ValidatorDesc instead of ValidatorId, as we need to know the Validator Url as well
         fn add(
             &self,
-            channel: &ChannelId,
-            validator: &ValidatorId,
+            for_channel: &ChannelId,
+            to_validator: &ValidatorDesc,
             message: Message<S>,
         ) -> RepositoryFuture<()>;
 
