@@ -1,9 +1,8 @@
-use std::convert::TryFrom;
 use std::error::Error;
 use std::fmt;
 
 use domain::validator::message::{Message, State};
-use domain::{Channel, RepositoryError, ValidatorId};
+use domain::{Channel, RepositoryError};
 
 use crate::domain::MessageRepository;
 
@@ -55,12 +54,10 @@ impl<S: State> MessagePropagator<S> {
         let mut results = Vec::default();
 
         for validator in channel.spec.validators.into_iter() {
-            // @TODO: Remove once we have ValidatorId in ValidatorDesc
-            let validator_id = ValidatorId::try_from(validator.id.as_str()).unwrap();
             let add_result =
                 await!(self
                     .message_repository
-                    .add(&channel.id, &validator_id, message.clone()))
+                    .add(&channel.id, &validator.id, message.clone()))
                 .map_err(Into::into);
             results.push(add_result);
         }

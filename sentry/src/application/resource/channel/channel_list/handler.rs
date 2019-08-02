@@ -22,10 +22,10 @@ impl ChannelListHandler {
 
 impl ChannelListHandler {
     #[allow(clippy::needless_lifetimes)]
-    pub async fn handle(
-        &self,
+    pub async fn handle<'a>(
+        &'a self,
         page: u64,
-        validator: Option<String>,
+        validator: Option<&'a str>,
     ) -> Result<ChannelListResponse, ()> {
         let channel_list_params =
             ChannelListParams::new(Utc::now(), self.limit_per_page, page, validator)

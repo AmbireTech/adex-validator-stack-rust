@@ -151,8 +151,7 @@ fn listing_channels_can_handles_validator_filtration_and_keeps_valid_until_filtr
 
         let repository = MemoryChannelRepository::new(Some(&channels));
 
-        let params =
-            ChannelListParams::new(valid_until_ge, 10, 1, Some("validator-1".to_string())).unwrap();
+        let params = ChannelListParams::new(valid_until_ge, 10, 1, Some("validator-1")).unwrap();
         let list_channels = await!(repository.list(&params)).expect("Should list all channels");
 
         assert_eq!(1, list_channels.len());

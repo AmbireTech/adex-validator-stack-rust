@@ -3,13 +3,16 @@ use std::{error, fmt};
 use chrono::Utc;
 
 use domain::channel::{SpecValidator, SpecValidators};
-use domain::{Asset, Channel};
+use domain::{Asset, Channel, ValidatorId};
 
 use crate::adapter::Config;
+use std::convert::TryFrom;
 
 pub trait SanityChecker {
     fn check(config: &Config, channel: &Channel) -> Result<(), SanityError> {
-        let adapter_channel_validator = match channel.spec.validators.find(&config.identity) {
+        let identity =
+            ValidatorId::try_from(config.identity.as_str()).expect("Identity failed to be created");
+        let adapter_channel_validator = match channel.spec.validators.find(&identity) {
             // check if the channel validators include our adapter identity
             SpecValidator::None => return Err(SanityError::AdapterNotIncluded),
             SpecValidator::Leader(validator) | SpecValidator::Follower(validator) => validator,
@@ -50,7 +53,8 @@ fn all_validators_listed(validators: &SpecValidators, whitelist: &[String]) -> b
         let found_validators = whitelist
             .iter()
             .filter(|&allowed| {
-                allowed == &validators.leader().id || allowed == &validators.follower().id
+                allowed == validators.leader().id.as_ref()
+                    || allowed == validators.follower().id.as_ref()
             })
             // this will ensure that if we find the 2 validators earlier
             // we don't go over the other values of the whitelist
@@ -131,7 +135,7 @@ mod test {
         let channel = get_channel("channel_1", &Some(passed_valid_until), None);
 
         let identity = channel.spec.validators.leader().id.clone();
-        let config = ConfigBuilder::new(&identity).build();
+        let config = ConfigBuilder::new(identity.as_ref()).build();
 
         assert_eq!(
             Err(SanityError::PassedValidUntil),
@@ -145,17 +149,18 @@ mod test {
 
         // as identity use the leader, otherwise we won't pass the AdapterNotIncluded check
         let identity = channel.spec.validators.leader().id.clone();
-        let config = ConfigBuilder::new(&identity)
+        let config = ConfigBuilder::new(identity.as_ref())
             .set_validators_whitelist(&["my validator"])
             .build();
 
         // make sure we don't use the leader or follower validators as a whitelisted validator
         assert_ne!(
-            &identity, "my validator",
+            identity.as_ref(),
+            "my validator",
             "The whitelisted validator and the leader have the same id"
         );
         assert_ne!(
-            &channel.spec.validators.follower().id,
+            channel.spec.validators.follower().id.as_ref(),
             "my validator",
             "The whitelisted validator and the follower have the same id"
         );
@@ -172,7 +177,7 @@ mod test {
 
         // as identity use the leader, otherwise we won't pass the AdapterNotIncluded check
         let identity = channel.spec.validators.leader().id.clone();
-        let config = ConfigBuilder::new(&identity)
+        let config = ConfigBuilder::new(identity.as_ref())
             .set_creators_whitelist(&["creator"])
             .build();
 
@@ -193,7 +198,7 @@ mod test {
 
         // as identity use the leader, otherwise we won't pass the AdapterNotIncluded check
         let identity = channel.spec.validators.leader().id.clone();
-        let config = ConfigBuilder::new(&identity)
+        let config = ConfigBuilder::new(identity.as_ref())
             .set_assets_whitelist(&["ASSET".into()])
             .build();
 
@@ -215,7 +220,7 @@ mod test {
 
         // as identity use the leader, otherwise we won't pass the AdapterNotIncluded check
         let identity = channel.spec.validators.leader().id.clone();
-        let config = ConfigBuilder::new(&identity)
+        let config = ConfigBuilder::new(identity.as_ref())
             // set the minimum deposit to the `channel.deposit_amount + 1`
             .set_minimum_deposit(&channel.deposit_amount + &1.into())
             .build();
@@ -233,7 +238,7 @@ mod test {
         let leader = channel.spec.validators.leader();
         // as identity use the leader, otherwise we won't pass the AdapterNotIncluded check
         let identity = leader.id.clone();
-        let config = ConfigBuilder::new(&identity)
+        let config = ConfigBuilder::new(identity.as_ref())
             // set the minimum deposit to the `leader.fee + 1`
             .set_minimum_fee(&leader.fee + &1.into())
             .build();

@@ -22,6 +22,12 @@ impl TryFrom<&str> for ValidatorId {
     }
 }
 
+impl Into<String> for ValidatorId {
+    fn into(self) -> String {
+        self.0
+    }
+}
+
 impl AsRef<str> for ValidatorId {
     fn as_ref(&self) -> &str {
         self.0.as_str()
@@ -37,8 +43,7 @@ impl fmt::Display for ValidatorId {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ValidatorDesc {
-    // @TODO: Replace id `String` with `ValidatorId` https://github.com/AdExNetwork/adex-validator-stack-rust/issues/83
-    pub id: String,
+    pub id: ValidatorId,
     pub url: String,
     pub fee: BigNum,
 }
@@ -47,9 +52,9 @@ pub struct ValidatorDesc {
 pub mod fixtures {
     use fake::faker::*;
 
+    use super::{ValidatorDesc, ValidatorId};
     use crate::BigNum;
-
-    use super::ValidatorDesc;
+    use std::convert::TryFrom;
 
     pub fn get_validator<V: AsRef<str>>(validator_id: V, fee: Option<BigNum>) -> ValidatorDesc {
         let fee = fee.unwrap_or_else(|| BigNum::from(<Faker as Number>::between(1, 13)));
@@ -57,9 +62,11 @@ pub mod fixtures {
             "http://{}-validator-url.com/validator",
             validator_id.as_ref()
         );
+        let validator_id =
+            ValidatorId::try_from(validator_id.as_ref()).expect("Creating ValidatorId failed");
 
         ValidatorDesc {
-            id: validator_id.as_ref().to_string(),
+            id: validator_id,
             url,
             fee,
         }

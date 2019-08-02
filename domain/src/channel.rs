@@ -9,7 +9,9 @@ use serde_hex::{SerHex, StrictPfx};
 
 use crate::big_num::BigNum;
 use crate::util::serde::ts_milliseconds_option;
-use crate::{AdUnit, Asset, DomainError, EventSubmission, TargetingTag, ValidatorDesc};
+use crate::{
+    AdUnit, Asset, DomainError, EventSubmission, TargetingTag, ValidatorDesc, ValidatorId,
+};
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Copy, Clone)]
 #[serde(transparent)]
@@ -195,10 +197,10 @@ impl SpecValidators {
         &self.0[1]
     }
 
-    pub fn find(&self, validator_id: &str) -> SpecValidator<'_> {
-        if self.leader().id == validator_id {
+    pub fn find(&self, validator: &ValidatorId) -> SpecValidator<'_> {
+        if &self.leader().id == validator {
             SpecValidator::Leader(&self.leader())
-        } else if self.follower().id == validator_id {
+        } else if &self.follower().id == validator {
             SpecValidator::Follower(&self.follower())
         } else {
             SpecValidator::None
