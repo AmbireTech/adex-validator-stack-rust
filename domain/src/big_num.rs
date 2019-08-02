@@ -155,7 +155,8 @@ impl Mul<&Ratio<BigNum>> for &BigNum {
     type Output = BigNum;
 
     fn mul(self, rhs: &Ratio<BigNum>) -> Self::Output {
-        self / rhs.denom() * rhs.numer()
+        // perform multiplication first!
+        (self * rhs.numer()) / rhs.denom()
     }
 }
 
@@ -163,7 +164,8 @@ impl Mul<&Ratio<BigNum>> for BigNum {
     type Output = BigNum;
 
     fn mul(self, rhs: &Ratio<BigNum>) -> Self::Output {
-        self / rhs.denom() * rhs.numer()
+        // perform multiplication first!
+        (self * rhs.numer()) / rhs.denom()
     }
 }
 
@@ -209,4 +211,18 @@ where
     S: Serializer,
 {
     serializer.serialize_str(&num.to_str_radix(10))
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn bignum_mul_by_ratio() {
+        let big_num: BigNum = 50.into();
+        let ratio: Ratio<BigNum> = (23.into(), 100.into()).into();
+
+        let expected: BigNum = 11.into();
+        assert_eq!(expected, &big_num * &ratio);
+    }
 }
