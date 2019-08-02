@@ -4,7 +4,7 @@ use futures::future::{ready, FutureExt};
 
 use domain::validator::message::{MessageType, State};
 use domain::validator::{Message, ValidatorId};
-use domain::{ChannelId, RepositoryFuture};
+use domain::{ChannelId, RepositoryFuture, ValidatorDesc};
 use memory_repository::MemoryRepository;
 
 use crate::domain::validator::repository::MessageRepository;
@@ -21,6 +21,7 @@ impl State for MemoryState {
 pub struct MemoryMessage {
     pub message: Message<MemoryState>,
     pub channel: ChannelId,
+    /// As we are not dealing with any URL requests here, we can only store and use the ValidatorId
     pub owner: ValidatorId,
 }
 
@@ -41,14 +42,14 @@ impl MemoryMessageRepository {
 impl MessageRepository<MemoryState> for MemoryMessageRepository {
     fn add(
         &self,
-        channel: &ChannelId,
-        validator: &ValidatorId,
+        for_channel: &ChannelId,
+        to_validator: &ValidatorDesc,
         message: Message<MemoryState>,
     ) -> RepositoryFuture<()> {
         let message = MemoryMessage {
             message,
-            channel: *channel,
-            owner: validator.clone(),
+            channel: *for_channel,
+            owner: to_validator.id.clone(),
         };
         // this should never match against the new record, that's why always pass false.
         ready(self.inner.add(&false, message).map_err(Into::into)).boxed()
@@ -92,6 +93,7 @@ mod test {
     use domain::validator::message::fixtures::{get_heartbeat, get_reject_state};
 
     use super::*;
+    use domain::validator::fixtures::get_validator;
     use domain::validator::message::TYPE_REJECT;
 
     fn get_reject_memory_message(
@@ -109,7 +111,7 @@ mod test {
     #[test]
     fn adds_message_for_validator() {
         futures::executor::block_on(async {
-            let validator = ValidatorId::try_from("identity").expect("ValidatorId failed");
+            let validator = get_validator("identity", None);
             let repo = MemoryMessageRepository::new(&[]);
 
             let message = get_reject_state(None);
@@ -124,7 +126,7 @@ mod test {
                 .expect("Listing all Messages failed");
 
             assert_eq!(1, list_all.len());
-            assert_eq!(validator, list_all[0].owner);
+            assert_eq!(validator.id, list_all[0].owner);
             assert_eq!(channel_id, list_all[0].channel);
         })
     }
@@ -132,7 +134,7 @@ mod test {
     #[test]
     fn getting_latest_message() {
         futures::executor::block_on(async {
-            let validator = ValidatorId::try_from("identity").expect("ValidatorId failed");
+            let validator = get_validator("identity", None);
             let channel = get_channel_id("channel id");
 
             let repo = MemoryMessageRepository::new(&[]);
@@ -145,7 +147,7 @@ mod test {
             let new_message = Message::RejectState(get_reject_state(Some("my reason".to_string())));
             await!(repo.add(&channel, &validator, new_message)).expect("Adding a message failed");
 
-            let latest_any = await!(repo.latest(&channel, &validator, None))
+            let latest_any = await!(repo.latest(&channel, &validator.id, None))
                 .expect("Getting latest Message failed");
 
             match latest_any.expect("There was no latest message returned") {

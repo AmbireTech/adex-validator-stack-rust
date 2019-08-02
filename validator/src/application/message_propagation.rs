@@ -57,7 +57,7 @@ impl<S: State> MessagePropagator<S> {
             let add_result =
                 await!(self
                     .message_repository
-                    .add(&channel.id, &validator.id, message.clone()))
+                    .add(&channel.id, &validator, message.clone()))
                 .map_err(Into::into);
             results.push(add_result);
         }
@@ -75,7 +75,7 @@ mod test {
     use domain::channel::fixtures::get_channel;
     use domain::validator::message::fixtures::{get_reject_state, DummyState};
     use domain::validator::message::{Message, MessageType};
-    use domain::{ChannelId, ValidatorId};
+    use domain::{ChannelId, ValidatorDesc, ValidatorId};
     use domain::{RepositoryError, RepositoryFuture};
 
     use crate::application::MessagePropagator;
@@ -95,7 +95,7 @@ mod test {
         fn add(
             &self,
             _channel: &ChannelId,
-            _validator: &ValidatorId,
+            _validator: &ValidatorDesc,
             _message: Message<DummyState>,
         ) -> RepositoryFuture<()> {
             let result = self
