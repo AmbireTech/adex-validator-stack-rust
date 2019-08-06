@@ -6,6 +6,6 @@ members = [
     "sentry",
     "validator",
     "memory-repository",
-    "store",
     "validatorWorker",
+    "primitives"
 ]

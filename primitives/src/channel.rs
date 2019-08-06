@@ -11,6 +11,52 @@ use crate::big_num::BigNum;
 use crate::util::serde::ts_milliseconds_option;
 use crate::{AdUnit, Asset, DomainError, EventSubmission, TargetingTag, ValidatorDesc};
 
+
+pub struct ChannelListParams {
+    /// page to show, should be >= 1
+    pub page: u64,
+    /// channels limit per page, should be >= 1
+    pub limit: u32,
+    /// filters `valid_until` to be `>= valid_until_ge`
+    pub valid_until_ge: DateTime<Utc>,
+    /// filters the channels containing a specific validator if provided
+    pub validator: Option<String>,
+    /// Ensures that this struct can only be created by calling `new()`
+    _secret: (),
+}
+
+impl ChannelListParams {
+    pub fn new(
+        valid_until_ge: Option<DateTime<Utc>>,
+        limit: Option<u64>,
+        _page: Option<u64>,
+        validator: Option<String>,
+    ) -> Result<Self, DomainError> {
+        if page < 1 {
+            return Err(DomainError::InvalidArgument(
+                "Page should be >= 1".to_string(),
+            ));
+        }
+
+        if limit < 1 {
+            return Err(DomainError::InvalidArgument(
+                "Limit should be >= 1".to_string(),
+            ));
+        }
+        let page = _page.and_then(|s| if s.is_empty() { None } else { Some(s) });
+        let validator = validator.and_then(|s| if s.is_empty() { None } else { Some(s) });
+
+        Ok(Self {
+            valid_until_ge,
+            page,
+            limit,
+            validator,
+            _secret: (),
+        })
+    }
+}
+
+
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Copy, Clone)]
 #[serde(transparent)]
 pub struct ChannelId {

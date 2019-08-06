@@ -18,9 +18,9 @@ pub struct ChannelListParams {
 
 impl ChannelListParams {
     pub fn new(
-        valid_until_ge: DateTime<Utc>,
-        limit: u32,
-        page: u64,
+        valid_until_ge: Option<DateTime<Utc>>,
+        limit: Option<u64>,
+        page: Option<u64>,
         validator: Option<String>,
     ) -> Result<Self, DomainError> {
         if page < 1 {
@@ -34,7 +34,7 @@ impl ChannelListParams {
                 "Limit should be >= 1".to_string(),
             ));
         }
-
+        let page = 
         let validator = validator.and_then(|s| if s.is_empty() { None } else { Some(s) });
 
         Ok(Self {
