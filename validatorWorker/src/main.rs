@@ -32,6 +32,12 @@ lazy_static! {
     };
 }
 
+struct Config {
+    pub validation_tick_timeout: Duration,
+    pub ticks_wait_time: Duration,
+    pub sentry_url: String,
+}
+
 fn main() {
     use adapter::dummy::DummyAdapter;
     use adapter::ConfigBuilder;
@@ -127,10 +133,4 @@ fn run(is_single_tick: bool, adapter: impl Adapter) {
                 .compat(),
         );
     }
-}
-
-struct Config {
-    pub validation_tick_timeout: Duration,
-    pub ticks_wait_time: Duration,
-    pub sentry_url: String,
 }

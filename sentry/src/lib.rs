@@ -1,6 +1,7 @@
-#![feature(async_await, await_macro)]
-#![deny(rust_2018_idioms)]
-#![deny(clippy::all)]
-pub mod application;
-pub mod domain;
-pub mod infrastructure;
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn it_works() {
+        assert_eq!(2 + 2, 4);
+    }
+}
