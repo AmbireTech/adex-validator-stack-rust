@@ -15,12 +15,12 @@ pub enum Event {
     #[serde(rename_all = "camelCase")]
     UpdateImpressionPrice {
         publisher: String,
-        price: u64,
+        price: BigNum,
         ad_unit: AdUnit,
     },
     #[serde(rename_all = "camelCase")]
     ImpressionWithCommission {
-        earner: Vec<Earner>,
+        earners: Vec<Earner>,
         ad_unit: AdUnit,
     },
     #[serde(rename_all = "camelCase")]
@@ -35,6 +35,7 @@ pub enum Event {
 
 #[derive(Serialize, Deserialize)]
 pub struct Earner {
-    publisher: String,
+    #[serde(rename = "publisher")]
+    address: String,
     promilles: u64,
 }
