@@ -1,7 +1,7 @@
 [package]
-name = "domain"
+name = "primitives"
 version = "0.1.0"
-authors = ["Lachezar Lechev <lachezar@adex.network>"]
+authors = ["Lachezar Lechev <lachezar@adex.network>, Omidiora Samuel <sam@adex.network>"]
 edition = "2018"
 
 [features]

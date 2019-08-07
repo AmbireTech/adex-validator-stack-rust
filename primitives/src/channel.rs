@@ -1,90 +1,24 @@
 use std::convert::TryFrom;
 use std::fmt;
-
+//
 use chrono::serde::{ts_milliseconds, ts_seconds};
 use chrono::{DateTime, Utc};
 use hex::FromHex;
 use serde::{Deserialize, Serialize};
 use serde_hex::{SerHex, StrictPfx};
-
+//
 use crate::big_num::BigNum;
 use crate::util::serde::ts_milliseconds_option;
-use crate::{AdUnit, Asset, DomainError, EventSubmission, TargetingTag, ValidatorDesc};
-
-
-pub struct ChannelListParams {
-    /// page to show, should be >= 1
-    pub page: u64,
-    /// channels limit per page, should be >= 1
-    pub limit: u32,
-    /// filters `valid_until` to be `>= valid_until_ge`
-    pub valid_until_ge: DateTime<Utc>,
-    /// filters the channels containing a specific validator if provided
-    pub validator: Option<String>,
-    /// Ensures that this struct can only be created by calling `new()`
-    _secret: (),
-}
-
-impl ChannelListParams {
-    pub fn new(
-        valid_until_ge: Option<DateTime<Utc>>,
-        limit: Option<u64>,
-        _page: Option<u64>,
-        validator: Option<String>,
-    ) -> Result<Self, DomainError> {
-        if page < 1 {
-            return Err(DomainError::InvalidArgument(
-                "Page should be >= 1".to_string(),
-            ));
-        }
-
-        if limit < 1 {
-            return Err(DomainError::InvalidArgument(
-                "Limit should be >= 1".to_string(),
-            ));
-        }
-        let page = _page.and_then(|s| if s.is_empty() { None } else { Some(s) });
-        let validator = validator.and_then(|s| if s.is_empty() { None } else { Some(s) });
-
-        Ok(Self {
-            valid_until_ge,
-            page,
-            limit,
-            validator,
-            _secret: (),
-        })
-    }
-}
-
+//AdUnit, Asset, DomainError, EventSubmission, TargetingTag,
+use crate::{ValidatorDesc};
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Copy, Clone)]
-#[serde(transparent)]
-pub struct ChannelId {
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub bytes: [u8; 32],
-}
-
-impl fmt::Display for ChannelId {
-    /// Converts a ChannelId to hex string with prefix
-    ///
-    /// Example:
-    /// ```
-    /// use domain::ChannelId;
-    ///
-    /// let hex_string = "0x061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088";
-    /// let channel_id = ChannelId::try_from_hex(&hex_string).expect("Should be a valid hex string already");
-    /// let channel_hex_string = format!("{}", channel_id);
-    /// assert_eq!("0x061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088", &channel_hex_string);
-    /// ```
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let hex_string = SerHex::<StrictPfx>::into_hex(&self.bytes).unwrap();
-        write!(f, "{}", hex_string)
-    }
-}
+pub struct ChannelId(pub String);
 
 impl TryFrom<&str> for ChannelId {
     type Error = DomainError;
-
+    /// @TODO Fix this example
+    ///
     /// Tries to create a ChannelId from &str, which should be 32 bytes length.
     ///
     /// Example:
@@ -98,58 +32,16 @@ impl TryFrom<&str> for ChannelId {
     /// assert_eq!(ChannelId { bytes }, ChannelId::try_from("12345678901234567890123456789012").unwrap())
     /// ```
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let bytes = value.as_bytes();
-        if bytes.len() != 32 {
-            return Err(DomainError::InvalidArgument(
-                "The value of the id should have exactly 32 bytes".to_string(),
-            ));
-        }
-        let mut id = [0; 32];
-        id.copy_from_slice(&bytes[..32]);
-
-        Ok(Self { bytes: id })
-    }
-}
-
-impl ChannelId {
-    /// Creates a ChannelId from a string hex with or without `0x` prefix.
-    /// The bytes should be 32 after decoding.
-    ///
-    /// Example:
-    ///
-    /// ```
-    /// use domain::ChannelId;
-    ///
-    /// let hex_string = "0x061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088";
-    ///
-    /// let from_hex = domain::ChannelId::try_from_hex(hex_string).expect("This should be valid hex string");
-    ///
-    /// let expected_channel_id = ChannelId{ bytes: [6, 29, 94, 42, 103, 208, 169, 161, 15, 28, 115, 43, 202, 18, 166, 118, 216, 63, 121, 102, 58, 57, 111, 125, 135, 179, 227, 11, 155, 65, 16, 136]};
-    /// assert_eq!(expected_channel_id, from_hex)
-    /// ```
-    pub fn try_from_hex(hex: &str) -> Result<Self, DomainError> {
-        let s = hex.trim_start_matches("0x");
-
-        let bytes: Vec<u8> =
-            Vec::from_hex(s).map_err(|err| DomainError::InvalidArgument(err.to_string()))?;
-        if bytes.len() != 32 {
-            return Err(DomainError::InvalidArgument(
-                "The value of the id should have exactly 32 bytes".to_string(),
-            ));
-        }
-
-        let mut id = [0; 32];
-        id.copy_from_slice(&bytes[..32]);
-
-        Ok(Self { bytes: id })
+       Ok(())
     }
 }
 
 impl PartialEq<ChannelId> for &str {
     fn eq(&self, channel_id: &ChannelId) -> bool {
-        self.as_bytes() == channel_id.bytes
+        self.0 == channel_id.0
     }
 }
+
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -162,7 +54,7 @@ pub struct Channel {
     pub valid_until: DateTime<Utc>,
     pub spec: ChannelSpec,
 }
-
+//
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ChannelSpec {
@@ -187,9 +79,9 @@ pub struct ChannelSpec {
     /// A millisecond timestamp representing the time you want this campaign to become active (optional)
     /// Used by the AdViewManager
     #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "ts_milliseconds_option"
+    default,
+    skip_serializing_if = "Option::is_none",
+    with = "ts_milliseconds_option"
     )]
     pub active_from: Option<DateTime<Utc>>,
     /// A random number to ensure the campaignSpec hash is unique
@@ -204,6 +96,10 @@ pub struct ChannelSpec {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ad_units: Vec<AdUnit>,
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(transparent)]
+pub struct SpecValidators([ValidatorDesc; 2]);
 
 pub enum SpecValidator<'a> {
     Leader(&'a ValidatorDesc),
@@ -223,10 +119,6 @@ impl<'a> SpecValidator<'a> {
         !self.is_some()
     }
 }
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(transparent)]
-pub struct SpecValidators([ValidatorDesc; 2]);
 
 impl SpecValidators {
     pub fn new(leader: ValidatorDesc, follower: ValidatorDesc) -> Self {
@@ -267,10 +159,154 @@ impl<'a> IntoIterator for &'a SpecValidators {
     }
 }
 
-#[cfg(any(test, feature = "fixtures"))]
-#[path = "./channel_fixtures.rs"]
-pub mod fixtures;
+//impl AsRef<[String]> for ChannelId {
+//    fn as_ref(&self) -> &[str] {
+//        &self.0
+//    }
+//}
 
-#[cfg(test)]
-#[path = "./channel_test.rs"]
-mod test;
+//
+//
+pub struct ChannelListParams {
+    /// page to show, should be >= 1
+    pub page: u64,
+    /// channels limit per page, should be >= 1
+    pub limit: u32,
+    /// filters `valid_until` to be `>= valid_until_ge`
+    pub valid_until_ge: DateTime<Utc>,
+    /// filters the channels containing a specific validator if provided
+    pub validator: Option<String>,
+    /// Ensures that this struct can only be created by calling `new()`
+    _secret: (),
+}
+
+impl ChannelListParams {
+    pub fn new(
+        valid_until_ge: DateTime<Utc>,
+        limit: u64,
+        page: u64,
+        validator: String,
+    ) -> Result<Self, Error> {
+        Ok(())
+//        if page < 1 {
+//            return Err(DomainError::InvalidArgument(
+//                "Page should be >= 1".to_string(),
+//            ));
+//        }
+//
+//        if limit < 1 {
+//            return Err(DomainError::InvalidArgument(
+//                "Limit should be >= 1".to_string(),
+//            ));
+//        }
+////        let page = _page.and_then(|s| if s.is_empty() { None } else { Some(s) });
+//        let validator = validator.and_then(|s| if s.is_empty() { None } else { Some(s) });
+//
+//        Ok(Self {
+//            valid_until_ge,
+//            page,
+//            limit,
+//            validator,
+//            _secret: (),
+//        })
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum ChannelError {
+    /// When the Adapter address is not listed in the `channel.spec.validators`
+    /// which in terms means, that the adapter shouldn't handle this Channel
+    AdapterNotIncluded,
+    /// when `channel.valid_until` has passed (< now), the channel should be handled
+    PassedValidUntil,
+    UnlistedValidator,
+    UnlistedCreator,
+    UnlistedAsset,
+    MinimumDepositNotMet,
+    MinimumValidatorFeeNotMet,
+}
+
+impl fmt::Display for ChannelError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Channel error",)
+    }
+}
+
+impl error::Error for ChannelError {
+    fn cause(&self) -> Option<&dyn error::Error> {
+        None
+    }
+}
+//
+//
+//#[serde(transparent)]
+//pub struct ChannelId {
+//    #[serde(with = "SerHex::<StrictPfx>")]
+//    pub bytes: [u8; 32],
+//}
+//
+//impl fmt::Display for ChannelId {
+//    /// Converts a ChannelId to hex string with prefix
+//    ///
+//    /// Example:
+//    /// ```
+//    /// use domain::ChannelId;
+//    ///
+//    /// let hex_string = "0x061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088";
+//    /// let channel_id = ChannelId::try_from_hex(&hex_string).expect("Should be a valid hex string already");
+//    /// let channel_hex_string = format!("{}", channel_id);
+//    /// assert_eq!("0x061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088", &channel_hex_string);
+//    /// ```
+//    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//        let hex_string = SerHex::<StrictPfx>::into_hex(&self.bytes).unwrap();
+//        write!(f, "{}", hex_string)
+//    }
+//}
+//
+
+//
+//impl ChannelId {
+//    /// Creates a ChannelId from a string hex with or without `0x` prefix.
+//    /// The bytes should be 32 after decoding.
+//    ///
+//    /// Example:
+//    ///
+//    /// ```
+//    /// use domain::ChannelId;
+//    ///
+//    /// let hex_string = "0x061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088";
+//    ///
+//    /// let from_hex = domain::ChannelId::try_from_hex(hex_string).expect("This should be valid hex string");
+//    ///
+//    /// let expected_channel_id = ChannelId{ bytes: [6, 29, 94, 42, 103, 208, 169, 161, 15, 28, 115, 43, 202, 18, 166, 118, 216, 63, 121, 102, 58, 57, 111, 125, 135, 179, 227, 11, 155, 65, 16, 136]};
+//    /// assert_eq!(expected_channel_id, from_hex)
+//    /// ```
+//    pub fn try_from_hex(hex: &str) -> Result<Self, DomainError> {
+//        let s = hex.trim_start_matches("0x");
+//
+//        let bytes: Vec<u8> =
+//            Vec::from_hex(s).map_err(|err| DomainError::InvalidArgument(err.to_string()))?;
+//        if bytes.len() != 32 {
+//            return Err(DomainError::InvalidArgument(
+//                "The value of the id should have exactly 32 bytes".to_string(),
+//            ));
+//        }
+//
+//        let mut id = [0; 32];
+//        id.copy_from_slice(&bytes[..32]);
+//
+//        Ok(Self { bytes: id })
+//    }
+//}
+//
+
+
+//
+//
+//#[cfg(any(test, feature = "fixtures"))]
+//#[path = "./channel_fixtures.rs"]
+//pub mod fixtures;
+//
+//#[cfg(test)]
+//#[path = "./channel_test.rs"]
+//mod test;
