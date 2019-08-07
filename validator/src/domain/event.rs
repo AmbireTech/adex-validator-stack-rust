@@ -14,23 +14,19 @@ pub enum Event {
     },
     #[serde(rename_all = "camelCase")]
     UpdateImpressionPrice {
-        publisher: String,
         price: BigNum,
-        ad_unit: AdUnit,
     },
     #[serde(rename_all = "camelCase")]
     ImpressionWithCommission {
         earners: Vec<Earner>,
-        ad_unit: AdUnit,
     },
     #[serde(rename_all = "camelCase")]
     Pay {
         outputs: HashMap<String, BigNum>,
-        ad_unit: AdUnit,
     },
-    PauseChannel {},
+    PauseChannel,
     #[serde(skip_deserializing)]
-    Close {},
+    Close,
 }
 
 #[derive(Serialize, Deserialize)]
