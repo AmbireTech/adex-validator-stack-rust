@@ -8,24 +8,18 @@ use domain::{AdUnit, BigNum};
 #[derive(Serialize, Deserialize)]
 pub enum Event {
     #[serde(rename_all = "camelCase")]
-    Impression {
-        publisher: String,
-        ad_unit: AdUnit,
-    },
+    Impression { publisher: String, ad_unit: AdUnit },
     #[serde(rename_all = "camelCase")]
-    UpdateImpressionPrice {
-        price: BigNum,
-    },
+    ImpressionWithCommission { earners: Vec<Earner> },
+    /// only the creator can send this event
     #[serde(rename_all = "camelCase")]
-    ImpressionWithCommission {
-        earners: Vec<Earner>,
-    },
+    UpdateImpressionPrice { price: BigNum },
+    /// only the creator can send this event
     #[serde(rename_all = "camelCase")]
-    Pay {
-        outputs: HashMap<String, BigNum>,
-    },
+    Pay { outputs: HashMap<String, BigNum> },
+    /// only the creator can send this event
     PauseChannel,
-    #[serde(skip_deserializing)]
+    /// only the creator can send this event
     Close,
 }
 
