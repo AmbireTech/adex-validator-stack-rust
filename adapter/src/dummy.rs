@@ -1,9 +1,4 @@
 use hex::encode;
-
-//use crate::adapter::{
-//    Adapter, AdapterError, AdapterFuture, BalanceRoot, ChannelId, Config, SignableStateRoot,
-//};
-//
 use futures::future::{err, ok, FutureExt};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -12,9 +7,7 @@ use std::fmt;
 use primitives::channel_validator::{ChannelValidator};
 use primitives::adapter::{Adapter, AdapterFuture, DummyAdapterOptions};
 use primitives::config::{Config};
-//
-//use domain::validator::message::State;
-//
+
 #[derive(Debug)]
 pub struct DummyParticipant {
     pub identity: String,

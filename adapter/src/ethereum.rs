@@ -10,6 +10,8 @@ use std::fs;
 
 use futures::future::{err, ok, FutureExt};
 use serde::{Deserialize, Serialize};
+use web3::futures::Future;
+use web3::types::{Address, U256};
 
 use primitives::channel_validator::{ChannelValidator};
 use primitives::adapter::{Adapter, AdapterFuture, EthereumAdapterOptions};
@@ -28,8 +30,7 @@ pub struct EthereumAdapter {
     keystorePwd: String,
     authTokens: HashMap<String, String>,
     verifiedAuth:  HashMap<String, String>,
-//    wallet:
-//    provider:
+    wallet: Option<Address>
 }
 
 // Enables DummyAdapter to be able to
@@ -41,11 +42,17 @@ impl Adapter for DummyAdapter {
         // check if file exists
         let contents = fs::read_to_string(opts.keystoreFile)
             .expect("keystoreFile required");
-
+        EthereumAdapter {
+            keystoreJson: contents,
+            keystorePwd: opts.keystorePwd,
+            authTokens: HashMap::new(),
+            verifiedAuth: HashMap::new(),
+            wallet: None
+        }
 
     }
 
-    fn unlock() -> Self {
+    fn unlock(&self) -> Self {
 
     }
 }
