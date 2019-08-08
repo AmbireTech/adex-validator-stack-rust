@@ -4,11 +4,6 @@ use chrono::Utc;
 use crate::config::Config;
 use crate::channel::{ Channel, ChannelError, SpecValidator, SpecValidators };
 
-//
-//use domain::channel::{SpecValidator, SpecValidators};
-//use domain::{Asset, Channel};
-//
-
 
 pub trait ChannelValidator {
      fn is_channel_valid(config: &Config, channel: &Channel) -> Result<(), ChannelError> {

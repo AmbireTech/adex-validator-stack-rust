@@ -16,8 +16,26 @@ pub struct BigNum(
     BigUint,
 );
 
+#[derive(Debug, PartialEq)]
+pub enum BigNumError {
+    InvalidArgument(String),
+    RuleViolation(String),
+}
+
+impl fmt::Display for DomainError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Domain error",)
+    }
+}
+
+impl error::Error for DomainError {
+    fn cause(&self) -> Option<&dyn error::Error> {
+        None
+    }
+}
+
 impl BigNum {
-    pub fn new(num: BigUint) -> Result<Self, super::DomainError> {
+    pub fn new(num: BigUint) -> Result<Self, Error> {
         Ok(Self(num))
     }
 
