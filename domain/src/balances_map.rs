@@ -63,6 +63,10 @@ impl BalancesMap {
 
         balances
     }
+
+    pub fn sum(&self) -> BigNum {
+        self.0.iter().map(|(_, value)| value).sum()
+    }
 }
 
 #[derive(Debug)]
