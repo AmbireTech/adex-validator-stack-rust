@@ -1,3 +1,9 @@
+
+pub Sentry {
+    // database to be intialised
+    
+}
+
 #[cfg(test)]
 mod tests {
     #[test]

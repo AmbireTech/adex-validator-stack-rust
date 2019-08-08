@@ -8,11 +8,6 @@ use primitives::channel_validator::{ChannelValidator};
 use primitives::adapter::{Adapter, AdapterFuture, DummyAdapterOptions};
 use primitives::config::{Config};
 
-#[derive(Debug)]
-pub struct DummyParticipant {
-    pub identity: String,
-    pub token: String,
-}
 
 pub struct DummyAdapter {
     identity: String,
