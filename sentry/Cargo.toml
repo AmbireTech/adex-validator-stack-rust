@@ -8,3 +8,9 @@ edition = "2018"
 
 [dependencies]
 primitives = {path = "../primitives"}
+# CLI
+clap = "2.33.0"
+# Logger
+slog = { version = "^2.2.3" , features = ["max_level_trace"] }
+slog-term = "^2.4.0"
+slog-async = "^2.3.0"

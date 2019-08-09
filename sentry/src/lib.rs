@@ -1,7 +1,7 @@
 
-pub Sentry {
+pub Application {
     // database to be intialised
-    
+    logger
 }
 
 #[cfg(test)]

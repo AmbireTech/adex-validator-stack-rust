@@ -1,9 +1,8 @@
 use std::pin::Pin;
-
 use futures::{Future, FutureExt};
 use std::collections::HashMap;
 // use domain::validator::message::State;
-use crate::{ BigNum, Channel};
+use crate::{ BigNum, Channel };
 //
 //use crate::sanity::SanityChecker;
 use std::error::Error;

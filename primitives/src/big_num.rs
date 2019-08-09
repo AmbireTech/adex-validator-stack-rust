@@ -3,9 +3,7 @@ use std::error::Error;
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, Mul, Sub};
 use std::str::FromStr;
-
-use num::rational::Ratio;
-use num::Integer;
+use std::fmt;
 use num_bigint::BigUint;
 use num_derive::{Num, NumOps, One, Zero};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -27,20 +25,20 @@ pub enum BigNumError {
     RuleViolation(String),
 }
 
-impl fmt::Display for DomainError {
+impl fmt::Display for BigNumError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Domain error",)
     }
 }
 
-impl error::Error for DomainError {
-    fn cause(&self) -> Option<&dyn error::Error> {
+impl Error for BigNumError {
+    fn cause(&self) -> Option<&dyn Error> {
         None
     }
 }
 
 impl BigNum {
-    pub fn new(num: BigUint) -> Result<Self, Error> {
+    pub fn new(num: BigUint) -> Result<Self, BigNumError> {
         Ok(Self(num))
     }
 
@@ -188,11 +186,11 @@ impl Mul<&Ratio<BigNum>> for BigNum {
 }
 
 impl TryFrom<&str> for BigNum {
-    type Error = super::DomainError;
+    type Error = BigNumError;
 
     fn try_from(num: &str) -> Result<Self, Self::Error> {
         let big_uint = BigUint::from_str(&num)
-            .map_err(|err| super::DomainError::InvalidArgument(err.description().to_string()))?;
+            .map_err(|err| BigNumError::InvalidArgument(err.description().to_string()))?;
 
         Ok(Self(big_uint))
     }

@@ -8,5 +8,7 @@
 //
 //mod adapter;
 //#[cfg(any(test, feature = "dummy-adapter"))]
-//pub mod dummy;
+pub mod dummy;
+pub mod ethereum;
+
 //mod sanity;
