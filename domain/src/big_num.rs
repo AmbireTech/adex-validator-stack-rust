@@ -5,8 +5,7 @@ use std::ops::{Add, AddAssign, Div, Mul, Sub};
 use std::str::FromStr;
 
 use num::rational::Ratio;
-use num::Integer;
-use num_bigint::BigUint;
+use num::{BigUint, CheckedSub, Integer};
 use num_derive::{Num, NumOps, One, Zero};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -148,6 +147,12 @@ impl<'a> Sum<&'a BigNum> for BigNum {
         let sum_uint = iter.map(|big_num| &big_num.0).sum();
 
         Self(sum_uint)
+    }
+}
+
+impl CheckedSub for BigNum {
+    fn checked_sub(&self, v: &Self) -> Option<Self> {
+        self.0.checked_sub(&v.0).map(|big_uint| Self(big_uint))
     }
 }
 
