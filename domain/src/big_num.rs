@@ -152,7 +152,7 @@ impl<'a> Sum<&'a BigNum> for BigNum {
 
 impl CheckedSub for BigNum {
     fn checked_sub(&self, v: &Self) -> Option<Self> {
-        self.0.checked_sub(&v.0).map(|big_uint| Self(big_uint))
+        self.0.checked_sub(&v.0).map(Self)
     }
 }
 

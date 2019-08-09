@@ -14,7 +14,8 @@ pub enum Event {
     #[serde(rename_all = "camelCase")]
     Impression {
         publisher: String,
-        ad_unit: AdUnit,
+        // clippy warning for big size difference, because of field
+        ad_unit: Box<AdUnit>,
     },
     ImpressionWithCommission {
         earners: Vec<Earner>,
@@ -55,6 +56,7 @@ pub struct AggregateEvents {
     pub event_payouts: HashMap<String, BigNum>,
 }
 
+#[allow(dead_code)]
 fn merge_aggrs(
     accounting: &Accounting,
     aggregates: &[EventAggregate],
@@ -109,7 +111,9 @@ fn merge_payouts_into_balances<'a, T: Iterator<Item = &'a AggregateEvents>>(
     for (acc, payout) in all_payouts {
         let to_add = payout.min(&remaining);
 
-        let new_balance = new_balances.entry(acc.to_owned()).or_insert(0.into());
+        let new_balance = new_balances
+            .entry(acc.to_owned())
+            .or_insert_with(|| 0.into());
 
         *new_balance += &to_add;
 
