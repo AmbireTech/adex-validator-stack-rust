@@ -6,6 +6,7 @@ use std::fmt;
 pub mod big_num;
 pub mod config;
 pub mod adapter;
+pub mod channel;
 pub mod channel_validator;
 
 //#[cfg(any(test, feature = "fixtures"))]
@@ -16,7 +17,7 @@ pub mod channel_validator;
 //pub use self::balances_map::BalancesMap;
 pub use self::big_num::BigNum;
 pub use self::config::Config;
-//pub use self::channel::{Channel, ChannelId, ChannelSpec, SpecValidator, SpecValidators};
+pub use self::channel::{Channel, ChannelId, ChannelSpec, SpecValidator, SpecValidators};
 //pub use self::event_submission::EventSubmission;
 //#[cfg(feature = "repositories")]
 //pub use self::repository::*;
