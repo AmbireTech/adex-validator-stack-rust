@@ -25,7 +25,7 @@ pub trait ChannelValidator {
             return Err(ChannelError::UnlistedCreator);
         }
 
-        if !asset_listed(&channel, &config.assets_whitelist) {
+        if !asset_listed(&channel, &config.token_address_whitelist) {
             return Err(ChannelError::UnlistedAsset);
         }
 

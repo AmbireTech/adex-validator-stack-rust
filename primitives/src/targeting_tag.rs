@@ -14,9 +14,9 @@ pub struct Score(#[serde(deserialize_with = "score_deserialize")] u8);
 impl Score {
     /// score should be between 0 and 100
     #[allow(dead_code)]
-    fn new(score: u8) -> Result<Self, dyn Error> {
+    fn new(score: u8) -> Result<Self, Box<dyn Error>> {
         if score > 100 {
-            return Err("score should be between 0 >= x <= 100".to_string());
+            return Err("score should be between 0 >= x <= 100".into());
         }
 
         Ok(Self(score))

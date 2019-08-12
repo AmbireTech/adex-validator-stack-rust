@@ -3,16 +3,16 @@ use futures::future::{err, ok, FutureExt};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
-
+use primitives::{Channel};
 use primitives::channel_validator::{ChannelValidator};
-use primitives::adapter::{Adapter, AdapterFuture, DummyAdapterOptions};
+use primitives::adapter::{Adapter, AdapterFuture, AdapterOptions};
 use primitives::config::{Config};
 
 
 pub struct DummyAdapter {
     identity: String,
-    authTokens: HashMap<String, String>,
-    verifiedAuth:  HashMap<String, String>
+    auth_tokens: HashMap<String, String>,
+    verified_auth:  HashMap<String, String>
 }
 
 // Enables DummyAdapter to be able to
@@ -21,33 +21,37 @@ impl ChannelValidator for DummyAdapter {}
 
 impl Adapter for DummyAdapter {
 
-    fn init(self, opts: &DummyAdapterOptions, config: &Config) -> Self {
-        self.identity = opts.dummyIdentity;
-        self.auth = opts.auth;
-        self.authTokens = opts.authTokens;
+    fn init(self, opts: &AdapterOptions, config: &Config) -> Self {
+        // opts.dummy_identity.expect("dummyIdentity required");
+        // opts.dummy_auth.expect("dummy auth required");
+        // opts.dummy_auth_tokens.expect("dummy auth tokens required");
+        // self.identity = opts.dummy_identity.unwrap();
+        // self.authTokens = opts.dummy_auth.unwrap();
+        // self.verifiedAuth = opts.dummy_auth_tokens.unwrap();
         self
     }
 
-    fn unlock(self) -> Self {
-        self
+    fn unlock(&self) -> AdapterFuture<bool> {
+        ok(true).boxed()
     }
 
-    fn whoami(&self) -> &str {
-        self.identity
+    fn whoami(&self) -> String {
+        self.identity.to_string()
     }
 
-    fn sign(&self, stateRoot: &str) -> AdapterFuture<String> {
+    fn sign(&self, state_root: String) -> AdapterFuture<String> {
         let signature = format!(
             "Dummy adapter signature for {} by {}",
-            state_root.to_hex(),
+            state_root,
             self.whoami()
         );
-        ok(signature.into()).boxed()
+        ok(signature).boxed()
     }
 
     fn verify(
         &self,
         signer: &str,
+        state_root: &str,
         signature: &str,
     ) -> AdapterFuture<bool> {
         // select the `identity` and compare it to the signer
@@ -61,28 +65,36 @@ impl Adapter for DummyAdapter {
     }
 
     fn validate_channel(&self, channel: &Channel) -> AdapterFuture<bool> {
-        unimplemented!()
+        // @TODO
+        ok(true).boxed()
     }
 
-    fn session_from_token() -> AdapterFuture<String> {
-        unimplemented!()
+    fn session_from_token(&self, token: &str) -> AdapterFuture<String> {
+        // @TODO
+        ok("hello".to_string()).boxed()
     }
 
     fn get_auth(&self, validator: &str) -> AdapterFuture<String> {
-        let participant = self
-            .participants
-            .iter()
-            .find(|&(_, participant)| participant.identity == validator);
-        let future = match participant {
-            Some((_, participant)) => ok(participant.token.to_string()),
-            None => err(AdapterError::Authentication(
-                "Identity not found".to_string(),
-            )),
-        };
-
-        future.boxed()
+        // let participant = self
+        //     .participants
+        //     .iter()
+        //     .find(|&(_, participant)| participant.identity == validator);
+        // let future = match participant {
+        //     Some((_, participant)) => ok(participant.token.to_string()),
+        //     None => err(AdapterError::Authentication(
+        //         "Identity not found".to_string(),
+        //     )),
+        // };
+       ok("auth".to_string()).boxed()
     }
 
+    fn signable_state_root(
+        channel_id: &str,
+        balance_root: &str,
+    ) -> String {
+        // @TODO
+        "Signed".to_string()
+    }
 
 }
 
