@@ -3,6 +3,66 @@ use serde::{Deserialize, Serialize};
 
 use crate::BigNum;
 
+pub const DEVELOPMENT_CONFIG: &str = r#"
+        MAX_CHANNELS = 512
+        CHANNELS_FIND_LIMIT = 200
+        WAIT_TIME = 500
+
+        AGGR_THROTTLE = 0
+        EVENTS_FIND_LIMIT = 100
+        MSGS_FIND_LIMIT = 10
+
+        HEARTBEAT_TIME = 30000
+        HEALTH_THRESHOLD_PROMILLES = 950
+        PROPAGATION_TIMEOUT = 1000
+
+        LIST_TIMEOUT = 5000
+        FETCH_TIMEOUT = 5000
+        VALIDATOR_TICK_TIMEOUT = 5000
+
+        [ratelimit]
+        IP_RATE_LIMIT = { type = "ip", timeframe = 20000 }
+        SID_RATE_LIMIT = { type = 'sid', timeframe = 20000 }
+
+        [ethereum]
+        ETHEREUM_CORE_ADDR = '0x333420fc6a897356e69b62417cd17ff012177d2b'
+        ETHEREUM_NETWORK = 'goerli'
+    "#;
+
+pub const PRODUCTION_CONFIG: &str = r#"
+    # Maximum number of channels to return per request
+    MAX_CHANNELS = 512
+    
+    CHANNELS_FIND_LIMIT = 512
+    WAIT_TIME = 500
+
+    AGGR_THROTTLE = 5000
+    EVENTS_FIND_LIMIT = 100
+    MSGS_FIND_LIMIT = 10
+
+    HEARTBEAT_TIME = 60000
+    HEALTH_THRESHOLD_PROMILLES = 970
+    PROPAGATION_TIMEOUT = 3000
+
+    LIST_TIMEOUT = 10000
+    FETCH_TIMEOUT = 10000
+    VALIDATOR_TICK_TIMEOUT = 10000
+
+    [ratelimit]
+    IP_RATE_LIMIT = { type = "ip", timeframe = 20000 }
+
+    [ethereum]
+    ETHEREUM_CORE_ADDR = '0x333420fc6a897356e69b62417cd17ff012177d2b'
+    ETHEREUM_NETWORK = 'homestead'
+    TOKEN_ADDRESS_WHITELIST = ['0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359']
+
+    [validator]
+    CREATORS_WHITELIST = []
+    MINIMAL_DEPOSIT = 0
+    MINIMAL_FEE = 0
+    VALIDATORS_WHITELIST = []
+    "#;
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct RateLimit {
@@ -38,7 +98,6 @@ pub struct Config {
     pub ethereum_network: String,
     pub validators_whitelist: Vec<String>,
 }
-
 
 // use primitives::Config;
 

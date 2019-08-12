@@ -88,14 +88,6 @@ impl Adapter for DummyAdapter {
        ok("auth".to_string()).boxed()
     }
 
-    fn signable_state_root(
-        channel_id: &str,
-        balance_root: &str,
-    ) -> String {
-        // @TODO
-        "Signed".to_string()
-    }
-
 }
 
 //
