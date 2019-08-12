@@ -3,5 +3,6 @@
 #![deny(clippy::all)]
 #![allow(clippy::needless_lifetimes)]
 pub mod application;
+pub mod core;
 pub mod domain;
 pub mod infrastructure;
