@@ -11,4 +11,13 @@
 pub mod dummy;
 pub mod ethereum;
 
-//mod sanity;
+pub fn signable_state_root(
+        channel_id: &str,
+        balance_root: &str,
+) -> String {
+        // @TODO
+        "Signed".to_string()
+    
+}
+
+// fn get_balance_leaf()

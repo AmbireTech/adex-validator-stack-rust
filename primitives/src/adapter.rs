@@ -66,14 +66,6 @@ pub trait Adapter {
 
     /// Gets authentication for specific validator
     fn get_auth(&self, validator: &str) -> AdapterFuture<String>;
-
-    //   @TODO
-    // fn get_balance_leaf()
-
-    fn signable_state_root(
-        channel_id: &str,
-        balance_root: &str,
-    ) -> String;
 }
 
 //

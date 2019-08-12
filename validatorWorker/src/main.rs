@@ -3,7 +3,7 @@
 #![deny(clippy::all)]
 
 use std::time::Duration;
-use self::Config;
+use primitives::config::{PRODUCTION_CONFIG};
 
 // use adapter::Adapter;
 use lazy_static::lazy_static;

@@ -12,8 +12,8 @@ path = "src/lib.rs"
 
 [dependencies]
 # Primitve
-primitives = { version = "0.1", path = "../primitives", features = ["repositories", "fixtures"] }
-adapter = { version = "0.1", path = "../adapter", features = ["dummy-adapter"] }
+primitives = { path = "../primitives" }
+adapter = { version = "0.1", path = "../adapter" }
 chrono = { version = "0.4", features = ["serde"] }
 # Futures
 futures-preview = { version = "=0.3.0-alpha.16", features = ["compat", "io-compat"] }
