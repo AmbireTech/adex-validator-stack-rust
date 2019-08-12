@@ -24,7 +24,6 @@ pub trait Validator {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ValidatorDesc {
-    // @TODO: Replace id `String` with `ValidatorId` https://github.com/AdExNetwork/adex-validator-stack-rust/issues/83
     pub id: String,
     pub url: String,
     pub fee: BigNum,

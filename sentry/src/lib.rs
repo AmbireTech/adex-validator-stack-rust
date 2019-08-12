@@ -1,9 +1,18 @@
+#[macro_use()]
+use slog::{crit, debug, info, o, Drain};
 
-pub Application {
+pub Application<T: Adapter, S: Storage> {
     // database to be intialised
-    logger
+    storage: S,
+    adapter: T,
+    logger: slog::Logger,
 }
 
+impl Application {
+    fn new() -> Self {
+
+    }
+}
 #[cfg(test)]
 mod tests {
     #[test]

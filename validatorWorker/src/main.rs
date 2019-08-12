@@ -3,8 +3,9 @@
 #![deny(clippy::all)]
 
 use std::time::Duration;
+use self::Config;
 
-use adapter::Adapter;
+// use adapter::Adapter;
 use lazy_static::lazy_static;
 
 lazy_static! {
@@ -32,11 +33,6 @@ lazy_static! {
     };
 }
 
-struct Config {
-    pub validation_tick_timeout: Duration,
-    pub ticks_wait_time: Duration,
-    pub sentry_url: String,
-}
 
 fn main() {
     use adapter::dummy::DummyAdapter;

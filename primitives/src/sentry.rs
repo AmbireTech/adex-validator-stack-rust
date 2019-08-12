@@ -1,3 +1,3 @@
 trait Sentry {
-    fn
+    // fn
 }
