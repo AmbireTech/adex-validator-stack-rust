@@ -1,9 +1,22 @@
 use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
 
 use crate::BigNum;
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct RateLimit {
+    /// "ip", "uid"
+    #[serde(rename = "type")]
+    pub limit_type: String,
+    /// in milliseconds
+    #[serde(rename = "timeframe")]
+    pub time_frame: u64,
+}
+
 #[derive(Debug, Clone)]
 pub struct Config {
+    pub identity: String, // should not be hear maybe?
     pub max_channels: u32,
     pub wait_time: u32,
     pub aggr_throttle: u32,
@@ -15,8 +28,8 @@ pub struct Config {
     pub fetch_timeout: u32,
     pub list_timeout: u32,
     pub validator_tick: u32,
-    pub ip_rate_limit: Vec<String>, // change
-    pub sid_rate_limt: Vec<String>,
+    pub ip_rate_limit: Vec<RateLimit>, // HashMap??
+    pub sid_rate_limt: Vec<RateLimit>, // HashMap ??
     pub creators_whitelist: Vec<String>,
     pub minimal_deposit: BigNum,
     pub minimal_fee: BigNum,

@@ -2,28 +2,12 @@ use std::pin::Pin;
 use futures::{Future, FutureExt};
 use std::collections::HashMap;
 // use domain::validator::message::State;
-use crate::{ Channel };
+use crate::{ Channel, Config };
 //
 //use crate::sanity::SanityChecker;
 use std::error::Error;
 use std::fmt;
-//
-//pub struct ChannelId(pub [u8; 32]);
-//impl AsRef<[u8]> for ChannelId {
-//    fn as_ref(&self) -> &[u8] {
-//        &self.0
-//    }
-//}
-//
-//pub struct BalanceRoot(pub [u8; 32]);
-//impl AsRef<[u8]> for BalanceRoot {
-//    fn as_ref(&self) -> &[u8] {
-//        &self.0
-//    }
-//}
-//
-//pub struct SignableStateRoot<T: fmt::Display>(pub T);
-//
+
 pub type AdapterFuture<T> = Pin<Box<dyn Future<Output = Result<T, AdapterError>> + Send>>;
 
 #[derive(Debug, Eq, PartialEq)]
@@ -42,27 +26,23 @@ impl fmt::Display for AdapterError {
 }
 
 #[derive(Debug, Clone)]
-pub struct DummyAdapterOptions {
-    pub dummyIdentity: String,
-    pub authTokens: HashMap<String, String>,
-    pub verifiedAuth: HashMap<String, String>
-}
-
-#[derive(Debug, Clone)]
-pub struct EthereumAdapterOptions {
-    pub keystoreFile: String,
-    pub keystorePwd: String,
+pub struct AdapterOptions {
+    pub dummy_identity: Option<String>,
+    pub dummy_auth: Option<HashMap<String, String>>,
+    pub dummy_auth_tokens: Option<HashMap<String, String>>,
+    pub keystore_file: Option<String>,
+    pub keystore_pwd: Option<String>,
 }
 
 pub trait Adapter {
     /// Initialize adapter
-    fn init(&self) -> Self;
+    fn init(self, opts: &AdapterOptions, config: &Config) -> Self;
 
     /// Unlock adapter
-    fn unlock(&self) -> Self;
+    fn unlock(&self) -> AdapterFuture<bool>;
 
     /// Get Adapter whoami
-    fn whoami(&self) -> &str;
+    fn whoami(&self) -> String;
 
     /// Signs the provided state_root
     fn sign(
@@ -82,7 +62,7 @@ pub trait Adapter {
     fn validate_channel(&self, channel: &Channel) -> AdapterFuture<bool>;
 
     /// Get user session from token
-    fn session_from_token(&self, token: &str) -> String;
+    fn session_from_token(&self, token: &str) ->  AdapterFuture<String>;
 
     /// Gets authentication for specific validator
     fn get_auth(&self, validator: &str) -> AdapterFuture<String>;
@@ -95,3 +75,21 @@ pub trait Adapter {
         balance_root: &str,
     ) -> String;
 }
+
+//
+//pub struct ChannelId(pub [u8; 32]);
+//impl AsRef<[u8]> for ChannelId {
+//    fn as_ref(&self) -> &[u8] {
+//        &self.0
+//    }
+//}
+//
+//pub struct BalanceRoot(pub [u8; 32]);
+//impl AsRef<[u8]> for BalanceRoot {
+//    fn as_ref(&self) -> &[u8] {
+//        &self.0
+//    }
+//}
+//
+//pub struct SignableStateRoot<T: fmt::Display>(pub T);
+//

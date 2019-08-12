@@ -227,9 +227,9 @@ pub struct ChannelListParams {
 impl ChannelListParams {
     pub fn new(
         valid_until_ge: DateTime<Utc>,
-        limit: u64,
+        limit: u32,
         page: u64,
-        validator: String,
+        validator: Option<&str>,
     ) -> Result<Self, ChannelError> {
        if page < 1 {
            return Err(ChannelError::InvalidArgument(
@@ -242,9 +242,8 @@ impl ChannelListParams {
                "Limit should be >= 1".to_string(),
            ));
        }
-       let page = _page.and_then(|s| if s.is_empty() { None } else { Some(s) });
-       let validator = validator.and_then(|s| if s.is_empty() { None } else { Some(s) });
 
+       let validator = validator.and_then(|s| if s.is_empty() { None } else { Some(s.into()) });
        Ok(Self {
            valid_until_ge,
            page,
@@ -257,6 +256,7 @@ impl ChannelListParams {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ChannelError {
+    InvalidArgument(String),
     /// When the Adapter address is not listed in the `channel.spec.validators`
     /// which in terms means, that the adapter shouldn't handle this Channel
     AdapterNotIncluded,
