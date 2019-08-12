@@ -11,3 +11,13 @@ pub struct Config {
     pub minimal_deposit: BigNum,
     pub minimal_fee: BigNum,
 }
+
+impl Default for Config {
+    fn default(identity: &str) -> Self {
+        Self {
+            identity: identity.to_owned(),
+            validators_whitelist: vec![],
+            creators_whitelist: vec![],
+        }
+    }
+}
