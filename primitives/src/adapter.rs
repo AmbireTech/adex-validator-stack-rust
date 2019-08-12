@@ -2,7 +2,7 @@ use std::pin::Pin;
 use futures::{Future, FutureExt};
 use std::collections::HashMap;
 // use domain::validator::message::State;
-use crate::{ BigNum, Channel };
+use crate::{ Channel };
 //
 //use crate::sanity::SanityChecker;
 use std::error::Error;
@@ -91,7 +91,7 @@ pub trait Adapter {
     // fn get_balance_leaf()
 
     fn signable_state_root(
-        channel_id: ChannelId,
-        balance_root: BalanceRoot,
+        channel_id: &str,
+        balance_root: &str,
     ) -> String;
 }

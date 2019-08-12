@@ -42,31 +42,37 @@ pub mod config;
 pub mod adapter;
 pub mod channel;
 pub mod channel_validator;
+<<<<<<< HEAD
 >>>>>>> 6e6e18a... add: ethereum adapter
+=======
+pub mod util;
+pub mod validator;
+pub mod targeting_tag;
+pub mod event_submission;
+pub mod ad_unit;
+>>>>>>> b9035f5... add: more properties to config struct
 
 //#[cfg(any(test, feature = "fixtures"))]
 //pub use util::tests as test_util;
 //
-//pub use self::ad_unit::AdUnit;
 //pub use self::asset::Asset;
 //pub use self::balances_map::BalancesMap;
+pub use self::ad_unit::AdUnit;
 pub use self::big_num::BigNum;
 pub use self::config::Config;
-pub use self::channel::{Channel, ChannelId, ChannelSpec, SpecValidator, SpecValidators};
-//pub use self::event_submission::EventSubmission;
+pub use self::channel::{Channel, ChannelSpec, SpecValidator, SpecValidators};
+pub use self::validator::{ValidatorDesc};
+pub use self::event_submission::EventSubmission;
 //#[cfg(feature = "repositories")]
 //pub use self::repository::*;
-//pub use self::targeting_tag::TargetingTag;
+pub use self::targeting_tag::TargetingTag;
 ////pub use self::validator::{ValidatorDesc, ValidatorId};
 //
-//pub mod ad_unit;
 //pub mod asset;
 //pub mod balances_map;
 
 //pub mod channel;
-//pub mod event_submission;
 //pub mod targeting_tag;
-//pub mod util;
 //pub mod validator;
 //
 ///// re-exports all the fixtures in one module
@@ -78,22 +84,22 @@ pub use self::channel::{Channel, ChannelId, ChannelSpec, SpecValidator, SpecVali
 ////    pub use super::validator::fixtures::*;
 //}
 //
-//#[derive(Debug)]
-//pub enum DomainError {
-//    InvalidArgument(String),
-//}
-//
-//impl fmt::Display for DomainError {
-//    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//        write!(f, "Domain error",)
-//    }
-//}
-//
-//impl error::Error for DomainError {
-//    fn cause(&self) -> Option<&dyn error::Error> {
-//        None
-//    }
-//}
+#[derive(Debug)]
+pub enum DomainError {
+   InvalidArgument(String),
+}
+
+impl fmt::Display for DomainError {
+   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+       write!(f, "Domain error",)
+   }
+}
+
+impl error::Error for DomainError {
+   fn cause(&self) -> Option<&dyn error::Error> {
+       None
+   }
+}
 //
 //#[cfg(feature = "repositories")]
 //pub mod repository {

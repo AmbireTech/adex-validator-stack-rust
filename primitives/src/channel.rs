@@ -9,10 +9,6 @@ use serde_hex::{SerHex, StrictPfx};
 //
 use crate::big_num::BigNum;
 use crate::util::serde::ts_milliseconds_option;
-<<<<<<< HEAD
-use crate::{
-    AdUnit, Asset, DomainError, EventSubmission, TargetingTag, ValidatorDesc, ValidatorId,
-};
 
 
 pub struct ChannelListParams {
@@ -59,48 +55,44 @@ impl ChannelListParams {
     }
 }
 
-=======
-//AdUnit, Asset, DomainError, EventSubmission, TargetingTag,
-use crate::{ValidatorDesc};
->>>>>>> 6e6e18a... add: ethereum adapter
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Copy, Clone)]
-pub struct ChannelId(pub String);
+// #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Copy, Clone)]
+// pub struct ChannelId(pub String);
 
-impl TryFrom<&str> for ChannelId {
-    type Error = DomainError;
-    /// @TODO Fix this example
-    ///
-    /// Tries to create a ChannelId from &str, which should be 32 bytes length.
-    ///
-    /// Example:
-    ///
-    /// ```
-    /// use std::convert::TryFrom;
-    /// use domain::channel::ChannelId;
-    ///
-    /// let bytes: [u8; 32] = *b"12345678901234567890123456789012";
-    ///
-    /// assert_eq!(ChannelId { bytes }, ChannelId::try_from("12345678901234567890123456789012").unwrap())
-    /// ```
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-       Ok(())
-    }
-}
+// impl TryFrom<&str> for ChannelId {
+//     type Error = DomainError;
+//     /// @TODO Fix this example
+//     ///
+//     /// Tries to create a ChannelId from &str, which should be 32 bytes length.
+//     ///
+//     /// Example:
+//     ///
+//     /// ```
+//     /// use std::convert::TryFrom;
+//     /// use domain::channel::ChannelId;
+//     ///
+//     /// let bytes: [u8; 32] = *b"12345678901234567890123456789012";
+//     ///
+//     /// assert_eq!(ChannelId { bytes }, ChannelId::try_from("12345678901234567890123456789012").unwrap())
+//     /// ```
+//     fn try_from(value: &str) -> Result<Self, Self::Error> {
+//        Ok(())
+//     }
+// }
 
-impl PartialEq<ChannelId> for &str {
-    fn eq(&self, channel_id: &ChannelId) -> bool {
-        self.0 == channel_id.0
-    }
-}
+// impl PartialEq<ChannelId> for &str {
+//     fn eq(&self, channel_id: &ChannelId) -> bool {
+//         self.0 == channel_id.0
+//     }
+// }
 
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Channel {
-    pub id: ChannelId,
+    pub id: String,
     pub creator: String,
-    pub deposit_asset: Asset,
+    pub deposit_asset: String,
     pub deposit_amount: BigNum,
     #[serde(with = "ts_seconds")]
     pub valid_until: DateTime<Utc>,
@@ -238,29 +230,28 @@ impl ChannelListParams {
         limit: u64,
         page: u64,
         validator: String,
-    ) -> Result<Self, Error> {
-        Ok(())
-//        if page < 1 {
-//            return Err(DomainError::InvalidArgument(
-//                "Page should be >= 1".to_string(),
-//            ));
-//        }
-//
-//        if limit < 1 {
-//            return Err(DomainError::InvalidArgument(
-//                "Limit should be >= 1".to_string(),
-//            ));
-//        }
-////        let page = _page.and_then(|s| if s.is_empty() { None } else { Some(s) });
-//        let validator = validator.and_then(|s| if s.is_empty() { None } else { Some(s) });
-//
-//        Ok(Self {
-//            valid_until_ge,
-//            page,
-//            limit,
-//            validator,
-//            _secret: (),
-//        })
+    ) -> Result<Self, ChannelError> {
+       if page < 1 {
+           return Err(ChannelError::InvalidArgument(
+               "Page should be >= 1".to_string(),
+           ));
+       }
+
+       if limit < 1 {
+           return Err(ChannelError::InvalidArgument(
+               "Limit should be >= 1".to_string(),
+           ));
+       }
+       let page = _page.and_then(|s| if s.is_empty() { None } else { Some(s) });
+       let validator = validator.and_then(|s| if s.is_empty() { None } else { Some(s) });
+
+       Ok(Self {
+           valid_until_ge,
+           page,
+           limit,
+           validator,
+           _secret: (),
+       })
     }
 }
 
@@ -284,8 +275,8 @@ impl fmt::Display for ChannelError {
     }
 }
 
-impl error::Error for ChannelError {
-    fn cause(&self) -> Option<&dyn error::Error> {
+impl Error for ChannelError {
+    fn cause(&self) -> Option<&dyn Error> {
         None
     }
 }

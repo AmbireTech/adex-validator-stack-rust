@@ -9,7 +9,7 @@ pub trait ChannelValidator {
      fn is_channel_valid(config: &Config, channel: &Channel) -> Result<(), ChannelError> {
         let adapter_channel_validator = match channel.spec.validators.find(&config.identity) {
             // check if the channel validators include our adapter identity
-            SpecValidator::None => return Err(SanityError::AdapterNotIncluded),
+            SpecValidator::None => return Err(ChannelError::AdapterNotIncluded),
             SpecValidator::Leader(validator) | SpecValidator::Follower(validator) => validator,
         };
 
