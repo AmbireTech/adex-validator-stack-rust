@@ -44,7 +44,7 @@ impl<S: State> Message<S> {
 #[derive(Debug, PartialEq, Eq)]
 pub struct MessageType(&'static str);
 
-pub const TYPE_APPROVE: MessageType = MessageType("approve");
+pub const TYPE_APPROVE:   = MessageType("approve");
 pub const TYPE_NEW: MessageType = MessageType("new");
 pub const TYPE_REJECT: MessageType = MessageType("reject");
 pub const TYPE_HEARTBEAT: MessageType = MessageType("heartbeat");

@@ -34,6 +34,13 @@ pub struct AdapterOptions {
     pub keystore_pwd: Option<String>,
 }
 
+impl AdapterOptions {
+    fn new() -> Self {
+    }
+
+    
+}
+
 pub trait Adapter : Sized {
 
     type Output;
