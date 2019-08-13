@@ -9,20 +9,18 @@ use serde::Deserialize;
 use std::iter::once;
 
 
-pub trait SentryInterface {
-    fn propagate() -> bool;
-    fn get_latest_msg -> None;
-    fn get_our_latest_msg -> None;
-    fn get_last_approve -> None;
-    fn get_last_msgs ->None;
-    fn get_event_aggrs -> None;
-}
-
 #[derive(Clone)]
 // @TODO: make pub(crate)
 pub struct SentryApi {
     pub sentry_url: String,
     pub client: Client,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct ChannelAllResponse {
+    pub channels: Vec<Channel>,
+    pub total_pages: u64,
 }
 
 impl SentryApi {
@@ -86,11 +84,4 @@ impl SentryApi {
 
         await!(future.compat())
     }
-}
-
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct ChannelAllResponse {
-    pub channels: Vec<Channel>,
-    pub total_pages: u64,
 }
