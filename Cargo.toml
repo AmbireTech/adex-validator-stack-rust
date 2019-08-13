@@ -3,6 +3,6 @@
 members = [
     "adapter",
     "primitives",
-    "sentry",
-    "validatorWorker",
+     "validatorWorker",
+         # "sentry",
 ]

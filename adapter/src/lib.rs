@@ -11,6 +11,9 @@
 pub mod dummy;
 pub mod ethereum;
 
+pub use self::dummy::DummyAdapter;
+pub use self::ethereum::EthereumAdapter;
+
 pub fn signable_state_root(
         channel_id: &str,
         balance_root: &str,

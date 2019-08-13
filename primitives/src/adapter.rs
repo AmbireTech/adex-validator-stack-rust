@@ -1,5 +1,5 @@
 use std::pin::Pin;
-use futures::{Future, FutureExt};
+use futures::prelude::*;
 use std::collections::HashMap;
 // use domain::validator::message::State;
 use crate::{ Channel, Config };
@@ -34,9 +34,12 @@ pub struct AdapterOptions {
     pub keystore_pwd: Option<String>,
 }
 
-pub trait Adapter {
+pub trait Adapter : Sized {
+
+    type Output;
+
     /// Initialize adapter
-    fn init(self, opts: &AdapterOptions, config: &Config) -> Self;
+    fn init(opts: AdapterOptions, config: &Config) -> Self::Output;
 
     /// Unlock adapter
     fn unlock(&self) -> AdapterFuture<bool>;

@@ -74,7 +74,7 @@ pub struct RateLimit {
     pub time_frame: u64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
     pub identity: String, // should not be hear maybe?
     pub max_channels: u32,

@@ -4,7 +4,7 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 use crate::{ BigNum };
 use std::pin::Pin;
-use futures::Future;
+use futures::prelude::*;
 use crate::Channel;
 
 pub type ValidatorFuture<T> = Pin<Box<dyn Future<Output = Result<T, ValidatorError>> + Send>>;
