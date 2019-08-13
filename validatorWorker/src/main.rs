@@ -3,130 +3,145 @@
 #![deny(clippy::all)]
 
 use std::time::Duration;
-use primitives::config::{PRODUCTION_CONFIG};
-
-// use adapter::Adapter;
 use lazy_static::lazy_static;
-
-lazy_static! {
-    static ref CONFIG: Config = {
-        dotenv::dotenv().ok();
-
-        let ticks_wait_time = std::env::var("VALIDATOR_TICKS_WAIT_TIME")
-            .unwrap()
-            .parse()
-            .unwrap();
-
-        let validation_tick_timeout = std::env::var("VALIDATOR_VALIDATION_TICK_TIMEOUT")
-            .unwrap()
-            .parse()
-            .unwrap();
-
-        Config {
-            validation_tick_timeout: Duration::from_millis(validation_tick_timeout),
-            ticks_wait_time: Duration::from_millis(ticks_wait_time),
-            sentry_url: std::env::var("VALIDATOR_SENTRY_URL")
-                .unwrap()
-                .parse()
-                .unwrap(),
-        }
-    };
-}
-
+use adapter::{DummyAdapter, EthereumAdapter};
+use primitives::{ Config};
+use primitives::adapter::{Adapter, AdapterOptions};
+use clap::{App, Arg};
+use std::collections::HashMap;
+use crate::{configuration};
 
 fn main() {
-    use adapter::dummy::DummyAdapter;
-    use adapter::ConfigBuilder;
-    use clap::{App, Arg, SubCommand};
-    use std::collections::HashMap;
-
-    let matches = App::new("Validator worker")
-        .version("0.2")
+    let cli = App::new("Validator worker")
+        .version("0.1")
         .arg(
-            Arg::with_name("single-tick")
-                .short("s")
-                .help("Runs the validator in single-tick mode"),
+            Arg::with_name("config")
+                .help("the config file for the validator worker")
+                .takes_value(true),
         )
-        .subcommand(
-            SubCommand::with_name("dummy")
-                .about("Runs the validator with the Dummy adapter")
-                .arg(
-                    Arg::with_name("IDENTITY")
-                        .help("The dummy identity to be used for the validator")
-                        .required(true)
-                        .index(1),
-                ),
+        .arg(
+            Arg::with_name("adapter")
+                .short("a")
+                .help("the adapter for authentication and signing")
+                .required(true)
+                .default_value("ethereum")
+                .possible_values(&["ethereum", "dummy"])
+                .takes_value(true),
+        )
+         .arg(
+            Arg::with_name("keystoreFile")
+                .short("k")
+                .help("path to the JSON Ethereum Keystore file")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("dummyIdentity")
+                .short("s")
+                .help("the identity to use with the dummy adapter")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("sentryUrl")
+                .short("u")
+                .help("the URL to the sentry used for listing channels")
+                .default_value("http://127.0.0.1:8005")
+                .required(true)
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("singleTick")
+                .short("s")
+                .help("Runs the validator in single-tick mode and exits")
         )
         .get_matches();
 
-    let is_single_tick = matches.is_present("single-tick");
+    let environment = std::env::var("ENV").unwrap_or("development".to_string());    
+    let config_file = cli.value_of("config");
+    let config = configuration(&environment, &config_file).unwrap();
+    // @TODO fix 
+    // let adapter = match cli.value_of("adapter").unwrap() {
+    //     "ethereum" => {
+    //         let keystore_file = cli.value_of("keystoreFile").unwrap();
+    //         let keystore_pwd = std::env::var("KEYSTORE_PWD").unwrap();
 
-    let adapter = match matches.subcommand_matches("dummy") {
-        Some(dummy_matches) => {
-            let identity = dummy_matches.value_of("IDENTITY").unwrap();
+    //         let options = AdapterOptions{
+    //             keystore_file: Some(keystore_file.to_string()),
+    //             keystore_pwd: Some(keystore_pwd),
+    //             dummy_identity: None,
+    //             dummy_auth: None,
+    //             dummy_auth_tokens: None,
+    //         };
+    //         EthereumAdapter::init(options, &config)
+    //     },
+    //     "dummy" => {
+    //         let dummy_identity = cli.value_of("dummyIdentity").unwrap();
+    //         let options = AdapterOptions{
+    //             dummy_identity
+    //         };
+    //        DummyAdapter::init(options, &config)
+    //     },
+    //     // @TODO exit gracefully
+    //     _ => panic!("We don't have any other adapters implemented yet!"),
+    // };
+    let sentry_url = cli.value_of("sentryUrl").unwrap();
+    let is_single_tick = cli.is_present("singleTick");
 
-            DummyAdapter {
-                config: ConfigBuilder::new(identity).build(),
-                participants: HashMap::default(),
-            }
-        }
-        None => panic!("We don't have any other adapters implemented yet!"),
-    };
-
-    run(is_single_tick, adapter);
+    // run(is_single_tick, adapter);
 }
 
 fn run(is_single_tick: bool, adapter: impl Adapter) {
-    use futures::future::{FutureExt, TryFutureExt};
-    use reqwest::r#async::Client;
 
-    use std::sync::Arc;
-    use validator::application::validator::{Follower, Leader};
-    use validator::application::worker::{InfiniteWorker, TickWorker};
-    use validator::domain::worker::Worker;
-    use validator::infrastructure::persistence::channel::{
-        ApiChannelRepository, MemoryChannelRepository,
-    };
-    use validator::infrastructure::sentry::SentryApi;
-
-    let sentry = SentryApi {
-        client: Client::new(),
-        sentry_url: CONFIG.sentry_url.clone(),
-    };
-
-    let _channel_repository = Arc::new(ApiChannelRepository { sentry });
-    let channel_repository = Arc::new(MemoryChannelRepository::new(&[]));
-
-    let tick_worker = TickWorker {
-        leader: Leader {},
-        follower: Follower {},
-        channel_repository,
-        identity: adapter.config().identity.to_string(),
-        validation_tick_timeout: CONFIG.validation_tick_timeout,
-    };
-
-    if !is_single_tick {
-        let worker = InfiniteWorker {
-            tick_worker,
-            ticks_wait_time: CONFIG.ticks_wait_time,
-        };
-
-        tokio::run(
-            async move {
-                await!(worker.run()).unwrap();
-            }
-                .unit_error()
-                .boxed()
-                .compat(),
-        );
-    } else {
-        tokio::run(
-            async move {
-                await!(tick_worker.run()).unwrap();
-            }
-                .unit_error()
-                .boxed()
-                .compat(),
-        );
-    }
 }
+//     use futures::future::{FutureExt, TryFutureExt};
+//     use reqwest::r#async::Client;
+
+//     use std::sync::Arc;
+//     use validator::application::validator::{Follower, Leader};
+//     use validator::application::worker::{InfiniteWorker, TickWorker};
+//     use validator::domain::worker::Worker;
+//     use validator::infrastructure::persistence::channel::{
+//         ApiChannelRepository, MemoryChannelRepository,
+//     };
+//     use validator::infrastructure::sentry::SentryApi;
+
+//     let sentry = SentryApi {
+//         client: Client::new(),
+//         sentry_url: CONFIG.sentry_url.clone(),
+//     };
+
+//     let _channel_repository = Arc::new(ApiChannelRepository { sentry });
+//     let channel_repository = Arc::new(MemoryChannelRepository::new(&[]));
+
+//     let tick_worker = TickWorker {
+//         leader: Leader {},
+//         follower: Follower {},
+//         channel_repository,
+//         identity: adapter.config().identity.to_string(),
+//         validation_tick_timeout: CONFIG.validation_tick_timeout,
+//     };
+
+//     if !is_single_tick {
+//         let worker = InfiniteWorker {
+//             tick_worker,
+//             ticks_wait_time: CONFIG.ticks_wait_time,
+//         };
+
+//         tokio::run(
+//             async move {
+//                 await!(worker.run()).unwrap();
+//             }
+//                 .unit_error()
+//                 .boxed()
+//                 .compat(),
+//         );
+//     } else {
+//         tokio::run(
+//             async move {
+//                 await!(tick_worker.run()).unwrap();
+//             }
+//                 .unit_error()
+//                 .boxed()
+//                 .compat(),
+//         );
+//     }
+// }

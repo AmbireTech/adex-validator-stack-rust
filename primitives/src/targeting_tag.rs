@@ -38,32 +38,32 @@ where
     }
 }
 
-#[cfg(any(test, feature = "fixtures"))]
-pub mod fixtures {
-    use fake::faker::*;
+// #[cfg(any(test, feature = "fixtures"))]
+// pub mod fixtures {
+//     use fake::faker::*;
 
-    use super::{Score, TargetingTag};
+//     use super::{Score, TargetingTag};
 
-    pub fn get_targeting_tag(tag: String) -> TargetingTag {
-        TargetingTag {
-            tag,
-            score: get_score(None),
-        }
-    }
+//     pub fn get_targeting_tag(tag: String) -> TargetingTag {
+//         TargetingTag {
+//             tag,
+//             score: get_score(None),
+//         }
+//     }
 
-    pub fn get_targeting_tags(count: usize) -> Vec<TargetingTag> {
-        (1..=count)
-            .map(|c| {
-                let tag_name = format!("tag {}", c);
+//     pub fn get_targeting_tags(count: usize) -> Vec<TargetingTag> {
+//         (1..=count)
+//             .map(|c| {
+//                 let tag_name = format!("tag {}", c);
 
-                get_targeting_tag(tag_name)
-            })
-            .collect()
-    }
+//                 get_targeting_tag(tag_name)
+//             })
+//             .collect()
+//     }
 
-    pub fn get_score(score: Option<u8>) -> Score {
-        let score = score.unwrap_or_else(|| <Faker as Number>::between(0, 100));
+//     pub fn get_score(score: Option<u8>) -> Score {
+//         let score = score.unwrap_or_else(|| <Faker as Number>::between(0, 100));
 
-        Score::new(score).expect("Score was unable to be created")
-    }
-}
+//         Score::new(score).expect("Score was unable to be created")
+//     }
+// }

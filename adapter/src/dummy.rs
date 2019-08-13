@@ -21,14 +21,20 @@ impl ChannelValidator for DummyAdapter {}
 
 impl Adapter for DummyAdapter {
 
-    fn init(self, opts: &AdapterOptions, config: &Config) -> Self {
+    type Output = DummyAdapter;
+
+    fn init(opts: AdapterOptions, config: &Config) -> DummyAdapter {
         // opts.dummy_identity.expect("dummyIdentity required");
         // opts.dummy_auth.expect("dummy auth required");
         // opts.dummy_auth_tokens.expect("dummy auth tokens required");
         // self.identity = opts.dummy_identity.unwrap();
         // self.authTokens = opts.dummy_auth.unwrap();
         // self.verifiedAuth = opts.dummy_auth_tokens.unwrap();
-        self
+        Self {
+            identity: opts.dummy_identity.unwrap(),
+            auth_tokens: HashMap::new(),
+            verified_auth: HashMap::new(),
+        }
     }
 
     fn unlock(&self) -> AdapterFuture<bool> {
