@@ -13,12 +13,13 @@ pub mod validator;
 pub mod targeting_tag;
 pub mod event_submission;
 pub mod ad_unit;
+pub mod balances_map;
 
 //#[cfg(any(test, feature = "fixtures"))]
 //pub use util::tests as test_util;
 //
 //pub use self::asset::Asset;
-//pub use self::balances_map::BalancesMap;
+pub use self::balances_map::BalancesMap;
 pub use self::ad_unit::AdUnit;
 pub use self::big_num::BigNum;
 pub use self::config::Config;
@@ -31,7 +32,6 @@ pub use self::targeting_tag::TargetingTag;
 ////pub use self::validator::{ValidatorDesc, ValidatorId};
 //
 //pub mod asset;
-//pub mod balances_map;
 
 //pub mod channel;
 //pub mod targeting_tag;
