@@ -2,7 +2,8 @@ use std::convert::TryFrom;
 use std::fmt;
 //
 use serde::{Deserialize, Serialize};
-use crate::{ BigNum };
+use crate::{ BigNum, BalancesMap };
+use chrono::{DateTime, Utc};
 use std::pin::Pin;
 use futures::prelude::*;
 use crate::Channel;
@@ -27,7 +28,6 @@ pub struct ValidatorDesc {
     pub id: String,
     pub url: String,
     pub fee: BigNum,
-<<<<<<< HEAD
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -61,51 +61,6 @@ impl fmt::Display for ValidatorId {
     }
 }
 
-<<<<<<< HEAD
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct ValidatorDesc {
-    pub id: ValidatorId,
-    pub url: String,
-    pub fee: BigNum,
-}
-
-#[cfg(any(test, feature = "fixtures"))]
-pub mod fixtures {
-    use fake::faker::*;
-
-    use super::{ValidatorDesc, ValidatorId};
-    use crate::BigNum;
-    use std::convert::TryFrom;
-
-    pub fn get_validator<V: AsRef<str>>(validator_id: V, fee: Option<BigNum>) -> ValidatorDesc {
-        let fee = fee.unwrap_or_else(|| BigNum::from(<Faker as Number>::between(1, 13)));
-        let url = format!(
-            "http://{}-validator-url.com/validator",
-            validator_id.as_ref()
-        );
-        let validator_id =
-            ValidatorId::try_from(validator_id.as_ref()).expect("Creating ValidatorId failed");
-
-        ValidatorDesc {
-            id: validator_id,
-            url,
-            fee,
-        }
-    }
-
-    pub fn get_validators(count: usize, prefix: Option<&str>) -> Vec<ValidatorDesc> {
-        let prefix = prefix.map_or(String::new(), |prefix| format!("{}-", prefix));
-        (0..count)
-            .map(|c| {
-                let validator_id = format!("{}validator-{}", prefix, c + 1);
-
-                get_validator(&validator_id, None)
-            })
-            .collect()
-    }
-}
-=======
 
 //
 //pub mod repository {
@@ -131,7 +86,87 @@ pub mod fixtures {
 //}
 //
 
->>>>>>> 6e6e18a... add: ethereum adapter
-=======
+
+// Validator Message Types
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Accounting {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    #[serde(rename = "last_ev_aggr")]
+    pub last_event_aggregate: DateTime<Utc>,
+    pub balances_before_fees: BalancesMap,
+    pub balances: BalancesMap,
 }
->>>>>>> f8ae6f3... add: primitives types
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ApproveState {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub state_root: String,
+    pub signature: String,
+    pub is_healthy: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NewState {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub state_root: String,
+    pub signature: String,
+    pub balances: String,
+}
+
+#[derive(Default, Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct RejectState {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub reason: String,
+    pub state_root: String,
+    pub signature: String,
+    pub balances: Option<String>,
+    pub timestamp: Option<DateTime<Utc>>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Heartbeat  {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub signature: String,
+    pub state_root: String,
+    pub timestamp: DateTime<Utc>,
+    // we always want to create heartbeat with Timestamp NOW, so add a hidden field
+    // and force the creation of Heartbeat always to be from the `new()` method
+    _secret: (),
+}
+
+
+impl Heartbeat {
+    pub fn new(signature: String, state_root: String) -> Self {
+        Self {
+            message_type: "Heartbeat".into(),
+            signature,
+            state_root,
+            timestamp: Utc::now(),
+            _secret: (),
+        }
+    }
+}
+
+pub enum MessageTypes {
+    ApproveState(ApproveState),
+    NewState(NewState),
+    RejectState(RejectState),
+    Heartbeat(Heartbeat),
+    Accounting(Accounting),
+}
+
+
+
+
+>>>>>>> 59ef6ec... refactor: validator message types
