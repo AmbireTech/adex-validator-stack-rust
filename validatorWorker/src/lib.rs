@@ -17,25 +17,6 @@ use futures::future::{FutureExt, TryFutureExt};
 use reqwest::r#async::Client;
 
 
-pub fn configuration(environment: &str, config_file: Option<&str>) -> Result<Config, ValidatorWokerError>  {
-    let result : Config = match config_file {
-        Some(config_file) => {
-            let data = match fs::read_to_string(config_file) {
-                Ok(result) => result,
-                Err(e) => return Err(ValidatorWokerError::ConfigurationError(format!("Unable to read provided config file {}", config_file))),
-            };
-            toml::from_str(&data).unwrap()
-        },
-        None => {
-            if environment == "production" {
-                return toml::from_str(&PRODUCTION_CONFIG).unwrap();
-            } else {
-                return toml::from_str(&DEVELOPMENT_CONFIG).unwrap();
-            }
-        }
-    };
-    Ok(result)
-}
 
 //     use std::sync::Arc;
 //     use validator::application::validator::{Follower, Leader};

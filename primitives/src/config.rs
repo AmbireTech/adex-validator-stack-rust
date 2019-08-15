@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
-
+use std::fs;
 use crate::BigNum;
+use toml;
 
 pub const DEVELOPMENT_CONFIG: &str = r#"
         max_channels = 512
@@ -92,6 +93,31 @@ pub struct Config {
     pub ethereum_core_address: String,
     pub ethereum_network: String,
     pub validators_whitelist: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum ConfigError {
+    InvalidFile(String),
+}
+
+pub fn configuration(environment: &str, config_file: Option<&str>) -> Result<Config, ConfigError>  {
+    let result : Config = match config_file {
+        Some(config_file) => {
+            let data = match fs::read_to_string(config_file) {
+                Ok(result) => result,
+                Err(e) => return Err(ConfigError::InvalidFile(format!("Unable to read provided config file {}", config_file))),
+            };
+            toml::from_str(&data).unwrap()
+        },
+        None => {
+            if environment == "production" {
+                return toml::from_str(&PRODUCTION_CONFIG).unwrap();
+            } else {
+                return toml::from_str(&DEVELOPMENT_CONFIG).unwrap();
+            }
+        }
+    };
+    Ok(result)
 }
 
 // use primitives::Config;

@@ -6,10 +6,10 @@ use std::time::Duration;
 use lazy_static::lazy_static;
 use adapter::{DummyAdapter, EthereumAdapter};
 use primitives::{ Config};
+use primitives::config::{configuration};
 use primitives::adapter::{Adapter, AdapterOptions};
 use clap::{App, Arg};
 use std::collections::HashMap;
-use crate::{configuration};
 
 fn main() {
     let cli = App::new("Validator worker")
@@ -55,9 +55,12 @@ fn main() {
         )
         .get_matches();
 
-    let environment = std::env::var("ENV").unwrap_or("development".to_string());    
-    let config_file = cli.value_of("config");
-    let config = configuration(&environment, &config_file).unwrap();
+    let environment = std::env::var("ENV").unwrap_or_else(|_| "development".into());
+    let config_file = cli.value_of("config").unwrap_or("");
+    let config = configuration(&environment, Some(&config_file)).unwrap();
+    let sentry_url = cli.value_of("sentryUrl").unwrap();
+    let is_single_tick = cli.is_present("singleTick");
+    
     // @TODO fix 
     // let adapter = match cli.value_of("adapter").unwrap() {
     //     "ethereum" => {
@@ -83,8 +86,7 @@ fn main() {
     //     // @TODO exit gracefully
     //     _ => panic!("We don't have any other adapters implemented yet!"),
     // };
-    // let sentry_url = cli.value_of("sentryUrl").unwrap();
-    // let is_single_tick = cli.is_present("singleTick");
+   
 
     // run(is_single_tick, adapter);
 }
