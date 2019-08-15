@@ -4,57 +4,16 @@ use std::error;
 use std::fmt;
 
 pub mod big_num;
-<<<<<<< HEAD
-pub mod channel;
-pub mod event_submission;
-pub mod targeting_tag;
-pub mod util;
-pub mod validator;
-
-/// re-exports all the fixtures in one module
-#[cfg(any(test, feature = "fixtures"))]
-pub mod fixtures {
-    pub use super::asset::fixtures::*;
-    pub use super::channel::fixtures::*;
-    pub use super::targeting_tag::fixtures::*;
-    pub use super::validator::fixtures::*;
-}
-
-#[derive(Debug, PartialEq)]
-pub enum DomainError {
-    InvalidArgument(String),
-    RuleViolation(String),
-}
-
-impl fmt::Display for DomainError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Domain error",)
-    }
-}
-
-impl error::Error for DomainError {
-    fn cause(&self) -> Option<&dyn error::Error> {
-        None
-    }
-}
-=======
 pub mod config;
 pub mod adapter;
 pub mod channel;
 pub mod channel_validator;
-<<<<<<< HEAD
->>>>>>> 6e6e18a... add: ethereum adapter
-=======
 pub mod util;
 pub mod validator;
 pub mod targeting_tag;
 pub mod event_submission;
 pub mod ad_unit;
-<<<<<<< HEAD
->>>>>>> b9035f5... add: more properties to config struct
-=======
 pub mod balances_map;
->>>>>>> 59ef6ec... refactor: validator message types
 
 //#[cfg(any(test, feature = "fixtures"))]
 //pub use util::tests as test_util;
