@@ -16,12 +16,6 @@ pub struct SentryApi {
     pub client: Client,
 }
 
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct ChannelAllResponse {
-    pub channels: Vec<Channel>,
-    pub total_pages: u64,
-}
 
 impl SentryApi {
     pub fn all_channels(
@@ -84,4 +78,30 @@ impl SentryApi {
 
         await!(future.compat())
     }
+
+    pub fn propagate() {
+
+    }
+
+    pub fn get_latest_msg() {
+
+    }
+
+    pub fn get_our_latest_msg() {
+
+    }
+
+    pub fn get_last_approved() {
+
+    }
+
+    pub fn get_last_msgs() {
+
+    }
+
+    pub fn get_event_aggregates() {
+
+    }
+
+
 }
