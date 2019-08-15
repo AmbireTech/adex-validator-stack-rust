@@ -14,6 +14,7 @@ futures-preview = { version = "=0.3.0-alpha.16", features = ["compat", "io-compa
 serde = { version = "^1.0", features = ['derive'] }
 serde_json = "1.0"
 serde-hex = "0.1.0"
+toml = "0.5"
 # Domain
 chrono = { version = "0.4", features = ["serde"] }
 time = "0.1.42"
