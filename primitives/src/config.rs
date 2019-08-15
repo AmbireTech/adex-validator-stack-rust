@@ -4,63 +4,58 @@ use serde::{Deserialize, Serialize};
 use crate::BigNum;
 
 pub const DEVELOPMENT_CONFIG: &str = r#"
-        MAX_CHANNELS = 512
-        CHANNELS_FIND_LIMIT = 200
-        WAIT_TIME = 500
+        max_channels = 512
+        channels_find_limit = 200
+        wait_time = 500
 
-        AGGR_THROTTLE = 0
-        EVENTS_FIND_LIMIT = 100
-        MSGS_FIND_LIMIT = 10
+        aggr_throttle = 0
+        events_find_limit = 100
+        msgs_find_limit = 10
 
-        HEARTBEAT_TIME = 30000
-        HEALTH_THRESHOLD_PROMILLES = 950
-        PROPAGATION_TIMEOUT = 1000
+        heartbeat_time = 30000
+        health_threshold_promilles = 950
+        propagation_timeout = 1000
 
-        LIST_TIMEOUT = 5000
-        FETCH_TIMEOUT = 5000
-        VALIDATOR_TICK_TIMEOUT = 5000
+        list_timeout = 5000
+        fetch_timeout = 5000
+        validator_tick_timeout = 5000
 
-        [ratelimit]
-        IP_RATE_LIMIT = { type = "ip", timeframe = 20000 }
+        ip_rate_limit = { type = "ip", timeframe = 20000 }
         SID_RATE_LIMIT = { type = 'sid', timeframe = 20000 }
 
-        [ethereum]
-        ETHEREUM_CORE_ADDR = '0x333420fc6a897356e69b62417cd17ff012177d2b'
-        ETHEREUM_NETWORK = 'goerli'
+        ethereum_core_address = '0x333420fc6a897356e69b62417cd17ff012177d2b'
+        ethereum_network = 'goerli'
     "#;
 
 pub const PRODUCTION_CONFIG: &str = r#"
     # Maximum number of channels to return per request
     MAX_CHANNELS = 512
     
-    CHANNELS_FIND_LIMIT = 512
-    WAIT_TIME = 500
+    channels_find_limit = 512
+    wait_time = 500
 
-    AGGR_THROTTLE = 5000
-    EVENTS_FIND_LIMIT = 100
-    MSGS_FIND_LIMIT = 10
+    aggr_throttle = 5000
+    events_find_limit = 100
+    msgs_find_limit = 10
 
-    HEARTBEAT_TIME = 60000
-    HEALTH_THRESHOLD_PROMILLES = 970
-    PROPAGATION_TIMEOUT = 3000
+    heartbeat_time = 60000
+    health_threshold_promilles = 970
+    propagation_timeout = 3000
 
-    LIST_TIMEOUT = 10000
-    FETCH_TIMEOUT = 10000
-    VALIDATOR_TICK_TIMEOUT = 10000
+    list_timeout = 10000
+    fetch_timeout = 10000
+    validator_tick_timeout = 10000
 
-    [ratelimit]
-    IP_RATE_LIMIT = { type = "ip", timeframe = 20000 }
+    ip_rate_limit = { type = "ip", timeframe = 20000 }
 
-    [ethereum]
-    ETHEREUM_CORE_ADDR = '0x333420fc6a897356e69b62417cd17ff012177d2b'
-    ETHEREUM_NETWORK = 'homestead'
-    TOKEN_ADDRESS_WHITELIST = ['0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359']
+    ethereum_core_address = '0x333420fc6a897356e69b62417cd17ff012177d2b'
+    ethereum_network = 'homestead'
+    token_address_whitelist = ['0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359']
 
-    [validator]
-    CREATORS_WHITELIST = []
-    MINIMAL_DEPOSIT = 0
-    MINIMAL_FEE = 0
-    VALIDATORS_WHITELIST = []
+    creators_whitelist = []
+    minimal_deposit = 0
+    minimal_fee = 0
+    validators_whitelist = []
     "#;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -76,7 +71,7 @@ pub struct RateLimit {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
-    pub identity: String, // should not be hear maybe?
+    pub identity: String, // should not be here maybe?
     pub max_channels: u32,
     pub wait_time: u32,
     pub aggr_throttle: u32,
@@ -94,7 +89,7 @@ pub struct Config {
     pub minimal_deposit: BigNum,
     pub minimal_fee: BigNum,
     pub token_address_whitelist: Vec<String>,
-    pub ethereum_core_addr: String,
+    pub ethereum_core_address: String,
     pub ethereum_network: String,
     pub validators_whitelist: Vec<String>,
 }

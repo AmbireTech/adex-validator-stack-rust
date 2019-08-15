@@ -83,39 +83,39 @@ fn main() {
     //     // @TODO exit gracefully
     //     _ => panic!("We don't have any other adapters implemented yet!"),
     // };
-    let sentry_url = cli.value_of("sentryUrl").unwrap();
-    let is_single_tick = cli.is_present("singleTick");
+    // let sentry_url = cli.value_of("sentryUrl").unwrap();
+    // let is_single_tick = cli.is_present("singleTick");
 
     // run(is_single_tick, adapter);
 }
 
 fn run(is_single_tick: bool, adapter: impl Adapter) {
-    let sentry = SentryApi {
-        client: Client::new(),
-        sentry_url: CONFIG.sentry_url.clone(),
-    };
-       if !is_single_tick {
-        let worker = InfiniteWorker {
-            tick_worker,
-            ticks_wait_time: CONFIG.ticks_wait_time,
-        };
+    // let sentry = SentryApi {
+    //     client: Client::new(),
+    //     sentry_url: CONFIG.sentry_url.clone(),
+    // };
+    //    if !is_single_tick {
+    //     let worker = InfiniteWorker {
+    //         tick_worker,
+    //         ticks_wait_time: CONFIG.ticks_wait_time,
+    //     };
 
-        tokio::run(
-            async move {
-                await!(worker.run()).unwrap();
-            }
-                .unit_error()
-                .boxed()
-                .compat(),
-        );
-    } else {
-        tokio::run(
-            async move {
-                await!(tick_worker.run()).unwrap();
-            }
-                .unit_error()
-                .boxed()
-                .compat(),
-        );
-    }
+    //     tokio::run(
+    //         async move {
+    //             await!(worker.run()).unwrap();
+    //         }
+    //             .unit_error()
+    //             .boxed()
+    //             .compat(),
+    //     );
+    // } else {
+    //     tokio::run(
+    //         async move {
+    //             await!(tick_worker.run()).unwrap();
+    //         }
+    //             .unit_error()
+    //             .boxed()
+    //             .compat(),
+    //     );
+    // }
 }
