@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use domain::balances_map::get_balances_after_fees_tree;
 use domain::validator::message::Accounting;
-use domain::{AdUnit, BalancesMap, BigNum, Channel, ChannelId, DomainError};
+use domain::{BalancesMap, BigNum, Channel, ChannelId, DomainError};
 
 #[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
 #[derive(Serialize, Deserialize)]
@@ -14,8 +14,7 @@ pub enum Event {
     #[serde(rename_all = "camelCase")]
     Impression {
         publisher: String,
-        // clippy warning for big size difference, because of field
-        ad_unit: Box<AdUnit>,
+        ad_unit: Option<String>,
     },
     ImpressionWithCommission {
         earners: Vec<Earner>,
@@ -67,7 +66,7 @@ fn merge_aggrs(
     let last_event_aggregate = [accounting.last_event_aggregate]
         .iter()
         .chain(aggregates.iter().map(|aggr| &aggr.created))
-        .max_by(|lhs, rhs| lhs.cmp(rhs))
+        .max()
         .unwrap_or(&accounting.last_event_aggregate)
         .to_owned();
 
