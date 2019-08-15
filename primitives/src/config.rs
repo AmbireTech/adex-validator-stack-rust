@@ -30,7 +30,7 @@ pub const DEVELOPMENT_CONFIG: &str = r#"
 
 pub const PRODUCTION_CONFIG: &str = r#"
     # Maximum number of channels to return per request
-    MAX_CHANNELS = 512
+    max_channels = 512
     
     channels_find_limit = 512
     wait_time = 500
