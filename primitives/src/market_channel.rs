@@ -1,0 +1,34 @@
+use std::collections::HashMap;
+
+use chrono::{DateTime, Utc};
+
+use crate::{AdUnit, BigNum, Channel, ChannelSpec};
+
+#[derive(Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+struct MarketStatus {
+    #[serde(rename = "name")]
+    pub status_type: MarketStatusType,
+    pub usd_estimate: f32,
+    #[serde(rename = "lastApprovedBalances")]
+    pub balances: HashMap<String, BigNum>,
+    #[serde(with = "ts_milliseconds")]
+    pub last_checked: DateTime<Utc>,
+}
+
+impl MarketStatus {
+    fn balances_sum(&self) -> BigNum {
+        self.balances.values().sum()
+    }
+}
+
+#[derive(Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+struct MarketChannel {
+    pub id: String,
+    pub creator: String,
+    pub deposit_asset: String,
+    pub deposit_amount: BigNum,
+    pub status: MarketStatus,
+    pub spec: ChannelSpec,
+}

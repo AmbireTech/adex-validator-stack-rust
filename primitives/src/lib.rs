@@ -14,6 +14,7 @@ pub mod event_submission;
 pub mod targeting_tag;
 pub mod util;
 pub mod validator;
+pub mod market_channel;
 
 //#[cfg(any(test, feature = "fixtures"))]
 //pub use util::tests as test_util;
