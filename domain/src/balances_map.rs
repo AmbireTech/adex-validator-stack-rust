@@ -1,63 +1,68 @@
 use std::collections::BTreeMap;
 
+use serde::{Deserialize, Serialize};
+
 use crate::{BigNum, Channel, DomainError, ValidatorDesc};
 use num::rational::Ratio;
 
-pub type BalancesMap = BTreeMap<String, BigNum>;
+type InnerBTreeMap = BTreeMap<String, BigNum>;
 
-pub fn get_balances_after_fees_tree(
-    balances: &BalancesMap,
-    channel: &Channel,
-) -> Result<BalancesMap, DomainError> {
-    let distribution = Distribution::new(balances, &channel)?;
+#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(transparent)]
+pub struct BalancesMap(InnerBTreeMap);
 
-    let mut balances_after_fees = BTreeMap::default();
-    let mut total = BigNum::from(0);
+impl BalancesMap {
+    pub fn apply_fees(&self, on_channel: &Channel) -> Result<Self, DomainError> {
+        let distribution = Distribution::new(&self.0, &on_channel)?;
 
-    for (key, value) in balances.iter() {
-        let adjusted_balance = value * &distribution.ratio;
+        let mut balances_after_fees = BTreeMap::default();
+        let mut total = BigNum::from(0);
 
-        total += &adjusted_balance;
-        balances_after_fees.insert(key.clone(), adjusted_balance);
-    }
+        for (key, value) in self.0.iter() {
+            let adjusted_balance = value * &distribution.ratio;
 
-    let rounding_error = distribution.rounding_error(&total)?;
-
-    let balances_after_fees = distribute_fee(
-        balances_after_fees,
-        rounding_error,
-        distribution.fee_ratio,
-        channel.spec.validators.into_iter(),
-    );
-
-    Ok(balances_after_fees)
-}
-
-fn distribute_fee<'a>(
-    mut balances: BalancesMap,
-    rounding_error: BigNum,
-    fee_ratio: Ratio<BigNum>,
-    validators: impl Iterator<Item = &'a ValidatorDesc>,
-) -> BalancesMap {
-    for (index, validator) in validators.enumerate() {
-        let fee = &validator.fee * &fee_ratio;
-
-        let fee_rounded = if index == 0 {
-            &fee + &rounding_error
-        } else {
-            fee
-        };
-
-        if fee_rounded > 0.into() {
-            let entry = balances
-                .entry(validator.id.clone().into())
-                .or_insert_with(|| 0.into());
-
-            *entry += &fee_rounded;
+            total += &adjusted_balance;
+            balances_after_fees.insert(key.clone(), adjusted_balance);
         }
+
+        let rounding_error = distribution.rounding_error(&total)?;
+
+        let balances_after_fees = Self::distribute_fee(
+            balances_after_fees,
+            rounding_error,
+            distribution.fee_ratio,
+            on_channel.spec.validators.into_iter(),
+        );
+
+        Ok(Self(balances_after_fees))
     }
 
-    balances
+    fn distribute_fee<'a>(
+        mut balances: InnerBTreeMap,
+        rounding_error: BigNum,
+        fee_ratio: Ratio<BigNum>,
+        validators: impl Iterator<Item = &'a ValidatorDesc>,
+    ) -> InnerBTreeMap {
+        for (index, validator) in validators.enumerate() {
+            let fee = &validator.fee * &fee_ratio;
+
+            let fee_rounded = if index == 0 {
+                &fee + &rounding_error
+            } else {
+                fee
+            };
+
+            if fee_rounded > 0.into() {
+                let entry = balances
+                    .entry(validator.id.clone().into())
+                    .or_insert_with(|| 0.into());
+
+                *entry += &fee_rounded;
+            }
+        }
+
+        balances
+    }
 }
 
 #[derive(Debug)]
@@ -77,7 +82,7 @@ struct Distribution {
 }
 
 impl Distribution {
-    pub fn new(for_balances: &BalancesMap, on_channel: &Channel) -> Result<Self, DomainError> {
+    pub fn new(for_balances: &InnerBTreeMap, on_channel: &Channel) -> Result<Self, DomainError> {
         let deposit = on_channel.deposit_amount.clone();
 
         let total_distributed: BigNum = for_balances.iter().map(|(_, balance)| balance).sum();
@@ -139,10 +144,13 @@ mod test {
 
     mod applying_fee_returns_the_same_tree_with_zero_fees {
         use super::*;
-        fn setup_balances_map(balances_map: &BalancesMap) -> BalancesMap {
+        fn setup_balances_map(tree: &InnerBTreeMap) -> BalancesMap {
             let channel = get_zero_fee_channel();
 
-            let balances_after_fee = get_balances_after_fees_tree(balances_map, &channel)
+            let balances_map = BalancesMap(tree.clone());
+
+            let balances_after_fee = balances_map
+                .apply_fees(&channel)
                 .expect("Calculation of fees failed");
 
             balances_after_fee
@@ -150,7 +158,7 @@ mod test {
 
         #[test]
         fn case_1_three_values() {
-            let balances_map: BalancesMap = vec![
+            let tree: InnerBTreeMap = vec![
                 ("a".to_string(), 1001.into()),
                 ("b".to_string(), 3124.into()),
                 ("c".to_string(), 122.into()),
@@ -158,12 +166,12 @@ mod test {
             .into_iter()
             .collect();
 
-            assert_eq!(setup_balances_map(&balances_map), balances_map);
+            assert_eq!(setup_balances_map(&tree).0, tree);
         }
 
         #[test]
         fn case_2_three_simple_values() {
-            let balances_map: BalancesMap = vec![
+            let tree: InnerBTreeMap = vec![
                 ("a".to_string(), 1.into()),
                 ("b".to_string(), 2.into()),
                 ("c".to_string(), 3.into()),
@@ -171,28 +179,28 @@ mod test {
             .into_iter()
             .collect();
 
-            assert_eq!(setup_balances_map(&balances_map), balances_map);
+            assert_eq!(setup_balances_map(&tree).0, tree);
         }
 
         #[test]
         fn case_3_one_value() {
-            let balances_map = vec![("a".to_string(), BigNum::from(1))]
+            let tree: InnerBTreeMap = vec![("a".to_string(), BigNum::from(1))]
                 .into_iter()
                 .collect();
 
-            assert_eq!(setup_balances_map(&balances_map), balances_map);
+            assert_eq!(setup_balances_map(&tree).0, tree);
         }
 
         #[test]
         fn case_4_two_values() {
-            let balances_map = vec![
+            let tree: InnerBTreeMap = vec![
                 ("a".to_string(), 1.into()),
                 ("b".to_string(), 99_999.into()),
             ]
             .into_iter()
             .collect();
 
-            assert_eq!(setup_balances_map(&balances_map), balances_map);
+            assert_eq!(setup_balances_map(&tree).0, tree);
         }
 
         fn get_zero_fee_channel() -> Channel {
@@ -210,7 +218,7 @@ mod test {
     mod applying_fee_correctly {
         use super::*;
 
-        fn setup_balances_after_fee(balances_map: BalancesMap) -> BalancesMap {
+        fn setup_balances_after_fee(tree: InnerBTreeMap) -> BalancesMap {
             let leader = get_validator("one", Some(50.into()));
             let follower = get_validator("two", Some(50.into()));
 
@@ -218,7 +226,10 @@ mod test {
             let mut channel = get_channel("apply fees", &None, Some(spec));
             channel.deposit_amount = 10_000.into();
 
-            let balances_after_fee = get_balances_after_fees_tree(&balances_map, &channel)
+            let balances_map = BalancesMap(tree);
+
+            let balances_after_fee = balances_map
+                .apply_fees(&channel)
                 .expect("Calculation of fees failed");
 
             balances_after_fee
@@ -226,14 +237,14 @@ mod test {
 
         #[test]
         fn case_1_partially_distributed() {
-            let balances_map = vec![
+            let tree = vec![
                 ("a".to_string(), 1_000.into()),
                 ("b".to_string(), 1_200.into()),
             ]
             .into_iter()
             .collect();
 
-            let expected_balances: BalancesMap = vec![
+            let expected_tree: InnerBTreeMap = vec![
                 ("a".to_string(), 990.into()),
                 ("b".to_string(), 1_188.into()),
                 ("one".to_string(), 11.into()),
@@ -242,22 +253,19 @@ mod test {
             .into_iter()
             .collect();
 
-            let balances_after_fee = setup_balances_after_fee(balances_map);
+            let balances_after_fee = setup_balances_after_fee(tree).0;
             let actual_sum: BigNum = balances_after_fee.iter().map(|(_, v)| v).sum();
 
             assert_eq!(
-                expected_balances
-                    .iter()
-                    .map(|(_, value)| value)
-                    .sum::<BigNum>(),
+                expected_tree.iter().map(|(_, value)| value).sum::<BigNum>(),
                 actual_sum
             );
-            assert_eq!(expected_balances, balances_after_fee);
+            assert_eq!(expected_tree, balances_after_fee);
         }
 
         #[test]
-        fn case_2_partially_distributed_with_validator_in_the_input_balances_map() {
-            let balances_map = vec![
+        fn case_2_partially_distributed_with_validator_in_the_input_tree() {
+            let tree = vec![
                 ("a".to_string(), 100.into()),
                 ("b".to_string(), 2_000.into()),
                 ("one".to_string(), 200.into()),
@@ -265,7 +273,7 @@ mod test {
             .into_iter()
             .collect();
 
-            let expected_balances: BalancesMap = vec![
+            let expected_tree: InnerBTreeMap = vec![
                 ("a".to_string(), 99.into()),
                 ("b".to_string(), 1_980.into()),
                 ("one".to_string(), 209.into()),
@@ -274,23 +282,20 @@ mod test {
             .into_iter()
             .collect();
 
-            let balances_after_fee = setup_balances_after_fee(balances_map);
+            let balances_after_fee = setup_balances_after_fee(tree).0;
             let actual_sum: BigNum = balances_after_fee.iter().map(|(_, v)| v).sum();
 
             assert_eq!(
-                expected_balances
-                    .iter()
-                    .map(|(_, value)| value)
-                    .sum::<BigNum>(),
+                expected_tree.iter().map(|(_, value)| value).sum::<BigNum>(),
                 actual_sum
             );
-            assert_eq!(expected_balances, balances_after_fee);
+            assert_eq!(expected_tree, balances_after_fee);
         }
 
         #[test]
         /// also testing the rounding error correction
         fn case_3_fully_distributed() {
-            let balances_map = vec![
+            let tree = vec![
                 ("a".to_string(), 105.into()),
                 ("b".to_string(), 195.into()),
                 ("c".to_string(), 700.into()),
@@ -300,7 +305,7 @@ mod test {
             .into_iter()
             .collect();
 
-            let expected_balances: BalancesMap = vec![
+            let expected_tree: InnerBTreeMap = vec![
                 ("a".to_string(), 103.into()),
                 ("b".to_string(), 193.into()),
                 ("c".to_string(), 693.into()),
@@ -312,23 +317,20 @@ mod test {
             .into_iter()
             .collect();
 
-            let balances_after_fee = setup_balances_after_fee(balances_map);
+            let balances_after_fee = setup_balances_after_fee(tree).0;
             let actual_sum: BigNum = balances_after_fee.iter().map(|(_, v)| v).sum();
 
             assert_eq!(
-                expected_balances
-                    .iter()
-                    .map(|(_, value)| value)
-                    .sum::<BigNum>(),
+                expected_tree.iter().map(|(_, value)| value).sum::<BigNum>(),
                 actual_sum
             );
-            assert_eq!(expected_balances, balances_after_fee);
+            assert_eq!(expected_tree, balances_after_fee);
         }
     }
 
     #[test]
     fn errors_when_fees_larger_that_deposit() {
-        let balances_map = vec![("a".to_string(), 10.into()), ("b".to_string(), 10.into())]
+        let tree: InnerBTreeMap = vec![("a".to_string(), 10.into()), ("b".to_string(), 10.into())]
             .into_iter()
             .collect();
 
@@ -338,7 +340,10 @@ mod test {
         let mut channel = get_channel("zero fees", &None, Some(spec));
         channel.deposit_amount = 1_000.into();
 
-        let domain_error = get_balances_after_fees_tree(&balances_map, &channel)
+        let balances_map = BalancesMap(tree.clone());
+
+        let domain_error = balances_map
+            .apply_fees(&channel)
             .expect_err("Should be DomainError not allow fees sum to exceed the deposit");
 
         assert_eq!(
