@@ -5,4 +5,5 @@ members = [
     "primitives",
      "validator_worker",
          # "sentry",
+         "adview-manager",
 ]
