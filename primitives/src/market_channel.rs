@@ -1,12 +1,28 @@
 use std::collections::HashMap;
+use serde::{Serialize, Deserialize};
+use chrono::serde::ts_milliseconds;
 
 use chrono::{DateTime, Utc};
 
 use crate::{AdUnit, BigNum, Channel, ChannelSpec};
 
+// Data structs specific to the market
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum MarketStatusType {
+    Initializing,
+    Ready,
+    Active,
+    Offline,
+    Disconnected,
+    Unhealthy,
+    Withdraw,
+    Expired,
+    Exhausted,
+}
+
 #[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
-struct MarketStatus {
+pub struct MarketStatus {
     #[serde(rename = "name")]
     pub status_type: MarketStatusType,
     pub usd_estimate: f32,
@@ -24,7 +40,7 @@ impl MarketStatus {
 
 #[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
-struct MarketChannel {
+pub struct MarketChannel {
     pub id: String,
     pub creator: String,
     pub deposit_asset: String,
