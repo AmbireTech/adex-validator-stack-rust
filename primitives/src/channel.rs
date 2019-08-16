@@ -37,7 +37,7 @@ pub struct ChannelSpec {
     pub targeting: Vec<TargetingTag>,
     /// Minimum targeting score (optional)
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub min_targeting_score: Option<u64>,
+    pub min_targeting_score: Option<f64>,
     /// EventSubmission object, applies to event submission (POST /channel/:id/events)
     pub event_submission: EventSubmission,
     /// A millisecond timestamp of when the campaign was created
