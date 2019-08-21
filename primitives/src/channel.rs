@@ -54,6 +54,7 @@ pub struct Channel {
     pub valid_until: DateTime<Utc>,
     pub spec: ChannelSpec,
 }
+
 //
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -236,6 +237,7 @@ impl Error for ChannelError {
         None
     }
 }
+
 //
 //
 //#[serde(transparent)]

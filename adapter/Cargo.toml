@@ -20,5 +20,7 @@ serde =  {version = "^1.0", features = ['derive']}
 # Ethereum
 web3 = { git = "https://github.com/tomusdrw/rust-web3" }
 eth_checksum = "0.1.1"
+ethabi = "8.0.1"
+tiny-keccak = "1.5"
 
 [dev-dependencies]
