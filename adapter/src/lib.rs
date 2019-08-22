@@ -62,7 +62,7 @@ pub fn get_balance_leaf(acc: &str, amnt: &str) -> Result<[u8; 32], Box<dyn Error
 }
 
 // OnChain channel Representation
-pub struct ProtocolChannel {
+pub struct EthereumChannel {
     pub creator: String,
     pub token_addr: String,
     pub token_amount: String,
@@ -71,9 +71,9 @@ pub struct ProtocolChannel {
     pub spec: String
 }
 
-impl ProtocolChannel {
+impl EthereumChannel {
 
-    fn new(creator: &str, token_addr: &str, token_amount: String, valid_until: String, validators: String, spec: String) -> ProtocolChannel {
+    fn new(creator: &str, token_addr: &str, token_amount: String, valid_until: String, validators: String, spec: String) -> Self {
         //@TODO some validation
         Self {
             creator: creator.to_owned(),
@@ -130,7 +130,6 @@ impl ProtocolChannel {
                 format!("0x{}", self.valid_until.to_owned()),
                 self.validators.to_owned(),
                 self.spec.to_owned()
-
         ]
     }
 
@@ -144,7 +143,6 @@ impl ProtocolChannel {
     }
 
 }
-
 
 fn encode_params(types: &[String], values: &[String], lenient: bool) -> Result<String, Box<dyn Error>> {
 	assert_eq!(types.len(), values.len());
@@ -165,11 +163,15 @@ fn encode_params(types: &[String], values: &[String], lenient: bool) -> Result<S
 
 fn parse_tokens(params: &[(ParamType, &str)], lenient: bool) -> Result<Vec<Token>, Box< dyn Error>> {
 	params.iter()
-		.map(|&(ref param, value)| match lenient {
-			true => LenientTokenizer::tokenize(param, value),
-			false => StrictTokenizer::tokenize(param, value)
+		.map(|&(ref param, value)| if lenient {
+			 LenientTokenizer::tokenize(param, value)
+        } else {
+			StrictTokenizer::tokenize(param, value)
 		})
 		.collect::<Result<_, _>>()
 		.map_err(From::from)
 }
 
+fn to_ethereum_channel() -> EthereumChannel {
+        unimplemented!()
+}

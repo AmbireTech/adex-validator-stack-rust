@@ -10,14 +10,23 @@ use std::iter::once;
 
 
 #[derive(Clone)]
-// @TODO: make pub(crate)
-pub struct SentryApi {
+pub(crate) struct SentryApi {
     pub sentry_url: String,
     pub client: Client,
+    pub logging: bool
 }
 
 
 impl SentryApi {
+    
+    pub new(sentry_url: &str, logging: bool) -> Self {
+        Self {
+            sentry_url,
+            client: Client::new(),
+            logging
+        }
+    }
+
     pub fn all_channels(
         &self,
         validator: Option<&ValidatorId>,
