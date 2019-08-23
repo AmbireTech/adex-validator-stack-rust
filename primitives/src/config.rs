@@ -1,6 +1,5 @@
 use crate::BigNum;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fs;
 use toml;
 
@@ -107,8 +106,8 @@ pub fn configuration(environment: &str, config_file: Option<&str>) -> Result<Con
                 Ok(result) => result,
                 Err(e) => {
                     return Err(ConfigError::InvalidFile(format!(
-                        "Unable to read provided config file {}",
-                        config_file
+                        "Unable to read provided config file {} {}",
+                        config_file, e
                     )))
                 }
             };

@@ -1,15 +1,13 @@
-use hex::encode;
-use std::collections::HashMap;
-use std::fmt;
-use std::fs;
+#![deny(clippy::all)]
+#![deny(rust_2018_idioms)]
 
-use futures::future::{err, ok, FutureExt};
+use std::collections::HashMap;
+
+use futures::future::{ok, FutureExt};
 use primitives::adapter::{Adapter, AdapterFuture, AdapterOptions};
 use primitives::channel_validator::ChannelValidator;
 use primitives::config::Config;
 use primitives::Channel;
-use serde::{Deserialize, Serialize};
-use web3::futures::Future;
 use web3::types::Address;
 
 pub struct EthereumAdapter {

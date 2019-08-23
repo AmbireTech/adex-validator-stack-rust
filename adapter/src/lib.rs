@@ -5,12 +5,9 @@
 #![doc(test(attr(feature(async_await, await_macro))))]
 #![doc(test(attr(cfg(feature = "dummy-adapter"))))]
 
-use chrono::{DateTime, Utc};
 use ethabi::encode;
 use ethabi::param_type::{ParamType, Reader};
 use ethabi::token::{LenientTokenizer, StrictTokenizer, Token, Tokenizer};
-use hex::{FromHex, ToHex};
-use primitives::big_num::BigNum;
 use std::error::Error;
 use tiny_keccak::Keccak;
 
