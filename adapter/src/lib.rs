@@ -171,6 +171,6 @@ fn parse_tokens(params: &[(ParamType, &str)], lenient: bool) -> Result<Vec<Token
 		.map_err(From::from)
 }
 
-fn to_ethereum_channel() -> EthereumChannel {
+fn to_ethereum_channel() {
         unimplemented!()
 }
