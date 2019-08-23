@@ -27,7 +27,7 @@ impl ChannelValidator for EthereumAdapter {}
 impl Adapter for EthereumAdapter {
     type Output = EthereumAdapter;
 
-    fn init(opts: AdapterOptions, config: &Config) -> EthereumAdapter {
+    fn init(opts: AdapterOptions, _config: &Config) -> EthereumAdapter {
         // opts.dummy_identity.expect("dummyIdentity required");
         // opts.dummy_auth.expect("dummy auth required");
         // opts.dummy_auth_tokens.expect("dummy auth tokens required");
@@ -64,7 +64,7 @@ impl Adapter for EthereumAdapter {
         ok(signature).boxed()
     }
 
-    fn verify(&self, signer: &str, state_root: &str, signature: &str) -> AdapterFuture<bool> {
+    fn verify(&self, signer: &str, _state_root: &str, signature: &str) -> AdapterFuture<bool> {
         // select the `identity` and compare it to the signer
         // for empty string this will return array with 1 element - an empty string `[""]`
         let is_same = match signature.rsplit(' ').take(1).next() {
@@ -75,17 +75,17 @@ impl Adapter for EthereumAdapter {
         ok(is_same).boxed()
     }
 
-    fn validate_channel(&self, channel: &Channel) -> AdapterFuture<bool> {
+    fn validate_channel(&self, _channel: &Channel) -> AdapterFuture<bool> {
         // @TODO
         ok(true).boxed()
     }
 
-    fn session_from_token(&self, token: &str) -> AdapterFuture<String> {
+    fn session_from_token(&self, _token: &str) -> AdapterFuture<String> {
         // @TODO
         ok("hello".to_string()).boxed()
     }
 
-    fn get_auth(&self, validator: &str) -> AdapterFuture<String> {
+    fn get_auth(&self, _validator: &str) -> AdapterFuture<String> {
         // let participant = self
         //     .participants
         //     .iter()

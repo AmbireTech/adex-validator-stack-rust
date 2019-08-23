@@ -4,12 +4,12 @@
 
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
 use clap::{App, Arg};
-use lazy_static::lazy_static;
+
 use primitives::adapter::{Adapter, AdapterOptions};
 use primitives::config::configuration;
-use primitives::Config;
-use std::collections::HashMap;
-use std::time::Duration;
+
+
+
 
 fn main() {
     let cli = App::new("Validator worker")
@@ -58,7 +58,7 @@ fn main() {
     let environment = std::env::var("ENV").unwrap_or_else(|_| "development".into());
     let config_file = cli.value_of("config").unwrap_or("");
     let config = configuration(&environment, Some(&config_file)).unwrap();
-    let sentry_url = cli.value_of("sentryUrl").unwrap();
+    let _sentry_url = cli.value_of("sentryUrl").unwrap();
     let is_single_tick = cli.is_present("singleTick");
 
     let adapter = match cli.value_of("adapter").unwrap() {
@@ -98,7 +98,7 @@ fn main() {
     }
 }
 
-fn run(is_single_tick: bool, adapter: impl Adapter) {
+fn run(_is_single_tick: bool, _adapter: impl Adapter) {
     // let sentry = SentryApi {
     //     client: Client::new(),
     //     sentry_url: CONFIG.sentry_url.clone(),
