@@ -4,11 +4,6 @@
 #![deny(clippy::match_bool)] 
 #![doc(test(attr(feature(async_await, await_macro))))]
 #![doc(test(attr(cfg(feature = "dummy-adapter"))))]
-//pub use self::adapter::*;
-//pub use self::sanity::*;
-//
-//mod adapter;
-//#[cfg(any(test, feature = "dummy-adapter"))]
 
 use primitives::big_num::BigNum;
 use chrono::{DateTime, Utc};
@@ -25,6 +20,10 @@ pub mod ethereum;
 pub use self::dummy::DummyAdapter;
 pub use self::ethereum::EthereumAdapter;
 
+pub enum AdapterTypes {
+    DummyAdapter(DummyAdapter),
+    EthereumAdapter(EthereumAdapter)
+}
 
 pub fn get_signable_state_root( channel_id: &str, balance_root: &str ) -> Result<[u8; 32], Box<dyn Error>> {
         let types: Vec<String> = vec![

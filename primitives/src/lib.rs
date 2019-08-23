@@ -62,36 +62,3 @@ impl error::Error for DomainError {
        None
    }
 }
-//
-//#[cfg(feature = "repositories")]
-//pub mod repository {
-//    use std::pin::Pin;
-//
-//    use futures::Future;
-//    use std::error::Error;
-//    use std::fmt;
-//
-//    pub trait IOError: std::error::Error + Send {}
-//
-//    #[derive(Debug)]
-//    pub enum RepositoryError {
-//        /// An error with the underlying implementation occurred
-//        IO(Box<dyn IOError>),
-//        /// Error handling save errors, like Primary key already exists and etc.
-//        /// @TODO: Add and underlying implementation for this error
-//        User,
-//    }
-//
-//    impl Error for RepositoryError {}
-//
-//    impl fmt::Display for RepositoryError {
-//        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//            match self {
-//                RepositoryError::User => write!(f, "User error: TODO"),
-//                RepositoryError::IO(error) => write!(f, "IO error: {}", error),
-//            }
-//        }
-//    }
-//
-//    pub type RepositoryFuture<T> = Pin<Box<dyn Future<Output = Result<T, RepositoryError>> + Send>>;
-//}

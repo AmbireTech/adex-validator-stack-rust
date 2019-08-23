@@ -34,7 +34,7 @@ pub struct AdapterOptions {
     pub keystore_pwd: Option<String>,
 }
 
-pub trait Adapter : Sized {
+pub trait Adapter {
 
     type Output;
 
@@ -70,21 +70,3 @@ pub trait Adapter : Sized {
     /// Gets authentication for specific validator
     fn get_auth(&self, validator: &str) -> AdapterFuture<String>;
 }
-
-//
-//pub struct ChannelId(pub [u8; 32]);
-//impl AsRef<[u8]> for ChannelId {
-//    fn as_ref(&self) -> &[u8] {
-//        &self.0
-//    }
-//}
-//
-//pub struct BalanceRoot(pub [u8; 32]);
-//impl AsRef<[u8]> for BalanceRoot {
-//    fn as_ref(&self) -> &[u8] {
-//        &self.0
-//    }
-//}
-//
-//pub struct SignableStateRoot<T: fmt::Display>(pub T);
-//

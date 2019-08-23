@@ -4,7 +4,7 @@
 
 use std::time::Duration;
 use lazy_static::lazy_static;
-use adapter::{DummyAdapter, EthereumAdapter};
+use adapter::{DummyAdapter, EthereumAdapter, AdapterTypes};
 use primitives::{ Config};
 use primitives::config::{configuration};
 use primitives::adapter::{Adapter, AdapterOptions};
@@ -61,34 +61,41 @@ fn main() {
     let sentry_url = cli.value_of("sentryUrl").unwrap();
     let is_single_tick = cli.is_present("singleTick");
     
-    // @TODO fix 
-    // let adapter = match cli.value_of("adapter").unwrap() {
-    //     "ethereum" => {
-    //         let keystore_file = cli.value_of("keystoreFile").unwrap();
-    //         let keystore_pwd = std::env::var("KEYSTORE_PWD").unwrap();
+    let adapter = match cli.value_of("adapter").unwrap() {
+        "ethereum" => {
+            let keystore_file = cli.value_of("keystoreFile").unwrap();
+            let keystore_pwd = std::env::var("KEYSTORE_PWD").unwrap();
 
-    //         let options = AdapterOptions{
-    //             keystore_file: Some(keystore_file.to_string()),
-    //             keystore_pwd: Some(keystore_pwd),
-    //             dummy_identity: None,
-    //             dummy_auth: None,
-    //             dummy_auth_tokens: None,
-    //         };
-    //         EthereumAdapter::init(options, &config)
-    //     },
-    //     "dummy" => {
-    //         let dummy_identity = cli.value_of("dummyIdentity").unwrap();
-    //         let options = AdapterOptions{
-    //             dummy_identity
-    //         };
-    //        DummyAdapter::init(options, &config)
-    //     },
-    //     // @TODO exit gracefully
-    //     _ => panic!("We don't have any other adapters implemented yet!"),
-    // };
-   
+            let options = AdapterOptions{
+                keystore_file: Some(keystore_file.to_string()),
+                keystore_pwd: Some(keystore_pwd),
+                dummy_identity: None,
+                dummy_auth: None,
+                dummy_auth_tokens: None,
+            };
+            AdapterTypes::EthereumAdapter(EthereumAdapter::init(options, &config))
+        },
+        "dummy" => {
+            let dummy_identity = cli.value_of("dummyIdentity").unwrap();
+            let options = AdapterOptions{
+                dummy_identity: Some(dummy_identity.to_string()),
+                // this should be prefilled using fixtures
+                // 
+                dummy_auth: None,
+                dummy_auth_tokens: None,
+                keystore_file: None,
+                keystore_pwd: None,
+            };
+           AdapterTypes::DummyAdapter(DummyAdapter::init(options, &config))
+        },
+        // @TODO exit gracefully
+        _ => panic!("We don't have any other adapters implemented yet!"),
+    };
 
-    // run(is_single_tick, adapter);
+    match adapter {
+        AdapterTypes::EthereumAdapter(ethadapter) => run(is_single_tick, ethadapter),
+        AdapterTypes::DummyAdapter(dummyadapter) => run(is_single_tick, dummyadapter)
+    }
 }
 
 fn run(is_single_tick: bool, adapter: impl Adapter) {
