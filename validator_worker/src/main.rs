@@ -4,12 +4,8 @@
 
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
 use clap::{App, Arg};
-
 use primitives::adapter::{Adapter, AdapterOptions};
 use primitives::config::configuration;
-
-
-
 
 fn main() {
     let cli = App::new("Validator worker")

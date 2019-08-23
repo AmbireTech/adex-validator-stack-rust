@@ -2212,7 +2212,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "validatorWorker"
+name = "validator_worker"
 version = "0.1.0"
 dependencies = [
  "adapter 0.1.0",
