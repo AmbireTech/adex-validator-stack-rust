@@ -29,23 +29,7 @@ pub use self::event_submission::EventSubmission;
 //#[cfg(feature = "repositories")]
 //pub use self::repository::*;
 pub use self::targeting_tag::TargetingTag;
-////pub use self::validator::{ValidatorDesc, ValidatorId};
-//
-//pub mod asset;
 
-//pub mod channel;
-//pub mod targeting_tag;
-//pub mod validator;
-//
-///// re-exports all the fixtures in one module
-//#[cfg(any(test, feature = "fixtures"))]
-//pub mod fixtures {
-//    pub use super::asset::fixtures::*;
-//    pub use super::channel::fixtures::*;
-//    pub use super::targeting_tag::fixtures::*;
-////    pub use super::validator::fixtures::*;
-//}
-//
 #[derive(Debug)]
 pub enum DomainError {
    InvalidArgument(String),
