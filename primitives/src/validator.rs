@@ -1,12 +1,12 @@
 use std::convert::TryFrom;
 use std::fmt;
 //
-use serde::{Deserialize, Serialize};
-use crate::{ BigNum, BalancesMap };
-use chrono::{DateTime, Utc};
-use std::pin::Pin;
-use futures::prelude::*;
 use crate::Channel;
+use crate::{BalancesMap, BigNum};
+use chrono::{DateTime, Utc};
+use futures::prelude::*;
+use serde::{Deserialize, Serialize};
+use std::pin::Pin;
 
 pub type ValidatorFuture<T> = Pin<Box<dyn Future<Output = Result<T, ValidatorError>> + Send>>;
 
@@ -15,7 +15,7 @@ pub enum ValidatorError {
     None,
     InvalidRootHash,
     InvalidSignature,
-    InvalidTransition
+    InvalidTransition,
 }
 
 pub trait Validator {
@@ -29,7 +29,6 @@ pub struct ValidatorDesc {
     pub url: String,
     pub fee: BigNum,
 }
-
 
 // Validator Message Types
 
@@ -78,7 +77,7 @@ pub struct RejectState {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct Heartbeat  {
+pub struct Heartbeat {
     #[serde(rename = "type")]
     pub message_type: String,
     pub signature: String,
@@ -88,7 +87,6 @@ pub struct Heartbeat  {
     // and force the creation of Heartbeat always to be from the `new()` method
     _secret: (),
 }
-
 
 impl Heartbeat {
     pub fn new(signature: String, state_root: String) -> Self {

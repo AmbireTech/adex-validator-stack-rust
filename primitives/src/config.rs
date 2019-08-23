@@ -1,7 +1,7 @@
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
-use std::fs;
 use crate::BigNum;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fs;
 use toml;
 
 pub const DEVELOPMENT_CONFIG: &str = r#"
@@ -100,15 +100,20 @@ pub enum ConfigError {
     InvalidFile(String),
 }
 
-pub fn configuration(environment: &str, config_file: Option<&str>) -> Result<Config, ConfigError>  {
-    let result : Config = match config_file {
+pub fn configuration(environment: &str, config_file: Option<&str>) -> Result<Config, ConfigError> {
+    let result: Config = match config_file {
         Some(config_file) => {
             let data = match fs::read_to_string(config_file) {
                 Ok(result) => result,
-                Err(e) => return Err(ConfigError::InvalidFile(format!("Unable to read provided config file {}", config_file))),
+                Err(e) => {
+                    return Err(ConfigError::InvalidFile(format!(
+                        "Unable to read provided config file {}",
+                        config_file
+                    )))
+                }
             };
             toml::from_str(&data).unwrap()
-        },
+        }
         None => {
             if environment == "production" {
                 return toml::from_str(&PRODUCTION_CONFIG).unwrap();

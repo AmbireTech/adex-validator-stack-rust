@@ -1,18 +1,17 @@
-use hex::encode;
 use futures::future::{err, ok, FutureExt};
+use hex::encode;
+use primitives::adapter::{Adapter, AdapterFuture, AdapterOptions};
+use primitives::channel_validator::ChannelValidator;
+use primitives::config::Config;
+use primitives::Channel;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
-use primitives::{Channel};
-use primitives::channel_validator::{ChannelValidator};
-use primitives::adapter::{Adapter, AdapterFuture, AdapterOptions};
-use primitives::config::{Config};
-
 
 pub struct DummyAdapter {
     identity: String,
     auth_tokens: HashMap<String, String>,
-    verified_auth:  HashMap<String, String>
+    verified_auth: HashMap<String, String>,
 }
 
 // Enables DummyAdapter to be able to
@@ -20,7 +19,6 @@ pub struct DummyAdapter {
 impl ChannelValidator for DummyAdapter {}
 
 impl Adapter for DummyAdapter {
-
     type Output = DummyAdapter;
 
     fn init(opts: AdapterOptions, config: &Config) -> DummyAdapter {
@@ -54,12 +52,7 @@ impl Adapter for DummyAdapter {
         ok(signature).boxed()
     }
 
-    fn verify(
-        &self,
-        signer: &str,
-        state_root: &str,
-        signature: &str,
-    ) -> AdapterFuture<bool> {
+    fn verify(&self, signer: &str, state_root: &str, signature: &str) -> AdapterFuture<bool> {
         // select the `identity` and compare it to the signer
         // for empty string this will return array with 1 element - an empty string `[""]`
         let is_same = match signature.rsplit(' ').take(1).next() {
@@ -91,7 +84,6 @@ impl Adapter for DummyAdapter {
         //         "Identity not found".to_string(),
         //     )),
         // };
-       ok("auth".to_string()).boxed()
+        ok("auth".to_string()).boxed()
     }
-
 }

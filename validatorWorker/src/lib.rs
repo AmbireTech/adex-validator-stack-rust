@@ -5,14 +5,13 @@
 
 pub mod error;
 
-use std::time::Duration;
-use std::error::Error;
-use std::io::prelude::*;
-use std::io;
-use std::fs;
-use toml;
-use error::{ ValidatorWokerError };
-use primitives::config::{Config, PRODUCTION_CONFIG, DEVELOPMENT_CONFIG};
+use error::ValidatorWokerError;
 use futures::future::{FutureExt, TryFutureExt};
+use primitives::config::{Config, DEVELOPMENT_CONFIG, PRODUCTION_CONFIG};
 use reqwest::r#async::Client;
-
+use std::error::Error;
+use std::fs;
+use std::io;
+use std::io::prelude::*;
+use std::time::Duration;
+use toml;

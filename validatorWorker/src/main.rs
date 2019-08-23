@@ -2,14 +2,14 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
 
-use std::time::Duration;
-use lazy_static::lazy_static;
-use adapter::{DummyAdapter, EthereumAdapter, AdapterTypes};
-use primitives::{ Config};
-use primitives::config::{configuration};
-use primitives::adapter::{Adapter, AdapterOptions};
+use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
 use clap::{App, Arg};
+use lazy_static::lazy_static;
+use primitives::adapter::{Adapter, AdapterOptions};
+use primitives::config::configuration;
+use primitives::Config;
 use std::collections::HashMap;
+use std::time::Duration;
 
 fn main() {
     let cli = App::new("Validator worker")
@@ -28,7 +28,7 @@ fn main() {
                 .possible_values(&["ethereum", "dummy"])
                 .takes_value(true),
         )
-         .arg(
+        .arg(
             Arg::with_name("keystoreFile")
                 .short("k")
                 .help("path to the JSON Ethereum Keystore file")
@@ -51,7 +51,7 @@ fn main() {
         .arg(
             Arg::with_name("singleTick")
                 .short("s")
-                .help("Runs the validator in single-tick mode and exits")
+                .help("Runs the validator in single-tick mode and exits"),
         )
         .get_matches();
 
@@ -60,13 +60,13 @@ fn main() {
     let config = configuration(&environment, Some(&config_file)).unwrap();
     let sentry_url = cli.value_of("sentryUrl").unwrap();
     let is_single_tick = cli.is_present("singleTick");
-    
+
     let adapter = match cli.value_of("adapter").unwrap() {
         "ethereum" => {
             let keystore_file = cli.value_of("keystoreFile").unwrap();
             let keystore_pwd = std::env::var("KEYSTORE_PWD").unwrap();
 
-            let options = AdapterOptions{
+            let options = AdapterOptions {
                 keystore_file: Some(keystore_file.to_string()),
                 keystore_pwd: Some(keystore_pwd),
                 dummy_identity: None,
@@ -74,27 +74,27 @@ fn main() {
                 dummy_auth_tokens: None,
             };
             AdapterTypes::EthereumAdapter(EthereumAdapter::init(options, &config))
-        },
+        }
         "dummy" => {
             let dummy_identity = cli.value_of("dummyIdentity").unwrap();
-            let options = AdapterOptions{
+            let options = AdapterOptions {
                 dummy_identity: Some(dummy_identity.to_string()),
                 // this should be prefilled using fixtures
-                // 
+                //
                 dummy_auth: None,
                 dummy_auth_tokens: None,
                 keystore_file: None,
                 keystore_pwd: None,
             };
-           AdapterTypes::DummyAdapter(DummyAdapter::init(options, &config))
-        },
+            AdapterTypes::DummyAdapter(DummyAdapter::init(options, &config))
+        }
         // @TODO exit gracefully
         _ => panic!("We don't have any other adapters implemented yet!"),
     };
 
     match adapter {
         AdapterTypes::EthereumAdapter(ethadapter) => run(is_single_tick, ethadapter),
-        AdapterTypes::DummyAdapter(dummyadapter) => run(is_single_tick, dummyadapter)
+        AdapterTypes::DummyAdapter(dummyadapter) => run(is_single_tick, dummyadapter),
     }
 }
 

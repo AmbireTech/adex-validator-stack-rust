@@ -1,12 +1,11 @@
 use std::{error, fmt};
 
-use chrono::Utc;
+use crate::channel::{Channel, ChannelError, SpecValidator, SpecValidators};
 use crate::config::Config;
-use crate::channel::{ Channel, ChannelError, SpecValidator, SpecValidators };
-
+use chrono::Utc;
 
 pub trait ChannelValidator {
-     fn is_channel_valid(config: &Config, channel: &Channel) -> Result<(), ChannelError> {
+    fn is_channel_valid(config: &Config, channel: &Channel) -> Result<(), ChannelError> {
         let adapter_channel_validator = match channel.spec.validators.find(&config.identity) {
             // check if the channel validators include our adapter identity
             SpecValidator::None => return Err(ChannelError::AdapterNotIncluded),
@@ -72,7 +71,6 @@ pub fn asset_listed(channel: &Channel, whitelist: &[String]) -> bool {
             .iter()
             .any(|allowed| allowed == &channel.deposit_asset)
 }
-
 
 //#[cfg(test)]
 //mod test {

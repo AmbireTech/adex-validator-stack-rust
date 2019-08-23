@@ -1,8 +1,8 @@
-use std::pin::Pin;
 use futures::prelude::*;
 use std::collections::HashMap;
+use std::pin::Pin;
 // use domain::validator::message::State;
-use crate::{ Channel, Config };
+use crate::{Channel, Config};
 //
 //use crate::sanity::SanityChecker;
 use std::error::Error;
@@ -35,7 +35,6 @@ pub struct AdapterOptions {
 }
 
 pub trait Adapter {
-
     type Output;
 
     /// Initialize adapter
@@ -48,24 +47,16 @@ pub trait Adapter {
     fn whoami(&self) -> String;
 
     /// Signs the provided state_root
-    fn sign(
-        &self,
-        state_root: String,
-    ) -> AdapterFuture<String>;
+    fn sign(&self, state_root: String) -> AdapterFuture<String>;
 
     /// Verify, based on the signature & state_root, that the signer is the same
-    fn verify(
-        &self,
-        signer: &str,
-        state_root: &str,
-        signature: &str,
-    ) -> AdapterFuture<bool>;
+    fn verify(&self, signer: &str, state_root: &str, signature: &str) -> AdapterFuture<bool>;
 
     /// Validate a channel
     fn validate_channel(&self, channel: &Channel) -> AdapterFuture<bool>;
 
     /// Get user session from token
-    fn session_from_token(&self, token: &str) ->  AdapterFuture<String>;
+    fn session_from_token(&self, token: &str) -> AdapterFuture<String>;
 
     /// Gets authentication for specific validator
     fn get_auth(&self, validator: &str) -> AdapterFuture<String>;

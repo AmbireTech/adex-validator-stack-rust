@@ -9,9 +9,8 @@ use serde_hex::{SerHex, StrictPfx};
 //
 use crate::big_num::BigNum;
 use crate::util::serde::ts_milliseconds_option;
-use crate::{ValidatorDesc, TargetingTag, EventSubmission, AdUnit};
+use crate::{AdUnit, EventSubmission, TargetingTag, ValidatorDesc};
 use std::error::Error;
-
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -50,9 +49,9 @@ pub struct ChannelSpec {
     /// A millisecond timestamp representing the time you want this campaign to become active (optional)
     /// Used by the AdViewManager
     #[serde(
-    default,
-    skip_serializing_if = "Option::is_none",
-    with = "ts_milliseconds_option"
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "ts_milliseconds_option"
     )]
     pub active_from: Option<DateTime<Utc>>,
     /// A random number to ensure the campaignSpec hash is unique
@@ -150,26 +149,26 @@ impl ChannelListParams {
         page: u64,
         validator: Option<&str>,
     ) -> Result<Self, ChannelError> {
-       if page < 1 {
-           return Err(ChannelError::InvalidArgument(
-               "Page should be >= 1".to_string(),
-           ));
-       }
+        if page < 1 {
+            return Err(ChannelError::InvalidArgument(
+                "Page should be >= 1".to_string(),
+            ));
+        }
 
-       if limit < 1 {
-           return Err(ChannelError::InvalidArgument(
-               "Limit should be >= 1".to_string(),
-           ));
-       }
+        if limit < 1 {
+            return Err(ChannelError::InvalidArgument(
+                "Limit should be >= 1".to_string(),
+            ));
+        }
 
-       let validator = validator.and_then(|s| if s.is_empty() { None } else { Some(s.into()) });
-       Ok(Self {
-           valid_until_ge,
-           page,
-           limit,
-           validator,
-           _secret: (),
-       })
+        let validator = validator.and_then(|s| if s.is_empty() { None } else { Some(s.into()) });
+        Ok(Self {
+            valid_until_ge,
+            page,
+            limit,
+            validator,
+            _secret: (),
+        })
     }
 }
 

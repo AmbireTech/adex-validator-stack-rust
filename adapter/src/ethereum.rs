@@ -4,21 +4,21 @@ use std::fmt;
 use std::fs;
 
 use futures::future::{err, ok, FutureExt};
+use primitives::adapter::{Adapter, AdapterFuture, AdapterOptions};
+use primitives::channel_validator::ChannelValidator;
+use primitives::config::Config;
+use primitives::Channel;
 use serde::{Deserialize, Serialize};
 use web3::futures::Future;
-use web3::types::{Address};
-use primitives::{Channel};
-use primitives::adapter::{Adapter, AdapterFuture, AdapterOptions };
-use primitives::config::{Config};
-use primitives::channel_validator::{ChannelValidator};
+use web3::types::Address;
 
 pub struct EthereumAdapter {
     address: Option<Address>,
     keystore_json: String,
     keystore_pwd: String,
     auth_tokens: HashMap<String, String>,
-    verified_auth:  HashMap<String, String>,
-    wallet: Option<Address>
+    verified_auth: HashMap<String, String>,
+    wallet: Option<Address>,
 }
 
 // Enables EthereumAdapter to be able to
@@ -27,7 +27,6 @@ impl ChannelValidator for EthereumAdapter {}
 
 // @TODO
 impl Adapter for EthereumAdapter {
-    
     type Output = EthereumAdapter;
 
     fn init(opts: AdapterOptions, config: &Config) -> EthereumAdapter {
@@ -46,7 +45,7 @@ impl Adapter for EthereumAdapter {
             keystore_pwd,
             auth_tokens: HashMap::new(),
             verified_auth: HashMap::new(),
-            wallet: None
+            wallet: None,
         }
     }
 
@@ -67,12 +66,7 @@ impl Adapter for EthereumAdapter {
         ok(signature).boxed()
     }
 
-    fn verify(
-        &self,
-        signer: &str,
-        state_root: &str,
-        signature: &str,
-    ) -> AdapterFuture<bool> {
+    fn verify(&self, signer: &str, state_root: &str, signature: &str) -> AdapterFuture<bool> {
         // select the `identity` and compare it to the signer
         // for empty string this will return array with 1 element - an empty string `[""]`
         let is_same = match signature.rsplit(' ').take(1).next() {
@@ -104,6 +98,6 @@ impl Adapter for EthereumAdapter {
         //         "Identity not found".to_string(),
         //     )),
         // };
-       ok("auth".to_string()).boxed()
+        ok("auth".to_string()).boxed()
     }
 }
