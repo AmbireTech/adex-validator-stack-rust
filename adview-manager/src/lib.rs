@@ -157,7 +157,7 @@ pub fn apply_selection(campaigns: &[MarketChannel], options: &AdViewManagerOptio
 }
 
 fn is_video(ad_unit: &AdUnit) -> bool {
-    ad_unit.media_mime.split('/').take(1).collect::<Vec<&str>>()[0] == "video"
+    ad_unit.media_mime.split('/').nth(0) == Some("video")
 }
 
 fn calculate_target_score(a: &[TargetingTag], b: &[TargetingTag]) -> TargetingScore {

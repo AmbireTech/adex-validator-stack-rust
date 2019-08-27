@@ -76,7 +76,7 @@ pub mod fixtures {
             .collect()
     }
 
-    pub fn get_score(score: Option<u8>) -> Score {
+    pub fn get_score(score: Option<f64>) -> Score {
         let score = score.unwrap_or_else(|| <Faker as Number>::between(0, 100));
 
         Score::new(score).expect("Score was unable to be created")
