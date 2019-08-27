@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 pub type TargetingScore = f64;
 pub type MinTargetingScore = TargetingScore;
 
+const IPFS_GATEWAY: &str = "https://ipfs.moonicorn.network/ipfs/";
+
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AdViewManagerOptions {
@@ -37,6 +39,13 @@ pub struct AdViewManagerOptions {
     pub fallback_unit: Option<String>,
     /// Defaulted
     pub disabled_video: bool,
+}
+
+impl AdViewManagerOptions {
+    pub fn size(&self) -> Option<(u64, u64)> {
+        self.width
+            .and_then(|width| self.height.and_then(|height| Some((width, height))))
+    }
 }
 
 #[derive(Debug)]
@@ -71,7 +80,7 @@ impl Unit {
     }
 }
 
-pub fn apply_selection(campaigns: &[MarketChannel], options: AdViewManagerOptions) -> Vec<Unit> {
+pub fn apply_selection(campaigns: &[MarketChannel], options: &AdViewManagerOptions) -> Vec<Unit> {
     let eligible = campaigns.iter().filter(|campaign| {
         options
             .accepted_states
@@ -148,7 +157,7 @@ pub fn apply_selection(campaigns: &[MarketChannel], options: AdViewManagerOption
 }
 
 fn is_video(ad_unit: &AdUnit) -> bool {
-    ad_unit.media_mime.split('/').collect::<Vec<&str>>()[0] == "video"
+    ad_unit.media_mime.split('/').take(1).collect::<Vec<&str>>()[0] == "video"
 }
 
 fn calculate_target_score(a: &[TargetingTag], b: &[TargetingTag]) -> TargetingScore {
@@ -176,6 +185,44 @@ struct EventBody {
     events: Vec<Event>,
 }
 
+fn image_html(
+    event_body: &str,
+    on_load: &str,
+    size: &Option<(u64, u64)>,
+    image_url: &str,
+) -> String {
+    let size = size
+        .map(|(width, height)| format!("width=\"{}\" height=\"{}\"", width, height))
+        .unwrap_or("".to_string());
+
+    format!("<img src=\"{image_url}\" data-event-body='{event_body}' alt=\"AdEx ad\" rel=\"nofollow\" onload=\"{on_load}\" {size}>",
+            image_url = image_url, event_body = event_body, on_load = on_load, size = size)
+}
+
+fn normalize_url(url: &str) -> String {
+    if url.starts_with("ipfs://") {
+        url.replacen("ipfs://", IPFS_GATEWAY, 1)
+    } else {
+        url.to_string()
+    }
+}
+
+fn video_html(
+    event_body: &str,
+    on_load: &str,
+    size: &Option<(u64, u64)>,
+    image_url: &str,
+    media_mime: &str,
+) -> String {
+    let size = size
+        .map(|(width, height)| format!("width=\"{}\" height=\"{}\"", width, height))
+        .unwrap_or("".to_string());
+
+    format!("<video {size} loop autoplay data-event-body='{event_body}' onloadeddata=\"${on_load}\" muted>
+    <source src=\"{image_url}\" type=\"{media_mime}\">
+    </video>", size = size, event_body = event_body, on_load = on_load, image_url = image_url, media_mime = media_mime)
+}
+
 pub fn get_html(
     options: &AdViewManagerOptions,
     ad_unit: AdUnit,
@@ -190,7 +237,7 @@ pub fn get_html(
         }],
     };
 
-    let on_load_code: String = validators.into_iter().map(|validator| {
+    let on_load: String = validators.into_iter().map(|validator| {
         let fetch_opts = "{ method: 'POST', headers: { 'content-type': 'application/json' }, body: this.dataset.eventBody }";
         let fetch_url = format!("{}/channel/{}/events", validator.url, channel_id);
 
@@ -199,31 +246,26 @@ pub fn get_html(
 
     let ev_body = serde_json::to_string(&ev_body).expect("should convert");
 
-    get_unit_html(&options, ad_unit, &ev_body, &on_load_code)
+    get_unit_html(&options.size(), ad_unit, &ev_body, &on_load)
 }
 
 fn get_unit_html(
-    options: &AdViewManagerOptions,
+    size: &Option<(u64, u64)>,
     ad_unit: AdUnit,
     event_body: &str,
     on_load: &str,
 ) -> String {
-    let size = options
-        .width
-        .and_then(|width| options.height.and_then(|height| Some((width, height))));
+    let image_url = normalize_url(&ad_unit.media_url);
+
+    let element_html = if is_video(&ad_unit) {
+        video_html(event_body, on_load, size, &image_url, &ad_unit.media_mime)
+    } else {
+        image_html(event_body, on_load, size, &image_url)
+    };
 
     let style_size = size
         .map(|(width, height)| format!("width: {}; height: {};", width, height))
         .unwrap_or("".to_string());
-    let element_html = if is_video(&ad_unit) {
-        // get_video_html
-        // videoHtml({ evBody, onLoadCode, size, imgUrl, mediaMime: unit.mediaMime })
-        "videoHtml"
-    } else {
-        // get_image_html
-        // imageHtml({ evBody, onLoadCode, size, imgUrl }))
-        "imageHtml"
-    };
 
     let adex_icon = "<a href=\"https://www.adex.network\" target=\"_blank\" rel=\"noopener noreferrer\"
             style=\"position: absolute; top: 0; right: 0;\"
@@ -250,4 +292,47 @@ fn get_unit_html(
     ", target_url = ad_unit.target_url, size = style_size, element_html = element_html, adex_icon = adex_icon);
 
     result.to_string()
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn get_ad_unit(media_mime: &str) -> AdUnit {
+        AdUnit {
+            ipfs: "".to_string(),
+            ad_type: "".to_string(),
+            media_url: "".to_string(),
+            media_mime: media_mime.to_string(),
+            target_url: "".to_string(),
+            targeting: vec![],
+            min_targeting_score: None,
+            tags: vec![],
+            owner: "".to_string(),
+            created: Utc::now(),
+            title: None,
+            description: None,
+            archived: false,
+            modified: None,
+        }
+    }
+
+    #[test]
+    fn test_is_video() {
+        assert_eq!(true, is_video(&get_ad_unit("video/avi")));
+        assert_eq!(false, is_video(&get_ad_unit("image/jpeg")));
+    }
+
+    #[test]
+    fn normalization_of_url() {
+        // IPFS case
+        assert_eq!(format!("{}123", IPFS_GATEWAY), normalize_url("ipfs://123"));
+        assert_eq!(
+            format!("{}123ipfs://", IPFS_GATEWAY),
+            normalize_url("ipfs://123ipfs://")
+        );
+
+        // Non-IPFS case
+        assert_eq!("http://123".to_string(), normalize_url("http://123"));
+    }
 }
