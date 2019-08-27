@@ -35,11 +35,8 @@ impl ChannelListParams {
                 "Limit should be >= 1".to_string(),
             ));
         }
-
-        let validator = validator
-            .and_then(|s| if s.is_empty() { None } else { Some(s) })
-            .map(ValidatorId::try_from)
-            .transpose()?;
+        let page = 
+        let validator = validator.and_then(|s| if s.is_empty() { None } else { Some(s) });
 
         Ok(Self {
             valid_until_ge,

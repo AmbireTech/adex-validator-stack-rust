@@ -2,8 +2,7 @@
 
 members = [
     "adapter",
-    "domain",
-    "sentry",
-    "validator",
-    "memory-repository",
+    "primitives",
+     "validator_worker",
+         # "sentry",
 ]

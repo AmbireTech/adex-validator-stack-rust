@@ -1,6 +1,6 @@
 [env]
 CARGO_MAKE_EXTEND_WORKSPACE_MAKEFILE = "true"
-CARGO_MAKE_CLIPPY_ARGS = "--all-features -- -D warnings"
+CARGO_MAKE_CLIPPY_ARGS = "--all-features"
 
 [tasks.dev-test-flow]
 dependencies = [

@@ -1,37 +1,49 @@
 #![deny(clippy::all)]
 #![deny(rust_2018_idioms)]
 
+use std::collections::HashMap;
+
 use futures::future::{ok, FutureExt};
 use primitives::adapter::{Adapter, AdapterFuture, AdapterOptions};
 use primitives::channel_validator::ChannelValidator;
 use primitives::config::Config;
 use primitives::Channel;
-use std::collections::HashMap;
+use web3::types::Address;
 
-pub struct DummyAdapter {
-    identity: String,
+pub struct EthereumAdapter {
+    address: Option<Address>,
+    keystore_json: String,
+    keystore_pwd: String,
     auth_tokens: HashMap<String, String>,
     verified_auth: HashMap<String, String>,
+    wallet: Option<Address>,
 }
 
-// Enables DummyAdapter to be able to
+// Enables EthereumAdapter to be able to
 // check if a channel is valid
-impl ChannelValidator for DummyAdapter {}
+impl ChannelValidator for EthereumAdapter {}
 
-impl Adapter for DummyAdapter {
-    type Output = DummyAdapter;
+// @TODO
+impl Adapter for EthereumAdapter {
+    type Output = EthereumAdapter;
 
-    fn init(opts: AdapterOptions, _config: &Config) -> DummyAdapter {
+    fn init(opts: AdapterOptions, _config: &Config) -> EthereumAdapter {
         // opts.dummy_identity.expect("dummyIdentity required");
         // opts.dummy_auth.expect("dummy auth required");
         // opts.dummy_auth_tokens.expect("dummy auth tokens required");
         // self.identity = opts.dummy_identity.unwrap();
         // self.authTokens = opts.dummy_auth.unwrap();
         // self.verifiedAuth = opts.dummy_auth_tokens.unwrap();
+        let keystore_json = opts.keystore_file.unwrap();
+        let keystore_pwd = opts.keystore_pwd.unwrap();
+
         Self {
-            identity: opts.dummy_identity.unwrap(),
+            address: None,
+            keystore_json,
+            keystore_pwd,
             auth_tokens: HashMap::new(),
             verified_auth: HashMap::new(),
+            wallet: None,
         }
     }
 
@@ -40,7 +52,7 @@ impl Adapter for DummyAdapter {
     }
 
     fn whoami(&self) -> String {
-        self.identity.to_string()
+        self.address.unwrap().to_string()
     }
 
     fn sign(&self, state_root: String) -> AdapterFuture<String> {
