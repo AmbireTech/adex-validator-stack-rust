@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 
-use crate::{AdUnit, BigNum, Channel, ChannelSpec};
+use crate::{BigNum, ChannelSpec};
 
 // Data structs specific to the market
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -33,7 +33,7 @@ pub struct MarketStatus {
 }
 
 impl MarketStatus {
-    fn balances_sum(&self) -> BigNum {
+    pub fn balances_sum(&self) -> BigNum {
         self.balances.values().sum()
     }
 }
