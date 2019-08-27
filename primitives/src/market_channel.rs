@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 use chrono::serde::ts_milliseconds;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 
