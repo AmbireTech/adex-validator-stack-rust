@@ -1,5 +1,6 @@
 use serde::{Deserialize, Deserializer, Serialize};
 use std::error::Error;
+use std::ops::Mul;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TargetingTag {
@@ -9,13 +10,13 @@ pub struct TargetingTag {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(transparent)]
-pub struct Score(#[serde(deserialize_with = "score_deserialize")] u8);
+pub struct Score(#[serde(deserialize_with = "score_deserialize")] f64);
 
 impl Score {
     /// score should be between 0 and 100
     #[allow(dead_code)]
-    fn new(score: u8) -> Result<Self, Box<dyn Error>> {
-        if score > 100 {
+    fn new(score: f64) -> Result<Self, Box<dyn Error>> {
+        if score > 100_f64 {
             return Err("score should be between 0 >= x <= 100".into());
         }
 
@@ -23,13 +24,27 @@ impl Score {
     }
 }
 
-pub fn score_deserialize<'de, D>(deserializer: D) -> Result<u8, D::Error>
+impl Mul for &Score {
+    type Output = Score;
+
+    fn mul(self, rhs: Self) -> Score {
+        Score(self.0 * rhs.0)
+    }
+}
+
+impl From<Score> for f64 {
+    fn from(score: Score) -> f64 {
+        score.0
+    }
+}
+
+pub fn score_deserialize<'de, D>(deserializer: D) -> Result<f64, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let score_unchecked: u8 = u8::deserialize(deserializer)?;
+    let score_unchecked: f64 = <_>::deserialize(deserializer)?;
 
-    if score_unchecked > 100 {
+    if score_unchecked > 100_f64 {
         Err(serde::de::Error::custom(
             "Score should be between 0 >= x <= 100",
         ))
@@ -61,8 +76,8 @@ pub mod fixtures {
             .collect()
     }
 
-    pub fn get_score(score: Option<u8>) -> Score {
-        let score = score.unwrap_or_else(|| <Faker as Number>::between(0, 100));
+    pub fn get_score(score: Option<f64>) -> Score {
+        let score = score.unwrap_or_else(|| <Faker as Number>::between(0.0, 100.0));
 
         Score::new(score).expect("Score was unable to be created")
     }

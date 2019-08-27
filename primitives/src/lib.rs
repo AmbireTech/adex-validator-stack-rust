@@ -11,6 +11,7 @@ pub mod channel;
 pub mod channel_validator;
 pub mod config;
 pub mod event_submission;
+pub mod market_channel;
 pub mod targeting_tag;
 pub mod util;
 pub mod validator;
