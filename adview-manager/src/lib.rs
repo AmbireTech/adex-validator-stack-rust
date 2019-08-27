@@ -105,7 +105,7 @@ pub fn apply_selection(campaigns: &[MarketChannel], options: &AdViewManagerOptio
                     min_targeting_score: ad_unit
                         .min_targeting_score
                         .or(campaign.spec.min_targeting_score)
-                        .unwrap_or(0.into()),
+                        .unwrap_or_else(|| 0.into()),
                     min_per_impression: campaign.spec.min_per_impression.clone(),
                 };
 
@@ -193,7 +193,7 @@ fn image_html(
 ) -> String {
     let size = size
         .map(|(width, height)| format!("width=\"{}\" height=\"{}\"", width, height))
-        .unwrap_or("".to_string());
+        .unwrap_or_else(|| "".to_string());
 
     format!("<img src=\"{image_url}\" data-event-body='{event_body}' alt=\"AdEx ad\" rel=\"nofollow\" onload=\"{on_load}\" {size}>",
             image_url = image_url, event_body = event_body, on_load = on_load, size = size)
@@ -216,7 +216,7 @@ fn video_html(
 ) -> String {
     let size = size
         .map(|(width, height)| format!("width=\"{}\" height=\"{}\"", width, height))
-        .unwrap_or("".to_string());
+        .unwrap_or_else(|| "".to_string());
 
     format!("<video {size} loop autoplay data-event-body='{event_body}' onloadeddata=\"${on_load}\" muted>
     <source src=\"{image_url}\" type=\"{media_mime}\">
@@ -265,7 +265,7 @@ fn get_unit_html(
 
     let style_size = size
         .map(|(width, height)| format!("width: {}; height: {};", width, height))
-        .unwrap_or("".to_string());
+        .unwrap_or_else(|| "".to_string());
 
     let adex_icon = "<a href=\"https://www.adex.network\" target=\"_blank\" rel=\"noopener noreferrer\"
             style=\"position: absolute; top: 0; right: 0;\"
