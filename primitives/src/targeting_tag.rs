@@ -77,7 +77,7 @@ pub mod fixtures {
     }
 
     pub fn get_score(score: Option<f64>) -> Score {
-        let score = score.unwrap_or_else(|| <Faker as Number>::between(0, 100));
+        let score = score.unwrap_or_else(|| <Faker as Number>::between(0.0, 100.0));
 
         Score::new(score).expect("Score was unable to be created")
     }
