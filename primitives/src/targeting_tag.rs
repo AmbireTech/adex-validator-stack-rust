@@ -53,7 +53,6 @@ where
     }
 }
 
-#[cfg(any(test, feature = "fixtures"))]
 pub mod fixtures {
     use fake::faker::*;
 
