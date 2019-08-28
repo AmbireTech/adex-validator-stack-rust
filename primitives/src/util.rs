@@ -1,4 +1,3 @@
-#[cfg(any(test, feature = "fixtures"))]
 pub mod tests;
 
 pub mod serde {
