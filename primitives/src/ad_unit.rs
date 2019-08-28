@@ -29,7 +29,7 @@ pub struct AdUnit {
     /// Array of TargetingTag
     pub targeting: Vec<TargetingTag>,
     /// Number; minimum targeting score (optional)
-    pub min_targeting_score: Option<u8>,
+    pub min_targeting_score: Option<f64>,
     /// Array of TargetingTag (optional)
     /// meant for discovery between publishers/advertisers
     #[serde(default)]
