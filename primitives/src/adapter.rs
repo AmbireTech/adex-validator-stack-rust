@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::pin::Pin;
 // use domain::validator::message::State;
 use crate::{Channel, Config};
-//
+use crate::validator::{ValidatorDesc};
 //use crate::sanity::SanityChecker;
 use std::error::Error;
 use std::fmt;
@@ -59,5 +59,5 @@ pub trait Adapter {
     fn session_from_token(&self, token: &str) -> AdapterFuture<String>;
 
     /// Gets authentication for specific validator
-    fn get_auth(&self, validator: &str) -> AdapterFuture<String>;
+    fn get_auth(&self, validator: &ValidatorDesc) -> AdapterFuture<String>;
 }

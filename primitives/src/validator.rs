@@ -82,9 +82,6 @@ pub struct Heartbeat {
     pub signature: String,
     pub state_root: String,
     pub timestamp: DateTime<Utc>,
-    // we always want to create heartbeat with Timestamp NOW, so add a hidden field
-    // and force the creation of Heartbeat always to be from the `new()` method
-    _secret: (),
 }
 
 impl Heartbeat {
@@ -94,11 +91,12 @@ impl Heartbeat {
             signature,
             state_root,
             timestamp: Utc::now(),
-            _secret: (),
         }
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(tag = "type")]
 pub enum MessageTypes {
     ApproveState(ApproveState),
     NewState(NewState),
