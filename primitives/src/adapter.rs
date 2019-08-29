@@ -4,9 +4,11 @@ use std::pin::Pin;
 // use domain::validator::message::State;
 use crate::{Channel, Config};
 use crate::validator::{ValidatorDesc};
+use crate::channel_validator::ChannelValidator;
 //use crate::sanity::SanityChecker;
 use std::error::Error;
 use std::fmt;
+use std::fmt::{Debug};
 
 pub type AdapterFuture<T> = Pin<Box<dyn Future<Output = Result<T, AdapterError>> + Send>>;
 
@@ -34,7 +36,8 @@ pub struct AdapterOptions {
     pub keystore_pwd: Option<String>,
 }
 
-pub trait Adapter {
+pub trait Adapter : ChannelValidator + Clone + Debug + Send + Sync {
+
     type Output;
 
     /// Initialize adapter

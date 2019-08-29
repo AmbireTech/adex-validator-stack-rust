@@ -4,3 +4,4 @@
 #![allow(clippy::needless_lifetimes)]
 
 pub mod sentry_interface;
+pub mod error;

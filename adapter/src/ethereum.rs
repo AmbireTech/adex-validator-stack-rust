@@ -2,14 +2,14 @@
 #![deny(rust_2018_idioms)]
 
 use std::collections::HashMap;
-
 use futures::future::{ok, FutureExt};
 use primitives::adapter::{Adapter, AdapterFuture, AdapterOptions};
 use primitives::channel_validator::ChannelValidator;
 use primitives::config::Config;
-use primitives::Channel;
+use primitives::{Channel, ValidatorDesc};
 use web3::types::Address;
 
+#[derive(Debug, Clone)]
 pub struct EthereumAdapter {
     address: Option<Address>,
     keystore_json: String,
@@ -85,7 +85,7 @@ impl Adapter for EthereumAdapter {
         ok("hello".to_string()).boxed()
     }
 
-    fn get_auth(&self, _validator: &str) -> AdapterFuture<String> {
+    fn get_auth(&self, _validator: &ValidatorDesc) -> AdapterFuture<String> {
         // let participant = self
         //     .participants
         //     .iter()

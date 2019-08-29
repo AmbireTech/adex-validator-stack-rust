@@ -17,39 +17,48 @@ use reqwest::Error;
 use serde::Deserialize;
 use std::iter::once;
 use std::time::Duration;
+use crate::error::{ValidatorWorkerError};
 
-#[derive(Clone)]
-pub(crate) struct SentryApi {
-    pub adapter: Adapter,
+#[derive(Clone, Debug)]
+pub(crate) struct SentryApi<T: Adapter> {
+    pub validator: ValidatorDesc,
+    pub adapter: T,
     pub sentry_url: String,
     pub client: Client,
     pub logging: bool,
-    pub channel: Channel
+    pub channel: Channel,
 }
 
-impl SentryApi {
+impl <T : Adapter + 'static> SentryApi <T> {
 
-    pub new(adapter: impl Adapter, channel: &Channel, logging: bool) -> Self {
+    pub fn new(adapter: T, channel: &Channel, logging: bool) -> Result<Self, ValidatorWorkerError> {
+
         let whoami = adapter.whoami();
-        let validator = channel.spec.validators.find(|v| v.id === whoami);
-        // assert!(vaildator, 'we can not find validator entry for whoami')
-        let sentry_url = format!("{}/channel/{}", validator.url, channel.id);
+        let validator = channel.spec.validators.into_iter().find(|&v| v.id == whoami);
 
-        Self {
-            adapter,
-            sentry_url,
-            client: Client::new(),
-            logging,
-            channel: channel.to_owned()
+        match validator {
+            Some(v) => {
+                let sentry_url = format!("{}/channel/{}", v.url, channel.id);
+
+                Ok(Self {
+                    validator: v.clone().to_owned(),
+                    adapter,
+                    sentry_url,
+                    client: Client::new(),
+                    logging,
+                    channel: channel.to_owned()
+                })
+
+            },
+            None => Err(ValidatorWorkerError::InvalidValidatorEntry("we can not find validator entry for whoami".to_string()))
         }
     }
 
-    pub fn all_channels(
-        &self,
-    ) -> impl Future<Output = Result<Vec<Channel>, Error>> {
-        let validator = validator.cloned();
+    pub fn all_channels(&self) -> impl Future<Output = Result<Vec<Channel>, Error>> {
+        let validator = self.validator.clone();
         // call Sentry and fetch first page, where validator = identity
-        let first_page = fetch_page(1, validator.clone());
+        let first_page = self.clone().fetch_page(1, validator.clone().url);
+        let handle = self.clone();
 
         first_page
             .and_then(move |response| {
@@ -62,7 +71,9 @@ impl SentryApi {
                     // call Sentry again for the rest of tha pages
                     let futures = (2..=response.total_pages)
                         .map(|page| {
-                                fetch_page(page, validator.clone())
+                            handle
+                                .clone()
+                                .fetch_page(page, validator.clone().url)
                                 .map(|response_result| {
                                     response_result.and_then(|response| Ok(response.channels))
                                 })
@@ -82,12 +93,13 @@ impl SentryApi {
     }
 
     async fn fetch_page(
-        &self,
-        page: u64
+        self,
+        page: u64,
+        validator: String,
     ) -> Result<ChannelAllResponse, reqwest::Error> {
         
         let mut query = vec![format!("page={}", page)];    
-        query.push(format!("validator={}", validator));
+        query.push(format!("validator={}", validator.to_string()));
 
         let future = self
             .client
@@ -102,11 +114,11 @@ impl SentryApi {
         let serialised_messages = messages.into_iter().map(
             | message | {
                 match message {
-                    MessageTypes::NewState(new_state) => serde_json::to_string(&new_state),
-                    MessageTypes::ApproveState(approve_state) => serde_json::to_string(&approve_state),
-                    MessageTypes::Heartbeat(heartbeat) => serde_json::to_string(&heartbeat),
-                    MessageTypes::RejectState(reject_state) => serde_json::to_string(&reject_state),
-                    MessageTypes::Accounting(accounting) => serde_json::to_string(&accounting)
+                    MessageTypes::NewState(new_state) => serde_json::to_string(&new_state).unwrap(),
+                    MessageTypes::ApproveState(approve_state) => serde_json::to_string(&approve_state).unwrap(),
+                    MessageTypes::Heartbeat(heartbeat) => serde_json::to_string(&heartbeat).unwrap(),
+                    MessageTypes::RejectState(reject_state) => serde_json::to_string(&reject_state).unwrap(),
+                    MessageTypes::Accounting(accounting) => serde_json::to_string(&accounting).unwrap()
                 }
             }
         ).collect();
