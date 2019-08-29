@@ -19,7 +19,7 @@ pub fn is_healthy(
     channel: &Channel,
     our: &BalancesMap,
     approved: &BalancesMap,
-    health_threshold_neg: BigNum,
+    health_threshold: BigNum,
 ) -> bool {
     let sum_our: BigNum = our.values().sum();
 
@@ -34,6 +34,7 @@ pub fn is_healthy(
     }
 
     let deposit = &channel.deposit_amount;
+    let health_threshold_neg = BigNum::from(1_000) - health_threshold;
     let acceptable_difference = deposit * &health_threshold_neg / &BigNum::from(1_000);
 
     sum_our - sum_approved_mins < acceptable_difference
@@ -45,7 +46,7 @@ mod test {
     use primitives::channel::fixtures::get_channel;
 
     fn health_threshold() -> BigNum {
-        (1000 - 950).into()
+        950.into()
     }
 
     fn get_dummy_channel<T: Into<BigNum>>(deposit: T) -> Channel {
