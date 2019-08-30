@@ -44,16 +44,17 @@ pub fn is_healthy(
 mod test {
     use super::*;
     use primitives::channel::fixtures::get_channel;
+    use primitives::util::tests::prep_db::DUMMY_CHANNEL;
 
     fn health_threshold() -> BigNum {
         950.into()
     }
 
     fn get_dummy_channel<T: Into<BigNum>>(deposit: T) -> Channel {
-        let mut channel = get_channel("channel", &None, None);
-        channel.deposit_amount = deposit.into();
-
-        channel
+        Channel {
+            deposit_amount: deposit.into(),
+            ..DUMMY_CHANNEL.clone()
+        }
     }
 
     #[test]

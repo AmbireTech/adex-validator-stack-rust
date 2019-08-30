@@ -5,7 +5,7 @@ use lazy_static::lazy_static;
 use std::collections::HashMap;
 
 lazy_static! {
-    static ref IDS: HashMap<&'static str, String> = {
+    pub static ref IDS: HashMap<&'static str, String> = {
         let mut ids = HashMap::new();
 
         ids.insert("leader", "awesomeLeader".into());
@@ -18,7 +18,7 @@ lazy_static! {
         ids
     };
 
-    static ref AUTH: HashMap<&'static str, String> = {
+    pub static ref AUTH: HashMap<&'static str, String> = {
         let mut auth = HashMap::new();
 
         auth.insert("leader", "AUTH_awesomeLeader".into());
@@ -31,7 +31,7 @@ lazy_static! {
         auth
     };
 
-    static ref DUMMY_CHANNEL: Channel = {
+    pub static ref DUMMY_CHANNEL: Channel = {
         let leader = ValidatorDesc {
             id: "awesomeLeader".to_string(),
             url: "http://localhost:8005".to_string(),
