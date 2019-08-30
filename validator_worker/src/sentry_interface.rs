@@ -13,11 +13,12 @@ use futures::future::{ok, try_join_all, FutureExt, TryFutureExt};
 use futures::Future;
 use futures_legacy::Future as LegacyFuture;
 use reqwest::r#async::{Client, Response};
-use reqwest::Error;
 use serde::Deserialize;
 use std::iter::once;
 use std::time::Duration;
 use crate::error::{ValidatorWorkerError};
+use reqwest::header::AUTHORIZATION;
+use std::error::Error;
 
 #[derive(Clone, Debug)]
 pub(crate) struct SentryApi<T: Adapter> {
@@ -54,7 +55,7 @@ impl <T : Adapter + 'static> SentryApi <T> {
         }
     }
 
-    pub fn all_channels(&self) -> impl Future<Output = Result<Vec<Channel>, Error>> {
+    pub fn all_channels(&self) -> impl Future<Output = Result<Vec<Channel>, reqwest::Error>> {
         let validator = self.validator.clone();
         // call Sentry and fetch first page, where validator = identity
         let first_page = self.clone().fetch_page(1, validator.clone().url);
@@ -111,7 +112,7 @@ impl <T : Adapter + 'static> SentryApi <T> {
     }
 
     pub fn propagate(&self, messages: Vec<MessageTypes>) {
-        let serialised_messages = messages.into_iter().map(
+        let serialised_messages: Vec<String> = messages.into_iter().map(
             | message | {
                 match message {
                     MessageTypes::NewState(new_state) => serde_json::to_string(&new_state).unwrap(),
@@ -124,66 +125,68 @@ impl <T : Adapter + 'static> SentryApi <T> {
         ).collect();
 
         for validator in self.channel.spec.validators.into_iter() {
-            let auth = self.adapter.get_auth(&validator);
-            auth.and_then( |auth_token| {
-                // log if a timeout error occurs
-                match propagate_to(auth_token, self.timeout, &validator, &serialised_messages) {
-                    Ok(_) => return,
-                    Err(e) =>  handle_http_error(e, &validator.url)
-                }
-            })
+            // self.adapter.get_auth(&validator).
+            // .and_then( |auth_token| {
+            //     // log if a timeout error occurs
+            //     match propagate_to(auth_token, self.timeout, &validator, &serialised_messages) {
+            //         Ok(_) => return,
+            //         Err(e) =>  handle_http_error(e, &validator.url)
+            //     }
+            // })
             
         }
     }
 
-    pub fn get_latest_msg(from: &str, message_type: &str) -> impl Future<Output = Result<ValidatorMessageResponse, Error>>  {
+    pub async fn get_latest_msg(&self, from: String, message_type: String) -> Result<ValidatorMessageResponse, reqwest::Error> {
         let future = self
+            .clone()
             .client
-            .get(format!("{}/validator-messages/{}/{}?limit=1", self.sentry_url, from, message_type))
+            .get(&format!("{}/validator-messages/{}/{}?limit=1", self.sentry_url, from, message_type))
             .send()
-            .and_then(|mut res: Response| res.json::<ValidatorMessageResponse>());
+            .and_then(|mut res: Response| res.json::<ValidatorMessageResponse>())
+            .compat();
 
-        await!(future.compat())
+        await!(future)
     }
 
-    pub fn get_our_latest_msg(message_type: &str) -> impl Future<Output = Result<ValidatorMessageResponse, Error>>  {
-        let whoami = adapter.whoami();
-        self.get_latest_msg(whoami, message_type)
+    pub async fn get_our_latest_msg(&self, message_type: String) -> Result<ValidatorMessageResponse, reqwest::Error> {
+        let whoami = self.adapter.whoami();
+        await!(self.get_latest_msg(whoami, message_type))
     }
 
-    pub fn get_last_approved() -> impl Future<Output = Result<LastApprovedResponse, Error>> {
+    pub async fn get_last_approved(&self) -> Result<LastApprovedResponse, reqwest::Error> {
         let future = self
             .client
-            .get(format!("{}/last-approved", self.sentry_url))
+            .get(&format!("{}/last-approved", self.sentry_url))
             .send()
             .and_then(|mut res: Response| res.json::<LastApprovedResponse>());
 
         await!(future.compat())
     }
 
-    pub fn get_last_msgs() -> impl Future<Output = Result<LastApprovedResponse, Error>>  {
+    pub async fn get_last_msgs(&self) -> Result<LastApprovedResponse, reqwest::Error>  {
          let future = self
             .client
-            .get(format!("{}/last-approved?withHearbeat=true", self.sentry_url))
+            .get(&format!("{}/last-approved?withHearbeat=true", self.sentry_url))
             .send()
             .and_then(|mut res: Response| res.json::<LastApprovedResponse>());
 
         await!(future.compat())
     }
 
-    pub fn get_event_aggregates(&self, after: Option<u32> ) -> impl Future<Output = Result<EventAggregateResponse, Error>>  {
-        let whoami = adapter.whoami();
-        let validator = channel.spec.validators.find(|v| v.id === whoami);
-        let auth_token = self.adapter.get_auth(&validator);
+    pub async fn get_event_aggregates(&self, after: Option<u32> ) -> Result<EventAggregateResponse, reqwest::Error> {
+        let whoami = self.adapter.whoami();
+        let validator = self.channel.spec.validators.into_iter().find(|&v| v.id == whoami);
+        let auth_token = self.adapter.get_auth(validator.unwrap()).unwrap();
 
         let url = match after {
             Some(duration) => format!("{}/events-aggregates?after={}", self.sentry_url, duration),
             None => format!("{}/events-aggregates", self.sentry_url)
-        }
+        };
         
         let future = self
             .client
-            .get(url)
+            .get(&url)
             .header("authorization", auth_token.to_string())
             .send()
             .and_then(|mut res: Response| res.json::<EventAggregateResponse>());
@@ -194,18 +197,21 @@ impl <T : Adapter + 'static> SentryApi <T> {
 
 fn propagate_to(
     auth_token: &str,
-    timeout: u32,
+    timeout: u64,
     validator: &ValidatorDesc,
-    messages: &Vec<String>
-    ) -> Result<SuccessResponse, reqwest::Error> {
+    messages: Vec<String>
+    ) -> Result<(), reqwest::Error> {
     // create client with timeout
     let client = reqwest::Client::builder().timeout(Duration::from_secs(timeout)).build()?;
     let url = validator.url.to_string();
 
-    client.post(url)
-        .header("authorization".to_string(), auth_token.to_string())    
-        .json(messages)
-        .send()
+    let response: SuccessResponse = client.post(&url)
+        .header(AUTHORIZATION, auth_token.to_string())    
+        .json(&messages)
+        .send()?
+        .json()?;
+    
+    Ok(())
 }
 
 fn handle_http_error(e: reqwest::Error, url: &str) {

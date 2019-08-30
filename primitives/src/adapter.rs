@@ -10,7 +10,7 @@ use std::error::Error;
 use std::fmt;
 use std::fmt::{Debug};
 
-pub type AdapterFuture<T> = Pin<Box<dyn Future<Output = Result<T, AdapterError>> + Send>>;
+pub type AdapterResult<T> = Result<T, AdapterError>;
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum AdapterError {
@@ -44,23 +44,23 @@ pub trait Adapter : ChannelValidator + Clone + Debug + Send + Sync {
     fn init(opts: AdapterOptions, config: &Config) -> Self::Output;
 
     /// Unlock adapter
-    fn unlock(&self) -> AdapterFuture<bool>;
+    fn unlock(&self) -> AdapterResult<bool>;
 
     /// Get Adapter whoami
     fn whoami(&self) -> String;
 
     /// Signs the provided state_root
-    fn sign(&self, state_root: String) -> AdapterFuture<String>;
+    fn sign(&self, state_root: String) -> AdapterResult<String>;
 
     /// Verify, based on the signature & state_root, that the signer is the same
-    fn verify(&self, signer: &str, state_root: &str, signature: &str) -> AdapterFuture<bool>;
+    fn verify(&self, signer: &str, state_root: &str, signature: &str) -> AdapterResult<bool>;
 
     /// Validate a channel
-    fn validate_channel(&self, channel: &Channel) -> AdapterFuture<bool>;
+    fn validate_channel(&self, channel: &Channel) -> AdapterResult<bool>;
 
     /// Get user session from token
-    fn session_from_token(&self, token: &str) -> AdapterFuture<String>;
+    fn session_from_token(&self, token: &str) -> AdapterResult<String>;
 
     /// Gets authentication for specific validator
-    fn get_auth(&self, validator: &ValidatorDesc) -> AdapterFuture<String>;
+    fn get_auth(&self, validator: &ValidatorDesc) -> AdapterResult<String>;
 }
