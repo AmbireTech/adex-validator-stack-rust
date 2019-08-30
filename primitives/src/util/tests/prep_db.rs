@@ -7,6 +7,7 @@ use std::collections::HashMap;
 lazy_static! {
     static ref IDS: HashMap<&'static str, String> = {
         let mut ids = HashMap::new();
+
         ids.insert("leader", "awesomeLeader".into());
         ids.insert("follower", "awesomeFollower".into());
         ids.insert("user", "awesomeTestUser".into());
@@ -15,6 +16,19 @@ lazy_static! {
         ids.insert("creator", "awesomeCreator".into());
 
         ids
+    };
+
+    static ref AUTH: HashMap<&'static str, String> = {
+        let mut auth = HashMap::new();
+
+        auth.insert("leader", "AUTH_awesomeLeader".into());
+        auth.insert("follower", "AUTH_awesomeLeader".into());
+        auth.insert("user", "x8c9v1b2".into());
+        auth.insert("publisher", "testing".into());
+        auth.insert("publisher2", "testing2".into());
+        auth.insert("creator", "awesomeCreator".into());
+
+        auth
     };
 
     static ref DUMMY_CHANNEL: Channel = {
