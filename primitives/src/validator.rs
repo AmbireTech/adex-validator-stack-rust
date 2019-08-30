@@ -1,9 +1,11 @@
-use crate::Channel;
-use crate::{BalancesMap, BigNum};
+use std::pin::Pin;
+
 use chrono::{DateTime, Utc};
 use futures::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::pin::Pin;
+
+use crate::Channel;
+use crate::{BalancesMap, BigNum};
 
 pub type ValidatorFuture<T> = Pin<Box<dyn Future<Output = Result<T, ValidatorError>> + Send>>;
 
@@ -103,4 +105,23 @@ pub enum MessageTypes {
     RejectState(RejectState),
     Heartbeat(Heartbeat),
     Accounting(Accounting),
+}
+
+pub mod fixtures {
+    use fake::faker::*;
+
+    use crate::BigNum;
+
+    use super::ValidatorDesc;
+
+    pub fn get_validator<V: AsRef<str>>(validator_id: V, fee: Option<BigNum>) -> ValidatorDesc {
+        let fee = fee.unwrap_or_else(|| BigNum::from(<Faker as Number>::between(1, 13)));
+        let url = format!(
+            "http://{}-validator-url.com/validator",
+            validator_id.as_ref()
+        );
+        let id = validator_id.as_ref().to_string();
+
+        ValidatorDesc { id, url, fee }
+    }
 }

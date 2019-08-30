@@ -1,13 +1,15 @@
+use std::error::Error;
 use std::fmt;
-//
+
 use chrono::serde::{ts_milliseconds, ts_seconds};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-//
+
 use crate::big_num::BigNum;
 use crate::util::serde::ts_milliseconds_option;
 use crate::{AdUnit, EventSubmission, TargetingTag, ValidatorDesc};
-use std::error::Error;
+#[path = "./channel_fixtures.rs"]
+pub mod fixtures;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -21,7 +23,6 @@ pub struct Channel {
     pub spec: ChannelSpec,
 }
 
-//
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ChannelSpec {
