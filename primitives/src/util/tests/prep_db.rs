@@ -2,8 +2,21 @@ use crate::{BigNum, Channel, ChannelSpec, EventSubmission, SpecValidators, Valid
 use chrono::{TimeZone, Utc};
 use fake::faker::{Faker, Number};
 use lazy_static::lazy_static;
+use std::collections::HashMap;
 
 lazy_static! {
+    static ref IDS: HashMap<&'static str, String> = {
+        let mut ids = HashMap::new();
+        ids.insert("leader", "awesomeLeader".into());
+        ids.insert("follower", "awesomeFollower".into());
+        ids.insert("user", "awesomeTestUser".into());
+        ids.insert("publisher", "myAwesomePublisher".into());
+        ids.insert("publisher2", "myAwesomePublisher2".into());
+        ids.insert("creator", "awesomeCreator".into());
+
+        ids
+    };
+
     static ref DUMMY_CHANNEL: Channel = {
         let leader = ValidatorDesc {
             id: "awesomeLeader".to_string(),
