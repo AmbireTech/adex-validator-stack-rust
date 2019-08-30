@@ -31,17 +31,19 @@ lazy_static! {
         auth
     };
 
+    pub static ref DUMMY_VALIDATOR_LEADER: ValidatorDesc = ValidatorDesc {
+        id: "awesomeLeader".to_string(),
+        url: "http://localhost:8005".to_string(),
+        fee: 100.into(),
+    };
+
+    pub static ref DUMMY_VALIDATOR_FOLLOWER: ValidatorDesc = ValidatorDesc {
+        id: "awesomeFollower".to_string(),
+        url: "http://localhost:8006".to_string(),
+        fee: 100.into(),
+    };
+
     pub static ref DUMMY_CHANNEL: Channel = {
-        let leader = ValidatorDesc {
-            id: "awesomeLeader".to_string(),
-            url: "http://localhost:8005".to_string(),
-            fee: 100.into(),
-        };
-        let follower = ValidatorDesc {
-            id: "awesomeFollower".to_string(),
-            url: "http://localhost:8006".to_string(),
-            fee: 100.into(),
-        };
         let nonce = BigNum::from(<Faker as Number>::between(100_000_000, 999_999_999));
 
         Channel {
@@ -53,7 +55,7 @@ lazy_static! {
             valid_until: Utc.timestamp(4_102_444_800, 0),
             spec: ChannelSpec {
                 title: None,
-                validators: SpecValidators::new(leader, follower),
+                validators: SpecValidators::new(DUMMY_VALIDATOR_LEADER.clone(), DUMMY_VALIDATOR_FOLLOWER.clone()),
                 max_per_impression: 10.into(),
                 min_per_impression: 10.into(),
                 targeting: vec![],
