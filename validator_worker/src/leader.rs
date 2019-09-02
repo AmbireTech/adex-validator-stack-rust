@@ -1,6 +1,6 @@
-use primitives::validator::{Validator, ValidatorFuture};
-use primitives::{Channel};
 use futures::future::FutureExt;
+use primitives::validator::{Validator, ValidatorFuture};
+use primitives::Channel;
 
 #[derive(Clone)]
 pub struct Leader {}

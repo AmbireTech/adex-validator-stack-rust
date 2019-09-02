@@ -2,7 +2,7 @@
 #![deny(rust_2018_idioms)]
 
 use futures::future::{ok, FutureExt};
-use primitives::adapter::{Adapter, AdapterResult, AdapterOptions};
+use primitives::adapter::{Adapter, AdapterOptions, AdapterResult};
 use primitives::channel_validator::ChannelValidator;
 use primitives::config::Config;
 use primitives::{Channel, ValidatorDesc};

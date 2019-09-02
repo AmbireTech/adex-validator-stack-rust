@@ -31,7 +31,7 @@ pub struct Config {
     pub fetch_timeout: u32,
     pub list_timeout: u32,
     pub validator_tick_timeout: u32,
-    pub ip_rate_limit: RateLimit, // HashMap??
+    pub ip_rate_limit: RateLimit,  // HashMap??
     pub sid_rate_limit: RateLimit, // HashMap ??
     pub creators_whitelist: Vec<String>,
     pub minimal_deposit: BigNum,
@@ -60,19 +60,16 @@ pub fn configuration(environment: &str, config_file: Option<&str>) -> Result<Con
                 }
             };
             toml::from_str(&data).unwrap()
-        },
+        }
         None => {
-            println!("should be here I think");
             if environment == "production" {
-                println!("{:?}", &PRODUCTION_CONFIG);
                 return toml::from_str(&PRODUCTION_CONFIG).unwrap();
             } else {
                 let result = match toml::from_str(&DEVELOPMENT_CONFIG) {
                     Err(e) => {
-                        println!("{:?}", e);
                         return Err(ConfigError::InvalidFile(e.to_string()));
-                    },
-                    Ok(data) => Ok(data)
+                    }
+                    Ok(data) => Ok(data),
                 };
                 return result;
             }

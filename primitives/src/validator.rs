@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 use crate::Channel;
 use crate::{BalancesMap, BigNum};
 
-
 #[derive(Debug)]
 pub enum ValidatorError {
     None,

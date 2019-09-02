@@ -4,12 +4,12 @@
 
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
 use clap::{App, Arg};
+use futures::compat::Future01CompatExt;
+use futures::future::{FutureExt, TryFutureExt};
 use primitives::adapter::{Adapter, AdapterOptions};
 use primitives::config::{configuration, Config};
 use validator_worker::sentry_interface::{all_channels, SentryApi};
-use validator_worker::{Leader, Follower};
-use futures::future::{FutureExt, TryFutureExt};
-use futures::compat::Future01CompatExt;
+use validator_worker::{Follower, Leader};
 // use pin_utils::pin_mut;
 use std::error::Error;
 fn main() {
@@ -58,7 +58,6 @@ fn main() {
 
     let environment = std::env::var("ENV").unwrap_or_else(|_| "development".into());
     let config_file = cli.value_of("config");
-    println!("{:?}", config_file);
     let config = configuration(&environment, config_file).unwrap();
     let sentry_url = cli.value_of("sentryUrl").unwrap();
     let is_single_tick = cli.is_present("singleTick");
@@ -78,7 +77,6 @@ fn main() {
             AdapterTypes::EthereumAdapter(EthereumAdapter::init(options, &config))
         }
         "dummy" => {
-            println!("in dummy adapter working for christ");
             let dummy_identity = cli.value_of("dummyIdentity").unwrap();
             let options = AdapterOptions {
                 dummy_identity: Some(dummy_identity.to_string()),
@@ -96,8 +94,12 @@ fn main() {
     };
 
     match adapter {
-        AdapterTypes::EthereumAdapter(ethadapter) => run(is_single_tick, &sentry_url, &config, ethadapter),
-        AdapterTypes::DummyAdapter(dummyadapter) => run(is_single_tick, &sentry_url, &config, dummyadapter),
+        AdapterTypes::EthereumAdapter(ethadapter) => {
+            run(is_single_tick, &sentry_url, &config, ethadapter)
+        }
+        AdapterTypes::DummyAdapter(dummyadapter) => {
+            run(is_single_tick, &sentry_url, &config, dummyadapter)
+        }
     }
 }
 
@@ -111,7 +113,7 @@ fn run(_is_single_tick: bool, sentry: &str, _config: &Config, _adapter: impl Ada
     //     let channels = await!(all_channels(&sentry_url, adapter.clone())).unwrap();
     //     println!("{:?}", channels);
     //     for channel in channels.into_iter() {
-    //         let sentry = SentryApi::new(adapter.clone(), &channel, &config, true); 
+    //         let sentry = SentryApi::new(adapter.clone(), &channel, &config, true);
     //         let whoami = adapter.whoami();
     //         let index = channel.spec.validators.into_iter().position(|v| v.id == whoami);
     //         let tick = match index {

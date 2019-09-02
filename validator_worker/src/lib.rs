@@ -3,14 +3,14 @@
 #![deny(clippy::all)]
 #![allow(clippy::needless_lifetimes)]
 
-pub mod sentry_interface;
 pub mod error;
-pub mod leader;
 pub mod follower;
+pub mod leader;
+pub mod sentry_interface;
 
-pub use self::sentry_interface::{all_channels};
-pub use self::leader::Leader;
 pub use self::follower::Follower;
+pub use self::leader::Leader;
+pub use self::sentry_interface::all_channels;
 
 pub mod core {
     pub mod fees;

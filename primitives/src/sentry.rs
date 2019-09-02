@@ -1,10 +1,9 @@
-use hex::FromHex;
-use crate::{Channel, BalancesMap, BigNum};
+use crate::validator::{ApproveState, Heartbeat, MessageTypes, NewState};
+use crate::{BalancesMap, BigNum, Channel};
 use chrono::{DateTime, Utc};
+use hex::FromHex;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap};
-use crate::validator::{MessageTypes, NewState, ApproveState, Heartbeat};
-
+use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -71,8 +70,7 @@ pub struct ChannelAllResponse {
 #[serde(rename_all = "camelCase")]
 pub struct LastApprovedResponse {
     pub last_approved: LastApproved,
-    pub heartbeats: Option<Vec<Heartbeat>>
-
+    pub heartbeats: Option<Vec<Heartbeat>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -89,5 +87,5 @@ pub struct ValidatorMessageResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct EventAggregateResponse {
-    pub events: Vec<EventAggregate>
+    pub events: Vec<EventAggregate>,
 }

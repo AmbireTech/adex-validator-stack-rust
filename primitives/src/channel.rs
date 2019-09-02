@@ -64,7 +64,7 @@ pub struct ChannelSpec {
     pub withdraw_period_start: DateTime<Utc>,
     /// An array of AdUnit (optional)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub ad_units: Vec<AdUnit>
+    pub ad_units: Vec<AdUnit>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

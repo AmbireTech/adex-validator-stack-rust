@@ -2,13 +2,13 @@ use futures::prelude::*;
 use std::collections::HashMap;
 use std::pin::Pin;
 // use domain::validator::message::State;
-use crate::{Channel, Config};
-use crate::validator::{ValidatorDesc};
 use crate::channel_validator::ChannelValidator;
+use crate::validator::ValidatorDesc;
+use crate::{Channel, Config};
 //use crate::sanity::SanityChecker;
 use std::error::Error;
 use std::fmt;
-use std::fmt::{Debug};
+use std::fmt::Debug;
 
 pub type AdapterResult<T> = Result<T, AdapterError>;
 
@@ -36,8 +36,7 @@ pub struct AdapterOptions {
     pub keystore_pwd: Option<String>,
 }
 
-pub trait Adapter : ChannelValidator + Clone + Debug + Send + Sync {
-
+pub trait Adapter: ChannelValidator + Clone + Debug + Send + Sync {
     type Output;
 
     /// Initialize adapter
