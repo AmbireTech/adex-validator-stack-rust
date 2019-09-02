@@ -8,8 +8,6 @@ use serde::{Deserialize, Serialize};
 use crate::big_num::BigNum;
 use crate::util::serde::ts_milliseconds_option;
 use crate::{AdUnit, EventSubmission, TargetingTag, ValidatorDesc};
-#[path = "./channel_fixtures.rs"]
-pub mod fixtures;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
