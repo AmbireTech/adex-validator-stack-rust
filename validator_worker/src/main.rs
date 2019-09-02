@@ -5,7 +5,7 @@
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
 use clap::{App, Arg};
 use primitives::adapter::{Adapter, AdapterOptions};
-use primitives::config::configuration;
+use primitives::config::{configuration, Config};
 use validator_worker::sentry_interface::{all_channels, SentryApi};
 use validator_worker::{Leader, Follower};
 use futures::future::{FutureExt, TryFutureExt};
@@ -96,61 +96,31 @@ fn main() {
     };
 
     match adapter {
-        AdapterTypes::EthereumAdapter(ethadapter) => run(is_single_tick, &sentry_url, ethadapter),
-        AdapterTypes::DummyAdapter(dummyadapter) => run(is_single_tick, &sentry_url, dummyadapter),
+        AdapterTypes::EthereumAdapter(ethadapter) => run(is_single_tick, &sentry_url, &config, ethadapter),
+        AdapterTypes::DummyAdapter(dummyadapter) => run(is_single_tick, &sentry_url, &config, dummyadapter),
     }
 }
 
 // @TODO work in separate pull request
-fn run(_is_single_tick: bool, sentry: &str, _adapter: impl Adapter + 'static) {
+fn run(_is_single_tick: bool, sentry: &str, _config: &Config, _adapter: impl Adapter + 'static) {
     let sentry_url = sentry.to_owned();
-    let adapter = _adapter.to_owned();
-    let result = async move {
-        let channels = await!(all_channels(&sentry_url, adapter.clone())).unwrap();
-        println!("{:?}", channels);
-        for channel in channels.into_iter() {
-            let sentry = SentryApi::new(adapter.clone(), &channel, true); 
-            let whoami = adapter.whoami();
-            let index = channel.spec.validators.into_iter().position(|v| v.id == whoami);
-            // let tick = match index {
-            //     Some(0) => Leader.tick(&channel),
-            //     Some(1) => Follower.tick(&channel)
-            // };
-        }
-        Ok(())
-    };
-    tokio::run(result.map_err(|e: Box<dyn Error>| panic!("{}", e)).boxed().compat())
-    // println!("{:?}", channels)
-    // let channels = await!()).unwrap();
-    // tokio::run(channels.boxed().compat());
+    let adapter = _adapter.clone();
+    let config = _config.clone();
 
-    // let channels 
-    // let sentry = SentryApi {
-    //     client: Client::new(),
-    //     sentry_url: CONFIG.sentry_url.clone(),
+    // let result = async move {
+    //     let channels = await!(all_channels(&sentry_url, adapter.clone())).unwrap();
+    //     println!("{:?}", channels);
+    //     for channel in channels.into_iter() {
+    //         let sentry = SentryApi::new(adapter.clone(), &channel, &config, true); 
+    //         let whoami = adapter.whoami();
+    //         let index = channel.spec.validators.into_iter().position(|v| v.id == whoami);
+    //         let tick = match index {
+    //             Some(0) => Leader.tick(&channel),
+    //             Some(1) => Follower.tick(&channel)
+    //         };
+    //     }
+    //     Ok(())
     // };
-    //    if !is_single_tick {
-    //     let worker = InfiniteWorker {
-    //         tick_worker,
-    //         ticks_wait_time: CONFIG.ticks_wait_time,
-    //     };
-
-    //     tokio::run(
-    //         async move {
-    //             await!(worker.run()).unwrap();
-    //         }
-    //             .unit_error()
-    //             .boxed()
-    //             .compat(),
-    //     );
-    // } else {
-    //     tokio::run(
-    //         async move {
-    //             await!(tick_worker.run()).unwrap();
-    //         }
-    //             .unit_error()
-    //             .boxed()
-    //             .compat(),
-    //     );
-    // }
+    // @TODO hanlde errors more gracefully
+    // tokio::run(result.map_err(|e: Box<dyn Error>| panic!("{}", e)).boxed().compat())
 }

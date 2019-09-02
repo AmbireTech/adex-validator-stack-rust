@@ -1,4 +1,4 @@
-use primitives::{Channel, ValidatorDesc, };
+use primitives::{Channel, ValidatorDesc, Config};
 use primitives::sentry::{
     ChannelAllResponse, 
     SuccessResponse,
@@ -29,14 +29,19 @@ pub struct SentryApi<T: Adapter> {
     pub client: Client,
     pub logging: bool,
     pub channel: Channel,
+    pub config: Config,
 }
 
 impl <T : Adapter + 'static> SentryApi <T> {
 
-    pub fn new(adapter: T, channel: &Channel, logging: bool) -> Result<Self, ValidatorWorkerError> {
+    pub fn new(adapter: T, channel: &Channel, config: &Config,logging: bool) -> Result<Self, ValidatorWorkerError> {
 
         let whoami = adapter.whoami();
         let validator = channel.spec.validators.into_iter().find(|&v| v.id == whoami);
+
+        let client = Client::builder()
+                            .timeout(Duration::from_secs(config.fetch_timeout.into()))
+                            .build().unwrap();
 
         match validator {
             Some(v) => {
@@ -46,9 +51,10 @@ impl <T : Adapter + 'static> SentryApi <T> {
                     validator: v.clone().to_owned(),
                     adapter,
                     sentry_url,
-                    client: Client::new(),
+                    client,
                     logging,
-                    channel: channel.to_owned()
+                    channel: channel.to_owned(),
+                    config: config.to_owned()
                 })
 
             },
@@ -71,7 +77,7 @@ impl <T : Adapter + 'static> SentryApi <T> {
 
         for validator in self.channel.spec.validators.into_iter() {
             let auth_token = self.adapter.get_auth(&validator).unwrap();
-            match propagate_to(&auth_token, 10, &validator, &serialised_messages) {
+            match propagate_to(&auth_token, self.config.propagation_timeout, &validator, &serialised_messages) {
                 Ok(_) => return,
                 Err(e) =>  handle_http_error(e, &validator.url)
             }
@@ -137,12 +143,12 @@ impl <T : Adapter + 'static> SentryApi <T> {
 
 fn propagate_to(
     auth_token: &str,
-    timeout: u64,
+    timeout: u32,
     validator: &ValidatorDesc,
     messages: &[String]
     ) -> Result<(), reqwest::Error> {
     // create client with timeout
-    let client = reqwest::Client::builder().timeout(Duration::from_secs(timeout)).build()?;
+    let client = reqwest::Client::builder().timeout(Duration::from_secs(timeout.into())).build()?;
     let url = validator.url.to_string();
 
     let response: SuccessResponse = client.post(&url)
