@@ -6,7 +6,12 @@ use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
 use clap::{App, Arg};
 use primitives::adapter::{Adapter, AdapterOptions};
 use primitives::config::configuration;
-
+use validator_worker::sentry_interface::{all_channels, SentryApi};
+use validator_worker::{Leader, Follower};
+use futures::future::{FutureExt, TryFutureExt};
+use futures::compat::Future01CompatExt;
+// use pin_utils::pin_mut;
+use std::error::Error;
 fn main() {
     let cli = App::new("Validator worker")
         .version("0.1")
@@ -32,7 +37,7 @@ fn main() {
         )
         .arg(
             Arg::with_name("dummyIdentity")
-                .short("s")
+                .short("i")
                 .help("the identity to use with the dummy adapter")
                 .takes_value(true),
         )
@@ -52,9 +57,10 @@ fn main() {
         .get_matches();
 
     let environment = std::env::var("ENV").unwrap_or_else(|_| "development".into());
-    let config_file = cli.value_of("config").unwrap_or("");
-    let config = configuration(&environment, Some(&config_file)).unwrap();
-    let _sentry_url = cli.value_of("sentryUrl").unwrap();
+    let config_file = cli.value_of("config");
+    println!("{:?}", config_file);
+    let config = configuration(&environment, config_file).unwrap();
+    let sentry_url = cli.value_of("sentryUrl").unwrap();
     let is_single_tick = cli.is_present("singleTick");
 
     let adapter = match cli.value_of("adapter").unwrap() {
@@ -72,6 +78,7 @@ fn main() {
             AdapterTypes::EthereumAdapter(EthereumAdapter::init(options, &config))
         }
         "dummy" => {
+            println!("in dummy adapter working for christ");
             let dummy_identity = cli.value_of("dummyIdentity").unwrap();
             let options = AdapterOptions {
                 dummy_identity: Some(dummy_identity.to_string()),
@@ -89,12 +96,35 @@ fn main() {
     };
 
     match adapter {
-        AdapterTypes::EthereumAdapter(ethadapter) => run(is_single_tick, ethadapter),
-        AdapterTypes::DummyAdapter(dummyadapter) => run(is_single_tick, dummyadapter),
+        AdapterTypes::EthereumAdapter(ethadapter) => run(is_single_tick, &sentry_url, ethadapter),
+        AdapterTypes::DummyAdapter(dummyadapter) => run(is_single_tick, &sentry_url, dummyadapter),
     }
 }
 
-fn run(_is_single_tick: bool, _adapter: impl Adapter) {
+// @TODO work in separate pull request
+fn run(_is_single_tick: bool, sentry: &str, _adapter: impl Adapter + 'static) {
+    let sentry_url = sentry.to_owned();
+    let adapter = _adapter.to_owned();
+    let result = async move {
+        let channels = await!(all_channels(&sentry_url, adapter.clone())).unwrap();
+        println!("{:?}", channels);
+        for channel in channels.into_iter() {
+            let sentry = SentryApi::new(adapter.clone(), &channel, true); 
+            let whoami = adapter.whoami();
+            let index = channel.spec.validators.into_iter().position(|v| v.id == whoami);
+            // let tick = match index {
+            //     Some(0) => Leader.tick(&channel),
+            //     Some(1) => Follower.tick(&channel)
+            // };
+        }
+        Ok(())
+    };
+    tokio::run(result.map_err(|e: Box<dyn Error>| panic!("{}", e)).boxed().compat())
+    // println!("{:?}", channels)
+    // let channels = await!()).unwrap();
+    // tokio::run(channels.boxed().compat());
+
+    // let channels 
     // let sentry = SentryApi {
     //     client: Client::new(),
     //     sentry_url: CONFIG.sentry_url.clone(),

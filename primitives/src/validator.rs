@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 use crate::Channel;
 use crate::{BalancesMap, BigNum};
 
-pub type ValidatorFuture<T> = Pin<Box<dyn Future<Output = Result<T, ValidatorError>> + Send>>;
 
 #[derive(Debug)]
 pub enum ValidatorError {
@@ -16,6 +15,8 @@ pub enum ValidatorError {
     InvalidSignature,
     InvalidTransition,
 }
+
+pub type ValidatorFuture<T> = Pin<Box<dyn Future<Output = Result<T, ValidatorError>> + Send>>;
 
 pub trait Validator {
     fn tick(&self, channel: Channel) -> ValidatorFuture<()>;

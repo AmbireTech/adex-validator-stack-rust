@@ -19,9 +19,10 @@ use std::time::Duration;
 use crate::error::{ValidatorWorkerError};
 use reqwest::header::AUTHORIZATION;
 use std::error::Error;
+use std::pin::Pin;
 
 #[derive(Clone, Debug)]
-pub(crate) struct SentryApi<T: Adapter> {
+pub struct SentryApi<T: Adapter> {
     pub validator: ValidatorDesc,
     pub adapter: T,
     pub sentry_url: String,
@@ -55,62 +56,6 @@ impl <T : Adapter + 'static> SentryApi <T> {
         }
     }
 
-    pub fn all_channels(&self) -> impl Future<Output = Result<Vec<Channel>, reqwest::Error>> {
-        let validator = self.validator.clone();
-        // call Sentry and fetch first page, where validator = identity
-        let first_page = self.clone().fetch_page(1, validator.clone().url);
-        let handle = self.clone();
-
-        first_page
-            .and_then(move |response| {
-                let first_page_future = ok(response.channels).boxed();
-
-                if response.total_pages < 2 {
-                    // if there is only 1 page, return the results
-                    first_page_future
-                } else {
-                    // call Sentry again for the rest of tha pages
-                    let futures = (2..=response.total_pages)
-                        .map(|page| {
-                            handle
-                                .clone()
-                                .fetch_page(page, validator.clone().url)
-                                .map(|response_result| {
-                                    response_result.and_then(|response| Ok(response.channels))
-                                })
-                                .boxed()
-                        })
-                        .chain(once(first_page_future));
-
-                    try_join_all(futures)
-                        .map(|result_all| {
-                            result_all
-                                .and_then(|all| Ok(all.into_iter().flatten().collect::<Vec<_>>()))
-                        })
-                        .boxed()
-                }
-            })
-            .boxed()
-    }
-
-    async fn fetch_page(
-        self,
-        page: u64,
-        validator: String,
-    ) -> Result<ChannelAllResponse, reqwest::Error> {
-        
-        let mut query = vec![format!("page={}", page)];    
-        query.push(format!("validator={}", validator.to_string()));
-
-        let future = self
-            .client
-            .get(format!("{}/channel/list?{}", self.sentry_url, query.join("&")).as_str())
-            .send()
-            .and_then(|mut res: Response| res.json::<ChannelAllResponse>());
-
-        await!(future.compat())
-    }
-
     pub fn propagate(&self, messages: Vec<MessageTypes>) {
         let serialised_messages: Vec<String> = messages.into_iter().map(
             | message | {
@@ -125,21 +70,16 @@ impl <T : Adapter + 'static> SentryApi <T> {
         ).collect();
 
         for validator in self.channel.spec.validators.into_iter() {
-            // self.adapter.get_auth(&validator).
-            // .and_then( |auth_token| {
-            //     // log if a timeout error occurs
-            //     match propagate_to(auth_token, self.timeout, &validator, &serialised_messages) {
-            //         Ok(_) => return,
-            //         Err(e) =>  handle_http_error(e, &validator.url)
-            //     }
-            // })
-            
+            let auth_token = self.adapter.get_auth(&validator).unwrap();
+            match propagate_to(&auth_token, 10, &validator, &serialised_messages) {
+                Ok(_) => return,
+                Err(e) =>  handle_http_error(e, &validator.url)
+            }
         }
     }
 
     pub async fn get_latest_msg(&self, from: String, message_type: String) -> Result<ValidatorMessageResponse, reqwest::Error> {
         let future = self
-            .clone()
             .client
             .get(&format!("{}/validator-messages/{}/{}?limit=1", self.sentry_url, from, message_type))
             .send()
@@ -199,7 +139,7 @@ fn propagate_to(
     auth_token: &str,
     timeout: u64,
     validator: &ValidatorDesc,
-    messages: Vec<String>
+    messages: &[String]
     ) -> Result<(), reqwest::Error> {
     // create client with timeout
     let client = reqwest::Client::builder().timeout(Duration::from_secs(timeout)).build()?;
@@ -207,7 +147,7 @@ fn propagate_to(
 
     let response: SuccessResponse = client.post(&url)
         .header(AUTHORIZATION, auth_token.to_string())    
-        .json(&messages)
+        .json(messages)
         .send()?
         .json()?;
     
@@ -237,4 +177,40 @@ fn handle_http_error(e: reqwest::Error, url: &str) {
    if e.is_redirect() {
        println!("server redirecting too many times or making loop");
    }
+}
+
+pub async fn all_channels(sentry_url: &str, adapter: impl Adapter + 'static) -> Result<Vec<Channel>, ()> {
+    let validator = adapter.whoami();
+    let url = sentry_url.to_owned();
+    let first_page = await!(fetch_page(url.clone(), 0, validator.clone())).unwrap();
+    println!("{} {} {:?}", validator, url, first_page);
+    if first_page.total_pages < 2 {
+        Ok(first_page.channels)
+    } else {
+        let mut all: Vec<ChannelAllResponse> = await!(
+            try_join_all((0..first_page.total_pages).map(|i| fetch_page(url.clone(), i, validator.clone())))
+        ).unwrap();
+        all.push(first_page);
+        let result_all: Vec<Channel> = all.into_iter().flat_map(|ch| ch.channels.into_iter()).collect();
+        Ok(result_all)
+    }
+}
+
+pub async fn fetch_page(
+    sentry_url: String,
+    page: u64,
+    validator: String,
+) -> Result<ChannelAllResponse, reqwest::Error> {
+
+    let client = Client::new();
+    
+    let mut query = vec![format!("page={}", page)];    
+    query.push(format!("validator={}", validator.to_string()));
+    println!("{}", format!("{}/channel/list?{}", sentry_url, query.join("&") ));
+    let future = client
+        .get(format!("{}/channel/list?{}", sentry_url, query.join("&")).as_str())
+        .send()
+        .and_then(|mut res: Response| res.json::<ChannelAllResponse>());
+
+    await!(future.compat())
 }
