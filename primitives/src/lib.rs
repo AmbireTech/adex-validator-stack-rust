@@ -15,6 +15,7 @@ pub mod market_channel;
 pub mod targeting_tag;
 pub mod util;
 pub mod validator;
+pub mod merkle_tree;
 
 //#[cfg(any(test, feature = "fixtures"))]
 //pub use util::tests as test_util;
