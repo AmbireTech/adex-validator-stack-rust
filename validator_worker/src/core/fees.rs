@@ -143,10 +143,8 @@ mod test {
         fn setup_balances_map(balances_map: &BalancesMap) -> BalancesMap {
             let channel = get_zero_fee_channel();
 
-            let balances_after_fee = get_balances_after_fees_tree(balances_map, &channel)
-                .expect("Calculation of fees failed");
-
-            balances_after_fee
+            get_balances_after_fees_tree(balances_map, &channel)
+                .expect("Calculation of fees failed")
         }
 
         #[test]
@@ -239,10 +237,8 @@ mod test {
                 ..DUMMY_CHANNEL.clone()
             };
 
-            let balances_after_fee = get_balances_after_fees_tree(&balances_map, &channel)
-                .expect("Calculation of fees failed");
-
-            balances_after_fee
+            get_balances_after_fees_tree(&balances_map, &channel)
+                .expect("Calculation of fees failed")
         }
 
         #[test]
