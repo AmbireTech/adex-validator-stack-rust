@@ -31,9 +31,10 @@ pub use self::validator::ValidatorDesc;
 //pub use self::repository::*;
 pub use self::targeting_tag::TargetingTag;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum DomainError {
     InvalidArgument(String),
+    RuleViolation(String),
 }
 
 impl fmt::Display for DomainError {

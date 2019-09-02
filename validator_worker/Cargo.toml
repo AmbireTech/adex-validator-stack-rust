@@ -15,6 +15,7 @@ path = "src/lib.rs"
 primitives = { path = "../primitives" }
 adapter = { version = "0.1", path = "../adapter" }
 chrono = { version = "0.4", features = ["serde"] }
+num = "0.2.0"
 # Futures
 futures-preview = { version = "=0.3.0-alpha.16", features = ["compat", "io-compat"] }
 futures_legacy = { version = "0.1", package = "futures" }

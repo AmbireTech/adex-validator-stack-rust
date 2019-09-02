@@ -1,10 +1,7 @@
-use primitives::channel::Channel;
-use primitves::{BigNum};
-
 use std::collections::BTreeMap;
 
-use crate::{BigNum, Channel, DomainError, ValidatorDesc};
 use num::rational::Ratio;
+use primitives::{BigNum, Channel, DomainError, ValidatorDesc};
 
 pub type BalancesMap = BTreeMap<String, BigNum>;
 
@@ -53,7 +50,7 @@ fn distribute_fee<'a>(
 
         if fee_rounded > 0.into() {
             let entry = balances
-                .entry(validator.id.clone().into())
+                .entry(validator.id.clone())
                 .or_insert_with(|| 0.into());
 
             *entry += &fee_rounded;
@@ -137,8 +134,9 @@ impl Distribution {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::channel::fixtures::{get_channel, get_channel_spec, ValidatorsOption};
-    use crate::validator::fixtures::get_validator;
+    use primitives::util::tests::prep_db::{
+        DUMMY_CHANNEL, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, IDS,
+    };
 
     mod applying_fee_returns_the_same_tree_with_zero_fees {
         use super::*;
@@ -199,14 +197,23 @@ mod test {
         }
 
         fn get_zero_fee_channel() -> Channel {
-            let leader = get_validator("one", Some(0.into()));
-            let follower = get_validator("two", Some(0.into()));
+            let leader = ValidatorDesc {
+                fee: 0.into(),
+                ..DUMMY_VALIDATOR_LEADER.clone()
+            };
+            let follower = ValidatorDesc {
+                fee: 0.into(),
+                ..DUMMY_VALIDATOR_FOLLOWER.clone()
+            };
 
-            let spec = get_channel_spec(ValidatorsOption::Pair { leader, follower });
-            let mut channel = get_channel("zero fees", &None, Some(spec));
-            channel.deposit_amount = 100_000.into();
+            let mut spec = DUMMY_CHANNEL.spec.clone();
+            spec.validators = [leader, follower].into();
 
-            channel
+            Channel {
+                deposit_amount: 100_000.into(),
+                spec,
+                ..DUMMY_CHANNEL.clone()
+            }
         }
     }
 
@@ -214,12 +221,23 @@ mod test {
         use super::*;
 
         fn setup_balances_after_fee(balances_map: BalancesMap) -> BalancesMap {
-            let leader = get_validator("one", Some(50.into()));
-            let follower = get_validator("two", Some(50.into()));
+            let leader = ValidatorDesc {
+                fee: 50.into(),
+                ..DUMMY_VALIDATOR_LEADER.clone()
+            };
+            let follower = ValidatorDesc {
+                fee: 50.into(),
+                ..DUMMY_VALIDATOR_FOLLOWER.clone()
+            };
 
-            let spec = get_channel_spec(ValidatorsOption::Pair { leader, follower });
-            let mut channel = get_channel("apply fees", &None, Some(spec));
-            channel.deposit_amount = 10_000.into();
+            let mut spec = DUMMY_CHANNEL.spec.clone();
+            spec.validators = [leader, follower].into();
+
+            let channel = Channel {
+                deposit_amount: 10_000.into(),
+                spec,
+                ..DUMMY_CHANNEL.clone()
+            };
 
             let balances_after_fee = get_balances_after_fees_tree(&balances_map, &channel)
                 .expect("Calculation of fees failed");
@@ -239,8 +257,8 @@ mod test {
             let expected_balances: BalancesMap = vec![
                 ("a".to_string(), 990.into()),
                 ("b".to_string(), 1_188.into()),
-                ("one".to_string(), 11.into()),
-                ("two".into(), 11.into()),
+                (IDS.get("leader").unwrap().to_owned(), 11.into()),
+                (IDS.get("follower").unwrap().to_owned(), 11.into()),
             ]
             .into_iter()
             .collect();
@@ -263,7 +281,7 @@ mod test {
             let balances_map = vec![
                 ("a".to_string(), 100.into()),
                 ("b".to_string(), 2_000.into()),
-                ("one".to_string(), 200.into()),
+                (IDS.get("leader").unwrap().to_owned(), 200.into()),
             ]
             .into_iter()
             .collect();
@@ -271,8 +289,8 @@ mod test {
             let expected_balances: BalancesMap = vec![
                 ("a".to_string(), 99.into()),
                 ("b".to_string(), 1_980.into()),
-                ("one".to_string(), 209.into()),
-                ("two".into(), 11.into()),
+                (IDS.get("leader").unwrap().to_owned(), 209.into()),
+                (IDS.get("follower").unwrap().to_owned(), 11.into()),
             ]
             .into_iter()
             .collect();
@@ -309,8 +327,8 @@ mod test {
                 ("c".to_string(), 693.into()),
                 ("d".to_string(), 4_950.into()),
                 ("e".to_string(), 3_960.into()),
-                ("one".to_string(), 51.into()),
-                ("two".to_string(), 50.into()),
+                (IDS.get("leader").unwrap().to_owned(), 51.into()),
+                (IDS.get("follower").unwrap().to_owned(), 50.into()),
             ]
             .into_iter()
             .collect();
@@ -335,11 +353,23 @@ mod test {
             .into_iter()
             .collect();
 
-        let leader = get_validator("one", Some(600.into()));
-        let follower = get_validator("two", Some(600.into()));
-        let spec = get_channel_spec(ValidatorsOption::Pair { leader, follower });
-        let mut channel = get_channel("zero fees", &None, Some(spec));
-        channel.deposit_amount = 1_000.into();
+        let leader = ValidatorDesc {
+            fee: 600.into(),
+            ..DUMMY_VALIDATOR_LEADER.clone()
+        };
+        let follower = ValidatorDesc {
+            fee: 600.into(),
+            ..DUMMY_VALIDATOR_FOLLOWER.clone()
+        };
+
+        let mut spec = DUMMY_CHANNEL.spec.clone();
+        spec.validators = [leader, follower].into();
+
+        let channel = Channel {
+            deposit_amount: 1_000.into(),
+            spec,
+            ..DUMMY_CHANNEL.clone()
+        };
 
         let domain_error = get_balances_after_fees_tree(&balances_map, &channel)
             .expect_err("Should be DomainError not allow fees sum to exceed the deposit");
@@ -351,9 +381,4 @@ mod test {
             domain_error
         );
     }
-
 }
-
-// pub fn get_balances_after_fees_tree(mut balances: &HashMap<String, String>, channel: &Channel) {
-//     unimplemented!()
-// }
