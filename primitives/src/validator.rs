@@ -34,8 +34,6 @@ pub struct ValidatorDesc {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Accounting {
-    #[serde(rename = "type")]
-    pub message_type: String,
     #[serde(rename = "last_ev_aggr")]
     pub last_event_aggregate: DateTime<Utc>,
     pub balances_before_fees: BalancesMap,
@@ -45,8 +43,6 @@ pub struct Accounting {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ApproveState {
-    #[serde(rename = "type")]
-    pub message_type: String,
     pub state_root: String,
     pub signature: String,
     pub is_healthy: bool,
@@ -55,8 +51,6 @@ pub struct ApproveState {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct NewState {
-    #[serde(rename = "type")]
-    pub message_type: String,
     pub state_root: String,
     pub signature: String,
     pub balances: String,
@@ -65,8 +59,6 @@ pub struct NewState {
 #[derive(Default, Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct RejectState {
-    #[serde(rename = "type")]
-    pub message_type: String,
     pub reason: String,
     pub state_root: String,
     pub signature: String,
@@ -77,8 +69,6 @@ pub struct RejectState {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Heartbeat {
-    #[serde(rename = "type")]
-    pub message_type: String,
     pub signature: String,
     pub state_root: String,
     pub timestamp: DateTime<Utc>,
@@ -87,7 +77,6 @@ pub struct Heartbeat {
 impl Heartbeat {
     pub fn new(signature: String, state_root: String) -> Self {
         Self {
-            message_type: "Heartbeat".into(),
             signature,
             state_root,
             timestamp: Utc::now(),
