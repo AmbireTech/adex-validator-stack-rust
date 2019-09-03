@@ -13,6 +13,7 @@ pub use self::leader::Leader;
 pub use self::sentry_interface::all_channels;
 
 pub mod core {
+    pub mod events;
     pub mod fees;
     pub mod follower_rules;
 }
