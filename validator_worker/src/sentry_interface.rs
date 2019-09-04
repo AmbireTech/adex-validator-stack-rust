@@ -74,7 +74,10 @@ impl<T: Adapter + 'static> SentryApi<T> {
             .collect();
 
         for validator in self.channel.spec.validators.into_iter() {
-            let auth_token = self.adapter.get_auth(&validator).expect("Failed to get user auth token");
+            let auth_token = self
+                .adapter
+                .get_auth(&validator)
+                .expect("Failed to get user auth token");
             match propagate_to(
                 &auth_token,
                 self.config.propagation_timeout,
@@ -147,7 +150,10 @@ impl<T: Adapter + 'static> SentryApi<T> {
             .validators
             .into_iter()
             .find(|&v| v.id == whoami);
-        let auth_token = self.adapter.get_auth(validator.unwrap()).expect("Failed to get user auth token");
+        let auth_token = self
+            .adapter
+            .get_auth(validator.unwrap())
+            .expect("Failed to get user auth token");
 
         let url = format!(
             "{}/events-aggregates?after={}",
@@ -218,7 +224,8 @@ pub async fn all_channels(
 ) -> Result<Vec<Channel>, ()> {
     let validator = adapter.whoami();
     let url = sentry_url.to_owned();
-    let first_page = await!(fetch_page(url.clone(), 0, validator.clone())).expect("Failed to get channels from sentry url");
+    let first_page = await!(fetch_page(url.clone(), 0, validator.clone()))
+        .expect("Failed to get channels from sentry url");
     if first_page.total_pages < 2 {
         Ok(first_page.channels)
     } else {
@@ -235,7 +242,7 @@ pub async fn all_channels(
     }
 }
 
-pub async fn fetch_page(
+async fn fetch_page(
     sentry_url: String,
     page: u64,
     validator: String,
