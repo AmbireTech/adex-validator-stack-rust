@@ -70,21 +70,11 @@ impl<T: Adapter + 'static> SentryApi<T> {
     pub fn propagate(&self, messages: Vec<MessageTypes>) {
         let serialised_messages: Vec<String> = messages
             .into_iter()
-            .map(|message| match message {
-                MessageTypes::NewState(new_state) => serde_json::to_string(&new_state).unwrap(),
-                MessageTypes::ApproveState(approve_state) => {
-                    serde_json::to_string(&approve_state).unwrap()
-                }
-                MessageTypes::Heartbeat(heartbeat) => serde_json::to_string(&heartbeat).unwrap(),
-                MessageTypes::RejectState(reject_state) => {
-                    serde_json::to_string(&reject_state).unwrap()
-                }
-                MessageTypes::Accounting(accounting) => serde_json::to_string(&accounting).unwrap(),
-            })
+            .map(|message| serde_json::to_string(&message).unwrap())
             .collect();
 
         for validator in self.channel.spec.validators.into_iter() {
-            let auth_token = self.adapter.get_auth(&validator).unwrap();
+            let auth_token = self.adapter.get_auth(&validator).expect("Failed to get user auth token");
             match propagate_to(
                 &auth_token,
                 self.config.propagation_timeout,
@@ -157,7 +147,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
             .validators
             .into_iter()
             .find(|&v| v.id == whoami);
-        let auth_token = self.adapter.get_auth(validator.unwrap()).unwrap();
+        let auth_token = self.adapter.get_auth(validator.unwrap()).expect("Failed to get user auth token");
 
         let url = format!(
             "{}/events-aggregates?after={}",
@@ -167,7 +157,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
         let future = self
             .client
             .get(&url)
-            .header("authorization", auth_token.to_string())
+            .header(AUTHORIZATION, auth_token.to_string())
             .send()
             .and_then(|mut res: Response| res.json::<EventAggregateResponse>());
 
@@ -228,7 +218,7 @@ pub async fn all_channels(
 ) -> Result<Vec<Channel>, ()> {
     let validator = adapter.whoami();
     let url = sentry_url.to_owned();
-    let first_page = await!(fetch_page(url.clone(), 0, validator.clone())).unwrap();
+    let first_page = await!(fetch_page(url.clone(), 0, validator.clone())).expect("Failed to get channels from sentry url");
     if first_page.total_pages < 2 {
         Ok(first_page.channels)
     } else {

@@ -6,9 +6,11 @@ use toml;
 
 lazy_static! {
     static ref DEVELOPMENT_CONFIG: Config =
-        toml::from_str(include_str!("../../docs/config/dev.toml")).unwrap();
+        toml::from_str(include_str!("../../docs/config/dev.toml"))
+            .expect("Failed to parse dev.toml config file");
     static ref PRODUCTION_CONFIG: Config =
-        toml::from_str(include_str!("../../docs/config/prod.toml")).unwrap();
+        toml::from_str(include_str!("../../docs/config/prod.toml"))
+            .expect("Failed to parse prod.toml config file");
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
