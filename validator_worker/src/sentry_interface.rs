@@ -1,4 +1,5 @@
 use crate::error::ValidatorWorkerError;
+use chrono::{DateTime, Utc};
 use futures::compat::Future01CompatExt;
 use futures::future::{ok, try_join_all, FutureExt, TryFutureExt};
 use futures::Future;
@@ -20,9 +21,8 @@ use std::time::Duration;
 
 #[derive(Clone, Debug)]
 pub struct SentryApi<T: Adapter> {
-    pub validator: ValidatorDesc,
     pub adapter: T,
-    pub sentry_url: String,
+    pub validator_url: String,
     pub client: Client,
     pub logging: bool,
     pub channel: Channel,
@@ -37,25 +37,24 @@ impl<T: Adapter + 'static> SentryApi<T> {
         logging: bool,
     ) -> Result<Self, ValidatorWorkerError> {
         let whoami = adapter.whoami();
-        let validator = channel
-            .spec
-            .validators
-            .into_iter()
-            .find(|&v| v.id == whoami);
-
         let client = Client::builder()
             .timeout(Duration::from_secs(config.fetch_timeout.into()))
             .build()
             .unwrap();
 
-        match validator {
+        // validate that we are to validate the channel
+        match channel
+            .spec
+            .validators
+            .into_iter()
+            .find(|&v| v.id == whoami)
+        {
             Some(v) => {
-                let sentry_url = format!("{}/channel/{}", v.url, channel.id);
+                let validator_url = format!("{}/channel/{}", v.url, channel.id);
 
                 Ok(Self {
-                    validator: v.clone().to_owned(),
                     adapter,
-                    sentry_url,
+                    validator_url,
                     client,
                     logging,
                     channel: channel.to_owned(),
@@ -107,7 +106,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
             .client
             .get(&format!(
                 "{}/validator-messages/{}/{}?limit=1",
-                self.sentry_url, from, message_type
+                self.validator_url, from, message_type
             ))
             .send()
             .and_then(|mut res: Response| res.json::<ValidatorMessageResponse>())
@@ -127,7 +126,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
     pub async fn get_last_approved(&self) -> Result<LastApprovedResponse, reqwest::Error> {
         let future = self
             .client
-            .get(&format!("{}/last-approved", self.sentry_url))
+            .get(&format!("{}/last-approved", self.validator_url))
             .send()
             .and_then(|mut res: Response| res.json::<LastApprovedResponse>());
 
@@ -139,7 +138,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
             .client
             .get(&format!(
                 "{}/last-approved?withHearbeat=true",
-                self.sentry_url
+                self.validator_url
             ))
             .send()
             .and_then(|mut res: Response| res.json::<LastApprovedResponse>());
@@ -149,7 +148,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
 
     pub async fn get_event_aggregates(
         &self,
-        after: Option<u32>,
+        after: DateTime<Utc>,
     ) -> Result<EventAggregateResponse, reqwest::Error> {
         let whoami = self.adapter.whoami();
         let validator = self
@@ -160,11 +159,11 @@ impl<T: Adapter + 'static> SentryApi<T> {
             .find(|&v| v.id == whoami);
         let auth_token = self.adapter.get_auth(validator.unwrap()).unwrap();
 
-        let url = match after {
-            Some(duration) => format!("{}/events-aggregates?after={}", self.sentry_url, duration),
-            None => format!("{}/events-aggregates", self.sentry_url),
-        };
-
+        let url = format!(
+            "{}/events-aggregates?after={}",
+            self.validator_url,
+            after.timestamp()
+        );
         let future = self
             .client
             .get(&url)

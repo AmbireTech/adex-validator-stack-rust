@@ -1,10 +1,15 @@
 use crate::BigNum;
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use toml;
 
-pub const DEVELOPMENT_CONFIG: &str = include_str!("../../docs/config/dev.toml");
-pub const PRODUCTION_CONFIG: &str = include_str!("../../docs/config/prod.toml");
+lazy_static! {
+    static ref DEVELOPMENT_CONFIG: Config =
+        toml::from_str(include_str!("../../docs/config/dev.toml")).unwrap();
+    static ref PRODUCTION_CONFIG: Config =
+        toml::from_str(include_str!("../../docs/config/prod.toml")).unwrap();
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -48,32 +53,20 @@ pub enum ConfigError {
 }
 
 pub fn configuration(environment: &str, config_file: Option<&str>) -> Result<Config, ConfigError> {
-    let result: Config = match config_file {
-        Some(config_file) => {
-            let data = match fs::read_to_string(config_file) {
-                Ok(result) => result,
-                Err(e) => {
-                    return Err(ConfigError::InvalidFile(format!(
-                        "Unable to read provided config file {} {}",
-                        config_file, e
-                    )))
-                }
-            };
-            toml::from_str(&data).unwrap()
-        }
-        None => {
-            if environment == "production" {
-                return toml::from_str(&PRODUCTION_CONFIG).unwrap();
-            } else {
-                let result = match toml::from_str(&DEVELOPMENT_CONFIG) {
-                    Err(e) => {
-                        return Err(ConfigError::InvalidFile(e.to_string()));
-                    }
-                    Ok(data) => Ok(data),
-                };
-                return result;
-            }
-        }
-    };
-    Ok(result)
+    match config_file {
+        Some(config_file) => match fs::read_to_string(config_file) {
+            Ok(config) => match toml::from_str(&config) {
+                Ok(data) => data,
+                Err(e) => Err(ConfigError::InvalidFile(e.to_string())),
+            },
+            Err(e) => Err(ConfigError::InvalidFile(format!(
+                "Unable to read provided config file {} {}",
+                config_file, e
+            ))),
+        },
+        None => match environment {
+            "production" => Ok(PRODUCTION_CONFIG.clone()),
+            _ => Ok(DEVELOPMENT_CONFIG.clone()),
+        },
+    }
 }
