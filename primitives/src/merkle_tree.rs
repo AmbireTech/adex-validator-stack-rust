@@ -117,7 +117,9 @@ mod test {
     fn it_works_okay_with_js_impl() {
         let mut h1 = hex::decode("item").unwrap();
         let mut h2 = hex::decode("item").unwrap();
+        
         println!("len {}", h1.len());
+
         let mut h1_slice: [u8; 32] = Default::default();
         h1_slice.copy_from_slice(h1.as_slice());
 
