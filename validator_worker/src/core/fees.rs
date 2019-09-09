@@ -1,9 +1,5 @@
-use std::collections::BTreeMap;
-
 use num::rational::Ratio;
-use primitives::{BigNum, Channel, DomainError, ValidatorDesc};
-
-pub type BalancesMap = BTreeMap<String, BigNum>;
+use primitives::{BalancesMap, BigNum, Channel, DomainError, ValidatorDesc};
 
 pub fn get_balances_after_fees_tree(
     balances: &BalancesMap,
@@ -11,7 +7,7 @@ pub fn get_balances_after_fees_tree(
 ) -> Result<BalancesMap, DomainError> {
     let distribution = Distribution::new(balances, &channel)?;
 
-    let mut balances_after_fees = BTreeMap::default();
+    let mut balances_after_fees = BalancesMap::default();
     let mut total = BigNum::from(0);
 
     for (key, value) in balances.iter() {

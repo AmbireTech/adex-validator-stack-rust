@@ -4,10 +4,10 @@ use chrono::{DateTime, Utc};
 use num_traits::CheckedSub;
 use serde::{Deserialize, Serialize};
 
-use domain::balances_map::get_balances_after_fees_tree;
-use domain::validator::message::Accounting;
-use domain::{BalancesMap, BigNum, Channel, ChannelId, DomainError};
-
+use crate::core::fees::get_balances_after_fees_tree;
+use primitives::sentry::{AggregateEvents, EventAggregate};
+use primitives::validator::Accounting;
+use primitives::{BalancesMap, BigNum, Channel, DomainError};
 
 #[allow(dead_code)]
 fn merge_aggrs(
@@ -25,7 +25,7 @@ fn merge_aggrs(
         .to_owned();
 
     // Build an intermediary balances representation
-    let mut balances_before_fees = accounting.pre_fees.clone();
+    let mut balances_before_fees = accounting.balances_before_fees.clone();
 
     // Merge in all the aggrs
     for aggr in aggregates {
@@ -38,7 +38,7 @@ fn merge_aggrs(
 
     let new_accounting = Accounting {
         last_event_aggregate,
-        pre_fees: balances_before_fees,
+        balances_before_fees,
         balances: balances.clone(),
     };
 
@@ -83,20 +83,29 @@ fn merge_payouts_into_balances<'a, T: Iterator<Item = &'a AggregateEvents>>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use domain::channel::fixtures::{get_channel, get_channel_spec, ValidatorsOption};
-    use domain::fixtures::get_channel_id;
-    use domain::validator::fixtures::get_validator;
+    use primitives::util::tests::prep_db::{
+        DUMMY_CHANNEL, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER,
+    };
+    use primitives::{Channel, ChannelSpec, ValidatorDesc};
 
     #[test]
     fn should_merge_event_aggrs_and_apply_fees() {
         // fees: 100
-        // deposit: 10000
-        let leader = get_validator("one", Some(50.into()));
-        let follower = get_validator("two", Some(50.into()));
+        // deposit: 10 000
+        let leader = ValidatorDesc {
+            fee: 50.into(),
+            ..DUMMY_VALIDATOR_LEADER.clone()
+        };
+        let follower = ValidatorDesc {
+            fee: 50.into(),
+            ..DUMMY_VALIDATOR_FOLLOWER.clone()
+        };
 
-        let spec = get_channel_spec(ValidatorsOption::Pair { leader, follower });
-        let mut channel = get_channel("channel", &None, Some(spec));
-        channel.deposit_amount = 10_000.into();
+        let mut channel = Channel {
+            deposit_amount: 10_000.into(),
+            ..DUMMY_CHANNEL.clone()
+        };
+        channel.spec.validators = [leader, follower].into();
 
         let balances_before_fees: BalancesMap =
             vec![("a".to_string(), 100.into()), ("b".to_string(), 200.into())]
@@ -105,7 +114,7 @@ mod test {
 
         let acc = Accounting {
             last_event_aggregate: Utc::now(),
-            pre_fees: balances_before_fees,
+            balances_before_fees,
             balances: BalancesMap::default(),
         };
 
@@ -114,7 +123,7 @@ mod test {
 
         assert_eq!(balances, new_accounting.balances, "balances is the same");
         assert_eq!(
-            new_accounting.pre_fees["a"],
+            new_accounting.balances_before_fees["a"],
             150.into(),
             "balance of recipient incremented accordingly"
         );
@@ -127,12 +136,24 @@ mod test {
 
     #[test]
     fn should_never_allow_exceeding_the_deposit() {
-        let leader = get_validator("one", Some(50.into()));
-        let follower = get_validator("two", Some(50.into()));
+        let leader = ValidatorDesc {
+            fee: 50.into(),
+            ..DUMMY_VALIDATOR_LEADER.clone()
+        };
+        let follower = ValidatorDesc {
+            fee: 50.into(),
+            ..DUMMY_VALIDATOR_FOLLOWER.clone()
+        };
 
-        let spec = get_channel_spec(ValidatorsOption::Pair { leader, follower });
-        let mut channel = get_channel("channel", &None, Some(spec));
-        channel.deposit_amount = 10_000.into();
+        let spec = ChannelSpec {
+            validators: [leader, follower].into(),
+            ..DUMMY_CHANNEL.spec.clone()
+        };
+        let channel = Channel {
+            deposit_amount: 10_000.into(),
+            spec,
+            ..DUMMY_CHANNEL.clone()
+        };
 
         let balances_before_fees: BalancesMap =
             vec![("a".to_string(), 100.into()), ("b".to_string(), 200.into())]
@@ -141,7 +162,7 @@ mod test {
 
         let acc = Accounting {
             last_event_aggregate: Utc::now(),
-            pre_fees: balances_before_fees,
+            balances_before_fees,
             balances: BalancesMap::default(),
         };
 
@@ -150,12 +171,12 @@ mod test {
 
         assert_eq!(balances, new_accounting.balances, "balances is the same");
         assert_eq!(
-            new_accounting.pre_fees["a"],
+            new_accounting.balances_before_fees["a"],
             9_800.into(),
             "balance of recipient incremented accordingly"
         );
         assert_eq!(
-            new_accounting.pre_fees["b"],
+            new_accounting.balances_before_fees["b"],
             200.into(),
             "balances of non-recipient remains the same"
         );
@@ -165,7 +186,7 @@ mod test {
             "balanceAfterFees is ok"
         );
         assert_eq!(
-            &new_accounting.pre_fees.values().sum::<BigNum>(),
+            &new_accounting.balances_before_fees.values().sum::<BigNum>(),
             &channel.deposit_amount,
             "sum(balancesBeforeFees) == depositAmount"
         );
@@ -187,7 +208,7 @@ mod test {
         };
 
         EventAggregate {
-            channel_id: get_channel_id("one"),
+            channel_id: DUMMY_CHANNEL.id.to_owned(),
             created: Utc::now(),
             events: vec![("IMPRESSION".to_string(), aggregate_events)]
                 .into_iter()
