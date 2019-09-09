@@ -6,6 +6,7 @@
 pub mod error;
 pub mod follower;
 pub mod leader;
+pub mod producer;
 pub mod sentry_interface;
 
 pub use self::follower::Follower;
