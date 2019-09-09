@@ -1,7 +1,6 @@
-use domain::Channel;
-
-use crate::domain::validator::{Validator, ValidatorFuture};
 use futures::future::FutureExt;
+use primitives::validator::{Validator, ValidatorFuture};
+use primitives::Channel;
 
 #[derive(Clone)]
 pub struct Follower {}

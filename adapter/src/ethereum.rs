@@ -1,15 +1,15 @@
 #![deny(clippy::all)]
 #![deny(rust_2018_idioms)]
 
-use std::collections::HashMap;
-
 use futures::future::{ok, FutureExt};
-use primitives::adapter::{Adapter, AdapterFuture, AdapterOptions};
+use primitives::adapter::{Adapter, AdapterOptions, AdapterResult};
 use primitives::channel_validator::ChannelValidator;
 use primitives::config::Config;
-use primitives::Channel;
+use primitives::{Channel, ValidatorDesc};
+use std::collections::HashMap;
 use web3::types::Address;
 
+#[derive(Debug, Clone)]
 pub struct EthereumAdapter {
     address: Option<Address>,
     keystore_json: String,
@@ -47,24 +47,24 @@ impl Adapter for EthereumAdapter {
         }
     }
 
-    fn unlock(&self) -> AdapterFuture<bool> {
-        ok(true).boxed()
+    fn unlock(&self) -> AdapterResult<bool> {
+        Ok(true)
     }
 
     fn whoami(&self) -> String {
         self.address.unwrap().to_string()
     }
 
-    fn sign(&self, state_root: String) -> AdapterFuture<String> {
+    fn sign(&self, state_root: String) -> AdapterResult<String> {
         let signature = format!(
             "Dummy adapter signature for {} by {}",
             state_root,
             self.whoami()
         );
-        ok(signature).boxed()
+        Ok(signature)
     }
 
-    fn verify(&self, signer: &str, _state_root: &str, signature: &str) -> AdapterFuture<bool> {
+    fn verify(&self, signer: &str, _state_root: &str, signature: &str) -> AdapterResult<bool> {
         // select the `identity` and compare it to the signer
         // for empty string this will return array with 1 element - an empty string `[""]`
         let is_same = match signature.rsplit(' ').take(1).next() {
@@ -72,20 +72,20 @@ impl Adapter for EthereumAdapter {
             None => false,
         };
 
-        ok(is_same).boxed()
+        Ok(is_same)
     }
 
-    fn validate_channel(&self, _channel: &Channel) -> AdapterFuture<bool> {
+    fn validate_channel(&self, _channel: &Channel) -> AdapterResult<bool> {
         // @TODO
-        ok(true).boxed()
+        Ok(true)
     }
 
-    fn session_from_token(&self, _token: &str) -> AdapterFuture<String> {
+    fn session_from_token(&self, _token: &str) -> AdapterResult<String> {
         // @TODO
-        ok("hello".to_string()).boxed()
+        Ok("hello".to_string())
     }
 
-    fn get_auth(&self, _validator: &str) -> AdapterFuture<String> {
+    fn get_auth(&self, _validator: &ValidatorDesc) -> AdapterResult<String> {
         // let participant = self
         //     .participants
         //     .iter()
@@ -96,6 +96,6 @@ impl Adapter for EthereumAdapter {
         //         "Identity not found".to_string(),
         //     )),
         // };
-        ok("auth".to_string()).boxed()
+        Ok("auth".to_string())
     }
 }

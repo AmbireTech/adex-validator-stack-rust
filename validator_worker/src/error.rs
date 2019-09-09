@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum ValidatorWokerError {
+pub enum ValidatorWorkerError {
     ConfigurationError(String),
+    InvalidValidatorEntry(String),
 }

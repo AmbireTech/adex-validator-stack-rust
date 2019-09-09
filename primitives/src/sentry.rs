@@ -1,41 +1,15 @@
+use crate::validator::{ApproveState, Heartbeat, MessageTypes, NewState};
+use crate::{BalancesMap, BigNum, Channel};
 use chrono::{DateTime, Utc};
 use hex::FromHex;
 use serde::{Deserialize, Serialize};
-use crate::{Channel, BalancesMap};
-
-pub trait SentryInterface {
-    fn propagate() -> bool;
-    fn get_latest_msg -> None;
-    fn get_our_latest_msg -> None;
-    fn get_last_approve -> None;
-    fn get_last_msgs ->None;
-    fn get_event_aggrs -> None;
-}
+use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ValidatorMessage {
-    type: String,
-    state_root: String,
-    signature: String,
-    last_ev_aggr: String,
-    balances: BalancesMap,
-    timestamp: String,
-    balances_before_fees: BalancesMap,
-    reason: String,
-    is_healthy: bool
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct SentryValidatorMessage {
-    from: String,
-    received: Datetime<Utc>,
-    msg: Vec<ValidatorMessage>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct LastApproved {
-    new_state: ValidatorMessage,
-    approved_state: ValidatorMessage,
+    new_state: NewState,
+    approved_state: ApproveState,
 }
 
 #[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
@@ -70,17 +44,48 @@ pub struct Earner {
     pub promilles: u64,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EventAggregate {
-    pub channel_id: ChannelId,
+    pub channel_id: String,
     pub created: DateTime<Utc>,
     pub events: HashMap<String, AggregateEvents>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AggregateEvents {
     pub event_counts: HashMap<String, BigNum>,
     pub event_payouts: HashMap<String, BigNum>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelAllResponse {
+    pub channels: Vec<Channel>,
+    pub total_pages: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct LastApprovedResponse {
+    pub last_approved: LastApproved,
+    pub heartbeats: Option<Vec<Heartbeat>>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SuccessResponse {
+    pub success: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ValidatorMessageResponse {
+    pub from: String,
+    pub received: DateTime<Utc>,
+    pub msg: Vec<MessageTypes>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct EventAggregateResponse {
+    pub events: Vec<EventAggregate>,
 }

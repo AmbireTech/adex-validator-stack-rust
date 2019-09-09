@@ -38,10 +38,14 @@ pub struct ChannelSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub min_targeting_score: Option<f64>,
     /// EventSubmission object, applies to event submission (POST /channel/:id/events)
-    pub event_submission: EventSubmission,
+    pub event_submission: Option<EventSubmission>,
     /// A millisecond timestamp of when the campaign was created
-    #[serde(with = "ts_milliseconds")]
-    pub created: DateTime<Utc>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "ts_milliseconds_option"
+    )]
+    pub created: Option<DateTime<Utc>>,
     /// A millisecond timestamp representing the time you want this campaign to become active (optional)
     /// Used by the AdViewManager
     #[serde(
@@ -51,7 +55,7 @@ pub struct ChannelSpec {
     )]
     pub active_from: Option<DateTime<Utc>>,
     /// A random number to ensure the campaignSpec hash is unique
-    pub nonce: BigNum,
+    pub nonce: Option<BigNum>,
     /// A millisecond timestamp of when the campaign should enter a withdraw period
     /// (no longer accept any events other than CHANNEL_CLOSE)
     /// A sane value should be lower than channel.validUntil * 1000 and higher than created
