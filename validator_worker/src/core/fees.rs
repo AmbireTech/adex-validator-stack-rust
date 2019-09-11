@@ -1,11 +1,12 @@
 use num::rational::Ratio;
+use num_traits::CheckedSub;
 use primitives::{BalancesMap, BigNum, Channel, DomainError, ValidatorDesc};
 
 pub fn get_balances_after_fees_tree(
     balances: &BalancesMap,
     channel: &Channel,
 ) -> Result<BalancesMap, DomainError> {
-    let deposit = channel.deposit_amount.clone();
+    let deposit_amount = channel.deposit_amount.clone();
 
     let total_distributed = balances.iter().map(|(_, balance)| balance).sum::<BigNum>();
 
@@ -14,22 +15,22 @@ pub fn get_balances_after_fees_tree(
         .map(|validator| &validator.fee)
         .sum::<BigNum>();
 
-    if total_validators_fee > deposit {
+    if total_validators_fee > deposit_amount {
         return Err(DomainError::RuleViolation(
             "total fees <= deposit: fee constraint violated".into(),
         ));
     }
 
-    if total_distributed > deposit {
+    if total_distributed > deposit_amount {
         return Err(DomainError::RuleViolation(
             "distributed <= deposit: OUTPACE rule #4".into(),
         ));
     }
 
-    let to_distribute = &deposit - &total_validators_fee;
+    let deposit_to_distribute = &deposit_amount - &total_validators_fee;
 
-    let ratio = Ratio::new(to_distribute.clone(), deposit.clone());
-    let fee_ratio = Ratio::new(total_distributed.clone(), deposit.clone());
+    let ratio = Ratio::new(deposit_to_distribute.clone(), deposit_amount.clone());
+    let fee_ratio = Ratio::new(total_distributed.clone(), deposit_amount.clone());
 
     let mut balances_after_fees = BalancesMap::default();
     let mut total = BigNum::from(0);
@@ -41,17 +42,15 @@ pub fn get_balances_after_fees_tree(
         balances_after_fees.insert(key.clone(), adjusted_balance);
     }
 
-    let rounding_error = if deposit == total_distributed {
-        &to_distribute - &total_distributed
+    let rounding_error = if deposit_amount == total_distributed {
+        deposit_to_distribute
+            .checked_sub(&total)
+            .ok_or(DomainError::RuleViolation(
+                "rounding_err should never be negative".to_owned(),
+            ))?
     } else {
         BigNum::from(0)
     };
-
-    if rounding_error < BigNum::from(0) {
-        return Err(DomainError::RuleViolation(
-            "The Rounding error should never be negative".into(),
-        ));
-    }
 
     let balances_after_fees = distribute_fee(
         balances_after_fees,
