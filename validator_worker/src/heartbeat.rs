@@ -17,7 +17,7 @@ async fn send_heartbeat<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result<()
     // TODO: create stateRootRaw
     let state_root_raw = "state_root_raw".to_owned();
     // TODO: get the Hex of State root
-    let state_root = "0x.....".to_string();
+    let state_root = state_root_raw.clone();
     let signature = iface.adapter.sign(&state_root_raw)?;
 
     iface.propagate(&[MessageTypes::Heartbeat(Heartbeat {
