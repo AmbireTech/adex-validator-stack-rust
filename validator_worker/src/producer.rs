@@ -34,7 +34,7 @@ pub async fn tick<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result {
         let (balances, new_accounting) = merge_aggrs(&accounting, &aggrs.events, &iface.channel)?;
 
         let message_types = MessageTypes::Accounting(new_accounting);
-        iface.propagate(vec![message_types.clone()]);
+        iface.propagate(&[message_types.clone()]);
 
         Ok((balances, Some(message_types)))
     } else {
