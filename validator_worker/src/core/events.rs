@@ -9,8 +9,7 @@ use primitives::sentry::{AggregateEvents, EventAggregate};
 use primitives::validator::Accounting;
 use primitives::{BalancesMap, BigNum, Channel, DomainError};
 
-#[allow(dead_code)]
-fn merge_aggrs(
+pub(crate) fn merge_aggrs(
     accounting: &Accounting,
     aggregates: &[EventAggregate],
     channel: &Channel,
