@@ -49,7 +49,7 @@ pub trait Adapter: ChannelValidator + Clone + Debug + Send + Sync {
     fn whoami(&self) -> String;
 
     /// Signs the provided state_root
-    fn sign(&self, state_root: String) -> AdapterResult<String>;
+    fn sign(&self, state_root: &str) -> AdapterResult<String>;
 
     /// Verify, based on the signature & state_root, that the signer is the same
     fn verify(&self, signer: &str, state_root: &str, signature: &str) -> AdapterResult<bool>;

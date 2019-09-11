@@ -44,7 +44,7 @@ impl Adapter for DummyAdapter {
         self.identity.to_string()
     }
 
-    fn sign(&self, state_root: String) -> AdapterResult<String> {
+    fn sign(&self, state_root: &str) -> AdapterResult<String> {
         let signature = format!(
             "Dummy adapter signature for {} by {}",
             state_root,
