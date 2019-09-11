@@ -67,10 +67,10 @@ impl<T: Adapter + 'static> SentryApi<T> {
         }
     }
 
-    pub fn propagate(&self, messages: Vec<MessageTypes>) {
+    pub fn propagate(&self, messages: &[MessageTypes]) {
         let serialised_messages: Vec<String> = messages
-            .into_iter()
-            .map(|message| serde_json::to_string(&message).unwrap())
+            .iter()
+            .map(|message| serde_json::to_string(message).unwrap())
             .collect();
 
         for validator in self.channel.spec.validators.into_iter() {
@@ -84,7 +84,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
                 &validator,
                 &serialised_messages,
             ) {
-                Ok(_) => return,
+                Ok(_) => {}
                 Err(e) => handle_http_error(e, &validator.url),
             }
         }
