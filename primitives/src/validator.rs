@@ -53,7 +53,7 @@ pub struct ApproveState {
 pub struct NewState {
     pub state_root: String,
     pub signature: String,
-    pub balances: String,
+    pub balances: BalancesMap,
 }
 
 #[derive(Default, Serialize, Deserialize, Debug, Clone)]
