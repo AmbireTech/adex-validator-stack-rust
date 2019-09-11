@@ -67,7 +67,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
         }
     }
 
-    pub fn propagate(&self, messages: &[MessageTypes]) {
+    pub fn propagate(&self, messages: &[&MessageTypes]) {
         let serialised_messages: Vec<String> = messages
             .iter()
             .map(|message| serde_json::to_string(message).unwrap())

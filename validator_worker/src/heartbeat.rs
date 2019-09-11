@@ -20,11 +20,13 @@ async fn send_heartbeat<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result<()
     let state_root = "0x.....".to_string();
     let signature = iface.adapter.sign(&state_root_raw)?;
 
-    iface.propagate(&[MessageTypes::Heartbeat(Heartbeat {
+    let message_types = MessageTypes::Heartbeat(Heartbeat {
         signature,
         state_root,
         timestamp,
-    })]);
+    });
+
+    iface.propagate(&[&message_types]);
 
     Ok(())
 }
