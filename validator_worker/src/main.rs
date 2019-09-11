@@ -2,16 +2,12 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
 
-use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
 use clap::{App, Arg};
-use futures::compat::Future01CompatExt;
-use futures::future::{FutureExt, TryFutureExt};
+
+use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
 use primitives::adapter::{Adapter, AdapterOptions};
 use primitives::config::{configuration, Config};
-use validator_worker::sentry_interface::{all_channels, SentryApi};
-use validator_worker::{Follower, Leader};
-// use pin_utils::pin_mut;
-use std::error::Error;
+
 fn main() {
     let cli = App::new("Validator worker")
         .version("0.1")
@@ -104,10 +100,10 @@ fn main() {
 }
 
 // @TODO work in separate pull request
-fn run(_is_single_tick: bool, sentry: &str, _config: &Config, _adapter: impl Adapter + 'static) {
-    let sentry_url = sentry.to_owned();
-    let adapter = _adapter.clone();
-    let config = _config.clone();
+fn run(_is_single_tick: bool, sentry: &str, config: &Config, adapter: impl Adapter + 'static) {
+    let _sentry_url = sentry.to_owned();
+    let _adapter = adapter.clone();
+    let _config = config.clone();
 
     // let result = async move {
     //     let channels = await!(all_channels(&sentry_url, adapter.clone())).unwrap();
