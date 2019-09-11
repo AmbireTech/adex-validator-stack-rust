@@ -1,8 +1,6 @@
 use std::fmt;
 use std::hash::Hasher;
 use std::iter::FromIterator;
-use crypto::sha3::{Sha3, Sha3Mode};
-use crypto::digest::Digest;
 use merkletree::hash::{Algorithm, Hashable};
 use merkletree::merkle;
 use merkletree::merkle::{VecStore};
@@ -16,7 +14,7 @@ struct KeccakAlgorithm(Keccak);
 
 impl KeccakAlgorithm {
     pub fn new() -> KeccakAlgorithm {
-        KeccakAlgorithm(Keccak::new_sha3_256())
+        KeccakAlgorithm(Keccak::new_keccak256())
     }
 }
 
@@ -38,7 +36,7 @@ impl Hasher for KeccakAlgorithm {
     }
 }
 
-pub type MerkleItem = [u8; 32];
+type MerkleItem = [u8; 32];
 
 impl Algorithm<MerkleItem> for KeccakAlgorithm {
     #[inline]
@@ -50,38 +48,66 @@ impl Algorithm<MerkleItem> for KeccakAlgorithm {
 
      #[inline]
     fn reset(&mut self) {
-        self.0 = Keccak::new_sha3_256()
+        self.0 = Keccak::new_keccak256()
     }
 
-    // fn leaf(&mut self, leaf: MerkleItem) -> MerkleItem {
-    //     self.write(leaf.as_ref());
-    //     self.hash()
-    // }
+    fn leaf(&mut self, leaf: MerkleItem) -> MerkleItem {
+        leaf
+    }
 
-//     fn node(&mut self, left: MerkleItem, right: MerkleItem, _height: usize) -> MerkleItem {
-//         let mut buf: Vec<u8> = left.iter().cloned().collect();
-//         let mut buf1: Vec<u8> = right.iter().cloned().collect();
-//         buf.append(&mut buf1);
-//         buf.sort();
-//         println!(" buf len {}", buf.len());
+    fn node(&mut self, left: MerkleItem, right: MerkleItem, _height: usize) -> MerkleItem {
+        let left_vec: Vec<u8> = left.into_iter().cloned().collect();
+        let right_vec: Vec<u8> = right.into_iter().cloned().collect();
 
-//         self.write(buf.as_slice());
-//         self.hash()
-//     }
+        let mut node_vec = vec![left_vec.clone(), right_vec.clone()];
+        node_vec.sort();
+        
+        let check: Vec<u8> = node_vec.into_iter().flatten().collect();
+
+        self.write(&check.as_slice());
+        self.hash()
+    }
 }
 
-pub struct MerkleTree(merkle::MerkleTree<MerkleItem, KeccakAlgorithm, VecStore<MerkleItem>>);
+type ExternalMerkleTree = merkletree::merkle::MerkleTree<MerkleItem, KeccakAlgorithm, VecStore<MerkleItem>>;
+
+enum Tree {
+    SingleItem(MerkleItem),
+    MerkleTree(ExternalMerkleTree),
+}
+
+pub struct MerkleTree{
+    tree: Tree,
+    root: MerkleItem
+}
 
 impl MerkleTree {
-    pub fn new(_leaves: Vec<MerkleItem>) -> MerkleTree {
-        let mut leaves = _leaves;
+    pub fn new(data: &[MerkleItem]) -> MerkleTree {
+        let d = data.to_owned();
+        let mut leaves: Vec<MerkleItem> = d.into_iter().collect();
         leaves.sort();
-        let t = merkle::MerkleTree::from_iter(leaves);
-        Self(t)
+
+        let mut root = [0; 32];
+        let mut tree = Tree::SingleItem([0; 32]);
+
+        if leaves.len() == 1 {
+            root = leaves.first().unwrap().to_owned();
+            tree = Tree::SingleItem(root.to_owned());
+        } else {
+            let merkletree = merkle::MerkleTree::from_iter(leaves);
+
+            root = merkletree.root();
+            tree = Tree::MerkleTree(merkletree.clone());
+        }
+        
+        MerkleTree {
+            tree,
+            root
+        }
     }
 
     pub fn root(&self)-> MerkleItem {
-        self.0.root()
+        self.root
     }
 
     pub fn verify(&self, proof: (Vec<MerkleItem>, Vec<bool>) ) -> bool {
@@ -90,10 +116,15 @@ impl MerkleTree {
     }
 
     pub fn proof(&self, i: usize) -> (Vec<MerkleItem>, Vec<bool>) {
-        let proof = self.0.gen_proof(i);
-        let path = proof.path();
-        let lemma = proof.lemma();
-        (lemma.to_owned(), path.to_owned())
+        match &self.tree {
+            Tree::SingleItem(_) => (vec![], vec![]),
+            Tree::MerkleTree(merkle) => {
+                let proof = merkle.gen_proof(i);
+                let path = proof.path();
+                let lemma = proof.lemma();
+                (lemma.to_owned(), path.to_owned())
+            }
+        }
     }
 }
 
@@ -103,35 +134,32 @@ mod test {
     use hex::FromHex;
 
     #[test]
-    fn it_generates_correct_proof() {
-        let mut h1 = [0u8; 32];
-        let mut h2 = [0u8; 32];
-        let mut h3 = [0u8; 32];
-        h1[0] = 0x11;
-        h2[0] = 0x22;
-        h3[0] = 0x33;
-
-        let t: MerkleTree = MerkleTree::new(vec![h1, h2, h3]);
-        let proof =  t.proof(1);
-        let verify = t.verify(proof.clone());
-        assert_eq!(verify, true, "should verify proof successfully");
-    }
-
-    #[test]
     fn it_works_okay_with_js_impl() {
-        let h1_slice = <[u8; 32]>::from_hex("71b1b2ad4db89eea341553b718f51f4f0aac03c6a596c4c0e1697f7b9d9da337").expect("Decoding failed");
-        let h2_slice = <[u8; 32]>::from_hex("71b1b2ad4db89eea341553b718f51f4f0aac03c6a596c4c0e1697f7b9d9da337").unwrap();
-        
+        let h1_slice =  <[u8; 32]>::from_hex("71b1b2ad4db89eea341553b718f51f4f0aac03c6a596c4c0e1697f7b9d9da337").unwrap();
+        let h2_slice = <[u8; 32]>::from_hex("778b613574ae22c119efb252f2a56cb05b0d137f8494c0193f4e015c49f43453").unwrap();
+        println!("h1 slice representation {:?}", h1_slice);
         println!("len {}", h1_slice.len());
 
         println!("{:?}", hex::encode(h1_slice));
+        let h1 = h1_slice.clone();
+        let h2 = h2_slice.clone();
+        let top = MerkleTree::new(&[h1, h2]);
 
-        let t: MerkleTree = MerkleTree::new(vec![h1_slice, h2_slice]);
-        let root = t.root();
-        println!("root {:?}", hex::encode(root));
-        // let leaves = t.
-        let proof =  t.proof(1);
-        let verify = t.verify(proof.clone());
-        assert_eq!(verify, true, "should verify proof successfully");
+        let root =  hex::encode(&top.root());
+
+        assert_eq!(root, 
+        "70d6549669561c65fdc687b87743b67e494e1f4be5d19a2955507220e57baaa6",
+        "should generate the correct root"
+        );
+
+        let proof =  top.proof(0);
+        println!("{:?}", proof);
+
+        let verify = top.verify(proof.clone());
+         println!("verify {:?}", verify);
+        assert_eq!(
+            verify, 
+            true, 
+            "should verify proof successfully");
     }
 }
