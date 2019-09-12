@@ -30,7 +30,7 @@ pub fn get_signable_state_root(
     let values = [channel_id.to_string(), balance_root.to_string()];
     let encoded = encode_params(&types, &values, true)?;
 
-    let mut result = Keccak::new_sha3_256();
+    let mut result = Keccak::new_keccak256();
     result.update(encoded.as_ref());
 
     let mut res: [u8; 32] = [0; 32];
@@ -44,7 +44,7 @@ pub fn get_balance_leaf(acc: &str, amnt: &str) -> Result<[u8; 32], Box<dyn Error
     let values = [acc.to_string(), amnt.to_string()];
     let encoded = encode_params(&types, &values, true)?;
 
-    let mut result = Keccak::new_sha3_256();
+    let mut result = Keccak::new_keccak256();
     result.update(encoded.as_ref());
 
     let mut res: [u8; 32] = [0; 32];
@@ -107,7 +107,7 @@ impl EthereumChannel {
             self.spec.to_owned(),
         ];
         let encoded = encode_params(&types, &values, true)?;
-        let mut result = Keccak::new_sha3_256();
+        let mut result = Keccak::new_keccak256();
         result.update(encoded.as_ref());
 
         let mut res: [u8; 32] = [0; 32];
