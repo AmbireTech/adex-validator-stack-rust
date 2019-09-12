@@ -1,13 +1,11 @@
-use std::fmt;
 use std::hash::Hasher;
 use std::iter::FromIterator;
-use merkletree::hash::{Algorithm, Hashable};
+use merkletree::hash::{Algorithm};
 use merkletree::merkle;
 use merkletree::merkle::{VecStore};
 use merkletree::proof::Proof;
 use tiny_keccak::Keccak;
-use hex::ToHex;
-use hex::FromHex;
+
 
 #[derive(Clone)]
 struct KeccakAlgorithm(Keccak);
@@ -83,17 +81,20 @@ pub struct MerkleTree{
 
 impl MerkleTree {
     pub fn new(data: &[MerkleItem]) -> MerkleTree {
-        let d = data.to_owned();
-        let mut leaves: Vec<MerkleItem> = d.into_iter().collect();
-        leaves.sort();
+        let mut leaves: Vec<MerkleItem> = data.to_owned();;
 
-        let mut root = [0; 32];
-        let mut tree = Tree::SingleItem([0; 32]);
+        let root: MerkleItem;
+        let tree: Tree;
 
         if leaves.len() == 1 {
             root = leaves.first().unwrap().to_owned();
-            tree = Tree::SingleItem(root.to_owned());
+            tree = Tree::SingleItem(root.clone());
         } else {
+            // sort the merkle tree leaves
+            leaves.sort();
+            // remove duplicates
+            leaves.dedup_by(|a, b| a == b);
+
             let merkletree = merkle::MerkleTree::from_iter(leaves);
 
             root = merkletree.root();
@@ -137,29 +138,54 @@ mod test {
     fn it_works_okay_with_js_impl() {
         let h1_slice =  <[u8; 32]>::from_hex("71b1b2ad4db89eea341553b718f51f4f0aac03c6a596c4c0e1697f7b9d9da337").unwrap();
         let h2_slice = <[u8; 32]>::from_hex("778b613574ae22c119efb252f2a56cb05b0d137f8494c0193f4e015c49f43453").unwrap();
-        println!("h1 slice representation {:?}", h1_slice);
-        println!("len {}", h1_slice.len());
 
-        println!("{:?}", hex::encode(h1_slice));
         let h1 = h1_slice.clone();
         let h2 = h2_slice.clone();
         let top = MerkleTree::new(&[h1, h2]);
 
         let root =  hex::encode(&top.root());
 
-        assert_eq!(root, 
-        "70d6549669561c65fdc687b87743b67e494e1f4be5d19a2955507220e57baaa6",
-        "should generate the correct root"
+        assert_eq!(
+            root, 
+            "70d6549669561c65fdc687b87743b67e494e1f4be5d19a2955507220e57baaa6",
+            "should generate the correct root"
         );
 
         let proof =  top.proof(0);
-        println!("{:?}", proof);
 
         let verify = top.verify(proof.clone());
-         println!("verify {:?}", verify);
         assert_eq!(
             verify, 
             true, 
             "should verify proof successfully");
+    }
+
+    #[test]
+    fn it_works_okay_with_duplicate_leaves_js_impl() {
+        let h1_slice =  <[u8; 32]>::from_hex("71b1b2ad4db89eea341553b718f51f4f0aac03c6a596c4c0e1697f7b9d9da337").unwrap();
+        let h2_slice = <[u8; 32]>::from_hex("778b613574ae22c119efb252f2a56cb05b0d137f8494c0193f4e015c49f43453").unwrap();
+
+        let h1 = h1_slice.clone();
+        let h2 = h2_slice.clone();
+
+        // duplicate leaves
+        let top = MerkleTree::new(&[h1, h2, h2]);
+
+        let root =  hex::encode(&top.root());
+
+        assert_eq!(
+            root, 
+            "70d6549669561c65fdc687b87743b67e494e1f4be5d19a2955507220e57baaa6",
+            "should generate the correct root"
+        );
+
+        let proof =  top.proof(0);
+        let verify = top.verify(proof.clone());
+
+        assert_eq!(
+            verify, 
+            true, 
+            "should verify proof successfully"
+        );
     }
 }
