@@ -61,7 +61,7 @@ impl Algorithm<MerkleItem> for KeccakAlgorithm {
 
         let flatten_node_vec: Vec<u8> = node_vec.into_iter().flatten().collect();
 
-        self.write(&flatten_node_vec.as_slice());
+        self.write(&flatten_node_vec);
         self.hash()
     }
 }
@@ -85,14 +85,14 @@ impl MerkleTree {
         let mut leaves: Vec<MerkleItem> = data.to_owned();;
 
         let tree: Tree = if leaves.len() == 1 {
-            Tree::SingleItem(leaves.first().unwrap().to_owned())
+            Tree::SingleItem(leaves[0].to_owned())
         } else {
             // sort the merkle tree leaves
             leaves.sort();
             // remove duplicates
             leaves.dedup_by(|a, b| a == b);
 
-            let merkletree = merkle::MerkleTree::from_iter(leaves.clone());
+            let merkletree = merkle::MerkleTree::from_iter(leaves);
             Tree::MerkleTree(merkletree)
         };
 
@@ -132,7 +132,7 @@ mod test {
     use hex::FromHex;
 
     #[test]
-    fn it_works_okay_with_js_impl() {
+    fn it_generates_correct_merkle_tree_that_correlates_with_js_impl() {
         let h1 = <[u8; 32]>::from_hex(
             "71b1b2ad4db89eea341553b718f51f4f0aac03c6a596c4c0e1697f7b9d9da337",
         )
@@ -153,12 +153,12 @@ mod test {
 
         let proof = top.proof(0);
 
-        let verify = top.verify(proof.clone());
+        let verify = top.verify(proof);
         assert_eq!(verify, true, "should verify proof successfully");
     }
 
     #[test]
-    fn it_works_okay_with_duplicate_leaves_js_impl() {
+    fn it_generates_correct_merkle_tree_with_duplicate_leaves() {
         let h1 = <[u8; 32]>::from_hex(
             "71b1b2ad4db89eea341553b718f51f4f0aac03c6a596c4c0e1697f7b9d9da337",
         )
@@ -179,7 +179,7 @@ mod test {
         );
 
         let proof = top.proof(0);
-        let verify = top.verify(proof.clone());
+        let verify = top.verify(proof);
 
         assert_eq!(verify, true, "should verify proof successfully");
     }
