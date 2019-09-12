@@ -9,6 +9,7 @@ use merkletree::merkle::{VecStore};
 use merkletree::proof::Proof;
 use tiny_keccak::Keccak;
 use hex::ToHex;
+use hex::FromHex;
 
 #[derive(Clone)]
 struct KeccakAlgorithm(Keccak);
@@ -47,24 +48,26 @@ impl Algorithm<MerkleItem> for KeccakAlgorithm {
         res
     }
 
-    fn leaf(&mut self, leaf: MerkleItem) -> MerkleItem {
-        self.write(leaf.as_ref());
-        self.hash()
+     #[inline]
+    fn reset(&mut self) {
+        self.0 = Keccak::new_sha3_256()
     }
 
-    fn node(&mut self, left: MerkleItem, right: MerkleItem, _height: usize) -> MerkleItem {
-        let mut buf: Vec<u8> = left.iter().cloned().collect();
-        let mut buf1: Vec<u8> = right.iter().cloned().collect();
-        buf.append(&mut buf1);
-        buf.sort();
-        println!(" buf len {}", buf.len());
+    // fn leaf(&mut self, leaf: MerkleItem) -> MerkleItem {
+    //     self.write(leaf.as_ref());
+    //     self.hash()
+    // }
 
-        let mut buf_slice: [u8; 64] = [0; 64];
-        buf_slice.copy_from_slice(buf.as_slice());
+//     fn node(&mut self, left: MerkleItem, right: MerkleItem, _height: usize) -> MerkleItem {
+//         let mut buf: Vec<u8> = left.iter().cloned().collect();
+//         let mut buf1: Vec<u8> = right.iter().cloned().collect();
+//         buf.append(&mut buf1);
+//         buf.sort();
+//         println!(" buf len {}", buf.len());
 
-        self.write(buf_slice.as_ref());
-        self.hash()
-    }
+//         self.write(buf.as_slice());
+//         self.hash()
+//     }
 }
 
 pub struct MerkleTree(merkle::MerkleTree<MerkleItem, KeccakAlgorithm, VecStore<MerkleItem>>);
@@ -97,6 +100,7 @@ impl MerkleTree {
 #[cfg(test)]
 mod test {
     use super::*;
+    use hex::FromHex;
 
     #[test]
     fn it_generates_correct_proof() {
@@ -115,18 +119,10 @@ mod test {
 
     #[test]
     fn it_works_okay_with_js_impl() {
-        let mut h1 = hex::decode("item").unwrap();
-        let mut h2 = hex::decode("item").unwrap();
+        let h1_slice = <[u8; 32]>::from_hex("71b1b2ad4db89eea341553b718f51f4f0aac03c6a596c4c0e1697f7b9d9da337").expect("Decoding failed");
+        let h2_slice = <[u8; 32]>::from_hex("71b1b2ad4db89eea341553b718f51f4f0aac03c6a596c4c0e1697f7b9d9da337").unwrap();
         
-        println!("len {}", h1.len());
-
-        let mut h1_slice: [u8; 32] = Default::default();
-        h1_slice.copy_from_slice(h1.as_slice());
-
-        println!("{:?}", hex::encode(h1_slice));
-
-        let mut h2_slice: [u8; 32] = Default::default();
-        h2_slice.copy_from_slice(h2.as_slice());
+        println!("len {}", h1_slice.len());
 
         println!("{:?}", hex::encode(h1_slice));
 
