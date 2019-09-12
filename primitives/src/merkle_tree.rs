@@ -69,6 +69,7 @@ impl Algorithm<MerkleItem> for KeccakAlgorithm {
 type ExternalMerkleTree =
     merkletree::merkle::MerkleTree<MerkleItem, KeccakAlgorithm, VecStore<MerkleItem>>;
 
+#[derive(Clone)]
 enum Tree {
     SingleItem(MerkleItem),
     MerkleTree(ExternalMerkleTree),
@@ -83,23 +84,22 @@ impl MerkleTree {
     pub fn new(data: &[MerkleItem]) -> MerkleTree {
         let mut leaves: Vec<MerkleItem> = data.to_owned();;
 
-        let root: MerkleItem;
-        let tree: Tree;
-
-        if leaves.len() == 1 {
-            root = leaves.first().unwrap().to_owned();
-            tree = Tree::SingleItem(root.clone());
+        let tree: Tree = if leaves.len() == 1 {
+            Tree::SingleItem(leaves.first().unwrap().to_owned())
         } else {
             // sort the merkle tree leaves
             leaves.sort();
             // remove duplicates
             leaves.dedup_by(|a, b| a == b);
 
-            let merkletree = merkle::MerkleTree::from_iter(leaves);
+            let merkletree = merkle::MerkleTree::from_iter(leaves.clone());
+            Tree::MerkleTree(merkletree)
+        };
 
-            root = merkletree.root();
-            tree = Tree::MerkleTree(merkletree.clone());
-        }
+        let root: MerkleItem = match &tree {
+            Tree::SingleItem(root) => root.to_owned(),
+            Tree::MerkleTree(merkletree) => merkletree.root(),
+        };
 
         MerkleTree { tree, root }
     }
@@ -133,17 +133,15 @@ mod test {
 
     #[test]
     fn it_works_okay_with_js_impl() {
-        let h1_slice = <[u8; 32]>::from_hex(
+        let h1 = <[u8; 32]>::from_hex(
             "71b1b2ad4db89eea341553b718f51f4f0aac03c6a596c4c0e1697f7b9d9da337",
         )
         .unwrap();
-        let h2_slice = <[u8; 32]>::from_hex(
+        let h2 = <[u8; 32]>::from_hex(
             "778b613574ae22c119efb252f2a56cb05b0d137f8494c0193f4e015c49f43453",
         )
         .unwrap();
 
-        let h1 = h1_slice.clone();
-        let h2 = h2_slice.clone();
         let top = MerkleTree::new(&[h1, h2]);
 
         let root = hex::encode(&top.root());
@@ -161,17 +159,14 @@ mod test {
 
     #[test]
     fn it_works_okay_with_duplicate_leaves_js_impl() {
-        let h1_slice = <[u8; 32]>::from_hex(
+        let h1 = <[u8; 32]>::from_hex(
             "71b1b2ad4db89eea341553b718f51f4f0aac03c6a596c4c0e1697f7b9d9da337",
         )
         .unwrap();
-        let h2_slice = <[u8; 32]>::from_hex(
+        let h2 = <[u8; 32]>::from_hex(
             "778b613574ae22c119efb252f2a56cb05b0d137f8494c0193f4e015c49f43453",
         )
         .unwrap();
-
-        let h1 = h1_slice.clone();
-        let h2 = h2_slice.clone();
 
         // duplicate leaves
         let top = MerkleTree::new(&[h1, h2, h2]);
