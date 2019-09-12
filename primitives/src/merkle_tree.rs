@@ -53,15 +53,15 @@ impl Algorithm<MerkleItem> for KeccakAlgorithm {
     }
 
     fn node(&mut self, left: MerkleItem, right: MerkleItem, _height: usize) -> MerkleItem {
-        let left_vec: Vec<u8> = left.into_iter().cloned().collect();
-        let right_vec: Vec<u8> = right.into_iter().cloned().collect();
+        let left_vec: Vec<u8> = left.to_vec();
+        let right_vec: Vec<u8> = right.to_vec();
 
-        let mut node_vec = vec![left_vec.clone(), right_vec.clone()];
+        let mut node_vec = vec![left_vec, right_vec];
         node_vec.sort();
 
-        let check: Vec<u8> = node_vec.into_iter().flatten().collect();
+        let flatten_node_vec: Vec<u8> = node_vec.into_iter().flatten().collect();
 
-        self.write(&check.as_slice());
+        self.write(&flatten_node_vec.as_slice());
         self.hash()
     }
 }
