@@ -1,11 +1,10 @@
+use merkletree::hash::Algorithm;
+use merkletree::merkle;
+use merkletree::merkle::VecStore;
+use merkletree::proof::Proof;
 use std::hash::Hasher;
 use std::iter::FromIterator;
-use merkletree::hash::{Algorithm};
-use merkletree::merkle;
-use merkletree::merkle::{VecStore};
-use merkletree::proof::Proof;
 use tiny_keccak::Keccak;
-
 
 #[derive(Clone)]
 struct KeccakAlgorithm(Keccak);
@@ -44,7 +43,7 @@ impl Algorithm<MerkleItem> for KeccakAlgorithm {
         res
     }
 
-     #[inline]
+    #[inline]
     fn reset(&mut self) {
         self.0 = Keccak::new_keccak256()
     }
@@ -59,7 +58,7 @@ impl Algorithm<MerkleItem> for KeccakAlgorithm {
 
         let mut node_vec = vec![left_vec.clone(), right_vec.clone()];
         node_vec.sort();
-        
+
         let check: Vec<u8> = node_vec.into_iter().flatten().collect();
 
         self.write(&check.as_slice());
@@ -67,16 +66,17 @@ impl Algorithm<MerkleItem> for KeccakAlgorithm {
     }
 }
 
-type ExternalMerkleTree = merkletree::merkle::MerkleTree<MerkleItem, KeccakAlgorithm, VecStore<MerkleItem>>;
+type ExternalMerkleTree =
+    merkletree::merkle::MerkleTree<MerkleItem, KeccakAlgorithm, VecStore<MerkleItem>>;
 
 enum Tree {
     SingleItem(MerkleItem),
     MerkleTree(ExternalMerkleTree),
 }
 
-pub struct MerkleTree{
+pub struct MerkleTree {
     tree: Tree,
-    root: MerkleItem
+    root: MerkleItem,
 }
 
 impl MerkleTree {
@@ -100,18 +100,15 @@ impl MerkleTree {
             root = merkletree.root();
             tree = Tree::MerkleTree(merkletree.clone());
         }
-        
-        MerkleTree {
-            tree,
-            root
-        }
+
+        MerkleTree { tree, root }
     }
 
-    pub fn root(&self)-> MerkleItem {
+    pub fn root(&self) -> MerkleItem {
         self.root
     }
 
-    pub fn verify(&self, proof: (Vec<MerkleItem>, Vec<bool>) ) -> bool {
+    pub fn verify(&self, proof: (Vec<MerkleItem>, Vec<bool>)) -> bool {
         let proof = Proof::new(proof.0, proof.1);
         proof.validate::<KeccakAlgorithm>()
     }
@@ -136,34 +133,42 @@ mod test {
 
     #[test]
     fn it_works_okay_with_js_impl() {
-        let h1_slice =  <[u8; 32]>::from_hex("71b1b2ad4db89eea341553b718f51f4f0aac03c6a596c4c0e1697f7b9d9da337").unwrap();
-        let h2_slice = <[u8; 32]>::from_hex("778b613574ae22c119efb252f2a56cb05b0d137f8494c0193f4e015c49f43453").unwrap();
+        let h1_slice = <[u8; 32]>::from_hex(
+            "71b1b2ad4db89eea341553b718f51f4f0aac03c6a596c4c0e1697f7b9d9da337",
+        )
+        .unwrap();
+        let h2_slice = <[u8; 32]>::from_hex(
+            "778b613574ae22c119efb252f2a56cb05b0d137f8494c0193f4e015c49f43453",
+        )
+        .unwrap();
 
         let h1 = h1_slice.clone();
         let h2 = h2_slice.clone();
         let top = MerkleTree::new(&[h1, h2]);
 
-        let root =  hex::encode(&top.root());
+        let root = hex::encode(&top.root());
 
         assert_eq!(
-            root, 
-            "70d6549669561c65fdc687b87743b67e494e1f4be5d19a2955507220e57baaa6",
+            root, "70d6549669561c65fdc687b87743b67e494e1f4be5d19a2955507220e57baaa6",
             "should generate the correct root"
         );
 
-        let proof =  top.proof(0);
+        let proof = top.proof(0);
 
         let verify = top.verify(proof.clone());
-        assert_eq!(
-            verify, 
-            true, 
-            "should verify proof successfully");
+        assert_eq!(verify, true, "should verify proof successfully");
     }
 
     #[test]
     fn it_works_okay_with_duplicate_leaves_js_impl() {
-        let h1_slice =  <[u8; 32]>::from_hex("71b1b2ad4db89eea341553b718f51f4f0aac03c6a596c4c0e1697f7b9d9da337").unwrap();
-        let h2_slice = <[u8; 32]>::from_hex("778b613574ae22c119efb252f2a56cb05b0d137f8494c0193f4e015c49f43453").unwrap();
+        let h1_slice = <[u8; 32]>::from_hex(
+            "71b1b2ad4db89eea341553b718f51f4f0aac03c6a596c4c0e1697f7b9d9da337",
+        )
+        .unwrap();
+        let h2_slice = <[u8; 32]>::from_hex(
+            "778b613574ae22c119efb252f2a56cb05b0d137f8494c0193f4e015c49f43453",
+        )
+        .unwrap();
 
         let h1 = h1_slice.clone();
         let h2 = h2_slice.clone();
@@ -171,21 +176,16 @@ mod test {
         // duplicate leaves
         let top = MerkleTree::new(&[h1, h2, h2]);
 
-        let root =  hex::encode(&top.root());
+        let root = hex::encode(&top.root());
 
         assert_eq!(
-            root, 
-            "70d6549669561c65fdc687b87743b67e494e1f4be5d19a2955507220e57baaa6",
+            root, "70d6549669561c65fdc687b87743b67e494e1f4be5d19a2955507220e57baaa6",
             "should generate the correct root"
         );
 
-        let proof =  top.proof(0);
+        let proof = top.proof(0);
         let verify = top.verify(proof.clone());
 
-        assert_eq!(
-            verify, 
-            true, 
-            "should verify proof successfully"
-        );
+        assert_eq!(verify, true, "should verify proof successfully");
     }
 }
