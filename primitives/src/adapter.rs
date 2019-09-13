@@ -1,11 +1,7 @@
-use futures::prelude::*;
-use std::collections::HashMap;
-use std::pin::Pin;
-// use domain::validator::message::State;
 use crate::channel_validator::ChannelValidator;
 use crate::validator::ValidatorDesc;
 use crate::{Channel, Config};
-//use crate::sanity::SanityChecker;
+use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 use std::fmt::Debug;

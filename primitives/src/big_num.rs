@@ -40,6 +40,10 @@ impl BigNum {
 
         self.0.to_u64()
     }
+
+    pub fn to_str_radix(&self, radix: u32) -> String {
+        self.0.to_str_radix(radix)
+    }
 }
 
 impl Integer for BigNum {

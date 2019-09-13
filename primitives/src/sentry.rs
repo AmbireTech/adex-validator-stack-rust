@@ -1,7 +1,6 @@
 use crate::validator::{ApproveState, Heartbeat, MessageTypes, NewState};
-use crate::{BalancesMap, BigNum, Channel};
+use crate::{BigNum, Channel};
 use chrono::{DateTime, Utc};
-use hex::FromHex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
