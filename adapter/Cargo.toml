@@ -4,9 +4,6 @@ version = "0.1.0"
 authors = ["Lachezar Lechev <lachezar@adex.network>, Omidiora Samuel <sam@adex.network>"]
 edition = "2018"
 
-[features]
-
-
 [dependencies]
 primitives = {path = "../primitives"}
 # Futures
@@ -15,7 +12,7 @@ futures-preview = {version = "=0.3.0-alpha.16"}
 chrono = "0.4"
 time = "0.1.42"
 # To/From Hex
-hex = {version = "0.3.2"}
+hex = "0.3.2"
 serde =  {version = "^1.0", features = ['derive']}
 # Ethereum
 web3 = { git = "https://github.com/tomusdrw/rust-web3" }
@@ -24,3 +21,4 @@ ethabi = "8.0.1"
 tiny-keccak = "1.5"
 
 [dev-dependencies]
+byteorder = "1.3"

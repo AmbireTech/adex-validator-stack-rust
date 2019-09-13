@@ -12,10 +12,12 @@ pub mod channel_validator;
 pub mod config;
 pub mod event_submission;
 pub mod market_channel;
+pub mod merkle_tree;
 pub mod sentry;
 pub mod targeting_tag;
 pub mod util;
 pub mod validator;
+
 //#[cfg(any(test, feature = "fixtures"))]
 //pub use util::tests as test_util;
 //
