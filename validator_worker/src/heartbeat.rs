@@ -1,8 +1,7 @@
 use std::convert::TryFrom;
 use std::error::Error;
 
-use chrono::Utc;
-use chrono::{Duration, TimeZone};
+use chrono::{Duration, Utc};
 
 use adapter::get_signable_state_root;
 use byteorder::{BigEndian, ByteOrder};

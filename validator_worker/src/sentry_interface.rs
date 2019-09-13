@@ -1,8 +1,7 @@
 use crate::error::ValidatorWorkerError;
 use chrono::{DateTime, Utc};
 use futures::compat::Future01CompatExt;
-use futures::future::{ok, try_join_all, FutureExt, TryFutureExt};
-use futures::Future;
+use futures::future::try_join_all;
 use futures_legacy::Future as LegacyFuture;
 use primitives::adapter::Adapter;
 use primitives::sentry::{
@@ -13,10 +12,6 @@ use primitives::validator::MessageTypes;
 use primitives::{Channel, Config, ValidatorDesc};
 use reqwest::header::AUTHORIZATION;
 use reqwest::r#async::{Client, Response};
-use serde::Deserialize;
-use std::error::Error;
-use std::iter::once;
-use std::pin::Pin;
 use std::time::Duration;
 
 #[derive(Clone, Debug)]
@@ -183,7 +178,7 @@ fn propagate_to(
         .build()?;
     let url = validator.url.to_string();
 
-    let response: SuccessResponse = client
+    let _response: SuccessResponse = client
         .post(&url)
         .header(AUTHORIZATION, auth_token.to_string())
         .json(messages)

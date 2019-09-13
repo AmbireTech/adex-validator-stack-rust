@@ -3,7 +3,6 @@
 #![deny(clippy::all)]
 #![deny(clippy::match_bool)]
 #![doc(test(attr(feature(async_await, await_macro))))]
-#![doc(test(attr(cfg(feature = "dummy-adapter"))))]
 
 use ethabi::encode;
 use ethabi::param_type::{ParamType, Reader};
@@ -132,7 +131,7 @@ impl EthereumChannel {
         ]
     }
 
-    fn hash_to_sign(
+    pub fn hash_to_sign(
         &self,
         contract_addr: &str,
         balance_root: &str,
@@ -140,7 +139,7 @@ impl EthereumChannel {
         get_signable_state_root(contract_addr, balance_root)
     }
 
-    fn hash_to_sign_hex(
+    pub fn hash_to_sign_hex(
         &self,
         contract_addr: &str,
         balance_root: &str,
