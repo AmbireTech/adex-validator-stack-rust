@@ -4,7 +4,6 @@
 #![deny(clippy::match_bool)]
 #![doc(test(attr(feature(async_await, await_macro))))]
 #![doc(test(attr(cfg(feature = "dummy-adapter"))))]
-#![allow(dead_code)]
 
 use ethabi::encode;
 use ethabi::param_type::{ParamType, Reader};
