@@ -3,8 +3,8 @@ use std::error::Error;
 use chrono::{TimeZone, Utc};
 
 use primitives::adapter::Adapter;
+use primitives::BalancesMap;
 use primitives::validator::{Accounting, MessageTypes};
-use primitives::{BalancesMap, Channel};
 
 use crate::core::events::merge_aggrs;
 use crate::sentry_interface::SentryApi;
