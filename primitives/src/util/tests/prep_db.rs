@@ -11,9 +11,10 @@ lazy_static! {
         ids.insert("leader", "awesomeLeader".into());
         ids.insert("follower", "awesomeFollower".into());
         ids.insert("user", "awesomeTestUser".into());
-        ids.insert("publisher", "myAwesomePublisher".into());
+        ids.insert("publisher", "b7d3f81e857692d13e9d63b232a90f4a1793189e".into());
         ids.insert("publisher2", "myAwesomePublisher2".into());
         ids.insert("creator", "awesomeCreator".into());
+        ids.insert("tester", "2892f6C41E0718eeeDd49D98D648C789668cA67d".into());
 
         ids
     };
@@ -47,7 +48,7 @@ lazy_static! {
         let nonce = BigNum::from(<Faker as Number>::between(100_000_000, 999_999_999));
 
         Channel {
-            id: "awesomeTestChannel".to_string(),
+            id: "061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088".to_string(),
             creator: "awesomeCreator".to_string(),
             deposit_asset: "DAI".to_string(),
             deposit_amount: 1_000.into(),
