@@ -12,7 +12,6 @@ use primitives::BalancesMap;
 
 use crate::sentry_interface::SentryApi;
 
-pub use self::follower::Follower;
 pub use self::sentry_interface::all_channels;
 
 pub mod error;
