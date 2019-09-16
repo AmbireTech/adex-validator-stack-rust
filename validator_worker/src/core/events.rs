@@ -1,9 +1,10 @@
 use num_traits::CheckedSub;
 
-use crate::core::fees::get_balances_after_fees_tree;
 use primitives::sentry::{AggregateEvents, EventAggregate};
 use primitives::validator::Accounting;
 use primitives::{BalancesMap, BigNum, Channel, DomainError};
+
+use crate::core::fees::get_balances_after_fees_tree;
 
 pub(crate) fn merge_aggrs(
     accounting: &Accounting,
@@ -77,11 +78,14 @@ fn merge_payouts_into_balances<'a, T: Iterator<Item = &'a AggregateEvents>>(
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use chrono::Utc;
+
     use primitives::util::tests::prep_db::{
         DUMMY_CHANNEL, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER,
     };
     use primitives::{Channel, ChannelSpec, ValidatorDesc};
+
+    use super::*;
 
     #[test]
     fn should_merge_event_aggrs_and_apply_fees() {
