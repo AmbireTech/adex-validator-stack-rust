@@ -7,8 +7,8 @@
 use std::error::Error;
 
 use ethabi::encode;
-use ethabi::param_type::{ParamType, Reader};
-use ethabi::token::{LenientTokenizer, StrictTokenizer, Token, Tokenizer};
+use ethabi::param_type::ParamType;
+use ethabi::token::{LenientTokenizer, StrictTokenizer, Tokenizer};
 use tiny_keccak::Keccak;
 
 use primitives::BigNum;
@@ -28,9 +28,11 @@ pub fn get_signable_state_root(
     channel_id: &str,
     balance_root: &str,
 ) -> Result<[u8; 32], Box<dyn Error>> {
-    let types = ["bytes32", "bytes32"];
-    let values = [channel_id, balance_root];
-    let encoded = encode_params(&types, &values, true)?;
+    let params = [
+        (ParamType::FixedBytes(32), channel_id),
+        (ParamType::FixedBytes(32), balance_root),
+    ];
+    let encoded = encode_params(&params, true)?;
 
     let mut result = Keccak::new_keccak256();
     result.update(&encoded);
@@ -42,9 +44,11 @@ pub fn get_signable_state_root(
 }
 
 pub fn get_balance_leaf(acc: &str, amnt: &BigNum) -> Result<[u8; 32], Box<dyn Error>> {
-    let types = ["address", "uint256"];
-    let values = [acc, &amnt.to_str_radix(16)];
-    let encoded = encode_params(&types, &values, true)?;
+    let params = [
+        (ParamType::Address, acc),
+        (ParamType::Uint(256), &amnt.to_str_radix(16)),
+    ];
+    let encoded = encode_params(&params, true)?;
 
     let mut result = Keccak::new_keccak256();
     result.update(&encoded);
@@ -86,26 +90,20 @@ impl EthereumChannel {
     }
 
     pub fn hash(&self, contract_addr: &str) -> Result<[u8; 32], Box<dyn Error>> {
-        let types = [
-            "address",
-            "address",
-            "address",
-            "uint256",
-            "uint256",
-            "address[]",
-            "bytes32",
+        let params = [
+            (ParamType::Address, contract_addr),
+            (ParamType::Address, &self.creator),
+            (ParamType::Address, &self.token_addr),
+            (ParamType::Uint(256), &self.token_amount),
+            (ParamType::Uint(256), &self.valid_until),
+            (
+                ParamType::Array(Box::new(ParamType::Address)),
+                &self.validators,
+            ),
+            (ParamType::FixedBytes(32), &self.spec),
         ];
 
-        let values = [
-            contract_addr,
-            &self.creator,
-            &self.token_addr,
-            &self.token_amount,
-            &self.valid_until,
-            &self.validators,
-            &self.spec,
-        ];
-        let encoded = encode_params(&types, &values, true)?;
+        let encoded = encode_params(&params, true)?;
         let mut result = Keccak::new_keccak256();
         result.update(&encoded);
 
@@ -149,37 +147,19 @@ impl EthereumChannel {
     }
 }
 
-fn encode_params(
-    types: &[&str],
-    values: &[&str],
-    lenient: bool,
-) -> Result<Vec<u8>, Box<dyn Error>> {
-    assert_eq!(types.len(), values.len());
-
-    let types: Vec<ParamType> = types
+fn encode_params(params: &[(ParamType, &str)], lenient: bool) -> Result<Vec<u8>, Box<dyn Error>> {
+    let tokens = params
         .iter()
-        .map(|s| Reader::read(s))
-        .collect::<Result<_, _>>()?;
-
-    let params = types.into_iter().zip(values.to_vec()).collect::<Vec<_>>();
-
-    let tokens = parse_tokens(&params, lenient)?;
-
-    Ok(encode(&tokens).to_vec())
-}
-
-fn parse_tokens(params: &[(ParamType, &str)], lenient: bool) -> Result<Vec<Token>, Box<dyn Error>> {
-    params
-        .iter()
-        .map(|&(ref param, value)| {
+        .map(|(param, value)| {
             if lenient {
                 LenientTokenizer::tokenize(param, value)
             } else {
                 StrictTokenizer::tokenize(param, value)
             }
         })
-        .collect::<Result<_, _>>()
-        .map_err(From::from)
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(encode(&tokens).to_vec())
 }
 
 #[cfg(test)]
