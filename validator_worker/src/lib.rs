@@ -3,18 +3,24 @@
 #![deny(clippy::all)]
 #![allow(clippy::needless_lifetimes)]
 
+use std::error::Error;
+
+use adapter::{get_balance_leaf, get_signable_state_root};
+use primitives::adapter::Adapter;
+use primitives::merkle_tree::MerkleTree;
+use primitives::BalancesMap;
+
+use crate::sentry_interface::SentryApi;
+
+pub use self::follower::Follower;
+pub use self::sentry_interface::all_channels;
+
 pub mod error;
 pub mod follower;
 pub mod heartbeat;
 pub mod leader;
 pub mod producer;
 pub mod sentry_interface;
-
-pub use self::follower::Follower;
-pub use self::sentry_interface::all_channels;
-use crate::sentry_interface::SentryApi;
-use primitives::adapter::Adapter;
-use primitives::BalancesMap;
 
 pub mod core {
     pub mod events;
@@ -23,8 +29,19 @@ pub mod core {
 }
 
 pub(crate) fn get_state_root_hash<A: Adapter + 'static>(
-    _iface: &SentryApi<A>,
-    _balances: &BalancesMap,
-) -> String {
-    unimplemented!("Still need implementation")
+    iface: &SentryApi<A>,
+    balances: &BalancesMap,
+) -> Result<[u8; 32], Box<dyn Error>> {
+    // Note: MerkleTree takes care of deduplicating and sorting
+    let elems: Vec<[u8; 32]> = balances
+        .iter()
+        .map(|(acc, amount)| get_balance_leaf(acc, amount))
+        .collect::<Result<_, _>>()?;
+
+    let tree = MerkleTree::new(&elems);
+
+    let balance_root = hex::encode(tree.root());
+
+    // keccak256(channelId, balanceRoot)
+    get_signable_state_root(&iface.channel.id, &balance_root)
 }
