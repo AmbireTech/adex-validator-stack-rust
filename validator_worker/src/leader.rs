@@ -4,6 +4,7 @@ use primitives::adapter::Adapter;
 use primitives::validator::{Accounting, MessageTypes, NewState};
 use primitives::BalancesMap;
 
+use crate::heartbeat::heartbeat;
 use crate::sentry_interface::SentryApi;
 use crate::{get_state_root_hash, producer};
 
@@ -14,7 +15,8 @@ pub async fn tick<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result<(), Box<
         on_new_accounting(&iface, (&balances, &new_accounting))?;
     }
 
-    Ok(())
+    // TODO: Pass the heartbeat time from the Configuration
+    await!(heartbeat(&iface, balances, 250)).map(|_| ())
 }
 
 fn on_new_accounting<A: Adapter + 'static>(
