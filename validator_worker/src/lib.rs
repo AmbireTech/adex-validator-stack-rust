@@ -45,3 +45,68 @@ pub(crate) fn get_state_root_hash<A: Adapter + 'static>(
     // keccak256(channelId, balanceRoot)
     get_signable_state_root(&iface.channel.id, &balance_root)
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use adapter::DummyAdapter;
+    use primitives::adapter::AdapterOptions;
+    use primitives::util::tests::prep_db::{DUMMY_CHANNEL, IDS};
+    use primitives::{config::DEVELOPMENT_CONFIG, BalancesMap, Channel};
+
+    fn setup_iface(channel: &Channel) -> SentryApi<DummyAdapter> {
+        let adapter_options = AdapterOptions {
+            dummy_identity: Some(IDS["leader"].clone()),
+            dummy_auth: None,
+            dummy_auth_tokens: None,
+            keystore_file: None,
+            keystore_pwd: None,
+        };
+        let config = DEVELOPMENT_CONFIG.clone();
+        let dummy_adapter = DummyAdapter::init(adapter_options, &config);
+
+        SentryApi::new(dummy_adapter, &channel, &config, false).expect("should succeed")
+    }
+
+    #[test]
+    fn get_state_root_hash_returns_correct_hash_aligning_with_js_impl() {
+        let channel = DUMMY_CHANNEL.clone();
+
+        let iface = setup_iface(&channel);
+
+        let balances: BalancesMap = vec![
+            (IDS["publisher"].clone(), 1.into()),
+            (IDS["tester"].clone(), 2.into()),
+        ]
+        .into_iter()
+        .collect();
+
+        let actual_hash =
+            get_state_root_hash(&iface, &balances).expect("should get state root hash");
+
+        assert_eq!(
+            "d6c784be61c4d2c47a52cc72af6c133d24b163ad053ac7f0a65091001f43dda1",
+            hex::encode(actual_hash)
+        );
+    }
+
+    #[test]
+    fn get_state_root_hash_returns_correct_hash_for_fake_channel_aligning_with_js_impl() {
+        let channel = DUMMY_CHANNEL.clone();
+
+        let iface = setup_iface(&channel);
+
+        let balances: BalancesMap = vec![(IDS["publisher"].clone(), 0.into())]
+            .into_iter()
+            .collect();
+
+        let actual_hash =
+            get_state_root_hash(&iface, &balances).expect("should get state root hash");
+
+        assert_eq!(
+            "4fad5375c3ef5f8a9d23a8276fed0151164dea72a5891cec8b43e1d190ed430e",
+            hex::encode(actual_hash)
+        );
+    }
+}

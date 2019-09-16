@@ -1,11 +1,11 @@
 use std::error::Error;
 
-use primitives::BalancesMap;
 use primitives::adapter::Adapter;
 use primitives::validator::{Accounting, MessageTypes, NewState};
+use primitives::BalancesMap;
 
-use crate::{get_state_root_hash, producer};
 use crate::sentry_interface::SentryApi;
+use crate::{get_state_root_hash, producer};
 
 pub async fn tick<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result<(), Box<dyn Error>> {
     let (balances, new_accounting) = await!(producer::tick(&iface))?;
