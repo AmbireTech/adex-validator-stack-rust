@@ -39,7 +39,6 @@ async fn send_heartbeat<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result<()
 pub async fn heartbeat<A: Adapter + 'static>(
     iface: &SentryApi<A>,
     balances: BalancesMap,
-    heartbeat_time: u32,
 ) -> Result<(), Box<dyn Error>> {
     let validator_message_response = await!(iface.get_our_latest_msg("Heartbeat".into()))?;
 
@@ -53,7 +52,7 @@ pub async fn heartbeat<A: Adapter + 'static>(
 
     let should_send = heartbeat_msg.map_or(true, |heartbeat| {
         let duration = Utc::now() - heartbeat.timestamp;
-        duration > Duration::milliseconds(heartbeat_time.into())
+        duration > Duration::milliseconds(iface.config.heartbeat_time.into())
             && is_channel_not_exhausted(&iface.channel, &balances)
     });
 

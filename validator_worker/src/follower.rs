@@ -42,7 +42,7 @@ pub async fn tick<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result<(), Box<
     }
 
     // TODO: Pass the heartbeat time from the Configuration
-    await!(heartbeat(&iface, balances, 250)).map(|_| ())
+    await!(heartbeat(&iface, balances)).map(|_| ())
 }
 
 fn on_new_state<A: Adapter + 'static>(
