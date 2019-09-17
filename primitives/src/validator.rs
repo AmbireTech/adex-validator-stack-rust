@@ -62,7 +62,7 @@ pub struct RejectState {
     pub reason: String,
     pub state_root: String,
     pub signature: String,
-    pub balances: Option<String>,
+    pub balances: Option<BalancesMap>,
     pub timestamp: Option<DateTime<Utc>>,
 }
 
