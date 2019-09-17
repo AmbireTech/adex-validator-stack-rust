@@ -3,7 +3,6 @@
 #![deny(clippy::all)]
 #![deny(clippy::match_bool)]
 #![doc(test(attr(feature(async_await, await_macro))))]
-#![doc(test(attr(cfg(feature = "dummy-adapter"))))]
 
 use ethabi::encode;
 use ethabi::param_type::{ParamType, Reader};
@@ -26,12 +25,12 @@ pub fn get_signable_state_root(
     channel_id: &str,
     balance_root: &str,
 ) -> Result<[u8; 32], Box<dyn Error>> {
-    let types: Vec<String> = vec!["bytes32".to_string(), "bytes32".to_string()];
+    let types = ["bytes32".to_string(), "bytes32".to_string()];
     let values = [channel_id.to_string(), balance_root.to_string()];
     let encoded = encode_params(&types, &values, true)?;
 
     let mut result = Keccak::new_keccak256();
-    result.update(encoded.as_ref());
+    result.update(&encoded);
 
     let mut res: [u8; 32] = [0; 32];
     result.finalize(&mut res);
@@ -45,7 +44,7 @@ pub fn get_balance_leaf(acc: &str, amnt: &str) -> Result<[u8; 32], Box<dyn Error
     let encoded = encode_params(&types, &values, true)?;
 
     let mut result = Keccak::new_keccak256();
-    result.update(encoded.as_ref());
+    result.update(&encoded);
 
     let mut res: [u8; 32] = [0; 32];
     result.finalize(&mut res);
@@ -64,7 +63,7 @@ pub struct EthereumChannel {
 }
 
 impl EthereumChannel {
-    fn new(
+    pub fn new(
         creator: &str,
         token_addr: &str,
         token_amount: String,
@@ -83,7 +82,7 @@ impl EthereumChannel {
         }
     }
 
-    fn hash(&self, contract_addr: &str) -> Result<[u8; 32], Box<dyn Error>> {
+    pub fn hash(&self, contract_addr: &str) -> Result<[u8; 32], Box<dyn Error>> {
         let types: Vec<String> = vec![
             "address",
             "address",
@@ -108,7 +107,7 @@ impl EthereumChannel {
         ];
         let encoded = encode_params(&types, &values, true)?;
         let mut result = Keccak::new_keccak256();
-        result.update(encoded.as_ref());
+        result.update(&encoded);
 
         let mut res: [u8; 32] = [0; 32];
         result.finalize(&mut res);
@@ -116,12 +115,12 @@ impl EthereumChannel {
         Ok(res)
     }
 
-    fn hash_hex(&self, contract_addr: &str) -> Result<String, Box<dyn Error>> {
+    pub fn hash_hex(&self, contract_addr: &str) -> Result<String, Box<dyn Error>> {
         let result = self.hash(contract_addr)?;
         Ok(format!("0x{}", hex::encode(result).to_string()))
     }
 
-    fn to_solidity_tuple(&self) -> Vec<String> {
+    pub fn to_solidity_tuple(&self) -> Vec<String> {
         vec![
             self.creator.to_owned(),
             self.token_addr.to_owned(),
@@ -132,7 +131,7 @@ impl EthereumChannel {
         ]
     }
 
-    fn hash_to_sign(
+    pub fn hash_to_sign(
         &self,
         contract_addr: &str,
         balance_root: &str,
@@ -140,7 +139,7 @@ impl EthereumChannel {
         get_signable_state_root(contract_addr, balance_root)
     }
 
-    fn hash_to_sign_hex(
+    pub fn hash_to_sign_hex(
         &self,
         contract_addr: &str,
         balance_root: &str,
@@ -154,7 +153,7 @@ fn encode_params(
     types: &[String],
     values: &[String],
     lenient: bool,
-) -> Result<String, Box<dyn Error>> {
+) -> Result<Vec<u8>, Box<dyn Error>> {
     assert_eq!(types.len(), values.len());
 
     let types: Vec<ParamType> = types
@@ -164,13 +163,13 @@ fn encode_params(
 
     let params: Vec<_> = types
         .into_iter()
-        .zip(values.iter().map(|v| v as &str))
+        .zip(values.iter().map(|s| s as &str))
         .collect();
 
     let tokens = parse_tokens(&params, lenient)?;
     let result = encode(&tokens);
 
-    Ok(hex::encode(result).to_string())
+    Ok(result.to_vec())
 }
 
 fn parse_tokens(params: &[(ParamType, &str)], lenient: bool) -> Result<Vec<Token>, Box<dyn Error>> {
@@ -185,4 +184,36 @@ fn parse_tokens(params: &[(ParamType, &str)], lenient: bool) -> Result<Vec<Token
         })
         .collect::<Result<_, _>>()
         .map_err(From::from)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use byteorder::{BigEndian, ByteOrder};
+    use chrono::{TimeZone, Utc};
+    use primitives::merkle_tree::MerkleTree;
+    use std::convert::TryFrom;
+
+    #[test]
+    fn test_get_signable_state_root_hash_is_aligned_with_js_impl() {
+        let timestamp = Utc.ymd(2019, 9, 12).and_hms(17, 0, 0);
+        let mut timestamp_buf = [0_u8; 32];
+        let n: u64 = u64::try_from(timestamp.timestamp_millis())
+            .expect("The timestamp should be able to be converted to u64");
+        BigEndian::write_uint(&mut timestamp_buf[26..], n, 6);
+
+        let merkle_tree = MerkleTree::new(&[timestamp_buf]);
+        let info_root_raw = hex::encode(merkle_tree.root());
+
+        let channel_id = "061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088";
+
+        let state_root =
+            get_signable_state_root(&channel_id, &info_root_raw).expect("Should get state_root");
+
+        let expected_hex =
+            hex::decode("b68cde9b0c8b63ac7152e78a65c736989b4b99bfc252758b1c3fd6ca357e0d6b")
+                .expect("Should decode valid expected hex");
+
+        assert_eq!(state_root.to_vec(), expected_hex);
+    }
 }

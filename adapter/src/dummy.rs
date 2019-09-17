@@ -1,7 +1,6 @@
 #![deny(clippy::all)]
 #![deny(rust_2018_idioms)]
 
-use futures::future::{ok, FutureExt};
 use primitives::adapter::{Adapter, AdapterOptions, AdapterResult};
 use primitives::channel_validator::ChannelValidator;
 use primitives::config::Config;
@@ -44,7 +43,7 @@ impl Adapter for DummyAdapter {
         self.identity.to_string()
     }
 
-    fn sign(&self, state_root: String) -> AdapterResult<String> {
+    fn sign(&self, state_root: &str) -> AdapterResult<String> {
         let signature = format!(
             "Dummy adapter signature for {} by {}",
             state_root,
