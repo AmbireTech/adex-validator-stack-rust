@@ -15,7 +15,6 @@ pub async fn tick<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result<(), Box<
         on_new_accounting(&iface, (&balances, &new_accounting))?;
     }
 
-    // TODO: Pass the heartbeat time from the Configuration
     await!(heartbeat(&iface, balances)).map(|_| ())
 }
 
