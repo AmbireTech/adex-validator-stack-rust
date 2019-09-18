@@ -14,11 +14,16 @@ time = "0.1.42"
 # To/From Hex
 hex = "0.3.2"
 serde =  {version = "^1.0", features = ['derive']}
+serde_json = "1.0"
+serde-hex = "0.1.0"
 # Ethereum
 web3 = { git = "https://github.com/tomusdrw/rust-web3" }
 eth_checksum = "0.1.1"
 ethabi = "8.0.1"
+ethsign = "0.7.1"
 tiny-keccak = "1.5"
+ethkey = { git = "https://github.com/paritytech/parity.git" }
+sha2 = "0.8.0"
 
 [dev-dependencies]
 byteorder = "1.3"

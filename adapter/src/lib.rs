@@ -10,6 +10,10 @@ use ethabi::encode;
 use ethabi::param_type::ParamType;
 use ethabi::token::{LenientTokenizer, StrictTokenizer, Tokenizer};
 use tiny_keccak::Keccak;
+use primitives::Channel;
+use sha2::{Sha256, Digest};
+use primitives::BigNum;
+use std::convert::From;
 
 use primitives::BigNum;
 
@@ -59,24 +63,69 @@ pub fn get_balance_leaf(acc: &str, amnt: &BigNum) -> Result<[u8; 32], Box<dyn Er
     Ok(res)
 }
 
+pub fn to_ethereum_channel(channel: &Channel) -> EthereumChannel {
+    // let spec = 
+    let spec = serde_json::to_string(&channel.spec).expect("Failed to serialize channel spec");
+
+    let mut hash = Sha256::new();
+    hash.input(spec);
+
+    let spec_hash = hash.result();
+
+    let validators: Vec<String> = channel.spec.validators.into_iter().map(|v| v.id).collect();
+
+    
+    EthereumChannel::new(
+        &channel.creator, 
+        &channel.deposit_asset, 
+        &channel.deposit_amount.to_string(), 
+        &channel.valid_until.timestamp().to_string(), 
+        &validators.as_slice(), 
+        spec_hash.into()
+    )
+}
+
 // OnChain channel Representation
 pub struct EthereumChannel {
     pub creator: String,
     pub token_addr: String,
     pub token_amount: String,
     pub valid_until: String,
-    pub validators: String,
-    pub spec: String,
+    pub validators: [String; 2],
+    pub spec: [u8; 32],
+}
+
+impl From<Channel> for EthereumChannel {
+    fn from(channel: &Channel) -> Self {
+        // let spec = 
+        let spec = serde_json::to_string(&channel.spec).expect("Failed to serialize channel spec");
+
+        let mut hash = Sha256::new();
+        hash.input(spec);
+
+        let spec_hash = hash.result();
+
+        let validators: Vec<String> = channel.spec.validators.into_iter().map(|v| v.id).collect();
+
+        EthereumChannel::new(
+            &channel.creator, 
+            &channel.deposit_asset, 
+            &channel.deposit_amount.to_string(), 
+            &channel.valid_until.timestamp().to_string(), 
+            validators.as_slice(), 
+            spec_hash
+        )
+    }
 }
 
 impl EthereumChannel {
     pub fn new(
         creator: &str,
         token_addr: &str,
-        token_amount: String,
-        valid_until: String,
-        validators: String,
-        spec: String,
+        token_amount: &str,
+        valid_until: &str,
+        validators: [String; 2],
+        spec: &[u8; 32],
     ) -> Self {
         //@TODO some validation
         Self {
@@ -85,7 +134,7 @@ impl EthereumChannel {
             token_amount: token_amount.to_owned(),
             valid_until,
             validators,
-            spec,
+            spec: spec.to_owned(),
         }
     }
 

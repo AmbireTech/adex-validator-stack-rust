@@ -18,6 +18,7 @@ pub mod targeting_tag;
 pub mod util;
 pub mod validator;
 
+// pub mod ethereum;
 //#[cfg(any(test, feature = "fixtures"))]
 //pub use util::tests as test_util;
 //

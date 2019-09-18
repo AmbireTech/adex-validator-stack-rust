@@ -7,16 +7,51 @@ use primitives::channel_validator::ChannelValidator;
 use primitives::config::Config;
 use primitives::{Channel, ValidatorDesc};
 use std::collections::HashMap;
-use web3::types::Address;
+use std::fs::File;
+use web3::futures::Future;
+use web3::types::{Address};
+use web3::contract::{Contract, Options};
+use crate::EthereumChannel;
+use std::path::{Path, PathBuf};
+use ethsign::{
+    keyfile::{Bytes, KeyFile},
+    Protected,
+};
+// use ethsign::{PublicKey, SecretKey, Signature};
+use ethkey::{Signature, KeyPair};
+
+use std::error::Error;
+
+pub type Password = Protected;
+// pub type Message = [u8; 32];
+
+// #[derive(Debug, Clone)]
+// pub struct EthAccount {
+//     pub secret: SecretKey,
+//     pub public: PublicKey,
+//     pub address: Address,
+// }
+
+// impl EthAccount {
+//     pub fn sign(&self, msg: &Message) -> Result<Signature, Box<dyn Error>> {
+//         Ok(self.secret.sign(msg)?)
+//     }
+
+//     /// verifies signature for given message and self public key
+//     pub fn verify(&self, sig: &Signature, msg: &Message) -> Result<bool, Box<dyn Error>> {
+//         Ok(self.public.verify(sig, msg)?)
+//     }
+// }
 
 #[derive(Debug, Clone)]
 pub struct EthereumAdapter {
-    address: Option<Address>,
     keystore_json: String,
     keystore_pwd: String,
+    ethereum_core_address: String, 
+    ethereum_network: String,
     auth_tokens: HashMap<String, String>,
     verified_auth: HashMap<String, String>,
-    wallet: Option<Address>,
+    wallet: Option<KeyPair>
 }
 
 // Enables EthereumAdapter to be able to
@@ -27,57 +62,76 @@ impl ChannelValidator for EthereumAdapter {}
 impl Adapter for EthereumAdapter {
     type Output = EthereumAdapter;
 
-    fn init(opts: AdapterOptions, _config: &Config) -> EthereumAdapter {
-        // opts.dummy_identity.expect("dummyIdentity required");
-        // opts.dummy_auth.expect("dummy auth required");
-        // opts.dummy_auth_tokens.expect("dummy auth tokens required");
-        // self.identity = opts.dummy_identity.unwrap();
-        // self.authTokens = opts.dummy_auth.unwrap();
-        // self.verifiedAuth = opts.dummy_auth_tokens.unwrap();
-        let keystore_json = opts.keystore_file.unwrap();
-        let keystore_pwd = opts.keystore_pwd.unwrap();
+    fn init(opts: AdapterOptions, config: &Config) -> EthereumAdapter {
+        // @TODO ensure the keystore_json file exists
+        // during program startup
+        let keystore_json = opts.keystore_file.expect("Keystore file required");
+        let keystore_pwd = opts.keystore_pwd.expect("Keystore password required");
 
         Self {
-            address: None,
             keystore_json,
             keystore_pwd,
             auth_tokens: HashMap::new(),
             verified_auth: HashMap::new(),
             wallet: None,
+            ethereum_network: config.ethereum_network,
+            ethereum_core_address: config.ethereum_core_address
         }
     }
 
     fn unlock(&self) -> AdapterResult<bool> {
+        let path = Path::new(&self.keystore_json).to_path_buf();
+        let password: Password = self.keystore_pwd.into();
+
+        let json_file = File::open(&path).expect("Failed to load json file");
+        let key_file: KeyFile = serde_json::from_reader(json_file).expect("Invalid keystore json");
+        // let secret = key_file.to_secret_key(&password).expect("Invalid Keystore password");
+        let plain_secret = key_file.crypto.decrypt(&password).expect("Invalid keystore password");
+
+        let keypair = KeyPair::from_secret_slice(&plain_secret.as_slice()).expect("Failed to create keypair");
+
+        self.wallet = Some(keypair);
+    
+        // wallet has been unlocked
         Ok(true)
     }
 
     fn whoami(&self) -> String {
-        self.address.unwrap().to_string()
+        match self.wallet {
+            Some(wallet) =>  format!("0x{}", wallet.address()),
+            None => {
+                eprintln!("Unlock wallet before use");
+                "".to_string()
+            }
+        }
     }
 
-    fn sign(&self, state_root: &str) -> AdapterResult<String> {
-        let signature = format!(
-            "Dummy adapter signature for {} by {}",
-            state_root,
-            self.whoami()
-        );
-        Ok(signature)
+    fn sign(&self, state_root: &[u8; 32]) -> AdapterResult<String> {
+        let wallet = self.wallet.expect("Unlock the wallet before signing");
+        let signature = wallet.sign(state_root).expect("sign message");
+        
+        format!("{}", signature)
     }
 
-    fn verify(&self, signer: &str, _state_root: &str, signature: &str) -> AdapterResult<bool> {
-        // select the `identity` and compare it to the signer
-        // for empty string this will return array with 1 element - an empty string `[""]`
-        let is_same = match signature.rsplit(' ').take(1).next() {
-            Some(from) => from == signer,
-            None => false,
-        };
+    fn verify(&self, _signer: &str, state_root: &[u8; 32], signature: &[u8; 32]) -> AdapterResult<bool> {
 
-        Ok(is_same)
+        self.wallet.verify(signature, state_root)
     }
 
-    fn validate_channel(&self, _channel: &Channel) -> AdapterResult<bool> {
-        // @TODO
-        Ok(true)
+    fn validate_channel(&self, channel: &Channel) -> AdapterResult<bool> {
+        let contract = Contract::from_json(
+            self.web3.eth(), 
+            self.ethereum_core_address.into(), 
+            include_bytes!("../contract/AdExCore.json"),
+        ).unwrap();
+
+        let eth_channel: EthereumChannel = EthereumChannel::new();
+
+        // assert_eq!(channel.id, )
+
+        
+
+
     }
 
     fn session_from_token(&self, _token: &str) -> AdapterResult<String> {
