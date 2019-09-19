@@ -1,7 +1,7 @@
 #![deny(clippy::all)]
 #![deny(rust_2018_idioms)]
 
-use futures::future::{ok, FutureExt};
+
 use primitives::adapter::{Adapter, AdapterOptions, AdapterResult};
 use primitives::channel_validator::ChannelValidator;
 use primitives::config::Config;

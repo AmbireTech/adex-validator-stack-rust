@@ -9,13 +9,13 @@ use crate::sentry_interface::SentryApi;
 use crate::{get_state_root_hash, producer};
 
 pub async fn tick<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result<(), Box<dyn Error>> {
-    let (balances, new_accounting) = await!(producer::tick(&iface))?;
+    let (balances, new_accounting) = producer::tick(&iface).await?;
 
     if let Some(new_accounting) = new_accounting {
         on_new_accounting(&iface, (&balances, &new_accounting))?;
     }
 
-    await!(heartbeat(&iface, balances)).map(|_| ())
+    heartbeat(&iface, balances).await.map(|_| ())
 }
 
 fn on_new_accounting<A: Adapter + 'static>(
