@@ -1,8 +1,6 @@
-#![feature(async_await, await_macro)]
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
 #![deny(clippy::match_bool)]
-#![doc(test(attr(feature(async_await, await_macro))))]
 
 use std::error::Error;
 

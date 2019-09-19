@@ -1,5 +1,3 @@
-#![feature(async_await, await_macro)]
-
 use std::convert::TryFrom;
 use std::env::Vars;
 use std::net::SocketAddr;
