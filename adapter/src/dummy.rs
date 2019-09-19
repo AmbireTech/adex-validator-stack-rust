@@ -1,7 +1,7 @@
 #![deny(clippy::all)]
 #![deny(rust_2018_idioms)]
 
-use primitives::adapter::{Adapter, AdapterOptions, AdapterResult};
+use primitives::adapter::{Adapter, AdapterOptions, AdapterResult, Session, AdapterError};
 use primitives::channel_validator::ChannelValidator;
 use primitives::config::Config;
 use primitives::{Channel, ValidatorDesc};
@@ -10,8 +10,8 @@ use std::collections::HashMap;
 #[derive(Debug, Clone)]
 pub struct DummyAdapter {
     identity: String,
-    auth_tokens: HashMap<String, String>,
-    verified_auth: HashMap<String, String>,
+    tokens_verified: HashMap<String, String>,
+    tokens_for_auth: HashMap<String, String>,
 }
 
 // Enables DummyAdapter to be able to
@@ -22,20 +22,18 @@ impl Adapter for DummyAdapter {
     type Output = DummyAdapter;
 
     fn init(opts: AdapterOptions, _config: &Config) -> DummyAdapter {
-        // opts.dummy_identity.expect("dummyIdentity required");
-        // opts.dummy_auth.expect("dummy auth required");
-        // opts.dummy_auth_tokens.expect("dummy auth tokens required");
-        // self.identity = opts.dummy_identity.unwrap();
-        // self.authTokens = opts.dummy_auth.unwrap();
-        // self.verifiedAuth = opts.dummy_auth_tokens.unwrap();
+        let identity = opts.dummy_identity.expect("dummyIdentity required");
+        let tokens_for_auth = opts.dummy_auth.expect("dummy auth required");
+        let tokens_verified = opts.dummy_auth_tokens.expect("dummy auth tokens required");
+
         Self {
-            identity: opts.dummy_identity.unwrap(),
-            auth_tokens: HashMap::new(),
-            verified_auth: HashMap::new(),
+            identity,
+            tokens_verified,
+            tokens_for_auth,
         }
     }
 
-    fn unlock(&self) -> AdapterResult<bool> {
+    fn unlock(&mut self) -> AdapterResult<bool> {
         Ok(true)
     }
 
@@ -63,27 +61,34 @@ impl Adapter for DummyAdapter {
         Ok(is_same)
     }
 
-    fn validate_channel(&self, _channel: &Channel) -> AdapterResult<bool> {
-        // @TODO
-        Ok(true)
+    fn validate_channel(&self, channel: &Channel) -> AdapterResult<bool> {
+        self.validate_channel(channel)
     }
 
-    fn session_from_token(&self, _token: &str) -> AdapterResult<String> {
-        // @TODO
-        Ok("hello".to_string())
+    fn session_from_token(&mut self, token: &str) -> AdapterResult<Session> {
+        let mut identity = "";
+        for (key, val) in self.tokens_for_auth.iter() {
+            if val == token {
+                identity = key;
+            }
+        }
+
+        Ok(Session { uid: identity.to_owned(), era: 0 })
     }
 
-    fn get_auth(&self, _validator: &ValidatorDesc) -> AdapterResult<String> {
-        // let participant = self
-        //     .participants
-        //     .iter()
-        //     .find(|&(_, participant)| participant.identity == validator);
-        // let future = match participant {
-        //     Some((_, participant)) => ok(participant.token.to_string()),
-        //     None => err(AdapterError::Authentication(
-        //         "Identity not found".to_string(),
-        //     )),
-        // };
-        Ok("auth".to_string())
+    fn get_auth(&mut self, _validator: &ValidatorDesc) -> AdapterResult<String> {
+        let who = self
+            .tokens_verified
+            .clone()
+            .into_iter()
+            .find(|(_, id)| id.to_owned() == self.identity);
+
+        match who {
+            Some((id, _)) => {
+                let auth = self.tokens_for_auth.get(&id).unwrap();
+                Ok(auth.to_owned())
+            }
+            None => Err(AdapterError::Authentication(format!("no auth token for this identity: {}", self.identity)))
+        }
     }
 }

@@ -24,6 +24,8 @@ ethsign = "0.7.1"
 tiny-keccak = "1.5"
 ethkey = { git = "https://github.com/paritytech/parity.git" }
 sha2 = "0.8.0"
+base64 = "0.10.1"
+
 
 [dev-dependencies]
 byteorder = "1.3"
