@@ -14,6 +14,7 @@ use primitives::Channel;
 use sha2::{Sha256, Digest};
 use primitives::BigNum;
 use std::convert::From;
+use hex;
 
 use primitives::BigNum;
 
@@ -63,39 +64,17 @@ pub fn get_balance_leaf(acc: &str, amnt: &BigNum) -> Result<[u8; 32], Box<dyn Er
     Ok(res)
 }
 
-pub fn to_ethereum_channel(channel: &Channel) -> EthereumChannel {
-    // let spec = 
-    let spec = serde_json::to_string(&channel.spec).expect("Failed to serialize channel spec");
-
-    let mut hash = Sha256::new();
-    hash.input(spec);
-
-    let spec_hash = hash.result();
-
-    let validators: Vec<String> = channel.spec.validators.into_iter().map(|v| v.id).collect();
-
-    
-    EthereumChannel::new(
-        &channel.creator, 
-        &channel.deposit_asset, 
-        &channel.deposit_amount.to_string(), 
-        &channel.valid_until.timestamp().to_string(), 
-        &validators.as_slice(), 
-        spec_hash.into()
-    )
-}
-
 // OnChain channel Representation
 pub struct EthereumChannel {
     pub creator: String,
     pub token_addr: String,
     pub token_amount: String,
-    pub valid_until: String,
-    pub validators: [String; 2],
-    pub spec: [u8; 32],
+    pub valid_until: i64,
+    pub validators: Vec<String>,
+    pub spec: String,
 }
 
-impl From<Channel> for EthereumChannel {
+impl From<&Channel> for EthereumChannel {
     fn from(channel: &Channel) -> Self {
         // let spec = 
         let spec = serde_json::to_string(&channel.spec).expect("Failed to serialize channel spec");
@@ -103,17 +82,17 @@ impl From<Channel> for EthereumChannel {
         let mut hash = Sha256::new();
         hash.input(spec);
 
-        let spec_hash = hash.result();
+        let spec_hash = format!("{:02x}", hash.result());
 
-        let validators: Vec<String> = channel.spec.validators.into_iter().map(|v| v.id).collect();
+        let validators: Vec<String> = channel.spec.validators.into_iter().map(|v| v.id.clone()).collect();
 
         EthereumChannel::new(
             &channel.creator, 
             &channel.deposit_asset, 
             &channel.deposit_amount.to_string(), 
-            &channel.valid_until.timestamp().to_string(), 
-            validators.as_slice(), 
-            spec_hash
+            channel.valid_until.timestamp(), 
+            validators, 
+            &spec_hash
         )
     }
 }
@@ -123,9 +102,9 @@ impl EthereumChannel {
         creator: &str,
         token_addr: &str,
         token_amount: &str,
-        valid_until: &str,
-        validators: [String; 2],
-        spec: &[u8; 32],
+        valid_until: i64,
+        validators: Vec<String>,
+        spec: &str,
     ) -> Self {
         //@TODO some validation
         Self {
@@ -168,13 +147,16 @@ impl EthereumChannel {
     }
 
     pub fn to_solidity_tuple(&self) -> Vec<String> {
+        let validators = format!("[ {} ]", self.validators.join(", "));
+        let spec = hex::encode(&self.spec);
+
         vec![
             self.creator.to_owned(),
             self.token_addr.to_owned(),
             format!("0x{}", self.token_amount.to_owned()),
             format!("0x{}", self.valid_until.to_owned()),
-            self.validators.to_owned(),
-            self.spec.to_owned(),
+            validators,
+            spec,
         ]
     }
 

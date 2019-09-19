@@ -11,6 +11,8 @@ pub type AdapterResult<T> = Result<T, AdapterError>;
 #[derive(Debug, Eq, PartialEq)]
 pub enum AdapterError {
     Authentication(String),
+    EwtVerifyFailed(String),
+    Authorization(String)
 }
 
 impl Error for AdapterError {}
@@ -19,6 +21,8 @@ impl fmt::Display for AdapterError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             AdapterError::Authentication(error) => write!(f, "Authentication error: {}", error),
+            AdapterError::EwtVerifyFailed(error) => write!(f, "Ewt verification error: {}", error),
+            AdapterError::Authorization(error) => write!(f, "Authorization error: {}", error)
         }
     }
 }
@@ -32,6 +36,12 @@ pub struct AdapterOptions {
     pub keystore_pwd: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+pub struct Session {
+    pub era: usize,
+    pub uid: String
+}
+
 pub trait Adapter: ChannelValidator + Clone + Debug + Send + Sync {
     type Output;
 
@@ -39,7 +49,7 @@ pub trait Adapter: ChannelValidator + Clone + Debug + Send + Sync {
     fn init(opts: AdapterOptions, config: &Config) -> Self::Output;
 
     /// Unlock adapter
-    fn unlock(&self) -> AdapterResult<bool>;
+    fn unlock(&mut self) -> AdapterResult<bool>;
 
     /// Get Adapter whoami
     fn whoami(&self) -> String;
@@ -54,8 +64,8 @@ pub trait Adapter: ChannelValidator + Clone + Debug + Send + Sync {
     fn validate_channel(&self, channel: &Channel) -> AdapterResult<bool>;
 
     /// Get user session from token
-    fn session_from_token(&self, token: &str) -> AdapterResult<String>;
+    fn session_from_token(&mut self, token: &str) -> AdapterResult<Session>;
 
     /// Gets authentication for specific validator
-    fn get_auth(&self, validator: &ValidatorDesc) -> AdapterResult<String>;
+    fn get_auth(&mut self, validator: &ValidatorDesc) -> AdapterResult<String>;
 }
