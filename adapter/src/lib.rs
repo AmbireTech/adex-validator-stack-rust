@@ -4,6 +4,7 @@
 #![deny(clippy::match_bool)]
 #![doc(test(attr(feature(async_await, await_macro))))]
 
+<<<<<<< HEAD
 use std::error::Error;
 
 use ethabi::encode;
@@ -12,9 +13,18 @@ use ethabi::token::{LenientTokenizer, StrictTokenizer, Tokenizer};
 use tiny_keccak::Keccak;
 use primitives::Channel;
 use sha2::{Sha256, Digest};
-use primitives::BigNum;
-use std::convert::From;
+=======
+use ethabi::encode;
+use ethabi::param_type::{ParamType, Reader};
+use ethabi::token::{LenientTokenizer, StrictTokenizer, Token, Tokenizer};
 use hex;
+>>>>>>> 955cd39... fix: ethereum adapter
+use primitives::BigNum;
+use primitives::Channel;
+use sha2::{Digest, Sha256};
+use std::convert::From;
+use std::error::Error;
+use tiny_keccak::Keccak;
 
 use primitives::BigNum;
 
@@ -76,7 +86,7 @@ pub struct EthereumChannel {
 
 impl From<&Channel> for EthereumChannel {
     fn from(channel: &Channel) -> Self {
-        // let spec = 
+        // let spec =
         let spec = serde_json::to_string(&channel.spec).expect("Failed to serialize channel spec");
 
         let mut hash = Sha256::new();
@@ -84,15 +94,20 @@ impl From<&Channel> for EthereumChannel {
 
         let spec_hash = format!("{:02x}", hash.result());
 
-        let validators: Vec<String> = channel.spec.validators.into_iter().map(|v| v.id.clone()).collect();
+        let validators: Vec<String> = channel
+            .spec
+            .validators
+            .into_iter()
+            .map(|v| v.id.clone())
+            .collect();
 
         EthereumChannel::new(
-            &channel.creator, 
-            &channel.deposit_asset, 
-            &channel.deposit_amount.to_string(), 
-            channel.valid_until.timestamp(), 
-            validators, 
-            &spec_hash
+            &channel.creator,
+            &channel.deposit_asset,
+            &channel.deposit_amount.to_string(),
+            channel.valid_until.timestamp(),
+            validators,
+            &spec_hash,
         )
     }
 }

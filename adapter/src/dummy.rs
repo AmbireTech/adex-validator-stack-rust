@@ -1,7 +1,7 @@
 #![deny(clippy::all)]
 #![deny(rust_2018_idioms)]
 
-use primitives::adapter::{Adapter, AdapterOptions, AdapterResult, Session, AdapterError};
+use primitives::adapter::{Adapter, AdapterError, AdapterOptions, AdapterResult, Session};
 use primitives::channel_validator::ChannelValidator;
 use primitives::config::Config;
 use primitives::{Channel, ValidatorDesc};
@@ -62,7 +62,7 @@ impl Adapter for DummyAdapter {
     }
 
     fn validate_channel(&self, channel: &Channel) -> AdapterResult<bool> {
-        self.validate_channel(channel)
+        DummyAdapter::is_channel_valid(channel)
     }
 
     fn session_from_token(&mut self, token: &str) -> AdapterResult<Session> {
@@ -73,7 +73,10 @@ impl Adapter for DummyAdapter {
             }
         }
 
-        Ok(Session { uid: identity.to_owned(), era: 0 })
+        Ok(Session {
+            uid: identity.to_owned(),
+            era: 0,
+        })
     }
 
     fn get_auth(&mut self, _validator: &ValidatorDesc) -> AdapterResult<String> {
@@ -81,14 +84,17 @@ impl Adapter for DummyAdapter {
             .tokens_verified
             .clone()
             .into_iter()
-            .find(|(_, id)| id.to_owned() == self.identity);
+            .find(|(_, id)| id.to_string() == self.identity);
 
         match who {
             Some((id, _)) => {
                 let auth = self.tokens_for_auth.get(&id).unwrap();
                 Ok(auth.to_owned())
             }
-            None => Err(AdapterError::Authentication(format!("no auth token for this identity: {}", self.identity)))
+            None => Err(AdapterError::Authentication(format!(
+                "no auth token for this identity: {}",
+                self.identity
+            ))),
         }
     }
 }
