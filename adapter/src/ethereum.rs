@@ -240,8 +240,7 @@ pub fn ewt_verify<'a>(token: &'a str) -> Result<VerifyPayload<'a>, Box<dyn Error
     let mut parts: Vec<String> = token.split(".").map( |k| k.to_owned()).collect();
     assert_eq!(parts.len(), 3, "verify: token needs to be of 3 parts");
 
-    let part1 = parts.get(1).unwrap().to_owned();
-    let decode_part1 = base64::decode(&part1)?;
+    let part1 = format!("{}", parts.get(1).unwrap());
 
     let msg = format!("{}.{}", parts.get(0).unwrap(), part1);
     let message = Message::from_slice(msg.as_bytes());
@@ -251,9 +250,10 @@ pub fn ewt_verify<'a>(token: &'a str) -> Result<VerifyPayload<'a>, Box<dyn Error
 
     let public_key = recover(&signature, &message)?;
 
-    let payload_string = String::from_utf8_lossy(&decode_part1.as_slice());
+    let decode_part1 = base64::decode(&part1)?;
+    let payload_string = String::from_utf8(decode_part1)?;
 
-    let payload: Payload<'a> = serde_json::from_str(&payload_string)?;
+    let payload: Payload<'a> = serde_json::from_str(payload_string.as_ref())?;
 
     let verified_payload = VerifyPayload {
         from: public_key,
