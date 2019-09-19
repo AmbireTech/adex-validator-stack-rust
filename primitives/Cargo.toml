@@ -4,9 +4,6 @@ version = "0.1.0"
 authors = ["Lachezar Lechev <lachezar@adex.network>, Omidiora Samuel <sam@adex.network>"]
 edition = "2018"
 
-[features]
-
-
 [dependencies]
 # Futures
 futures-preview = { version = "=0.3.0-alpha.16", features = ["compat", "io-compat"]}
