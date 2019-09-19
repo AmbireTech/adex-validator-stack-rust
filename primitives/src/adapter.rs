@@ -12,7 +12,10 @@ pub type AdapterResult<T> = Result<T, AdapterError>;
 pub enum AdapterError {
     Authentication(String),
     EwtVerifyFailed(String),
-    Authorization(String)
+    Authorization(String),
+    Configuration(String),
+    Signature(String),
+    InvalidChannel(String),
 }
 
 impl Error for AdapterError {}
@@ -22,7 +25,10 @@ impl fmt::Display for AdapterError {
         match self {
             AdapterError::Authentication(error) => write!(f, "Authentication error: {}", error),
             AdapterError::EwtVerifyFailed(error) => write!(f, "Ewt verification error: {}", error),
-            AdapterError::Authorization(error) => write!(f, "Authorization error: {}", error)
+            AdapterError::Authorization(error) => write!(f, "Authorization error: {}", error),
+            AdapterError::Configuration(error) => write!(f, "Configuration error: {}", error),
+            AdapterError::Signature(error) => write!(f, "Signature error: {}", error),
+            AdapterError::InvalidChannel(error) => write!(f, "Invalid Channel error: {}", error),
         }
     }
 }
@@ -39,20 +45,20 @@ pub struct AdapterOptions {
 #[derive(Debug, Clone)]
 pub struct Session {
     pub era: usize,
-    pub uid: String
+    pub uid: String,
 }
 
 pub trait Adapter: ChannelValidator + Clone + Debug + Send + Sync {
     type Output;
 
     /// Initialize adapter
-    fn init(opts: AdapterOptions, config: &Config) -> Self::Output;
+    fn init(opts: AdapterOptions, config: &Config) -> AdapterResult<Self::Output>;
 
     /// Unlock adapter
     fn unlock(&mut self) -> AdapterResult<bool>;
 
     /// Get Adapter whoami
-    fn whoami(&self) -> String;
+    fn whoami(&self) -> AdapterResult<String>;
 
     /// Signs the provided state_root
     fn sign(&self, state_root: &str) -> AdapterResult<String>;

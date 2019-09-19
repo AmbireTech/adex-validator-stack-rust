@@ -10,6 +10,7 @@ use std::collections::HashMap;
 #[derive(Debug, Clone)]
 pub struct DummyAdapter {
     identity: String,
+    config: Config,
     tokens_verified: HashMap<String, String>,
     tokens_for_auth: HashMap<String, String>,
 }
@@ -21,31 +22,32 @@ impl ChannelValidator for DummyAdapter {}
 impl Adapter for DummyAdapter {
     type Output = DummyAdapter;
 
-    fn init(opts: AdapterOptions, _config: &Config) -> DummyAdapter {
+    fn init(opts: AdapterOptions, config: &Config) -> AdapterResult<DummyAdapter> {
         let identity = opts.dummy_identity.expect("dummyIdentity required");
         let tokens_for_auth = opts.dummy_auth.expect("dummy auth required");
         let tokens_verified = opts.dummy_auth_tokens.expect("dummy auth tokens required");
 
-        Self {
+        Ok(Self {
             identity,
+            config: config.to_owned(),
             tokens_verified,
             tokens_for_auth,
-        }
+        })
     }
 
     fn unlock(&mut self) -> AdapterResult<bool> {
         Ok(true)
     }
 
-    fn whoami(&self) -> String {
-        self.identity.to_string()
+    fn whoami(&self) -> AdapterResult<String> {
+        Ok(self.identity.to_string())
     }
 
     fn sign(&self, state_root: &str) -> AdapterResult<String> {
         let signature = format!(
             "Dummy adapter signature for {} by {}",
             state_root,
-            self.whoami()
+            self.whoami()?
         );
         Ok(signature)
     }
@@ -62,7 +64,10 @@ impl Adapter for DummyAdapter {
     }
 
     fn validate_channel(&self, channel: &Channel) -> AdapterResult<bool> {
-        DummyAdapter::is_channel_valid(channel)
+        match DummyAdapter::is_channel_valid(&self.config, channel) {
+            Ok(_) => Ok(true),
+            Err(e) => Err(AdapterError::InvalidChannel(format!("{}", e))),
+        }
     }
 
     fn session_from_token(&mut self, token: &str) -> AdapterResult<Session> {
@@ -84,7 +89,7 @@ impl Adapter for DummyAdapter {
             .tokens_verified
             .clone()
             .into_iter()
-            .find(|(_, id)| id.to_string() == self.identity);
+            .find(|(_, id)| *id == self.identity);
 
         match who {
             Some((id, _)) => {
