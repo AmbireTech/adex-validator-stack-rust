@@ -3,7 +3,6 @@
 use std::error;
 use std::fmt;
 
-
 pub mod ad_unit;
 pub mod adapter;
 pub mod balances_map;
@@ -19,7 +18,6 @@ pub mod targeting_tag;
 pub mod util;
 pub mod validator;
 
-// pub mod ethereum;
 //#[cfg(any(test, feature = "fixtures"))]
 //pub use util::tests as test_util;
 //

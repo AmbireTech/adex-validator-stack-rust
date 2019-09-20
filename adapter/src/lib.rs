@@ -78,7 +78,6 @@ pub struct EthereumChannel {
 
 impl From<&Channel> for EthereumChannel {
     fn from(channel: &Channel) -> Self {
-        // let spec =
         let spec = serde_json::to_string(&channel.spec).expect("Failed to serialize channel spec");
 
         let mut hash = Sha256::new();
@@ -154,7 +153,7 @@ impl EthereumChannel {
     }
 
     pub fn to_solidity_tuple(&self) -> Vec<String> {
-        let validators = format!("[ {} ]", self.validators.join(", "));
+        let validators = format!("[{}]", self.validators.join(","));
         let spec = hex::encode(&self.spec);
 
         vec![
