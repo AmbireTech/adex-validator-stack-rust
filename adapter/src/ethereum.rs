@@ -90,7 +90,7 @@ impl Adapter for EthereumAdapter {
                 ))
             }
         };
-        println!("{:?}", json_file);
+
         let key_file: KeyFile = match serde_json::from_reader(json_file) {
             Ok(data) => data,
             Err(e) => return Err(AdapterError::Configuration(format!("{}", e))),
@@ -189,7 +189,13 @@ impl Adapter for EthereumAdapter {
             ));
         }
 
-        // @TODO checksum ethereum address
+        let validators: Vec<&str> = channel.spec.validators.into_iter().map(|v| &v.id[..]).collect();
+        let invalid_address_checkum = check_address_checksum(&validators);
+        if invalid_address_checkum {
+            return Err(AdapterError::Configuration(
+                "channel.validators: all addresses are checksummed".to_string()
+            ))
+        }
         // check if channel is valid
         let is_channel_valid = EthereumAdapter::is_channel_valid(&self.config, channel);
         if is_channel_valid.is_err() {
@@ -291,6 +297,19 @@ impl Adapter for EthereumAdapter {
             )),
         }
     }
+}
+
+fn check_address_checksum(addresses: &[&str]) -> bool {
+    let mut invalid_address_checkum = false;
+    
+    for address in addresses {
+        if eth_checksum::checksum(address) != *address {
+            invalid_address_checkum = true;
+            break;
+        }
+    }
+
+    invalid_address_checkum
 }
 
 fn hash_message(message: &str) -> [u8; 32] {
