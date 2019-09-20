@@ -4,7 +4,6 @@
 #![deny(clippy::match_bool)]
 #![doc(test(attr(feature(async_await, await_macro))))]
 
-<<<<<<< HEAD
 use std::error::Error;
 
 use ethabi::encode;
@@ -13,13 +12,6 @@ use ethabi::token::{LenientTokenizer, StrictTokenizer, Tokenizer};
 use tiny_keccak::Keccak;
 use primitives::Channel;
 use sha2::{Sha256, Digest};
-=======
-use ethabi::encode;
-use ethabi::param_type::{ParamType, Reader};
-use ethabi::token::{LenientTokenizer, StrictTokenizer, Token, Tokenizer};
-use hex;
->>>>>>> 955cd39... fix: ethereum adapter
-use primitives::BigNum;
 use primitives::Channel;
 use sha2::{Digest, Sha256};
 use std::convert::From;

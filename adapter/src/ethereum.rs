@@ -2,14 +2,11 @@
 #![deny(rust_2018_idioms)]
 
 use crate::EthereumChannel;
-use base64;
 use chrono::Utc;
-use eth_checksum;
 use ethkey::{
-    public_to_address, recover, sign, verify_address, Address, KeyPair, Message, Public, Signature,
+    public_to_address, recover, sign, verify_address, Address, KeyPair, Message, Signature,
 };
 use ethsign::{keyfile::KeyFile, Protected};
-use hex::ToHex;
 use primitives::{
     adapter::{Adapter, AdapterError, AdapterOptions, AdapterResult, Session},
     channel_validator::ChannelValidator,
@@ -21,8 +18,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::error::Error;
 use std::fs::File;
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
+use std::path::Path;
 use tiny_keccak::Keccak;
 use web3::{
     contract::{Contract, Options},
@@ -50,20 +46,11 @@ impl Adapter for EthereumAdapter {
     type Output = EthereumAdapter;
 
     fn init(opts: AdapterOptions, config: &Config) -> AdapterResult<EthereumAdapter> {
-        let keystore_json = match opts.keystore_file {
-            Some(file) => file,
-            None => {
+        let (keystore_json, keystore_pwd) = match (opts.keystore_file, opts.keystore_pwd) {
+            (Some(file), Some(pwd)) => (file, pwd),
+            (_, _) => {
                 return Err(AdapterError::Configuration(
-                    "Missing keystore json file".to_string(),
-                ))
-            }
-        };
-
-        let keystore_pwd = match opts.keystore_pwd {
-            Some(file) => file,
-            None => {
-                return Err(AdapterError::Configuration(
-                    "Missing keystore pwd".to_string(),
+                    "Missing keystore json file or password".to_string(),
                 ))
             }
         };
@@ -131,7 +118,7 @@ impl Adapter for EthereumAdapter {
         let message = Message::from_slice(&hash_message(state_root));
         match &self.wallet {
             Some(wallet) => {
-                let wallet_sign = sign(wallet.secret(), &message).expect("sign message");
+                let wallet_sign = sign(wallet.secret(), &message).expect("failed to sign messages");
                 let signature: Signature = wallet_sign.into_electrum().into();
                 Ok(format!("0x{}", signature))
             }
@@ -157,10 +144,7 @@ impl Adapter for EthereumAdapter {
 
         match verify_address(&address, &signature, &message) {
             Ok(result) => Ok(result),
-            Err(e) => {
-                println!("{}", e);
-                Ok(false)
-            }
+            Err(_) => Ok(false),
         }
     }
 
@@ -189,12 +173,17 @@ impl Adapter for EthereumAdapter {
             ));
         }
 
-        let validators: Vec<&str> = channel.spec.validators.into_iter().map(|v| &v.id[..]).collect();
+        let validators: Vec<&str> = channel
+            .spec
+            .validators
+            .into_iter()
+            .map(|v| &v.id[..])
+            .collect();
         let invalid_address_checkum = check_address_checksum(&validators);
         if invalid_address_checkum {
             return Err(AdapterError::Configuration(
-                "channel.validators: all addresses are checksummed".to_string()
-            ))
+                "channel.validators: all addresses are checksummed".to_string(),
+            ));
         }
         // check if channel is valid
         let is_channel_valid = EthereumAdapter::is_channel_valid(&self.config, channel);
@@ -301,7 +290,7 @@ impl Adapter for EthereumAdapter {
 
 fn check_address_checksum(addresses: &[&str]) -> bool {
     let mut invalid_address_checkum = false;
-    
+
     for address in addresses {
         if eth_checksum::checksum(address) != *address {
             invalid_address_checkum = true;
@@ -352,46 +341,45 @@ struct Header {
 }
 
 pub fn ewt_sign(signer: &KeyPair, payload: &Payload) -> Result<String, Box<dyn Error>> {
-    let header_json = Header {
+    let header = Header {
         header_type: "JWT".to_string(),
         alg: "ETH".to_string(),
     };
-    let header_1 = serde_json::to_string(&header_json)?;
-    println!("header json {}", header_1);
 
-    let header = base64::encode_config(&header_1.as_bytes(), base64::URL_SAFE_NO_PAD);
-    println!("header hex {}", header);
-    let payload_json = serde_json::to_string(&payload)?;
-    println!("payload json hex {}", payload_json);
-    let payload_encoded = base64::encode_config(&payload_json, base64::URL_SAFE_NO_PAD);
-    let payload_string = format!("{}.{}", header, payload_encoded);
+    let header_encoded = base64::encode_config(
+        &serde_json::to_string(&header)?.as_bytes(),
+        base64::URL_SAFE_NO_PAD,
+    );
 
-    println!("payload string {}", payload_string);
+    let payload_encoded =
+        base64::encode_config(&serde_json::to_string(payload)?, base64::URL_SAFE_NO_PAD);
 
-    let message = Message::from_slice(&hash_message(&payload_string));
-    let wallet_sign = sign(signer.secret(), &message)?;
-    let signature: Signature = wallet_sign.into_electrum().into();
-    println!("\n available signature {} \n ", signature);
-    let sig_hex = hex::decode(format!("{}", signature))?;
-    let tail = base64::encode_config(&sig_hex, base64::URL_SAFE_NO_PAD);
-    Ok(format!("{}.{}.{}", header, payload_encoded, tail))
+    let message = Message::from_slice(&hash_message(&format!(
+        "{}.{}",
+        header_encoded, payload_encoded
+    )));
+    let signature: Signature = sign(signer.secret(), &message)?.into_electrum().into();
+
+    let token = base64::encode_config(
+        &hex::decode(format!("{}", signature))?,
+        base64::URL_SAFE_NO_PAD,
+    );
+
+    Ok(format!("{}.{}.{}", header_encoded, payload_encoded, token))
 }
 
 pub fn ewt_verify(token: &str) -> Result<VerifyPayload, Box<dyn Error>> {
     let parts: Vec<String> = token.split('.').map(ToString::to_string).collect();
 
-    let msg = format!("{}.{}", parts[0], parts[1]);
-    let message = Message::from_slice(&hash_message(&msg));
+    let message = Message::from_slice(&hash_message(&format!("{}.{}", parts[0], parts[1])));
 
-    let sig = base64::decode_config(&parts[2], base64::URL_SAFE_NO_PAD)?;
-    let signature = Signature::from_electrum(&sig);
+    let decoded_signature = base64::decode_config(&parts[2], base64::URL_SAFE_NO_PAD)?;
+    let signature = Signature::from_electrum(&decoded_signature);
 
-    let public_key = recover(&signature, &message)?;
-    let address = public_to_address(&public_key);
+    let address = public_to_address(&recover(&signature, &message)?);
 
-    let decode_part1 = base64::decode_config(&parts[1], base64::URL_SAFE_NO_PAD)?;
-    let payload_string = String::from_utf8(decode_part1)?;
-
+    let payload_string =
+        String::from_utf8(base64::decode_config(&parts[1], base64::URL_SAFE_NO_PAD)?)?;
     let payload: Payload = serde_json::from_str(&payload_string)?;
 
     let verified_payload = VerifyPayload {
@@ -435,18 +423,18 @@ mod test {
         eth_adapter.unlock().expect("should unlock eth adapter");
 
         let whoami = eth_adapter.whoami().expect("failed to get whoami");
-        println!("whami {}", whoami);
         assert_eq!(
             whoami, "0x2bDeAFAE53940669DaA6F519373f686c1f3d3393",
             "failed to get correct whoami"
         );
+
         // Sign
-        let message = "2bdeafae53940669daa6f519373f686c";
         let expected_response =
             "0xce654de0b3d14d63e1cb3181eee7a7a37ef4a06c9fabc204faf96f26357441b625b1be460fbe8f5278cc02aa88a5d0ac2f238e9e3b8e4893760d33bccf77e47f1b";
+        let message = "2bdeafae53940669daa6f519373f686c";
         let response = eth_adapter.sign(message).expect("failed to sign message");
-        println!("{}", response);
-        // assert_eq!(expected_response, response, "invalid signature");
+        assert_eq!(expected_response, response, "invalid signature");
+
         // Verify
         let signature =
             "ce654de0b3d14d63e1cb3181eee7a7a37ef4a06c9fabc204faf96f26357441b625b1be460fbe8f5278cc02aa88a5d0ac2f238e9e3b8e4893760d33bccf77e47f1b";
@@ -457,7 +445,7 @@ mod test {
                 &signature,
             )
             .expect("Failed to verify signatures");
-        println!("{}", verify);
+        assert_eq!(verify, true, "invalid signature verification");
     }
 
     #[test]
