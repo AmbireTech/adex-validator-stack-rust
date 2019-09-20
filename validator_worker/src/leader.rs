@@ -25,7 +25,7 @@ fn on_new_accounting<A: Adapter + 'static>(
     let state_root_raw = get_state_root_hash(&iface, &balances)?;
     let state_root = hex::encode(state_root_raw);
 
-    let signature = iface.adapter.sign(&hex::encode(&state_root))?;
+    let signature = iface.adapter.sign(&state_root)?;
 
     iface.propagate(&[&MessageTypes::NewState(NewState {
         state_root,
