@@ -87,9 +87,9 @@ async fn on_new_state<'a, A: Adapter + 'static>(
     let last_approve_response = await!(iface.get_last_approved())?;
     let prev_balances = last_approve_response
         .last_approved
-        .new_state
-        .map(|new_state| new_state.balances)
-        .unwrap_or_else(Default::default);
+        .and_then(|last_approved| last_approved.new_state)
+        .map_or(Default::default(), |new_state| new_state.balances);
+
     if !is_valid_transition(&iface.channel, &prev_balances, &proposed_balances) {
         return Ok(await!(on_error(
             &iface,
@@ -134,7 +134,6 @@ async fn on_error<'a, A: Adapter + 'static>(
         signature: new_state.signature.clone(),
         balances: Some(new_state.balances.clone()),
         /// The NewState timestamp that is being rejected
-        // TODO: Double check this, if we decide to have 2 timestamps - 1 for the RejectState & 1 for NewState timestamp
         timestamp: Some(Utc::now()),
     })]);
 

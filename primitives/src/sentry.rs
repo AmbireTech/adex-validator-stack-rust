@@ -70,7 +70,7 @@ pub struct ChannelAllResponse {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct LastApprovedResponse {
-    pub last_approved: LastApproved,
+    pub last_approved: Option<LastApproved>,
     pub heartbeats: Option<Vec<Heartbeat>>,
 }
 
