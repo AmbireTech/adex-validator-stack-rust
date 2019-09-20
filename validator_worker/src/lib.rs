@@ -51,8 +51,9 @@ mod test {
 
     use adapter::DummyAdapter;
     use primitives::adapter::AdapterOptions;
+    use primitives::config::configuration;
     use primitives::util::tests::prep_db::{DUMMY_CHANNEL, IDS};
-    use primitives::{config::DEVELOPMENT_CONFIG, BalancesMap, Channel};
+    use primitives::{BalancesMap, Channel};
 
     fn setup_iface(channel: &Channel) -> SentryApi<DummyAdapter> {
         let adapter_options = AdapterOptions {
@@ -62,7 +63,7 @@ mod test {
             keystore_file: None,
             keystore_pwd: None,
         };
-        let config = DEVELOPMENT_CONFIG.clone();
+        let config = configuration("development", None).expect("Dev config should be available");
         let dummy_adapter = DummyAdapter::init(adapter_options, &config);
 
         SentryApi::new(dummy_adapter, &channel, &config, false).expect("should succeed")

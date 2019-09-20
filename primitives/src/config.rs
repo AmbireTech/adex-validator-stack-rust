@@ -5,7 +5,7 @@ use std::fs;
 use toml;
 
 lazy_static! {
-    pub static ref DEVELOPMENT_CONFIG: Config =
+    static ref DEVELOPMENT_CONFIG: Config =
         toml::from_str(include_str!("../../docs/config/dev.toml"))
             .expect("Failed to parse dev.toml config file");
     static ref PRODUCTION_CONFIG: Config =
