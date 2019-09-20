@@ -7,8 +7,9 @@ use std::collections::HashMap;
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct LastApproved {
-    pub new_state: NewState,
-    /// ApproveState can be None if the channel is brand new and we have only NewState atm
+    /// NewState can be None if the channel is brand new
+    pub new_state: Option<NewState>,
+    /// ApproveState can be None if the channel is brand new
     pub approved_state: Option<ApproveState>,
 }
 
