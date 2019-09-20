@@ -85,8 +85,11 @@ async fn on_new_state<'a, A: Adapter + 'static>(
     }
 
     let last_approve_response = await!(iface.get_last_approved())?;
-    // TODO: Check if it's possible to have an empty response (i.e. we don't have LastApprove)
-    let prev_balances = last_approve_response.last_approved.new_state.balances;
+    let prev_balances = last_approve_response
+        .last_approved
+        .new_state
+        .map(|new_state| new_state.balances)
+        .unwrap_or_else(Default::default);
     if !is_valid_transition(&iface.channel, &prev_balances, &proposed_balances) {
         return Ok(await!(on_error(
             &iface,
