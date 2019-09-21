@@ -3,10 +3,8 @@
 
 use crate::EthereumChannel;
 use chrono::Utc;
-use ethkey::{
-    public_to_address, recover, sign, verify_address, Address, KeyPair, Message, Signature,
-};
-use ethsign::{keyfile::KeyFile, Protected};
+use ethkey::{public_to_address, recover, verify_address, Address, Message, Password, Signature};
+use ethstore::SafeAccount;
 use primitives::{
     adapter::{Adapter, AdapterError, AdapterOptions, AdapterResult, Session},
     channel_validator::ChannelValidator,
@@ -26,16 +24,16 @@ use web3::{
     types::U256,
 };
 
-pub type Password = Protected;
+// pub type Password = Protected;
 
 #[derive(Debug, Clone)]
 pub struct EthereumAdapter {
     keystore_json: String,
-    keystore_pwd: String,
+    keystore_pwd: Password,
     config: Config,
     tokens_verified: HashMap<String, Session>,
     tokens_for_auth: HashMap<String, String>,
-    wallet: Option<KeyPair>,
+    wallet: Option<SafeAccount>,
 }
 
 // Enables EthereumAdapter to be able to
@@ -57,7 +55,7 @@ impl Adapter for EthereumAdapter {
 
         Ok(Self {
             keystore_json,
-            keystore_pwd,
+            keystore_pwd: keystore_pwd.into(),
             tokens_verified: HashMap::new(),
             tokens_for_auth: HashMap::new(),
             wallet: None,
@@ -66,10 +64,7 @@ impl Adapter for EthereumAdapter {
     }
 
     fn unlock(&mut self) -> AdapterResult<bool> {
-        let path = Path::new(&self.keystore_json).to_path_buf();
-        let password: Password = self.keystore_pwd.clone().into();
-
-        let json_file = match File::open(&path) {
+        let json_file = match File::open(&Path::new(&self.keystore_json).to_path_buf()) {
             Ok(data) => data,
             Err(_) => {
                 return Err(AdapterError::Configuration(
@@ -78,24 +73,14 @@ impl Adapter for EthereumAdapter {
             }
         };
 
-        let key_file: KeyFile = match serde_json::from_reader(json_file) {
-            Ok(data) => data,
-            Err(e) => return Err(AdapterError::Configuration(format!("{}", e))),
-        };
+        let account = SafeAccount::from_file(
+            serde_json::from_reader(json_file).expect("Failed to read json file"),
+            None,
+            &Some(self.keystore_pwd.clone()),
+        )
+        .expect("Failed to create account");
 
-        let plain_secret = match key_file.crypto.decrypt(&password) {
-            Ok(data) => data,
-            Err(_) => {
-                return Err(AdapterError::Configuration(
-                    "Invalid keystore password provided".to_string(),
-                ))
-            }
-        };
-
-        let keypair =
-            KeyPair::from_secret_slice(&plain_secret.as_slice()).expect("Failed to create keypair");
-
-        self.wallet = Some(keypair);
+        self.wallet = Some(account);
 
         // wallet has been unlocked
         Ok(true)
@@ -104,7 +89,14 @@ impl Adapter for EthereumAdapter {
     fn whoami(&self) -> AdapterResult<String> {
         match &self.wallet {
             Some(wallet) => {
-                let address = format!("{:?}", wallet.address());
+                let address = format!(
+                    "{:?}",
+                    public_to_address(
+                        &wallet
+                            .public(&self.keystore_pwd)
+                            .expect("failed to get public key")
+                    )
+                );
                 let checksum_address = eth_checksum::checksum(&address);
                 Ok(checksum_address)
             }
@@ -118,7 +110,9 @@ impl Adapter for EthereumAdapter {
         let message = Message::from_slice(&hash_message(state_root));
         match &self.wallet {
             Some(wallet) => {
-                let wallet_sign = sign(wallet.secret(), &message).expect("failed to sign messages");
+                let wallet_sign = wallet
+                    .sign(&self.keystore_pwd, &message)
+                    .expect("failed to sign messages");
                 let signature: Signature = wallet_sign.into_electrum().into();
                 Ok(format!("0x{}", signature))
             }
@@ -276,7 +270,8 @@ impl Adapter for EthereumAdapter {
                     identity: None,
                     address: None,
                 };
-                let token = ewt_sign(wallet, &payload).expect("Failed to sign token");
+                let token =
+                    ewt_sign(wallet, &self.keystore_pwd, &payload).expect("Failed to sign token");
                 self.tokens_for_auth
                     .insert(validator.id.clone(), token.clone());
                 Ok(token)
@@ -340,7 +335,11 @@ struct Header {
     alg: String,
 }
 
-pub fn ewt_sign(signer: &KeyPair, payload: &Payload) -> Result<String, Box<dyn Error>> {
+pub fn ewt_sign(
+    signer: &SafeAccount,
+    password: &Password,
+    payload: &Payload,
+) -> Result<String, Box<dyn Error>> {
     let header = Header {
         header_type: "JWT".to_string(),
         alg: "ETH".to_string(),
@@ -358,7 +357,11 @@ pub fn ewt_sign(signer: &KeyPair, payload: &Payload) -> Result<String, Box<dyn E
         "{}.{}",
         header_encoded, payload_encoded
     )));
-    let signature: Signature = sign(signer.secret(), &message)?.into_electrum().into();
+    let signature: Signature = signer
+        .sign(password, &message)
+        .expect("sign message")
+        .into_electrum()
+        .into();
 
     let token = base64::encode_config(
         &hex::decode(format!("{}", signature))?,
@@ -460,8 +463,12 @@ mod test {
             identity: None,
         };
 
-        let response = ewt_sign(&eth_adapter.wallet.unwrap(), &payload)
-            .expect("failed to generate ewt signature");
+        let response = ewt_sign(
+            &eth_adapter.wallet.unwrap(),
+            &eth_adapter.keystore_pwd,
+            &payload,
+        )
+        .expect("failed to generate ewt signature");
         let expected =
             "eyJ0eXBlIjoiSldUIiwiYWxnIjoiRVRIIn0.eyJpZCI6ImF3ZXNvbWVWYWxpZGF0b3IiLCJlcmEiOjEwMDAwMCwiYWRkcmVzcyI6IjB4MmJEZUFGQUU1Mzk0MDY2OURhQTZGNTE5MzczZjY4NmMxZjNkMzM5MyJ9.gGw_sfnxirENdcX5KJQWaEt4FVRvfEjSLD4f3OiPrJIltRadeYP2zWy9T2GYcK5xxD96vnqAw4GebAW7rMlz4xw";
         assert_eq!(response, expected, "generated wrong ewt signature");
