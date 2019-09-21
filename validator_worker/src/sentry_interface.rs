@@ -31,7 +31,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
         config: &Config,
         logging: bool,
     ) -> Result<Self, ValidatorWorkerError> {
-        let whoami = adapter.whoami();
+        let whoami = adapter.whoami().expect("Failed to get whoami");
         let client = Client::builder()
             .timeout(Duration::from_secs(config.fetch_timeout.into()))
             .build()
@@ -62,7 +62,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
         }
     }
 
-    pub fn propagate(&self, messages: &[&MessageTypes]) {
+    pub fn propagate(&mut self, messages: &[&MessageTypes]) {
         let serialised_messages: Vec<String> = messages
             .iter()
             .map(|message| serde_json::to_string(message).unwrap())
@@ -107,7 +107,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
         &self,
         message_type: String,
     ) -> Result<ValidatorMessageResponse, reqwest::Error> {
-        let whoami = self.adapter.whoami();
+        let whoami = self.adapter.whoami().expect("Failed to get whoami");
         await!(self.get_latest_msg(whoami, message_type))
     }
 
@@ -135,10 +135,10 @@ impl<T: Adapter + 'static> SentryApi<T> {
     }
 
     pub async fn get_event_aggregates(
-        &self,
+        &mut self,
         after: DateTime<Utc>,
     ) -> Result<EventAggregateResponse, reqwest::Error> {
-        let whoami = self.adapter.whoami();
+        let whoami = self.adapter.whoami().expect("failed to get whoami");
         let validator = self
             .channel
             .spec
@@ -217,7 +217,7 @@ pub async fn all_channels(
     sentry_url: &str,
     adapter: impl Adapter + 'static,
 ) -> Result<Vec<Channel>, ()> {
-    let validator = adapter.whoami();
+    let validator = adapter.whoami().expect("Failed to get whoami");
     let url = sentry_url.to_owned();
     let first_page = await!(fetch_page(url.clone(), 0, validator.clone()))
         .expect("Failed to get channels from sentry url");
