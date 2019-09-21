@@ -27,8 +27,8 @@ pub mod dummy;
 pub mod ethereum;
 
 pub enum AdapterTypes {
-    DummyAdapter(DummyAdapter),
-    EthereumAdapter(EthereumAdapter),
+    DummyAdapter(Box<DummyAdapter>),
+    EthereumAdapter(Box<EthereumAdapter>),
 }
 
 pub fn get_signable_state_root(

@@ -70,9 +70,9 @@ fn main() {
                 dummy_auth: None,
                 dummy_auth_tokens: None,
             };
-            AdapterTypes::EthereumAdapter(
+            AdapterTypes::EthereumAdapter(Box::new(
                 EthereumAdapter::init(options, &config).expect("failed to init adapter"),
-            )
+            ))
         }
         "dummy" => {
             let dummy_identity = cli.value_of("dummyIdentity").unwrap();
@@ -85,9 +85,9 @@ fn main() {
                 keystore_file: None,
                 keystore_pwd: None,
             };
-            AdapterTypes::DummyAdapter(
+            AdapterTypes::DummyAdapter(Box::new(
                 DummyAdapter::init(options, &config).expect("failed to init adapter"),
-            )
+            ))
         }
         // @TODO exit gracefully
         _ => panic!("We don't have any other adapters implemented yet!"),
@@ -95,10 +95,10 @@ fn main() {
 
     match adapter {
         AdapterTypes::EthereumAdapter(ethadapter) => {
-            run(is_single_tick, &sentry_url, &config, ethadapter)
+            run(is_single_tick, &sentry_url, &config, *ethadapter)
         }
         AdapterTypes::DummyAdapter(dummyadapter) => {
-            run(is_single_tick, &sentry_url, &config, dummyadapter)
+            run(is_single_tick, &sentry_url, &config, *dummyadapter)
         }
     }
 }
