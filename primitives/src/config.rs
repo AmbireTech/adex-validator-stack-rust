@@ -30,7 +30,7 @@ pub struct Config {
     pub max_channels: u32,
     pub wait_time: u32,
     pub aggr_throttle: u32,
-    pub heartbeat_time: u32,
+    pub heartbeat_time: u32, // in milliseconds
     pub channels_find_limit: u32,
     pub events_find_limit: u32,
     pub health_threshold_promilles: u32,

@@ -4,7 +4,7 @@ use chrono::{TimeZone, Utc};
 
 use primitives::adapter::Adapter;
 use primitives::validator::{Accounting, MessageTypes};
-use primitives::{BalancesMap, Channel};
+use primitives::BalancesMap;
 
 use crate::core::events::merge_aggrs;
 use crate::sentry_interface::SentryApi;
