@@ -35,7 +35,7 @@ impl Adapter for DummyAdapter {
         })
     }
 
-    fn unlock(&mut self) -> AdapterResult<bool> {
+    fn unlock(&self) -> AdapterResult<bool> {
         Ok(true)
     }
 
@@ -70,7 +70,7 @@ impl Adapter for DummyAdapter {
         }
     }
 
-    fn session_from_token(&mut self, token: &str) -> AdapterResult<Session> {
+    fn session_from_token(&self, token: &str) -> AdapterResult<Session> {
         let mut identity = "";
         for (key, val) in self.tokens_for_auth.iter() {
             if val == token {
@@ -84,7 +84,7 @@ impl Adapter for DummyAdapter {
         })
     }
 
-    fn get_auth(&mut self, _validator: &ValidatorDesc) -> AdapterResult<String> {
+    fn get_auth(&self, _validator: &ValidatorDesc) -> AdapterResult<String> {
         let who = self
             .tokens_verified
             .clone()

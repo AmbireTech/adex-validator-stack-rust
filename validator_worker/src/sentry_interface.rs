@@ -26,7 +26,7 @@ pub struct SentryApi<T: Adapter> {
 
 impl<T: Adapter + 'static> SentryApi<T> {
     pub fn new(
-        adapter: T,
+        adapter: mut T,
         channel: &Channel,
         config: &Config,
         logging: bool,

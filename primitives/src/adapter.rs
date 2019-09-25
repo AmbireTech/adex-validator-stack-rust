@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 use std::fmt::Debug;
-
+use std::ops::Deref;
 pub type AdapterResult<T> = Result<T, AdapterError>;
 
 #[derive(Debug, Eq, PartialEq)]
@@ -44,8 +44,16 @@ pub struct AdapterOptions {
 
 #[derive(Debug, Clone)]
 pub struct Session {
-    pub era: usize,
+    pub era: i64,
     pub uid: String,
+}
+
+
+impl Deref for Session {
+    type Target = Session;
+    fn deref(&self) -> &Self::Target {
+        &self
+    }
 }
 
 pub trait Adapter: ChannelValidator + Clone + Debug + Send + Sync {
@@ -55,7 +63,7 @@ pub trait Adapter: ChannelValidator + Clone + Debug + Send + Sync {
     fn init(opts: AdapterOptions, config: &Config) -> AdapterResult<Self::Output>;
 
     /// Unlock adapter
-    fn unlock(&mut self) -> AdapterResult<bool>;
+    fn unlock(&self) -> AdapterResult<bool>;
 
     /// Get Adapter whoami
     fn whoami(&self) -> AdapterResult<String>;
@@ -70,8 +78,8 @@ pub trait Adapter: ChannelValidator + Clone + Debug + Send + Sync {
     fn validate_channel(&self, channel: &Channel) -> AdapterResult<bool>;
 
     /// Get user session from token
-    fn session_from_token(&mut self, token: &str) -> AdapterResult<Session>;
+    fn session_from_token(&self, token: &str) -> AdapterResult<Session>;
 
     /// Gets authentication for specific validator
-    fn get_auth(&mut self, validator: &ValidatorDesc) -> AdapterResult<String>;
+    fn get_auth(&self, validator: &ValidatorDesc) -> AdapterResult<String>;
 }

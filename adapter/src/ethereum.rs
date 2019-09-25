@@ -17,6 +17,7 @@ use std::convert::TryFrom;
 use std::error::Error;
 use std::fs::File;
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 use tiny_keccak::Keccak;
 use web3::{
     contract::{Contract, Options},
@@ -24,16 +25,16 @@ use web3::{
     types::U256,
 };
 
-// pub type Password = Protected;
-
 #[derive(Debug, Clone)]
 pub struct EthereumAdapter {
     keystore_json: String,
     keystore_pwd: Password,
     config: Config,
-    tokens_verified: HashMap<String, Session>,
-    tokens_for_auth: HashMap<String, String>,
-    wallet: Option<SafeAccount>,
+    wallet: SafeAccount,
+    // Auth tokens that we have verified (tokenId => session)
+    tokens_verified: Arc<Mutex<HashMap<String, Session>>>,
+    // Auth tokens that we've generated to authenticate with someone (address => token)
+    tokens_for_auth: Arc<Mutex<HashMap<String, String>>>,
 }
 
 // Enables EthereumAdapter to be able to
@@ -44,7 +45,7 @@ impl Adapter for EthereumAdapter {
     type Output = EthereumAdapter;
 
     fn init(opts: AdapterOptions, config: &Config) -> AdapterResult<EthereumAdapter> {
-        let (keystore_json, keystore_pwd) = match (opts.keystore_file, opts.keystore_pwd) {
+        let (keystore_json, pwd) = match (opts.keystore_file, opts.keystore_pwd) {
             (Some(file), Some(pwd)) => (file, pwd),
             (_, _) => {
                 return Err(AdapterError::Configuration(
@@ -53,18 +54,9 @@ impl Adapter for EthereumAdapter {
             }
         };
 
-        Ok(Self {
-            keystore_json,
-            keystore_pwd: keystore_pwd.into(),
-            tokens_verified: HashMap::new(),
-            tokens_for_auth: HashMap::new(),
-            wallet: None,
-            config: config.to_owned(),
-        })
-    }
+        let keystore_pwd: Password = pwd.into();
 
-    fn unlock(&mut self) -> AdapterResult<bool> {
-        let json_file = match File::open(&Path::new(&self.keystore_json).to_path_buf()) {
+        let json_file = match File::open(&Path::new(&keystore_json).to_path_buf()) {
             Ok(data) => data,
             Err(_) => {
                 return Err(AdapterError::Configuration(
@@ -73,53 +65,49 @@ impl Adapter for EthereumAdapter {
             }
         };
 
-        let account = SafeAccount::from_file(
+        let wallet = SafeAccount::from_file(
             serde_json::from_reader(json_file).expect("Failed to read json file"),
             None,
-            &Some(self.keystore_pwd.clone()),
+            &Some(keystore_pwd),
         )
         .expect("Failed to create account");
 
-        self.wallet = Some(account);
+        Ok(Self {
+            keystore_json,
+            keystore_pwd,
+            tokens_verified: Arc::new(Mutex::new(HashMap::new())),
+            tokens_for_auth: Arc::new(Mutex::new(HashMap::new())),
+            wallet,
+            config: config.to_owned(),
+        })
+    }
 
+    fn unlock(&self) -> AdapterResult<bool> {
         // wallet has been unlocked
         Ok(true)
     }
 
     fn whoami(&self) -> AdapterResult<String> {
-        match &self.wallet {
-            Some(wallet) => {
-                let address = format!(
-                    "{:?}",
-                    public_to_address(
-                        &wallet
-                            .public(&self.keystore_pwd)
-                            .expect("failed to get public key")
-                    )
-                );
-                let checksum_address = eth_checksum::checksum(&address);
-                Ok(checksum_address)
-            }
-            None => Err(AdapterError::Configuration(
-                "Unlock wallet before use".to_string(),
-            )),
-        }
+        let address = format!(
+            "{:?}",
+            public_to_address(
+                &self.wallet
+                    .public(&self.keystore_pwd)
+                    .expect("failed to get public key")
+            )
+        );
+        let checksum_address = eth_checksum::checksum(&address);
+        Ok(checksum_address)
+          
     }
 
     fn sign(&self, state_root: &str) -> AdapterResult<String> {
         let message = Message::from_slice(&hash_message(state_root));
-        match &self.wallet {
-            Some(wallet) => {
-                let wallet_sign = wallet
-                    .sign(&self.keystore_pwd, &message)
-                    .expect("failed to sign messages");
-                let signature: Signature = wallet_sign.into_electrum().into();
-                Ok(format!("0x{}", signature))
-            }
-            None => Err(AdapterError::Configuration(
-                "Unlock the wallet before signing".to_string(),
-            )),
-        }
+        let wallet_sign = self.wallet
+            .sign(&self.keystore_pwd, &message)
+            .expect("failed to sign messages");
+        let signature: Signature = wallet_sign.into_electrum().into();
+        Ok(format!("0x{}", signature))
     }
 
     fn verify(&self, signer: &str, state_root: &str, sig: &str) -> AdapterResult<bool> {
@@ -201,11 +189,11 @@ impl Adapter for EthereumAdapter {
         Ok(true)
     }
 
-    fn session_from_token(&mut self, token: &str) -> AdapterResult<Session> {
+    fn session_from_token(&self, token: &str) -> AdapterResult<Session> {
         let token_id = token.to_owned()[..16].to_string();
-        let result = self.tokens_verified.get(&token_id);
+        let result = self.tokens_verified.lock().unwrap().get(&token_id);
         if result.is_some() {
-            return Ok(result.unwrap().to_owned());
+            return Ok(*result);
         }
 
         let verified = match ewt_verify(&token) {
@@ -255,30 +243,33 @@ impl Adapter for EthereumAdapter {
                 uid: verified.from,
             },
         };
+        *self.tokens_verified.get_mut().unwrap().insert(token_id, Box::new(sess));
 
-        self.tokens_verified.insert(token_id, sess.clone());
+        // let mut tokens_verified = self.tokens_verified.lock().unwrap();
+        // *tokens_verified.insert(token_id, sess.clone());
+        // self.wallet.insert();
         Ok(sess)
     }
 
-    fn get_auth(&mut self, validator: &ValidatorDesc) -> AdapterResult<String> {
-        match (self.tokens_for_auth.get(&validator.id), &self.wallet) {
-            (Some(token), Some(_)) => Ok(token.to_owned()),
-            (None, Some(wallet)) => {
+    fn get_auth(&self, validator: &ValidatorDesc) -> AdapterResult<String> {
+        let tokens_for_auth = self.tokens_for_auth.into_inner().unwrap();
+        match *tokens_for_auth.get(&validator.id) {
+            Some(token) => Ok(token.to_owned()),
+            None => {
                 let payload = Payload {
                     id: validator.id.clone(),
-                    era: usize::try_from(Utc::now().timestamp()).expect("failed to parse utc now"),
+                    era: Utc::now().timestamp(),
                     identity: None,
                     address: None,
                 };
                 let token =
-                    ewt_sign(wallet, &self.keystore_pwd, &payload).expect("Failed to sign token");
-                self.tokens_for_auth
+                    ewt_sign(&wallet, &self.keystore_pwd, &payload).expect("Failed to sign token");
+                
+                let mut tokens_for_auth = self.tokens_for_auth.lock().unwrap();
+                *tokens_for_auth
                     .insert(validator.id.clone(), token.clone());
                 Ok(token)
             }
-            (_, _) => Err(AdapterError::Configuration(
-                "failed to unlock wallet".to_string(),
-            )),
         }
     }
 }
@@ -315,7 +306,7 @@ fn hash_message(message: &str) -> [u8; 32] {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Payload {
     pub id: String,
-    pub era: usize,
+    pub era: i64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub address: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

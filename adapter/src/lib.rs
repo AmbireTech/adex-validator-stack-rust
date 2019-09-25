@@ -12,11 +12,7 @@ use ethabi::token::{LenientTokenizer, StrictTokenizer, Tokenizer};
 use tiny_keccak::Keccak;
 use primitives::Channel;
 use sha2::{Sha256, Digest};
-use primitives::Channel;
-use sha2::{Digest, Sha256};
 use std::convert::From;
-use std::error::Error;
-use tiny_keccak::Keccak;
 
 use primitives::BigNum;
 
@@ -72,7 +68,7 @@ pub struct EthereumChannel {
     pub token_addr: String,
     pub token_amount: String,
     pub valid_until: i64,
-    pub validators: Vec<String>,
+    pub validators: String,
     pub spec: String,
 }
 
@@ -118,18 +114,19 @@ impl EthereumChannel {
             token_addr: token_addr.to_owned(),
             token_amount: token_amount.to_owned(),
             valid_until,
-            validators,
+            validators: format!("[{}]", validators.join(",")),
             spec: spec.to_owned(),
         }
     }
 
     pub fn hash(&self, contract_addr: &str) -> Result<[u8; 32], Box<dyn Error>> {
+
         let params = [
             (ParamType::Address, contract_addr),
             (ParamType::Address, &self.creator),
             (ParamType::Address, &self.token_addr),
             (ParamType::Uint(256), &self.token_amount),
-            (ParamType::Uint(256), &self.valid_until),
+            (ParamType::Uint(256), &self.valid_until.to_string()),
             (
                 ParamType::Array(Box::new(ParamType::Address)),
                 &self.validators,
@@ -153,16 +150,13 @@ impl EthereumChannel {
     }
 
     pub fn to_solidity_tuple(&self) -> Vec<String> {
-        let validators = format!("[{}]", self.validators.join(","));
-        let spec = hex::encode(&self.spec);
-
         vec![
             self.creator.to_owned(),
             self.token_addr.to_owned(),
             format!("0x{}", self.token_amount.to_owned()),
             format!("0x{}", self.valid_until.to_owned()),
-            validators,
-            spec,
+            self.validators.to_owned(),
+            self.spec.to_owned(),
         ]
     }
 
