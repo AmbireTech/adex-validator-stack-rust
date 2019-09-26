@@ -1,6 +1,3 @@
-#![deny(clippy::all)]
-#![deny(rust_2018_idioms)]
-
 use primitives::adapter::{Adapter, AdapterError, AdapterOptions, AdapterResult, Session};
 use primitives::channel_validator::ChannelValidator;
 use primitives::config::Config;
@@ -23,9 +20,17 @@ impl Adapter for DummyAdapter {
     type Output = DummyAdapter;
 
     fn init(opts: AdapterOptions, config: &Config) -> AdapterResult<DummyAdapter> {
-        let identity = opts.dummy_identity.expect("dummyIdentity required");
-        let tokens_for_auth = opts.dummy_auth.expect("dummy auth required");
-        let tokens_verified = opts.dummy_auth_tokens.expect("dummy auth tokens required");
+        let (identity, tokens_for_auth, tokens_verified) =
+            match (opts.dummy_identity, opts.dummy_auth, opts.dummy_auth_tokens) {
+                (Some(identity), Some(tokens_for_auth), Some(tokens_verified)) => {
+                    (identity, tokens_for_auth, tokens_verified)
+                }
+                (_, _, _) => {
+                    return Err(AdapterError::Configuration(
+                        "dummy_identity, dummy_auth, dummy_auth_tokens required".to_string(),
+                    ))
+                }
+            };
 
         Ok(Self {
             identity,
@@ -66,7 +71,7 @@ impl Adapter for DummyAdapter {
     fn validate_channel(&self, channel: &Channel) -> AdapterResult<bool> {
         match DummyAdapter::is_channel_valid(&self.config, channel) {
             Ok(_) => Ok(true),
-            Err(e) => Err(AdapterError::InvalidChannel(format!("{}", e))),
+            Err(e) => Err(AdapterError::InvalidChannel(e.to_string())),
         }
     }
 

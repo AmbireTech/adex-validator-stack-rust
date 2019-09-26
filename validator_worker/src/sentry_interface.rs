@@ -26,7 +26,7 @@ pub struct SentryApi<T: Adapter> {
 
 impl<T: Adapter + 'static> SentryApi<T> {
     pub fn new(
-        adapter: mut T,
+        adapter: T,
         channel: &Channel,
         config: &Config,
         logging: bool,
@@ -62,7 +62,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
         }
     }
 
-    pub fn propagate(&mut self, messages: &[&MessageTypes]) {
+    pub fn propagate(&self, messages: &[&MessageTypes]) {
         let serialised_messages: Vec<String> = messages
             .iter()
             .map(|message| serde_json::to_string(message).unwrap())
@@ -135,7 +135,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
     }
 
     pub async fn get_event_aggregates(
-        &mut self,
+        &self,
         after: DateTime<Utc>,
     ) -> Result<EventAggregateResponse, reqwest::Error> {
         let whoami = self.adapter.whoami().expect("failed to get whoami");

@@ -9,10 +9,10 @@ use std::error::Error;
 use ethabi::encode;
 use ethabi::param_type::ParamType;
 use ethabi::token::{LenientTokenizer, StrictTokenizer, Tokenizer};
-use tiny_keccak::Keccak;
 use primitives::Channel;
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 use std::convert::From;
+use tiny_keccak::Keccak;
 
 use primitives::BigNum;
 
@@ -120,7 +120,6 @@ impl EthereumChannel {
     }
 
     pub fn hash(&self, contract_addr: &str) -> Result<[u8; 32], Box<dyn Error>> {
-
         let params = [
             (ParamType::Address, contract_addr),
             (ParamType::Address, &self.creator),

@@ -1,10 +1,8 @@
-#![deny(clippy::all)]
-#![deny(rust_2018_idioms)]
-
 use crate::EthereumChannel;
 use chrono::Utc;
 use ethkey::{public_to_address, recover, verify_address, Address, Message, Password, Signature};
 use ethstore::SafeAccount;
+use lazy_static::lazy_static;
 use primitives::{
     adapter::{Adapter, AdapterError, AdapterOptions, AdapterResult, Session},
     channel_validator::ChannelValidator,
@@ -12,12 +10,11 @@ use primitives::{
     Channel, ValidatorDesc,
 };
 use serde::{Deserialize, Serialize};
+use std::cell::RefCell;
 use std::collections::HashMap;
-use std::convert::TryFrom;
 use std::error::Error;
 use std::fs::File;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
 use tiny_keccak::Keccak;
 use web3::{
     contract::{Contract, Options},
@@ -25,16 +22,19 @@ use web3::{
     types::U256,
 };
 
+lazy_static! {
+    static ref ADEXCORE_ABI: &'static [u8] = include_bytes!("../contract/AdExCore.json");
+    static ref IDENTITY_ABI: &'static [u8] = include_bytes!("../contract/Identity.json");
+}
+
 #[derive(Debug, Clone)]
 pub struct EthereumAdapter {
     keystore_json: String,
     keystore_pwd: Password,
     config: Config,
-    wallet: SafeAccount,
-    // Auth tokens that we have verified (tokenId => session)
-    tokens_verified: Arc<Mutex<HashMap<String, Session>>>,
-    // Auth tokens that we've generated to authenticate with someone (address => token)
-    tokens_for_auth: Arc<Mutex<HashMap<String, String>>>,
+    tokens_verified: RefCell<HashMap<String, Session>>,
+    tokens_for_auth: RefCell<HashMap<String, String>>,
+    wallet: RefCell<Option<SafeAccount>>,
 }
 
 // Enables EthereumAdapter to be able to
@@ -45,7 +45,7 @@ impl Adapter for EthereumAdapter {
     type Output = EthereumAdapter;
 
     fn init(opts: AdapterOptions, config: &Config) -> AdapterResult<EthereumAdapter> {
-        let (keystore_json, pwd) = match (opts.keystore_file, opts.keystore_pwd) {
+        let (keystore_json, keystore_pwd) = match (opts.keystore_file, opts.keystore_pwd) {
             (Some(file), Some(pwd)) => (file, pwd),
             (_, _) => {
                 return Err(AdapterError::Configuration(
@@ -54,60 +54,63 @@ impl Adapter for EthereumAdapter {
             }
         };
 
-        let keystore_pwd: Password = pwd.into();
-
-        let json_file = match File::open(&Path::new(&keystore_json).to_path_buf()) {
-            Ok(data) => data,
-            Err(_) => {
-                return Err(AdapterError::Configuration(
-                    "Invalid keystore location provided".to_string(),
-                ))
-            }
-        };
-
-        let wallet = SafeAccount::from_file(
-            serde_json::from_reader(json_file).expect("Failed to read json file"),
-            None,
-            &Some(keystore_pwd),
-        )
-        .expect("Failed to create account");
-
         Ok(Self {
             keystore_json,
-            keystore_pwd,
-            tokens_verified: Arc::new(Mutex::new(HashMap::new())),
-            tokens_for_auth: Arc::new(Mutex::new(HashMap::new())),
-            wallet,
+            keystore_pwd: keystore_pwd.into(),
+            tokens_verified: RefCell::new(HashMap::new()),
+            tokens_for_auth: RefCell::new(HashMap::new()),
+            wallet: RefCell::new(None),
             config: config.to_owned(),
         })
     }
 
     fn unlock(&self) -> AdapterResult<bool> {
+        let json_file = File::open(&Path::new(&self.keystore_json).to_path_buf())
+            .map_err(|_| map_io_error("Invalid keystore location provided"))?;
+
+        let account = SafeAccount::from_file(
+            serde_json::from_reader(json_file).unwrap(),
+            None,
+            &Some(self.keystore_pwd.clone()),
+        )
+        .map_err(|_| map_io_error("Failed to create account"))?;
+
+        self.wallet.replace(Some(account));
+
         // wallet has been unlocked
         Ok(true)
     }
 
     fn whoami(&self) -> AdapterResult<String> {
-        let address = format!(
-            "{:?}",
-            public_to_address(
-                &self.wallet
+        match self.wallet.borrow().clone() {
+            Some(wallet) => {
+                let public = &wallet
                     .public(&self.keystore_pwd)
-                    .expect("failed to get public key")
-            )
-        );
-        let checksum_address = eth_checksum::checksum(&address);
-        Ok(checksum_address)
-          
+                    .map_err(|_| map_io_error("Failed to get public key"))?;
+                let address = format!("{:?}", public_to_address(public));
+                let checksum_address = eth_checksum::checksum(&address);
+                Ok(checksum_address)
+            }
+            None => Err(AdapterError::Configuration(
+                "Unlock wallet before use".to_string(),
+            )),
+        }
     }
 
     fn sign(&self, state_root: &str) -> AdapterResult<String> {
         let message = Message::from_slice(&hash_message(state_root));
-        let wallet_sign = self.wallet
-            .sign(&self.keystore_pwd, &message)
-            .expect("failed to sign messages");
-        let signature: Signature = wallet_sign.into_electrum().into();
-        Ok(format!("0x{}", signature))
+        match self.wallet.borrow().clone() {
+            Some(wallet) => {
+                let wallet_sign = wallet
+                    .sign(&self.keystore_pwd, &message)
+                    .map_err(|_| map_io_error("failed to sign messages"))?;
+                let signature: Signature = wallet_sign.into_electrum().into();
+                Ok(format!("0x{}", signature))
+            }
+            None => Err(AdapterError::Configuration(
+                "Unlock the wallet before signing".to_string(),
+            )),
+        }
     }
 
     fn verify(&self, signer: &str, state_root: &str, sig: &str) -> AdapterResult<bool> {
@@ -132,22 +135,18 @@ impl Adapter for EthereumAdapter {
 
     fn validate_channel(&self, channel: &Channel) -> AdapterResult<bool> {
         let (_eloop, transport) = web3::transports::Http::new(&self.config.ethereum_network)
-            .expect("Failed to initialise web3 transport");
+            .map_err(|_| map_io_error("Failed to initialise web3 transport"))?;
         let web3 = web3::Web3::new(transport);
         let contract_address = Address::from_slice(self.config.ethereum_core_address.as_bytes());
 
-        let contract = Contract::from_json(
-            web3.eth(),
-            contract_address,
-            include_bytes!("../contract/AdExCore.json"),
-        )
-        .expect("failed to initialise contract");
+        let contract = Contract::from_json(web3.eth(), contract_address, &ADEXCORE_ABI)
+            .map_err(|_| map_io_error("Failed to initialise web3 transport"))?;
 
         let eth_channel: EthereumChannel = channel.into();
 
         let channel_id = eth_channel
             .hash_hex(&self.config.ethereum_core_address)
-            .expect("Failed to hash the channel id");
+            .map_err(|_| map_io_error("Failed to hash the channel id"))?;
 
         if channel_id != channel.id {
             return Err(AdapterError::Configuration(
@@ -170,15 +169,16 @@ impl Adapter for EthereumAdapter {
         // check if channel is valid
         let is_channel_valid = EthereumAdapter::is_channel_valid(&self.config, channel);
         if is_channel_valid.is_err() {
-            return Err(AdapterError::InvalidChannel(format!(
-                "{}",
-                is_channel_valid.err().unwrap()
-            )));
+            return Err(AdapterError::InvalidChannel(
+                is_channel_valid.err().unwrap().to_string(),
+            ));
         }
 
         // query the blockchain for the channel status
         let contract_query = contract.query("states", channel_id, None, Options::default(), None);
-        let channel_status: U256 = contract_query.wait().expect("contract query failed");
+        let channel_status: U256 = contract_query
+            .wait()
+            .map_err(|_| map_io_error("contract channel status query failed"))?;
 
         if channel_status != 1.into() {
             return Err(AdapterError::Configuration(
@@ -191,14 +191,14 @@ impl Adapter for EthereumAdapter {
 
     fn session_from_token(&self, token: &str) -> AdapterResult<Session> {
         let token_id = token.to_owned()[..16].to_string();
-        let result = self.tokens_verified.lock().unwrap().get(&token_id);
-        if result.is_some() {
-            return Ok(*result);
+        let result = self.tokens_verified.borrow_mut();
+        if result.get(&token_id).is_some() {
+            return Ok(result.get(&token_id).unwrap().to_owned());
         }
 
         let verified = match ewt_verify(&token) {
             Ok(v) => v,
-            Err(e) => return Err(AdapterError::EwtVerifyFailed(format!("{}", e))),
+            Err(e) => return Err(AdapterError::EwtVerifyFailed(e.to_string())),
         };
 
         let whoami = self.whoami()?;
@@ -211,22 +211,21 @@ impl Adapter for EthereumAdapter {
         let sess = match &verified.payload.identity {
             Some(identity) => {
                 let (_eloop, transport) =
-                    web3::transports::Http::new(&self.config.ethereum_network).unwrap();
+                    web3::transports::Http::new(&self.config.ethereum_network)
+                        .map_err(|_| map_io_error("Failed to initialise web3 transport"))?;
                 let web3 = web3::Web3::new(transport);
 
                 let contract_address =
                     Address::from_slice(self.config.ethereum_core_address.as_bytes());
 
-                let contract = Contract::from_json(
-                    web3.eth(),
-                    contract_address,
-                    include_bytes!("../contract/Identity.json"),
-                )
-                .unwrap();
+                let contract = Contract::from_json(web3.eth(), contract_address, &IDENTITY_ABI)
+                    .map_err(|_| map_io_error("failed to init identity contract"))?;
 
                 let contract_query =
                     contract.query("privileges", verified.from, None, Options::default(), None);
-                let priviledge_level: U256 = contract_query.wait().unwrap();
+                let priviledge_level: U256 = contract_query
+                    .wait()
+                    .map_err(|_| map_io_error("failed query priviledge level on contract"))?;
 
                 if priviledge_level == 0.into() {
                     return Err(AdapterError::Authorization(
@@ -243,33 +242,39 @@ impl Adapter for EthereumAdapter {
                 uid: verified.from,
             },
         };
-        *self.tokens_verified.get_mut().unwrap().insert(token_id, Box::new(sess));
 
-        // let mut tokens_verified = self.tokens_verified.lock().unwrap();
-        // *tokens_verified.insert(token_id, sess.clone());
-        // self.wallet.insert();
+        self.tokens_verified
+            .borrow_mut()
+            .insert(token_id, sess.clone());
         Ok(sess)
     }
 
     fn get_auth(&self, validator: &ValidatorDesc) -> AdapterResult<String> {
-        let tokens_for_auth = self.tokens_for_auth.into_inner().unwrap();
-        match *tokens_for_auth.get(&validator.id) {
-            Some(token) => Ok(token.to_owned()),
-            None => {
+        let tokens_for_auth = self.tokens_for_auth.borrow();
+        match (
+            self.wallet.borrow().clone(),
+            tokens_for_auth.get(&validator.id),
+        ) {
+            (Some(_), Some(token)) => Ok(token.to_owned()),
+            (Some(wallet), None) => {
                 let payload = Payload {
                     id: validator.id.clone(),
                     era: Utc::now().timestamp(),
                     identity: None,
                     address: None,
                 };
-                let token =
-                    ewt_sign(&wallet, &self.keystore_pwd, &payload).expect("Failed to sign token");
-                
-                let mut tokens_for_auth = self.tokens_for_auth.lock().unwrap();
-                *tokens_for_auth
+                let token = ewt_sign(&wallet, &self.keystore_pwd, &payload)
+                    .map_err(|_| map_io_error("Failed to sign token"))?;
+
+                self.tokens_for_auth
+                    .borrow_mut()
                     .insert(validator.id.clone(), token.clone());
+
                 Ok(token)
             }
+            (_, _) => Err(AdapterError::Configuration(
+                "failed to unlock wallet".to_string(),
+            )),
         }
     }
 }
@@ -350,7 +355,7 @@ pub fn ewt_sign(
     )));
     let signature: Signature = signer
         .sign(password, &message)
-        .expect("sign message")
+        .map_err(|_| map_io_error("sign message"))?
         .into_electrum()
         .into();
 
@@ -384,6 +389,10 @@ pub fn ewt_verify(token: &str) -> Result<VerifyPayload, Box<dyn Error>> {
     Ok(verified_payload)
 }
 
+fn map_io_error(err: &str) -> AdapterError {
+    AdapterError::IO(err.to_string())
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -404,7 +413,7 @@ mod test {
 
     #[test]
     fn should_init_and_unlock_ethereum_adapter() {
-        let mut eth_adapter = setup_eth_adapter();
+        let eth_adapter = setup_eth_adapter();
         let unlock = eth_adapter.unlock().expect("should unlock eth adapter");
 
         assert_eq!(true, unlock, "failed to unlock eth adapter");
@@ -413,7 +422,7 @@ mod test {
     #[test]
     fn should_get_whoami_sign_and_verify_messages() {
         // whoami
-        let mut eth_adapter = setup_eth_adapter();
+        let eth_adapter = setup_eth_adapter();
         eth_adapter.unlock().expect("should unlock eth adapter");
 
         let whoami = eth_adapter.whoami().expect("failed to get whoami");
@@ -444,7 +453,7 @@ mod test {
 
     #[test]
     fn should_generate_correct_ewt_sign_and_verify() {
-        let mut eth_adapter = setup_eth_adapter();
+        let eth_adapter = setup_eth_adapter();
         eth_adapter.unlock().expect("should unlock eth adapter");
 
         let payload = Payload {
@@ -453,13 +462,9 @@ mod test {
             address: Some(eth_adapter.whoami().expect("should get whoami ewt sign")),
             identity: None,
         };
-
-        let response = ewt_sign(
-            &eth_adapter.wallet.unwrap(),
-            &eth_adapter.keystore_pwd,
-            &payload,
-        )
-        .expect("failed to generate ewt signature");
+        let wallet = eth_adapter.wallet.borrow().clone();
+        let response = ewt_sign(&wallet.unwrap(), &eth_adapter.keystore_pwd, &payload)
+            .expect("failed to generate ewt signature");
         let expected =
             "eyJ0eXBlIjoiSldUIiwiYWxnIjoiRVRIIn0.eyJpZCI6ImF3ZXNvbWVWYWxpZGF0b3IiLCJlcmEiOjEwMDAwMCwiYWRkcmVzcyI6IjB4MmJEZUFGQUU1Mzk0MDY2OURhQTZGNTE5MzczZjY4NmMxZjNkMzM5MyJ9.gGw_sfnxirENdcX5KJQWaEt4FVRvfEjSLD4f3OiPrJIltRadeYP2zWy9T2GYcK5xxD96vnqAw4GebAW7rMlz4xw";
         assert_eq!(response, expected, "generated wrong ewt signature");

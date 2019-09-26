@@ -5,7 +5,6 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 use std::fmt::Debug;
-use std::ops::Deref;
 pub type AdapterResult<T> = Result<T, AdapterError>;
 
 #[derive(Debug, Eq, PartialEq)]
@@ -16,6 +15,7 @@ pub enum AdapterError {
     Configuration(String),
     Signature(String),
     InvalidChannel(String),
+    IO(String),
 }
 
 impl Error for AdapterError {}
@@ -29,6 +29,7 @@ impl fmt::Display for AdapterError {
             AdapterError::Configuration(error) => write!(f, "Configuration error: {}", error),
             AdapterError::Signature(error) => write!(f, "Signature error: {}", error),
             AdapterError::InvalidChannel(error) => write!(f, "Invalid Channel error: {}", error),
+            AdapterError::IO(error) => write!(f, "IO error: {}", error),
         }
     }
 }
@@ -48,15 +49,7 @@ pub struct Session {
     pub uid: String,
 }
 
-
-impl Deref for Session {
-    type Target = Session;
-    fn deref(&self) -> &Self::Target {
-        &self
-    }
-}
-
-pub trait Adapter: ChannelValidator + Clone + Debug + Send + Sync {
+pub trait Adapter: ChannelValidator + Clone + Debug {
     type Output;
 
     /// Initialize adapter

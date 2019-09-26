@@ -12,9 +12,7 @@ use primitives::{BalancesMap, BigNum, Channel};
 
 use crate::sentry_interface::SentryApi;
 
-async fn send_heartbeat<A: Adapter + 'static>(
-    iface: &mut SentryApi<A>,
-) -> Result<(), Box<dyn Error>> {
+async fn send_heartbeat<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result<(), Box<dyn Error>> {
     let mut timestamp_buf = [0_u8; 32];
     let milliseconds: u64 = u64::try_from(Utc::now().timestamp_millis())
         .expect("The timestamp should be able to be converted to u64");
@@ -39,7 +37,7 @@ async fn send_heartbeat<A: Adapter + 'static>(
 }
 
 pub async fn heartbeat<A: Adapter + 'static>(
-    iface: &mut SentryApi<A>,
+    iface: &SentryApi<A>,
     balances: BalancesMap,
 ) -> Result<(), Box<dyn Error>> {
     let validator_message_response = await!(iface.get_our_latest_msg("Heartbeat".into()))?;
