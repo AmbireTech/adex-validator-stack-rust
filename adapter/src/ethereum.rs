@@ -23,8 +23,8 @@ use web3::{
 };
 
 lazy_static! {
-    static ref ADEXCORE_ABI: &'static [u8] = include_bytes!("../contract/AdExCore.json");
-    static ref IDENTITY_ABI: &'static [u8] = include_bytes!("../contract/Identity.json");
+    static ref ADEXCORE_ABI: &'static [u8] = include_bytes!("../../lib/protocol-eth/abi/AdExCore.json");
+    static ref IDENTITY_ABI: &'static [u8] = include_bytes!("../../lib/protocol-eth/abi/Identity.json");
 }
 
 #[derive(Debug, Clone)]
