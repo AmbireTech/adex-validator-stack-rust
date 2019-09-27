@@ -66,14 +66,15 @@ impl Adapter for EthereumAdapter {
 
     fn unlock(&self) -> AdapterResult<bool> {
         let json_file = File::open(&Path::new(&self.keystore_json).to_path_buf())
-            .map_err(|_| map_io_error("Invalid keystore location provided"))?;
+            .map_err(|_| map_error("Invalid keystore location provided"))?;
 
         let account = SafeAccount::from_file(
-            serde_json::from_reader(json_file).unwrap(),
+            serde_json::from_reader(json_file)
+                .map_err(|_| map_error("Invalid keystore location provided"))?,
             None,
             &Some(self.keystore_pwd.clone()),
         )
-        .map_err(|_| map_io_error("Failed to create account"))?;
+        .map_err(|_| map_error("Failed to create account"))?;
 
         self.wallet.replace(Some(account));
 
@@ -86,7 +87,7 @@ impl Adapter for EthereumAdapter {
             Some(wallet) => {
                 let public = &wallet
                     .public(&self.keystore_pwd)
-                    .map_err(|_| map_io_error("Failed to get public key"))?;
+                    .map_err(|_| map_error("Failed to get public key"))?;
                 let address = format!("{:?}", public_to_address(public));
                 let checksum_address = eth_checksum::checksum(&address);
                 Ok(checksum_address)
@@ -103,7 +104,7 @@ impl Adapter for EthereumAdapter {
             Some(wallet) => {
                 let wallet_sign = wallet
                     .sign(&self.keystore_pwd, &message)
-                    .map_err(|_| map_io_error("failed to sign messages"))?;
+                    .map_err(|_| map_error("failed to sign messages"))?;
                 let signature: Signature = wallet_sign.into_electrum().into();
                 Ok(format!("0x{}", signature))
             }
@@ -135,18 +136,18 @@ impl Adapter for EthereumAdapter {
 
     fn validate_channel(&self, channel: &Channel) -> AdapterResult<bool> {
         let (_eloop, transport) = web3::transports::Http::new(&self.config.ethereum_network)
-            .map_err(|_| map_io_error("Failed to initialise web3 transport"))?;
+            .map_err(|_| map_error("Failed to initialise web3 transport"))?;
         let web3 = web3::Web3::new(transport);
         let contract_address = Address::from_slice(self.config.ethereum_core_address.as_bytes());
 
         let contract = Contract::from_json(web3.eth(), contract_address, &ADEXCORE_ABI)
-            .map_err(|_| map_io_error("Failed to initialise web3 transport"))?;
+            .map_err(|_| map_error("Failed to initialise web3 transport"))?;
 
         let eth_channel: EthereumChannel = channel.into();
 
         let channel_id = eth_channel
             .hash_hex(&self.config.ethereum_core_address)
-            .map_err(|_| map_io_error("Failed to hash the channel id"))?;
+            .map_err(|_| map_error("Failed to hash the channel id"))?;
 
         if channel_id != channel.id {
             return Err(AdapterError::Configuration(
@@ -178,7 +179,7 @@ impl Adapter for EthereumAdapter {
         let contract_query = contract.query("states", channel_id, None, Options::default(), None);
         let channel_status: U256 = contract_query
             .wait()
-            .map_err(|_| map_io_error("contract channel status query failed"))?;
+            .map_err(|_| map_error("contract channel status query failed"))?;
 
         if channel_status != 1.into() {
             return Err(AdapterError::Configuration(
@@ -212,20 +213,20 @@ impl Adapter for EthereumAdapter {
             Some(identity) => {
                 let (_eloop, transport) =
                     web3::transports::Http::new(&self.config.ethereum_network)
-                        .map_err(|_| map_io_error("Failed to initialise web3 transport"))?;
+                        .map_err(|_| map_error("Failed to initialise web3 transport"))?;
                 let web3 = web3::Web3::new(transport);
 
                 let contract_address =
                     Address::from_slice(self.config.ethereum_core_address.as_bytes());
 
                 let contract = Contract::from_json(web3.eth(), contract_address, &IDENTITY_ABI)
-                    .map_err(|_| map_io_error("failed to init identity contract"))?;
+                    .map_err(|_| map_error("failed to init identity contract"))?;
 
                 let contract_query =
                     contract.query("privileges", verified.from, None, Options::default(), None);
                 let priviledge_level: U256 = contract_query
                     .wait()
-                    .map_err(|_| map_io_error("failed query priviledge level on contract"))?;
+                    .map_err(|_| map_error("failed query priviledge level on contract"))?;
 
                 if priviledge_level == 0.into() {
                     return Err(AdapterError::Authorization(
@@ -264,7 +265,7 @@ impl Adapter for EthereumAdapter {
                     address: None,
                 };
                 let token = ewt_sign(&wallet, &self.keystore_pwd, &payload)
-                    .map_err(|_| map_io_error("Failed to sign token"))?;
+                    .map_err(|_| map_error("Failed to sign token"))?;
 
                 self.tokens_for_auth
                     .borrow_mut()
@@ -355,7 +356,7 @@ pub fn ewt_sign(
     )));
     let signature: Signature = signer
         .sign(password, &message)
-        .map_err(|_| map_io_error("sign message"))?
+        .map_err(|_| map_error("sign message"))?
         .into_electrum()
         .into();
 
@@ -389,8 +390,8 @@ pub fn ewt_verify(token: &str) -> Result<VerifyPayload, Box<dyn Error>> {
     Ok(verified_payload)
 }
 
-fn map_io_error(err: &str) -> AdapterError {
-    AdapterError::IO(err.to_string())
+fn map_error(err: &str) -> AdapterError {
+    AdapterError::Failed(err.to_string())
 }
 
 #[cfg(test)]

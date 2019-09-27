@@ -76,17 +76,19 @@ impl Adapter for DummyAdapter {
     }
 
     fn session_from_token(&self, token: &str) -> AdapterResult<Session> {
-        let mut identity = "";
-        for (key, val) in self.tokens_for_auth.iter() {
-            if val == token {
-                identity = key;
-            }
-        }
+        let identity = self
+            .tokens_for_auth
+            .clone()
+            .into_iter()
+            .find(|(_, id)| *id == token);
 
-        Ok(Session {
-            uid: identity.to_owned(),
-            era: 0,
-        })
+        match identity {
+            Some((id, _)) => Ok(Session { uid: id, era: 0 }),
+            None => Err(AdapterError::Authentication(format!(
+                "no session token for this auth: {}",
+                token
+            ))),
+        }
     }
 
     fn get_auth(&self, _validator: &ValidatorDesc) -> AdapterResult<String> {
@@ -98,7 +100,7 @@ impl Adapter for DummyAdapter {
 
         match who {
             Some((id, _)) => {
-                let auth = self.tokens_for_auth.get(&id).unwrap();
+                let auth = self.tokens_for_auth.get(&id).expect("id should exist");
                 Ok(auth.to_owned())
             }
             None => Err(AdapterError::Authentication(format!(
