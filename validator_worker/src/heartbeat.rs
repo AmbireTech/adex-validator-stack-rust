@@ -57,7 +57,7 @@ pub async fn heartbeat<A: Adapter + 'static>(
     });
 
     if should_send {
-        await!(send_heartbeat(iface))?;
+        await!(send_heartbeat(&iface))?;
     }
 
     Ok(())

@@ -23,8 +23,10 @@ use web3::{
 };
 
 lazy_static! {
-    static ref ADEXCORE_ABI: &'static [u8] = include_bytes!("../../lib/protocol-eth/abi/AdExCore.json");
-    static ref IDENTITY_ABI: &'static [u8] = include_bytes!("../../lib/protocol-eth/abi/Identity.json");
+    static ref ADEXCORE_ABI: &'static [u8] =
+        include_bytes!("../../lib/protocol-eth/abi/AdExCore.json");
+    static ref IDENTITY_ABI: &'static [u8] =
+        include_bytes!("../../lib/protocol-eth/abi/Identity.json");
 }
 
 #[derive(Debug, Clone)]
@@ -70,7 +72,7 @@ impl Adapter for EthereumAdapter {
 
         let account = SafeAccount::from_file(
             serde_json::from_reader(json_file)
-                .map_err(|_| map_error("Invalid keystore location provided"))?,
+                .map_err(|_| map_error("Invalid keystore json provided"))?,
             None,
             &Some(self.keystore_pwd.clone()),
         )

@@ -15,7 +15,6 @@ pub enum AdapterError {
     Configuration(String),
     Signature(String),
     InvalidChannel(String),
-    IO(String),
     Failed(String),
 }
 
@@ -30,8 +29,7 @@ impl fmt::Display for AdapterError {
             AdapterError::Configuration(error) => write!(f, "Configuration error: {}", error),
             AdapterError::Signature(error) => write!(f, "Signature error: {}", error),
             AdapterError::InvalidChannel(error) => write!(f, "Invalid Channel error: {}", error),
-            AdapterError::IO(error) => write!(f, "IO error: {}", error),
-            AdapterError::Failed(error) => write!(f, "IO error: {}", error),
+            AdapterError::Failed(error) => write!(f, "error: {}", error),
         }
     }
 }
