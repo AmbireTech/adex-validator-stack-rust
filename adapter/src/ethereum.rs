@@ -283,16 +283,13 @@ impl Adapter for EthereumAdapter {
 }
 
 fn check_address_checksum(addresses: &[&str]) -> bool {
-    let mut invalid_address_checkum = false;
+    let invalid_address_checkum: Vec<&str> = addresses
+        .iter()
+        .cloned()
+        .filter(|address| *address != eth_checksum::checksum(address))
+        .collect();
 
-    for address in addresses {
-        if eth_checksum::checksum(address) != *address {
-            invalid_address_checkum = true;
-            break;
-        }
-    }
-
-    invalid_address_checkum
+    invalid_address_checkum.is_empty()
 }
 
 fn hash_message(message: &str) -> [u8; 32] {
