@@ -8,8 +8,10 @@ use std::collections::HashMap;
 pub struct DummyAdapter {
     identity: String,
     config: Config,
-    tokens_verified: HashMap<String, String>,
-    tokens_for_auth: HashMap<String, String>,
+    // Auth tokens that we have verified (tokenId => session)
+    session_tokens: HashMap<String, String>,
+    // Auth tokens that we've generated to authenticate with someone (address => token)
+    authorization_tokens: HashMap<String, String>,
 }
 
 // Enables DummyAdapter to be able to
@@ -20,10 +22,10 @@ impl Adapter for DummyAdapter {
     type Output = DummyAdapter;
 
     fn init(opts: AdapterOptions, config: &Config) -> AdapterResult<DummyAdapter> {
-        let (identity, tokens_for_auth, tokens_verified) =
+        let (identity, authorization_tokens, session_tokens) =
             match (opts.dummy_identity, opts.dummy_auth, opts.dummy_auth_tokens) {
-                (Some(identity), Some(tokens_for_auth), Some(tokens_verified)) => {
-                    (identity, tokens_for_auth, tokens_verified)
+                (Some(identity), Some(authorization_tokens), Some(session_tokens)) => {
+                    (identity, authorization_tokens, session_tokens)
                 }
                 (_, _, _) => {
                     return Err(AdapterError::Configuration(
@@ -35,8 +37,8 @@ impl Adapter for DummyAdapter {
         Ok(Self {
             identity,
             config: config.to_owned(),
-            tokens_verified,
-            tokens_for_auth,
+            session_tokens,
+            authorization_tokens,
         })
     }
 
@@ -77,7 +79,7 @@ impl Adapter for DummyAdapter {
 
     fn session_from_token(&self, token: &str) -> AdapterResult<Session> {
         let identity = self
-            .tokens_for_auth
+            .authorization_tokens
             .clone()
             .into_iter()
             .find(|(_, id)| *id == token);
@@ -93,14 +95,14 @@ impl Adapter for DummyAdapter {
 
     fn get_auth(&self, _validator: &ValidatorDesc) -> AdapterResult<String> {
         let who = self
-            .tokens_verified
+            .session_tokens
             .clone()
             .into_iter()
             .find(|(_, id)| *id == self.identity);
 
         match who {
             Some((id, _)) => {
-                let auth = self.tokens_for_auth.get(&id).expect("id should exist");
+                let auth = self.authorization_tokens.get(&id).expect("id should exist");
                 Ok(auth.to_owned())
             }
             None => Err(AdapterError::Authentication(format!(
