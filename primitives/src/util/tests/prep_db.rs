@@ -28,6 +28,7 @@ lazy_static! {
         auth.insert("publisher", "testing".into());
         auth.insert("publisher2", "testing2".into());
         auth.insert("creator", "awesomeCreator".into());
+        auth.insert("tester", "AUTH_awesomeTester".into());
 
         auth
     };
