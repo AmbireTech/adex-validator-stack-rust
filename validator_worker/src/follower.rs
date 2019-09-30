@@ -84,11 +84,7 @@ async fn on_new_state<'a, A: Adapter + 'static>(
         .map_or(Default::default(), |new_state| new_state.balances);
 
     if !is_valid_transition(&iface.channel, &prev_balances, &proposed_balances) {
-        return Ok(on_error(
-            &iface,
-            &new_state,
-            InvalidNewState::Transition
-        ).await);
+        return Ok(on_error(&iface, &new_state, InvalidNewState::Transition).await);
     }
 
     let signature = iface.adapter.sign(&new_state.state_root)?;
