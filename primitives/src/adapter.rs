@@ -56,7 +56,7 @@ pub trait Adapter: ChannelValidator + Clone + Debug {
     fn init(opts: AdapterOptions, config: &Config) -> AdapterResult<Self::Output>;
 
     /// Unlock adapter
-    fn unlock(&self) -> AdapterResult<bool>;
+    fn unlock(&self) -> AdapterResult<()>;
 
     /// Get Adapter whoami
     fn whoami(&self) -> String;

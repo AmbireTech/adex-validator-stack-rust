@@ -1,20 +1,14 @@
-#![feature(async_await, await_macro)]
-#![deny(rust_2018_idioms)]
-#![deny(clippy::all)]
-#![deny(clippy::match_bool)]
-#![doc(test(attr(feature(async_await, await_macro))))]
-
 use std::error::Error;
 
+use chrono::{DateTime, Utc};
 use ethabi::encode;
 use ethabi::param_type::ParamType;
 use ethabi::token::{LenientTokenizer, StrictTokenizer, Tokenizer};
+use primitives::BigNum;
 use primitives::Channel;
 use sha2::{Digest, Sha256};
 use std::convert::From;
 use tiny_keccak::Keccak;
-
-use primitives::BigNum;
 
 pub use self::dummy::DummyAdapter;
 pub use self::ethereum::EthereumAdapter;
@@ -81,7 +75,7 @@ impl From<&Channel> for EthereumChannel {
 
         let spec_hash = format!("{:02x}", hash.result());
 
-        let validators: Vec<String> = channel
+        let validators = channel
             .spec
             .validators
             .into_iter()
@@ -92,7 +86,7 @@ impl From<&Channel> for EthereumChannel {
             &channel.creator,
             &channel.deposit_asset,
             &channel.deposit_amount.to_string(),
-            channel.valid_until.timestamp(),
+            channel.valid_until,
             validators,
             &spec_hash,
         )
@@ -104,16 +98,16 @@ impl EthereumChannel {
         creator: &str,
         token_addr: &str,
         token_amount: &str,
-        valid_until: i64,
+        valid_until: DateTime<Utc>,
         validators: Vec<String>,
         spec: &str,
     ) -> Self {
-        //@TODO some validation
+        // @TODO some validation
         Self {
             creator: creator.to_owned(),
             token_addr: token_addr.to_owned(),
             token_amount: token_amount.to_owned(),
-            valid_until,
+            valid_until: valid_until.timestamp(),
             validators: format!("[{}]", validators.join(",")),
             spec: spec.to_owned(),
         }

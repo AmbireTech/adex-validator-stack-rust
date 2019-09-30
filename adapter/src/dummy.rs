@@ -42,8 +42,8 @@ impl Adapter for DummyAdapter {
         })
     }
 
-    fn unlock(&self) -> AdapterResult<bool> {
-        Ok(true)
+    fn unlock(&self) -> AdapterResult<()> {
+        Ok(())
     }
 
     fn whoami(&self) -> String {
@@ -80,12 +80,14 @@ impl Adapter for DummyAdapter {
     fn session_from_token(&self, token: &str) -> AdapterResult<Session> {
         let identity = self
             .authorization_tokens
-            .clone()
-            .into_iter()
+            .iter()
             .find(|(_, id)| *id == token);
 
         match identity {
-            Some((id, _)) => Ok(Session { uid: id, era: 0 }),
+            Some((id, _)) => Ok(Session {
+                uid: id.to_owned(),
+                era: 0,
+            }),
             None => Err(AdapterError::Authentication(format!(
                 "no session token for this auth: {}",
                 token
@@ -96,13 +98,12 @@ impl Adapter for DummyAdapter {
     fn get_auth(&self, _validator: &ValidatorDesc) -> AdapterResult<String> {
         let who = self
             .session_tokens
-            .clone()
-            .into_iter()
-            .find(|(_, id)| *id == self.identity);
+            .iter()
+            .find(|(_, id)| *id == &self.identity);
 
         match who {
             Some((id, _)) => {
-                let auth = self.authorization_tokens.get(&id).expect("id should exist");
+                let auth = self.authorization_tokens.get(id).expect("id should exist");
                 Ok(auth.to_owned())
             }
             None => Err(AdapterError::Authentication(format!(
