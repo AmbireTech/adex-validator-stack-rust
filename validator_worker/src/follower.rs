@@ -77,18 +77,18 @@ async fn on_new_state<'a, A: Adapter + 'static>(
         return Ok(on_error(&iface, &new_state, InvalidNewState::Signature).await);
     }
 
-    let last_approve_response = await!(iface.get_last_approved())?;
+    let last_approve_response = iface.get_last_approved().await?;
     let prev_balances = last_approve_response
         .last_approved
         .and_then(|last_approved| last_approved.new_state)
         .map_or(Default::default(), |new_state| new_state.balances);
 
     if !is_valid_transition(&iface.channel, &prev_balances, &proposed_balances) {
-        return Ok(await!(on_error(
+        return Ok(on_error(
             &iface,
             &new_state,
             InvalidNewState::Transition
-        )));
+        ).await);
     }
 
     let signature = iface.adapter.sign(&new_state.state_root)?;
