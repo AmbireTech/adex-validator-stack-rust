@@ -185,6 +185,10 @@ impl Adapter for EthereumAdapter {
     }
 
     fn session_from_token(&self, token: &str) -> AdapterResult<Session> {
+        if token.len() < 16 {
+            return Err(AdapterError::Failed("invaild token id".to_string()));
+        }
+        
         let token_id = token.to_owned()[token.len() - 16..].to_string();
 
         let mut session_tokens = self.session_tokens.borrow_mut();
@@ -209,10 +213,8 @@ impl Adapter for EthereumAdapter {
                 }
             };
 
-        let verified = match ewt_verify(header_encoded, payload_encoded, token_encoded) {
-            Ok(v) => v,
-            Err(e) => return Err(AdapterError::EwtVerifyFailed(e.to_string())),
-        };
+        let verified = ewt_verify(header_encoded, payload_encoded, token_encoded)
+            .map_err(|e| map_error(&e.to_string()))?;
 
         if self.whoami()? != verified.payload.id {
             return Err(AdapterError::Configuration(
