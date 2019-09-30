@@ -10,11 +10,11 @@ use primitives::{
     Channel, ValidatorDesc,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::error::Error;
-use std::fs::File;
-use std::path::Path;
+use std::fs;
 use tiny_keccak::Keccak;
 use web3::transports::Http;
 use web3::{
@@ -32,7 +32,8 @@ lazy_static! {
 
 #[derive(Debug, Clone)]
 pub struct EthereumAdapter {
-    keystore_json: String,
+    address: String,
+    keystore_json: Value,
     keystore_pwd: Password,
     config: Config,
     // Auth tokens that we have verified (tokenId => session)
@@ -50,7 +51,7 @@ impl Adapter for EthereumAdapter {
     type Output = EthereumAdapter;
 
     fn init(opts: AdapterOptions, config: &Config) -> AdapterResult<EthereumAdapter> {
-        let (keystore_json, keystore_pwd) = match (opts.keystore_file, opts.keystore_pwd) {
+        let (keystore_file, keystore_pwd) = match (opts.keystore_file, opts.keystore_pwd) {
             (Some(file), Some(pwd)) => (file, pwd),
             (_, _) => {
                 return Err(AdapterError::Configuration(
@@ -59,7 +60,23 @@ impl Adapter for EthereumAdapter {
             }
         };
 
+        let keystore_contents = fs::read_to_string(&keystore_file)
+            .map_err(|_| map_error("Invalid keystore location provided"))?;
+
+        let keystore_json: Value = serde_json::from_str(&keystore_contents)
+            .map_err(|_| map_error("Invalid keystore json provided"))?;
+
+        let address = match keystore_json["address"].as_str() {
+            Some(addr) => eth_checksum::checksum(&addr),
+            None => {
+                return Err(AdapterError::Failed(
+                    "address missing in keystore json".to_string(),
+                ))
+            }
+        };
+
         Ok(Self {
+            address,
             keystore_json,
             keystore_pwd: keystore_pwd.into(),
             session_tokens: RefCell::new(HashMap::new()),
@@ -70,11 +87,8 @@ impl Adapter for EthereumAdapter {
     }
 
     fn unlock(&self) -> AdapterResult<bool> {
-        let json_file = File::open(&Path::new(&self.keystore_json).to_path_buf())
-            .map_err(|_| map_error("Invalid keystore location provided"))?;
-
         let account = SafeAccount::from_file(
-            serde_json::from_reader(json_file)
+            serde_json::from_value(self.keystore_json.clone())
                 .map_err(|_| map_error("Invalid keystore json provided"))?,
             None,
             &Some(self.keystore_pwd.clone()),
@@ -87,19 +101,8 @@ impl Adapter for EthereumAdapter {
         Ok(true)
     }
 
-    fn whoami(&self) -> AdapterResult<String> {
-        match self.wallet.borrow().clone() {
-            Some(wallet) => {
-                let public = wallet
-                    .public(&self.keystore_pwd)
-                    .map_err(|_| map_error("Failed to get public key"))?;
-                let address = format!("{:?}", public_to_address(&public));
-                Ok(eth_checksum::checksum(&address))
-            }
-            None => Err(AdapterError::Configuration(
-                "Unlock wallet before use".to_string(),
-            )),
-        }
+    fn whoami(&self) -> String {
+        self.address.clone()
     }
 
     fn sign(&self, state_root: &str) -> AdapterResult<String> {
@@ -188,7 +191,7 @@ impl Adapter for EthereumAdapter {
         if token.len() < 16 {
             return Err(AdapterError::Failed("invaild token id".to_string()));
         }
-        
+
         let token_id = token.to_owned()[token.len() - 16..].to_string();
 
         let mut session_tokens = self.session_tokens.borrow_mut();
@@ -216,7 +219,7 @@ impl Adapter for EthereumAdapter {
         let verified = ewt_verify(header_encoded, payload_encoded, token_encoded)
             .map_err(|e| map_error(&e.to_string()))?;
 
-        if self.whoami()? != verified.payload.id {
+        if self.whoami() != verified.payload.id {
             return Err(AdapterError::Configuration(
                 "token payload.id !== whoami(): token was not intended for us".to_string(),
             ));
@@ -445,13 +448,13 @@ mod test {
     fn should_get_whoami_sign_and_verify_messages() {
         // whoami
         let eth_adapter = setup_eth_adapter();
-        eth_adapter.unlock().expect("should unlock eth adapter");
-
-        let whoami = eth_adapter.whoami().expect("failed to get whoami");
+        let whoami = eth_adapter.whoami();
         assert_eq!(
             whoami, "0x2bDeAFAE53940669DaA6F519373f686c1f3d3393",
             "failed to get correct whoami"
         );
+
+        eth_adapter.unlock().expect("should unlock eth adapter");
 
         // Sign
         let expected_response =
@@ -481,7 +484,7 @@ mod test {
         let payload = Payload {
             id: "awesomeValidator".to_string(),
             era: 10_0000,
-            address: Some(eth_adapter.whoami().expect("should get whoami ewt sign")),
+            address: Some(eth_adapter.whoami()),
             identity: None,
         };
         let wallet = eth_adapter.wallet.borrow().clone();

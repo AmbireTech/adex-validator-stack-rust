@@ -59,7 +59,7 @@ pub trait Adapter: ChannelValidator + Clone + Debug {
     fn unlock(&self) -> AdapterResult<bool>;
 
     /// Get Adapter whoami
-    fn whoami(&self) -> AdapterResult<String>;
+    fn whoami(&self) -> String;
 
     /// Signs the provided state_root
     fn sign(&self, state_root: &str) -> AdapterResult<String>;

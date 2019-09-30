@@ -46,15 +46,15 @@ impl Adapter for DummyAdapter {
         Ok(true)
     }
 
-    fn whoami(&self) -> AdapterResult<String> {
-        Ok(self.identity.to_string())
+    fn whoami(&self) -> String {
+        self.identity.clone()
     }
 
     fn sign(&self, state_root: &str) -> AdapterResult<String> {
         let signature = format!(
             "Dummy adapter signature for {} by {}",
             state_root,
-            self.whoami()?
+            self.whoami()
         );
         Ok(signature)
     }
