@@ -9,8 +9,7 @@ use channel_list::{ChannelListHandler, ChannelListResponse};
 use crate::domain::channel::ChannelRepository;
 use std::sync::Arc;
 
-mod channel_create;
-mod channel_list;
+pub(crate) mod create {}
 
 #[derive(Clone)]
 pub struct ChannelResource {
