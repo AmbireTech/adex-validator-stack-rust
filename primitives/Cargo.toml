@@ -4,12 +4,9 @@ version = "0.1.0"
 authors = ["Lachezar Lechev <lachezar@adex.network>, Omidiora Samuel <sam@adex.network>"]
 edition = "2018"
 
-[features]
-
-
 [dependencies]
 # Futures
-futures-preview = { version = "=0.3.0-alpha.16", features = ["compat", "io-compat"]}
+futures-preview = { version = "=0.3.0-alpha.19", features = ["compat"]}
 # (De)Serialization
 serde = { version = "^1.0", features = ['derive'] }
 serde_json = "1.0"
@@ -30,3 +27,4 @@ rand = { version = "^0.6" }
 lazy_static = "1.4.0"
 merkletree = "0.10.0"
 tiny-keccak = "1.5"
+

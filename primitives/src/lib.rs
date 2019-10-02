@@ -18,20 +18,14 @@ pub mod targeting_tag;
 pub mod util;
 pub mod validator;
 
-//#[cfg(any(test, feature = "fixtures"))]
-//pub use util::tests as test_util;
-//
-//pub use self::asset::Asset;
 pub use self::ad_unit::AdUnit;
 pub use self::balances_map::BalancesMap;
 pub use self::big_num::BigNum;
 pub use self::channel::{Channel, ChannelSpec, SpecValidator, SpecValidators};
 pub use self::config::Config;
 pub use self::event_submission::EventSubmission;
-pub use self::validator::ValidatorDesc;
-//#[cfg(feature = "repositories")]
-//pub use self::repository::*;
 pub use self::targeting_tag::TargetingTag;
+pub use self::validator::ValidatorDesc;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum DomainError {

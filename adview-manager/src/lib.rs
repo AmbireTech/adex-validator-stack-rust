@@ -44,7 +44,7 @@ pub struct AdViewManagerOptions {
 impl AdViewManagerOptions {
     pub fn size(&self) -> Option<(u64, u64)> {
         self.width
-            .and_then(|width| self.height.and_then(|height| Some((width, height))))
+            .and_then(|width| self.height.map(|height| (width, height)))
     }
 }
 

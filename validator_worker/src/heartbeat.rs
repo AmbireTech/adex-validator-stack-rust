@@ -40,7 +40,7 @@ pub async fn heartbeat<A: Adapter + 'static>(
     iface: &SentryApi<A>,
     balances: BalancesMap,
 ) -> Result<(), Box<dyn Error>> {
-    let validator_message_response = await!(iface.get_our_latest_msg("Heartbeat".into()))?;
+    let validator_message_response = iface.get_our_latest_msg("Heartbeat".into()).await?;
 
     let heartbeat_msg = validator_message_response
         .msg
@@ -57,7 +57,7 @@ pub async fn heartbeat<A: Adapter + 'static>(
     });
 
     if should_send {
-        await!(send_heartbeat(&iface))?;
+        send_heartbeat(&iface).await?;
     }
 
     Ok(())

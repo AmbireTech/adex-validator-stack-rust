@@ -5,30 +5,30 @@ use lazy_static::lazy_static;
 use std::collections::HashMap;
 
 lazy_static! {
-    pub static ref IDS: HashMap<&'static str, String> = {
+    pub static ref IDS: HashMap<String, String> = {
         let mut ids = HashMap::new();
 
-        ids.insert("leader", "awesomeLeader".into());
-        ids.insert("follower", "awesomeFollower".into());
-        ids.insert("user", "awesomeTestUser".into());
-        ids.insert("publisher", "b7d3f81e857692d13e9d63b232a90f4a1793189e".into());
-        ids.insert("publisher2", "myAwesomePublisher2".into());
-        ids.insert("creator", "awesomeCreator".into());
-        ids.insert("tester", "2892f6C41E0718eeeDd49D98D648C789668cA67d".into());
+        ids.insert("leader".into(), "awesomeLeader".into());
+        ids.insert("follower".into(), "awesomeFollower".into());
+        ids.insert("user".into(), "awesomeTestUser".into());
+        ids.insert("publisher".into(), "b7d3f81e857692d13e9d63b232a90f4a1793189e".into());
+        ids.insert("publisher2".into(), "myAwesomePublisher2".into());
+        ids.insert("creator".into(), "awesomeCreator".into());
+        ids.insert("tester".into(), "2892f6C41E0718eeeDd49D98D648C789668cA67d".into());
 
         ids
     };
 
-    pub static ref AUTH: HashMap<&'static str, String> = {
+    pub static ref AUTH: HashMap<String, String> = {
         let mut auth = HashMap::new();
 
-        auth.insert("leader", "AUTH_awesomeLeader".into());
-        auth.insert("follower", "AUTH_awesomeLeader".into());
-        auth.insert("user", "x8c9v1b2".into());
-        auth.insert("publisher", "testing".into());
-        auth.insert("publisher2", "testing2".into());
-        auth.insert("creator", "awesomeCreator".into());
-        auth.insert("tester", "AUTH_awesomeTester".into());
+        auth.insert("leader".into(), "AUTH_awesomeLeader".into());
+        auth.insert("follower".into(), "AUTH_awesomeLeader".into());
+        auth.insert("user".into(), "x8c9v1b2".into());
+        auth.insert("publisher".into(), "testing".into());
+        auth.insert("publisher2".into(), "testing2".into());
+        auth.insert("creator".into(), "awesomeCreator".into());
+        auth.insert("tester".into(), "AUTH_awesomeTester".into());
 
         auth
     };

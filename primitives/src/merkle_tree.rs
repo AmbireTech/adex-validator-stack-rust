@@ -82,7 +82,7 @@ pub struct MerkleTree {
 
 impl MerkleTree {
     pub fn new(data: &[MerkleItem]) -> MerkleTree {
-        let mut leaves: Vec<MerkleItem> = data.to_owned();;
+        let mut leaves: Vec<MerkleItem> = data.to_owned();
 
         let tree: Tree = if leaves.len() == 1 {
             Tree::SingleItem(leaves[0].to_owned())
