@@ -11,5 +11,3 @@ dependencies = [
     "post-build",
     "test-flow",
 ]
-[tasks.install-clippy-any]
-install_crate_args = ["--git", "https://github.com/rust-lang/rust-clippy/", "clippy"]
