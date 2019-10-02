@@ -1,7 +1,4 @@
-#![deny(clippy::all)]
-#![deny(rust_2018_idioms)]
-
-use primitives::adapter::{Adapter, AdapterOptions, AdapterResult};
+use primitives::adapter::{Adapter, AdapterError, AdapterOptions, AdapterResult, Session};
 use primitives::channel_validator::ChannelValidator;
 use primitives::config::Config;
 use primitives::{Channel, ValidatorDesc};
@@ -10,8 +7,11 @@ use std::collections::HashMap;
 #[derive(Debug, Clone)]
 pub struct DummyAdapter {
     identity: String,
-    auth_tokens: HashMap<String, String>,
-    verified_auth: HashMap<String, String>,
+    config: Config,
+    // Auth tokens that we have verified (tokenId => session)
+    session_tokens: HashMap<String, String>,
+    // Auth tokens that we've generated to authenticate with someone (address => token)
+    authorization_tokens: HashMap<String, String>,
 }
 
 // Enables DummyAdapter to be able to
@@ -21,26 +21,33 @@ impl ChannelValidator for DummyAdapter {}
 impl Adapter for DummyAdapter {
     type Output = DummyAdapter;
 
-    fn init(opts: AdapterOptions, _config: &Config) -> DummyAdapter {
-        // opts.dummy_identity.expect("dummyIdentity required");
-        // opts.dummy_auth.expect("dummy auth required");
-        // opts.dummy_auth_tokens.expect("dummy auth tokens required");
-        // self.identity = opts.dummy_identity.unwrap();
-        // self.authTokens = opts.dummy_auth.unwrap();
-        // self.verifiedAuth = opts.dummy_auth_tokens.unwrap();
-        Self {
-            identity: opts.dummy_identity.unwrap(),
-            auth_tokens: HashMap::new(),
-            verified_auth: HashMap::new(),
-        }
+    fn init(opts: AdapterOptions, config: &Config) -> AdapterResult<DummyAdapter> {
+        let (identity, authorization_tokens, session_tokens) =
+            match (opts.dummy_identity, opts.dummy_auth, opts.dummy_auth_tokens) {
+                (Some(identity), Some(authorization_tokens), Some(session_tokens)) => {
+                    (identity, authorization_tokens, session_tokens)
+                }
+                (_, _, _) => {
+                    return Err(AdapterError::Configuration(
+                        "dummy_identity, dummy_auth, dummy_auth_tokens required".to_string(),
+                    ))
+                }
+            };
+
+        Ok(Self {
+            identity,
+            config: config.to_owned(),
+            session_tokens,
+            authorization_tokens,
+        })
     }
 
-    fn unlock(&self) -> AdapterResult<bool> {
-        Ok(true)
+    fn unlock(&self) -> AdapterResult<()> {
+        Ok(())
     }
 
     fn whoami(&self) -> String {
-        self.identity.to_string()
+        self.identity.clone()
     }
 
     fn sign(&self, state_root: &str) -> AdapterResult<String> {
@@ -63,27 +70,46 @@ impl Adapter for DummyAdapter {
         Ok(is_same)
     }
 
-    fn validate_channel(&self, _channel: &Channel) -> AdapterResult<bool> {
-        // @TODO
-        Ok(true)
+    fn validate_channel(&self, channel: &Channel) -> AdapterResult<bool> {
+        match DummyAdapter::is_channel_valid(&self.config, channel) {
+            Ok(_) => Ok(true),
+            Err(e) => Err(AdapterError::InvalidChannel(e.to_string())),
+        }
     }
 
-    fn session_from_token(&self, _token: &str) -> AdapterResult<String> {
-        // @TODO
-        Ok("hello".to_string())
+    fn session_from_token(&self, token: &str) -> AdapterResult<Session> {
+        let identity = self
+            .authorization_tokens
+            .iter()
+            .find(|(_, id)| *id == token);
+
+        match identity {
+            Some((id, _)) => Ok(Session {
+                uid: id.to_owned(),
+                era: 0,
+            }),
+            None => Err(AdapterError::Authentication(format!(
+                "no session token for this auth: {}",
+                token
+            ))),
+        }
     }
 
     fn get_auth(&self, _validator: &ValidatorDesc) -> AdapterResult<String> {
-        // let participant = self
-        //     .participants
-        //     .iter()
-        //     .find(|&(_, participant)| participant.identity == validator);
-        // let future = match participant {
-        //     Some((_, participant)) => ok(participant.token.to_string()),
-        //     None => err(AdapterError::Authentication(
-        //         "Identity not found".to_string(),
-        //     )),
-        // };
-        Ok("auth".to_string())
+        let who = self
+            .session_tokens
+            .iter()
+            .find(|(_, id)| *id == &self.identity);
+
+        match who {
+            Some((id, _)) => {
+                let auth = self.authorization_tokens.get(id).expect("id should exist");
+                Ok(auth.to_owned())
+            }
+            None => Err(AdapterError::Authentication(format!(
+                "no auth token for this identity: {}",
+                self.identity
+            ))),
+        }
     }
 }

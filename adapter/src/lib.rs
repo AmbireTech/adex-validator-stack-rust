@@ -4,12 +4,15 @@
 
 use std::error::Error;
 
+use chrono::{DateTime, Utc};
 use ethabi::encode;
 use ethabi::param_type::ParamType;
 use ethabi::token::{LenientTokenizer, StrictTokenizer, Tokenizer};
-use tiny_keccak::Keccak;
-
 use primitives::BigNum;
+use primitives::Channel;
+use sha2::{Digest, Sha256};
+use std::convert::From;
+use tiny_keccak::Keccak;
 
 pub use self::dummy::DummyAdapter;
 pub use self::ethereum::EthereumAdapter;
@@ -18,8 +21,8 @@ pub mod dummy;
 pub mod ethereum;
 
 pub enum AdapterTypes {
-    DummyAdapter(DummyAdapter),
-    EthereumAdapter(EthereumAdapter),
+    DummyAdapter(Box<DummyAdapter>),
+    EthereumAdapter(Box<EthereumAdapter>),
 }
 
 pub fn get_signable_state_root(
@@ -62,28 +65,55 @@ pub struct EthereumChannel {
     pub creator: String,
     pub token_addr: String,
     pub token_amount: String,
-    pub valid_until: String,
+    pub valid_until: i64,
     pub validators: String,
     pub spec: String,
+}
+
+impl From<&Channel> for EthereumChannel {
+    fn from(channel: &Channel) -> Self {
+        let spec = serde_json::to_string(&channel.spec).expect("Failed to serialize channel spec");
+
+        let mut hash = Sha256::new();
+        hash.input(spec);
+
+        let spec_hash = format!("{:02x}", hash.result());
+
+        let validators = channel
+            .spec
+            .validators
+            .into_iter()
+            .map(|v| v.id.clone())
+            .collect();
+
+        EthereumChannel::new(
+            &channel.creator,
+            &channel.deposit_asset,
+            &channel.deposit_amount.to_string(),
+            channel.valid_until,
+            validators,
+            &spec_hash,
+        )
+    }
 }
 
 impl EthereumChannel {
     pub fn new(
         creator: &str,
         token_addr: &str,
-        token_amount: String,
-        valid_until: String,
-        validators: String,
-        spec: String,
+        token_amount: &str,
+        valid_until: DateTime<Utc>,
+        validators: Vec<String>,
+        spec: &str,
     ) -> Self {
-        //@TODO some validation
+        // @TODO some validation
         Self {
             creator: creator.to_owned(),
             token_addr: token_addr.to_owned(),
             token_amount: token_amount.to_owned(),
-            valid_until,
-            validators,
-            spec,
+            valid_until: valid_until.timestamp(),
+            validators: format!("[{}]", validators.join(",")),
+            spec: spec.to_owned(),
         }
     }
 
@@ -93,7 +123,7 @@ impl EthereumChannel {
             (ParamType::Address, &self.creator),
             (ParamType::Address, &self.token_addr),
             (ParamType::Uint(256), &self.token_amount),
-            (ParamType::Uint(256), &self.valid_until),
+            (ParamType::Uint(256), &self.valid_until.to_string()),
             (
                 ParamType::Array(Box::new(ParamType::Address)),
                 &self.validators,

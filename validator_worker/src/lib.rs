@@ -50,19 +50,19 @@ mod test {
     use adapter::DummyAdapter;
     use primitives::adapter::AdapterOptions;
     use primitives::config::configuration;
-    use primitives::util::tests::prep_db::{DUMMY_CHANNEL, IDS};
+    use primitives::util::tests::prep_db::{AUTH, DUMMY_CHANNEL, IDS};
     use primitives::{BalancesMap, Channel};
 
     fn setup_iface(channel: &Channel) -> SentryApi<DummyAdapter> {
         let adapter_options = AdapterOptions {
             dummy_identity: Some(IDS["leader"].clone()),
-            dummy_auth: None,
-            dummy_auth_tokens: None,
+            dummy_auth: Some(IDS.clone()),
+            dummy_auth_tokens: Some(AUTH.clone()),
             keystore_file: None,
             keystore_pwd: None,
         };
         let config = configuration("development", None).expect("Dev config should be available");
-        let dummy_adapter = DummyAdapter::init(adapter_options, &config);
+        let dummy_adapter = DummyAdapter::init(adapter_options, &config).expect("init adadpter");
 
         SentryApi::new(dummy_adapter, &channel, &config, false).expect("should succeed")
     }
