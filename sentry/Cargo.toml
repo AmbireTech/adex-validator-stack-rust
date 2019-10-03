@@ -5,9 +5,16 @@ authors = ["Omidiora Samuel <sam@adex.network>"]
 edition = "2018"
 
 [dependencies]
+# Futures
+futures-preview = { version = "=0.3.0-alpha.19", features = ["compat"]}
 primitives = {path = "../primitives"}
+adapter = { version = "0.1", path = "../adapter" }
 # CLI
 clap = "2.33.0"
+# Server
+tokio = "0.2.0-alpha.6"
+hyper = "=0.13.0-alpha.4"
+regex = "1"
 # Logger
 slog = { version = "^2.2.3" , features = ["max_level_trace"] }
 slog-term = "^2.4.0"

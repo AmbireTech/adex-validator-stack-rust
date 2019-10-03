@@ -77,8 +77,7 @@ fn main() {
             let dummy_identity = cli.value_of("dummyIdentity").unwrap();
             let options = AdapterOptions {
                 dummy_identity: Some(dummy_identity.to_string()),
-                // this should be prefilled using fixtures
-                //
+                // @TODO: this should be prefilled using fixtures
                 dummy_auth: None,
                 dummy_auth_tokens: None,
                 keystore_file: None,
