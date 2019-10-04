@@ -2,13 +2,14 @@
 #![deny(rust_2018_idioms)]
 
 use clap::{App, Arg};
-use hyper::{Body, Error, Request, Response, Server, StatusCode};
 use hyper::service::{make_service_fn, service_fn};
+use hyper::{Body, Error, Request, Response, Server};
 
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
 use primitives::adapter::{Adapter, AdapterOptions};
 use primitives::config::configuration;
 use primitives::util::tests::prep_db::{AUTH, IDS};
+use sentry::not_found;
 
 const DEFAULT_PORT: u16 = 8005;
 
@@ -49,7 +50,7 @@ async fn main() {
         )
         .get_matches();
 
-    let environment = std::env::var("ENV").unwrap_or("development".into());
+    let environment = std::env::var("ENV").unwrap_or_else(|_| "development".into());
     let port = std::env::var("PORT")
         .map(|s| s.parse::<u16>().expect("Invalid port(u16) was provided"))
         .unwrap_or_else(|_| DEFAULT_PORT);
@@ -71,7 +72,8 @@ async fn main() {
                 dummy_auth: None,
                 dummy_auth_tokens: None,
             };
-            let ethereum_adapter = EthereumAdapter::init(options, &config).expect("Should initialize ethereum adapter");
+            let ethereum_adapter = EthereumAdapter::init(options, &config)
+                .expect("Should initialize ethereum adapter");
 
             AdapterTypes::EthereumAdapter(Box::new(ethereum_adapter))
         }
@@ -89,7 +91,8 @@ async fn main() {
                 keystore_pwd: None,
             };
 
-            let dummy_adapter = DummyAdapter::init(options, &config).expect("Should initialize dummy adapter");
+            let dummy_adapter =
+                DummyAdapter::init(options, &config).expect("Should initialize dummy adapter");
             AdapterTypes::DummyAdapter(Box::new(dummy_adapter))
         }
         // @TODO exit gracefully
@@ -103,10 +106,12 @@ async fn main() {
 async fn run(_clustered: bool, port: u16) {
     let addr = ([127, 0, 0, 1], port).into();
 
-    let make_service = make_service_fn(|_| async {
-        Ok::<_, Error>(service_fn(|req| async {
-            Ok::<_, Error>(handle_routing(req))
-        }))
+    let make_service = make_service_fn(|_| {
+        async {
+            Ok::<_, Error>(service_fn(|req| {
+                async { Ok::<_, Error>(handle_routing(req)) }
+            }))
+        }
     });
 
     let server = Server::bind(&addr).serve(make_service);
@@ -117,17 +122,10 @@ async fn run(_clustered: bool, port: u16) {
 }
 
 fn handle_routing(req: Request<Body>) -> Response<Body> {
-//fn handle_routing(req: Request<Body>, _config: Arc<Config>, _adapter: Arc<AdapterTypes>) -> Response<Body> {
+    //fn handle_routing(req: Request<Body>, _config: Arc<Config>, _adapter: Arc<AdapterTypes>) -> Response<Body> {
     if req.uri().path().starts_with("/channel") {
-        return Response::new(Body::from("Channel!!"));
+        sentry::routes::channel::handle_channel_routes(req)
+    } else {
+        not_found()
     }
-
-    not_found()
-}
-
-fn not_found() -> Response<Body> {
-    let mut response = Response::new(Body::from("Not found"));
-    let status = response.status_mut();
-    *status = StatusCode::NOT_FOUND;
-    response
 }
