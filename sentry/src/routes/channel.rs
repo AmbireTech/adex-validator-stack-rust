@@ -1,65 +1,26 @@
-use futures::future::{FutureExt, TryFutureExt};
-use futures_legacy::Future;
-use tokio::await;
-use tower_web::{derive_resource_impl, impl_web, Deserialize, Extract};
+use crate::bad_request;
+use hyper::{Body, Request, Response};
+use serde::Deserialize;
 
-use channel_create::{ChannelCreateHandler, ChannelCreateResponse, ChannelInput};
-use channel_list::{ChannelListHandler, ChannelListResponse};
-
-use crate::domain::channel::ChannelRepository;
-use std::sync::Arc;
-
-pub(crate) mod create {}
-
-#[derive(Clone)]
-pub struct ChannelResource {
-    pub channel_list_limit: u32,
-    pub channel_repository: Arc<dyn ChannelRepository>,
-}
-
-impl_web! {
-    #[allow(clippy::needless_lifetimes)]
-    impl ChannelResource {
-        #[post("/channel")]
-        #[content_type("application/json")]
-        async fn create_channel(&self, body: ChannelInput) -> ChannelCreateResponse {
-
-            let handler = ChannelCreateHandler::new(self.channel_repository.clone());
-
-            await!(handler.handle(body).boxed().compat()).unwrap()
-        }
-
-        #[get("/channel/list")]
-        #[content_type("application/json")]
-        async fn channel_list(&self, query_string: ChannelListQuery) -> ChannelListResponse {
-            let handler = ChannelListHandler::new(self.channel_list_limit, self.channel_repository.clone());
-
-            await!(handler.handle(query_string.page(), query_string.validator()).boxed().compat()).unwrap()
-        }
-    }
-}
-
-#[derive(Extract)]
+#[derive(Debug, Deserialize)]
 struct ChannelListQuery {
     page: Option<u64>,
     validator: Option<String>,
 }
 
-impl ChannelListQuery {
-    pub fn page(&self) -> u64 {
-        match self.page {
-            Some(page) if page >= 1 => page,
-            _ => 1,
+pub fn handle_channel_routes(req: Request<Body>) -> Response<Body> {
+    if req.uri().path().starts_with("/channel/list") {
+        // @TODO: Get from Config
+        let _channel_find_limit = 5;
+
+        let query =
+            serde_urlencoded::from_str::<ChannelListQuery>(&req.uri().query().unwrap_or(""));
+
+        if query.is_err() {
+            return bad_request();
         }
-    }
 
-    pub fn validator(&self) -> Option<&str> {
-        self.validator.as_ref().and_then(|s| {
-            if s.is_empty() {
-                return None;
-            }
-
-            Some(s.as_str())
-        })
+        println!("{:?}", query)
     }
+    Response::new(Body::from("Channel!!"))
 }
