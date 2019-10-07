@@ -42,7 +42,7 @@ impl Adapter for DummyAdapter {
         })
     }
 
-    fn unlock(&self) -> AdapterResult<()> {
+    fn unlock(&mut self) -> AdapterResult<()> {
         Ok(())
     }
 
@@ -77,7 +77,7 @@ impl Adapter for DummyAdapter {
         }
     }
 
-    fn session_from_token(&self, token: &str) -> AdapterResult<Session> {
+    fn session_from_token(&mut self, token: &str) -> AdapterResult<Session> {
         let identity = self
             .authorization_tokens
             .iter()
@@ -95,7 +95,7 @@ impl Adapter for DummyAdapter {
         }
     }
 
-    fn get_auth(&self, _validator: &ValidatorDesc) -> AdapterResult<String> {
+    fn get_auth(&mut self, _validator: &str) -> AdapterResult<String> {
         let who = self
             .session_tokens
             .iter()
