@@ -1,5 +1,4 @@
 use crate::channel_validator::ChannelValidator;
-use crate::validator::ValidatorDesc;
 use crate::{Channel, Config};
 use std::collections::HashMap;
 use std::error::Error;
@@ -56,7 +55,7 @@ pub trait Adapter: ChannelValidator + Clone + Debug {
     fn init(opts: AdapterOptions, config: &Config) -> AdapterResult<Self::Output>;
 
     /// Unlock adapter
-    fn unlock(&self) -> AdapterResult<()>;
+    fn unlock(&mut self) -> AdapterResult<()>;
 
     /// Get Adapter whoami
     fn whoami(&self) -> String;
@@ -71,8 +70,8 @@ pub trait Adapter: ChannelValidator + Clone + Debug {
     fn validate_channel(&self, channel: &Channel) -> AdapterResult<bool>;
 
     /// Get user session from token
-    fn session_from_token(&self, token: &str) -> AdapterResult<Session>;
+    fn session_from_token(&mut self, token: &str) -> AdapterResult<Session>;
 
     /// Gets authentication for specific validator
-    fn get_auth(&self, validator: &ValidatorDesc) -> AdapterResult<String>;
+    fn get_auth(&mut self, validator_id: &str) -> AdapterResult<String>;
 }

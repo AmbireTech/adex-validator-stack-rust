@@ -69,7 +69,12 @@ async fn on_new_state<'a, A: Adapter + 'static>(
         return Ok(on_error(&iface, &new_state, InvalidNewState::RootHash).await);
     }
 
-    if !iface.adapter.verify(
+    let adapter = iface
+        .adapter
+        .read()
+        .expect("on_new_state: failed to acquire read lock adapter");
+
+    if !adapter.verify(
         &iface.channel.spec.validators.leader().id,
         &proposed_state_root,
         &new_state.signature,
@@ -87,7 +92,7 @@ async fn on_new_state<'a, A: Adapter + 'static>(
         return Ok(on_error(&iface, &new_state, InvalidNewState::Transition).await);
     }
 
-    let signature = iface.adapter.sign(&new_state.state_root)?;
+    let signature = adapter.sign(&new_state.state_root)?;
     let health_threshold = u64::from(iface.config.health_threshold_promilles).into();
 
     iface.propagate(&[&MessageTypes::ApproveState(ApproveState {

@@ -1,4 +1,4 @@
-use crate::error::ValidatorWorkerError;
+use crate::error::ValidatorWorker;
 use chrono::{DateTime, Utc};
 use futures::compat::Future01CompatExt;
 use futures::future::try_join_all;
@@ -12,26 +12,32 @@ use primitives::validator::MessageTypes;
 use primitives::{Channel, Config, ValidatorDesc};
 use reqwest::header::AUTHORIZATION;
 use reqwest::r#async::{Client, Response};
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct SentryApi<T: Adapter> {
-    pub adapter: T,
+    pub adapter: Arc<RwLock<T>>,
     pub validator_url: String,
     pub client: Client,
     pub logging: bool,
     pub channel: Channel,
     pub config: Config,
+    pub whoami: String,
 }
 
 impl<T: Adapter + 'static> SentryApi<T> {
     pub fn new(
-        adapter: T,
+        adapter: Arc<RwLock<T>>,
         channel: &Channel,
         config: &Config,
         logging: bool,
-    ) -> Result<Self, ValidatorWorkerError> {
-        let whoami = adapter.whoami();
+    ) -> Result<Self, ValidatorWorker> {
+        let whoami = adapter
+            .read()
+            .expect("new: failed to acquire read lock")
+            .whoami();
+
         let client = Client::builder()
             .timeout(Duration::from_secs(config.fetch_timeout.into()))
             .build()
@@ -54,9 +60,10 @@ impl<T: Adapter + 'static> SentryApi<T> {
                     logging,
                     channel: channel.to_owned(),
                     config: config.to_owned(),
+                    whoami,
                 })
             }
-            None => Err(ValidatorWorkerError::InvalidValidatorEntry(
+            None => Err(ValidatorWorker::Failed(
                 "we can not find validator entry for whoami".to_string(),
             )),
         }
@@ -65,22 +72,29 @@ impl<T: Adapter + 'static> SentryApi<T> {
     pub fn propagate(&self, messages: &[&MessageTypes]) {
         let serialised_messages: Vec<String> = messages
             .iter()
-            .map(|message| serde_json::to_string(message).unwrap())
+            .map(|message| serde_json::to_string(message).expect("failed to serialise message"))
             .collect();
 
+        let mut adapter = self
+            .adapter
+            .write()
+            .expect("propagate: failed to get write lock");
+
         for validator in self.channel.spec.validators.into_iter() {
-            let auth_token = self
-                .adapter
-                .get_auth(&validator)
-                .expect("Failed to get user auth token");
-            match propagate_to(
-                &auth_token,
+            let auth_token = adapter.get_auth(&validator.id);
+
+            if let Err(e) = auth_token {
+                println!("propagate error: get auth failed {}", e);
+                continue;
+            }
+
+            if let Err(e) = propagate_to(
+                &auth_token.unwrap(),
                 self.config.propagation_timeout,
                 &validator,
                 &serialised_messages,
             ) {
-                Ok(_) => {}
-                Err(e) => handle_http_error(e, &validator.url),
+                handle_http_error(e, &validator.url)
             }
         }
     }
@@ -107,8 +121,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
         &self,
         message_type: String,
     ) -> Result<ValidatorMessageResponse, reqwest::Error> {
-        let whoami = self.adapter.whoami();
-        self.get_latest_msg(whoami, message_type).await
+        self.get_latest_msg(self.whoami.clone(), message_type).await
     }
 
     pub async fn get_last_approved(&self) -> Result<LastApprovedResponse, reqwest::Error> {
@@ -137,30 +150,29 @@ impl<T: Adapter + 'static> SentryApi<T> {
     pub async fn get_event_aggregates(
         &self,
         after: DateTime<Utc>,
-    ) -> Result<EventAggregateResponse, reqwest::Error> {
-        let whoami = self.adapter.whoami();
-        let validator = self
-            .channel
-            .spec
-            .validators
-            .into_iter()
-            .find(|&v| v.id == whoami);
-        let auth_token = self
+    ) -> Result<EventAggregateResponse, Box<ValidatorWorker>> {
+        let mut adapter = self
             .adapter
-            .get_auth(validator.unwrap())
-            .expect("Failed to get user auth token");
+            .write()
+            .expect("get_event_aggregates: Failed to acquire adapter");
+
+        let auth_token = adapter
+            .get_auth(&self.whoami)
+            .map_err(|e| Box::new(ValidatorWorker::Failed(e.to_string())))?;
 
         let url = format!(
             "{}/events-aggregates?after={}",
             self.validator_url,
             after.timestamp()
         );
+
         let future = self
             .client
             .get(&url)
             .header(AUTHORIZATION, auth_token.to_string())
             .send()
-            .and_then(|mut res: Response| res.json::<EventAggregateResponse>());
+            .and_then(|mut res: Response| res.json::<EventAggregateResponse>())
+            .map_err(|e| Box::new(ValidatorWorker::Failed(e.to_string())));
 
         future.compat().await
     }
