@@ -123,7 +123,7 @@ impl EthereumChannel {
             ));
         }
 
-        if let Err(_) = BigNum::try_from(token_amount) {
+        if BigNum::try_from(token_amount).is_err() {
             return Err(ChannelError::InvalidArgument("invalid token amount".into()));
         }
 
