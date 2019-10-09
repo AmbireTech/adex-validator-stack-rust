@@ -9,7 +9,8 @@ use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
 use primitives::adapter::{Adapter, AdapterOptions};
 use primitives::config::configuration;
 use primitives::util::tests::prep_db::{AUTH, IDS};
-use sentry::not_found;
+use sentry::{not_found, bad_request};
+use primitives::Config;
 
 const DEFAULT_PORT: u16 = 8005;
 
@@ -58,7 +59,7 @@ async fn main() {
     let config = configuration(&environment, config_file).unwrap();
     let clustered = cli.is_present("clustered");
 
-    let _adapter = match cli.value_of("adapter").unwrap() {
+    let adapter = match cli.value_of("adapter").unwrap() {
         "ethereum" => {
             let keystore_file = cli
                 .value_of("keystoreFile")
@@ -84,7 +85,6 @@ async fn main() {
 
             let options = AdapterOptions {
                 dummy_identity: Some(dummy_identity.to_string()),
-                // @TODO: this should be prefilled using fixtures
                 dummy_auth: Some(IDS.clone()),
                 dummy_auth_tokens: Some(AUTH.clone()),
                 keystore_file: None,
@@ -99,17 +99,22 @@ async fn main() {
         _ => panic!("We don't have any other adapters implemented yet!"),
     };
 
-    run(clustered, port).await;
+    match adapter {
+        AdapterTypes::EthereumAdapter(adapter) => run(config, *adapter, clustered, port).await,
+        AdapterTypes::DummyAdapter(adapter) => run(config, *adapter, clustered, port).await,
+    }
+
 }
 
-//async fn run(config: Config, adapter: AdapterTypes, _clustered: bool, port: u16) {
-async fn run(_clustered: bool, port: u16) {
+async fn run(config: Config, adapter: impl Adapter + Send + 'static, _clustered: bool, port: u16) {
     let addr = ([127, 0, 0, 1], port).into();
 
-    let make_service = make_service_fn(|_| {
-        async {
-            Ok::<_, Error>(service_fn(|req| {
-                async { Ok::<_, Error>(handle_routing(req)) }
+    let make_service = make_service_fn(move |_| {
+        let adapter_config = (adapter.clone(), config.clone());
+        async move {
+            Ok::<_, Error>(service_fn(move |req| {
+                let adapter_config = adapter_config.clone();
+                async move { Ok::<_, Error>(handle_routing(req, adapter_config.0).await) }
             }))
         }
     });
@@ -121,11 +126,11 @@ async fn run(_clustered: bool, port: u16) {
     }
 }
 
-fn handle_routing(req: Request<Body>) -> Response<Body> {
-    //fn handle_routing(req: Request<Body>, _config: Arc<Config>, _adapter: Arc<AdapterTypes>) -> Response<Body> {
+async fn handle_routing(req: Request<Body>, adapter: impl Adapter) -> Response<Body> {
     if req.uri().path().starts_with("/channel") {
-        sentry::routes::channel::handle_channel_routes(req)
+        sentry::routes::channel::handle_channel_routes(req, adapter).await
     } else {
-        not_found()
+        Ok(not_found())
     }
+        .unwrap_or_else(|err| bad_request(err))
 }

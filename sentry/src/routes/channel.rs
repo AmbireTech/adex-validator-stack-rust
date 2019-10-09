@@ -1,6 +1,11 @@
 use crate::bad_request;
-use hyper::{Body, Request, Response};
+use hyper::{Body, Method, Request, Response};
 use serde::Deserialize;
+use primitives::adapter::Adapter;
+use primitives::Channel;
+use futures::stream::StreamExt;
+use futures::stream::Stream;
+use futures::TryStreamExt;
 
 #[derive(Debug, Deserialize)]
 struct ChannelListQuery {
@@ -8,7 +13,20 @@ struct ChannelListQuery {
     validator: Option<String>,
 }
 
-pub fn handle_channel_routes(req: Request<Body>) -> Response<Body> {
+pub async fn handle_channel_routes(req: Request<Body>, adapter: impl Adapter) -> Result<Response<Body>, Box<dyn std::error::Error>> {
+    // Channel Create
+    if req.uri().path() == "/channel" && req.method() == Method::POST {
+        let body = req.into_body().try_concat().await?;
+        let channel = serde_json::from_slice::<Channel>(&body)?;
+
+        return if adapter.validate_channel(&channel)? == true {
+            Ok(Response::builder().status(200).body("OK".into()).unwrap())
+        } else {
+            Err("Channel is not valid".into())
+        }
+    }
+
+    // Channel List
     if req.uri().path().starts_with("/channel/list") {
         // @TODO: Get from Config
         let _channel_find_limit = 5;
@@ -17,10 +35,12 @@ pub fn handle_channel_routes(req: Request<Body>) -> Response<Body> {
             serde_urlencoded::from_str::<ChannelListQuery>(&req.uri().query().unwrap_or(""));
 
         if query.is_err() {
-            return bad_request();
+            return Err("Query string error".into())
         }
 
+        // @TODO: List all channels returned from the DB
         println!("{:?}", query)
     }
-    Response::new(Body::from("Channel!!"))
+
+    Err("Not found".into())
 }
