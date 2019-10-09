@@ -1,10 +1,7 @@
-use crate::bad_request;
 use hyper::{Body, Method, Request, Response};
 use serde::Deserialize;
 use primitives::adapter::Adapter;
 use primitives::Channel;
-use futures::stream::StreamExt;
-use futures::stream::Stream;
 use futures::TryStreamExt;
 
 #[derive(Debug, Deserialize)]
@@ -32,11 +29,7 @@ pub async fn handle_channel_routes(req: Request<Body>, adapter: impl Adapter) ->
         let _channel_find_limit = 5;
 
         let query =
-            serde_urlencoded::from_str::<ChannelListQuery>(&req.uri().query().unwrap_or(""));
-
-        if query.is_err() {
-            return Err("Query string error".into())
-        }
+            serde_urlencoded::from_str::<ChannelListQuery>(&req.uri().query().unwrap_or(""))?;
 
         // @TODO: List all channels returned from the DB
         println!("{:?}", query)

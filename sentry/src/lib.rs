@@ -29,11 +29,8 @@ pub fn not_found() -> Response<Body> {
     response
 }
 
-pub fn bad_request(error: Option<Box<dyn std::error::Error>>) -> Response<Body> {
-    let body = match error {
-        Some(err) => Body::from(format!("Bad Request: {}", error)),
-        None => Body::empty(),
-    };
+pub fn bad_request(error: Box<dyn std::error::Error>) -> Response<Body> {
+    let body = Body::from(format!("Bad Request: {}", error));
     let mut response = Response::new(body);
     let status = response.status_mut();
     *status = StatusCode::BAD_REQUEST;
