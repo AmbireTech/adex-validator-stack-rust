@@ -1,0 +1,3 @@
+[submodule "lib/protocol-eth"]
+	path = lib/protocol-eth
+	url = https://github.com/AdExNetwork/adex-protocol-eth

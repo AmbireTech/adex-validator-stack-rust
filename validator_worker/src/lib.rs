@@ -5,12 +5,11 @@
 
 use std::error::Error;
 
+use crate::sentry_interface::SentryApi;
 use adapter::{get_balance_leaf, get_signable_state_root};
 use primitives::adapter::Adapter;
 use primitives::merkle_tree::MerkleTree;
 use primitives::BalancesMap;
-
-use crate::sentry_interface::SentryApi;
 
 pub use self::sentry_interface::all_channels;
 
@@ -52,21 +51,26 @@ mod test {
     use adapter::DummyAdapter;
     use primitives::adapter::AdapterOptions;
     use primitives::config::configuration;
-    use primitives::util::tests::prep_db::{DUMMY_CHANNEL, IDS};
+    use primitives::util::tests::prep_db::{AUTH, DUMMY_CHANNEL, IDS};
     use primitives::{BalancesMap, Channel};
+    use std::sync::{Arc, RwLock};
 
     fn setup_iface(channel: &Channel) -> SentryApi<DummyAdapter> {
-        let adapter_options = AdapterOptions {
-            dummy_identity: Some(IDS["leader"].clone()),
-            dummy_auth: None,
-            dummy_auth_tokens: None,
-            keystore_file: None,
-            keystore_pwd: None,
+        let adapter_options = AdapterOptions::DummAdapter {
+            dummy_identity: IDS["leader"].clone(),
+            dummy_auth: IDS.clone(),
+            dummy_auth_tokens: AUTH.clone(),
         };
         let config = configuration("development", None).expect("Dev config should be available");
-        let dummy_adapter = DummyAdapter::init(adapter_options, &config);
+        let dummy_adapter = DummyAdapter::init(adapter_options, &config).expect("init adadpter");
 
-        SentryApi::new(dummy_adapter, &channel, &config, false).expect("should succeed")
+        SentryApi::new(
+            Arc::new(RwLock::new(dummy_adapter)),
+            &channel,
+            &config,
+            false,
+        )
+        .expect("should succeed")
     }
 
     #[test]
