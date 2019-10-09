@@ -7,11 +7,12 @@ use primitives::{
     adapter::{Adapter, AdapterError, AdapterOptions, AdapterResult, Session},
     channel_validator::ChannelValidator,
     config::Config,
-    Channel, ValidatorDesc,
+    Channel,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::error::Error;
 use std::fs;
 use tiny_keccak::Keccak;
@@ -52,9 +53,11 @@ impl Adapter for EthereumAdapter {
     type Output = EthereumAdapter;
 
     fn init(opts: AdapterOptions, config: &Config) -> AdapterResult<EthereumAdapter> {
-        let (keystore_file, keystore_pwd) = match (opts.keystore_file, opts.keystore_pwd) {
-            (Some(file), Some(pwd)) => (file, pwd),
-            (_, _) => {
+        let (keystore_file, keystore_pwd) = match opts {
+            AdapterOptions::EthereumAdapter(keystore_opts) => {
+                (keystore_opts.keystore_file, keystore_opts.keystore_pwd)
+            }
+            _ => {
                 return Err(AdapterError::Configuration(
                     "Missing keystore json file or password".to_string(),
                 ))
@@ -139,7 +142,19 @@ impl Adapter for EthereumAdapter {
     }
 
     fn validate_channel(&self, channel: &Channel) -> AdapterResult<bool> {
-        let eth_channel: EthereumChannel = channel.into();
+        if check_validator_id_checksum(channel) {
+            return Err(AdapterError::Configuration(
+                "channel.validators: all addresses are checksummed".to_string(),
+            ));
+        }
+        // check if channel is valid
+        if let Err(e) = EthereumAdapter::is_channel_valid(&self.config, channel) {
+            return Err(AdapterError::InvalidChannel(e.to_string()));
+        }
+
+        let eth_channel = EthereumChannel::try_from(channel)
+            .map_err(|e| AdapterError::InvalidChannel(e.to_string()))?;
+
         let channel_id = eth_channel
             .hash_hex(&self.config.ethereum_core_address)
             .map_err(|_| map_error("Failed to hash the channel id"))?;
@@ -150,15 +165,6 @@ impl Adapter for EthereumAdapter {
             ));
         }
 
-        if check_validator_id_checksum(channel) {
-            return Err(AdapterError::Configuration(
-                "channel.validators: all addresses are checksummed".to_string(),
-            ));
-        }
-        // check if channel is valid
-        if let Err(error) = EthereumAdapter::is_channel_valid(&self.config, channel) {
-            return Err(AdapterError::InvalidChannel(error.to_string()));
-        }
         // query the blockchain for the channel status
         let contract_address = Address::from_slice(self.config.ethereum_core_address.as_bytes());
         let contract = get_contract(&self.config, contract_address, &ADEXCORE_ABI)
@@ -399,17 +405,16 @@ pub fn ewt_verify(
 #[cfg(test)]
 mod test {
     use super::*;
+    use primitives::adapter::KeystoreOptions;
     use primitives::config::configuration;
 
     fn setup_eth_adapter() -> EthereumAdapter {
         let config = configuration("development", None).expect("failed parse config");
-        let adapter_options = AdapterOptions {
-            keystore_file: Some("./test/resources/keystore.json".to_string()),
-            keystore_pwd: Some("adexvalidator".to_string()),
-            dummy_identity: None,
-            dummy_auth: None,
-            dummy_auth_tokens: None,
+        let keystore_options = KeystoreOptions {
+            keystore_file: "./test/resources/keystore.json".to_string(),
+            keystore_pwd: "adexvalidator".to_string(),
         };
+        let adapter_options = AdapterOptions::EthereumAdapter(keystore_options);
 
         EthereumAdapter::init(adapter_options, &config).expect("should init ethereum adapter")
     }

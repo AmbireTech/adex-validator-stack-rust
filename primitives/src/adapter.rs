@@ -34,12 +34,19 @@ impl fmt::Display for AdapterError {
 }
 
 #[derive(Debug, Clone)]
-pub struct AdapterOptions {
-    pub dummy_identity: Option<String>,
-    pub dummy_auth: Option<HashMap<String, String>>,
-    pub dummy_auth_tokens: Option<HashMap<String, String>>,
-    pub keystore_file: Option<String>,
-    pub keystore_pwd: Option<String>,
+pub enum AdapterOptions {
+    DummAdapter {
+        dummy_identity: String,
+        dummy_auth: HashMap<String, String>,
+        dummy_auth_tokens: HashMap<String, String>,
+    },
+    EthereumAdapter(KeystoreOptions),
+}
+
+#[derive(Debug, Clone)]
+pub struct KeystoreOptions {
+    pub keystore_file: String,
+    pub keystore_pwd: String,
 }
 
 #[derive(Debug, Clone)]
