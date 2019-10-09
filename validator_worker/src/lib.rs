@@ -54,12 +54,10 @@ mod test {
     use std::sync::{Arc, RwLock};
 
     fn setup_iface(channel: &Channel) -> SentryApi<DummyAdapter> {
-        let adapter_options = AdapterOptions {
-            dummy_identity: Some(IDS["leader"].clone()),
-            dummy_auth: Some(IDS.clone()),
-            dummy_auth_tokens: Some(AUTH.clone()),
-            keystore_file: None,
-            keystore_pwd: None,
+        let adapter_options = AdapterOptions::DummAdapter {
+            dummy_identity: IDS["leader"].clone(),
+            dummy_auth: IDS.clone(),
+            dummy_auth_tokens: AUTH.clone(),
         };
         let config = configuration("development", None).expect("Dev config should be available");
         let dummy_adapter = DummyAdapter::init(adapter_options, &config).expect("init adadpter");

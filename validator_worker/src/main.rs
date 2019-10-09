@@ -4,8 +4,9 @@
 use clap::{App, Arg};
 
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
-use primitives::adapter::{Adapter, AdapterOptions};
+use primitives::adapter::{Adapter, AdapterOptions, KeystoreOptions};
 use primitives::config::{configuration, Config};
+use primitives::util::tests::prep_db::{AUTH, IDS};
 
 fn main() {
     let cli = App::new("Validator worker")
@@ -59,30 +60,25 @@ fn main() {
 
     let adapter = match cli.value_of("adapter").unwrap() {
         "ethereum" => {
-            let keystore_file = cli.value_of("keystoreFile").unwrap();
-            let keystore_pwd = std::env::var("KEYSTORE_PWD").unwrap();
-
-            let options = AdapterOptions {
-                keystore_file: Some(keystore_file.to_string()),
-                keystore_pwd: Some(keystore_pwd),
-                dummy_identity: None,
-                dummy_auth: None,
-                dummy_auth_tokens: None,
+            let keystore_file = cli
+                .value_of("keystoreFile")
+                .expect("unable to get keystore file");
+            let keystore_pwd = std::env::var("KEYSTORE_PWD").expect("unable to get keystore pwd");
+            let keystore_options = KeystoreOptions {
+                keystore_file: keystore_file.to_string(),
+                keystore_pwd,
             };
+            let options = AdapterOptions::EthereumAdapter(keystore_options);
             AdapterTypes::EthereumAdapter(Box::new(
                 EthereumAdapter::init(options, &config).expect("failed to init adapter"),
             ))
         }
         "dummy" => {
             let dummy_identity = cli.value_of("dummyIdentity").unwrap();
-            let options = AdapterOptions {
-                dummy_identity: Some(dummy_identity.to_string()),
-                // this should be prefilled using fixtures
-                //
-                dummy_auth: None,
-                dummy_auth_tokens: None,
-                keystore_file: None,
-                keystore_pwd: None,
+            let options = AdapterOptions::DummAdapter {
+                dummy_identity: dummy_identity.to_string(),
+                dummy_auth: IDS.clone(),
+                dummy_auth_tokens: AUTH.clone(),
             };
             AdapterTypes::DummyAdapter(Box::new(
                 DummyAdapter::init(options, &config).expect("failed to init adapter"),
