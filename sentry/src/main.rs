@@ -10,7 +10,7 @@ use primitives::adapter::{Adapter, AdapterOptions};
 use primitives::config::configuration;
 use primitives::util::tests::prep_db::{AUTH, IDS};
 use primitives::Config;
-use sentry::{bad_request, not_found};
+use sentry::{bad_request, not_found, ResponseError};
 
 const DEFAULT_PORT: u16 = 8005;
 
@@ -129,7 +129,10 @@ async fn handle_routing(req: Request<Body>, adapter: impl Adapter) -> Response<B
     if req.uri().path().starts_with("/channel") {
         sentry::routes::channel::handle_channel_routes(req, adapter).await
     } else {
-        Ok(not_found())
+        Err(ResponseError::NotFound)
     }
-    .unwrap_or_else(|err| bad_request(err))
+    .unwrap_or_else(|response_err| match response_err {
+        ResponseError::NotFound => not_found(),
+        ResponseError::BadRequest(error) => bad_request(error),
+    })
 }

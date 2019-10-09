@@ -21,6 +21,21 @@ impl<T: Adapter> Application<T> {
     }
 }
 
+#[derive(Debug)]
+pub enum ResponseError {
+    NotFound,
+    BadRequest(Box<dyn std::error::Error>),
+}
+
+impl<T> From<T> for ResponseError
+where
+    T: std::error::Error + 'static,
+{
+    fn from(error: T) -> Self {
+        ResponseError::BadRequest(error.into())
+    }
+}
+
 pub fn not_found() -> Response<Body> {
     let mut response = Response::new(Body::from("Not found"));
     let status = response.status_mut();
