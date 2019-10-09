@@ -9,8 +9,8 @@ use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
 use primitives::adapter::{Adapter, AdapterOptions};
 use primitives::config::configuration;
 use primitives::util::tests::prep_db::{AUTH, IDS};
-use sentry::{not_found, bad_request};
 use primitives::Config;
+use sentry::{bad_request, not_found};
 
 const DEFAULT_PORT: u16 = 8005;
 
@@ -103,7 +103,6 @@ async fn main() {
         AdapterTypes::EthereumAdapter(adapter) => run(config, *adapter, clustered, port).await,
         AdapterTypes::DummyAdapter(adapter) => run(config, *adapter, clustered, port).await,
     }
-
 }
 
 async fn run(config: Config, adapter: impl Adapter + Send + 'static, _clustered: bool, port: u16) {
@@ -132,5 +131,5 @@ async fn handle_routing(req: Request<Body>, adapter: impl Adapter) -> Response<B
     } else {
         Ok(not_found())
     }
-        .unwrap_or_else(|err| bad_request(err))
+    .unwrap_or_else(|err| bad_request(err))
 }

@@ -3,7 +3,6 @@
 
 use hyper::{Body, Response, StatusCode};
 use primitives::adapter::Adapter;
-use std::error::Error;
 
 pub mod routes {
     pub mod channel;
