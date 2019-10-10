@@ -2,23 +2,9 @@
 #![deny(rust_2018_idioms)]
 
 use hyper::{Body, Response, StatusCode};
-use primitives::adapter::Adapter;
 
 pub mod routes {
     pub mod channel;
-}
-
-pub struct Application<T: Adapter> {
-    // database to be initialised
-    // storage: Storage,
-    adapter: T,
-    logger: slog::Logger,
-}
-
-impl<T: Adapter> Application<T> {
-    fn new() -> Self {
-        unimplemented!("whoopsy")
-    }
 }
 
 #[derive(Debug)]

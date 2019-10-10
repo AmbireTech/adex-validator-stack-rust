@@ -6,7 +6,7 @@ use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Error, Request, Response, Server};
 
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
-use primitives::adapter::{Adapter, AdapterOptions};
+use primitives::adapter::{Adapter, AdapterOptions, KeystoreOptions};
 use primitives::config::configuration;
 use primitives::util::tests::prep_db::{AUTH, IDS};
 use primitives::Config;
@@ -64,15 +64,12 @@ async fn main() {
             let keystore_file = cli
                 .value_of("keystoreFile")
                 .expect("keystore file is required for the ethereum adapter");
-            let keystore_pwd = std::env::var("KEYSTORE_PWD").unwrap();
+            let keystore_pwd = std::env::var("KEYSTORE_PWD").expect("unable to get keystore pwd");
 
-            let options = AdapterOptions {
-                keystore_file: Some(keystore_file.to_string()),
-                keystore_pwd: Some(keystore_pwd),
-                dummy_identity: None,
-                dummy_auth: None,
-                dummy_auth_tokens: None,
-            };
+            let options = AdapterOptions::EthereumAdapter(KeystoreOptions {
+                keystore_file: keystore_file.to_string(),
+                keystore_pwd,
+            });
             let ethereum_adapter = EthereumAdapter::init(options, &config)
                 .expect("Should initialize ethereum adapter");
 
@@ -83,12 +80,10 @@ async fn main() {
                 .value_of("dummyIdentity")
                 .expect("Dummy identity is required for the dummy adapter");
 
-            let options = AdapterOptions {
-                dummy_identity: Some(dummy_identity.to_string()),
-                dummy_auth: Some(IDS.clone()),
-                dummy_auth_tokens: Some(AUTH.clone()),
-                keystore_file: None,
-                keystore_pwd: None,
+            let options = AdapterOptions::DummAdapter {
+                dummy_identity: dummy_identity.to_string(),
+                dummy_auth: IDS.clone(),
+                dummy_auth_tokens: AUTH.clone(),
             };
 
             let dummy_adapter =
