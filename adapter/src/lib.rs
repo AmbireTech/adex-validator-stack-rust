@@ -8,10 +8,11 @@ use chrono::{DateTime, Utc};
 use ethabi::encode;
 use ethabi::param_type::ParamType;
 use ethabi::token::{LenientTokenizer, StrictTokenizer, Tokenizer};
+use primitives::channel::ChannelError;
 use primitives::BigNum;
 use primitives::Channel;
 use sha2::{Digest, Sha256};
-use std::convert::From;
+use std::convert::TryFrom;
 use tiny_keccak::Keccak;
 
 pub use self::dummy::DummyAdapter;
@@ -70,9 +71,12 @@ pub struct EthereumChannel {
     pub spec: String,
 }
 
-impl From<&Channel> for EthereumChannel {
-    fn from(channel: &Channel) -> Self {
-        let spec = serde_json::to_string(&channel.spec).expect("Failed to serialize channel spec");
+impl TryFrom<&Channel> for EthereumChannel {
+    type Error = ChannelError;
+
+    fn try_from(channel: &Channel) -> Result<Self, Self::Error> {
+        let spec = serde_json::to_string(&channel.spec)
+            .map_err(|e| ChannelError::InvalidArgument(e.to_string()))?;
 
         let mut hash = Sha256::new();
         hash.input(spec);
@@ -105,16 +109,44 @@ impl EthereumChannel {
         valid_until: DateTime<Utc>,
         validators: Vec<String>,
         spec: &str,
-    ) -> Self {
-        // @TODO some validation
-        Self {
+    ) -> Result<Self, ChannelError> {
+        // check creator addres
+        if creator != eth_checksum::checksum(creator) {
+            return Err(ChannelError::InvalidArgument(
+                "Invalid creator address".into(),
+            ));
+        }
+
+        if token_addr != eth_checksum::checksum(token_addr) {
+            return Err(ChannelError::InvalidArgument(
+                "invalid token addresss".into(),
+            ));
+        }
+
+        if BigNum::try_from(token_amount).is_err() {
+            return Err(ChannelError::InvalidArgument("invalid token amount".into()));
+        }
+
+        if spec.len() != 32 {
+            return Err(ChannelError::InvalidArgument(
+                "32 len string expected".into(),
+            ));
+        }
+
+        if validators.iter().any(|v| *v != eth_checksum::checksum(v)) {
+            return Err(ChannelError::InvalidArgument(
+                "invalid validator address: must start with a 0x and be 42 characters long".into(),
+            ));
+        }
+
+        Ok(Self {
             creator: creator.to_owned(),
             token_addr: token_addr.to_owned(),
             token_amount: token_amount.to_owned(),
             valid_until: valid_until.timestamp(),
             validators: format!("[{}]", validators.join(",")),
             spec: spec.to_owned(),
-        }
+        })
     }
 
     pub fn hash(&self, contract_addr: &str) -> Result<[u8; 32], Box<dyn Error>> {

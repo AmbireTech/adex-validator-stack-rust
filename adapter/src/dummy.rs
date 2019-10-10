@@ -1,7 +1,7 @@
 use primitives::adapter::{Adapter, AdapterError, AdapterOptions, AdapterResult, Session};
 use primitives::channel_validator::ChannelValidator;
 use primitives::config::Config;
-use primitives::{Channel, ValidatorDesc};
+use primitives::Channel;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -22,17 +22,18 @@ impl Adapter for DummyAdapter {
     type Output = DummyAdapter;
 
     fn init(opts: AdapterOptions, config: &Config) -> AdapterResult<DummyAdapter> {
-        let (identity, authorization_tokens, session_tokens) =
-            match (opts.dummy_identity, opts.dummy_auth, opts.dummy_auth_tokens) {
-                (Some(identity), Some(authorization_tokens), Some(session_tokens)) => {
-                    (identity, authorization_tokens, session_tokens)
-                }
-                (_, _, _) => {
-                    return Err(AdapterError::Configuration(
-                        "dummy_identity, dummy_auth, dummy_auth_tokens required".to_string(),
-                    ))
-                }
-            };
+        let (identity, authorization_tokens, session_tokens) = match opts {
+            AdapterOptions::DummAdapter {
+                dummy_identity,
+                dummy_auth,
+                dummy_auth_tokens,
+            } => (dummy_identity, dummy_auth, dummy_auth_tokens),
+            _ => {
+                return Err(AdapterError::Configuration(
+                    "dummy_identity, dummy_auth, dummy_auth_tokens required".to_string(),
+                ))
+            }
+        };
 
         Ok(Self {
             identity,
