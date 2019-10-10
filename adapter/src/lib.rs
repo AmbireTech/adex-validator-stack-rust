@@ -1,3 +1,7 @@
+#![deny(rust_2018_idioms)]
+#![deny(clippy::all)]
+#![deny(clippy::match_bool)]
+
 use std::error::Error;
 
 use chrono::{DateTime, Utc};
@@ -119,7 +123,7 @@ impl EthereumChannel {
             ));
         }
 
-        if let Err(_) = BigNum::try_from(token_amount) {
+        if BigNum::try_from(token_amount).is_err() {
             return Err(ChannelError::InvalidArgument("invalid token amount".into()));
         }
 

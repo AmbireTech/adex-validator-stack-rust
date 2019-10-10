@@ -114,14 +114,14 @@ impl<T: Adapter + 'static> SentryApi<T> {
             .and_then(|mut res: Response| res.json::<ValidatorMessageResponse>())
             .compat();
 
-        await!(future)
+        future.await
     }
 
     pub async fn get_our_latest_msg(
         &self,
         message_type: String,
     ) -> Result<ValidatorMessageResponse, reqwest::Error> {
-        await!(self.get_latest_msg(self.whoami.clone(), message_type))
+        self.get_latest_msg(self.whoami.clone(), message_type).await
     }
 
     pub async fn get_last_approved(&self) -> Result<LastApprovedResponse, reqwest::Error> {
@@ -131,7 +131,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
             .send()
             .and_then(|mut res: Response| res.json::<LastApprovedResponse>());
 
-        await!(future.compat())
+        future.compat().await
     }
 
     pub async fn get_last_msgs(&self) -> Result<LastApprovedResponse, reqwest::Error> {
@@ -144,7 +144,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
             .send()
             .and_then(|mut res: Response| res.json::<LastApprovedResponse>());
 
-        await!(future.compat())
+        future.compat().await
     }
 
     pub async fn get_event_aggregates(
@@ -174,7 +174,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
             .and_then(|mut res: Response| res.json::<EventAggregateResponse>())
             .map_err(|e| Box::new(ValidatorWorker::Failed(e.to_string())));
 
-        await!(future.compat())
+        future.compat().await
     }
 }
 
@@ -231,14 +231,16 @@ pub async fn all_channels(
 ) -> Result<Vec<Channel>, ()> {
     let validator = adapter.whoami();
     let url = sentry_url.to_owned();
-    let first_page = await!(fetch_page(url.clone(), 0, validator.clone()))
+    let first_page = fetch_page(url.clone(), 0, validator.clone())
+        .await
         .expect("Failed to get channels from sentry url");
     if first_page.total_pages < 2 {
         Ok(first_page.channels)
     } else {
-        let mut all: Vec<ChannelAllResponse> = await!(try_join_all(
-            (0..first_page.total_pages).map(|i| fetch_page(url.clone(), i, validator.clone()))
-        ))
+        let mut all: Vec<ChannelAllResponse> = try_join_all(
+            (0..first_page.total_pages).map(|i| fetch_page(url.clone(), i, validator.clone())),
+        )
+        .await
         .unwrap();
         all.push(first_page);
         let result_all: Vec<Channel> = all
@@ -264,5 +266,5 @@ async fn fetch_page(
         .send()
         .and_then(|mut res: Response| res.json::<ChannelAllResponse>());
 
-    await!(future.compat())
+    future.compat().await
 }

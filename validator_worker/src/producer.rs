@@ -12,7 +12,7 @@ use crate::sentry_interface::SentryApi;
 pub type Result = std::result::Result<(BalancesMap, Option<Accounting>), Box<dyn Error>>;
 
 pub async fn tick<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result {
-    let validator_msg_resp = await!(iface.get_our_latest_msg("Accounting".to_owned()))?;
+    let validator_msg_resp = iface.get_our_latest_msg("Accounting".to_owned()).await?;
 
     let accounting = validator_msg_resp
         .msg
@@ -27,7 +27,9 @@ pub async fn tick<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result {
             balances: Default::default(),
         });
 
-    let aggrs = await!(iface.get_event_aggregates(accounting.last_event_aggregate))?;
+    let aggrs = iface
+        .get_event_aggregates(accounting.last_event_aggregate)
+        .await?;
 
     if !aggrs.events.is_empty() {
         // TODO: Log the merge

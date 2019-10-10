@@ -49,11 +49,9 @@ fn merge_payouts_into_balances<'a, T: Iterator<Item = &'a AggregateEvents>>(
     let mut new_balances = balances.clone();
 
     let total = balances.values().sum();
-    let mut remaining = deposit
-        .checked_sub(&total)
-        .ok_or(DomainError::RuleViolation(
-            "remaining starts negative: total>depositAmount".to_string(),
-        ))?;
+    let mut remaining = deposit.checked_sub(&total).ok_or_else(|| {
+        DomainError::RuleViolation("remaining starts negative: total>depositAmount".to_string())
+    })?;
 
     let all_payouts = events.map(|aggr_ev| aggr_ev.event_payouts.iter()).flatten();
 
@@ -66,11 +64,9 @@ fn merge_payouts_into_balances<'a, T: Iterator<Item = &'a AggregateEvents>>(
 
         *new_balance += &to_add;
 
-        remaining = remaining
-            .checked_sub(&to_add)
-            .ok_or(DomainError::RuleViolation(
-                "remaining must never be negative".to_string(),
-            ))?;
+        remaining = remaining.checked_sub(&to_add).ok_or_else(|| {
+            DomainError::RuleViolation("remaining must never be negative".to_string())
+        })?;
     }
 
     Ok(new_balances)

@@ -43,11 +43,9 @@ pub fn get_balances_after_fees_tree(
     }
 
     let rounding_error = if deposit_amount == total_distributed {
-        deposit_to_distribute
-            .checked_sub(&total)
-            .ok_or(DomainError::RuleViolation(
-                "rounding_err should never be negative".to_owned(),
-            ))?
+        deposit_to_distribute.checked_sub(&total).ok_or_else(|| {
+            DomainError::RuleViolation("rounding_err should never be negative".to_owned())
+        })?
     } else {
         BigNum::from(0)
     };
