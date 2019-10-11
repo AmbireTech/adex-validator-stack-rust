@@ -1,5 +1,5 @@
 use crate::channel_validator::ChannelValidator;
-use crate::{Channel, Config};
+use crate::Channel;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;

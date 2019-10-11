@@ -4,7 +4,7 @@
 use clap::{App, Arg};
 
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
-use primitives::adapter::{AdapterOptions, KeystoreOptions};
+use primitives::adapter::{DummyAdapterOptions, KeystoreOptions};
 use primitives::config::configuration;
 use primitives::util::tests::prep_db::{AUTH, IDS};
 use sentry::Application;
@@ -77,14 +77,13 @@ async fn main() {
                 .value_of("dummyIdentity")
                 .expect("Dummy identity is required for the dummy adapter");
 
-            let options = DummAdapterOptions {
+            let options = DummyAdapterOptions {
                 dummy_identity: dummy_identity.to_string(),
                 dummy_auth: IDS.clone(),
                 dummy_auth_tokens: AUTH.clone(),
             };
 
-            let dummy_adapter =
-                DummyAdapter::init(options, &config).expect("Should initialize dummy adapter");
+            let dummy_adapter = DummyAdapter::init(options, &config);
             AdapterTypes::DummyAdapter(Box::new(dummy_adapter))
         }
         // @TODO exit gracefully
@@ -92,7 +91,15 @@ async fn main() {
     };
 
     match adapter {
-        AdapterTypes::EthereumAdapter(adapter) => Application::new(*adapter, config, clustered, port).run().await,
-        AdapterTypes::DummyAdapter(adapter) => Application::new(*adapter, config, clustered, port).run().await,
+        AdapterTypes::EthereumAdapter(adapter) => {
+            Application::new(*adapter, config, clustered, port)
+                .run()
+                .await
+        }
+        AdapterTypes::DummyAdapter(adapter) => {
+            Application::new(*adapter, config, clustered, port)
+                .run()
+                .await
+        }
     }
 }

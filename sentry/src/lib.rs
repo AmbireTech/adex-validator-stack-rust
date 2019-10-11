@@ -1,11 +1,11 @@
 #![deny(clippy::all)]
 #![deny(rust_2018_idioms)]
 
-use primitives::adapter::Adapter;
-use primitives::Config;
-use slog::Logger;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Error, Request, Response, Server, StatusCode};
+use primitives::adapter::Adapter;
+use primitives::Config;
+//use slog::Logger;
 
 pub mod routes {
     pub mod channel;
@@ -13,18 +13,23 @@ pub mod routes {
 
 pub struct Application<A: Adapter> {
     adapter: A,
-//    logger: slog::Logger,
+    //    logger: slog::Logger,
     clustered: bool,
     port: u16,
     config: Config,
 }
 
 impl<A: Adapter + Send + 'static> Application<A> {
-    pub fn new(adapter: A, config: Config, /*logger: Logger,*/ clustered: bool, port: u16) -> Self {
+    pub fn new(
+        adapter: A,
+        config: Config,
+        /*logger: Logger,*/ clustered: bool,
+        port: u16,
+    ) -> Self {
         Self {
             adapter,
             config,
-//            logger,
+            //            logger,
             clustered,
             port,
         }
@@ -32,6 +37,8 @@ impl<A: Adapter + Send + 'static> Application<A> {
 
     pub async fn run(&self) {
         let addr = ([127, 0, 0, 1], self.port).into();
+
+        dbg!(self.clustered);
 
         let make_service = make_service_fn(move |_| {
             let adapter_config = (self.adapter.clone(), self.config.clone());
@@ -72,10 +79,10 @@ async fn handle_routing(req: Request<Body>, adapter: impl Adapter) -> Response<B
     } else {
         Err(ResponseError::NotFound)
     }
-        .unwrap_or_else(|response_err| match response_err {
-            ResponseError::NotFound => not_found(),
-            ResponseError::BadRequest(error) => bad_request(error),
-        })
+    .unwrap_or_else(|response_err| match response_err {
+        ResponseError::NotFound => not_found(),
+        ResponseError::BadRequest(error) => bad_request(error),
+    })
 }
 
 pub fn not_found() -> Response<Body> {

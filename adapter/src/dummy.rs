@@ -1,4 +1,4 @@
-use primitives::adapter::{Adapter, AdapterError, AdapterResult, Session, DummyAdapterOptions};
+use primitives::adapter::{Adapter, AdapterError, AdapterResult, DummyAdapterOptions, Session};
 use primitives::channel_validator::ChannelValidator;
 use primitives::config::Config;
 use primitives::Channel;

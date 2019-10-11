@@ -3,6 +3,7 @@ use chrono::Utc;
 use ethkey::{public_to_address, recover, verify_address, Address, Message, Password, Signature};
 use ethstore::SafeAccount;
 use lazy_static::lazy_static;
+use primitives::adapter::KeystoreOptions;
 use primitives::{
     adapter::{Adapter, AdapterError, AdapterResult, Session},
     channel_validator::ChannelValidator,
@@ -50,19 +51,8 @@ pub struct EthereumAdapter {
 impl ChannelValidator for EthereumAdapter {}
 
 impl EthereumAdapter {
-    pub fn init(opts: AdapterOptions, config: &Config) -> AdapterResult<EthereumAdapter> {
-        let (keystore_file, keystore_pwd) = match opts {
-            AdapterOptions::EthereumAdapter(keystore_opts) => {
-                (keystore_opts.keystore_file, keystore_opts.keystore_pwd)
-            }
-            _ => {
-                return Err(AdapterError::Configuration(
-                    "Missing keystore json file or password".to_string(),
-                ))
-            }
-        };
-
-        let keystore_contents = fs::read_to_string(&keystore_file)
+    pub fn init(opts: KeystoreOptions, config: &Config) -> AdapterResult<EthereumAdapter> {
+        let keystore_contents = fs::read_to_string(&opts.keystore_file)
             .map_err(|_| map_error("Invalid keystore location provided"))?;
 
         let keystore_json: Value = serde_json::from_str(&keystore_contents)
@@ -80,7 +70,7 @@ impl EthereumAdapter {
         Ok(Self {
             address,
             keystore_json,
-            keystore_pwd: keystore_pwd.into(),
+            keystore_pwd: opts.keystore_pwd.into(),
             session_tokens: HashMap::new(),
             authorization_tokens: HashMap::new(),
             wallet: None,
@@ -414,9 +404,8 @@ mod test {
             keystore_file: "./test/resources/keystore.json".to_string(),
             keystore_pwd: "adexvalidator".to_string(),
         };
-        let adapter_options = AdapterOptions::EthereumAdapter(keystore_options);
 
-        EthereumAdapter::init(adapter_options, &config).expect("should init ethereum adapter")
+        EthereumAdapter::init(keystore_options, &config).expect("should init ethereum adapter")
     }
 
     #[test]
