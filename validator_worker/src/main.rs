@@ -7,21 +7,17 @@ use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
 use futures::compat::Future01CompatExt;
 use futures::future::try_join_all;
 use futures::future::{join, FutureExt, TryFutureExt};
-use std::ops::Add;
-use std::time::{Duration, Instant};
-use tokio::timer::Delay;
-use tokio::util::FutureExt as TokioFutureExt;
 use futures::lock::Mutex;
-
 use primitives::adapter::{Adapter, AdapterOptions, KeystoreOptions};
 use primitives::config::{configuration, Config};
 use primitives::util::tests::prep_db::{AUTH, IDS};
-use primitives::{Channel};
-use std::error::Error;
-use std::sync::{Arc, RwLock};
+use primitives::Channel;
+use std::ops::Add;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+use tokio::timer::Delay;
+use tokio::util::FutureExt as TokioFutureExt;
 use validator_worker::{all_channels, follower, leader, SentryApi};
-
-const VALIDATOR_TICK_TIMEOUT: u64 = 5000;
 
 fn main() {
     let cli = App::new("Validator worker")
@@ -114,25 +110,51 @@ fn main() {
 }
 
 fn run<A: Adapter + 'static>(is_single_tick: bool, sentry_url: &str, config: &Config, adapter: A) {
-    let _adapter = adapter.clone();
     let _config = config.clone();
+    let sentry_adapter = Arc::new(Mutex::new(adapter.clone()));
+    let whoami = adapter.whoami();
 
     if is_single_tick {
-        tokio::run(iterate_channels(sentry_url, config, _adapter).boxed())
+        tokio::run(
+            iterate_channels(
+                sentry_url.to_owned(),
+                config.clone(),
+                sentry_adapter.clone(),
+                whoami.clone(),
+            )
+            .boxed()
+            .compat(),
+        );
     } else {
-        tokio::run(infinite(sentry_url, config, _adapter).boxed())
+        tokio::run(
+            infinite(
+                sentry_url.to_owned(),
+                config.clone(),
+                sentry_adapter.clone(),
+                whoami.clone(),
+            )
+            .boxed()
+            .compat(),
+        );
     }
 }
 
 async fn infinite<A: Adapter + 'static>(
-    sentry_url: &str,
-    config: &Config,
-    adapter: A,
+    sentry_url: String,
+    config: Config,
+    adapter: Arc<Mutex<A>>,
+    whoami: String,
 ) -> Result<(), ()> {
     loop {
-        let delay_future = Delay::new(Instant::now().add(config.wait_time));
+        let delay_future =
+            Delay::new(Instant::now().add(Duration::from_secs(config.wait_time as u64)));
         let joined = join(
-            iterate_channels(sentry_url, config, _adapter),
+            iterate_channels(
+                sentry_url.clone(),
+                config.clone(),
+                adapter.clone(),
+                whoami.clone(),
+            ),
             delay_future.compat(),
         );
         joined.await;
@@ -140,60 +162,75 @@ async fn infinite<A: Adapter + 'static>(
 }
 
 async fn iterate_channels<A: Adapter + 'static>(
-    sentry_url: &str,
-    config: &Config,
-    adapter: A,
-) -> Result<(), Box<dyn Error>> {
-    let whoami = adapter.whoami();
-    let channels = all_channels(&sentry_url, whoami.clone())
+    sentry_url: String,
+    config: Config,
+    adapter: Arc<Mutex<A>>,
+    whoami: String,
+) -> Result<(), ()> {
+    let channels = all_channels(&sentry_url, whoami.to_owned())
         .await
         .expect("Failed to get channels");
 
     println!("{:?}", channels);
+    let channels_size = channels.len();
 
-    let sentry_adapter = Arc::new(Mutex::new(adapter));
-
-    let mut all = try_join_all(
+    try_join_all(
         channels
             .into_iter()
-            .map(|channel| validator_tick(sentry_adapter.clone(), &channel, config, &whoami)),
+            .map(|channel| validator_tick(adapter.clone(), channel, &config, &whoami)),
     )
     .await
-    .unwrap();
+    .expect("Failed to iterate channels");
+
+    println!("processed {} channels", channels_size);
+    if channels_size >= config.max_channels as usize {
+        println!(
+            "WARNING: channel limit cfg.MAX_CHANNELS={} reached",
+            config.max_channels
+        )
+    }
 
     Ok(())
 }
 
 async fn validator_tick<A: Adapter + 'static>(
     adapter: Arc<Mutex<A>>,
-    channel: &Channel,
+    channel: Channel,
     config: &Config,
-    whoami: &str
+    whoami: &str,
 ) -> Result<(), ()> {
-    let sentry = SentryApi::new(adapter, &channel, &config, true, whoami)
-        .expect("Failed to init sentry");
+    let sentry =
+        SentryApi::new(adapter, &channel, &config, true, whoami).expect("Failed to init sentry");
     let index = channel
         .spec
         .validators
         .into_iter()
         .position(|v| v.id == *whoami);
-    let result = match index {
+    match index {
         Some(0) => {
-            let result = leader::tick(&sentry)
+            if let Err(e) = leader::tick(&sentry)
                 .boxed()
                 .compat()
-                .timeout(Duration::from_secs(5))
+                .timeout(Duration::from_secs(config.validator_tick_timeout as u64))
                 .compat()
-                .await;
+                .await
+            {
+                eprintln!("{}", e);
+            }
         }
         Some(1) => {
-            let result = follower::tick(&sentry)
+            if let Err(e) = follower::tick(&sentry)
                 .boxed()
                 .compat()
-                .timeout(Duration::from_secs(5))
+                .timeout(Duration::from_secs(config.validator_tick_timeout as u64))
                 .compat()
-                .await;
+                .await
+            {
+                eprintln!("{}", e);
+            }
         }
+        Some(_) => eprintln!("validatorTick: processing a channel where we are not validating"),
+        None => eprintln!("validatorTick: processing a channel where we are not validating"),
     };
     Ok(())
 }

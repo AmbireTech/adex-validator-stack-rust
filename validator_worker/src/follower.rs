@@ -69,10 +69,7 @@ async fn on_new_state<'a, A: Adapter + 'static>(
         return Ok(on_error(&iface, &new_state, InvalidNewState::RootHash).await);
     }
 
-    let adapter = iface
-        .adapter
-        .lock()
-        .await;
+    let adapter = iface.adapter.lock().await;
 
     if !adapter.verify(
         &iface.channel.spec.validators.leader().id,

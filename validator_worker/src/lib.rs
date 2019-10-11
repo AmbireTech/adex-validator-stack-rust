@@ -46,12 +46,12 @@ mod test {
     use super::*;
 
     use adapter::DummyAdapter;
+    use futures::lock::Mutex;
     use primitives::adapter::AdapterOptions;
     use primitives::config::configuration;
     use primitives::util::tests::prep_db::{AUTH, DUMMY_CHANNEL, IDS};
     use primitives::{BalancesMap, Channel};
-    use std::sync::{Arc};
-    use futures::lock::Mutex;
+    use std::sync::Arc;
 
     fn setup_iface(channel: &Channel) -> SentryApi<DummyAdapter> {
         let adapter_options = AdapterOptions::DummAdapter {
@@ -68,7 +68,7 @@ mod test {
             &channel,
             &config,
             false,
-            &whoami
+            &whoami,
         )
         .expect("should succeed")
     }

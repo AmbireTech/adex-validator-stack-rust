@@ -2,6 +2,7 @@ use crate::error::ValidatorWorker;
 use chrono::{DateTime, Utc};
 use futures::compat::Future01CompatExt;
 use futures::future::try_join_all;
+use futures::lock::Mutex;
 use futures_legacy::Future as LegacyFuture;
 use primitives::adapter::Adapter;
 use primitives::sentry::{
@@ -12,8 +13,7 @@ use primitives::validator::MessageTypes;
 use primitives::{Channel, Config, ValidatorDesc};
 use reqwest::header::AUTHORIZATION;
 use reqwest::r#async::{Client, Response};
-use std::sync::{Arc};
-use futures::lock::Mutex;
+use std::sync::Arc;
 use std::time::Duration;
 
 #[derive(Debug, Clone)]
@@ -33,7 +33,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
         channel: &Channel,
         config: &Config,
         logging: bool,
-        whoami: &str
+        whoami: &str,
     ) -> Result<Self, ValidatorWorker> {
         let client = Client::builder()
             .timeout(Duration::from_secs(config.fetch_timeout.into()))
@@ -72,10 +72,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
             .map(|message| serde_json::to_string(message).expect("failed to serialise message"))
             .collect();
 
-        let mut adapter = self
-            .adapter
-            .lock()
-            .await;
+        let mut adapter = self.adapter.lock().await;
 
         for validator in self.channel.spec.validators.into_iter() {
             let auth_token = adapter.get_auth(&validator.id);
@@ -148,10 +145,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
         &self,
         after: DateTime<Utc>,
     ) -> Result<EventAggregateResponse, Box<ValidatorWorker>> {
-        let mut adapter = self
-            .adapter
-            .lock()
-            .await;
+        let mut adapter = self.adapter.lock().await;
 
         let auth_token = adapter
             .get_auth(&self.whoami)
