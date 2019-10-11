@@ -71,8 +71,8 @@ async fn on_new_state<'a, A: Adapter + 'static>(
 
     let adapter = iface
         .adapter
-        .read()
-        .expect("on_new_state: failed to acquire read lock adapter");
+        .lock()
+        .await;
 
     if !adapter.verify(
         &iface.channel.spec.validators.leader().id,

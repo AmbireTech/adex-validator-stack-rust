@@ -25,8 +25,8 @@ async fn send_heartbeat<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result<()
     let state_root = hex::encode(state_root_raw);
     let signature = iface
         .adapter
-        .read()
-        .expect("send_heartbeat: failed to acquire adapter read lock")
+        .lock()
+        .await
         .sign(&state_root)?;
 
     let message_types = MessageTypes::Heartbeat(Heartbeat {

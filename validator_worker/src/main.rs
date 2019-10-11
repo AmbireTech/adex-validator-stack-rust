@@ -4,9 +4,24 @@
 use clap::{App, Arg};
 
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
+use futures::compat::Future01CompatExt;
+use futures::future::try_join_all;
+use futures::future::{join, FutureExt, TryFutureExt};
+use std::ops::Add;
+use std::time::{Duration, Instant};
+use tokio::timer::Delay;
+use tokio::util::FutureExt as TokioFutureExt;
+use futures::lock::Mutex;
+
 use primitives::adapter::{Adapter, AdapterOptions, KeystoreOptions};
 use primitives::config::{configuration, Config};
 use primitives::util::tests::prep_db::{AUTH, IDS};
+use primitives::{Channel};
+use std::error::Error;
+use std::sync::{Arc, RwLock};
+use validator_worker::{all_channels, follower, leader, SentryApi};
+
+const VALIDATOR_TICK_TIMEOUT: u64 = 5000;
 
 fn main() {
     let cli = App::new("Validator worker")
@@ -98,26 +113,87 @@ fn main() {
     }
 }
 
-// @TODO work in separate pull request
-fn run(_is_single_tick: bool, sentry: &str, config: &Config, adapter: impl Adapter + 'static) {
-    let _sentry_url = sentry.to_owned();
-    let _adapter = adapter;
+fn run<A: Adapter + 'static>(is_single_tick: bool, sentry_url: &str, config: &Config, adapter: A) {
+    let _adapter = adapter.clone();
     let _config = config.clone();
 
-    // let result = async move {
-    //     let channels = await!(all_channels(&sentry_url, adapter.clone())).unwrap();
-    //     println!("{:?}", channels);
-    //     for channel in channels.into_iter() {
-    //         let sentry = SentryApi::new(adapter.clone(), &channel, &config, true);
-    //         let whoami = adapter.whoami();
-    //         let index = channel.spec.validators.into_iter().position(|v| v.id == whoami);
-    //         let tick = match index {
-    //             Some(0) => Leader.tick(&channel),
-    //             Some(1) => Follower.tick(&channel)
-    //         };
-    //     }
-    //     Ok(())
-    // };
-    // @TODO hanlde errors more gracefully
-    // tokio::run(result.map_err(|e: Box<dyn Error>| panic!("{}", e)).boxed().compat())
+    if is_single_tick {
+        tokio::run(iterate_channels(sentry_url, config, _adapter).boxed())
+    } else {
+        tokio::run(infinite(sentry_url, config, _adapter).boxed())
+    }
+}
+
+async fn infinite<A: Adapter + 'static>(
+    sentry_url: &str,
+    config: &Config,
+    adapter: A,
+) -> Result<(), ()> {
+    loop {
+        let delay_future = Delay::new(Instant::now().add(config.wait_time));
+        let joined = join(
+            iterate_channels(sentry_url, config, _adapter),
+            delay_future.compat(),
+        );
+        joined.await;
+    }
+}
+
+async fn iterate_channels<A: Adapter + 'static>(
+    sentry_url: &str,
+    config: &Config,
+    adapter: A,
+) -> Result<(), Box<dyn Error>> {
+    let whoami = adapter.whoami();
+    let channels = all_channels(&sentry_url, whoami.clone())
+        .await
+        .expect("Failed to get channels");
+
+    println!("{:?}", channels);
+
+    let sentry_adapter = Arc::new(Mutex::new(adapter));
+
+    let mut all = try_join_all(
+        channels
+            .into_iter()
+            .map(|channel| validator_tick(sentry_adapter.clone(), &channel, config, &whoami)),
+    )
+    .await
+    .unwrap();
+
+    Ok(())
+}
+
+async fn validator_tick<A: Adapter + 'static>(
+    adapter: Arc<Mutex<A>>,
+    channel: &Channel,
+    config: &Config,
+    whoami: &str
+) -> Result<(), ()> {
+    let sentry = SentryApi::new(adapter, &channel, &config, true, whoami)
+        .expect("Failed to init sentry");
+    let index = channel
+        .spec
+        .validators
+        .into_iter()
+        .position(|v| v.id == *whoami);
+    let result = match index {
+        Some(0) => {
+            let result = leader::tick(&sentry)
+                .boxed()
+                .compat()
+                .timeout(Duration::from_secs(5))
+                .compat()
+                .await;
+        }
+        Some(1) => {
+            let result = follower::tick(&sentry)
+                .boxed()
+                .compat()
+                .timeout(Duration::from_secs(5))
+                .compat()
+                .await;
+        }
+    };
+    Ok(())
 }

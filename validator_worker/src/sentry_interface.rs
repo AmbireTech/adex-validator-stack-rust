@@ -12,12 +12,13 @@ use primitives::validator::MessageTypes;
 use primitives::{Channel, Config, ValidatorDesc};
 use reqwest::header::AUTHORIZATION;
 use reqwest::r#async::{Client, Response};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc};
+use futures::lock::Mutex;
 use std::time::Duration;
 
 #[derive(Debug, Clone)]
 pub struct SentryApi<T: Adapter> {
-    pub adapter: Arc<RwLock<T>>,
+    pub adapter: Arc<Mutex<T>>,
     pub validator_url: String,
     pub client: Client,
     pub logging: bool,
@@ -28,16 +29,12 @@ pub struct SentryApi<T: Adapter> {
 
 impl<T: Adapter + 'static> SentryApi<T> {
     pub fn new(
-        adapter: Arc<RwLock<T>>,
+        adapter: Arc<Mutex<T>>,
         channel: &Channel,
         config: &Config,
         logging: bool,
+        whoami: &str
     ) -> Result<Self, ValidatorWorker> {
-        let whoami = adapter
-            .read()
-            .expect("new: failed to acquire read lock")
-            .whoami();
-
         let client = Client::builder()
             .timeout(Duration::from_secs(config.fetch_timeout.into()))
             .build()
@@ -60,7 +57,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
                     logging,
                     channel: channel.to_owned(),
                     config: config.to_owned(),
-                    whoami,
+                    whoami: whoami.to_owned(),
                 })
             }
             None => Err(ValidatorWorker::Failed(
@@ -69,7 +66,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
         }
     }
 
-    pub fn propagate(&self, messages: &[&MessageTypes]) {
+    pub async fn propagate(&self, messages: &[&MessageTypes]) {
         let serialised_messages: Vec<String> = messages
             .iter()
             .map(|message| serde_json::to_string(message).expect("failed to serialise message"))
@@ -77,8 +74,8 @@ impl<T: Adapter + 'static> SentryApi<T> {
 
         let mut adapter = self
             .adapter
-            .write()
-            .expect("propagate: failed to get write lock");
+            .lock()
+            .await;
 
         for validator in self.channel.spec.validators.into_iter() {
             let auth_token = adapter.get_auth(&validator.id);
@@ -153,8 +150,8 @@ impl<T: Adapter + 'static> SentryApi<T> {
     ) -> Result<EventAggregateResponse, Box<ValidatorWorker>> {
         let mut adapter = self
             .adapter
-            .write()
-            .expect("get_event_aggregates: Failed to acquire adapter");
+            .lock()
+            .await;
 
         let auth_token = adapter
             .get_auth(&self.whoami)
@@ -225,20 +222,16 @@ fn handle_http_error(e: reqwest::Error, url: &str) {
     }
 }
 
-pub async fn all_channels(
-    sentry_url: &str,
-    adapter: impl Adapter + 'static,
-) -> Result<Vec<Channel>, ()> {
-    let validator = adapter.whoami();
+pub async fn all_channels(sentry_url: &str, whoami: String) -> Result<Vec<Channel>, ()> {
     let url = sentry_url.to_owned();
-    let first_page = fetch_page(url.clone(), 0, validator.clone())
+    let first_page = fetch_page(url.clone(), 0, whoami.clone())
         .await
         .expect("Failed to get channels from sentry url");
     if first_page.total_pages < 2 {
         Ok(first_page.channels)
     } else {
         let mut all: Vec<ChannelAllResponse> = try_join_all(
-            (0..first_page.total_pages).map(|i| fetch_page(url.clone(), i, validator.clone())),
+            (0..first_page.total_pages).map(|i| fetch_page(url.clone(), i, whoami.clone())),
         )
         .await
         .unwrap();
