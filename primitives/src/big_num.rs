@@ -91,7 +91,7 @@ impl Add<&BigNum> for &BigNum {
 
     fn add(self, rhs: &BigNum) -> Self::Output {
         let big_uint = &self.0 + &rhs.0;
-        BigNum(big_uint.to_owned())
+        BigNum(big_uint)
     }
 }
 
@@ -106,7 +106,7 @@ impl Sub<&BigNum> for &BigNum {
 
     fn sub(self, rhs: &BigNum) -> Self::Output {
         let big_uint = &self.0 - &rhs.0;
-        BigNum(big_uint.to_owned())
+        BigNum(big_uint)
     }
 }
 
@@ -115,7 +115,7 @@ impl Div<&BigNum> for &BigNum {
 
     fn div(self, rhs: &BigNum) -> Self::Output {
         let big_uint = &self.0 / &rhs.0;
-        BigNum(big_uint.to_owned())
+        BigNum(big_uint)
     }
 }
 
@@ -124,7 +124,7 @@ impl Div<&BigNum> for BigNum {
 
     fn div(self, rhs: &BigNum) -> Self::Output {
         let big_uint = &self.0 / &rhs.0;
-        BigNum(big_uint.to_owned())
+        BigNum(big_uint)
     }
 }
 
@@ -133,7 +133,7 @@ impl Mul<&BigNum> for &BigNum {
 
     fn mul(self, rhs: &BigNum) -> Self::Output {
         let big_uint = &self.0 * &rhs.0;
-        BigNum(big_uint.to_owned())
+        BigNum(big_uint)
     }
 }
 
@@ -142,7 +142,7 @@ impl Mul<&BigNum> for BigNum {
 
     fn mul(self, rhs: &BigNum) -> Self::Output {
         let big_uint = &self.0 * &rhs.0;
-        BigNum(big_uint.to_owned())
+        BigNum(big_uint)
     }
 }
 
