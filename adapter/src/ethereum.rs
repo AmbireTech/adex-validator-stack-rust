@@ -3,9 +3,8 @@ use chrono::Utc;
 use ethkey::{public_to_address, recover, verify_address, Address, Message, Password, Signature};
 use ethstore::SafeAccount;
 use lazy_static::lazy_static;
-use primitives::adapter::KeystoreOptions;
 use primitives::{
-    adapter::{Adapter, AdapterError, AdapterResult, Session},
+    adapter::{Adapter, AdapterError, AdapterResult, KeystoreOptions, Session},
     channel_validator::ChannelValidator,
     config::Config,
     Channel,
