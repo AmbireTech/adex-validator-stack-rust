@@ -1,4 +1,4 @@
-use primitives::adapter::{Adapter, AdapterError, AdapterOptions, AdapterResult, Session};
+use primitives::adapter::{Adapter, AdapterError, AdapterResult, Session, DummyAdapterOptions};
 use primitives::channel_validator::ChannelValidator;
 use primitives::config::Config;
 use primitives::Channel;
@@ -18,31 +18,18 @@ pub struct DummyAdapter {
 // check if a channel is valid
 impl ChannelValidator for DummyAdapter {}
 
-impl Adapter for DummyAdapter {
-    type Output = DummyAdapter;
-
-    fn init(opts: AdapterOptions, config: &Config) -> AdapterResult<DummyAdapter> {
-        let (identity, authorization_tokens, session_tokens) = match opts {
-            AdapterOptions::DummAdapter {
-                dummy_identity,
-                dummy_auth,
-                dummy_auth_tokens,
-            } => (dummy_identity, dummy_auth, dummy_auth_tokens),
-            _ => {
-                return Err(AdapterError::Configuration(
-                    "dummy_identity, dummy_auth, dummy_auth_tokens required".to_string(),
-                ))
-            }
-        };
-
-        Ok(Self {
-            identity,
+impl DummyAdapter {
+    pub fn init(opts: DummyAdapterOptions, config: &Config) -> Self {
+        Self {
+            identity: opts.dummy_identity,
             config: config.to_owned(),
-            session_tokens,
-            authorization_tokens,
-        })
+            session_tokens: opts.dummy_auth_tokens,
+            authorization_tokens: opts.dummy_auth,
+        }
     }
+}
 
+impl Adapter for DummyAdapter {
     fn unlock(&mut self) -> AdapterResult<()> {
         Ok(())
     }

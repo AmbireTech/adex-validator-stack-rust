@@ -33,14 +33,10 @@ impl fmt::Display for AdapterError {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum AdapterOptions {
-    DummAdapter {
-        dummy_identity: String,
-        dummy_auth: HashMap<String, String>,
-        dummy_auth_tokens: HashMap<String, String>,
-    },
-    EthereumAdapter(KeystoreOptions),
+pub struct DummyAdapterOptions {
+    pub dummy_identity: String,
+    pub dummy_auth: HashMap<String, String>,
+    pub dummy_auth_tokens: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone)]
@@ -56,11 +52,6 @@ pub struct Session {
 }
 
 pub trait Adapter: ChannelValidator + Clone + Debug {
-    type Output;
-
-    /// Initialize adapter
-    fn init(opts: AdapterOptions, config: &Config) -> AdapterResult<Self::Output>;
-
     /// Unlock adapter
     fn unlock(&mut self) -> AdapterResult<()>;
 

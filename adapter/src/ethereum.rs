@@ -4,7 +4,7 @@ use ethkey::{public_to_address, recover, verify_address, Address, Message, Passw
 use ethstore::SafeAccount;
 use lazy_static::lazy_static;
 use primitives::{
-    adapter::{Adapter, AdapterError, AdapterOptions, AdapterResult, Session},
+    adapter::{Adapter, AdapterError, AdapterResult, Session},
     channel_validator::ChannelValidator,
     config::Config,
     Channel,
@@ -49,10 +49,8 @@ pub struct EthereumAdapter {
 // check if a channel is valid
 impl ChannelValidator for EthereumAdapter {}
 
-impl Adapter for EthereumAdapter {
-    type Output = EthereumAdapter;
-
-    fn init(opts: AdapterOptions, config: &Config) -> AdapterResult<EthereumAdapter> {
+impl EthereumAdapter {
+    pub fn init(opts: AdapterOptions, config: &Config) -> AdapterResult<EthereumAdapter> {
         let (keystore_file, keystore_pwd) = match opts {
             AdapterOptions::EthereumAdapter(keystore_opts) => {
                 (keystore_opts.keystore_file, keystore_opts.keystore_pwd)
@@ -89,7 +87,9 @@ impl Adapter for EthereumAdapter {
             config: config.to_owned(),
         })
     }
+}
 
+impl Adapter for EthereumAdapter {
     fn unlock(&mut self) -> AdapterResult<()> {
         let account = SafeAccount::from_file(
             serde_json::from_value(self.keystore_json.clone())
