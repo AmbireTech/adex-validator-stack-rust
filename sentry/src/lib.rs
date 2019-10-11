@@ -1,10 +1,54 @@
 #![deny(clippy::all)]
 #![deny(rust_2018_idioms)]
 
-use hyper::{Body, Response, StatusCode};
+use primitives::adapter::Adapter;
+use primitives::Config;
+use slog::Logger;
+use hyper::service::{make_service_fn, service_fn};
+use hyper::{Body, Error, Request, Response, Server, StatusCode};
 
 pub mod routes {
     pub mod channel;
+}
+
+pub struct Application<A: Adapter> {
+    adapter: A,
+//    logger: slog::Logger,
+    clustered: bool,
+    port: u16,
+    config: Config,
+}
+
+impl<A: Adapter + Send + 'static> Application<A> {
+    pub fn new(adapter: A, config: Config, /*logger: Logger,*/ clustered: bool, port: u16) -> Self {
+        Self {
+            adapter,
+            config,
+//            logger,
+            clustered,
+            port,
+        }
+    }
+
+    pub async fn run(&self) {
+        let addr = ([127, 0, 0, 1], self.port).into();
+
+        let make_service = make_service_fn(move |_| {
+            let adapter_config = (self.adapter.clone(), self.config.clone());
+            async move {
+                Ok::<_, Error>(service_fn(move |req| {
+                    let adapter_config = adapter_config.clone();
+                    async move { Ok::<_, Error>(handle_routing(req, adapter_config.0).await) }
+                }))
+            }
+        });
+
+        let server = Server::bind(&addr).serve(make_service);
+
+        if let Err(e) = server.await {
+            eprintln!("server error: {}", e);
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -20,6 +64,18 @@ where
     fn from(error: T) -> Self {
         ResponseError::BadRequest(error.into())
     }
+}
+
+async fn handle_routing(req: Request<Body>, adapter: impl Adapter) -> Response<Body> {
+    if req.uri().path().starts_with("/channel") {
+        crate::routes::channel::handle_channel_routes(req, adapter).await
+    } else {
+        Err(ResponseError::NotFound)
+    }
+        .unwrap_or_else(|response_err| match response_err {
+            ResponseError::NotFound => not_found(),
+            ResponseError::BadRequest(error) => bad_request(error),
+        })
 }
 
 pub fn not_found() -> Response<Body> {

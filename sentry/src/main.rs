@@ -2,15 +2,12 @@
 #![deny(rust_2018_idioms)]
 
 use clap::{App, Arg};
-use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Error, Request, Response, Server};
 
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
-use primitives::adapter::{Adapter, AdapterOptions, KeystoreOptions};
+use primitives::adapter::{AdapterOptions, KeystoreOptions};
 use primitives::config::configuration;
 use primitives::util::tests::prep_db::{AUTH, IDS};
-use primitives::Config;
-use sentry::{bad_request, not_found, ResponseError};
+use sentry::Application;
 
 const DEFAULT_PORT: u16 = 8005;
 
@@ -66,10 +63,10 @@ async fn main() {
                 .expect("keystore file is required for the ethereum adapter");
             let keystore_pwd = std::env::var("KEYSTORE_PWD").expect("unable to get keystore pwd");
 
-            let options = AdapterOptions::EthereumAdapter(KeystoreOptions {
+            let options = KeystoreOptions {
                 keystore_file: keystore_file.to_string(),
                 keystore_pwd,
-            });
+            };
             let ethereum_adapter = EthereumAdapter::init(options, &config)
                 .expect("Should initialize ethereum adapter");
 
@@ -80,7 +77,7 @@ async fn main() {
                 .value_of("dummyIdentity")
                 .expect("Dummy identity is required for the dummy adapter");
 
-            let options = AdapterOptions::DummAdapter {
+            let options = DummAdapterOptions {
                 dummy_identity: dummy_identity.to_string(),
                 dummy_auth: IDS.clone(),
                 dummy_auth_tokens: AUTH.clone(),
@@ -95,39 +92,7 @@ async fn main() {
     };
 
     match adapter {
-        AdapterTypes::EthereumAdapter(adapter) => run(config, *adapter, clustered, port).await,
-        AdapterTypes::DummyAdapter(adapter) => run(config, *adapter, clustered, port).await,
+        AdapterTypes::EthereumAdapter(adapter) => Application::new(*adapter, config, clustered, port).run().await,
+        AdapterTypes::DummyAdapter(adapter) => Application::new(*adapter, config, clustered, port).run().await,
     }
-}
-
-async fn run(config: Config, adapter: impl Adapter + Send + 'static, _clustered: bool, port: u16) {
-    let addr = ([127, 0, 0, 1], port).into();
-
-    let make_service = make_service_fn(move |_| {
-        let adapter_config = (adapter.clone(), config.clone());
-        async move {
-            Ok::<_, Error>(service_fn(move |req| {
-                let adapter_config = adapter_config.clone();
-                async move { Ok::<_, Error>(handle_routing(req, adapter_config.0).await) }
-            }))
-        }
-    });
-
-    let server = Server::bind(&addr).serve(make_service);
-
-    if let Err(e) = server.await {
-        eprintln!("server error: {}", e);
-    }
-}
-
-async fn handle_routing(req: Request<Body>, adapter: impl Adapter) -> Response<Body> {
-    if req.uri().path().starts_with("/channel") {
-        sentry::routes::channel::handle_channel_routes(req, adapter).await
-    } else {
-        Err(ResponseError::NotFound)
-    }
-    .unwrap_or_else(|response_err| match response_err {
-        ResponseError::NotFound => not_found(),
-        ResponseError::BadRequest(error) => bad_request(error),
-    })
 }
