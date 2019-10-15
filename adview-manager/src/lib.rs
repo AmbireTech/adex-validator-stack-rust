@@ -291,7 +291,7 @@ fn get_unit_html(
         </div>
     ", target_url = ad_unit.target_url, size = style_size, element_html = element_html, adex_icon = adex_icon);
 
-    result.to_string()
+    result
 }
 
 #[cfg(test)]

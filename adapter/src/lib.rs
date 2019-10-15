@@ -175,7 +175,7 @@ impl EthereumChannel {
 
     pub fn hash_hex(&self, contract_addr: &str) -> Result<String, Box<dyn Error>> {
         let result = self.hash(contract_addr)?;
-        Ok(format!("0x{}", hex::encode(result).to_string()))
+        Ok(format!("0x{}", hex::encode(result)))
     }
 
     pub fn to_solidity_tuple(&self) -> Vec<String> {
@@ -203,7 +203,7 @@ impl EthereumChannel {
         balance_root: &str,
     ) -> Result<String, Box<dyn Error>> {
         let result = self.hash_to_sign(contract_addr, balance_root)?;
-        Ok(format!("0x{}", hex::encode(result).to_string()))
+        Ok(format!("0x{}", hex::encode(result)))
     }
 }
 
