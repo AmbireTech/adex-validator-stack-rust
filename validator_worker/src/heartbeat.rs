@@ -31,7 +31,7 @@ async fn send_heartbeat<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result<()
         timestamp: Utc::now(),
     });
 
-    iface.propagate(&[&message_types]);
+    iface.propagate(&[&message_types]).await;
 
     Ok(())
 }
@@ -42,13 +42,10 @@ pub async fn heartbeat<A: Adapter + 'static>(
 ) -> Result<(), Box<dyn Error>> {
     let validator_message_response = iface.get_our_latest_msg("Heartbeat".into()).await?;
 
-    let heartbeat_msg = validator_message_response
-        .msg
-        .get(0)
-        .and_then(|message_types| match message_types {
-            MessageTypes::Heartbeat(heartbeat) => Some(heartbeat.clone()),
-            _ => None,
-        });
+    let heartbeat_msg = match validator_message_response {
+        Some(MessageTypes::Heartbeat(heartbeat)) => Some(heartbeat.clone()),
+        _ => None,
+    };
 
     let should_send = heartbeat_msg.map_or(true, |heartbeat| {
         let duration = Utc::now() - heartbeat.timestamp;

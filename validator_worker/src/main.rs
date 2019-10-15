@@ -19,6 +19,14 @@ use tokio::timer::Delay;
 use tokio::util::FutureExt as TokioFutureExt;
 use validator_worker::{all_channels, follower, leader, SentryApi};
 
+#[derive(Debug, Clone)]
+struct Args<A: Adapter> {
+    sentry_url: String,
+    config: Config,
+    adapter: Arc<Mutex<A>>,
+    whoami: String,
+}
+
 fn main() {
     let cli = App::new("Validator worker")
         .version("0.1")
@@ -58,15 +66,16 @@ fn main() {
         )
         .arg(
             Arg::with_name("singleTick")
-                .short("s")
-                .help("Runs the validator in single-tick mode and exits"),
+                .short("t")
+                .takes_value(false)
+                .help("runs the validator in single-tick mode and exis"),
         )
         .get_matches();
 
     let environment = std::env::var("ENV").unwrap_or_else(|_| "development".into());
     let config_file = cli.value_of("config");
-    let config = configuration(&environment, config_file).unwrap();
-    let sentry_url = cli.value_of("sentryUrl").unwrap();
+    let config = configuration(&environment, config_file).expect("failed to parse configuration");
+    let sentry_url = cli.value_of("sentryUrl").expect("sentry url missing");
     let is_single_tick = cli.is_present("singleTick");
 
     let adapter = match cli.value_of("adapter").unwrap() {
@@ -85,7 +94,9 @@ fn main() {
             ))
         }
         "dummy" => {
-            let dummy_identity = cli.value_of("dummyIdentity").unwrap();
+            let dummy_identity = cli
+                .value_of("dummyIdentity")
+                .expect("unable to get dummyIdentity");
             let options = AdapterOptions::DummAdapter {
                 dummy_identity: dummy_identity.to_string(),
                 dummy_auth: IDS.clone(),
@@ -110,83 +121,52 @@ fn main() {
 }
 
 fn run<A: Adapter + 'static>(is_single_tick: bool, sentry_url: &str, config: &Config, adapter: A) {
-    let _config = config.clone();
     let sentry_adapter = Arc::new(Mutex::new(adapter.clone()));
     let whoami = adapter.whoami();
 
+    let args = Args {
+        sentry_url: sentry_url.to_owned(),
+        config: config.to_owned(),
+        adapter: sentry_adapter.clone(),
+        whoami: whoami.clone(),
+    };
+
     if is_single_tick {
-        tokio::run(
-            iterate_channels(
-                sentry_url.to_owned(),
-                config.clone(),
-                sentry_adapter.clone(),
-                whoami.clone(),
-            )
-            .boxed()
-            .compat(),
-        );
+        tokio::run(iterate_channels(args.clone()).boxed().compat());
     } else {
-        tokio::run(
-            infinite(
-                sentry_url.to_owned(),
-                config.clone(),
-                sentry_adapter.clone(),
-                whoami.clone(),
-            )
-            .boxed()
-            .compat(),
-        );
+        tokio::run(infinite(args.clone()).boxed().compat());
     }
 }
 
-async fn infinite<A: Adapter + 'static>(
-    sentry_url: String,
-    config: Config,
-    adapter: Arc<Mutex<A>>,
-    whoami: String,
-) -> Result<(), ()> {
+async fn infinite<A: Adapter + 'static>(arg: Args<A>) -> Result<(), ()> {
     loop {
+        let args = arg.clone();
         let delay_future =
-            Delay::new(Instant::now().add(Duration::from_secs(config.wait_time as u64)));
-        let joined = join(
-            iterate_channels(
-                sentry_url.clone(),
-                config.clone(),
-                adapter.clone(),
-                whoami.clone(),
-            ),
-            delay_future.compat(),
-        );
+            Delay::new(Instant::now().add(Duration::from_secs(args.config.wait_time as u64)));
+        let joined = join(iterate_channels(args), delay_future.compat());
         joined.await;
     }
 }
 
-async fn iterate_channels<A: Adapter + 'static>(
-    sentry_url: String,
-    config: Config,
-    adapter: Arc<Mutex<A>>,
-    whoami: String,
-) -> Result<(), ()> {
-    let channels = all_channels(&sentry_url, whoami.to_owned())
+async fn iterate_channels<A: Adapter + 'static>(args: Args<A>) -> Result<(), ()> {
+    let channels = all_channels(&args.sentry_url, args.whoami.clone())
         .await
         .expect("Failed to get channels");
-
-    println!("{:?}", channels);
     let channels_size = channels.len();
 
     try_join_all(
-        channels
-            .into_iter()
-            .map(|channel| validator_tick(adapter.clone(), channel, &config, &whoami)),
+        channels.into_iter().map(|channel| {
+            validator_tick(args.adapter.clone(), channel, &args.config, &args.whoami)
+        }),
     )
     .await
     .expect("Failed to iterate channels");
 
     println!("processed {} channels", channels_size);
-    if channels_size >= config.max_channels as usize {
+    if channels_size >= args.config.max_channels as usize {
         println!(
             "WARNING: channel limit cfg.MAX_CHANNELS={} reached",
-            config.max_channels
+            args.config.max_channels
         )
     }
 
@@ -206,12 +186,13 @@ async fn validator_tick<A: Adapter + 'static>(
         .validators
         .into_iter()
         .position(|v| v.id == *whoami);
+    let duration = Duration::from_secs(config.validator_tick_timeout as u64);
     match index {
         Some(0) => {
             if let Err(e) = leader::tick(&sentry)
                 .boxed()
                 .compat()
-                .timeout(Duration::from_secs(config.validator_tick_timeout as u64))
+                .timeout(duration)
                 .compat()
                 .await
             {
@@ -222,15 +203,14 @@ async fn validator_tick<A: Adapter + 'static>(
             if let Err(e) = follower::tick(&sentry)
                 .boxed()
                 .compat()
-                .timeout(Duration::from_secs(config.validator_tick_timeout as u64))
+                .timeout(duration)
                 .compat()
                 .await
             {
                 eprintln!("{}", e);
             }
         }
-        Some(_) => eprintln!("validatorTick: processing a channel where we are not validating"),
-        None => eprintln!("validatorTick: processing a channel where we are not validating"),
+        _ => eprintln!("validatorTick: processing a channel where we are not validating"),
     };
     Ok(())
 }

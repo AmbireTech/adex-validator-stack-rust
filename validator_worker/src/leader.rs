@@ -27,11 +27,13 @@ async fn on_new_accounting<A: Adapter + 'static>(
 
     let signature = iface.adapter.lock().await.sign(&state_root)?;
 
-    iface.propagate(&[&MessageTypes::NewState(NewState {
-        state_root,
-        signature,
-        balances: new_accounting.balances.clone(),
-    })]);
+    iface
+        .propagate(&[&MessageTypes::NewState(NewState {
+            state_root,
+            signature,
+            balances: new_accounting.balances.clone(),
+        })])
+        .await;
 
     Ok(())
 }
