@@ -98,7 +98,7 @@ fn main() {
 // @TODO work in separate pull request
 fn run(_is_single_tick: bool, sentry: &str, config: &Config, adapter: impl Adapter + 'static) {
     let _sentry_url = sentry.to_owned();
-    let _adapter = adapter.clone();
+    let _adapter = adapter;
     let _config = config.clone();
 
     // let result = async move {
