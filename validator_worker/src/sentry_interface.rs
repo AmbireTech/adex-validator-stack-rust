@@ -98,11 +98,6 @@ impl<T: Adapter + 'static> SentryApi<T> {
         from: String,
         message_type: String,
     ) -> Result<Option<MessageTypes>, reqwest::Error> {
-        println!(
-            "{}/validator-messages/{}/{}?limit=1",
-            self.validator_url, from, message_type
-        );
-
         let future = self
             .client
             .get(&format!(
@@ -113,32 +108,15 @@ impl<T: Adapter + 'static> SentryApi<T> {
             .and_then(|mut res: Response| res.json::<ValidatorMessageResponse>())
             .compat();
 
-        let future2 = self
-            .client
-            .get(&format!(
-                "{}/validator-messages/{}/{}?limit=1",
-                self.validator_url, from, message_type
-            ))
-            .send()
-            .and_then(|mut res: Response| res.text())
-            .compat();
-
-        let response2 = future2.await;
-
-        match response2 {
-            Ok(response) => println!("{}", response),
-            Err(e) => println!("{}", e),
-        };
-
         match future.await {
             Ok(response) => match response {
                 ValidatorMessageResponse::ValidatorMessages(Some(data)) => {
                     if data.len() > 0 {
                         return Ok(Some(data[0].msg.clone()));
                     }
-                    return Ok(None);
+                    Ok(None)
                 }
-                _ => Ok(None)
+                _ => Ok(None),
             },
             Err(e) => Err(e),
         }

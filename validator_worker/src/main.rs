@@ -138,13 +138,16 @@ fn run<A: Adapter + 'static>(is_single_tick: bool, sentry_url: &str, config: &Co
     }
 }
 
-async fn infinite<A: Adapter + 'static>(arg: Args<A>) -> Result<(), ()> {
+async fn infinite<A: Adapter + 'static>(args: Args<A>) -> Result<(), ()> {
     loop {
-        let args = arg.clone();
+        let arg = args.clone();
         let delay_future =
-            Delay::new(Instant::now().add(Duration::from_secs(args.config.wait_time as u64)));
-        let joined = join(iterate_channels(args), delay_future.compat());
-        joined.await;
+            Delay::new(Instant::now().add(Duration::from_secs(arg.config.wait_time as u64)));
+        let joined = join(iterate_channels(arg), delay_future.compat());
+        match joined.await {
+            (_, Err(e)) => eprintln!("{}", e),
+            _ => println!("finished processing channels"),
+        };
     }
 }
 
