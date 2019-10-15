@@ -477,8 +477,7 @@ mod test {
             "eyJ0eXBlIjoiSldUIiwiYWxnIjoiRVRIIn0.eyJpZCI6ImF3ZXNvbWVWYWxpZGF0b3IiLCJlcmEiOjEwMDAwMCwiYWRkcmVzcyI6IjB4MmJEZUFGQUU1Mzk0MDY2OURhQTZGNTE5MzczZjY4NmMxZjNkMzM5MyJ9.gGw_sfnxirENdcX5KJQWaEt4FVRvfEjSLD4f3OiPrJIltRadeYP2zWy9T2GYcK5xxD96vnqAw4GebAW7rMlz4xw";
         assert_eq!(response, expected, "generated wrong ewt signature");
 
-        let expected_verification_response =
-            r#"VerifyPayload { from: "0x2bDeAFAE53940669DaA6F519373f686c1f3d3393", payload: Payload { id: "awesomeValidator", era: 100000, address: Some("0x2bDeAFAE53940669DaA6F519373f686c1f3d3393"), identity: None } }"#;
+        let expected_verification_response = r#"VerifyPayload { from: "0x2bDeAFAE53940669DaA6F519373f686c1f3d3393", payload: Payload { id: "awesomeValidator", era: 100000, address: Some("0x2bDeAFAE53940669DaA6F519373f686c1f3d3393"), identity: None } }"#;
 
         let parts: Vec<&str> = expected.split('.').collect();
         let verification =
