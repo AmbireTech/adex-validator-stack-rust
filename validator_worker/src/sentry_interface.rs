@@ -28,7 +28,7 @@ pub struct SentryApi<T: Adapter> {
 }
 
 impl<T: Adapter + 'static> SentryApi<T> {
-    pub fn new(
+    pub fn init(
         adapter: Arc<Mutex<T>>,
         channel: &Channel,
         config: &Config,

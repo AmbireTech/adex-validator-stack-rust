@@ -183,7 +183,7 @@ async fn validator_tick<A: Adapter + 'static>(
     whoami: &str,
 ) -> Result<(), ()> {
     let sentry =
-        SentryApi::new(adapter, &channel, &config, true, whoami).expect("Failed to init sentry");
+        SentryApi::init(adapter, &channel, &config, true, whoami).expect("Failed to init sentry");
     let index = channel
         .spec
         .validators

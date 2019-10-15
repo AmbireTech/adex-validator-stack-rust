@@ -63,7 +63,7 @@ mod test {
         let dummy_adapter = DummyAdapter::init(adapter_options, &config).expect("init adadpter");
         let whoami = dummy_adapter.whoami();
 
-        SentryApi::new(
+        SentryApi::init(
             Arc::new(Mutex::new(dummy_adapter)),
             &channel,
             &config,
