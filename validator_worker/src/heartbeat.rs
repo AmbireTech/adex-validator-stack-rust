@@ -43,7 +43,7 @@ pub async fn heartbeat<A: Adapter + 'static>(
     let validator_message_response = iface.get_our_latest_msg("Heartbeat".into()).await?;
 
     let heartbeat_msg = match validator_message_response {
-        Some(MessageTypes::Heartbeat(heartbeat)) => Some(heartbeat.clone()),
+        Some(MessageTypes::Heartbeat(heartbeat)) => Some(heartbeat),
         _ => None,
     };
 

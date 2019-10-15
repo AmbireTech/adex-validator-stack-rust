@@ -25,7 +25,7 @@ pub async fn tick<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result<(), Box<
     let from = iface.channel.spec.validators.leader().id.clone();
     let new_msg_response = iface.get_latest_msg(from, "NewState".to_string()).await?;
     let new_msg = match new_msg_response {
-        Some(MessageTypes::NewState(new_state)) => Some(new_state.clone()),
+        Some(MessageTypes::NewState(new_state)) => Some(new_state),
         _ => None,
     };
 
@@ -34,8 +34,8 @@ pub async fn tick<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result<(), Box<
         .await?;
 
     let our_latest_msg_state_root = match our_latest_msg_response {
-        Some(MessageTypes::ApproveState(approve_state)) => Some(approve_state.state_root.clone()),
-        Some(MessageTypes::RejectState(reject_state)) => Some(reject_state.state_root.clone()),
+        Some(MessageTypes::ApproveState(approve_state)) => Some(approve_state.state_root),
+        Some(MessageTypes::RejectState(reject_state)) => Some(reject_state.state_root),
         _ => None,
     };
 

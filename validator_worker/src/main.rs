@@ -127,14 +127,14 @@ fn run<A: Adapter + 'static>(is_single_tick: bool, sentry_url: &str, config: &Co
     let args = Args {
         sentry_url: sentry_url.to_owned(),
         config: config.to_owned(),
-        adapter: sentry_adapter.clone(),
-        whoami: whoami.clone(),
+        adapter: sentry_adapter,
+        whoami,
     };
 
     if is_single_tick {
-        tokio::run(iterate_channels(args.clone()).boxed().compat());
+        tokio::run(iterate_channels(args).boxed().compat());
     } else {
-        tokio::run(infinite(args.clone()).boxed().compat());
+        tokio::run(infinite(args).boxed().compat());
     }
 }
 

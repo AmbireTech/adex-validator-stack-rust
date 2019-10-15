@@ -111,7 +111,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
         match future.await {
             Ok(response) => match response {
                 ValidatorMessageResponse::ValidatorMessages(Some(data)) => {
-                    if data.len() > 0 {
+                    if !data.is_empty() {
                         return Ok(Some(data[0].msg.clone()));
                     }
                     Ok(None)
@@ -239,7 +239,7 @@ pub async fn all_channels(sentry_url: &str, whoami: String) -> Result<Vec<Channe
             (0..first_page.total_pages).map(|i| fetch_page(url.clone(), i, whoami.clone())),
         )
         .await
-        .unwrap();
+        .expect("Failed to fetch all channels");
         all.push(first_page);
         let result_all: Vec<Channel> = all
             .into_iter()
