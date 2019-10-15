@@ -108,17 +108,15 @@ impl<T: Adapter + 'static> SentryApi<T> {
             .and_then(|mut res: Response| res.json::<ValidatorMessageResponse>())
             .compat();
 
-        match future.await {
-            Ok(response) => match response {
-                ValidatorMessageResponse::ValidatorMessages(Some(data)) => {
-                    if !data.is_empty() {
-                        return Ok(Some(data[0].msg.clone()));
-                    }
-                    Ok(None)
+        let response = future.await?;
+        match response {
+            ValidatorMessageResponse::ValidatorMessages(Some(data)) => {
+                if !data.is_empty() {
+                    return Ok(Some(data[0].msg.clone()));
                 }
-                _ => Ok(None),
-            },
-            Err(e) => Err(e),
+                Ok(None)
+            }
+            _ => Ok(None),
         }
     }
 
@@ -227,19 +225,21 @@ fn handle_http_error(e: reqwest::Error, url: &str) {
     }
 }
 
-pub async fn all_channels(sentry_url: &str, whoami: String) -> Result<Vec<Channel>, ()> {
+pub async fn all_channels(
+    sentry_url: &str,
+    whoami: String,
+) -> Result<Vec<Channel>, reqwest::Error> {
     let url = sentry_url.to_owned();
-    let first_page = fetch_page(url.clone(), 0, whoami.clone())
-        .await
-        .expect("Failed to get channels from sentry url");
+    let first_page = fetch_page(url.clone(), 0, whoami.clone()).await?;
+
     if first_page.total_pages < 2 {
         Ok(first_page.channels)
     } else {
         let mut all: Vec<ChannelAllResponse> = try_join_all(
             (0..first_page.total_pages).map(|i| fetch_page(url.clone(), i, whoami.clone())),
         )
-        .await
-        .expect("Failed to fetch all channels");
+        .await?;
+
         all.push(first_page);
         let result_all: Vec<Channel> = all
             .into_iter()

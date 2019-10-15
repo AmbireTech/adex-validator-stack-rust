@@ -17,6 +17,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::timer::Delay;
 use tokio::util::FutureExt as TokioFutureExt;
+use validator_worker::error::ValidatorWorker as ValidatorWorkerError;
 use validator_worker::{all_channels, follower, leader, SentryApi};
 
 #[derive(Debug, Clone)]
@@ -152,22 +153,29 @@ async fn infinite<A: Adapter + 'static>(args: Args<A>) -> Result<(), ()> {
 }
 
 async fn iterate_channels<A: Adapter + 'static>(args: Args<A>) -> Result<(), ()> {
-    let channels = all_channels(&args.sentry_url, args.whoami.clone())
-        .await
-        .expect("Failed to get channels");
+    let result = all_channels(&args.sentry_url, args.whoami.clone()).await;
+
+    if let Err(e) = result {
+        eprintln!("Failed to get channels {}", e);
+        return Ok(());
+    }
+
+    let channels = result.unwrap();
     let channels_size = channels.len();
 
-    try_join_all(
-        channels.into_iter().map(|channel| {
+    let tick =
+        try_join_all(channels.into_iter().map(|channel| {
             validator_tick(args.adapter.clone(), channel, &args.config, &args.whoami)
-        }),
-    )
-    .await
-    .expect("Failed to iterate channels");
+        }))
+        .await;
+
+    if let Err(e) = tick {
+        eprintln!("An occurred while processing channels {}", e);
+    }
 
     println!("processed {} channels", channels_size);
     if channels_size >= args.config.max_channels as usize {
-        println!(
+        eprintln!(
             "WARNING: channel limit cfg.MAX_CHANNELS={} reached",
             args.config.max_channels
         )
@@ -181,9 +189,9 @@ async fn validator_tick<A: Adapter + 'static>(
     channel: Channel,
     config: &Config,
     whoami: &str,
-) -> Result<(), ()> {
-    let sentry =
-        SentryApi::init(adapter, &channel, &config, true, whoami).expect("Failed to init sentry");
+) -> Result<(), ValidatorWorkerError> {
+    let sentry = SentryApi::init(adapter, &channel, &config, true, whoami)?;
+
     let index = channel
         .spec
         .validators
@@ -199,7 +207,7 @@ async fn validator_tick<A: Adapter + 'static>(
                 .compat()
                 .await
             {
-                eprintln!("{}", e);
+                return Err(ValidatorWorkerError::Failed(e.to_string()));
             }
         }
         Some(1) => {
@@ -210,10 +218,14 @@ async fn validator_tick<A: Adapter + 'static>(
                 .compat()
                 .await
             {
-                eprintln!("{}", e);
+                return Err(ValidatorWorkerError::Failed(e.to_string()));
             }
         }
-        _ => eprintln!("validatorTick: processing a channel where we are not validating"),
+        _ => {
+            return Err(ValidatorWorkerError::Failed(
+                "validatorTick: processing a channel where we are not validating".to_string(),
+            ))
+        }
     };
     Ok(())
 }
