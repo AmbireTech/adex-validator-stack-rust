@@ -2,8 +2,8 @@ use crate::error::ValidatorWorker;
 use chrono::{DateTime, Utc};
 use futures::compat::Future01CompatExt;
 use futures::future::try_join_all;
-use futures::lock::Mutex;
 use futures_legacy::Future as LegacyFuture;
+use futures_locks::RwLock;
 use primitives::adapter::Adapter;
 use primitives::sentry::{
     ChannelAllResponse, EventAggregateResponse, LastApprovedResponse, SuccessResponse,
@@ -18,7 +18,7 @@ use std::time::Duration;
 
 #[derive(Debug, Clone)]
 pub struct SentryApi<T: Adapter> {
-    pub adapter: Arc<Mutex<T>>,
+    pub adapter: Arc<RwLock<T>>,
     pub validator_url: String,
     pub client: Client,
     pub logging: bool,
@@ -29,7 +29,7 @@ pub struct SentryApi<T: Adapter> {
 
 impl<T: Adapter + 'static> SentryApi<T> {
     pub fn init(
-        adapter: Arc<Mutex<T>>,
+        adapter: Arc<RwLock<T>>,
         channel: &Channel,
         config: &Config,
         logging: bool,
@@ -72,7 +72,12 @@ impl<T: Adapter + 'static> SentryApi<T> {
             .map(|message| serde_json::to_string(message).expect("failed to serialise message"))
             .collect();
 
-        let mut adapter = self.adapter.lock().await;
+        let mut adapter = self
+            .adapter
+            .write()
+            .compat()
+            .await
+            .expect("propagate: failed to get write lock");
 
         for validator in self.channel.spec.validators.into_iter() {
             let auth_token = adapter.get_auth(&validator.id);
@@ -84,10 +89,12 @@ impl<T: Adapter + 'static> SentryApi<T> {
 
             if let Err(e) = propagate_to(
                 &auth_token.unwrap(),
-                self.config.propagation_timeout,
+                &self.client,
                 &validator,
                 &serialised_messages,
-            ) {
+            )
+            .await
+            {
                 handle_http_error(e, &validator.url)
             }
         }
@@ -124,7 +131,8 @@ impl<T: Adapter + 'static> SentryApi<T> {
         &self,
         message_types: &[&str],
     ) -> Result<Option<MessageTypes>, reqwest::Error> {
-        self.get_latest_msg(self.whoami.clone(), message_types).await
+        self.get_latest_msg(self.whoami.clone(), message_types)
+            .await
     }
 
     pub async fn get_last_approved(&self) -> Result<LastApprovedResponse, reqwest::Error> {
@@ -154,7 +162,12 @@ impl<T: Adapter + 'static> SentryApi<T> {
         &self,
         after: DateTime<Utc>,
     ) -> Result<EventAggregateResponse, Box<ValidatorWorker>> {
-        let mut adapter = self.adapter.lock().await;
+        let mut adapter = self
+            .adapter
+            .write()
+            .compat()
+            .await
+            .expect("get_event_aggregates: Failed to acquire adapter");
 
         let auth_token = adapter
             .get_auth(&self.whoami)
@@ -178,24 +191,24 @@ impl<T: Adapter + 'static> SentryApi<T> {
     }
 }
 
-fn propagate_to(
+async fn propagate_to(
     auth_token: &str,
-    timeout: u32,
+    client: &Client,
     validator: &ValidatorDesc,
     messages: &[String],
 ) -> Result<(), reqwest::Error> {
-    // create client with timeout
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(timeout.into()))
-        .build()?;
     let url = validator.url.to_string();
 
     let _response: SuccessResponse = client
         .post(&url)
         .header(AUTHORIZATION, auth_token.to_string())
         .json(messages)
-        .send()?
-        .json()?;
+        .send()
+        .compat()
+        .await?
+        .json()
+        .compat()
+        .await?;
 
     Ok(())
 }

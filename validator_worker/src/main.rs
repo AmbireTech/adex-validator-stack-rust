@@ -7,7 +7,7 @@ use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
 use futures::compat::Future01CompatExt;
 use futures::future::try_join_all;
 use futures::future::{join, FutureExt, TryFutureExt};
-use futures::lock::Mutex;
+use futures_locks::RwLock;
 use primitives::adapter::{Adapter, AdapterOptions, KeystoreOptions};
 use primitives::config::{configuration, Config};
 use primitives::util::tests::prep_db::{AUTH, IDS};
@@ -24,7 +24,7 @@ use validator_worker::{all_channels, follower, leader, SentryApi};
 struct Args<A: Adapter> {
     sentry_url: String,
     config: Config,
-    adapter: Arc<Mutex<A>>,
+    adapter: Arc<RwLock<A>>,
     whoami: String,
 }
 
@@ -122,7 +122,7 @@ fn main() {
 }
 
 fn run<A: Adapter + 'static>(is_single_tick: bool, sentry_url: &str, config: &Config, adapter: A) {
-    let sentry_adapter = Arc::new(Mutex::new(adapter.clone()));
+    let sentry_adapter = Arc::new(RwLock::new(adapter.clone()));
     let whoami = adapter.whoami();
 
     let args = Args {
@@ -185,7 +185,7 @@ async fn iterate_channels<A: Adapter + 'static>(args: Args<A>) -> Result<(), ()>
 }
 
 async fn validator_tick<A: Adapter + 'static>(
-    adapter: Arc<Mutex<A>>,
+    adapter: Arc<RwLock<A>>,
     channel: Channel,
     config: &Config,
     whoami: &str,

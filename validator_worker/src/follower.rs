@@ -1,5 +1,6 @@
 use std::error::Error;
 
+use futures::compat::Future01CompatExt;
 use primitives::adapter::Adapter;
 use primitives::validator::{ApproveState, MessageTypes, NewState, RejectState};
 use primitives::BalancesMap;
@@ -30,7 +31,7 @@ pub async fn tick<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result<(), Box<
     };
 
     let our_latest_msg_response = iface
-        .get_our_latest_msg(&["ApproveState","RejectState"])
+        .get_our_latest_msg(&["ApproveState", "RejectState"])
         .await?;
 
     let our_latest_msg_state_root = match our_latest_msg_response {
@@ -65,7 +66,12 @@ async fn on_new_state<'a, A: Adapter + 'static>(
         return Ok(on_error(&iface, &new_state, InvalidNewState::RootHash).await);
     }
 
-    let adapter = iface.adapter.lock().await;
+    let adapter = iface
+        .adapter
+        .read()
+        .compat()
+        .await
+        .expect("on_new_state: failed to acquire read lock adapter");
 
     if !adapter.verify(
         &iface.channel.spec.validators.leader().id,

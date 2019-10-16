@@ -46,7 +46,7 @@ mod test {
     use super::*;
 
     use adapter::DummyAdapter;
-    use futures::lock::Mutex;
+    use futures_locks::RwLock;
     use primitives::adapter::AdapterOptions;
     use primitives::config::configuration;
     use primitives::util::tests::prep_db::{AUTH, DUMMY_CHANNEL, IDS};
@@ -64,7 +64,7 @@ mod test {
         let whoami = dummy_adapter.whoami();
 
         SentryApi::init(
-            Arc::new(Mutex::new(dummy_adapter)),
+            Arc::new(RwLock::new(dummy_adapter)),
             &channel,
             &config,
             false,
