@@ -12,7 +12,7 @@ use crate::sentry_interface::SentryApi;
 pub type Result = std::result::Result<(BalancesMap, Option<Accounting>), Box<dyn Error>>;
 
 pub async fn tick<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result {
-    let validator_msg_resp = iface.get_our_latest_msg("Accounting".to_owned()).await?;
+    let validator_msg_resp = iface.get_our_latest_msg(&["Accounting"]).await?;
 
     let accounting = match validator_msg_resp {
         Some(MessageTypes::Accounting(accounting)) => accounting,

@@ -40,7 +40,7 @@ pub async fn heartbeat<A: Adapter + 'static>(
     iface: &SentryApi<A>,
     balances: BalancesMap,
 ) -> Result<(), Box<dyn Error>> {
-    let validator_message_response = iface.get_our_latest_msg("Heartbeat".into()).await?;
+    let validator_message_response = iface.get_our_latest_msg(&["Heartbeat"]).await?;
 
     let heartbeat_msg = match validator_message_response {
         Some(MessageTypes::Heartbeat(heartbeat)) => Some(heartbeat),

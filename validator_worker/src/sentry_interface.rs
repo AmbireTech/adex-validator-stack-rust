@@ -96,8 +96,9 @@ impl<T: Adapter + 'static> SentryApi<T> {
     pub async fn get_latest_msg(
         &self,
         from: String,
-        message_type: String,
+        message_types: &[&str],
     ) -> Result<Option<MessageTypes>, reqwest::Error> {
+        let message_type = message_types.join("+");
         let future = self
             .client
             .get(&format!(
@@ -110,21 +111,20 @@ impl<T: Adapter + 'static> SentryApi<T> {
 
         let response = future.await?;
         match response {
-            ValidatorMessageResponse::ValidatorMessages(Some(data)) => {
+            ValidatorMessageResponse::ValidatorMessages(data) => {
                 if !data.is_empty() {
                     return Ok(Some(data[0].msg.clone()));
                 }
                 Ok(None)
             }
-            _ => Ok(None),
         }
     }
 
     pub async fn get_our_latest_msg(
         &self,
-        message_type: String,
+        message_types: &[&str],
     ) -> Result<Option<MessageTypes>, reqwest::Error> {
-        self.get_latest_msg(self.whoami.clone(), message_type).await
+        self.get_latest_msg(self.whoami.clone(), message_types).await
     }
 
     pub async fn get_last_approved(&self) -> Result<LastApprovedResponse, reqwest::Error> {
