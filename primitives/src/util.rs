@@ -76,6 +76,9 @@ pub mod logging {
     use std::cell::RefCell;
     use std::{io, io::Write};
 
+    pub use slog_async::Async;
+    pub use slog_term::TermDecorator;
+
     pub struct PrefixedCompactFormat<D>
     where
         D: Decorator,
@@ -139,7 +142,7 @@ pub mod logging {
                 }
 
                 decorator.start_whitespace()?;
-                write!(decorator, "\n")?;
+                writeln!(decorator)?;
 
                 decorator.flush()?;
 
