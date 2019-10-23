@@ -6,8 +6,10 @@ use clap::{App, Arg};
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
 use primitives::adapter::{DummyAdapterOptions, KeystoreOptions};
 use primitives::config::configuration;
+use primitives::util::logging::{Async, PrefixedCompactFormat, TermDecorator};
 use primitives::util::tests::prep_db::{AUTH, IDS};
 use sentry::Application;
+use slog::{o, Drain, Logger};
 
 const DEFAULT_PORT: u16 = 8005;
 
@@ -90,16 +92,26 @@ async fn main() {
         _ => panic!("We don't have any other adapters implemented yet!"),
     };
 
+    let logger = logger();
+
     match adapter {
         AdapterTypes::EthereumAdapter(adapter) => {
-            Application::new(*adapter, config, clustered, port)
+            Application::new(*adapter, config, logger, clustered, port)
                 .run()
                 .await
         }
         AdapterTypes::DummyAdapter(adapter) => {
-            Application::new(*adapter, config, clustered, port)
+            Application::new(*adapter, config, logger, clustered, port)
                 .run()
                 .await
         }
     }
+}
+
+fn logger() -> Logger {
+    let decorator = TermDecorator::new().build();
+    let drain = PrefixedCompactFormat::new("sentry", decorator).fuse();
+    let drain = Async::new(drain).build().fuse();
+
+    Logger::root(drain, o!())
 }

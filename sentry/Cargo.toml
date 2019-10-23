@@ -19,8 +19,6 @@ hyper = {version = "=0.13.0-alpha.4", features = ["unstable-stream"]}
 regex = "1"
 # Logger
 slog = { version = "^2.2.3" , features = ["max_level_trace"] }
-slog-term = "^2.4.0"
-slog-async = "^2.3.0"
 # Serde
 serde = {version = "^1.0", features = ['derive']}
 serde_json = "^1.0"

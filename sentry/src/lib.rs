@@ -5,7 +5,7 @@ use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Error, Request, Response, Server, StatusCode};
 use primitives::adapter::Adapter;
 use primitives::Config;
-//use slog::Logger;
+use slog::{info, Logger};
 
 pub mod routes {
     pub mod channel;
@@ -13,23 +13,18 @@ pub mod routes {
 
 pub struct Application<A: Adapter> {
     adapter: A,
-    //    logger: slog::Logger,
+    logger: slog::Logger,
     clustered: bool,
     port: u16,
     config: Config,
 }
 
 impl<A: Adapter + Send + 'static> Application<A> {
-    pub fn new(
-        adapter: A,
-        config: Config,
-        /*logger: Logger,*/ clustered: bool,
-        port: u16,
-    ) -> Self {
+    pub fn new(adapter: A, config: Config, logger: Logger, clustered: bool, port: u16) -> Self {
         Self {
             adapter,
             config,
-            //            logger,
+            logger,
             clustered,
             port,
         }
@@ -39,6 +34,7 @@ impl<A: Adapter + Send + 'static> Application<A> {
         let addr = ([127, 0, 0, 1], self.port).into();
 
         dbg!(self.clustered);
+        info!(&self.logger, "Sentry working here!");
 
         let make_service = make_service_fn(move |_| {
             let adapter_config = (self.adapter.clone(), self.config.clone());
