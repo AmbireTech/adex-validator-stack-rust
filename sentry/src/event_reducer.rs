@@ -1,6 +1,8 @@
 use primitives::sentry::{AggregateEvents, Event, EventAggregate};
 use primitives::Channel;
 
+// @TODO: Remove attribute once we use this function!
+#[allow(dead_code)]
 pub(crate) fn reduce(
     channel: &Channel,
     mut initial_aggr: EventAggregate,
@@ -43,13 +45,13 @@ fn merge_impression_ev(
     let event_counts = impression
         .event_counts
         .entry(earner.into())
-        .or_insert(0.into());
+        .or_insert_with(|| 0.into());
     *event_counts += &1.into();
 
     let event_payouts = impression
         .event_payouts
         .entry(earner.into())
-        .or_insert(0.into());
+        .or_insert_with(|| 0.into());
     *event_payouts += &channel.spec.min_per_impression;
 
     impression
