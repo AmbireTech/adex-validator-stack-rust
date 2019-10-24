@@ -29,8 +29,8 @@ impl ValidatorId {
         format!("0x{}", hex::encode(self.0))
     }
 
-    pub fn into_inner(&self) -> &[u8; 20] {
-        &self.0
+    pub fn inner(&self) -> [u8; 20] {
+        self.0
     }
 
     pub fn to_hex_checksummed_string(&self) -> String {
@@ -40,14 +40,13 @@ impl ValidatorId {
 
 impl TryFrom<&str> for ValidatorId {
     type Error = DomainError;
-    // 0x prefixed string
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        // use hex::FromHex;
-        // @TODO: Should we have some constrains(like valid hex string starting with `0x`)? If not this should be just `From`.
-        let mut hex_value = value;
-        if value.len() == 42 {
-            hex_value = &value[2..];
-        }
+        let hex_value = if value.len() == 42 {
+            &value[2..]
+        } else {
+            value
+        };
+
         let result = hex::decode(hex_value).map_err(|_| {
             DomainError::InvalidArgument("Failed to deserialize validator id".to_string())
         })?;
@@ -57,23 +56,9 @@ impl TryFrom<&str> for ValidatorId {
     }
 }
 
-impl TryFrom<String> for ValidatorId {
-    type Error = DomainError;
-    // 0x prefixed string
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        // @TODO: Should we have some constrains(like valid hex string starting with `0x`)? If not this should be just `From`.
-        let result = hex::decode(&value[2..]).map_err(|_| {
-            DomainError::InvalidArgument("Failed to deserialize validator id".to_string())
-        })?;
-        let mut id: [u8; 20] = [0; 20];
-        id.copy_from_slice(&result[..]);
-        Ok(Self(id))
-    }
-}
-// returns a 0x prefix string
 impl Into<String> for ValidatorId {
     fn into(self) -> String {
-        format!("{}", hex::encode(self.0))
+        hex::encode(self.0)
     }
 }
 

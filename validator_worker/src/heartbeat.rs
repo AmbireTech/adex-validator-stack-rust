@@ -60,5 +60,5 @@ pub async fn heartbeat<A: Adapter + 'static>(
 }
 
 fn is_channel_not_exhausted(channel: &Channel, balances: &BalancesMap) -> bool {
-    !(balances.values().sum::<BigNum>() == channel.deposit_amount)
+    balances.values().sum::<BigNum>() != channel.deposit_amount
 }
