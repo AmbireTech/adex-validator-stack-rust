@@ -32,6 +32,7 @@ impl<A: Adapter + Send + 'static> Application<A> {
 
     pub async fn run(&self) {
         let addr = ([127, 0, 0, 1], self.port).into();
+        info!(&self.logger, "Listening on port {}!", self.port);
 
         let make_service = make_service_fn(move |_| {
             let adapter_config = (self.adapter.clone(), self.config.clone());
