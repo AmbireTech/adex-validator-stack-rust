@@ -23,8 +23,6 @@ pub async fn tick<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result {
         },
     };
 
-    println!("{:?}", accounting);
-
     let aggrs = iface
         .get_event_aggregates(accounting.last_event_aggregate)
         .await?;

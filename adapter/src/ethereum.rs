@@ -343,8 +343,6 @@ pub fn ewt_sign(
     let header_encoded =
         base64::encode_config(&serde_json::to_string(&header)?, base64::URL_SAFE_NO_PAD);
 
-    println!("{:?}", payload);
-
     let payload_encoded =
         base64::encode_config(&serde_json::to_string(payload)?, base64::URL_SAFE_NO_PAD);
     let message = Message::from_slice(&hash_message(&format!(

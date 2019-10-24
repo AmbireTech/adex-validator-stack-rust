@@ -22,8 +22,6 @@ async fn on_new_accounting<A: Adapter + 'static>(
     iface: &SentryApi<A>,
     (balances, new_accounting): (&BalancesMap, &Accounting),
 ) -> Result<(), Box<dyn Error>> {
-    println!("on new state");
-    println!("\n new accounting balances {:?} \n ", balances);
     let state_root_raw = get_state_root_hash(&iface, &balances)?;
     let state_root = hex::encode(state_root_raw);
 

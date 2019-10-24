@@ -61,8 +61,6 @@ impl TryFrom<String> for ValidatorId {
     type Error = DomainError;
     // 0x prefixed string
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        println!("value {}", value);
-        // use hex::FromHex;
         // @TODO: Should we have some constrains(like valid hex string starting with `0x`)? If not this should be just `From`.
         let result = hex::decode(&value[2..]).map_err(|_| {
             DomainError::InvalidArgument("Failed to deserialize validator id".to_string())

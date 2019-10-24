@@ -16,7 +16,6 @@ use primitives::{Channel, SpecValidator, ValidatorId};
 use std::convert::TryFrom;
 use std::error::Error;
 use std::ops::Add;
-use std::process::id;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::timer::Delay;
@@ -143,7 +142,6 @@ fn run<A: Adapter + 'static>(
 
     if is_single_tick {
         tokio::run(iterate_channels(args).boxed().compat());
-        println!("should exit 2 {} {}", id(), adapter.whoami());
     } else {
         tokio::run(infinite(args).boxed().compat());
     }
@@ -159,7 +157,7 @@ async fn infinite<A: Adapter + 'static>(args: Args<A>) -> Result<(), ()> {
         let joined = join(iterate_channels(arg), delay_future.compat());
         match joined.await {
             (_, Err(e)) => eprintln!("{}", e),
-            _ => println!("finished processing channels"),
+            _ => {}
         };
     }
 }
@@ -185,14 +183,12 @@ async fn iterate_channels<A: Adapter + 'static>(args: Args<A>) -> Result<(), ()>
         eprintln!("An occurred while processing channels {}", e);
     }
 
-    println!("processed {} channels", channels_size);
     if channels_size >= args.config.max_channels as usize {
         eprintln!(
             "WARNING: channel limit cfg.MAX_CHANNELS={} reached",
             args.config.max_channels
         )
     }
-    println!("should exit");
     Ok(())
 }
 

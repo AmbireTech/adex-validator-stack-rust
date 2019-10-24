@@ -28,7 +28,6 @@ pub(crate) fn get_state_root_hash<A: Adapter + 'static>(
     iface: &SentryApi<A>,
     balances: &BalancesMap,
 ) -> Result<[u8; 32], Box<dyn Error>> {
-    // println!("\n balances {:?} \n", balances);
     // Note: MerkleTree takes care of deduplicating and sorting
     let elems: Vec<[u8; 32]> = balances
         .iter()
@@ -40,20 +39,7 @@ pub(crate) fn get_state_root_hash<A: Adapter + 'static>(
         })
         .collect::<Result<_, _>>()?;
 
-    println!(
-        "merkle tree params {:?}",
-        elems
-            .iter()
-            .map(|e| hex::encode(e))
-            .collect::<Vec<String>>()
-    );
-
     let tree = MerkleTree::new(&elems);
-
-    let balance_root = hex::encode(tree.root());
-
-    println!("\n balance_root {} \n", balance_root);
-
     // keccak256(channelId, balanceRoot)
     get_signable_state_root(&iface.channel.id, &tree.root())
 }

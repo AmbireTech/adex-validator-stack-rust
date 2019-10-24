@@ -48,30 +48,9 @@ pub async fn heartbeat<A: Adapter + 'static>(
 
     let should_send = heartbeat_msg.map_or(true, |heartbeat| {
         let duration = Utc::now() - heartbeat.timestamp;
-        println!(
-            "{} is_channel_not_exhausted - {}",
-            hex::encode(iface.channel.id),
-            is_channel_not_exhausted(&iface.channel, &balances)
-        );
-        println!(
-            "{} left eq operator {}",
-            hex::encode(iface.channel.id),
-            balances.values().sum::<BigNum>().to_str_radix(10)
-        ); //iface.channel.deposit_amount
-        println!(
-            "{} right eq operator {}",
-            hex::encode(iface.channel.id),
-            iface.channel.deposit_amount.to_str_radix(10)
-        );
-        println!(
-            "eq operator {}",
-            !(balances.values().sum::<BigNum>() == iface.channel.deposit_amount)
-        );
         duration > Duration::milliseconds(iface.config.heartbeat_time.into())
             && is_channel_not_exhausted(&iface.channel, &balances)
     });
-
-    println!("should send {} ", should_send);
 
     if should_send {
         send_heartbeat(&iface).await?;

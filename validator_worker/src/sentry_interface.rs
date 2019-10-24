@@ -180,8 +180,6 @@ impl<T: Adapter + 'static> SentryApi<T> {
             .compat()
             .await?;
 
-        println!("get_event_aggregates: {:?}", result);
-
         Ok(result)
     }
 }
@@ -243,7 +241,6 @@ pub async fn all_channels(
     sentry_url: &str,
     whoami: String,
 ) -> Result<Vec<Channel>, reqwest::Error> {
-    println!("whoami all_channels {}", whoami);
     let url = sentry_url.to_owned();
     let first_page = fetch_page(url.clone(), 0, whoami.clone()).await?;
 
