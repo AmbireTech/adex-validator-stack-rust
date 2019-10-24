@@ -80,10 +80,16 @@ pub struct SuccessResponse {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ValidatorMessageResponse {
+pub struct ValidatorMessage {
     pub from: String,
     pub received: DateTime<Utc>,
-    pub msg: Vec<MessageTypes>,
+    pub msg: MessageTypes,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub enum ValidatorMessageResponse {
+    ValidatorMessages(Vec<ValidatorMessage>),
 }
 
 #[derive(Serialize, Deserialize, Debug)]

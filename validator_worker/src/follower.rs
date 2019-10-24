@@ -1,5 +1,6 @@
 use std::error::Error;
 
+use futures::compat::Future01CompatExt;
 use primitives::adapter::Adapter;
 use primitives::validator::{ApproveState, MessageTypes, NewState, RejectState};
 use primitives::BalancesMap;
@@ -23,25 +24,21 @@ enum NewStateResult {
 
 pub async fn tick<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result<(), Box<dyn Error>> {
     let from = iface.channel.spec.validators.leader().id.clone();
-    let new_msg_response = iface.get_latest_msg(from, "NewState".to_string()).await?;
-    let new_msg = new_msg_response
-        .msg
-        .get(0)
-        .and_then(|message_types| match message_types {
-            MessageTypes::NewState(new_state) => Some(new_state.clone()),
-            _ => None,
-        });
+    let new_msg_response = iface.get_latest_msg(from, &["NewState"]).await?;
+    let new_msg = match new_msg_response {
+        Some(MessageTypes::NewState(new_state)) => Some(new_state),
+        _ => None,
+    };
+
     let our_latest_msg_response = iface
-        .get_our_latest_msg("ApproveState+RejectState".to_string())
+        .get_our_latest_msg(&["ApproveState", "RejectState"])
         .await?;
-    let our_latest_msg_state_root = our_latest_msg_response
-        .msg
-        .get(0)
-        .and_then(|message_types| match message_types {
-            MessageTypes::ApproveState(approve_state) => Some(approve_state.state_root.clone()),
-            MessageTypes::RejectState(reject_state) => Some(reject_state.state_root.clone()),
-            _ => None,
-        });
+
+    let our_latest_msg_state_root = match our_latest_msg_response {
+        Some(MessageTypes::ApproveState(approve_state)) => Some(approve_state.state_root),
+        Some(MessageTypes::RejectState(reject_state)) => Some(reject_state.state_root),
+        _ => None,
+    };
 
     let latest_is_responded_to = match (&new_msg, &our_latest_msg_state_root) {
         (Some(new_msg), Some(state_root)) => &new_msg.state_root == state_root,
@@ -72,6 +69,8 @@ async fn on_new_state<'a, A: Adapter + 'static>(
     let adapter = iface
         .adapter
         .read()
+        .compat()
+        .await
         .expect("on_new_state: failed to acquire read lock adapter");
 
     if !adapter.verify(
@@ -95,16 +94,18 @@ async fn on_new_state<'a, A: Adapter + 'static>(
     let signature = adapter.sign(&new_state.state_root)?;
     let health_threshold = u64::from(iface.config.health_threshold_promilles).into();
 
-    iface.propagate(&[&MessageTypes::ApproveState(ApproveState {
-        state_root: proposed_state_root,
-        signature,
-        is_healthy: is_healthy(
-            &iface.channel,
-            balances,
-            &proposed_balances,
-            &health_threshold,
-        ),
-    })]);
+    iface
+        .propagate(&[&MessageTypes::ApproveState(ApproveState {
+            state_root: proposed_state_root,
+            signature,
+            is_healthy: is_healthy(
+                &iface.channel,
+                balances,
+                &proposed_balances,
+                &health_threshold,
+            ),
+        })])
+        .await;
 
     Ok(NewStateResult::Ok)
 }
@@ -122,14 +123,16 @@ async fn on_error<'a, A: Adapter + 'static>(
     }
     .to_string();
 
-    iface.propagate(&[&MessageTypes::RejectState(RejectState {
-        reason,
-        state_root: new_state.state_root.clone(),
-        signature: new_state.signature.clone(),
-        balances: Some(new_state.balances.clone()),
-        /// The NewState timestamp that is being rejected
-        timestamp: Some(Utc::now()),
-    })]);
+    iface
+        .propagate(&[&MessageTypes::RejectState(RejectState {
+            reason,
+            state_root: new_state.state_root.clone(),
+            signature: new_state.signature.clone(),
+            balances: Some(new_state.balances.clone()),
+            /// The NewState timestamp that is being rejected
+            timestamp: Some(Utc::now()),
+        })])
+        .await;
 
     NewStateResult::Err(status)
 }

@@ -4,9 +4,29 @@
 use clap::{App, Arg};
 
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
-use primitives::adapter::{Adapter, DummyAdapterOptions, KeystoreOptions};
+use futures::compat::Future01CompatExt;
+use futures::future::try_join_all;
+use futures::future::{join, FutureExt, TryFutureExt};
+use futures_locks::RwLock;
+use primitives::adapter::{Adapter, AdapterOptions, KeystoreOptions};
 use primitives::config::{configuration, Config};
 use primitives::util::tests::prep_db::{AUTH, IDS};
+use primitives::Channel;
+use std::ops::Add;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+use tokio::timer::Delay;
+use tokio::util::FutureExt as TokioFutureExt;
+use validator_worker::error::ValidatorWorker as ValidatorWorkerError;
+use validator_worker::{all_channels, follower, leader, SentryApi};
+
+#[derive(Debug, Clone)]
+struct Args<A: Adapter> {
+    sentry_url: String,
+    config: Config,
+    adapter: Arc<RwLock<A>>,
+    whoami: String,
+}
 
 fn main() {
     let cli = App::new("Validator worker")
@@ -47,15 +67,16 @@ fn main() {
         )
         .arg(
             Arg::with_name("singleTick")
-                .short("s")
-                .help("Runs the validator in single-tick mode and exits"),
+                .short("t")
+                .takes_value(false)
+                .help("runs the validator in single-tick mode and exis"),
         )
         .get_matches();
 
     let environment = std::env::var("ENV").unwrap_or_else(|_| "development".into());
     let config_file = cli.value_of("config");
-    let config = configuration(&environment, config_file).unwrap();
-    let sentry_url = cli.value_of("sentryUrl").unwrap();
+    let config = configuration(&environment, config_file).expect("failed to parse configuration");
+    let sentry_url = cli.value_of("sentryUrl").expect("sentry url missing");
     let is_single_tick = cli.is_present("singleTick");
 
     let adapter = match cli.value_of("adapter").unwrap() {
@@ -73,7 +94,9 @@ fn main() {
             ))
         }
         "dummy" => {
-            let dummy_identity = cli.value_of("dummyIdentity").unwrap();
+            let dummy_identity = cli
+                .value_of("dummyIdentity")
+                .expect("unable to get dummyIdentity");
             let options = DummyAdapterOptions {
                 dummy_identity: dummy_identity.to_string(),
                 dummy_auth: IDS.clone(),
@@ -95,26 +118,111 @@ fn main() {
     }
 }
 
-// @TODO work in separate pull request
-fn run(_is_single_tick: bool, sentry: &str, config: &Config, adapter: impl Adapter + 'static) {
-    let _sentry_url = sentry.to_owned();
-    let _adapter = adapter;
-    let _config = config.clone();
+fn run<A: Adapter + 'static>(is_single_tick: bool, sentry_url: &str, config: &Config, adapter: A) {
+    let sentry_adapter = Arc::new(RwLock::new(adapter.clone()));
+    let whoami = adapter.whoami();
 
-    // let result = async move {
-    //     let channels = await!(all_channels(&sentry_url, adapter.clone())).unwrap();
-    //     println!("{:?}", channels);
-    //     for channel in channels.into_iter() {
-    //         let sentry = SentryApi::new(adapter.clone(), &channel, &config, true);
-    //         let whoami = adapter.whoami();
-    //         let index = channel.spec.validators.into_iter().position(|v| v.id == whoami);
-    //         let tick = match index {
-    //             Some(0) => Leader.tick(&channel),
-    //             Some(1) => Follower.tick(&channel)
-    //         };
-    //     }
-    //     Ok(())
-    // };
-    // @TODO hanlde errors more gracefully
-    // tokio::run(result.map_err(|e: Box<dyn Error>| panic!("{}", e)).boxed().compat())
+    let args = Args {
+        sentry_url: sentry_url.to_owned(),
+        config: config.to_owned(),
+        adapter: sentry_adapter,
+        whoami,
+    };
+
+    if is_single_tick {
+        tokio::run(iterate_channels(args).boxed().compat());
+    } else {
+        tokio::run(infinite(args).boxed().compat());
+    }
+}
+
+async fn infinite<A: Adapter + 'static>(args: Args<A>) -> Result<(), ()> {
+    loop {
+        let arg = args.clone();
+        let delay_future =
+            Delay::new(Instant::now().add(Duration::from_secs(arg.config.wait_time as u64)));
+        let joined = join(iterate_channels(arg), delay_future.compat());
+        match joined.await {
+            (_, Err(e)) => eprintln!("{}", e),
+            _ => println!("finished processing channels"),
+        };
+    }
+}
+
+async fn iterate_channels<A: Adapter + 'static>(args: Args<A>) -> Result<(), ()> {
+    let result = all_channels(&args.sentry_url, args.whoami.clone()).await;
+
+    if let Err(e) = result {
+        eprintln!("Failed to get channels {}", e);
+        return Ok(());
+    }
+
+    let channels = result.unwrap();
+    let channels_size = channels.len();
+
+    let tick =
+        try_join_all(channels.into_iter().map(|channel| {
+            validator_tick(args.adapter.clone(), channel, &args.config, &args.whoami)
+        }))
+        .await;
+
+    if let Err(e) = tick {
+        eprintln!("An occurred while processing channels {}", e);
+    }
+
+    println!("processed {} channels", channels_size);
+    if channels_size >= args.config.max_channels as usize {
+        eprintln!(
+            "WARNING: channel limit cfg.MAX_CHANNELS={} reached",
+            args.config.max_channels
+        )
+    }
+
+    Ok(())
+}
+
+async fn validator_tick<A: Adapter + 'static>(
+    adapter: Arc<RwLock<A>>,
+    channel: Channel,
+    config: &Config,
+    whoami: &str,
+) -> Result<(), ValidatorWorkerError> {
+    let sentry = SentryApi::init(adapter, &channel, &config, true, whoami)?;
+
+    let index = channel
+        .spec
+        .validators
+        .into_iter()
+        .position(|v| v.id == *whoami);
+    let duration = Duration::from_secs(config.validator_tick_timeout as u64);
+    match index {
+        Some(0) => {
+            if let Err(e) = leader::tick(&sentry)
+                .boxed()
+                .compat()
+                .timeout(duration)
+                .compat()
+                .await
+            {
+                return Err(ValidatorWorkerError::Failed(e.to_string()));
+            }
+        }
+        Some(1) => {
+            if let Err(e) = follower::tick(&sentry)
+                .boxed()
+                .compat()
+                .timeout(duration)
+                .compat()
+                .await
+            {
+                return Err(ValidatorWorkerError::Failed(e.to_string()));
+            }
+        }
+        _ => {
+            return Err(ValidatorWorkerError::Failed(
+                "validatorTick: processing a channel where we are not validating".to_string(),
+            ))
+        }
+    };
+    Ok(())
 }

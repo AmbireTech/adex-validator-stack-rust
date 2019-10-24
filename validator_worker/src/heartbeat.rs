@@ -2,6 +2,7 @@ use std::convert::TryFrom;
 use std::error::Error;
 
 use chrono::{Duration, Utc};
+use futures::compat::Future01CompatExt;
 
 use adapter::get_signable_state_root;
 use byteorder::{BigEndian, ByteOrder};
@@ -23,10 +24,13 @@ async fn send_heartbeat<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result<()
 
     let state_root_raw = get_signable_state_root(&iface.channel.id, &info_root_raw)?;
     let state_root = hex::encode(state_root_raw);
+
     let signature = iface
         .adapter
         .read()
-        .expect("send_heartbeat: failed to acquire adapter read lock")
+        .compat()
+        .await
+        .expect("on_new_state: failed to acquire read lock adapter")
         .sign(&state_root)?;
 
     let message_types = MessageTypes::Heartbeat(Heartbeat {
@@ -35,7 +39,7 @@ async fn send_heartbeat<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result<()
         timestamp: Utc::now(),
     });
 
-    iface.propagate(&[&message_types]);
+    iface.propagate(&[&message_types]).await;
 
     Ok(())
 }
@@ -44,15 +48,12 @@ pub async fn heartbeat<A: Adapter + 'static>(
     iface: &SentryApi<A>,
     balances: BalancesMap,
 ) -> Result<(), Box<dyn Error>> {
-    let validator_message_response = iface.get_our_latest_msg("Heartbeat".into()).await?;
+    let validator_message_response = iface.get_our_latest_msg(&["Heartbeat"]).await?;
 
-    let heartbeat_msg = validator_message_response
-        .msg
-        .get(0)
-        .and_then(|message_types| match message_types {
-            MessageTypes::Heartbeat(heartbeat) => Some(heartbeat.clone()),
-            _ => None,
-        });
+    let heartbeat_msg = match validator_message_response {
+        Some(MessageTypes::Heartbeat(heartbeat)) => Some(heartbeat),
+        _ => None,
+    };
 
     let should_send = heartbeat_msg.map_or(true, |heartbeat| {
         let duration = Utc::now() - heartbeat.timestamp;
