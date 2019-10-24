@@ -5,7 +5,7 @@ use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Error, Request, Response, Server, StatusCode};
 use primitives::adapter::Adapter;
 use primitives::Config;
-use slog::{error, Logger};
+use slog::{error, info, Logger};
 
 pub mod routes {
     pub mod channel;
