@@ -11,6 +11,8 @@ pub mod routes {
     pub mod channel;
 }
 
+pub mod event_reducer;
+
 pub struct Application<A: Adapter> {
     adapter: A,
     logger: slog::Logger,
