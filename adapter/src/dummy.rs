@@ -3,7 +3,6 @@ use primitives::channel_validator::ChannelValidator;
 use primitives::config::Config;
 use primitives::{Channel, ValidatorId};
 use std::collections::HashMap;
-use std::convert::TryFrom;
 
 #[derive(Debug, Clone)]
 pub struct DummyAdapter {

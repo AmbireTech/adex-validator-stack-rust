@@ -203,7 +203,7 @@ impl Adapter for EthereumAdapter {
         let verified = ewt_verify(header_encoded, payload_encoded, token_encoded)
             .map_err(|e| map_error(&e.to_string()))?;
 
-        if self.whoami() != verified.payload.id {
+        if self.whoami().to_hex_checksummed_string() != verified.payload.id {
             return Err(AdapterError::Configuration(
                 "token payload.id !== whoami(): token was not intended for us".to_string(),
             ));
@@ -211,7 +211,7 @@ impl Adapter for EthereumAdapter {
 
         let sess = match &verified.payload.identity {
             Some(identity) => {
-                let contract_address = Address::from_slice(identity.into_inner());
+                let contract_address = Address::from_slice(identity.as_bytes());
                 let contract = get_contract(&self.config, contract_address, &IDENTITY_ABI)
                     .map_err(|_| map_error("failed to init identity contract"))?;
 
@@ -233,7 +233,7 @@ impl Adapter for EthereumAdapter {
                 }
                 Session {
                     era: verified.payload.era,
-                    uid: identity.to_owned(),
+                    uid: ValidatorId::try_from(identity.as_str())?,
                 }
             }
             None => Session {
@@ -256,10 +256,10 @@ impl Adapter for EthereumAdapter {
             (Some(wallet), None) => {
                 let era = Utc::now().timestamp_millis() as f64 / 60000.0;
                 let payload = Payload {
-                    id: validator.clone(),
+                    id: validator.to_hex_checksummed_string(),
                     era: era.floor() as i64,
                     identity: None,
-                    address: None,
+                    address: self.whoami().to_hex_checksummed_string(),
                 };
                 let token = ewt_sign(wallet, &self.keystore_pwd, &payload)
                     .map_err(|_| map_error("Failed to sign token"))?;
@@ -310,12 +310,11 @@ fn get_contract(
 // Ethereum Web Tokens
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Payload {
-    pub id: ValidatorId,
+    pub id: String,
     pub era: i64,
+    pub address: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub address: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub identity: Option<ValidatorId>,
+    pub identity: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -344,9 +343,10 @@ pub fn ewt_sign(
     let header_encoded =
         base64::encode_config(&serde_json::to_string(&header)?, base64::URL_SAFE_NO_PAD);
 
+    println!("{:?}", payload);
+
     let payload_encoded =
         base64::encode_config(&serde_json::to_string(payload)?, base64::URL_SAFE_NO_PAD);
-
     let message = Message::from_slice(&hash_message(&format!(
         "{}.{}",
         header_encoded, payload_encoded
@@ -425,7 +425,8 @@ mod test {
         let mut eth_adapter = setup_eth_adapter();
         let whoami = eth_adapter.whoami();
         assert_eq!(
-            whoami.to_hex_prefix_string(), "0x2bdeafae53940669daa6f519373f686c1f3d3393",
+            whoami.to_hex_prefix_string(),
+            "0x2bdeafae53940669daa6f519373f686c1f3d3393",
             "failed to get correct whoami"
         );
 
@@ -458,10 +459,9 @@ mod test {
         eth_adapter.unlock().expect("should unlock eth adapter");
 
         let payload = Payload {
-            id: ValidatorId::try_from("0xce07CbB7e054514D590a0262C93070D838bFBA2e")
-                .expect("failed to parse id"),
+            id: "awesomeValidator".into(),
             era: 100_000,
-            address: Some(eth_adapter.whoami().to_hex_prefix_string()),
+            address: eth_adapter.whoami().to_hex_checksummed_string(),
             identity: None,
         };
         let wallet = eth_adapter.wallet.clone();
@@ -471,7 +471,7 @@ mod test {
             "eyJ0eXBlIjoiSldUIiwiYWxnIjoiRVRIIn0.eyJpZCI6ImF3ZXNvbWVWYWxpZGF0b3IiLCJlcmEiOjEwMDAwMCwiYWRkcmVzcyI6IjB4MmJEZUFGQUU1Mzk0MDY2OURhQTZGNTE5MzczZjY4NmMxZjNkMzM5MyJ9.gGw_sfnxirENdcX5KJQWaEt4FVRvfEjSLD4f3OiPrJIltRadeYP2zWy9T2GYcK5xxD96vnqAw4GebAW7rMlz4xw";
         assert_eq!(response, expected, "generated wrong ewt signature");
 
-        let expected_verification_response = r#"VerifyPayload { from: "0x2bDeAFAE53940669DaA6F519373f686c1f3d3393", payload: Payload { id: "awesomeValidator", era: 100000, address: Some("0x2bDeAFAE53940669DaA6F519373f686c1f3d3393"), identity: None } }"#;
+        let expected_verification_response = r#"VerifyPayload { from: ValidatorId([43, 222, 175, 174, 83, 148, 6, 105, 218, 166, 245, 25, 55, 63, 104, 108, 31, 61, 51, 147]), payload: Payload { id: "awesomeValidator", era: 100000, address: "0x2bDeAFAE53940669DaA6F519373f686c1f3d3393", identity: None } }"#;
 
         let parts: Vec<&str> = expected.split('.').collect();
         let verification =

@@ -32,6 +32,10 @@ impl ValidatorId {
     pub fn into_inner(&self) -> &[u8; 20] {
         &self.0
     }
+
+    pub fn to_hex_checksummed_string(&self) -> String {
+        eth_checksum::checksum(&format!("0x{}", hex::encode(self.0)))
+    }
 }
 
 impl TryFrom<&str> for ValidatorId {
@@ -57,7 +61,7 @@ impl TryFrom<String> for ValidatorId {
     type Error = DomainError;
     // 0x prefixed string
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        println!("value {}", value );
+        println!("value {}", value);
         // use hex::FromHex;
         // @TODO: Should we have some constrains(like valid hex string starting with `0x`)? If not this should be just `From`.
         let result = hex::decode(&value[2..]).map_err(|_| {

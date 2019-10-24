@@ -227,7 +227,6 @@ fn encode_params(params: &[(ParamType, &str)], lenient: bool) -> Result<Vec<u8>,
 
 #[cfg(test)]
 mod test {
-    use hex::FromHex;
     use std::convert::TryFrom;
 
     use byteorder::{BigEndian, ByteOrder};
@@ -238,20 +237,7 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_get_signable_state_root_hash_is_aligned_with_js_impl() {
-        let balance_leaf = get_balance_leaf(
-            &<[u8; 20]>::from_hex("b7d3f81e857692d13e9d63b232a90f4a1793189e").expect("js_impl"),
-            &BigNum::try_from("2").expect("failed"),
-        )
-        .expect("failed");
-        println!("{}", hex::encode(balance_leaf));
-        let balance_leaf2 = get_balance_leaf(
-            &<[u8; 20]>::from_hex("b7d3f81e857692d13e9d63b232a90f4a1793189e").expect("js_impl"),
-            &BigNum::try_from("4").expect("failed"),
-        )
-        .expect("failed");
-        println!("{}", hex::encode(balance_leaf2));
-
+    fn get_signable_state_root_hash_is_aligned_with_js_impl() {
         let timestamp = Utc.ymd(2019, 9, 12).and_hms(17, 0, 0);
         let mut timestamp_buf = [0_u8; 32];
         let n: u64 = u64::try_from(timestamp.timestamp_millis())
@@ -263,7 +249,7 @@ mod test {
         let channel_id = "061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088";
 
         let state_root = get_signable_state_root(
-            &hex::decode(&channel_id[2..]).expect("fialed"),
+            &hex::decode(&channel_id).expect("fialed"),
             &merkle_tree.root(),
         )
         .expect("Should get state_root");
