@@ -3,6 +3,7 @@ use chrono::{DateTime, Utc};
 use futures::compat::Future01CompatExt;
 use futures::future::try_join_all;
 use futures_legacy::Future as LegacyFuture;
+use futures_locks::RwLock;
 use primitives::adapter::Adapter;
 use primitives::sentry::{
     ChannelAllResponse, EventAggregateResponse, LastApprovedResponse, SuccessResponse,
@@ -12,7 +13,7 @@ use primitives::validator::MessageTypes;
 use primitives::{Channel, Config, ValidatorDesc};
 use reqwest::header::AUTHORIZATION;
 use reqwest::r#async::{Client, Response};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::time::Duration;
 
 #[derive(Debug, Clone)]
@@ -27,17 +28,13 @@ pub struct SentryApi<T: Adapter> {
 }
 
 impl<T: Adapter + 'static> SentryApi<T> {
-    pub fn new(
+    pub fn init(
         adapter: Arc<RwLock<T>>,
         channel: &Channel,
         config: &Config,
         logging: bool,
+        whoami: &str,
     ) -> Result<Self, ValidatorWorker> {
-        let whoami = adapter
-            .read()
-            .expect("new: failed to acquire read lock")
-            .whoami();
-
         let client = Client::builder()
             .timeout(Duration::from_secs(config.fetch_timeout.into()))
             .build()
@@ -60,7 +57,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
                     logging,
                     channel: channel.to_owned(),
                     config: config.to_owned(),
-                    whoami,
+                    whoami: whoami.to_owned(),
                 })
             }
             None => Err(ValidatorWorker::Failed(
@@ -69,7 +66,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
         }
     }
 
-    pub fn propagate(&self, messages: &[&MessageTypes]) {
+    pub async fn propagate(&self, messages: &[&MessageTypes]) {
         let serialised_messages: Vec<String> = messages
             .iter()
             .map(|message| serde_json::to_string(message).expect("failed to serialise message"))
@@ -78,6 +75,8 @@ impl<T: Adapter + 'static> SentryApi<T> {
         let mut adapter = self
             .adapter
             .write()
+            .compat()
+            .await
             .expect("propagate: failed to get write lock");
 
         for validator in self.channel.spec.validators.into_iter() {
@@ -90,10 +89,12 @@ impl<T: Adapter + 'static> SentryApi<T> {
 
             if let Err(e) = propagate_to(
                 &auth_token.unwrap(),
-                self.config.propagation_timeout,
+                &self.client,
                 &validator,
                 &serialised_messages,
-            ) {
+            )
+            .await
+            {
                 handle_http_error(e, &validator.url)
             }
         }
@@ -102,8 +103,9 @@ impl<T: Adapter + 'static> SentryApi<T> {
     pub async fn get_latest_msg(
         &self,
         from: String,
-        message_type: String,
-    ) -> Result<ValidatorMessageResponse, reqwest::Error> {
+        message_types: &[&str],
+    ) -> Result<Option<MessageTypes>, reqwest::Error> {
+        let message_type = message_types.join("+");
         let future = self
             .client
             .get(&format!(
@@ -114,14 +116,23 @@ impl<T: Adapter + 'static> SentryApi<T> {
             .and_then(|mut res: Response| res.json::<ValidatorMessageResponse>())
             .compat();
 
-        future.await
+        let response = future.await?;
+        match response {
+            ValidatorMessageResponse::ValidatorMessages(data) => {
+                if !data.is_empty() {
+                    return Ok(Some(data[0].msg.clone()));
+                }
+                Ok(None)
+            }
+        }
     }
 
     pub async fn get_our_latest_msg(
         &self,
-        message_type: String,
-    ) -> Result<ValidatorMessageResponse, reqwest::Error> {
-        self.get_latest_msg(self.whoami.clone(), message_type).await
+        message_types: &[&str],
+    ) -> Result<Option<MessageTypes>, reqwest::Error> {
+        self.get_latest_msg(self.whoami.clone(), message_types)
+            .await
     }
 
     pub async fn get_last_approved(&self) -> Result<LastApprovedResponse, reqwest::Error> {
@@ -154,6 +165,8 @@ impl<T: Adapter + 'static> SentryApi<T> {
         let mut adapter = self
             .adapter
             .write()
+            .compat()
+            .await
             .expect("get_event_aggregates: Failed to acquire adapter");
 
         let auth_token = adapter
@@ -178,24 +191,24 @@ impl<T: Adapter + 'static> SentryApi<T> {
     }
 }
 
-fn propagate_to(
+async fn propagate_to(
     auth_token: &str,
-    timeout: u32,
+    client: &Client,
     validator: &ValidatorDesc,
     messages: &[String],
 ) -> Result<(), reqwest::Error> {
-    // create client with timeout
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(timeout.into()))
-        .build()?;
     let url = validator.url.to_string();
 
     let _response: SuccessResponse = client
         .post(&url)
         .header(AUTHORIZATION, auth_token.to_string())
         .json(messages)
-        .send()?
-        .json()?;
+        .send()
+        .compat()
+        .await?
+        .json()
+        .compat()
+        .await?;
 
     Ok(())
 }
@@ -227,21 +240,19 @@ fn handle_http_error(e: reqwest::Error, url: &str) {
 
 pub async fn all_channels(
     sentry_url: &str,
-    adapter: impl Adapter + 'static,
-) -> Result<Vec<Channel>, ()> {
-    let validator = adapter.whoami();
+    whoami: String,
+) -> Result<Vec<Channel>, reqwest::Error> {
     let url = sentry_url.to_owned();
-    let first_page = fetch_page(url.clone(), 0, validator.clone())
-        .await
-        .expect("Failed to get channels from sentry url");
+    let first_page = fetch_page(url.clone(), 0, whoami.clone()).await?;
+
     if first_page.total_pages < 2 {
         Ok(first_page.channels)
     } else {
         let mut all: Vec<ChannelAllResponse> = try_join_all(
-            (0..first_page.total_pages).map(|i| fetch_page(url.clone(), i, validator.clone())),
+            (0..first_page.total_pages).map(|i| fetch_page(url.clone(), i, whoami.clone())),
         )
-        .await
-        .unwrap();
+        .await?;
+
         all.push(first_page);
         let result_all: Vec<Channel> = all
             .into_iter()

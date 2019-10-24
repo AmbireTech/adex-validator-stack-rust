@@ -55,7 +55,7 @@ pub struct Session {
     pub uid: String,
 }
 
-pub trait Adapter: ChannelValidator + Clone + Debug {
+pub trait Adapter: ChannelValidator + Clone + Debug + Send {
     type Output;
 
     /// Initialize adapter
