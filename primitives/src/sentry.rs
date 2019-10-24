@@ -53,7 +53,7 @@ pub struct EventAggregate {
     pub events: HashMap<String, AggregateEvents>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AggregateEvents {
     pub event_counts: HashMap<String, BigNum>,

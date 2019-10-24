@@ -7,15 +7,15 @@ pub(crate) fn reduce(
     ev: &Event,
 ) -> EventAggregate {
     match ev {
-        Event::Impression { .. } => {
+        Event::Impression { publisher, .. } => {
             let impression = initial_aggr
                 .events
                 .get("IMPRESSION")
                 .expect("Event IMPRESSION should exist in the EventAggregate");
 
-            let merge = merge_impression_ev(impression, &ev, &channel);
+            let merge = merge_impression_ev(impression, &publisher, &channel);
 
-            initial_aggr.events.insert("IMPRESSION".to_owned(), merge)
+            initial_aggr.events.insert("IMPRESSION".to_owned(), merge);
         }
         Event::Close => {
             let creator = channel.creator.clone();
@@ -25,18 +25,32 @@ pub(crate) fn reduce(
                     .into_iter()
                     .collect(),
             };
-            initial_aggr.events.insert("CLOSE".to_owned(), close_event)
+            initial_aggr.events.insert("CLOSE".to_owned(), close_event);
         }
-        _ => panic!("Whoopsy for now"),
+        _ => {}
     };
 
     initial_aggr
 }
 
 fn merge_impression_ev(
-    _aggr_events: &AggregateEvents,
-    _ev: &Event,
-    _channel: &Channel,
+    impression: &AggregateEvents,
+    earner: &str,
+    channel: &Channel,
 ) -> AggregateEvents {
-    unimplemented!();
+    let mut impression = impression.clone();
+
+    let event_counts = impression
+        .event_counts
+        .entry(earner.into())
+        .or_insert(0.into());
+    *event_counts += &1.into();
+
+    let event_payouts = impression
+        .event_payouts
+        .entry(earner.into())
+        .or_insert(0.into());
+    *event_payouts += &channel.spec.min_per_impression;
+
+    impression
 }
