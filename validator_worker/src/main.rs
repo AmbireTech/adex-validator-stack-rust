@@ -8,7 +8,7 @@ use futures::compat::Future01CompatExt;
 use futures::future::try_join_all;
 use futures::future::{join, FutureExt, TryFutureExt};
 use futures_locks::RwLock;
-use primitives::adapter::{Adapter, AdapterOptions, KeystoreOptions};
+use primitives::adapter::{Adapter, DummyAdapterOptions, KeystoreOptions};
 use primitives::config::{configuration, Config};
 use primitives::util::tests::prep_db::{AUTH, IDS};
 use primitives::Channel;

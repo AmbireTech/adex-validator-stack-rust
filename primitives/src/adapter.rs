@@ -51,7 +51,7 @@ pub struct Session {
     pub uid: String,
 }
 
-pub trait Adapter: ChannelValidator + Clone + Debug {
+pub trait Adapter: ChannelValidator + Send + Clone + Debug {
     /// Unlock adapter
     fn unlock(&mut self) -> AdapterResult<()>;
 

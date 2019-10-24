@@ -19,7 +19,7 @@ pub struct Application<A: Adapter> {
     config: Config,
 }
 
-impl<A: Adapter + Send + 'static> Application<A> {
+impl<A: Adapter + 'static> Application<A> {
     pub fn new(adapter: A, config: Config, logger: Logger, clustered: bool, port: u16) -> Self {
         Self {
             adapter,
