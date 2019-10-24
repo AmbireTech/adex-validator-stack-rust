@@ -1,11 +1,16 @@
 use crate::channel::{Channel, ChannelError, SpecValidator, SpecValidators};
 use crate::config::Config;
+use crate::ValidatorId;
 use chrono::Utc;
+use std::convert::TryFrom;
 
 pub trait ChannelValidator {
     fn is_channel_valid(config: &Config, channel: &Channel) -> Result<(), ChannelError> {
         let identity = &config.clone().identity.unwrap_or_else(|| "".to_string());
-        let adapter_channel_validator = match channel.spec.validators.find(identity) {
+        let validator_identity = ValidatorId::try_from(&identity[..]).map_err(|_| {
+            ChannelError::InvalidArgument("Failed to deserialize identity".to_string())
+        })?;
+        let adapter_channel_validator = match channel.spec.validators.find(validator_identity) {
             // check if the channel validators include our adapter identity
             SpecValidator::None => return Err(ChannelError::AdapterNotIncluded),
             SpecValidator::Leader(validator) | SpecValidator::Follower(validator) => validator,
@@ -45,7 +50,9 @@ pub fn all_validators_listed(validators: &SpecValidators, whitelist: &[String]) 
     } else {
         let found_validators = whitelist
             .iter()
-            .filter(|&allowed| {
+            .map(|identity| ValidatorId::try_from(&identity[..]))
+            .filter_map(Result::ok)
+            .filter(|allowed| {
                 allowed == &validators.leader().id || allowed == &validators.follower().id
             })
             // this will ensure that if we find the 2 validators earlier

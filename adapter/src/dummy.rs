@@ -1,15 +1,16 @@
 use primitives::adapter::{Adapter, AdapterError, AdapterOptions, AdapterResult, Session};
 use primitives::channel_validator::ChannelValidator;
 use primitives::config::Config;
-use primitives::Channel;
+use primitives::{Channel, ValidatorId};
 use std::collections::HashMap;
+use std::convert::TryFrom;
 
 #[derive(Debug, Clone)]
 pub struct DummyAdapter {
-    identity: String,
+    identity: ValidatorId,
     config: Config,
     // Auth tokens that we have verified (tokenId => session)
-    session_tokens: HashMap<String, String>,
+    session_tokens: HashMap<String, ValidatorId>,
     // Auth tokens that we've generated to authenticate with someone (address => token)
     authorization_tokens: HashMap<String, String>,
 }
@@ -22,7 +23,7 @@ impl Adapter for DummyAdapter {
     type Output = DummyAdapter;
 
     fn init(opts: AdapterOptions, config: &Config) -> AdapterResult<DummyAdapter> {
-        let (identity, authorization_tokens, session_tokens) = match opts {
+        let (identity, session_tokens, authorization_tokens) = match opts {
             AdapterOptions::DummAdapter {
                 dummy_identity,
                 dummy_auth,
@@ -47,7 +48,7 @@ impl Adapter for DummyAdapter {
         Ok(())
     }
 
-    fn whoami(&self) -> String {
+    fn whoami(&self) -> ValidatorId {
         self.identity.clone()
     }
 
@@ -55,16 +56,21 @@ impl Adapter for DummyAdapter {
         let signature = format!(
             "Dummy adapter signature for {} by {}",
             state_root,
-            self.whoami()
+            self.whoami().to_hex_prefix_string()
         );
         Ok(signature)
     }
 
-    fn verify(&self, signer: &str, _state_root: &str, signature: &str) -> AdapterResult<bool> {
+    fn verify(
+        &self,
+        signer: &ValidatorId,
+        _state_root: &str,
+        signature: &str,
+    ) -> AdapterResult<bool> {
         // select the `identity` and compare it to the signer
         // for empty string this will return array with 1 element - an empty string `[""]`
         let is_same = match signature.rsplit(' ').take(1).next() {
-            Some(from) => from == signer,
+            Some(from) => from == signer.to_hex_prefix_string(),
             None => false,
         };
 
@@ -86,7 +92,7 @@ impl Adapter for DummyAdapter {
 
         match identity {
             Some((id, _)) => Ok(Session {
-                uid: id.to_owned(),
+                uid: self.session_tokens[id].clone(),
                 era: 0,
             }),
             None => Err(AdapterError::Authentication(format!(
@@ -96,12 +102,11 @@ impl Adapter for DummyAdapter {
         }
     }
 
-    fn get_auth(&mut self, _validator: &str) -> AdapterResult<String> {
+    fn get_auth(&mut self, _validator: &ValidatorId) -> AdapterResult<String> {
         let who = self
             .session_tokens
             .iter()
             .find(|(_, id)| *id == &self.identity);
-
         match who {
             Some((id, _)) => {
                 let auth = self.authorization_tokens.get(id).expect("id should exist");

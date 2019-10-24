@@ -8,6 +8,7 @@ use chrono::{DateTime, Utc};
 use ethabi::encode;
 use ethabi::param_type::ParamType;
 use ethabi::token::{LenientTokenizer, StrictTokenizer, Tokenizer};
+use hex::FromHex;
 use primitives::channel::ChannelError;
 use primitives::BigNum;
 use primitives::Channel;
@@ -27,12 +28,12 @@ pub enum AdapterTypes {
 }
 
 pub fn get_signable_state_root(
-    channel_id: &str,
-    balance_root: &str,
+    channel_id: &[u8],
+    balance_root: &[u8; 32],
 ) -> Result<[u8; 32], Box<dyn Error>> {
     let params = [
-        (ParamType::FixedBytes(32), channel_id),
-        (ParamType::FixedBytes(32), balance_root),
+        (ParamType::FixedBytes(32), &hex::encode(channel_id)[..]),
+        (ParamType::FixedBytes(32), &hex::encode(balance_root)[..]),
     ];
     let encoded = encode_params(&params, true)?;
 
@@ -45,10 +46,10 @@ pub fn get_signable_state_root(
     Ok(res)
 }
 
-pub fn get_balance_leaf(acc: &str, amnt: &BigNum) -> Result<[u8; 32], Box<dyn Error>> {
+pub fn get_balance_leaf(acc: &[u8; 20], amnt: &BigNum) -> Result<[u8; 32], Box<dyn Error>> {
     let params = [
-        (ParamType::Address, acc),
-        (ParamType::Uint(256), &amnt.to_str_radix(16)),
+        (ParamType::Address, &hex::encode(acc)[..]),
+        (ParamType::Uint(256), &amnt.to_str_radix(10)[..]),
     ];
     let encoded = encode_params(&params, true)?;
 
@@ -87,7 +88,7 @@ impl TryFrom<&Channel> for EthereumChannel {
             .spec
             .validators
             .into_iter()
-            .map(|v| v.id.clone())
+            .map(|v| v.id.to_string())
             .collect();
 
         EthereumChannel::new(
@@ -143,7 +144,7 @@ impl EthereumChannel {
             creator: creator.to_owned(),
             token_addr: token_addr.to_owned(),
             token_amount: token_amount.to_owned(),
-            valid_until: valid_until.timestamp(),
+            valid_until: valid_until.timestamp_millis(),
             validators: format!("[{}]", validators.join(",")),
             spec: spec.to_owned(),
         })
@@ -194,7 +195,9 @@ impl EthereumChannel {
         contract_addr: &str,
         balance_root: &str,
     ) -> Result<[u8; 32], Box<dyn Error>> {
-        get_signable_state_root(contract_addr, balance_root)
+        let root = <[u8; 32]>::from_hex(balance_root).unwrap();
+        let addr = hex::decode(contract_addr).unwrap();
+        get_signable_state_root(&addr, &root)
     }
 
     pub fn hash_to_sign_hex(
@@ -224,6 +227,7 @@ fn encode_params(params: &[(ParamType, &str)], lenient: bool) -> Result<Vec<u8>,
 
 #[cfg(test)]
 mod test {
+    use hex::FromHex;
     use std::convert::TryFrom;
 
     use byteorder::{BigEndian, ByteOrder};
@@ -235,6 +239,19 @@ mod test {
 
     #[test]
     fn test_get_signable_state_root_hash_is_aligned_with_js_impl() {
+        let balance_leaf = get_balance_leaf(
+            &<[u8; 20]>::from_hex("b7d3f81e857692d13e9d63b232a90f4a1793189e").expect("js_impl"),
+            &BigNum::try_from("2").expect("failed"),
+        )
+        .expect("failed");
+        println!("{}", hex::encode(balance_leaf));
+        let balance_leaf2 = get_balance_leaf(
+            &<[u8; 20]>::from_hex("b7d3f81e857692d13e9d63b232a90f4a1793189e").expect("js_impl"),
+            &BigNum::try_from("4").expect("failed"),
+        )
+        .expect("failed");
+        println!("{}", hex::encode(balance_leaf2));
+
         let timestamp = Utc.ymd(2019, 9, 12).and_hms(17, 0, 0);
         let mut timestamp_buf = [0_u8; 32];
         let n: u64 = u64::try_from(timestamp.timestamp_millis())
@@ -242,12 +259,14 @@ mod test {
         BigEndian::write_uint(&mut timestamp_buf[26..], n, 6);
 
         let merkle_tree = MerkleTree::new(&[timestamp_buf]);
-        let info_root_raw = hex::encode(merkle_tree.root());
 
         let channel_id = "061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088";
 
-        let state_root =
-            get_signable_state_root(&channel_id, &info_root_raw).expect("Should get state_root");
+        let state_root = get_signable_state_root(
+            &hex::decode(&channel_id[2..]).expect("fialed"),
+            &merkle_tree.root(),
+        )
+        .expect("Should get state_root");
 
         let expected_hex =
             hex::decode("b68cde9b0c8b63ac7152e78a65c736989b4b99bfc252758b1c3fd6ca357e0d6b")

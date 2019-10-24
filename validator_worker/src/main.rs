@@ -7,12 +7,16 @@ use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
 use futures::compat::Future01CompatExt;
 use futures::future::try_join_all;
 use futures::future::{join, FutureExt, TryFutureExt};
-use futures_locks::RwLock;
+// use futures_locks::RwLock;
+use async_std::sync::RwLock;
 use primitives::adapter::{Adapter, AdapterOptions, KeystoreOptions};
 use primitives::config::{configuration, Config};
 use primitives::util::tests::prep_db::{AUTH, IDS};
-use primitives::Channel;
+use primitives::{Channel, SpecValidator, ValidatorId};
+use std::convert::TryFrom;
+use std::error::Error;
 use std::ops::Add;
+use std::process::id;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::timer::Delay;
@@ -25,10 +29,10 @@ struct Args<A: Adapter> {
     sentry_url: String,
     config: Config,
     adapter: Arc<RwLock<A>>,
-    whoami: String,
+    whoami: ValidatorId,
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     let cli = App::new("Validator worker")
         .version("0.1")
         .arg(
@@ -99,7 +103,7 @@ fn main() {
                 .value_of("dummyIdentity")
                 .expect("unable to get dummyIdentity");
             let options = AdapterOptions::DummAdapter {
-                dummy_identity: dummy_identity.to_string(),
+                dummy_identity: ValidatorId::try_from(dummy_identity)?,
                 dummy_auth: IDS.clone(),
                 dummy_auth_tokens: AUTH.clone(),
             };
@@ -121,7 +125,12 @@ fn main() {
     }
 }
 
-fn run<A: Adapter + 'static>(is_single_tick: bool, sentry_url: &str, config: &Config, adapter: A) {
+fn run<A: Adapter + 'static>(
+    is_single_tick: bool,
+    sentry_url: &str,
+    config: &Config,
+    adapter: A,
+) -> Result<(), Box<dyn Error>> {
     let sentry_adapter = Arc::new(RwLock::new(adapter.clone()));
     let whoami = adapter.whoami();
 
@@ -134,9 +143,12 @@ fn run<A: Adapter + 'static>(is_single_tick: bool, sentry_url: &str, config: &Co
 
     if is_single_tick {
         tokio::run(iterate_channels(args).boxed().compat());
+        println!("should exit 2 {} {}", id(), adapter.whoami());
     } else {
         tokio::run(infinite(args).boxed().compat());
     }
+
+    Ok(())
 }
 
 async fn infinite<A: Adapter + 'static>(args: Args<A>) -> Result<(), ()> {
@@ -153,7 +165,7 @@ async fn infinite<A: Adapter + 'static>(args: Args<A>) -> Result<(), ()> {
 }
 
 async fn iterate_channels<A: Adapter + 'static>(args: Args<A>) -> Result<(), ()> {
-    let result = all_channels(&args.sentry_url, args.whoami.clone()).await;
+    let result = all_channels(&args.sentry_url, args.whoami.to_hex_prefix_string()).await;
 
     if let Err(e) = result {
         eprintln!("Failed to get channels {}", e);
@@ -180,7 +192,7 @@ async fn iterate_channels<A: Adapter + 'static>(args: Args<A>) -> Result<(), ()>
             args.config.max_channels
         )
     }
-
+    println!("should exit");
     Ok(())
 }
 
@@ -188,18 +200,13 @@ async fn validator_tick<A: Adapter + 'static>(
     adapter: Arc<RwLock<A>>,
     channel: Channel,
     config: &Config,
-    whoami: &str,
+    whoami: &ValidatorId,
 ) -> Result<(), ValidatorWorkerError> {
     let sentry = SentryApi::init(adapter, &channel, &config, true, whoami)?;
-
-    let index = channel
-        .spec
-        .validators
-        .into_iter()
-        .position(|v| v.id == *whoami);
     let duration = Duration::from_secs(config.validator_tick_timeout as u64);
-    match index {
-        Some(0) => {
+
+    match channel.spec.validators.find(whoami.to_owned()) {
+        SpecValidator::Leader(_) => {
             if let Err(e) = leader::tick(&sentry)
                 .boxed()
                 .compat()
@@ -210,7 +217,7 @@ async fn validator_tick<A: Adapter + 'static>(
                 return Err(ValidatorWorkerError::Failed(e.to_string()));
             }
         }
-        Some(1) => {
+        SpecValidator::Follower(_) => {
             if let Err(e) = follower::tick(&sentry)
                 .boxed()
                 .compat()
@@ -221,7 +228,7 @@ async fn validator_tick<A: Adapter + 'static>(
                 return Err(ValidatorWorkerError::Failed(e.to_string()));
             }
         }
-        _ => {
+        SpecValidator::None => {
             return Err(ValidatorWorkerError::Failed(
                 "validatorTick: processing a channel where we are not validating".to_string(),
             ))

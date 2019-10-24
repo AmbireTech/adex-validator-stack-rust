@@ -3,9 +3,12 @@ use std::pin::Pin;
 use chrono::{DateTime, Utc};
 use futures::prelude::*;
 use serde::{Deserialize, Serialize};
+use serde_hex::{SerHex, StrictPfx};
+use std::fmt;
 
 use crate::Channel;
-use crate::{BalancesMap, BigNum};
+use crate::{BalancesMap, BigNum, DomainError};
+use std::convert::TryFrom;
 
 #[derive(Debug)]
 pub enum ValidatorError {
@@ -17,6 +20,67 @@ pub enum ValidatorError {
 
 pub type ValidatorFuture<T> = Pin<Box<dyn Future<Output = Result<T, ValidatorError>> + Send>>;
 
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(transparent)]
+pub struct ValidatorId(#[serde(with = "SerHex::<StrictPfx>")] [u8; 20]);
+
+impl ValidatorId {
+    pub fn to_hex_prefix_string(&self) -> String {
+        format!("0x{}", hex::encode(self.0))
+    }
+
+    pub fn into_inner(&self) -> &[u8; 20] {
+        &self.0
+    }
+}
+
+impl TryFrom<&str> for ValidatorId {
+    type Error = DomainError;
+    // 0x prefixed string
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        // use hex::FromHex;
+        // @TODO: Should we have some constrains(like valid hex string starting with `0x`)? If not this should be just `From`.
+        let mut hex_value = value;
+        if value.len() == 42 {
+            hex_value = &value[2..];
+        }
+        let result = hex::decode(hex_value).map_err(|_| {
+            DomainError::InvalidArgument("Failed to deserialize validator id".to_string())
+        })?;
+        let mut id: [u8; 20] = [0; 20];
+        id.copy_from_slice(&result[..]);
+        Ok(Self(id))
+    }
+}
+
+impl TryFrom<String> for ValidatorId {
+    type Error = DomainError;
+    // 0x prefixed string
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        println!("value {}", value );
+        // use hex::FromHex;
+        // @TODO: Should we have some constrains(like valid hex string starting with `0x`)? If not this should be just `From`.
+        let result = hex::decode(&value[2..]).map_err(|_| {
+            DomainError::InvalidArgument("Failed to deserialize validator id".to_string())
+        })?;
+        let mut id: [u8; 20] = [0; 20];
+        id.copy_from_slice(&result[..]);
+        Ok(Self(id))
+    }
+}
+// returns a 0x prefix string
+impl Into<String> for ValidatorId {
+    fn into(self) -> String {
+        format!("{}", hex::encode(self.0))
+    }
+}
+
+impl fmt::Display for ValidatorId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", format!("0x{}", hex::encode(self.0)))
+    }
+}
+
 pub trait Validator {
     fn tick(&self, channel: Channel) -> ValidatorFuture<()>;
 }
@@ -24,7 +88,7 @@ pub trait Validator {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ValidatorDesc {
-    pub id: String,
+    pub id: ValidatorId,
     pub url: String,
     pub fee: BigNum,
 }
@@ -34,7 +98,7 @@ pub struct ValidatorDesc {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Accounting {
-    #[serde(rename = "last_ev_aggr")]
+    #[serde(rename = "lastEvAggr")]
     pub last_event_aggregate: DateTime<Utc>,
     pub balances_before_fees: BalancesMap,
     pub balances: BalancesMap,

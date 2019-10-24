@@ -4,15 +4,17 @@ use std::fmt;
 use chrono::serde::{ts_milliseconds, ts_seconds};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_hex::{SerHex, StrictPfx};
 
 use crate::big_num::BigNum;
 use crate::util::serde::ts_milliseconds_option;
-use crate::{AdUnit, EventSubmission, TargetingTag, ValidatorDesc};
+use crate::{AdUnit, EventSubmission, TargetingTag, ValidatorDesc, ValidatorId};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Channel {
-    pub id: String,
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub id: [u8; 32],
     pub creator: String,
     pub deposit_asset: String,
     pub deposit_amount: BigNum,
@@ -103,7 +105,7 @@ impl SpecValidators {
         &self.0[1]
     }
 
-    pub fn find(&self, validator_id: &str) -> SpecValidator<'_> {
+    pub fn find(&self, validator_id: ValidatorId) -> SpecValidator<'_> {
         if self.leader().id == validator_id {
             SpecValidator::Leader(&self.leader())
         } else if self.follower().id == validator_id {

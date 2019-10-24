@@ -77,7 +77,7 @@ fn distribute_fee<'a>(
 
         if fee_rounded > 0.into() {
             let entry = balances
-                .entry(validator.id.clone())
+                .entry(validator.id.to_string().clone())
                 .or_insert_with(|| 0.into());
 
             *entry += &fee_rounded;
@@ -209,8 +209,11 @@ mod test {
             let expected_balances: BalancesMap = vec![
                 ("a".to_string(), 990.into()),
                 ("b".to_string(), 1_188.into()),
-                (IDS.get("leader").unwrap().to_owned(), 11.into()),
-                (IDS.get("follower").unwrap().to_owned(), 11.into()),
+                (IDS.get("leader").unwrap().to_hex_prefix_string(), 11.into()),
+                (
+                    IDS.get("follower").unwrap().to_hex_prefix_string(),
+                    11.into(),
+                ),
             ]
             .into_iter()
             .collect();
@@ -233,7 +236,10 @@ mod test {
             let balances_map = vec![
                 ("a".to_string(), 100.into()),
                 ("b".to_string(), 2_000.into()),
-                (IDS.get("leader").unwrap().to_owned(), 200.into()),
+                (
+                    IDS.get("leader").unwrap().to_hex_prefix_string(),
+                    200.into(),
+                ),
             ]
             .into_iter()
             .collect();
@@ -241,8 +247,14 @@ mod test {
             let expected_balances: BalancesMap = vec![
                 ("a".to_string(), 99.into()),
                 ("b".to_string(), 1_980.into()),
-                (IDS.get("leader").unwrap().to_owned(), 209.into()),
-                (IDS.get("follower").unwrap().to_owned(), 11.into()),
+                (
+                    IDS.get("leader").unwrap().to_hex_prefix_string(),
+                    209.into(),
+                ),
+                (
+                    IDS.get("follower").unwrap().to_hex_prefix_string(),
+                    11.into(),
+                ),
             ]
             .into_iter()
             .collect();
@@ -279,8 +291,11 @@ mod test {
                 ("c".to_string(), 693.into()),
                 ("d".to_string(), 4_950.into()),
                 ("e".to_string(), 3_960.into()),
-                (IDS.get("leader").unwrap().to_owned(), 51.into()),
-                (IDS.get("follower").unwrap().to_owned(), 50.into()),
+                (IDS.get("leader").unwrap().to_hex_prefix_string(), 51.into()),
+                (
+                    IDS.get("follower").unwrap().to_hex_prefix_string(),
+                    50.into(),
+                ),
             ]
             .into_iter()
             .collect();

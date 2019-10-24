@@ -7,7 +7,7 @@ use primitives::{
     adapter::{Adapter, AdapterError, AdapterOptions, AdapterResult, Session},
     channel_validator::ChannelValidator,
     config::Config,
-    Channel,
+    Channel, ValidatorId,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -34,7 +34,7 @@ lazy_static! {
 
 #[derive(Debug, Clone)]
 pub struct EthereumAdapter {
-    address: String,
+    address: ValidatorId,
     keystore_json: Value,
     keystore_pwd: Password,
     config: Config,
@@ -79,8 +79,10 @@ impl Adapter for EthereumAdapter {
             }
         };
 
+        let identity = ValidatorId::try_from(address)?;
+
         Ok(Self {
-            address,
+            address: identity,
             keystore_json,
             keystore_pwd: keystore_pwd.into(),
             session_tokens: HashMap::new(),
@@ -104,7 +106,7 @@ impl Adapter for EthereumAdapter {
         Ok(())
     }
 
-    fn whoami(&self) -> String {
+    fn whoami(&self) -> ValidatorId {
         self.address.clone()
     }
 
@@ -124,17 +126,10 @@ impl Adapter for EthereumAdapter {
         }
     }
 
-    fn verify(&self, signer: &str, state_root: &str, sig: &str) -> AdapterResult<bool> {
-        let (decoded_adress, decoded_signature) = match (hex::decode(signer), hex::decode(sig)) {
-            (Ok(address), Ok(sig)) => (address, sig),
-            _ => {
-                return Err(AdapterError::Signature(
-                    "invalid signature or address".to_string(),
-                ))
-            }
-        };
-
-        let address = Address::from_slice(&decoded_adress);
+    fn verify(&self, signer: &ValidatorId, state_root: &str, sig: &str) -> AdapterResult<bool> {
+        let decoded_signature = hex::decode(sig)
+            .map_err(|_| AdapterError::Signature("invalid signature".to_string()))?;
+        let address = Address::from_slice(signer.into_inner());
         let signature = Signature::from_electrum(&decoded_signature);
         let message = Message::from_slice(&hash_message(state_root));
 
@@ -142,11 +137,6 @@ impl Adapter for EthereumAdapter {
     }
 
     fn validate_channel(&self, channel: &Channel) -> AdapterResult<bool> {
-        if check_validator_id_checksum(channel) {
-            return Err(AdapterError::Configuration(
-                "channel.validators: all addresses are checksummed".to_string(),
-            ));
-        }
         // check if channel is valid
         if let Err(e) = EthereumAdapter::is_channel_valid(&self.config, channel) {
             return Err(AdapterError::InvalidChannel(e.to_string()));
@@ -159,7 +149,8 @@ impl Adapter for EthereumAdapter {
             .hash_hex(&self.config.ethereum_core_address)
             .map_err(|_| map_error("Failed to hash the channel id"))?;
 
-        if channel_id != channel.id {
+        let our_channel_id = format!("0x{}", hex::encode(channel.id));
+        if channel_id != our_channel_id {
             return Err(AdapterError::Configuration(
                 "channel.id is not valid".to_string(),
             ));
@@ -220,12 +211,18 @@ impl Adapter for EthereumAdapter {
 
         let sess = match &verified.payload.identity {
             Some(identity) => {
-                let contract_address = Address::from_slice(identity.as_bytes());
+                let contract_address = Address::from_slice(identity.into_inner());
                 let contract = get_contract(&self.config, contract_address, &IDENTITY_ABI)
                     .map_err(|_| map_error("failed to init identity contract"))?;
 
                 let priviledge_level: U256 = contract
-                    .query("privileges", verified.from, None, Options::default(), None)
+                    .query(
+                        "privileges",
+                        verified.from.to_string(),
+                        None,
+                        Options::default(),
+                        None,
+                    )
                     .wait()
                     .map_err(|_| map_error("failed query priviledge level on contract"))?;
 
@@ -249,12 +246,15 @@ impl Adapter for EthereumAdapter {
         Ok(sess)
     }
 
-    fn get_auth(&mut self, validator_id: &str) -> AdapterResult<String> {
+    fn get_auth(&mut self, validator_id: &ValidatorId) -> AdapterResult<String> {
         let validator = validator_id.to_owned();
-        match (&self.wallet, self.authorization_tokens.get(&validator)) {
+        match (
+            &self.wallet,
+            self.authorization_tokens.get(&validator.to_string()),
+        ) {
             (Some(_), Some(token)) => Ok(token.to_owned()),
             (Some(wallet), None) => {
-                let era = Utc::now().timestamp() as f64 / 60000.0;
+                let era = Utc::now().timestamp_millis() as f64 / 60000.0;
                 let payload = Payload {
                     id: validator.clone(),
                     era: era.floor() as i64,
@@ -265,7 +265,7 @@ impl Adapter for EthereumAdapter {
                     .map_err(|_| map_error("Failed to sign token"))?;
 
                 self.authorization_tokens
-                    .insert(validator.clone(), token.clone());
+                    .insert(validator.to_string(), token.clone());
 
                 Ok(token)
             }
@@ -274,14 +274,6 @@ impl Adapter for EthereumAdapter {
             )),
         }
     }
-}
-
-fn check_validator_id_checksum(channel: &Channel) -> bool {
-    channel
-        .spec
-        .validators
-        .into_iter()
-        .any(|v| v.id != eth_checksum::checksum(&v.id))
 }
 
 fn hash_message(message: &str) -> [u8; 32] {
@@ -318,17 +310,17 @@ fn get_contract(
 // Ethereum Web Tokens
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Payload {
-    pub id: String,
+    pub id: ValidatorId,
     pub era: i64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub address: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub identity: Option<String>,
+    pub identity: Option<ValidatorId>,
 }
 
 #[derive(Clone, Debug)]
 pub struct VerifyPayload {
-    pub from: String,
+    pub from: ValidatorId,
     pub payload: Payload,
 }
 
@@ -395,7 +387,7 @@ pub fn ewt_verify(
     let payload: Payload = serde_json::from_str(&payload_string)?;
 
     let verified_payload = VerifyPayload {
-        from: eth_checksum::checksum(&format!("{:?}", address)),
+        from: ValidatorId::try_from(format!("{:?}", address))?,
         payload,
     };
 
@@ -433,7 +425,7 @@ mod test {
         let mut eth_adapter = setup_eth_adapter();
         let whoami = eth_adapter.whoami();
         assert_eq!(
-            whoami, "0x2bDeAFAE53940669DaA6F519373f686c1f3d3393",
+            whoami.to_hex_prefix_string(), "0x2bdeafae53940669daa6f519373f686c1f3d3393",
             "failed to get correct whoami"
         );
 
@@ -451,7 +443,8 @@ mod test {
             "ce654de0b3d14d63e1cb3181eee7a7a37ef4a06c9fabc204faf96f26357441b625b1be460fbe8f5278cc02aa88a5d0ac2f238e9e3b8e4893760d33bccf77e47f1b";
         let verify = eth_adapter
             .verify(
-                "2bDeAFAE53940669DaA6F519373f686c1f3d3393",
+                &ValidatorId::try_from("2bDeAFAE53940669DaA6F519373f686c1f3d3393")
+                    .expect("Failed to parse id"),
                 "2bdeafae53940669daa6f519373f686c",
                 &signature,
             )
@@ -465,9 +458,10 @@ mod test {
         eth_adapter.unlock().expect("should unlock eth adapter");
 
         let payload = Payload {
-            id: "awesomeValidator".to_string(),
+            id: ValidatorId::try_from("0xce07CbB7e054514D590a0262C93070D838bFBA2e")
+                .expect("failed to parse id"),
             era: 100_000,
-            address: Some(eth_adapter.whoami()),
+            address: Some(eth_adapter.whoami().to_hex_prefix_string()),
             identity: None,
         };
         let wallet = eth_adapter.wallet.clone();

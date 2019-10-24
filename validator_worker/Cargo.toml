@@ -38,3 +38,4 @@ clap = "2.33.0"
 slog = { version = "^2.2.3" , features = ["max_level_trace"] }
 slog-term = "^2.4.0"
 slog-async = "^2.3.0"
+async-std = "^0.99.10"
