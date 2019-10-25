@@ -98,22 +98,22 @@ mod test {
         );
     }
 
-    // #[test]
-    // fn get_state_root_hash_returns_correct_hash_for_fake_channel_aligning_with_js_impl() {
-    //     let channel = DUMMY_CHANNEL.clone();
+    #[test]
+    fn get_state_root_hash_returns_correct_hash_for_fake_channel_aligning_with_js_impl() {
+        let channel = DUMMY_CHANNEL.clone();
 
-    //     let iface = setup_iface(&channel);
+        let iface = setup_iface(&channel);
 
-    //     let balances: BalancesMap = vec![(IDS["publisher"].clone(), 0.into())]
-    //         .into_iter()
-    //         .collect();
+        let balances: BalancesMap = vec![(IDS["publisher"].to_string(), 0.into())]
+            .into_iter()
+            .collect();
 
-    //     let actual_hash =
-    //         get_state_root_hash(&iface, &balances).expect("should get state root hash");
+        let actual_hash =
+            get_state_root_hash(&iface, &balances).expect("should get state root hash");
 
-    //     assert_eq!(
-    //         "4fad5375c3ef5f8a9d23a8276fed0151164dea72a5891cec8b43e1d190ed430e",
-    //         hex::encode(actual_hash)
-    //     );
-    // }
+        assert_eq!(
+            "4fad5375c3ef5f8a9d23a8276fed0151164dea72a5891cec8b43e1d190ed430e",
+            hex::encode(actual_hash)
+        );
+    }
 }
