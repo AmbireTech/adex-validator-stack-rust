@@ -11,6 +11,7 @@ pub mod routes {
     pub mod channel;
 }
 
+pub mod access;
 pub mod db;
 
 pub struct Application<A: Adapter> {
