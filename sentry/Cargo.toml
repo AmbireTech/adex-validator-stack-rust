@@ -17,9 +17,13 @@ clap = "2.33.0"
 tokio = "0.2.0-alpha.6"
 hyper = {version = "=0.13.0-alpha.4", features = ["unstable-stream"]}
 regex = "1"
+# Database
+redis = "0.13.0"
 # Logger
 slog = { version = "^2.2.3" , features = ["max_level_trace"] }
 # Serde
 serde = {version = "^1.0", features = ['derive']}
 serde_json = "^1.0"
 serde_urlencoded = "0.6.1"
+# Other
+lazy_static = "1.4.0"
