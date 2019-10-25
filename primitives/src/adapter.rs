@@ -1,5 +1,5 @@
 use crate::channel_validator::ChannelValidator;
-use crate::{Channel, Config};
+use crate::Channel;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
@@ -33,14 +33,10 @@ impl fmt::Display for AdapterError {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum AdapterOptions {
-    DummAdapter {
-        dummy_identity: String,
-        dummy_auth: HashMap<String, String>,
-        dummy_auth_tokens: HashMap<String, String>,
-    },
-    EthereumAdapter(KeystoreOptions),
+pub struct DummyAdapterOptions {
+    pub dummy_identity: String,
+    pub dummy_auth: HashMap<String, String>,
+    pub dummy_auth_tokens: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone)]
@@ -55,12 +51,7 @@ pub struct Session {
     pub uid: String,
 }
 
-pub trait Adapter: ChannelValidator + Clone + Debug + Send {
-    type Output;
-
-    /// Initialize adapter
-    fn init(opts: AdapterOptions, config: &Config) -> AdapterResult<Self::Output>;
-
+pub trait Adapter: ChannelValidator + Send + Clone + Debug {
     /// Unlock adapter
     fn unlock(&mut self) -> AdapterResult<()>;
 

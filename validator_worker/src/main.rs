@@ -8,7 +8,7 @@ use futures::compat::Future01CompatExt;
 use futures::future::try_join_all;
 use futures::future::{join, FutureExt, TryFutureExt};
 use futures_locks::RwLock;
-use primitives::adapter::{Adapter, AdapterOptions, KeystoreOptions};
+use primitives::adapter::{Adapter, DummyAdapterOptions, KeystoreOptions};
 use primitives::config::{configuration, Config};
 use primitives::util::tests::prep_db::{AUTH, IDS};
 use primitives::Channel;
@@ -89,23 +89,20 @@ fn main() {
                 keystore_file: keystore_file.to_string(),
                 keystore_pwd,
             };
-            let options = AdapterOptions::EthereumAdapter(keystore_options);
             AdapterTypes::EthereumAdapter(Box::new(
-                EthereumAdapter::init(options, &config).expect("failed to init adapter"),
+                EthereumAdapter::init(keystore_options, &config).expect("failed to init adapter"),
             ))
         }
         "dummy" => {
             let dummy_identity = cli
                 .value_of("dummyIdentity")
                 .expect("unable to get dummyIdentity");
-            let options = AdapterOptions::DummAdapter {
+            let options = DummyAdapterOptions {
                 dummy_identity: dummy_identity.to_string(),
                 dummy_auth: IDS.clone(),
                 dummy_auth_tokens: AUTH.clone(),
             };
-            AdapterTypes::DummyAdapter(Box::new(
-                DummyAdapter::init(options, &config).expect("failed to init adapter"),
-            ))
+            AdapterTypes::DummyAdapter(Box::new(DummyAdapter::init(options, &config)))
         }
         // @TODO exit gracefully
         _ => panic!("We don't have any other adapters implemented yet!"),

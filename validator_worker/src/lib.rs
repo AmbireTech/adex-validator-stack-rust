@@ -47,20 +47,20 @@ mod test {
 
     use adapter::DummyAdapter;
     use futures_locks::RwLock;
-    use primitives::adapter::AdapterOptions;
+    use primitives::adapter::DummyAdapterOptions;
     use primitives::config::configuration;
     use primitives::util::tests::prep_db::{AUTH, DUMMY_CHANNEL, IDS};
     use primitives::{BalancesMap, Channel};
     use std::sync::Arc;
 
     fn setup_iface(channel: &Channel) -> SentryApi<DummyAdapter> {
-        let adapter_options = AdapterOptions::DummAdapter {
+        let adapter_options = DummyAdapterOptions {
             dummy_identity: IDS["leader"].clone(),
             dummy_auth: IDS.clone(),
             dummy_auth_tokens: AUTH.clone(),
         };
         let config = configuration("development", None).expect("Dev config should be available");
-        let dummy_adapter = DummyAdapter::init(adapter_options, &config).expect("init adadpter");
+        let dummy_adapter = DummyAdapter::init(adapter_options, &config);
         let whoami = dummy_adapter.whoami();
 
         SentryApi::init(

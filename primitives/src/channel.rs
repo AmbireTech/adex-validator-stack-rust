@@ -129,49 +129,6 @@ impl<'a> IntoIterator for &'a SpecValidators {
     }
 }
 
-pub struct ChannelListParams {
-    /// page to show, should be >= 1
-    pub page: u64,
-    /// channels limit per page, should be >= 1
-    pub limit: u32,
-    /// filters `valid_until` to be `>= valid_until_ge`
-    pub valid_until_ge: DateTime<Utc>,
-    /// filters the channels containing a specific validator if provided
-    pub validator: Option<String>,
-    /// Ensures that this struct can only be created by calling `new()`
-    _secret: (),
-}
-
-impl ChannelListParams {
-    pub fn new(
-        valid_until_ge: DateTime<Utc>,
-        limit: u32,
-        page: u64,
-        validator: Option<&str>,
-    ) -> Result<Self, ChannelError> {
-        if page < 1 {
-            return Err(ChannelError::InvalidArgument(
-                "Page should be >= 1".to_string(),
-            ));
-        }
-
-        if limit < 1 {
-            return Err(ChannelError::InvalidArgument(
-                "Limit should be >= 1".to_string(),
-            ));
-        }
-
-        let validator = validator.and_then(|s| if s.is_empty() { None } else { Some(s.into()) });
-        Ok(Self {
-            valid_until_ge,
-            page,
-            limit,
-            validator,
-            _secret: (),
-        })
-    }
-}
-
 #[derive(Debug, PartialEq, Eq)]
 pub enum ChannelError {
     InvalidArgument(String),
