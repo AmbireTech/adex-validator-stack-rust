@@ -98,25 +98,22 @@ impl<T: Adapter + 'static> SentryApi<T> {
         message_types: &[&str],
     ) -> Result<Option<MessageTypes>, reqwest::Error> {
         let message_type = message_types.join("+");
-        let future = self
+        let url = format!(
+            "{}/validator-messages/{}/{}?limit=1",
+            self.validator_url, from, message_type
+        );
+        let result = self
             .client
-            .get(&format!(
-                "{}/validator-messages/{}/{}?limit=1",
-                self.validator_url, from, message_type
-            ))
+            .get(&url)
             .send()
             .and_then(|mut res: Response| res.json::<ValidatorMessageResponse>())
-            .compat();
-
-        let response = future.await?;
-        match response {
-            ValidatorMessageResponse::ValidatorMessages(data) => {
-                if !data.is_empty() {
-                    return Ok(Some(data[0].msg.clone()));
-                }
-                Ok(None)
-            }
+            .compat()
+            .await?;
+        if !result.validator_messages.is_empty() {
+            return Ok(Some(result.validator_messages[0].msg.clone()));
         }
+
+        Ok(None)
     }
 
     pub async fn get_our_latest_msg(

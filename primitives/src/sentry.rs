@@ -91,8 +91,8 @@ pub struct ValidatorMessage {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub enum ValidatorMessageResponse {
-    ValidatorMessages(Vec<ValidatorMessage>),
+pub struct ValidatorMessageResponse {
+    pub validator_messages: Vec<ValidatorMessage>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
