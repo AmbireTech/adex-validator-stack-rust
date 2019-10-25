@@ -28,6 +28,9 @@ impl ValidatorId {
         self.0
     }
 
+    pub fn to_hex_non_prefix_string(&self) -> String {
+        hex::encode(self.0)
+    }
     pub fn to_hex_checksummed_string(&self) -> String {
         eth_checksum::checksum(&format!("0x{}", hex::encode(self.0)))
     }

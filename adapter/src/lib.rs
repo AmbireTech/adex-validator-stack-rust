@@ -48,7 +48,7 @@ pub fn get_signable_state_root(
 
 pub fn get_balance_leaf(acc: &ValidatorId, amnt: &BigNum) -> Result<[u8; 32], Box<dyn Error>> {
     let params = [
-        (ParamType::Address, &acc.to_string()[..]),
+        (ParamType::Address, &acc.to_hex_non_prefix_string()[..]),
         (ParamType::Uint(256), &amnt.to_str_radix(10)[..]),
     ];
     let encoded = encode_params(&params, true)?;
