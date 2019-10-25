@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 use std::fmt;
 
-use crate::Channel;
 use crate::{BalancesMap, BigNum, DomainError};
 use std::convert::TryFrom;
 
@@ -56,20 +55,10 @@ impl TryFrom<&str> for ValidatorId {
     }
 }
 
-impl Into<String> for ValidatorId {
-    fn into(self) -> String {
-        hex::encode(self.0)
-    }
-}
-
 impl fmt::Display for ValidatorId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", format!("0x{}", hex::encode(self.0)))
     }
-}
-
-pub trait Validator {
-    fn tick(&self, channel: Channel) -> ValidatorFuture<()>;
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
