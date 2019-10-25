@@ -11,7 +11,7 @@ use ethabi::token::{LenientTokenizer, StrictTokenizer, Tokenizer};
 use hex::FromHex;
 use primitives::channel::ChannelError;
 use primitives::BigNum;
-use primitives::Channel;
+use primitives::{Channel, ValidatorId};
 use sha2::{Digest, Sha256};
 use std::convert::TryFrom;
 use tiny_keccak::Keccak;
@@ -46,9 +46,9 @@ pub fn get_signable_state_root(
     Ok(res)
 }
 
-pub fn get_balance_leaf(acc: &[u8; 20], amnt: &BigNum) -> Result<[u8; 32], Box<dyn Error>> {
+pub fn get_balance_leaf(acc: &ValidatorId, amnt: &BigNum) -> Result<[u8; 32], Box<dyn Error>> {
     let params = [
-        (ParamType::Address, &hex::encode(acc)[..]),
+        (ParamType::Address, &acc.to_string()[..]),
         (ParamType::Uint(256), &amnt.to_str_radix(10)[..]),
     ];
     let encoded = encode_params(&params, true)?;

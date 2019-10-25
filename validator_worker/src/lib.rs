@@ -4,10 +4,10 @@
 use std::error::Error;
 
 use adapter::{get_balance_leaf, get_signable_state_root};
-use hex::FromHex;
 use primitives::adapter::Adapter;
 use primitives::merkle_tree::MerkleTree;
-use primitives::BalancesMap;
+use primitives::{BalancesMap, ValidatorId};
+use std::convert::TryFrom;
 
 pub use self::sentry_interface::{all_channels, SentryApi};
 
@@ -31,12 +31,7 @@ pub(crate) fn get_state_root_hash<A: Adapter + 'static>(
     // Note: MerkleTree takes care of deduplicating and sorting
     let elems: Vec<[u8; 32]> = balances
         .iter()
-        .map(|(acc, amount)| {
-            get_balance_leaf(
-                &<[u8; 20]>::from_hex(&acc[2..]).expect("failed to unwrap ex"),
-                amount,
-            )
-        })
+        .map(|(acc, amount)| get_balance_leaf(&ValidatorId::try_from(acc.as_str())?, amount))
         .collect::<Result<_, _>>()?;
 
     let tree = MerkleTree::new(&elems);
