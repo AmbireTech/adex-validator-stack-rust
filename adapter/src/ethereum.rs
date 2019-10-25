@@ -411,7 +411,7 @@ mod test {
         let mut eth_adapter = setup_eth_adapter();
         let whoami = eth_adapter.whoami();
         assert_eq!(
-            whoami.to_hex_prefix_string(),
+            whoami.to_string(),
             "0x2bdeafae53940669daa6f519373f686c1f3d3393",
             "failed to get correct whoami"
         );

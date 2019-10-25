@@ -120,7 +120,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
         &self,
         message_types: &[&str],
     ) -> Result<Option<MessageTypes>, reqwest::Error> {
-        self.get_latest_msg(self.whoami.to_hex_prefix_string(), message_types)
+        self.get_latest_msg(self.whoami.to_string(), message_types)
             .await
     }
 

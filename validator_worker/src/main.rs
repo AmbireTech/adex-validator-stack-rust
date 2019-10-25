@@ -158,7 +158,7 @@ async fn infinite<A: Adapter + 'static>(args: Args<A>) -> Result<(), ()> {
 }
 
 async fn iterate_channels<A: Adapter + 'static>(args: Args<A>) -> Result<(), ()> {
-    let result = all_channels(&args.sentry_url, args.whoami.to_hex_prefix_string()).await;
+    let result = all_channels(&args.sentry_url, args.whoami.to_string()).await;
 
     if let Err(e) = result {
         eprintln!("Failed to get channels {}", e);

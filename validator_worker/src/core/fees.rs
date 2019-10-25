@@ -209,9 +209,9 @@ mod test {
             let expected_balances: BalancesMap = vec![
                 ("a".to_string(), 990.into()),
                 ("b".to_string(), 1_188.into()),
-                (IDS.get("leader").unwrap().to_hex_prefix_string(), 11.into()),
+                (IDS.get("leader").unwrap().to_string(), 11.into()),
                 (
-                    IDS.get("follower").unwrap().to_hex_prefix_string(),
+                    IDS.get("follower").unwrap().to_string(),
                     11.into(),
                 ),
             ]
@@ -237,7 +237,7 @@ mod test {
                 ("a".to_string(), 100.into()),
                 ("b".to_string(), 2_000.into()),
                 (
-                    IDS.get("leader").unwrap().to_hex_prefix_string(),
+                    IDS.get("leader").unwrap().to_string(),
                     200.into(),
                 ),
             ]
@@ -248,11 +248,11 @@ mod test {
                 ("a".to_string(), 99.into()),
                 ("b".to_string(), 1_980.into()),
                 (
-                    IDS.get("leader").unwrap().to_hex_prefix_string(),
+                    IDS.get("leader").unwrap().to_string(),
                     209.into(),
                 ),
                 (
-                    IDS.get("follower").unwrap().to_hex_prefix_string(),
+                    IDS.get("follower").unwrap().to_string(),
                     11.into(),
                 ),
             ]
@@ -291,9 +291,9 @@ mod test {
                 ("c".to_string(), 693.into()),
                 ("d".to_string(), 4_950.into()),
                 ("e".to_string(), 3_960.into()),
-                (IDS.get("leader").unwrap().to_hex_prefix_string(), 51.into()),
+                (IDS.get("leader").unwrap().to_string(), 51.into()),
                 (
-                    IDS.get("follower").unwrap().to_hex_prefix_string(),
+                    IDS.get("follower").unwrap().to_string(),
                     50.into(),
                 ),
             ]

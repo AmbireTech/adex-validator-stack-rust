@@ -83,8 +83,8 @@ mod test {
         let iface = setup_iface(&channel);
 
         let balances: BalancesMap = vec![
-            (IDS["publisher"].to_hex_prefix_string(), 1.into()),
-            (IDS["tester"].to_hex_prefix_string(), 2.into()),
+            (IDS["publisher"].to_string(), 1.into()),
+            (IDS["tester"].to_string(), 2.into()),
         ]
         .into_iter()
         .collect();

@@ -24,7 +24,7 @@ enum NewStateResult {
 pub async fn tick<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result<(), Box<dyn Error>> {
     let from = iface.channel.spec.validators.leader().id.clone();
     let new_msg_response = iface
-        .get_latest_msg(from.to_hex_prefix_string(), &["NewState"])
+        .get_latest_msg(from.to_string(), &["NewState"])
         .await?;
     let new_msg = match new_msg_response {
         Some(MessageTypes::NewState(new_state)) => Some(new_state),

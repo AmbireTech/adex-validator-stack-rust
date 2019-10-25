@@ -24,10 +24,6 @@ pub type ValidatorFuture<T> = Pin<Box<dyn Future<Output = Result<T, ValidatorErr
 pub struct ValidatorId(#[serde(with = "SerHex::<StrictPfx>")] [u8; 20]);
 
 impl ValidatorId {
-    pub fn to_hex_prefix_string(&self) -> String {
-        format!("0x{}", hex::encode(self.0))
-    }
-
     pub fn inner(&self) -> [u8; 20] {
         self.0
     }

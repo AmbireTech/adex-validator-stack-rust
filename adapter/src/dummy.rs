@@ -42,7 +42,7 @@ impl Adapter for DummyAdapter {
         let signature = format!(
             "Dummy adapter signature for {} by {}",
             state_root,
-            self.whoami().to_hex_prefix_string()
+            self.whoami().to_string()
         );
         Ok(signature)
     }
@@ -56,7 +56,7 @@ impl Adapter for DummyAdapter {
         // select the `identity` and compare it to the signer
         // for empty string this will return array with 1 element - an empty string `[""]`
         let is_same = match signature.rsplit(' ').take(1).next() {
-            Some(from) => from == signer.to_hex_prefix_string(),
+            Some(from) => from == signer.to_string(),
             None => false,
         };
 
