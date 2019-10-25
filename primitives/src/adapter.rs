@@ -1,5 +1,5 @@
 use crate::channel_validator::ChannelValidator;
-use crate::{Channel, Config, DomainError, ValidatorId};
+use crate::{Channel, DomainError, ValidatorId};
 use std::collections::HashMap;
 use std::convert::From;
 use std::error::Error;
@@ -41,14 +41,10 @@ impl From<DomainError> for AdapterError {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum AdapterOptions {
-    DummAdapter {
-        dummy_identity: ValidatorId,
-        dummy_auth: HashMap<String, ValidatorId>,
-        dummy_auth_tokens: HashMap<String, String>,
-    },
-    EthereumAdapter(KeystoreOptions),
+pub struct DummyAdapterOptions {
+    pub dummy_identity: ValidatorId,
+    pub dummy_auth: HashMap<String, ValidatorId>,
+    pub dummy_auth_tokens: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone)]
@@ -63,12 +59,7 @@ pub struct Session {
     pub uid: ValidatorId,
 }
 
-pub trait Adapter: ChannelValidator + Clone + Debug + Send {
-    type Output;
-
-    /// Initialize adapter
-    fn init(opts: AdapterOptions, config: &Config) -> AdapterResult<Self::Output>;
-
+pub trait Adapter: ChannelValidator + Send + Clone + Debug {
     /// Unlock adapter
     fn unlock(&mut self) -> AdapterResult<()>;
 

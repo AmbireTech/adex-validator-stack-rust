@@ -4,12 +4,11 @@
 use clap::{App, Arg};
 
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
+use async_std::sync::RwLock;
 use futures::compat::Future01CompatExt;
 use futures::future::try_join_all;
 use futures::future::{join, FutureExt, TryFutureExt};
-// use futures_locks::RwLock;
-use async_std::sync::RwLock;
-use primitives::adapter::{Adapter, AdapterOptions, KeystoreOptions};
+use primitives::adapter::{Adapter, DummyAdapterOptions, KeystoreOptions};
 use primitives::config::{configuration, Config};
 use primitives::util::tests::prep_db::{AUTH, IDS};
 use primitives::{Channel, SpecValidator, ValidatorId};
@@ -92,23 +91,20 @@ fn main() -> Result<(), Box<dyn Error>> {
                 keystore_file: keystore_file.to_string(),
                 keystore_pwd,
             };
-            let options = AdapterOptions::EthereumAdapter(keystore_options);
             AdapterTypes::EthereumAdapter(Box::new(
-                EthereumAdapter::init(options, &config).expect("failed to init adapter"),
+                EthereumAdapter::init(keystore_options, &config).expect("failed to init adapter"),
             ))
         }
         "dummy" => {
             let dummy_identity = cli
                 .value_of("dummyIdentity")
                 .expect("unable to get dummyIdentity");
-            let options = AdapterOptions::DummAdapter {
+            let options = DummyAdapterOptions {
                 dummy_identity: ValidatorId::try_from(dummy_identity)?,
                 dummy_auth: IDS.clone(),
                 dummy_auth_tokens: AUTH.clone(),
             };
-            AdapterTypes::DummyAdapter(Box::new(
-                DummyAdapter::init(options, &config).expect("failed to init adapter"),
-            ))
+            AdapterTypes::DummyAdapter(Box::new(DummyAdapter::init(options, &config)))
         }
         // @TODO exit gracefully
         _ => panic!("We don't have any other adapters implemented yet!"),
@@ -155,10 +151,9 @@ async fn infinite<A: Adapter + 'static>(args: Args<A>) -> Result<(), ()> {
         let delay_future =
             Delay::new(Instant::now().add(Duration::from_secs(arg.config.wait_time as u64)));
         let joined = join(iterate_channels(arg), delay_future.compat());
-        match joined.await {
-            (_, Err(e)) => eprintln!("{}", e),
-            _ => {}
-        };
+        if let (_, Err(e)) = joined.await {
+            eprintln!("{}", e);
+        }
     }
 }
 

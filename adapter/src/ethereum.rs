@@ -4,7 +4,7 @@ use ethkey::{public_to_address, recover, verify_address, Address, Message, Passw
 use ethstore::SafeAccount;
 use lazy_static::lazy_static;
 use primitives::{
-    adapter::{Adapter, AdapterError, AdapterOptions, AdapterResult, Session},
+    adapter::{Adapter, AdapterError, AdapterResult, KeystoreOptions, Session},
     channel_validator::ChannelValidator,
     config::Config,
     Channel, ValidatorId,
@@ -49,22 +49,9 @@ pub struct EthereumAdapter {
 // check if a channel is valid
 impl ChannelValidator for EthereumAdapter {}
 
-impl Adapter for EthereumAdapter {
-    type Output = EthereumAdapter;
-
-    fn init(opts: AdapterOptions, config: &Config) -> AdapterResult<EthereumAdapter> {
-        let (keystore_file, keystore_pwd) = match opts {
-            AdapterOptions::EthereumAdapter(keystore_opts) => {
-                (keystore_opts.keystore_file, keystore_opts.keystore_pwd)
-            }
-            _ => {
-                return Err(AdapterError::Configuration(
-                    "Missing keystore json file or password".to_string(),
-                ))
-            }
-        };
-
-        let keystore_contents = fs::read_to_string(&keystore_file)
+impl EthereumAdapter {
+    pub fn init(opts: KeystoreOptions, config: &Config) -> AdapterResult<EthereumAdapter> {
+        let keystore_contents = fs::read_to_string(&opts.keystore_file)
             .map_err(|_| map_error("Invalid keystore location provided"))?;
 
         let keystore_json: Value = serde_json::from_str(&keystore_contents)
@@ -84,14 +71,16 @@ impl Adapter for EthereumAdapter {
         Ok(Self {
             address: identity,
             keystore_json,
-            keystore_pwd: keystore_pwd.into(),
+            keystore_pwd: opts.keystore_pwd.into(),
             session_tokens: HashMap::new(),
             authorization_tokens: HashMap::new(),
             wallet: None,
             config: config.to_owned(),
         })
     }
+}
 
+impl Adapter for EthereumAdapter {
     fn unlock(&mut self) -> AdapterResult<()> {
         let account = SafeAccount::from_file(
             serde_json::from_value(self.keystore_json.clone())
@@ -404,9 +393,8 @@ mod test {
             keystore_file: "./test/resources/keystore.json".to_string(),
             keystore_pwd: "adexvalidator".to_string(),
         };
-        let adapter_options = AdapterOptions::EthereumAdapter(keystore_options);
 
-        EthereumAdapter::init(adapter_options, &config).expect("should init ethereum adapter")
+        EthereumAdapter::init(keystore_options, &config).expect("should init ethereum adapter")
     }
 
     #[test]
@@ -465,8 +453,7 @@ mod test {
         let wallet = eth_adapter.wallet.clone();
         let response = ewt_sign(&wallet.unwrap(), &eth_adapter.keystore_pwd, &payload)
             .expect("failed to generate ewt signature");
-        let expected =
-            "eyJ0eXBlIjoiSldUIiwiYWxnIjoiRVRIIn0.eyJpZCI6ImF3ZXNvbWVWYWxpZGF0b3IiLCJlcmEiOjEwMDAwMCwiYWRkcmVzcyI6IjB4MmJEZUFGQUU1Mzk0MDY2OURhQTZGNTE5MzczZjY4NmMxZjNkMzM5MyJ9.gGw_sfnxirENdcX5KJQWaEt4FVRvfEjSLD4f3OiPrJIltRadeYP2zWy9T2GYcK5xxD96vnqAw4GebAW7rMlz4xw";
+        let expected = "eyJ0eXBlIjoiSldUIiwiYWxnIjoiRVRIIn0.eyJpZCI6ImF3ZXNvbWVWYWxpZGF0b3IiLCJlcmEiOjEwMDAwMCwiYWRkcmVzcyI6IjB4MmJEZUFGQUU1Mzk0MDY2OURhQTZGNTE5MzczZjY4NmMxZjNkMzM5MyJ9.gGw_sfnxirENdcX5KJQWaEt4FVRvfEjSLD4f3OiPrJIltRadeYP2zWy9T2GYcK5xxD96vnqAw4GebAW7rMlz4xw";
         assert_eq!(response, expected, "generated wrong ewt signature");
 
         let expected_verification_response = r#"VerifyPayload { from: ValidatorId([43, 222, 175, 174, 83, 148, 6, 105, 218, 166, 245, 25, 55, 63, 104, 108, 31, 61, 51, 147]), payload: Payload { id: "awesomeValidator", era: 100000, address: "0x2bDeAFAE53940669DaA6F519373f686c1f3d3393", identity: None } }"#;
