@@ -49,7 +49,7 @@ pub async fn heartbeat<A: Adapter + 'static>(
     let should_send = heartbeat_msg.map_or(true, |heartbeat| {
         let duration = Utc::now() - heartbeat.timestamp;
         duration > Duration::milliseconds(iface.config.heartbeat_time.into())
-            && is_channel_not_exhausted(&iface.channel, &balances)
+            && !is_channel_exhausted(&iface.channel, &balances)
     });
 
     if should_send {
@@ -59,6 +59,6 @@ pub async fn heartbeat<A: Adapter + 'static>(
     Ok(())
 }
 
-fn is_channel_not_exhausted(channel: &Channel, balances: &BalancesMap) -> bool {
-    balances.values().sum::<BigNum>() != channel.deposit_amount
+fn is_channel_exhausted(channel: &Channel, balances: &BalancesMap) -> bool {
+    balances.values().sum::<BigNum>() == channel.deposit_amount
 }

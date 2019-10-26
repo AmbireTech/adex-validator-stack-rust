@@ -105,10 +105,10 @@ impl SpecValidators {
         &self.0[1]
     }
 
-    pub fn find(&self, validator_id: ValidatorId) -> SpecValidator<'_> {
-        if self.leader().id == validator_id {
+    pub fn find(&self, validator_id: &ValidatorId) -> SpecValidator<'_> {
+        if &self.leader().id == validator_id {
             SpecValidator::Leader(&self.leader())
-        } else if self.follower().id == validator_id {
+        } else if &self.follower().id == validator_id {
             SpecValidator::Follower(&self.follower())
         } else {
             SpecValidator::None

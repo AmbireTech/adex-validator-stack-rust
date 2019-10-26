@@ -64,7 +64,7 @@ pub trait Adapter: ChannelValidator + Send + Clone + Debug {
     fn unlock(&mut self) -> AdapterResult<()>;
 
     /// Get Adapter whoami
-    fn whoami(&self) -> ValidatorId;
+    fn whoami(&self) -> &ValidatorId;
 
     /// Signs the provided state_root
     fn sign(&self, state_root: &str) -> AdapterResult<String>;

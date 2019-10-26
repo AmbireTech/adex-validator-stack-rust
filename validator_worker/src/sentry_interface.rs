@@ -42,7 +42,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
             .unwrap();
 
         // validate that we are to validate the channel
-        match channel.spec.validators.find(whoami.clone()) {
+        match channel.spec.validators.find(&whoami) {
             SpecValidator::Leader(v) | SpecValidator::Follower(v) => {
                 let channel_id = format!("0x{}", hex::encode(&channel.id));
                 let validator_url = format!("{}/channel/{}", v.url, channel_id);
@@ -88,8 +88,6 @@ impl<T: Adapter + 'static> SentryApi<T> {
                 handle_http_error(e, &validator.url);
             }
         }
-        // drop RwLock write access
-        drop(adapter);
     }
 
     pub async fn get_latest_msg(
@@ -164,8 +162,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
             after.timestamp_millis()
         );
 
-        let result: EventAggregateResponse = self
-            .client
+        self.client
             .get(&url)
             .bearer_auth(&auth_token)
             .send()
@@ -175,9 +172,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
             .json()
             .map_err(|e| Box::new(ValidatorWorker::Failed(e.to_string())))
             .compat()
-            .await?;
-
-        Ok(result)
+            .await
     }
 }
 

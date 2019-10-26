@@ -95,8 +95,8 @@ impl Adapter for EthereumAdapter {
         Ok(())
     }
 
-    fn whoami(&self) -> ValidatorId {
-        self.address.clone()
+    fn whoami(&self) -> &ValidatorId {
+        &self.address
     }
 
     fn sign(&self, state_root: &str) -> AdapterResult<String> {

@@ -59,7 +59,7 @@ mod test {
         };
         let config = configuration("development", None).expect("Dev config should be available");
         let dummy_adapter = DummyAdapter::init(adapter_options, &config);
-        let whoami = dummy_adapter.whoami();
+        let whoami = dummy_adapter.whoami().clone();
 
         SentryApi::init(
             Arc::new(RwLock::new(dummy_adapter)),

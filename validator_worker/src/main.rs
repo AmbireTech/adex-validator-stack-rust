@@ -127,7 +127,7 @@ fn run<A: Adapter + 'static>(
     adapter: A,
 ) -> Result<(), Box<dyn Error>> {
     let sentry_adapter = Arc::new(RwLock::new(adapter.clone()));
-    let whoami = adapter.whoami();
+    let whoami = adapter.whoami().to_owned();
 
     let args = Args {
         sentry_url: sentry_url.to_owned(),
@@ -196,7 +196,7 @@ async fn validator_tick<A: Adapter + 'static>(
     let sentry = SentryApi::init(adapter, &channel, &config, true, whoami)?;
     let duration = Duration::from_secs(config.validator_tick_timeout as u64);
 
-    match channel.spec.validators.find(whoami.to_owned()) {
+    match channel.spec.validators.find(&whoami) {
         SpecValidator::Leader(_) => {
             if let Err(e) = leader::tick(&sentry)
                 .boxed()

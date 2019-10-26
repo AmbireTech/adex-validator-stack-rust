@@ -10,7 +10,7 @@ pub trait ChannelValidator {
         let validator_identity = ValidatorId::try_from(&identity[..]).map_err(|_| {
             ChannelError::InvalidArgument("Failed to deserialize identity".to_string())
         })?;
-        let adapter_channel_validator = match channel.spec.validators.find(validator_identity) {
+        let adapter_channel_validator = match channel.spec.validators.find(&validator_identity) {
             // check if the channel validators include our adapter identity
             SpecValidator::None => return Err(ChannelError::AdapterNotIncluded),
             SpecValidator::Leader(validator) | SpecValidator::Follower(validator) => validator,

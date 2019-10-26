@@ -195,8 +195,8 @@ impl EthereumChannel {
         contract_addr: &str,
         balance_root: &str,
     ) -> Result<[u8; 32], Box<dyn Error>> {
-        let root = <[u8; 32]>::from_hex(balance_root).unwrap();
-        let addr = hex::decode(contract_addr).unwrap();
+        let root = <[u8; 32]>::from_hex(balance_root)?;
+        let addr = hex::decode(contract_addr)?;
         get_signable_state_root(&addr, &root)
     }
 
