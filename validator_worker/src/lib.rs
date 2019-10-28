@@ -31,11 +31,11 @@ pub(crate) fn get_state_root_hash<A: Adapter + 'static>(
     // Note: MerkleTree takes care of deduplicating and sorting
     let elems: Vec<[u8; 32]> = balances
         .iter()
-        .map(|(acc, amount)| get_balance_leaf(&ValidatorId::try_from(acc.as_str())?, amount))
+        .map(|(acc, amount)| get_balance_leaf(&ValidatorId::try_from(acc)?, amount))
         .collect::<Result<_, _>>()?;
 
     let tree = MerkleTree::new(&elems);
-    // keccak256(channelId, balanceRoot)
+    // keccak256(channelId, balanceRoot
     get_signable_state_root(&iface.channel.id, &tree.root())
 }
 

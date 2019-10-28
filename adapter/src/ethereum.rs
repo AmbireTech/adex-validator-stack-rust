@@ -66,10 +66,10 @@ impl EthereumAdapter {
             }
         };
 
-        let identity = ValidatorId::try_from(address.as_str())?;
+        let address = ValidatorId::try_from(&address)?;
 
         Ok(Self {
-            address: identity,
+            address,
             keystore_json,
             keystore_pwd: opts.keystore_pwd.into(),
             session_tokens: HashMap::new(),
@@ -118,7 +118,7 @@ impl Adapter for EthereumAdapter {
     fn verify(&self, signer: &ValidatorId, state_root: &str, sig: &str) -> AdapterResult<bool> {
         let decoded_signature = hex::decode(sig)
             .map_err(|_| AdapterError::Signature("invalid signature".to_string()))?;
-        let address = Address::from_slice(&signer.inner());
+        let address = Address::from_slice(signer.inner());
         let signature = Signature::from_electrum(&decoded_signature);
         let message = Message::from_slice(&hash_message(state_root));
 
@@ -222,7 +222,7 @@ impl Adapter for EthereumAdapter {
                 }
                 Session {
                     era: verified.payload.era,
-                    uid: ValidatorId::try_from(identity.as_str())?,
+                    uid: ValidatorId::try_from(identity)?,
                 }
             }
             None => Session {
@@ -374,7 +374,7 @@ pub fn ewt_verify(
     let payload: Payload = serde_json::from_str(&payload_string)?;
 
     let verified_payload = VerifyPayload {
-        from: ValidatorId::try_from(format!("{:?}", address).as_str())?,
+        from: ValidatorId::try_from(&format!("{:?}", address))?,
         payload,
     };
 

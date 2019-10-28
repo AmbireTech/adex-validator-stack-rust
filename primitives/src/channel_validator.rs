@@ -7,7 +7,7 @@ use std::convert::TryFrom;
 pub trait ChannelValidator {
     fn is_channel_valid(config: &Config, channel: &Channel) -> Result<(), ChannelError> {
         let identity = &config.clone().identity.unwrap_or_else(|| "".to_string());
-        let validator_identity = ValidatorId::try_from(&identity[..]).map_err(|_| {
+        let validator_identity = ValidatorId::try_from(identity).map_err(|_| {
             ChannelError::InvalidArgument("Failed to deserialize identity".to_string())
         })?;
         let adapter_channel_validator = match channel.spec.validators.find(&validator_identity) {
@@ -50,8 +50,7 @@ pub fn all_validators_listed(validators: &SpecValidators, whitelist: &[String]) 
     } else {
         let found_validators = whitelist
             .iter()
-            .map(|identity| ValidatorId::try_from(&identity[..]))
-            .filter_map(Result::ok)
+            .filter_map(|identity| ValidatorId::try_from(identity).ok())
             .filter(|allowed| {
                 allowed == &validators.leader().id || allowed == &validators.follower().id
             })

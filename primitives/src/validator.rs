@@ -24,8 +24,8 @@ pub type ValidatorFuture<T> = Pin<Box<dyn Future<Output = Result<T, ValidatorErr
 pub struct ValidatorId(#[serde(with = "SerHex::<StrictPfx>")] [u8; 20]);
 
 impl ValidatorId {
-    pub fn inner(&self) -> [u8; 20] {
-        self.0
+    pub fn inner(&self) -> &[u8; 20] {
+        &self.0
     }
 
     pub fn to_hex_non_prefix_string(&self) -> String {
@@ -51,6 +51,15 @@ impl TryFrom<&str> for ValidatorId {
         let mut id: [u8; 20] = [0; 20];
         id.copy_from_slice(&result[..]);
         Ok(Self(id))
+    }
+}
+
+impl TryFrom<&String> for ValidatorId {
+    type Error = DomainError;
+    fn try_from(value: &String) -> Result<Self, Self::Error> {
+        ValidatorId::try_from(value.as_str()).map_err(|_| {
+            DomainError::InvalidArgument("Failed to deserialize validator id".to_string())
+        })
     }
 }
 
