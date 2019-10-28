@@ -1,20 +1,25 @@
 use chrono::Utc;
-use redis::aio::Connection;
+use futures::compat::Future01CompatExt;
+use futures::future::try_join_all;
+use redis::aio::SharedConnection;
 
-use primitives::adapter::Session;
 use primitives::event_submission::{RateLimit, Rule};
 use primitives::sentry::Event;
 use primitives::Channel;
+
+use crate::Session;
 
 pub enum Response {
     OnlyCreatorCanCloseChannel,
     ChannelIsExpired,
     ChannelIsPastWithdrawPeriod,
+    RulesError(String),
     Success,
 }
 
+// @TODO: Make pub(crate)
 pub async fn check_access(
-    _redis: &Connection,
+    redis: &SharedConnection,
     session: &Session,
     rate_limit: RateLimit,
     channel: &Channel,
@@ -60,10 +65,82 @@ pub async fn check_access(
         .unwrap_or_else(|| &default_rules);
 
     // first, find an applicable access rule
-    let _rules = allow_rules.iter().filter(|r| match &r.uids {
-        Some(uids) => uids.iter().any(|uid| &session.uid == uid),
-        None => true,
-    });
+    let rules = allow_rules
+        .iter()
+        .filter(|r| match &r.uids {
+            Some(uids) => uids.iter().any(|uid| &session.uid == uid),
+            None => true,
+        })
+        .collect::<Vec<_>>();
 
-    Response::Success
+    if rules.iter().any(|r| r.rate_limit.is_none()) {
+        // We matched a rule that has *no rateLimit*, so we're good
+        return Response::Success;
+    }
+
+    if let Err(rule_error) = try_join_all(
+        rules
+            .iter()
+            .map(|rule| apply_rule(redis.clone(), &rule, &events, &channel, &session)),
+    )
+    .await
+    {
+        Response::RulesError(rule_error)
+    } else {
+        Response::Success
+    }
+}
+
+async fn apply_rule(
+    redis: SharedConnection,
+    rule: &Rule,
+    events: &[Event],
+    channel: &Channel,
+    session: &Session,
+) -> Result<(), String> {
+    match &rule.rate_limit {
+        Some(rate_limit) => {
+            let key = if &rate_limit.limit_type == "sid" {
+                // @TODO: Is this really necessary?
+                if session.uid.is_empty() {
+                    Err("rateLimit: unauthenticated request".to_string())
+                } else {
+                    Ok(format!("adexRateLimit:{}:{}", channel.id, session.uid))
+                }
+            } else if &rate_limit.limit_type == "ip" {
+                if events.len() != 1 {
+                    Err("rateLimit: only allows 1 event".to_string())
+                } else {
+                    Ok(format!("adexRateLimit:{}:{}", channel.id, session.ip))
+                }
+            } else {
+                // return for the whole function
+                return Ok(());
+            }?;
+
+            if redis::cmd("EXISTS")
+                .arg(&key)
+                .query_async::<_, String>(redis.clone())
+                .compat()
+                .await
+                .map(|(_, exists)| exists == "1")
+                .map_err(|error| format!("{}", error))?
+            {
+                return Err("rateLimit: too many requests".to_string());
+            }
+
+            let seconds = rate_limit.time_frame.as_secs_f32().ceil();
+
+            redis::cmd("SETEX")
+                .arg(&key)
+                .arg(seconds)
+                .arg("1")
+                .query_async::<_, String>(redis)
+                .compat()
+                .await
+                .map(|_| ())
+                .map_err(|error| format!("{}", error))
+        }
+        None => Ok(()),
+    }
 }
