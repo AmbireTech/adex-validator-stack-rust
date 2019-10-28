@@ -9,6 +9,7 @@ use primitives::Channel;
 
 use crate::Session;
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum Response {
     OnlyCreatorCanCloseChannel,
     ChannelIsExpired,
@@ -21,7 +22,7 @@ pub enum Response {
 pub async fn check_access(
     redis: &SharedConnection,
     session: &Session,
-    rate_limit: RateLimit,
+    rate_limit: &RateLimit,
     channel: &Channel,
     events: &[Event],
 ) -> Response {
@@ -53,7 +54,7 @@ pub async fn check_access(
         },
         Rule {
             uids: None,
-            rate_limit: Some(rate_limit),
+            rate_limit: Some(rate_limit.clone()),
         },
     ];
     // Enforce access limits
@@ -78,13 +79,13 @@ pub async fn check_access(
         return Response::Success;
     }
 
-    if let Err(rule_error) = try_join_all(
+    let apply_all_rules = try_join_all(
         rules
             .iter()
             .map(|rule| apply_rule(redis.clone(), &rule, &events, &channel, &session)),
-    )
-    .await
-    {
+    );
+
+    if let Err(rule_error) = apply_all_rules.await {
         Response::RulesError(rule_error)
     } else {
         Response::Success
