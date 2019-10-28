@@ -80,10 +80,7 @@ async fn on_new_state<'a, A: Adapter + 'static>(
     let prev_balances = last_approve_response
         .last_approved
         .and_then(|last_approved| last_approved.new_state)
-        .map_or(Default::default(), |new_state| match new_state.msg {
-            MessageTypes::NewState(state) => state.balances,
-            _ => Default::default(),
-        });
+        .map_or(Default::default(), |new_state| new_state.msg.balances);
 
     if !is_valid_transition(&iface.channel, &prev_balances, &proposed_balances) {
         drop(adapter);

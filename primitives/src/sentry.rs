@@ -1,4 +1,4 @@
-use crate::validator::{Heartbeat, MessageTypes};
+use crate::validator::{ApproveState, Heartbeat, MessageTypes, NewState};
 use crate::{BigNum, Channel};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -9,9 +9,23 @@ use std::collections::HashMap;
 #[serde(rename_all = "camelCase")]
 pub struct LastApproved {
     /// NewState can be None if the channel is brand new
-    pub new_state: Option<ValidatorMessage>,
+    pub new_state: Option<NewStateValidatorMessage>,
     /// ApproveState can be None if the channel is brand new
-    pub approved_state: Option<ValidatorMessage>,
+    pub approved_state: Option<ApproveStateValidatorMessage>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct NewStateValidatorMessage {
+    pub from: String,
+    pub received: DateTime<Utc>,
+    pub msg: NewState,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ApproveStateValidatorMessage {
+    pub from: String,
+    pub received: DateTime<Utc>,
+    pub msg: ApproveState,
 }
 
 #[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
