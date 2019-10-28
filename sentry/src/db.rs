@@ -10,6 +10,6 @@ lazy_static! {
 }
 
 pub async fn redis_connection() -> Result<SharedConnection, RedisError> {
-    let client = redis::Client::open(REDIS_URL.as_str()).unwrap();
+    let client = redis::Client::open(REDIS_URL.as_str()).expect("Wrong redis connection string");
     client.get_shared_async_connection().compat().await
 }
