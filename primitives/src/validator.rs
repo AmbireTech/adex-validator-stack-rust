@@ -48,6 +48,14 @@ impl TryFrom<&str> for ValidatorId {
         let result = hex::decode(hex_value).map_err(|_| {
             DomainError::InvalidArgument("Failed to deserialize validator id".to_string())
         })?;
+
+        if result.len() != 20 {
+            return Err(DomainError::InvalidArgument(format!(
+                "Invalid validator id value {}",
+                value
+            )));
+        }
+
         let mut id: [u8; 20] = [0; 20];
         id.copy_from_slice(&result[..]);
         Ok(Self(id))
