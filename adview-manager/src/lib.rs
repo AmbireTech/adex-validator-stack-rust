@@ -95,10 +95,23 @@ pub fn apply_selection(campaigns: &[MarketChannel], options: &AdViewManagerOptio
     });
 
     let mut units: Vec<UnitByPrice> = eligible
+        // filter ad_units by whitelisted type, map then to UnitByPrice and flat_map them for each campaing
         .flat_map(|campaign| {
-            let mut units = vec![];
-            for ad_unit in campaign.spec.ad_units.iter() {
-                let unit = UnitByPrice {
+            campaign
+                .spec
+                .ad_units
+                .iter()
+                .filter(|unit| {
+                    options
+                        .whitelisted_type
+                        .as_ref()
+                        .map(|whitelisted_type| {
+                            whitelisted_type != &unit.ad_type
+                                && !(options.disabled_video && is_video(&unit))
+                        })
+                        .unwrap_or(false)
+                })
+                .map(move |ad_unit| UnitByPrice {
                     unit: ad_unit.clone(),
                     channel_id: campaign.id.clone(),
                     validators: campaign.spec.validators.clone(),
@@ -107,32 +120,16 @@ pub fn apply_selection(campaigns: &[MarketChannel], options: &AdViewManagerOptio
                         .or(campaign.spec.min_targeting_score)
                         .unwrap_or_else(|| 0.into()),
                     min_per_impression: campaign.spec.min_per_impression.clone(),
-                };
-
-                units.push(unit);
-            }
-
-            units
+                })
         })
         .collect();
 
     // Sort
     units.sort_by(|b, a| a.min_per_impression.cmp(&b.min_per_impression));
+    // Top units
     units.truncate(options.top_by_price);
 
-    let units = units.into_iter().filter(|unit| {
-        options
-            .whitelisted_type
-            .as_ref()
-            .map(|whitelisted_type| {
-                whitelisted_type != &unit.unit.ad_type
-                    && !(options.disabled_video && is_video(&unit.unit))
-            })
-            .unwrap_or(false)
-    });
-
     let mut by_score: Vec<Unit> = units
-        .collect::<Vec<UnitByPrice>>()
         .into_iter()
         .filter_map(|by_price| {
             let targeting_score =
