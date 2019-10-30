@@ -2,7 +2,6 @@ use std::convert::TryFrom;
 use std::error::Error;
 
 use chrono::{Duration, Utc};
-use futures::compat::Future01CompatExt;
 
 use adapter::get_signable_state_root;
 use byteorder::{BigEndian, ByteOrder};
@@ -20,18 +19,11 @@ async fn send_heartbeat<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result<()
     BigEndian::write_uint(&mut timestamp_buf[26..], milliseconds, 6);
 
     let merkle_tree = MerkleTree::new(&[timestamp_buf]);
-    let info_root_raw = hex::encode(merkle_tree.root());
 
-    let state_root_raw = get_signable_state_root(&iface.channel.id, &info_root_raw)?;
+    let state_root_raw = get_signable_state_root(&iface.channel.id, &merkle_tree.root())?;
     let state_root = hex::encode(state_root_raw);
 
-    let signature = iface
-        .adapter
-        .read()
-        .compat()
-        .await
-        .expect("on_new_state: failed to acquire read lock adapter")
-        .sign(&state_root)?;
+    let signature = iface.adapter.read().await.sign(&state_root)?;
 
     let message_types = MessageTypes::Heartbeat(Heartbeat {
         signature,
@@ -49,7 +41,6 @@ pub async fn heartbeat<A: Adapter + 'static>(
     balances: BalancesMap,
 ) -> Result<(), Box<dyn Error>> {
     let validator_message_response = iface.get_our_latest_msg(&["Heartbeat"]).await?;
-
     let heartbeat_msg = match validator_message_response {
         Some(MessageTypes::Heartbeat(heartbeat)) => Some(heartbeat),
         _ => None,
@@ -58,7 +49,7 @@ pub async fn heartbeat<A: Adapter + 'static>(
     let should_send = heartbeat_msg.map_or(true, |heartbeat| {
         let duration = Utc::now() - heartbeat.timestamp;
         duration > Duration::milliseconds(iface.config.heartbeat_time.into())
-            && is_channel_not_exhausted(&iface.channel, &balances)
+            && !is_channel_exhausted(&iface.channel, &balances)
     });
 
     if should_send {
@@ -68,6 +59,6 @@ pub async fn heartbeat<A: Adapter + 'static>(
     Ok(())
 }
 
-fn is_channel_not_exhausted(channel: &Channel, balances: &BalancesMap) -> bool {
+fn is_channel_exhausted(channel: &Channel, balances: &BalancesMap) -> bool {
     balances.values().sum::<BigNum>() == channel.deposit_amount
 }

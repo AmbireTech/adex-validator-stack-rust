@@ -25,7 +25,7 @@ pub use self::channel::{Channel, ChannelSpec, SpecValidator, SpecValidators};
 pub use self::config::Config;
 pub use self::event_submission::EventSubmission;
 pub use self::targeting_tag::TargetingTag;
-pub use self::validator::ValidatorDesc;
+pub use self::validator::{ValidatorDesc, ValidatorId};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum DomainError {
