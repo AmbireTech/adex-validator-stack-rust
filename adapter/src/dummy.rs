@@ -1,15 +1,15 @@
 use primitives::adapter::{Adapter, AdapterError, AdapterResult, DummyAdapterOptions, Session};
 use primitives::channel_validator::ChannelValidator;
 use primitives::config::Config;
-use primitives::Channel;
+use primitives::{Channel, ValidatorId};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct DummyAdapter {
-    identity: String,
+    identity: ValidatorId,
     config: Config,
     // Auth tokens that we have verified (tokenId => session)
-    session_tokens: HashMap<String, String>,
+    session_tokens: HashMap<String, ValidatorId>,
     // Auth tokens that we've generated to authenticate with someone (address => token)
     authorization_tokens: HashMap<String, String>,
 }
@@ -23,8 +23,8 @@ impl DummyAdapter {
         Self {
             identity: opts.dummy_identity,
             config: config.to_owned(),
-            session_tokens: opts.dummy_auth_tokens,
-            authorization_tokens: opts.dummy_auth,
+            session_tokens: opts.dummy_auth,
+            authorization_tokens: opts.dummy_auth_tokens,
         }
     }
 }
@@ -34,8 +34,8 @@ impl Adapter for DummyAdapter {
         Ok(())
     }
 
-    fn whoami(&self) -> String {
-        self.identity.clone()
+    fn whoami(&self) -> &ValidatorId {
+        &self.identity
     }
 
     fn sign(&self, state_root: &str) -> AdapterResult<String> {
@@ -47,11 +47,16 @@ impl Adapter for DummyAdapter {
         Ok(signature)
     }
 
-    fn verify(&self, signer: &str, _state_root: &str, signature: &str) -> AdapterResult<bool> {
+    fn verify(
+        &self,
+        signer: &ValidatorId,
+        _state_root: &str,
+        signature: &str,
+    ) -> AdapterResult<bool> {
         // select the `identity` and compare it to the signer
         // for empty string this will return array with 1 element - an empty string `[""]`
         let is_same = match signature.rsplit(' ').take(1).next() {
-            Some(from) => from == signer,
+            Some(from) => from == signer.to_string(),
             None => false,
         };
 
@@ -73,7 +78,7 @@ impl Adapter for DummyAdapter {
 
         match identity {
             Some((id, _)) => Ok(Session {
-                uid: id.to_owned(),
+                uid: self.session_tokens[id].clone(),
                 era: 0,
             }),
             None => Err(AdapterError::Authentication(format!(
@@ -83,12 +88,11 @@ impl Adapter for DummyAdapter {
         }
     }
 
-    fn get_auth(&mut self, _validator: &str) -> AdapterResult<String> {
+    fn get_auth(&mut self, _validator: &ValidatorId) -> AdapterResult<String> {
         let who = self
             .session_tokens
             .iter()
             .find(|(_, id)| *id == &self.identity);
-
         match who {
             Some((id, _)) => {
                 let auth = self.authorization_tokens.get(id).expect("id should exist");

@@ -1,6 +1,5 @@
 use std::error::Error;
 
-use futures::compat::Future01CompatExt;
 use primitives::adapter::Adapter;
 use primitives::validator::{ApproveState, MessageTypes, NewState, RejectState};
 use primitives::BalancesMap;
@@ -24,7 +23,9 @@ enum NewStateResult {
 
 pub async fn tick<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result<(), Box<dyn Error>> {
     let from = iface.channel.spec.validators.leader().id.clone();
-    let new_msg_response = iface.get_latest_msg(from, &["NewState"]).await?;
+    let new_msg_response = iface
+        .get_latest_msg(from.to_string(), &["NewState"])
+        .await?;
     let new_msg = match new_msg_response {
         Some(MessageTypes::NewState(new_state)) => Some(new_state),
         _ => None,
@@ -46,11 +47,9 @@ pub async fn tick<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result<(), Box<
     };
 
     let (balances, _) = producer::tick(&iface).await?;
-
     if let (Some(new_state), false) = (new_msg, latest_is_responded_to) {
         on_new_state(&iface, &balances, &new_state).await?;
     }
-
     heartbeat(&iface, balances).await.map(|_| ())
 }
 
@@ -66,18 +65,14 @@ async fn on_new_state<'a, A: Adapter + 'static>(
         return Ok(on_error(&iface, &new_state, InvalidNewState::RootHash).await);
     }
 
-    let adapter = iface
-        .adapter
-        .read()
-        .compat()
-        .await
-        .expect("on_new_state: failed to acquire read lock adapter");
+    let adapter = iface.adapter.read().await;
 
     if !adapter.verify(
         &iface.channel.spec.validators.leader().id,
         &proposed_state_root,
         &new_state.signature,
     )? {
+        drop(adapter);
         return Ok(on_error(&iface, &new_state, InvalidNewState::Signature).await);
     }
 
@@ -85,25 +80,29 @@ async fn on_new_state<'a, A: Adapter + 'static>(
     let prev_balances = last_approve_response
         .last_approved
         .and_then(|last_approved| last_approved.new_state)
-        .map_or(Default::default(), |new_state| new_state.balances);
+        .map_or(Default::default(), |new_state| new_state.msg.balances);
 
     if !is_valid_transition(&iface.channel, &prev_balances, &proposed_balances) {
+        drop(adapter);
         return Ok(on_error(&iface, &new_state, InvalidNewState::Transition).await);
     }
 
     let signature = adapter.sign(&new_state.state_root)?;
     let health_threshold = u64::from(iface.config.health_threshold_promilles).into();
+    let health = is_healthy(
+        &iface.channel,
+        balances,
+        &proposed_balances,
+        &health_threshold,
+    );
+
+    drop(adapter);
 
     iface
         .propagate(&[&MessageTypes::ApproveState(ApproveState {
             state_root: proposed_state_root,
             signature,
-            is_healthy: is_healthy(
-                &iface.channel,
-                balances,
-                &proposed_balances,
-                &health_threshold,
-            ),
+            is_healthy: health,
         })])
         .await;
 
