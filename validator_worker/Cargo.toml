@@ -24,6 +24,7 @@ futures_legacy = { version = "0.1.20", package = "futures" }
 futures-locks = "0.3"
 # Concurrency
 tokio = { version = "=0.1.19" }
+async-std = "^0.99.10"
 # API client
 reqwest = "0.9.18"
 # Configuration
@@ -34,8 +35,3 @@ serde_json = "1.0"
 toml = "0.5"
 # CLI
 clap = "2.33.0"
-# Logger
-slog = { version = "^2.2.3" , features = ["max_level_trace"] }
-slog-term = "^2.4.2"
-slog-async = "^2.3.0"
-async-std = "^0.99.10"
