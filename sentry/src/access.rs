@@ -133,9 +133,8 @@ async fn apply_rule(
                 .arg(&key)
                 .arg(seconds as i32)
                 .arg("1")
-                .query_async::<_, String>(&mut redis.clone())
+                .query_async::<_, ()>(&mut redis.clone())
                 .await
-                .map(|_| ())
                 .map_err(|error| format!("{}", error))
         }
         None => Ok(()),
@@ -158,13 +157,21 @@ mod test {
     use super::*;
 
     fn get_channel(with_rule: Rule) -> Channel {
-        let mut channel: Channel = DUMMY_CHANNEL.clone();
+        let mut channel = DUMMY_CHANNEL.clone();
 
         channel.spec.event_submission = Some(EventSubmission {
             allow: vec![with_rule],
         });
 
         channel
+    }
+    fn get_impression_events(count: i8) -> Vec<Event> {
+        (0..count)
+            .map(|_| Event::Impression {
+                publisher: "working".to_string(),
+                ad_unit: None,
+            })
+            .collect()
     }
 
     #[tokio::test]
@@ -178,13 +185,6 @@ mod test {
             ip: Default::default(),
         };
 
-        let events = (0..1)
-            .map(|_| Event::Impression {
-                publisher: "working".to_string(),
-                ad_unit: None,
-            })
-            .collect::<Vec<_>>();
-
         let rule = Rule {
             uids: None,
             rate_limit: Some(RateLimit {
@@ -192,16 +192,67 @@ mod test {
                 time_frame: Duration::from_millis(20_000),
             }),
         };
+        let events = get_impression_events(2);
+        let channel = get_channel(rule);
+
+        let response =
+            check_access(&redis, &session, &config.ip_rate_limit, &channel, &events).await;
+        assert_eq!(Ok(()), response);
+
+        let err_response =
+            check_access(&redis, &session, &config.ip_rate_limit, &channel, &events).await;
+        assert_eq!(
+            Err(Error::RulesError(
+                "rateLimit: too many requests".to_string()
+            )),
+            err_response
+        );
+    }
+
+    #[tokio::test]
+    async fn ip_rate_limit() {
+        let redis = redis_connection().await.expect("Couldn't connect to Redis");
+        let config = configuration("development", None).expect("Failed to get dev configuration");
+
+        let session = Session {
+            era: 0,
+            uid: "response".to_string(),
+            ip: Default::default(),
+        };
+
+        let rule = Rule {
+            uids: None,
+            rate_limit: Some(RateLimit {
+                limit_type: "ip".to_string(),
+                time_frame: Duration::from_millis(20_000),
+            }),
+        };
+        let channel = get_channel(rule);
+
+        let err_response = check_access(
+            &redis,
+            &session,
+            &config.ip_rate_limit,
+            &channel,
+            &get_impression_events(2),
+        )
+        .await;
+
+        assert_eq!(
+            Err(Error::RulesError(
+                "rateLimit: only allows 1 event".to_string()
+            )),
+            err_response
+        );
 
         let response = check_access(
             &redis,
             &session,
             &config.ip_rate_limit,
-            &get_channel(rule),
-            &events,
+            &channel,
+            &get_impression_events(1),
         )
         .await;
-
         assert_eq!(Ok(()), response);
     }
 }
