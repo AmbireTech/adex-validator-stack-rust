@@ -36,5 +36,5 @@ toml = "0.5"
 clap = "2.33.0"
 # Logger
 slog = { version = "^2.2.3" , features = ["max_level_trace"] }
-slog-term = "^2.4.0"
+slog-term = "^2.4.2"
 slog-async = "^2.3.0"
