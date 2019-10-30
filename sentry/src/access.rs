@@ -1,5 +1,4 @@
 use chrono::Utc;
-use futures::compat::Future01CompatExt;
 use futures::future::try_join_all;
 use redis::aio::SharedConnection;
 
@@ -10,12 +9,11 @@ use primitives::Channel;
 use crate::Session;
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum Response {
+pub enum Error {
     OnlyCreatorCanCloseChannel,
     ChannelIsExpired,
     ChannelIsPastWithdrawPeriod,
     RulesError(String),
-    Success,
 }
 
 // @TODO: Make pub(crate)
@@ -25,7 +23,7 @@ pub async fn check_access(
     rate_limit: &RateLimit,
     channel: &Channel,
     events: &[Event],
-) -> Response {
+) -> Result<(), Error> {
     let is_close_event = |e: &Event| match e {
         Event::Close => true,
         _ => false,
@@ -34,17 +32,17 @@ pub async fn check_access(
     // Check basic access rules
     // only the creator can send a CLOSE
     if session.uid != channel.creator && events.iter().any(is_close_event) {
-        return Response::OnlyCreatorCanCloseChannel;
+        return Err(Error::OnlyCreatorCanCloseChannel);
     }
 
     let current_time = Utc::now();
 
     if current_time > channel.valid_until {
-        return Response::ChannelIsExpired;
+        return Err(Error::ChannelIsExpired);
     }
 
     if current_time > channel.spec.withdraw_period_start && !events.iter().all(is_close_event) {
-        return Response::ChannelIsPastWithdrawPeriod;
+        return Err(Error::ChannelIsPastWithdrawPeriod);
     }
 
     let default_rules = [
@@ -76,7 +74,7 @@ pub async fn check_access(
 
     if rules.iter().any(|r| r.rate_limit.is_none()) {
         // We matched a rule that has *no rateLimit*, so we're good
-        return Response::Success;
+        return Ok(());
     }
 
     let apply_all_rules = try_join_all(
@@ -86,9 +84,9 @@ pub async fn check_access(
     );
 
     if let Err(rule_error) = apply_all_rules.await {
-        Response::RulesError(rule_error)
+        Err(Error::RulesError(rule_error))
     } else {
-        Response::Success
+        Ok(())
     }
 }
 
@@ -121,10 +119,9 @@ async fn apply_rule(
 
             if redis::cmd("EXISTS")
                 .arg(&key)
-                .query_async::<_, String>(redis.clone())
-                .compat()
+                .query_async::<_, i8>(&mut redis.clone())
                 .await
-                .map(|(_, exists)| exists == "1")
+                .map(|exists| exists == 1)
                 .map_err(|error| format!("{}", error))?
             {
                 return Err("rateLimit: too many requests".to_string());
@@ -134,14 +131,77 @@ async fn apply_rule(
 
             redis::cmd("SETEX")
                 .arg(&key)
-                .arg(seconds)
+                .arg(seconds as i32)
                 .arg("1")
-                .query_async::<_, String>(redis)
-                .compat()
+                .query_async::<_, String>(&mut redis.clone())
                 .await
                 .map(|_| ())
                 .map_err(|error| format!("{}", error))
         }
         None => Ok(()),
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::time::Duration;
+
+    use primitives::config::configuration;
+    use primitives::event_submission::{RateLimit, Rule};
+    use primitives::sentry::Event;
+    use primitives::util::tests::prep_db::DUMMY_CHANNEL;
+    use primitives::{Channel, EventSubmission};
+
+    use crate::db::redis_connection;
+    use crate::Session;
+
+    use super::*;
+
+    fn get_channel(with_rule: Rule) -> Channel {
+        let mut channel: Channel = DUMMY_CHANNEL.clone();
+
+        channel.spec.event_submission = Some(EventSubmission {
+            allow: vec![with_rule],
+        });
+
+        channel
+    }
+
+    #[tokio::test]
+    async fn session_uid_rate_limit() {
+        let redis = redis_connection().await.expect("Couldn't connect to Redis");
+        let config = configuration("development", None).expect("Failed to get dev configuration");
+
+        let session = Session {
+            era: 0,
+            uid: "response".to_string(),
+            ip: Default::default(),
+        };
+
+        let events = (0..1)
+            .map(|_| Event::Impression {
+                publisher: "working".to_string(),
+                ad_unit: None,
+            })
+            .collect::<Vec<_>>();
+
+        let rule = Rule {
+            uids: None,
+            rate_limit: Some(RateLimit {
+                limit_type: "sid".to_string(),
+                time_frame: Duration::from_millis(20_000),
+            }),
+        };
+
+        let response = check_access(
+            &redis,
+            &session,
+            &config.ip_rate_limit,
+            &get_channel(rule),
+            &events,
+        )
+        .await;
+
+        assert_eq!(Ok(()), response);
     }
 }

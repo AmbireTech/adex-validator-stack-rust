@@ -1,4 +1,3 @@
-use futures::compat::Future01CompatExt;
 use redis::aio::SharedConnection;
 use redis::RedisError;
 
@@ -11,5 +10,5 @@ lazy_static! {
 
 pub async fn redis_connection() -> Result<SharedConnection, RedisError> {
     let client = redis::Client::open(REDIS_URL.as_str()).expect("Wrong redis connection string");
-    client.get_shared_async_connection().compat().await
+    client.get_shared_async_connection().await
 }
