@@ -104,13 +104,21 @@ async fn apply_rule(
                 if session.uid.is_empty() {
                     Err("rateLimit: unauthenticated request".to_string())
                 } else {
-                    Ok(format!("adexRateLimit:{}:{}", channel.id, session.uid))
+                    Ok(format!(
+                        "adexRateLimit:{}:{}",
+                        hex::encode(channel.id),
+                        session.uid
+                    ))
                 }
             } else if &rate_limit.limit_type == "ip" {
                 if events.len() != 1 {
                     Err("rateLimit: only allows 1 event".to_string())
                 } else {
-                    Ok(format!("adexRateLimit:{}:{}", channel.id, session.ip))
+                    Ok(format!(
+                        "adexRateLimit:{}:{}",
+                        hex::encode(channel.id),
+                        session.ip
+                    ))
                 }
             } else {
                 // return for the whole function

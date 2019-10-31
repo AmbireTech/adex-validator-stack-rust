@@ -2,15 +2,30 @@ use crate::validator::{ApproveState, Heartbeat, MessageTypes, NewState};
 use crate::{BigNum, Channel};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_hex::{SerHex, StrictPfx};
 use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct LastApproved {
     /// NewState can be None if the channel is brand new
-    pub new_state: Option<NewState>,
+    pub new_state: Option<NewStateValidatorMessage>,
     /// ApproveState can be None if the channel is brand new
-    pub approved_state: Option<ApproveState>,
+    pub approved_state: Option<ApproveStateValidatorMessage>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct NewStateValidatorMessage {
+    pub from: String,
+    pub received: DateTime<Utc>,
+    pub msg: NewState,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ApproveStateValidatorMessage {
+    pub from: String,
+    pub received: DateTime<Utc>,
+    pub msg: ApproveState,
 }
 
 #[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
@@ -48,7 +63,8 @@ pub struct Earner {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EventAggregate {
-    pub channel_id: String,
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub channel_id: [u8; 32],
     pub created: DateTime<Utc>,
     pub events: HashMap<String, AggregateEvents>,
 }
@@ -56,7 +72,8 @@ pub struct EventAggregate {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AggregateEvents {
-    pub event_counts: HashMap<String, BigNum>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event_counts: Option<HashMap<String, BigNum>>,
     pub event_payouts: HashMap<String, BigNum>,
 }
 
@@ -88,8 +105,8 @@ pub struct ValidatorMessage {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub enum ValidatorMessageResponse {
-    ValidatorMessages(Vec<ValidatorMessage>),
+pub struct ValidatorMessageResponse {
+    pub validator_messages: Vec<ValidatorMessage>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

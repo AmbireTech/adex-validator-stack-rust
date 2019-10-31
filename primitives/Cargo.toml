@@ -16,7 +16,7 @@ serde_millis = "0.1.1"
 toml = "0.5"
 # Logging
 slog = { version = "^2.5.2" , features = ["max_level_trace"] }
-slog-term = "^2.4.1"
+slog-term = "^2.4.2"
 slog-async = "^2.3.0"
 # Domain
 chrono = { version = "0.4", features = ["serde"] }
@@ -24,6 +24,7 @@ time = "0.1.42"
 hex = "0.3.2"
 merkletree = "0.10.0"
 tiny-keccak = "1.5"
+eth_checksum = "0.1.1"
 # Numbers - BigNum, Numbers, Traits and Derives
 num-bigint = { version = "0.2", features = ["serde"] }
 num = "0.2.0"

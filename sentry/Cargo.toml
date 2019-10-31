@@ -11,6 +11,7 @@ futures-preview = { version = "=0.3.0-alpha.19", features = ["compat"]}
 primitives = {path = "../primitives"}
 adapter = { version = "0.1", path = "../adapter" }
 chrono = { version = "0.4", features = ["serde"] }
+hex = "0.3.2"
 # CLI
 clap = "2.33.0"
 # Server

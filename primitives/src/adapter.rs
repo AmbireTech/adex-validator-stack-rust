@@ -1,9 +1,11 @@
 use crate::channel_validator::ChannelValidator;
-use crate::Channel;
+use crate::{Channel, DomainError, ValidatorId};
 use std::collections::HashMap;
+use std::convert::From;
 use std::error::Error;
 use std::fmt;
 use std::fmt::Debug;
+
 pub type AdapterResult<T> = Result<T, AdapterError>;
 
 #[derive(Debug, Eq, PartialEq)]
@@ -33,9 +35,15 @@ impl fmt::Display for AdapterError {
     }
 }
 
+impl From<DomainError> for AdapterError {
+    fn from(err: DomainError) -> AdapterError {
+        AdapterError::Failed(err.to_string())
+    }
+}
+
 pub struct DummyAdapterOptions {
-    pub dummy_identity: String,
-    pub dummy_auth: HashMap<String, String>,
+    pub dummy_identity: ValidatorId,
+    pub dummy_auth: HashMap<String, ValidatorId>,
     pub dummy_auth_tokens: HashMap<String, String>,
 }
 
@@ -48,7 +56,7 @@ pub struct KeystoreOptions {
 #[derive(Debug, Clone)]
 pub struct Session {
     pub era: i64,
-    pub uid: String,
+    pub uid: ValidatorId,
 }
 
 pub trait Adapter: ChannelValidator + Send + Clone + Debug {
@@ -56,13 +64,18 @@ pub trait Adapter: ChannelValidator + Send + Clone + Debug {
     fn unlock(&mut self) -> AdapterResult<()>;
 
     /// Get Adapter whoami
-    fn whoami(&self) -> String;
+    fn whoami(&self) -> &ValidatorId;
 
     /// Signs the provided state_root
     fn sign(&self, state_root: &str) -> AdapterResult<String>;
 
     /// Verify, based on the signature & state_root, that the signer is the same
-    fn verify(&self, signer: &str, state_root: &str, signature: &str) -> AdapterResult<bool>;
+    fn verify(
+        &self,
+        signer: &ValidatorId,
+        state_root: &str,
+        signature: &str,
+    ) -> AdapterResult<bool>;
 
     /// Validate a channel
     fn validate_channel(&self, channel: &Channel) -> AdapterResult<bool>;
@@ -71,5 +84,5 @@ pub trait Adapter: ChannelValidator + Send + Clone + Debug {
     fn session_from_token(&mut self, token: &str) -> AdapterResult<Session>;
 
     /// Gets authentication for specific validator
-    fn get_auth(&mut self, validator_id: &str) -> AdapterResult<String>;
+    fn get_auth(&mut self, validator_id: &ValidatorId) -> AdapterResult<String>;
 }
