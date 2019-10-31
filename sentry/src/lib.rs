@@ -2,7 +2,7 @@
 #![deny(rust_2018_idioms)]
 
 use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Error, Request, Response, Server, StatusCode};
+use hyper::{Body, Error, HeaderMap, Request, Response, Server, StatusCode};
 use primitives::adapter::Adapter;
 use primitives::Config;
 use slog::{error, info, Logger};
@@ -68,7 +68,9 @@ where
 }
 
 async fn handle_routing(req: Request<Body>, adapter: impl Adapter) -> Response<Body> {
-    if req.uri().path().starts_with("/channel") {
+    let headers = cors(&req).unwrap_or_else(Default::default);
+
+    let mut response = if req.uri().path().starts_with("/channel") {
         crate::routes::channel::handle_channel_routes(req, adapter).await
     } else {
         Err(ResponseError::NotFound)
@@ -76,7 +78,11 @@ async fn handle_routing(req: Request<Body>, adapter: impl Adapter) -> Response<B
     .unwrap_or_else(|response_err| match response_err {
         ResponseError::NotFound => not_found(),
         ResponseError::BadRequest(error) => bad_request(error),
-    })
+    });
+
+    // extend the headers with the inital headers we have from CORS (if there are some)
+    response.headers_mut().extend(headers);
+    response
 }
 
 pub fn not_found() -> Response<Body> {
@@ -92,4 +98,60 @@ pub fn bad_request(error: Box<dyn std::error::Error>) -> Response<Body> {
     let status = response.status_mut();
     *status = StatusCode::BAD_REQUEST;
     response
+}
+
+/// Simple Cross-Origin Resource Sharing request.
+/// Allows all origins and methods
+/// Does **not** support Preflighted `OPTIONS` requests.
+/// Sets initial `HeaderMap` to be used in the routes handlers.
+fn cors(req: &Request<Body>) -> Option<HeaderMap> {
+    use hyper::header::HeaderValue;
+    use hyper::http::header::{ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN, ORIGIN};
+
+    if let Some(_origin) = req.headers().get(ORIGIN) {
+        // hard code the methods and origins allowed, no need for fancy iterators and etc.
+        let allowed_methods = HeaderValue::from_static("GET,HEAD,PUT,PATCH,POST,DELETE");
+        let allowed_origins = HeaderValue::from_static("*");
+
+        let mut header_map = HeaderMap::new();
+        header_map.insert(ACCESS_CONTROL_ALLOW_ORIGIN, allowed_origins);
+        header_map.insert(ACCESS_CONTROL_ALLOW_METHODS, allowed_methods);
+
+        Some(header_map)
+    } else {
+        None
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use hyper::http::header::{ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN, ORIGIN};
+    use hyper::Request;
+
+    #[test]
+    fn check_that_cors_headers_are_set_correctly_when_needed() {
+        let cors_req = Request::builder()
+            .header(ORIGIN, "my-domain.com")
+            .body(Body::empty())
+            .unwrap();
+
+        let allowed_origin_headers = cors(&cors_req).expect("Should set headers for CORS");
+        assert_eq!(
+            allowed_origin_headers
+                .get(ACCESS_CONTROL_ALLOW_ORIGIN)
+                .expect("There should be allow origin Header"),
+            "*"
+        );
+        assert_eq!(
+            allowed_origin_headers
+                .get(ACCESS_CONTROL_ALLOW_METHODS)
+                .expect("There should be allow methods Header"),
+            "GET,HEAD,PUT,PATCH,POST,DELETE"
+        );
+
+        // non CORS request
+        // build an empty `Request` without `ORIGIN` header
+        assert!(cors(&Default::default()).is_none());
+    }
 }
