@@ -1,18 +1,19 @@
 use crate::error::ValidatorWorker;
+use async_std::sync::RwLock;
 use chrono::{DateTime, Utc};
 use futures::compat::Future01CompatExt;
 use futures::future::try_join_all;
 use futures_legacy::Future as LegacyFuture;
-use futures_locks::RwLock;
 use primitives::adapter::Adapter;
+use primitives::channel::SpecValidator;
 use primitives::sentry::{
     ChannelAllResponse, EventAggregateResponse, LastApprovedResponse, SuccessResponse,
     ValidatorMessageResponse,
 };
 use primitives::validator::MessageTypes;
-use primitives::{Channel, Config, ValidatorDesc};
-use reqwest::header::AUTHORIZATION;
+use primitives::{Channel, Config, ValidatorDesc, ValidatorId};
 use reqwest::r#async::{Client, Response};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -24,7 +25,7 @@ pub struct SentryApi<T: Adapter> {
     pub logging: bool,
     pub channel: Channel,
     pub config: Config,
-    pub whoami: String,
+    pub whoami: ValidatorId,
 }
 
 impl<T: Adapter + 'static> SentryApi<T> {
@@ -33,7 +34,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
         channel: &Channel,
         config: &Config,
         logging: bool,
-        whoami: &str,
+        whoami: &ValidatorId,
     ) -> Result<Self, ValidatorWorker> {
         let client = Client::builder()
             .timeout(Duration::from_secs(config.fetch_timeout.into()))
@@ -41,14 +42,10 @@ impl<T: Adapter + 'static> SentryApi<T> {
             .unwrap();
 
         // validate that we are to validate the channel
-        match channel
-            .spec
-            .validators
-            .into_iter()
-            .find(|&v| v.id == whoami)
-        {
-            Some(v) => {
-                let validator_url = format!("{}/channel/{}", v.url, channel.id);
+        match channel.spec.validators.find(&whoami) {
+            SpecValidator::Leader(v) | SpecValidator::Follower(v) => {
+                let channel_id = format!("0x{}", hex::encode(&channel.id));
+                let validator_url = format!("{}/channel/{}", v.url, channel_id);
 
                 Ok(Self {
                     adapter,
@@ -60,24 +57,16 @@ impl<T: Adapter + 'static> SentryApi<T> {
                     whoami: whoami.to_owned(),
                 })
             }
-            None => Err(ValidatorWorker::Failed(
+            SpecValidator::None => Err(ValidatorWorker::Failed(
                 "we can not find validator entry for whoami".to_string(),
             )),
         }
     }
 
     pub async fn propagate(&self, messages: &[&MessageTypes]) {
-        let serialised_messages: Vec<String> = messages
-            .iter()
-            .map(|message| serde_json::to_string(message).expect("failed to serialise message"))
-            .collect();
+        let mut adapter = self.adapter.write().await;
 
-        let mut adapter = self
-            .adapter
-            .write()
-            .compat()
-            .await
-            .expect("propagate: failed to get write lock");
+        let channel_id = format!("0x{}", hex::encode(&self.channel.id));
 
         for validator in self.channel.spec.validators.into_iter() {
             let auth_token = adapter.get_auth(&validator.id);
@@ -88,14 +77,15 @@ impl<T: Adapter + 'static> SentryApi<T> {
             }
 
             if let Err(e) = propagate_to(
+                &channel_id,
                 &auth_token.unwrap(),
                 &self.client,
                 &validator,
-                &serialised_messages,
+                messages,
             )
             .await
             {
-                handle_http_error(e, &validator.url)
+                handle_http_error(e, &validator.url);
             }
         }
     }
@@ -106,32 +96,29 @@ impl<T: Adapter + 'static> SentryApi<T> {
         message_types: &[&str],
     ) -> Result<Option<MessageTypes>, reqwest::Error> {
         let message_type = message_types.join("+");
-        let future = self
+        let url = format!(
+            "{}/validator-messages/{}/{}?limit=1",
+            self.validator_url, from, message_type
+        );
+        let result = self
             .client
-            .get(&format!(
-                "{}/validator-messages/{}/{}?limit=1",
-                self.validator_url, from, message_type
-            ))
+            .get(&url)
             .send()
             .and_then(|mut res: Response| res.json::<ValidatorMessageResponse>())
-            .compat();
-
-        let response = future.await?;
-        match response {
-            ValidatorMessageResponse::ValidatorMessages(data) => {
-                if !data.is_empty() {
-                    return Ok(Some(data[0].msg.clone()));
-                }
-                Ok(None)
-            }
+            .compat()
+            .await?;
+        if !result.validator_messages.is_empty() {
+            return Ok(Some(result.validator_messages[0].msg.clone()));
         }
+
+        Ok(None)
     }
 
     pub async fn get_our_latest_msg(
         &self,
         message_types: &[&str],
     ) -> Result<Option<MessageTypes>, reqwest::Error> {
-        self.get_latest_msg(self.whoami.clone(), message_types)
+        self.get_latest_msg(self.whoami.to_string(), message_types)
             .await
     }
 
@@ -162,47 +149,51 @@ impl<T: Adapter + 'static> SentryApi<T> {
         &self,
         after: DateTime<Utc>,
     ) -> Result<EventAggregateResponse, Box<ValidatorWorker>> {
-        let mut adapter = self
+        let auth_token = self
             .adapter
             .write()
-            .compat()
             .await
-            .expect("get_event_aggregates: Failed to acquire adapter");
-
-        let auth_token = adapter
             .get_auth(&self.whoami)
             .map_err(|e| Box::new(ValidatorWorker::Failed(e.to_string())))?;
 
         let url = format!(
             "{}/events-aggregates?after={}",
             self.validator_url,
-            after.timestamp()
+            after.timestamp_millis()
         );
 
-        let future = self
-            .client
+        self.client
             .get(&url)
-            .header(AUTHORIZATION, auth_token.to_string())
+            .bearer_auth(&auth_token)
             .send()
-            .and_then(|mut res: Response| res.json::<EventAggregateResponse>())
-            .map_err(|e| Box::new(ValidatorWorker::Failed(e.to_string())));
-
-        future.compat().await
+            .map_err(|e| Box::new(ValidatorWorker::Failed(e.to_string())))
+            .compat()
+            .await?
+            .json()
+            .map_err(|e| Box::new(ValidatorWorker::Failed(e.to_string())))
+            .compat()
+            .await
     }
 }
 
 async fn propagate_to(
+    channel_id: &str,
     auth_token: &str,
     client: &Client,
     validator: &ValidatorDesc,
-    messages: &[String],
+    messages: &[&MessageTypes],
 ) -> Result<(), reqwest::Error> {
-    let url = validator.url.to_string();
+    let url = format!(
+        "{}/channel/{}/validator-messages",
+        validator.url, channel_id
+    );
+    let mut body = HashMap::new();
+    body.insert("messages", messages);
 
     let _response: SuccessResponse = client
         .post(&url)
-        .header(AUTHORIZATION, auth_token.to_string())
-        .json(messages)
+        .bearer_auth(&auth_token)
+        .json(&body)
         .send()
         .compat()
         .await?
@@ -249,7 +240,7 @@ pub async fn all_channels(
         Ok(first_page.channels)
     } else {
         let mut all: Vec<ChannelAllResponse> = try_join_all(
-            (0..first_page.total_pages).map(|i| fetch_page(url.clone(), i, whoami.clone())),
+            (1..first_page.total_pages).map(|i| fetch_page(url.clone(), i, whoami.clone())),
         )
         .await?;
 

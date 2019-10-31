@@ -8,8 +8,10 @@ use primitives::adapter::{DummyAdapterOptions, KeystoreOptions};
 use primitives::config::configuration;
 use primitives::util::logging::{Async, PrefixedCompactFormat, TermDecorator};
 use primitives::util::tests::prep_db::{AUTH, IDS};
+use primitives::ValidatorId;
 use sentry::Application;
 use slog::{o, Drain, Logger};
+use std::convert::TryFrom;
 
 const DEFAULT_PORT: u16 = 8005;
 
@@ -80,7 +82,8 @@ async fn main() {
                 .expect("Dummy identity is required for the dummy adapter");
 
             let options = DummyAdapterOptions {
-                dummy_identity: dummy_identity.to_string(),
+                dummy_identity: ValidatorId::try_from(dummy_identity)
+                    .expect("failed to parse dummy identity"),
                 dummy_auth: IDS.clone(),
                 dummy_auth_tokens: AUTH.clone(),
             };
