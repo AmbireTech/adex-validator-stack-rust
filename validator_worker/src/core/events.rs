@@ -194,11 +194,9 @@ mod test {
 
     fn gen_ev_aggr(count: u64, recipient: &str) -> EventAggregate {
         let aggregate_events = AggregateEvents {
-            event_counts: Some(
-                vec![(recipient.to_string(), count.into())]
-                    .into_iter()
-                    .collect(),
-            ),
+            event_counts: vec![(recipient.to_string(), count.into())]
+                .into_iter()
+                .collect(),
             event_payouts: vec![(recipient.to_string(), (count * 10).into())]
                 .into_iter()
                 .collect(),

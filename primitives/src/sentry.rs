@@ -72,8 +72,8 @@ pub struct EventAggregate {
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AggregateEvents {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub event_counts: Option<HashMap<String, BigNum>>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub event_counts: HashMap<String, BigNum>,
     pub event_payouts: HashMap<String, BigNum>,
 }
 
