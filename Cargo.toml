@@ -7,6 +7,3 @@ members = [
     "sentry",
     "adview-manager",
 ]
-
-[patch.crates-io]
-slog-term = { git = "https://github.com/slog-rs/term", branch = "master"}
