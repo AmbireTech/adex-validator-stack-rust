@@ -1,3 +1,4 @@
+use crate::event_submission::RateLimit;
 use crate::BigNum;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -11,17 +12,6 @@ lazy_static! {
     static ref PRODUCTION_CONFIG: Config =
         toml::from_str(include_str!("../../docs/config/prod.toml"))
             .expect("Failed to parse prod.toml config file");
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct RateLimit {
-    /// "ip", "uid"
-    #[serde(rename = "type")]
-    pub limit_type: String,
-    /// in milliseconds
-    #[serde(rename = "timeframe")]
-    pub time_frame: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
