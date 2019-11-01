@@ -9,4 +9,4 @@ members = [
 ]
 
 [patch.crates-io]
-slog-term = { git = "https://github.com/slog-rs/term", branch = "master"}
+redis = {version = "0.13.1-alpha.0", git = "https://github.com/Marwes/redis-rs", branch = "async_await_api"}
