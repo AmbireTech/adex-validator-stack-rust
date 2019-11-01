@@ -15,7 +15,7 @@ pub(crate) fn reduce(channel: &Channel, initial_aggr: &mut EventAggregate, ev: &
         Event::Close => {
             let creator = channel.creator.clone();
             let close_event = AggregateEvents {
-                event_counts: vec![(creator.clone(), 1.into())].into_iter().collect(),
+                event_counts: Some(vec![(creator.clone(), 1.into())].into_iter().collect()),
                 event_payouts: vec![(creator, channel.deposit_amount.clone())]
                     .into_iter()
                     .collect(),
@@ -31,15 +31,15 @@ fn merge_impression_ev(
     earner: &str,
     channel: &Channel,
 ) -> AggregateEvents {
-    let mut impression = impression
-        .map(Clone::clone)
-        .unwrap_or_else(Default::default);
+    let mut impression = impression.map(Clone::clone).unwrap_or_default();
 
-    let event_counts = impression
+    let event_count = impression
         .event_counts
+        .get_or_insert_with(Default::default)
         .entry(earner.into())
         .or_insert_with(|| 0.into());
-    *event_counts += &1.into();
+
+    *event_count += &1.into();
 
     let event_payouts = impression
         .event_payouts
@@ -88,12 +88,16 @@ mod test {
 
         let event_counts = impression_event
             .event_counts
+            .as_ref()
+            .expect("there should be event_counts set")
             .get("myAwesomePublisher")
             .expect("There should be myAwesomePublisher event_counts key");
         assert_eq!(event_counts, &BigNum::from(101));
 
         let event_payouts = impression_event
             .event_counts
+            .as_ref()
+            .expect("there should be event_counts set")
             .get("myAwesomePublisher")
             .expect("There should be myAwesomePublisher event_payouts key");
         assert_eq!(event_payouts, &BigNum::from(101));
