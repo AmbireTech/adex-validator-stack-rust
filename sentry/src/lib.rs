@@ -11,6 +11,8 @@ pub mod routes {
     pub mod channel;
 }
 
+pub mod access;
+pub mod db;
 pub mod event_reducer;
 
 pub struct Application<A: Adapter> {
@@ -94,4 +96,12 @@ pub fn bad_request(error: Box<dyn std::error::Error>) -> Response<Body> {
     let status = response.status_mut();
     *status = StatusCode::BAD_REQUEST;
     response
+}
+
+// @TODO: Make pub(crate)
+#[derive(Debug, Clone)]
+pub struct Session {
+    pub era: i64,
+    pub uid: String,
+    pub ip: String,
 }

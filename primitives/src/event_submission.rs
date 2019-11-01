@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EventSubmission {
@@ -22,6 +23,6 @@ pub struct RateLimit {
     #[serde(rename = "type")]
     pub limit_type: String,
     /// in milliseconds
-    #[serde(rename = "timeframe")]
-    pub time_frame: u64,
+    #[serde(rename = "timeframe", with = "serde_millis")]
+    pub time_frame: Duration,
 }
