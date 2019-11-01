@@ -13,6 +13,7 @@ pub mod routes {
 
 pub mod access;
 pub mod db;
+pub mod event_reducer;
 
 pub struct Application<A: Adapter> {
     adapter: A,
