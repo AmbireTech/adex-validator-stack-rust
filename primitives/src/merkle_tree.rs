@@ -53,15 +53,13 @@ impl Algorithm<MerkleItem> for KeccakAlgorithm {
     }
 
     fn node(&mut self, left: MerkleItem, right: MerkleItem, _height: usize) -> MerkleItem {
-        let left_vec: Vec<u8> = left.to_vec();
-        let right_vec: Vec<u8> = right.to_vec();
         // This is a check for odd number of leaves items
         // left == right since the right is a duplicate of left
         // return the item unencoded as the JS impl
-        if right_vec == left_vec {
+        if left == right {
             left
         } else {
-            let mut node_vec = vec![left_vec, right_vec];
+            let mut node_vec = vec![left.to_vec(), right.to_vec()];
             node_vec.sort();
 
             let flatten_node_vec: Vec<u8> = node_vec.into_iter().flatten().collect();
