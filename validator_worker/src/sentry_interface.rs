@@ -108,7 +108,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
             .compat()
             .await?;
 
-        Ok(result.validator_messages.get(0).map(|m| m.msg.clone()))
+        Ok(result.validator_messages.first().map(|m| m.msg.clone()))
     }
 
     pub async fn get_our_latest_msg(
