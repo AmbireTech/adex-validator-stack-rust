@@ -60,7 +60,6 @@ async fn on_new_state<'a, A: Adapter + 'static>(
 ) -> Result<NewStateResult, Box<dyn Error>> {
     let proposed_balances = new_state.balances.clone();
     let proposed_state_root = new_state.state_root.clone();
-
     if proposed_state_root != hex::encode(get_state_root_hash(&iface, &proposed_balances)?) {
         return Ok(on_error(&iface, &new_state, InvalidNewState::RootHash).await);
     }
