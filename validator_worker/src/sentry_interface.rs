@@ -107,11 +107,8 @@ impl<T: Adapter + 'static> SentryApi<T> {
             .and_then(|mut res: Response| res.json::<ValidatorMessageResponse>())
             .compat()
             .await?;
-        if !result.validator_messages.is_empty() {
-            return Ok(Some(result.validator_messages[0].msg.clone()));
-        }
 
-        Ok(None)
+        Ok(result.validator_messages.get(0).map(|m| m.msg.clone()))
     }
 
     pub async fn get_our_latest_msg(
