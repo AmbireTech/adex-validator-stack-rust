@@ -53,16 +53,19 @@ impl Algorithm<MerkleItem> for KeccakAlgorithm {
     }
 
     fn node(&mut self, left: MerkleItem, right: MerkleItem, _height: usize) -> MerkleItem {
-        let left_vec: Vec<u8> = left.to_vec();
-        let right_vec: Vec<u8> = right.to_vec();
+        // This is a check for odd number of leaves items
+        // left == right since the right is a duplicate of left
+        // return the item unencoded as the JS impl
+        if left == right {
+            left
+        } else {
+            let mut node_vec = vec![left.to_vec(), right.to_vec()];
+            node_vec.sort();
 
-        let mut node_vec = vec![left_vec, right_vec];
-        node_vec.sort();
-
-        let flatten_node_vec: Vec<u8> = node_vec.into_iter().flatten().collect();
-
-        self.write(&flatten_node_vec);
-        self.hash()
+            let flatten_node_vec: Vec<u8> = node_vec.into_iter().flatten().collect();
+            self.write(&flatten_node_vec);
+            self.hash()
+        }
     }
 }
 
@@ -175,6 +178,38 @@ mod test {
 
         assert_eq!(
             root, "70d6549669561c65fdc687b87743b67e494e1f4be5d19a2955507220e57baaa6",
+            "should generate the correct root"
+        );
+
+        let proof = top.proof(0);
+        let verify = top.verify(proof);
+
+        assert_eq!(verify, true, "should verify proof successfully");
+    }
+
+    #[test]
+    fn it_generates_correct_merkle_tree_with_odd_leaves() {
+        let h1 = <[u8; 32]>::from_hex(
+            "13c21db99584c9bb3e9ad98061f6ca39364049b328b74822be6303a4da18014d",
+        )
+        .unwrap();
+        let h2 = <[u8; 32]>::from_hex(
+            "b1bea7b8b58cd47d475bfe07dbe6df33f50f7a76957c51cebe8254257542fd7d",
+        )
+        .unwrap();
+
+        let h3 = <[u8; 32]>::from_hex(
+            "c455ef23d4db0091e1e25ef5d652a2832a1fc4fa82b8e66c290a692836e0cbe6",
+        )
+        .unwrap();
+
+        // odd leaves
+        let top = MerkleTree::new(&[h1, h2, h3]);
+
+        let root = hex::encode(&top.root());
+
+        assert_eq!(
+            root, "e68ea33571084e5dea276b089a10fa7be9d59accf3d7838c0d9b050bf72634a1",
             "should generate the correct root"
         );
 
