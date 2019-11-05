@@ -161,7 +161,7 @@ mod test {
             };
 
             let mut spec = DUMMY_CHANNEL.spec.clone();
-            spec.validators = [leader, follower].into();
+            spec.validators = (leader, follower).into();
 
             Channel {
                 deposit_amount: 100_000.into(),
@@ -185,7 +185,7 @@ mod test {
             };
 
             let mut spec = DUMMY_CHANNEL.spec.clone();
-            spec.validators = [leader, follower].into();
+            spec.validators = (leader, follower).into();
 
             let channel = Channel {
                 deposit_amount: 10_000.into(),
@@ -315,7 +315,7 @@ mod test {
         };
 
         let mut spec = DUMMY_CHANNEL.spec.clone();
-        spec.validators = [leader, follower].into();
+        spec.validators = (leader, follower).into();
 
         let channel = Channel {
             deposit_amount: 1_000.into(),
