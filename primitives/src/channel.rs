@@ -70,8 +70,8 @@ pub struct ChannelSpec {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(transparent)]
-pub struct SpecValidators([ValidatorDesc; 2]);
+/// A (leader, follower) tuple
+pub struct SpecValidators(ValidatorDesc, ValidatorDesc);
 
 pub enum SpecValidator<'a> {
     Leader(&'a ValidatorDesc),
@@ -94,15 +94,15 @@ impl<'a> SpecValidator<'a> {
 
 impl SpecValidators {
     pub fn new(leader: ValidatorDesc, follower: ValidatorDesc) -> Self {
-        Self([leader, follower])
+        Self(leader, follower)
     }
 
     pub fn leader(&self) -> &ValidatorDesc {
-        &self.0[0]
+        &self.0
     }
 
     pub fn follower(&self) -> &ValidatorDesc {
-        &self.0[1]
+        &self.1
     }
 
     pub fn find(&self, validator_id: &ValidatorId) -> SpecValidator<'_> {
@@ -116,12 +116,13 @@ impl SpecValidators {
     }
 }
 
-impl From<[ValidatorDesc; 2]> for SpecValidators {
-    fn from(slice: [ValidatorDesc; 2]) -> Self {
-        Self(slice)
+impl From<(ValidatorDesc, ValidatorDesc)> for SpecValidators {
+    fn from((leader, follower): (ValidatorDesc, ValidatorDesc)) -> Self {
+        Self(leader, follower)
     }
 }
 
+/// Fixed size iterator of 2, as we need an iterator in couple of occasions
 impl<'a> IntoIterator for &'a SpecValidators {
     type Item = &'a ValidatorDesc;
     type IntoIter = ::std::vec::IntoIter<Self::Item>;
