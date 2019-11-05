@@ -15,7 +15,15 @@ pub mod market_channel;
 pub mod merkle_tree;
 pub mod sentry;
 pub mod targeting_tag;
-pub mod util;
+pub mod util {
+    pub mod tests {
+        pub mod prep_db;
+        pub mod time;
+    }
+
+    pub mod logging;
+    pub mod serde;
+}
 pub mod validator;
 
 pub use self::ad_unit::AdUnit;
