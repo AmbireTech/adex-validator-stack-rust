@@ -2,7 +2,7 @@
 #![deny(rust_2018_idioms)]
 
 use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Error, Request, Response, Server, StatusCode, Method};
+use hyper::{Body, Error, Method, Request, Response, Server, StatusCode};
 use primitives::adapter::Adapter;
 use primitives::Config;
 use slog::{error, info, Logger};
@@ -10,8 +10,8 @@ use slog::{error, info, Logger};
 pub mod routes {
     pub mod channel;
     pub mod cfg {
-        use hyper::{Body, Response};
         use crate::ResponseError;
+        use hyper::{Body, Response};
         use primitives::Config;
 
         pub fn return_config(config: &Config) -> Result<Response<Body>, ResponseError> {
@@ -82,10 +82,13 @@ where
     }
 }
 
-async fn handle_routing(req: Request<Body>, (adapter, config): (impl Adapter, Config)) -> Response<Body> {
+async fn handle_routing(
+    req: Request<Body>,
+    (adapter, config): (impl Adapter, Config),
+) -> Response<Body> {
     if req.uri().path().starts_with("/cfg") && req.method() == Method::GET {
         crate::routes::cfg::return_config(&config)
-    }else if req.uri().path().starts_with("/channel") {
+    } else if req.uri().path().starts_with("/channel") {
         crate::routes::channel::handle_channel_routes(req, adapter).await
     } else {
         Err(ResponseError::NotFound)
