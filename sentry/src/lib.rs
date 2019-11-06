@@ -1,12 +1,14 @@
 #![deny(clippy::all)]
 #![deny(rust_2018_idioms)]
 
+use crate::middleware::cors::{cors, CorsResult};
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Error, Request, Response, Server, StatusCode};
 use primitives::adapter::Adapter;
 use primitives::Config;
 use slog::{error, info, Logger};
 
+pub mod middleware;
 pub mod routes {
     pub mod channel;
 }
@@ -72,7 +74,14 @@ where
 }
 
 async fn handle_routing(req: Request<Body>, adapter: impl Adapter) -> Response<Body> {
-    if req.uri().path().starts_with("/channel") {
+    let headers = match cors(&req) {
+        CorsResult::Simple(headers) => headers,
+        // if we have a Preflight, just return the response directly
+        CorsResult::Preflight(response) => return response,
+        CorsResult::None => Default::default(),
+    };
+
+    let mut response = if req.uri().path().starts_with("/channel") {
         crate::routes::channel::handle_channel_routes(req, adapter).await
     } else {
         Err(ResponseError::NotFound)
@@ -80,7 +89,11 @@ async fn handle_routing(req: Request<Body>, adapter: impl Adapter) -> Response<B
     .unwrap_or_else(|response_err| match response_err {
         ResponseError::NotFound => not_found(),
         ResponseError::BadRequest(error) => bad_request(error),
-    })
+    });
+
+    // extend the headers with the inital headers we have from CORS (if there are some)
+    response.headers_mut().extend(headers);
+    response
 }
 
 pub fn not_found() -> Response<Body> {
