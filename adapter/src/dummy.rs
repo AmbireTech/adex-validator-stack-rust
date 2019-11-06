@@ -70,7 +70,7 @@ impl Adapter for DummyAdapter {
         }
     }
 
-    fn session_from_token(&mut self, token: &str) -> AdapterResult<Session> {
+    fn session_from_token(&self, token: &str) -> AdapterResult<Session> {
         let identity = self
             .authorization_tokens
             .iter()

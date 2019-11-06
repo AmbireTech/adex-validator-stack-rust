@@ -81,7 +81,7 @@ pub trait Adapter: ChannelValidator + Send + Clone + Debug {
     fn validate_channel(&self, channel: &Channel) -> AdapterResult<bool>;
 
     /// Get user session from token
-    fn session_from_token(&mut self, token: &str) -> AdapterResult<Session>;
+    fn session_from_token(&self, token: &str) -> AdapterResult<Session>;
 
     /// Gets authentication for specific validator
     fn get_auth(&mut self, validator_id: &ValidatorId) -> AdapterResult<String>;
