@@ -1,5 +1,6 @@
 use crate::channel_validator::ChannelValidator;
 use crate::{Channel, DomainError, ValidatorId};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::From;
 use std::error::Error;
@@ -53,7 +54,7 @@ pub struct KeystoreOptions {
     pub keystore_pwd: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Session {
     pub era: i64,
     pub uid: ValidatorId,
