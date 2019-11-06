@@ -164,15 +164,11 @@ impl Adapter for EthereumAdapter {
         Ok(true)
     }
 
-    fn session_from_token(&mut self, token: &str) -> AdapterResult<Session> {
+    /// Creates a `Session` from a provided Token by calling the Contract.
+    /// Does **not** cache the (`Token`, `Session`) pair.
+    fn session_from_token(&self, token: &str) -> AdapterResult<Session> {
         if token.len() < 16 {
-            return Err(AdapterError::Failed("invaild token id".to_string()));
-        }
-
-        let token_id = token[token.len() - 16..].to_string();
-
-        if let Some(token) = self.session_tokens.get(&token_id) {
-            return Ok(token.to_owned());
+            return Err(AdapterError::Failed("invalid token id".to_string()));
         }
 
         let parts: Vec<&str> = token.split('.').collect();
@@ -204,7 +200,7 @@ impl Adapter for EthereumAdapter {
                 let contract = get_contract(&self.config, contract_address, &IDENTITY_ABI)
                     .map_err(|_| map_error("failed to init identity contract"))?;
 
-                let priviledge_level: U256 = contract
+                let privilege_level: U256 = contract
                     .query(
                         "privileges",
                         verified.from.to_string(),
@@ -215,7 +211,7 @@ impl Adapter for EthereumAdapter {
                     .wait()
                     .map_err(|_| map_error("failed query priviledge level on contract"))?;
 
-                if priviledge_level == *PRIVILEGE_LEVEL_NONE {
+                if privilege_level == *PRIVILEGE_LEVEL_NONE {
                     return Err(AdapterError::Authorization(
                         "insufficient privilege".to_string(),
                     ));
@@ -231,7 +227,6 @@ impl Adapter for EthereumAdapter {
             },
         };
 
-        self.session_tokens.insert(token_id, sess.clone());
         Ok(sess)
     }
 
