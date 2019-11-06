@@ -86,12 +86,12 @@ async fn handle_routing(
     req: Request<Body>,
     (adapter, config): (impl Adapter, Config),
 ) -> Response<Body> {
-    if req.uri().path().starts_with("/cfg") && req.method() == Method::GET {
-        crate::routes::cfg::return_config(&config)
-    } else if req.uri().path().starts_with("/channel") {
-        crate::routes::channel::handle_channel_routes(req, adapter).await
-    } else {
-        Err(ResponseError::NotFound)
+    match (req.uri().path(), req.method()) {
+        ("/cfg", &Method::GET) => crate::routes::cfg::return_config(&config),
+        (route, _) if route.starts_with("/channel") => {
+            crate::routes::channel::handle_channel_routes(req, adapter).await
+        }
+        _ => Err(ResponseError::NotFound),
     }
     .unwrap_or_else(|response_err| match response_err {
         ResponseError::NotFound => not_found(),
