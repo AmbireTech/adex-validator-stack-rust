@@ -65,9 +65,7 @@ impl TryFrom<&str> for ValidatorId {
 impl TryFrom<&String> for ValidatorId {
     type Error = DomainError;
     fn try_from(value: &String) -> Result<Self, Self::Error> {
-        ValidatorId::try_from(value.as_str()).map_err(|_| {
-            DomainError::InvalidArgument("Failed to deserialize validator id".to_string())
-        })
+        ValidatorId::try_from(value.as_str())
     }
 }
 
