@@ -4,7 +4,6 @@
 use clap::{App, Arg};
 
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
-use async_std::sync::RwLock;
 use futures::compat::Future01CompatExt;
 use futures::future::try_join_all;
 use futures::future::{join, FutureExt, TryFutureExt};
@@ -15,7 +14,6 @@ use primitives::{Channel, SpecValidator, ValidatorId};
 use std::convert::TryFrom;
 use std::error::Error;
 use std::ops::Add;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::timer::Delay;
 use tokio::util::FutureExt as TokioFutureExt;
@@ -26,7 +24,7 @@ use validator_worker::{all_channels, follower, leader, SentryApi};
 struct Args<A: Adapter> {
     sentry_url: String,
     config: Config,
-    adapter: Arc<RwLock<A>>,
+    adapter: A,
     whoami: ValidatorId,
 }
 
@@ -126,7 +124,9 @@ fn run<A: Adapter + 'static>(
     config: &Config,
     adapter: A,
 ) -> Result<(), Box<dyn Error>> {
-    let sentry_adapter = Arc::new(RwLock::new(adapter.clone()));
+    let mut sentry_adapter = adapter.clone();
+    // unlock adapter
+    sentry_adapter.unlock()?;
     let whoami = adapter.whoami().to_owned();
 
     let args = Args {
@@ -188,7 +188,7 @@ async fn iterate_channels<A: Adapter + 'static>(args: Args<A>) -> Result<(), ()>
 }
 
 async fn validator_tick<A: Adapter + 'static>(
-    adapter: Arc<RwLock<A>>,
+    adapter: A,
     channel: Channel,
     config: &Config,
     whoami: &ValidatorId,

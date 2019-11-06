@@ -11,7 +11,6 @@ use primitives::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::error::Error;
 use std::fs;
@@ -38,8 +37,6 @@ pub struct EthereumAdapter {
     keystore_json: Value,
     keystore_pwd: Password,
     config: Config,
-    // Auth tokens that we've generated to authenticate with someone (address => token)
-    authorization_tokens: HashMap<String, String>,
     wallet: Option<SafeAccount>,
 }
 
@@ -70,7 +67,6 @@ impl EthereumAdapter {
             address,
             keystore_json,
             keystore_pwd: opts.keystore_pwd.into(),
-            authorization_tokens: HashMap::new(),
             wallet: None,
             config: config.to_owned(),
         })
@@ -228,9 +224,10 @@ impl Adapter for EthereumAdapter {
     }
 
     fn get_auth(&self, validator: &ValidatorId) -> AdapterResult<String> {
-        let wallet = self.wallet.clone().ok_or_else(|| AdapterError::Configuration(
-                "failed to unlock wallet".to_string()
-        ))?;
+        let wallet = self
+            .wallet
+            .clone()
+            .ok_or_else(|| AdapterError::Configuration("failed to unlock wallet".to_string()))?;
 
         let era = Utc::now().timestamp_millis() as f64 / 60000.0;
         let payload = Payload {
@@ -241,7 +238,7 @@ impl Adapter for EthereumAdapter {
         };
         let token = ewt_sign(&wallet, &self.keystore_pwd, &payload)
             .map_err(|_| map_error("Failed to sign token"))?;
-        
+
         Ok(token)
     }
 }

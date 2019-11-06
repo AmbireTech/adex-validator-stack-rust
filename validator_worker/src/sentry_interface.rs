@@ -1,5 +1,4 @@
 use crate::error::ValidatorWorker;
-use async_std::sync::RwLock;
 use chrono::{DateTime, Utc};
 use futures::compat::Future01CompatExt;
 use futures::future::try_join_all;
@@ -14,23 +13,23 @@ use primitives::validator::MessageTypes;
 use primitives::{Channel, Config, ValidatorDesc, ValidatorId};
 use reqwest::r#async::{Client, Response};
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::time::Duration;
 
 #[derive(Debug, Clone)]
 pub struct SentryApi<T: Adapter> {
-    pub adapter: Arc<RwLock<T>>,
+    pub adapter: T,
     pub validator_url: String,
     pub client: Client,
     pub logging: bool,
     pub channel: Channel,
     pub config: Config,
     pub whoami: ValidatorId,
+    pub propagate_to: Vec<(ValidatorDesc, String)>,
 }
 
 impl<T: Adapter + 'static> SentryApi<T> {
     pub fn init(
-        adapter: Arc<RwLock<T>>,
+        adapter: T,
         channel: &Channel,
         config: &Config,
         logging: bool,
@@ -46,12 +45,29 @@ impl<T: Adapter + 'static> SentryApi<T> {
             SpecValidator::Leader(v) | SpecValidator::Follower(v) => {
                 let channel_id = format!("0x{}", hex::encode(&channel.id));
                 let validator_url = format!("{}/channel/{}", v.url, channel_id);
+                let propagate_to = channel
+                    .spec
+                    .validators
+                    .into_iter()
+                    .map(|validator| {
+                        adapter
+                            .get_auth(&validator.id)
+                            .map(|auth| (validator.to_owned(), auth))
+                            .map_err(|e| {
+                                ValidatorWorker::Failed(format!(
+                                    "propagate error: get auth failed {}",
+                                    e
+                                ))
+                            })
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
 
                 Ok(Self {
                     adapter,
                     validator_url,
                     client,
                     logging,
+                    propagate_to,
                     channel: channel.to_owned(),
                     config: config.to_owned(),
                     whoami: whoami.to_owned(),
@@ -64,29 +80,13 @@ impl<T: Adapter + 'static> SentryApi<T> {
     }
 
     pub async fn propagate(&self, messages: &[&MessageTypes]) {
-        let mut adapter = self.adapter.write().await;
-
         let channel_id = format!("0x{}", hex::encode(&self.channel.id));
-
-        for validator in self.channel.spec.validators.into_iter() {
-            let auth_token = adapter.get_auth(&validator.id);
-
-            if let Err(e) = auth_token {
-                println!("propagate error: get auth failed {}", e);
-                continue;
-            }
-
-            if let Err(e) = propagate_to(
-                &channel_id,
-                &auth_token.unwrap(),
-                &self.client,
-                &validator,
-                messages,
-            )
-            .await
-            {
-                handle_http_error(e, &validator.url);
-            }
+        if let Err(e) = try_join_all(self.propagate_to.iter().map(|(validator, auth_token)| {
+            propagate_to(&channel_id, &auth_token, &self.client, &validator, messages)
+        }))
+        .await
+        {
+            handle_http_error(e);
         }
     }
 
@@ -148,8 +148,6 @@ impl<T: Adapter + 'static> SentryApi<T> {
     ) -> Result<EventAggregateResponse, Box<ValidatorWorker>> {
         let auth_token = self
             .adapter
-            .write()
-            .await
             .get_auth(&self.whoami)
             .map_err(|e| Box::new(ValidatorWorker::Failed(e.to_string())))?;
 
@@ -201,11 +199,11 @@ async fn propagate_to(
     Ok(())
 }
 
-fn handle_http_error(e: reqwest::Error, url: &str) {
+fn handle_http_error(e: reqwest::Error) {
     if e.is_http() {
         match e.url() {
             None => println!("No Url given"),
-            Some(url) => println!("Problem making request to: {}", url),
+            Some(url) => println!("erorr sending http request for validator {}", url),
         }
     }
     // Inspect the internal error and output it
@@ -215,10 +213,6 @@ fn handle_http_error(e: reqwest::Error, url: &str) {
             Some(err) => err,
         };
         println!("problem parsing information {}", serde_error);
-    }
-
-    if e.is_client_error() {
-        println!("erorr sending http request for validator {}", url)
     }
 
     if e.is_redirect() {
