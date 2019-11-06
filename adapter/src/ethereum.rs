@@ -227,33 +227,22 @@ impl Adapter for EthereumAdapter {
         Ok(sess)
     }
 
-    fn get_auth(&mut self, validator_id: &ValidatorId) -> AdapterResult<String> {
-        let validator = validator_id.to_owned();
-        match (
-            &self.wallet,
-            self.authorization_tokens.get(&validator.to_string()),
-        ) {
-            (Some(_), Some(token)) => Ok(token.to_owned()),
-            (Some(wallet), None) => {
-                let era = Utc::now().timestamp_millis() as f64 / 60000.0;
-                let payload = Payload {
-                    id: validator.to_hex_checksummed_string(),
-                    era: era.floor() as i64,
-                    identity: None,
-                    address: self.whoami().to_hex_checksummed_string(),
-                };
-                let token = ewt_sign(wallet, &self.keystore_pwd, &payload)
-                    .map_err(|_| map_error("Failed to sign token"))?;
+    fn get_auth(&self, validator: &ValidatorId) -> AdapterResult<String> {
+        let wallet = self.wallet.clone().ok_or_else(|| AdapterError::Configuration(
+                "failed to unlock wallet".to_string()
+        ))?;
 
-                self.authorization_tokens
-                    .insert(validator.to_string(), token.clone());
-
-                Ok(token)
-            }
-            (_, _) => Err(AdapterError::Configuration(
-                "failed to unlock wallet".to_string(),
-            )),
-        }
+        let era = Utc::now().timestamp_millis() as f64 / 60000.0;
+        let payload = Payload {
+            id: validator.to_hex_checksummed_string(),
+            era: era.floor() as i64,
+            identity: None,
+            address: self.whoami().to_hex_checksummed_string(),
+        };
+        let token = ewt_sign(&wallet, &self.keystore_pwd, &payload)
+            .map_err(|_| map_error("Failed to sign token"))?;
+        
+        Ok(token)
     }
 }
 

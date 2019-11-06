@@ -88,7 +88,7 @@ impl Adapter for DummyAdapter {
         }
     }
 
-    fn get_auth(&mut self, _validator: &ValidatorId) -> AdapterResult<String> {
+    fn get_auth(&self, _validator: &ValidatorId) -> AdapterResult<String> {
         let who = self
             .session_tokens
             .iter()
