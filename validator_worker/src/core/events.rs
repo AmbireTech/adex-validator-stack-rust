@@ -100,7 +100,7 @@ mod test {
             deposit_amount: 10_000.into(),
             ..DUMMY_CHANNEL.clone()
         };
-        channel.spec.validators = [leader, follower].into();
+        channel.spec.validators = (leader, follower).into();
 
         let balances_before_fees: BalancesMap =
             vec![("a".to_string(), 100.into()), ("b".to_string(), 200.into())]
@@ -141,7 +141,7 @@ mod test {
         };
 
         let spec = ChannelSpec {
-            validators: [leader, follower].into(),
+            validators: (leader, follower).into(),
             ..DUMMY_CHANNEL.spec.clone()
         };
         let channel = Channel {
