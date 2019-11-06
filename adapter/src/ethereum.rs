@@ -38,8 +38,6 @@ pub struct EthereumAdapter {
     keystore_json: Value,
     keystore_pwd: Password,
     config: Config,
-    // Auth tokens that we have verified (tokenId => session)
-    session_tokens: HashMap<String, Session>,
     // Auth tokens that we've generated to authenticate with someone (address => token)
     authorization_tokens: HashMap<String, String>,
     wallet: Option<SafeAccount>,
@@ -72,7 +70,6 @@ impl EthereumAdapter {
             address,
             keystore_json,
             keystore_pwd: opts.keystore_pwd.into(),
-            session_tokens: HashMap::new(),
             authorization_tokens: HashMap::new(),
             wallet: None,
             config: config.to_owned(),
