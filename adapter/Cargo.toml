@@ -10,7 +10,6 @@ primitives = {path = "../primitives"}
 futures-preview = {version = "=0.3.0-alpha.19"}
 # Time handling
 chrono = "0.4"
-time = "0.1.42"
 # To/From Hex
 hex = "0.3.2"
 serde =  {version = "^1.0", features = ['derive']}
