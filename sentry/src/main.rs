@@ -9,6 +9,7 @@ use primitives::config::configuration;
 use primitives::util::logging::{Async, PrefixedCompactFormat, TermDecorator};
 use primitives::util::tests::prep_db::{AUTH, IDS};
 use primitives::ValidatorId;
+use sentry::db::redis_connection;
 use sentry::Application;
 use slog::{o, Drain, Logger};
 use std::convert::TryFrom;
@@ -16,7 +17,7 @@ use std::convert::TryFrom;
 const DEFAULT_PORT: u16 = 8005;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = App::new("Sentry")
         .version("0.1")
         .arg(
@@ -96,19 +97,21 @@ async fn main() {
     };
 
     let logger = logger();
+    let redis = redis_connection().await?;
 
     match adapter {
         AdapterTypes::EthereumAdapter(adapter) => {
-            Application::new(*adapter, config, logger, clustered, port)
+            Application::new(*adapter, config, logger, redis, clustered, port)
                 .run()
                 .await
         }
         AdapterTypes::DummyAdapter(adapter) => {
-            Application::new(*adapter, config, logger, clustered, port)
+            Application::new(*adapter, config, logger, redis, clustered, port)
                 .run()
                 .await
         }
     }
+    Ok(())
 }
 
 fn logger() -> Logger {

@@ -117,7 +117,7 @@ async fn apply_rule(
                     Ok(format!(
                         "adexRateLimit:{}:{}",
                         hex::encode(channel.id),
-                        session.ip
+                        session.ip.as_ref().unwrap_or(&String::new())
                     ))
                 }
             } else {
