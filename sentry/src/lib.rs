@@ -4,7 +4,7 @@
 use crate::middleware::auth;
 use crate::middleware::cors::{cors, CorsResult};
 use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Error, Request, Response, Server, StatusCode};
+use hyper::{Body, Error, Method, Request, Response, Server, StatusCode};
 use primitives::adapter::Adapter;
 use primitives::Config;
 use redis::aio::SharedConnection;
@@ -16,6 +16,21 @@ pub mod middleware {
 }
 pub mod routes {
     pub mod channel;
+    pub mod cfg {
+        use crate::ResponseError;
+        use hyper::header::CONTENT_TYPE;
+        use hyper::{Body, Response};
+        use primitives::Config;
+
+        pub fn return_config(config: &Config) -> Result<Response<Body>, ResponseError> {
+            let config_str = serde_json::to_string(config)?;
+
+            Ok(Response::builder()
+                .header(CONTENT_TYPE, "application/json")
+                .body(Body::from(config_str))
+                .expect("Creating a response should never fail"))
+        }
+    }
 }
 
 pub mod access;
@@ -62,7 +77,7 @@ impl<A: Adapter + 'static> Application<A> {
                 Ok::<_, Error>(service_fn(move |req| {
                     let adapter_config = adapter_config.clone();
                     let redis = redis.clone();
-                    async move { Ok::<_, Error>(handle_routing(req, adapter_config.0, redis).await) }
+                    async move { Ok::<_, Error>(handle_routing(req, adapter_config, redis).await) }
                 }))
             }
         });
@@ -92,7 +107,7 @@ where
 
 async fn handle_routing(
     req: Request<Body>,
-    adapter: impl Adapter,
+    (adapter, config): (impl Adapter, Config),
     redis: SharedConnection,
 ) -> Response<Body> {
     let headers = match cors(&req) {
@@ -109,10 +124,12 @@ async fn handle_routing(
         Err(response_error) => return map_response_error(response_error),
     };
 
-    let mut response = if req.uri().path().starts_with("/channel") {
-        crate::routes::channel::handle_channel_routes(req, adapter).await
-    } else {
-        Err(ResponseError::NotFound)
+    let mut response = match (req.uri().path(), req.method()) {
+        ("/cfg", &Method::GET) => crate::routes::cfg::return_config(&config),
+        (route, _) if route.starts_with("/channel") => {
+            crate::routes::channel::handle_channel_routes(req, adapter).await
+        }
+        _ => Err(ResponseError::NotFound),
     }
     .unwrap_or_else(map_response_error);
 
