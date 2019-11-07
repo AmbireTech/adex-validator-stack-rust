@@ -227,7 +227,7 @@ impl Adapter for EthereumAdapter {
         let wallet = self
             .wallet
             .as_ref()
-            .ok_or_else(|| AdapterError::Configuration("failed to unlock wallet".to_string()))?;
+            .ok_or_else(|| AdapterError::Configuration("unlock wallet".to_string()))?;
 
         let era = Utc::now().timestamp_millis() as f64 / 60000.0;
         let payload = Payload {
