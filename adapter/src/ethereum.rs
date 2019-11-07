@@ -226,7 +226,7 @@ impl Adapter for EthereumAdapter {
     fn get_auth(&self, validator: &ValidatorId) -> AdapterResult<String> {
         let wallet = self
             .wallet
-            .clone()
+            .as_ref()
             .ok_or_else(|| AdapterError::Configuration("failed to unlock wallet".to_string()))?;
 
         let era = Utc::now().timestamp_millis() as f64 / 60000.0;
@@ -236,10 +236,9 @@ impl Adapter for EthereumAdapter {
             identity: None,
             address: self.whoami().to_hex_checksummed_string(),
         };
-        let token = ewt_sign(&wallet, &self.keystore_pwd, &payload)
-            .map_err(|_| map_error("Failed to sign token"))?;
 
-        Ok(token)
+        ewt_sign(&wallet, &self.keystore_pwd, &payload)
+            .map_err(|_| map_error("Failed to sign token"))
     }
 }
 
