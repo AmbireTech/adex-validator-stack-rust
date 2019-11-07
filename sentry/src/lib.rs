@@ -11,13 +11,17 @@ pub mod routes {
     pub mod channel;
     pub mod cfg {
         use crate::ResponseError;
+        use hyper::header::CONTENT_TYPE;
         use hyper::{Body, Response};
         use primitives::Config;
 
         pub fn return_config(config: &Config) -> Result<Response<Body>, ResponseError> {
             let config_str = serde_json::to_string(config)?;
 
-            Ok(Response::builder().body(Body::from(config_str)).unwrap())
+            Ok(Response::builder()
+                .header(CONTENT_TYPE, "application/json")
+                .body(Body::from(config_str))
+                .expect("Creating a response should never fail"))
         }
     }
 }
