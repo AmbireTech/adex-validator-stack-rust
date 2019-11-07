@@ -69,7 +69,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             Arg::with_name("singleTick")
                 .short("t")
                 .takes_value(false)
-                .help("runs the validator in single-tick mode and exis"),
+                .help("runs the validator in single-tick mode and exit"),
         )
         .get_matches();
 
