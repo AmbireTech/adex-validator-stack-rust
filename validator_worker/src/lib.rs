@@ -44,12 +44,10 @@ mod test {
     use super::*;
 
     use adapter::DummyAdapter;
-    use async_std::sync::RwLock;
     use primitives::adapter::DummyAdapterOptions;
     use primitives::config::configuration;
     use primitives::util::tests::prep_db::{AUTH, DUMMY_CHANNEL, IDS};
     use primitives::{BalancesMap, Channel};
-    use std::sync::Arc;
 
     fn setup_iface(channel: &Channel) -> SentryApi<DummyAdapter> {
         let adapter_options = DummyAdapterOptions {
@@ -61,14 +59,7 @@ mod test {
         let dummy_adapter = DummyAdapter::init(adapter_options, &config);
         let whoami = dummy_adapter.whoami().clone();
 
-        SentryApi::init(
-            Arc::new(RwLock::new(dummy_adapter)),
-            &channel,
-            &config,
-            false,
-            &whoami,
-        )
-        .expect("should succeed")
+        SentryApi::init(dummy_adapter, &channel, &config, false, &whoami).expect("should succeed")
     }
 
     #[test]

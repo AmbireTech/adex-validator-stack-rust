@@ -23,7 +23,7 @@ async fn send_heartbeat<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result<()
     let state_root_raw = get_signable_state_root(&iface.channel.id, &merkle_tree.root())?;
     let state_root = hex::encode(state_root_raw);
 
-    let signature = iface.adapter.read().await.sign(&state_root)?;
+    let signature = iface.adapter.sign(&state_root)?;
 
     let message_types = MessageTypes::Heartbeat(Heartbeat {
         signature,

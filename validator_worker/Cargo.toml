@@ -23,7 +23,6 @@ futures-preview = { version = "=0.3.0-alpha.19", features = ["compat"]}
 futures_legacy = { version = "0.1.20", package = "futures" }
 # Concurrency
 tokio = { version = "=0.1.19" }
-async-std = "^0.99.10"
 # API client
 reqwest = "0.9.18"
 # Configuration
