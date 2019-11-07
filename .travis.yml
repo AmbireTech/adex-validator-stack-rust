@@ -1,11 +1,13 @@
 language: rust
 rust:
-  - nightly-2019-05-08
+  - nightly-2019-10-14
 cache: cargo
 env:
   global:
     - CARGO_MAKE_RUN_CHECK_FORMAT="true"
     - CARGO_MAKE_RUN_CLIPPY="true"
+services:
+  - redis-server
 matrix:
   fast_finish: true
 script:

@@ -2,8 +2,11 @@
 
 members = [
     "adapter",
-    "domain",
+    "primitives",
+    "validator_worker",
     "sentry",
-    "validator",
-    "memory-repository",
+    "adview-manager",
 ]
+
+[patch.crates-io]
+redis = {version = "0.13.1-alpha.0", git = "https://github.com/Marwes/redis-rs", branch = "async_await_api"}
