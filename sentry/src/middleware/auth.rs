@@ -1,5 +1,5 @@
-use hyper::{Body, Request};
 use hyper::header::AUTHORIZATION;
+use hyper::{Body, Request};
 use redis::aio::SharedConnection;
 
 use primitives::adapter::{Adapter, Session as AdapterSession};
@@ -71,7 +71,7 @@ pub(crate) async fn for_request(
             }
         };
         let ip = get_request_ip(&req);
-        
+
         let session = Session {
             era: adapter_session.era,
             uid: adapter_session.uid.to_hex_non_prefix_string(),
@@ -91,7 +91,5 @@ fn get_request_ip(req: &Request<Body>) -> Option<String> {
     req.headers()
         .get("true-client-ip")
         .or_else(|| req.headers().get("x-forwarded-for"))
-        .and_then(|hv| {
-            hv.to_str().map(ToString::to_string).ok()
-        })
+        .and_then(|hv| hv.to_str().map(ToString::to_string).ok())
 }

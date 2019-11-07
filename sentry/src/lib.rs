@@ -117,7 +117,7 @@ async fn handle_routing(
         CorsResult::None => Default::default(),
     };
 
-    // otherwise problems with `.await` occurs about `Sync` not required for `Adapter`.
+    // otherwise problems with `.await` occurs about `Sync` being required for `Adapter`.
     let auth_connections = (adapter.clone(), redis.clone());
     let req = match auth::for_request(req, auth_connections.0, auth_connections.1).await {
         Ok(req) => req,
