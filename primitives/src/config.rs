@@ -15,6 +15,7 @@ lazy_static! {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all(serialize = "SCREAMING_SNAKE_CASE"))]
 pub struct Config {
     pub identity: Option<String>, // should not be here maybe?
     pub max_channels: u32,
