@@ -36,46 +36,34 @@ pub(crate) async fn for_request(
             .arg(token)
             .query_async::<_, Option<String>>(&mut redis.clone())
             .await?
-        {
-            Some(session) => {
-                match serde_json::from_str::<AdapterSession>(&session) {
-                    Ok(session) => session,
+            .and_then(|session_str| {
+                match serde_json::from_str::<AdapterSession>(&session_str) {
+                    Ok(session) => Some(session),
                     Err(serde_error) => {
-                        // On a Deserialization error remove the key from Redis as a precaution
-                        // DEL will return the number of deleted keys, but we don't need them
-                        let _ = redis::cmd("DEL")
-                            .arg(token)
-                            .query_async::<_, u8>(&mut redis.clone())
-                            .await
-                            .map_err(|remove_error| {
-                                // @TODO: Consider logging this error instead.
-                                println!("{}", remove_error);
-                            });
-
-                        return Err(serde_error.into());
+                        // log message instead
+                        println!("{}", serde_error);
+                        None
                     }
                 }
-            }
+            }) {
+            Some(adapter_session) => adapter_session,
             None => {
                 // If there was a problem with the Session or the Token, this will error
                 // and a BadRequest response will be returned
-                let session = adapter.session_from_token(token)?;
-
-                redis::cmd("SET")
-                    .arg(token)
-                    .arg(serde_json::to_string(&session)?)
-                    .query_async(&mut redis.clone())
-                    .await?;
-
-                session
+                adapter.session_from_token(token)?
             }
         };
-        let ip = get_request_ip(&req);
+
+        redis::cmd("SET")
+            .arg(token)
+            .arg(serde_json::to_string(&adapter_session)?)
+            .query_async(&mut redis.clone())
+            .await?;
 
         let session = Session {
             era: adapter_session.era,
             uid: adapter_session.uid.to_hex_non_prefix_string(),
-            ip,
+            ip: get_request_ip(&req),
         };
 
         req.extensions_mut().insert(session);
