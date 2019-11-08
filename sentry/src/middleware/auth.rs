@@ -105,7 +105,9 @@ mod test {
             dummy_auth_tokens: AUTH.clone(),
         };
         let config = configuration("development", None).expect("Dev config should be available");
-        let redis = redis_connection().await.expect("Couldn't connect to Redis");
+        let mut redis = redis_connection().await.expect("Couldn't connect to Redis");
+        // run `FLUSHALL` to clean any leftovers of other tests
+        let _ = redis::cmd("FLUSHALL").query_async::<_, String>(&mut redis).await;
         (DummyAdapter::init(adapter_options, &config), redis)
     }
 
@@ -132,7 +134,7 @@ mod test {
             Err(ResponseError::BadRequest(error)) => {
                 assert!(error.to_string().contains("no session token for this auth: wrong-token"), "Wrong error received");
             },
-            Ok(_)|Err(_) => panic!("We shouldn't get a success response nor a different Error than BadRequest for this call"),
+            _ => panic!("We shouldn't get a success response nor a different Error than BadRequest for this call"),
         };
     }
 }
