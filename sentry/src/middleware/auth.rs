@@ -50,15 +50,19 @@ pub(crate) async fn for_request(
             None => {
                 // If there was a problem with the Session or the Token, this will error
                 // and a BadRequest response will be returned
-                adapter.session_from_token(token)?
+                let adapter_session = adapter.session_from_token(token)?;
+
+                // save the Adapter Session to Redis for the next request
+                // if serde errors on deserialization this will override the value inside
+                redis::cmd("SET")
+                    .arg(token)
+                    .arg(serde_json::to_string(&adapter_session)?)
+                    .query_async(&mut redis.clone())
+                    .await?;
+
+                adapter_session
             }
         };
-
-        redis::cmd("SET")
-            .arg(token)
-            .arg(serde_json::to_string(&adapter_session)?)
-            .query_async(&mut redis.clone())
-            .await?;
 
         let session = Session {
             era: adapter_session.era,
