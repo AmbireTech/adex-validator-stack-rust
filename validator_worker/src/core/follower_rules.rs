@@ -15,12 +15,7 @@ pub fn is_valid_transition(channel: &Channel, prev: &BalancesMap, next: &Balance
     sum_next >= sum_prev && sum_next <= deposit && prev_checks
 }
 
-pub fn is_healthy(
-    channel: &Channel,
-    our: &BalancesMap,
-    approved: &BalancesMap,
-    health_threshold: &BigNum,
-) -> bool {
+pub fn get_health(channel: &Channel, our: &BalancesMap, approved: &BalancesMap) -> u64 {
     let sum_our: BigNum = our.values().sum();
 
     let zero = BigNum::from(0);
@@ -30,26 +25,21 @@ pub fn is_healthy(
         .sum();
 
     if sum_approved_mins >= sum_our {
-        return true;
+        return 1_000;
     }
 
-    let deposit = &channel.deposit_amount;
-    let health_threshold_neg = &BigNum::from(1_000) - health_threshold;
-    let acceptable_difference = deposit * &health_threshold_neg / &BigNum::from(1_000);
-
-    sum_our - sum_approved_mins < acceptable_difference
+    let diff = sum_our - sum_approved_mins;
+    let health_penalty = diff * &BigNum::from(1_000) / &channel.deposit_amount;
+    1_000 - health_penalty.to_u64().unwrap_or(1_000)
 }
 
 #[cfg(test)]
 mod test {
-    use lazy_static::lazy_static;
     use primitives::util::tests::prep_db::DUMMY_CHANNEL;
 
     use super::*;
 
-    lazy_static! {
-        static ref HEALTH_THRESHOLD: BigNum = BigNum::from(950);
-    }
+    const HEALTH_THRESHOLD: u64 = 950;
 
     fn get_dummy_channel<T: Into<BigNum>>(deposit: T) -> Channel {
         Channel {
@@ -161,107 +151,114 @@ mod test {
     }
 
     #[test]
-    fn is_healthy_the_approved_balance_tree_gte_our_accounting_is_healthy() {
+    fn get_health_the_approved_balance_tree_gte_our_accounting_is_healthy() {
         let channel = get_dummy_channel(50);
         let our = vec![("a".into(), 50.into())].into_iter().collect();
-        assert!(is_healthy(&channel, &our, &our, &HEALTH_THRESHOLD));
+        assert!(get_health(&channel, &our, &our) >= HEALTH_THRESHOLD);
 
-        assert!(is_healthy(
-            &channel,
-            &our,
-            &vec![("a".into(), 60.into())].into_iter().collect(),
-            &HEALTH_THRESHOLD
-        ));
+        assert!(
+            get_health(
+                &channel,
+                &our,
+                &vec![("a".into(), 60.into())].into_iter().collect()
+            ) >= HEALTH_THRESHOLD
+        );
     }
 
     #[test]
-    fn is_healthy_the_approved_balance_tree_is_positive_our_accounting_is_0_and_it_is_healthy() {
+    fn get_health_the_approved_balance_tree_is_positive_our_accounting_is_0_and_it_is_healthy() {
         let approved = vec![("a".into(), 50.into())].into_iter().collect();
 
-        assert!(is_healthy(
-            &get_dummy_channel(50),
-            &BalancesMap::default(),
-            &approved,
-            &HEALTH_THRESHOLD
-        ));
+        assert!(
+            get_health(&get_dummy_channel(50), &BalancesMap::default(), &approved)
+                >= HEALTH_THRESHOLD
+        );
     }
 
     #[test]
-    fn is_healthy_the_approved_balance_tree_has_less_but_within_margin_it_is_healthy() {
+    fn get_health_the_approved_balance_tree_has_less_but_within_margin_it_is_healthy() {
         let channel = get_dummy_channel(80);
 
-        assert!(is_healthy(
-            &channel,
-            &vec![("a".into(), 80.into())].into_iter().collect(),
-            &vec![("a".into(), 79.into())].into_iter().collect(),
-            &HEALTH_THRESHOLD
-        ));
+        assert!(
+            get_health(
+                &channel,
+                &vec![("a".into(), 80.into())].into_iter().collect(),
+                &vec![("a".into(), 79.into())].into_iter().collect()
+            ) >= HEALTH_THRESHOLD
+        );
 
-        assert!(is_healthy(
-            &channel,
-            &vec![("a".into(), 2.into())].into_iter().collect(),
-            &vec![("a".into(), 1.into())].into_iter().collect(),
-            &HEALTH_THRESHOLD
-        ));
+        assert!(
+            get_health(
+                &channel,
+                &vec![("a".into(), 2.into())].into_iter().collect(),
+                &vec![("a".into(), 1.into())].into_iter().collect()
+            ) >= HEALTH_THRESHOLD
+        );
     }
 
     #[test]
-    fn is_healthy_the_approved_balance_tree_has_less_it_is_unhealthy() {
+    fn get_health_the_approved_balance_tree_has_less_it_is_unhealthy() {
         let channel = get_dummy_channel(80);
 
-        assert!(!is_healthy(
-            &channel,
-            &vec![("a".into(), 80.into())].into_iter().collect(),
-            &vec![("a".into(), 70.into())].into_iter().collect(),
-            &HEALTH_THRESHOLD
-        ));
+        assert!(
+            get_health(
+                &channel,
+                &vec![("a".into(), 80.into())].into_iter().collect(),
+                &vec![("a".into(), 70.into())].into_iter().collect()
+            ) < HEALTH_THRESHOLD
+        );
     }
 
     #[test]
-    fn is_healthy_they_have_the_same_sum_but_different_entities_are_earning() {
+    fn get_health_they_have_the_same_sum_but_different_entities_are_earning() {
         let channel = get_dummy_channel(80);
 
-        assert!(!is_healthy(
-            &channel,
-            &vec![("a".into(), 80.into())].into_iter().collect(),
-            &vec![("b".into(), 80.into())].into_iter().collect(),
-            &HEALTH_THRESHOLD
-        ));
+        assert!(
+            get_health(
+                &channel,
+                &vec![("a".into(), 80.into())].into_iter().collect(),
+                &vec![("b".into(), 80.into())].into_iter().collect()
+            ) < HEALTH_THRESHOLD
+        );
 
-        assert!(!is_healthy(
-            &channel,
-            &vec![("a".into(), 80.into())].into_iter().collect(),
-            &vec![("b".into(), 40.into()), ("a".into(), 40.into())]
-                .into_iter()
-                .collect(),
-            &HEALTH_THRESHOLD
-        ));
+        assert!(
+            get_health(
+                &channel,
+                &vec![("a".into(), 80.into())].into_iter().collect(),
+                &vec![("b".into(), 40.into()), ("a".into(), 40.into())]
+                    .into_iter()
+                    .collect()
+            ) < HEALTH_THRESHOLD
+        );
 
-        assert!(!is_healthy(
-            &channel,
-            &vec![("a".into(), 80.into())].into_iter().collect(),
-            &vec![("b".into(), 20.into()), ("a".into(), 60.into())]
-                .into_iter()
-                .collect(),
-            &HEALTH_THRESHOLD
-        ));
+        assert!(
+            get_health(
+                &channel,
+                &vec![("a".into(), 80.into())].into_iter().collect(),
+                &vec![("b".into(), 20.into()), ("a".into(), 60.into())]
+                    .into_iter()
+                    .collect()
+            ) < HEALTH_THRESHOLD
+        );
 
-        assert!(is_healthy(
-            &channel,
-            &vec![("a".into(), 80.into())].into_iter().collect(),
-            &vec![("b".into(), 2.into()), ("a".into(), 78.into())]
-                .into_iter()
-                .collect(),
-            &HEALTH_THRESHOLD
-        ));
+        assert!(
+            get_health(
+                &channel,
+                &vec![("a".into(), 80.into())].into_iter().collect(),
+                &vec![("b".into(), 2.into()), ("a".into(), 78.into())]
+                    .into_iter()
+                    .collect()
+            ) >= HEALTH_THRESHOLD
+        );
 
-        assert!(is_healthy(
-            &channel,
-            &vec![("a".into(), 100.into()), ("b".into(), 1.into())]
-                .into_iter()
-                .collect(),
-            &vec![("a".into(), 100.into())].into_iter().collect(),
-            &HEALTH_THRESHOLD
-        ));
+        assert!(
+            get_health(
+                &channel,
+                &vec![("a".into(), 100.into()), ("b".into(), 1.into())]
+                    .into_iter()
+                    .collect(),
+                &vec![("a".into(), 100.into())].into_iter().collect()
+            ) >= HEALTH_THRESHOLD
+        );
     }
 }

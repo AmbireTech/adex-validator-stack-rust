@@ -4,7 +4,7 @@ use primitives::adapter::Adapter;
 use primitives::validator::{ApproveState, MessageTypes, NewState, RejectState};
 use primitives::BalancesMap;
 
-use crate::core::follower_rules::{is_healthy, is_valid_transition};
+use crate::core::follower_rules::{get_health, is_valid_transition};
 use crate::heartbeat::heartbeat;
 use crate::sentry_interface::SentryApi;
 use crate::{get_state_root_hash, producer};
@@ -14,6 +14,7 @@ enum InvalidNewState {
     RootHash,
     Signature,
     Transition,
+    Health,
 }
 
 enum NewStateResult {
@@ -82,20 +83,21 @@ async fn on_new_state<'a, A: Adapter + 'static>(
         return Ok(on_error(&iface, &new_state, InvalidNewState::Transition).await);
     }
 
+    let health = get_health(&iface.channel, balances, &proposed_balances);
+    // @TODO: don't hardcode that
+    if health < (750 as u64).into() {
+        return Ok(on_error(&iface, &new_state, InvalidNewState::Health).await);
+    }
+
     let signature = iface.adapter.sign(&new_state.state_root)?;
     let health_threshold = u64::from(iface.config.health_threshold_promilles).into();
-    let health = is_healthy(
-        &iface.channel,
-        balances,
-        &proposed_balances,
-        &health_threshold,
-    );
+    let is_healthy = &health >= &health_threshold;
 
     iface
         .propagate(&[&MessageTypes::ApproveState(ApproveState {
             state_root: proposed_state_root,
             signature,
-            is_healthy: health,
+            is_healthy,
         })])
         .await;
 
@@ -112,6 +114,7 @@ async fn on_error<'a, A: Adapter + 'static>(
         RootHash => "InvalidRootHash",
         Signature => "InvalidSignature",
         Transition => "InvalidTransition",
+        Health => "TooLowHealth",
     }
     .to_string();
 
