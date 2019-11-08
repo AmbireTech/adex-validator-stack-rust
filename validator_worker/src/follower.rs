@@ -84,7 +84,7 @@ async fn on_new_state<'a, A: Adapter + 'static>(
     }
 
     let health = get_health(&iface.channel, balances, &proposed_balances);
-    if health < u64::from(iface.config.health_unsignable_promilles).into() {
+    if health < u64::from(iface.config.health_unsignable_promilles) {
         return Ok(on_error(&iface, &new_state, InvalidNewState::Health).await);
     }
 
