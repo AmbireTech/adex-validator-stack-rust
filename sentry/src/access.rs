@@ -157,12 +157,22 @@ mod test {
     use primitives::event_submission::{RateLimit, Rule};
     use primitives::sentry::Event;
     use primitives::util::tests::prep_db::DUMMY_CHANNEL;
-    use primitives::{Channel, EventSubmission};
+    use primitives::{Channel, EventSubmission, Config};
 
     use crate::db::redis_connection;
     use crate::Session;
 
     use super::*;
+
+    async fn setup() -> (Config, SharedConnection) {
+        let mut redis = redis_connection().await.expect("Couldn't connect to Redis");
+        let config = configuration("development", None).expect("Failed to get dev configuration");
+
+        // run `FLUSHALL` to clean any leftovers of other tests
+        let _ = redis::cmd("FLUSHALL").query_async::<_, String>(&mut redis).await;
+
+        (config, redis)
+    }
 
     fn get_channel(with_rule: Rule) -> Channel {
         let mut channel = DUMMY_CHANNEL.clone();
@@ -184,8 +194,7 @@ mod test {
 
     #[tokio::test]
     async fn session_uid_rate_limit() {
-        let redis = redis_connection().await.expect("Couldn't connect to Redis");
-        let config = configuration("development", None).expect("Failed to get dev configuration");
+        let (config, redis) = setup().await;
 
         let session = Session {
             era: 0,
@@ -219,8 +228,7 @@ mod test {
 
     #[tokio::test]
     async fn ip_rate_limit() {
-        let redis = redis_connection().await.expect("Couldn't connect to Redis");
-        let config = configuration("development", None).expect("Failed to get dev configuration");
+        let (config, redis) = setup().await;
 
         let session = Session {
             era: 0,
