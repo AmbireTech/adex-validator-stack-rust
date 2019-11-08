@@ -84,14 +84,13 @@ async fn on_new_state<'a, A: Adapter + 'static>(
     }
 
     let health = get_health(&iface.channel, balances, &proposed_balances);
-    // @TODO: don't hardcode that
-    if health < (750 as u64).into() {
+    if health < u64::from(iface.config.health_unsignable_promilles).into() {
         return Ok(on_error(&iface, &new_state, InvalidNewState::Health).await);
     }
 
     let signature = iface.adapter.sign(&new_state.state_root)?;
-    let health_threshold = u64::from(iface.config.health_threshold_promilles).into();
-    let is_healthy = &health >= &health_threshold;
+    let health_threshold = u64::from(iface.config.health_threshold_promilles);
+    let is_healthy = health >= health_threshold;
 
     iface
         .propagate(&[&MessageTypes::ApproveState(ApproveState {
