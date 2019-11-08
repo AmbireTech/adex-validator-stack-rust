@@ -11,7 +11,6 @@ use primitives::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::error::Error;
 use std::fs;
@@ -38,8 +37,6 @@ pub struct EthereumAdapter {
     keystore_json: Value,
     keystore_pwd: Password,
     config: Config,
-    // Auth tokens that we've generated to authenticate with someone (address => token)
-    authorization_tokens: HashMap<String, String>,
     wallet: Option<SafeAccount>,
 }
 
@@ -70,7 +67,6 @@ impl EthereumAdapter {
             address,
             keystore_json,
             keystore_pwd: opts.keystore_pwd.into(),
-            authorization_tokens: HashMap::new(),
             wallet: None,
             config: config.to_owned(),
         })
@@ -227,33 +223,22 @@ impl Adapter for EthereumAdapter {
         Ok(sess)
     }
 
-    fn get_auth(&mut self, validator_id: &ValidatorId) -> AdapterResult<String> {
-        let validator = validator_id.to_owned();
-        match (
-            &self.wallet,
-            self.authorization_tokens.get(&validator.to_string()),
-        ) {
-            (Some(_), Some(token)) => Ok(token.to_owned()),
-            (Some(wallet), None) => {
-                let era = Utc::now().timestamp_millis() as f64 / 60000.0;
-                let payload = Payload {
-                    id: validator.to_hex_checksummed_string(),
-                    era: era.floor() as i64,
-                    identity: None,
-                    address: self.whoami().to_hex_checksummed_string(),
-                };
-                let token = ewt_sign(wallet, &self.keystore_pwd, &payload)
-                    .map_err(|_| map_error("Failed to sign token"))?;
+    fn get_auth(&self, validator: &ValidatorId) -> AdapterResult<String> {
+        let wallet = self
+            .wallet
+            .as_ref()
+            .ok_or_else(|| AdapterError::Configuration("unlock wallet".to_string()))?;
 
-                self.authorization_tokens
-                    .insert(validator.to_string(), token.clone());
+        let era = Utc::now().timestamp_millis() as f64 / 60000.0;
+        let payload = Payload {
+            id: validator.to_hex_checksummed_string(),
+            era: era.floor() as i64,
+            identity: None,
+            address: self.whoami().to_hex_checksummed_string(),
+        };
 
-                Ok(token)
-            }
-            (_, _) => Err(AdapterError::Configuration(
-                "failed to unlock wallet".to_string(),
-            )),
-        }
+        ewt_sign(&wallet, &self.keystore_pwd, &payload)
+            .map_err(|_| map_error("Failed to sign token"))
     }
 }
 

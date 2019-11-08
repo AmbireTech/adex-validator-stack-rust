@@ -64,9 +64,7 @@ async fn on_new_state<'a, A: Adapter + 'static>(
         return Ok(on_error(&iface, &new_state, InvalidNewState::RootHash).await);
     }
 
-    let adapter = iface.adapter.read().await.clone();
-
-    if !adapter.verify(
+    if !iface.adapter.verify(
         &iface.channel.spec.validators.leader().id,
         &proposed_state_root,
         &new_state.signature,
@@ -84,7 +82,7 @@ async fn on_new_state<'a, A: Adapter + 'static>(
         return Ok(on_error(&iface, &new_state, InvalidNewState::Transition).await);
     }
 
-    let signature = adapter.sign(&new_state.state_root)?;
+    let signature = iface.adapter.sign(&new_state.state_root)?;
     let health_threshold = u64::from(iface.config.health_threshold_promilles).into();
     let health = is_healthy(
         &iface.channel,
