@@ -10,7 +10,7 @@ use crate::{ResponseError, Session};
 /// If the `Adapter` fails to create an `AdapterSession`, `ResponseError::BadRequest` will be returned.
 pub(crate) async fn for_request(
     mut req: Request<Body>,
-    adapter: impl Adapter,
+    adapter: &impl Adapter,
     redis: SharedConnection,
 ) -> Result<Request<Body>, ResponseError> {
     let authorization = req.headers().get(AUTHORIZATION);
@@ -22,9 +22,9 @@ pub(crate) async fn for_request(
             hv.to_str()
                 .map(|token_str| {
                     if token_str.starts_with(prefix) {
-                        None
-                    } else {
                         Some(token_str.replacen(prefix, "", 1))
+                    } else {
+                        None
                     }
                 })
                 .transpose()
@@ -84,4 +84,55 @@ fn get_request_ip(req: &Request<Body>) -> Option<String> {
         .get("true-client-ip")
         .or_else(|| req.headers().get("x-forwarded-for"))
         .and_then(|hv| hv.to_str().map(ToString::to_string).ok())
+}
+
+
+#[cfg(test)]
+mod test {
+    use hyper::Request;
+    use super::*;
+    use adapter::DummyAdapter;
+    use primitives::config::configuration;
+    use crate::db::redis_connection;
+    use primitives::ValidatorId;
+    use primitives::adapter::DummyAdapterOptions;
+    use primitives::util::tests::prep_db::{AUTH, IDS};
+
+    async fn setup() -> (DummyAdapter, SharedConnection) {
+        let adapter_options = DummyAdapterOptions {
+            dummy_identity: IDS["leader"].clone(),
+            dummy_auth: IDS.clone(),
+            dummy_auth_tokens: AUTH.clone(),
+        };
+        let config = configuration("development", None).expect("Dev config should be available");
+        let redis = redis_connection().await.expect("Couldn't connect to Redis");
+        (DummyAdapter::init(adapter_options, &config), redis)
+    }
+
+    #[tokio::test]
+    async fn no_authentication_or_incorrect_value_should_not_add_session() {
+        let no_auth_req = Request::builder().body(Body::empty()).expect("should never fail!");
+
+        let (dummy_adapter, redis) = setup().await;
+        let no_auth = for_request(no_auth_req, &dummy_adapter, redis.clone()).await
+            .expect("Handling the Request shouldn't have failed");
+
+        assert!(no_auth.extensions().get::<Session>().is_none(), "There shouldn't be a Session in the extensions");
+        assert_eq!(Some(dummy_adapter.whoami()), no_auth.extensions().get::<ValidatorId>(), "There should be the whoami() ValidatorId of the adapter in the extensions");
+
+        // there is a Header, but it has wrong format
+        let incorrect_auth_req = Request::builder().header(AUTHORIZATION, "Wrong Header").body(Body::empty()).unwrap();
+        let incorrect_auth = for_request(incorrect_auth_req, &dummy_adapter, redis.clone()).await
+            .expect("Handling the Request shouldn't have failed");
+        assert!(incorrect_auth.extensions().get::<Session>().is_none(), "There shouldn't be a Session in the extensions");
+
+        // Token doesn't exist in the Adapter nor in Redis
+        let non_existent_token_req = Request::builder().header(AUTHORIZATION, "Bearer wrong-token").body(Body::empty()).unwrap();
+        match for_request(non_existent_token_req, &dummy_adapter, redis).await {
+            Err(ResponseError::BadRequest(error)) => {
+                assert!(error.to_string().contains("no session token for this auth: wrong-token"), "Wrong error received");
+            },
+            Ok(_)|Err(_) => panic!("We shouldn't get a success response nor a different Error than BadRequest for this call"),
+        };
+    }
 }

@@ -119,7 +119,7 @@ async fn handle_routing(
 
     // otherwise problems with `.await` occurs about `Sync` being required for `Adapter`.
     let auth_connections = (adapter.clone(), redis.clone());
-    let req = match auth::for_request(req, auth_connections.0, auth_connections.1).await {
+    let req = match auth::for_request(req, &auth_connections.0, auth_connections.1).await {
         Ok(req) => req,
         Err(response_error) => return map_response_error(response_error),
     };
