@@ -86,17 +86,16 @@ fn get_request_ip(req: &Request<Body>) -> Option<String> {
         .and_then(|hv| hv.to_str().map(ToString::to_string).ok())
 }
 
-
 #[cfg(test)]
 mod test {
-    use hyper::Request;
     use super::*;
-    use adapter::DummyAdapter;
-    use primitives::config::configuration;
     use crate::db::redis_connection;
-    use primitives::ValidatorId;
+    use adapter::DummyAdapter;
+    use hyper::Request;
     use primitives::adapter::DummyAdapterOptions;
+    use primitives::config::configuration;
     use primitives::util::tests::prep_db::{AUTH, IDS};
+    use primitives::ValidatorId;
 
     async fn setup() -> (DummyAdapter, SharedConnection) {
         let adapter_options = DummyAdapterOptions {
@@ -107,29 +106,51 @@ mod test {
         let config = configuration("development", None).expect("Dev config should be available");
         let mut redis = redis_connection().await.expect("Couldn't connect to Redis");
         // run `FLUSHALL` to clean any leftovers of other tests
-        let _ = redis::cmd("FLUSHALL").query_async::<_, String>(&mut redis).await;
+        let _ = redis::cmd("FLUSHALL")
+            .query_async::<_, String>(&mut redis)
+            .await;
         (DummyAdapter::init(adapter_options, &config), redis)
     }
 
     #[tokio::test]
     async fn no_authentication_or_incorrect_value_should_not_add_session() {
-        let no_auth_req = Request::builder().body(Body::empty()).expect("should never fail!");
+        let no_auth_req = Request::builder()
+            .body(Body::empty())
+            .expect("should never fail!");
 
         let (dummy_adapter, redis) = setup().await;
-        let no_auth = for_request(no_auth_req, &dummy_adapter, redis.clone()).await
+        let no_auth = for_request(no_auth_req, &dummy_adapter, redis.clone())
+            .await
             .expect("Handling the Request shouldn't have failed");
 
-        assert!(no_auth.extensions().get::<Session>().is_none(), "There shouldn't be a Session in the extensions");
-        assert_eq!(Some(dummy_adapter.whoami()), no_auth.extensions().get::<ValidatorId>(), "There should be the whoami() ValidatorId of the adapter in the extensions");
+        assert!(
+            no_auth.extensions().get::<Session>().is_none(),
+            "There shouldn't be a Session in the extensions"
+        );
+        assert_eq!(
+            Some(dummy_adapter.whoami()),
+            no_auth.extensions().get::<ValidatorId>(),
+            "There should be the whoami() ValidatorId of the adapter in the extensions"
+        );
 
         // there is a Header, but it has wrong format
-        let incorrect_auth_req = Request::builder().header(AUTHORIZATION, "Wrong Header").body(Body::empty()).unwrap();
-        let incorrect_auth = for_request(incorrect_auth_req, &dummy_adapter, redis.clone()).await
+        let incorrect_auth_req = Request::builder()
+            .header(AUTHORIZATION, "Wrong Header")
+            .body(Body::empty())
+            .unwrap();
+        let incorrect_auth = for_request(incorrect_auth_req, &dummy_adapter, redis.clone())
+            .await
             .expect("Handling the Request shouldn't have failed");
-        assert!(incorrect_auth.extensions().get::<Session>().is_none(), "There shouldn't be a Session in the extensions");
+        assert!(
+            incorrect_auth.extensions().get::<Session>().is_none(),
+            "There shouldn't be a Session in the extensions"
+        );
 
         // Token doesn't exist in the Adapter nor in Redis
-        let non_existent_token_req = Request::builder().header(AUTHORIZATION, "Bearer wrong-token").body(Body::empty()).unwrap();
+        let non_existent_token_req = Request::builder()
+            .header(AUTHORIZATION, "Bearer wrong-token")
+            .body(Body::empty())
+            .unwrap();
         match for_request(non_existent_token_req, &dummy_adapter, redis).await {
             Err(ResponseError::BadRequest(error)) => {
                 assert!(error.to_string().contains("no session token for this auth: wrong-token"), "Wrong error received");
@@ -144,10 +165,18 @@ mod test {
 
         let token = AUTH["leader"].clone();
         let auth_header = format!("Bearer {}", token);
-        let req = Request::builder().header(AUTHORIZATION, auth_header).body(Body::empty()).unwrap();
+        let req = Request::builder()
+            .header(AUTHORIZATION, auth_header)
+            .body(Body::empty())
+            .unwrap();
 
-        let altered_request = for_request(req, &dummy_adapter, redis).await.expect("Valid requests should succeed");
-        let session = altered_request.extensions().get::<Session>().expect("There should be a Session set inside the request");
+        let altered_request = for_request(req, &dummy_adapter, redis)
+            .await
+            .expect("Valid requests should succeed");
+        let session = altered_request
+            .extensions()
+            .get::<Session>()
+            .expect("There should be a Session set inside the request");
         let leader_id = IDS["leader"].to_hex_non_prefix_string();
         assert_eq!(leader_id, session.uid);
         assert!(session.ip.is_none());

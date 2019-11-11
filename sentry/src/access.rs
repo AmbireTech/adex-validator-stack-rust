@@ -157,7 +157,7 @@ mod test {
     use primitives::event_submission::{RateLimit, Rule};
     use primitives::sentry::Event;
     use primitives::util::tests::prep_db::DUMMY_CHANNEL;
-    use primitives::{Channel, EventSubmission, Config};
+    use primitives::{Channel, Config, EventSubmission};
 
     use crate::db::redis_connection;
     use crate::Session;
@@ -169,7 +169,9 @@ mod test {
         let config = configuration("development", None).expect("Failed to get dev configuration");
 
         // run `FLUSHALL` to clean any leftovers of other tests
-        let _ = redis::cmd("FLUSHALL").query_async::<_, String>(&mut redis).await;
+        let _ = redis::cmd("FLUSHALL")
+            .query_async::<_, String>(&mut redis)
+            .await;
 
         (config, redis)
     }
