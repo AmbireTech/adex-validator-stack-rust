@@ -77,7 +77,7 @@ impl<A: Adapter + 'static> Application<A> {
                 Ok::<_, Error>(service_fn(move |req| {
                     let adapter_config = adapter_config.clone();
                     let redis = redis.clone();
-                    async move { Ok::<_, Error>(handle_routing(req, adapter_config, redis).await) }
+                    async move { Ok::<_, Error>(handle_routing(req, (&adapter_config.0, &adapter_config.1), redis).await) }
                 }))
             }
         });
@@ -107,7 +107,7 @@ where
 
 async fn handle_routing(
     req: Request<Body>,
-    (adapter, config): (impl Adapter, Config),
+    (adapter, config): (&impl Adapter, &Config),
     redis: SharedConnection,
 ) -> Response<Body> {
     let headers = match cors(&req) {
@@ -117,9 +117,7 @@ async fn handle_routing(
         CorsResult::None => Default::default(),
     };
 
-    // otherwise problems with `.await` occurs about `Sync` being required for `Adapter`.
-    let auth_connections = (adapter.clone(), redis.clone());
-    let req = match auth::for_request(req, &auth_connections.0, auth_connections.1).await {
+    let req = match auth::for_request(req, adapter, redis.clone()).await {
         Ok(req) => req,
         Err(response_error) => return map_response_error(response_error),
     };

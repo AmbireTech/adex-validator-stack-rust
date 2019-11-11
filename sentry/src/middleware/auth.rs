@@ -73,9 +73,6 @@ pub(crate) async fn for_request(
         req.extensions_mut().insert(session);
     }
 
-    // @TODO: Check if we actually need this since we have the `adapter` for the check: `channelIfActive`
-    req.extensions_mut().insert(adapter.whoami().clone());
-
     Ok(req)
 }
 
@@ -95,7 +92,6 @@ mod test {
     use primitives::adapter::DummyAdapterOptions;
     use primitives::config::configuration;
     use primitives::util::tests::prep_db::{AUTH, IDS};
-    use primitives::ValidatorId;
 
     async fn setup() -> (DummyAdapter, SharedConnection) {
         let adapter_options = DummyAdapterOptions {
@@ -126,11 +122,6 @@ mod test {
         assert!(
             no_auth.extensions().get::<Session>().is_none(),
             "There shouldn't be a Session in the extensions"
-        );
-        assert_eq!(
-            Some(dummy_adapter.whoami()),
-            no_auth.extensions().get::<ValidatorId>(),
-            "There should be the whoami() ValidatorId of the adapter in the extensions"
         );
 
         // there is a Header, but it has wrong format
