@@ -137,4 +137,19 @@ mod test {
             _ => panic!("We shouldn't get a success response nor a different Error than BadRequest for this call"),
         };
     }
+
+    #[tokio::test]
+    async fn session_from_correct_authentication_token() {
+        let (dummy_adapter, redis) = setup().await;
+
+        let token = AUTH["leader"].clone();
+        let auth_header = format!("Bearer {}", token);
+        let req = Request::builder().header(AUTHORIZATION, auth_header).body(Body::empty()).unwrap();
+
+        let altered_request = for_request(req, &dummy_adapter, redis).await.expect("Valid requests should succeed");
+        let session = altered_request.extensions().get::<Session>().expect("There should be a Session set inside the request");
+        let leader_id = IDS["leader"].to_hex_non_prefix_string();
+        assert_eq!(leader_id, session.uid);
+        assert!(session.ip.is_none());
+    }
 }
