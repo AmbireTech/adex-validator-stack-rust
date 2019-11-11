@@ -10,6 +10,7 @@ msgs_find_limit = 10
 
 heartbeat_time = 60000
 health_threshold_promilles = 970
+health_unsignable_promilles = 770
 propagation_timeout = 3000
 
 list_timeout = 10000
