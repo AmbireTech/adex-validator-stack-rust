@@ -25,6 +25,7 @@ pub struct Config {
     pub channels_find_limit: u32,
     pub events_find_limit: u32,
     pub health_threshold_promilles: u32,
+    pub health_unsignable_promilles: u32,
     pub propagation_timeout: u32,
     pub fetch_timeout: u32,
     pub list_timeout: u32,
