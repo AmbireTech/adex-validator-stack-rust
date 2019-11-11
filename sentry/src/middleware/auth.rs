@@ -22,7 +22,7 @@ pub(crate) async fn for_request(
             hv.to_str()
                 .map(|token_str| {
                     if token_str.starts_with(prefix) {
-                        Some(token_str.replacen(prefix, "", 1))
+                        Some(token_str[prefix.len()..].to_string())
                     } else {
                         None
                     }

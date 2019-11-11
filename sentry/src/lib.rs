@@ -2,7 +2,7 @@
 #![deny(rust_2018_idioms)]
 
 use crate::middleware::auth;
-use crate::middleware::cors::{cors, CorsResult};
+use crate::middleware::cors::{cors, Cors};
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Error, Method, Request, Response, Server, StatusCode};
 use primitives::adapter::Adapter;
@@ -77,7 +77,12 @@ impl<A: Adapter + 'static> Application<A> {
                 Ok::<_, Error>(service_fn(move |req| {
                     let adapter_config = adapter_config.clone();
                     let redis = redis.clone();
-                    async move { Ok::<_, Error>(handle_routing(req, (&adapter_config.0, &adapter_config.1), redis).await) }
+                    async move {
+                        Ok::<_, Error>(
+                            handle_routing(req, (&adapter_config.0, &adapter_config.1), redis)
+                                .await,
+                        )
+                    }
                 }))
             }
         });
@@ -111,10 +116,10 @@ async fn handle_routing(
     redis: SharedConnection,
 ) -> Response<Body> {
     let headers = match cors(&req) {
-        CorsResult::Simple(headers) => headers,
+        Some(Cors::Simple(headers)) => headers,
         // if we have a Preflight, just return the response directly
-        CorsResult::Preflight(response) => return response,
-        CorsResult::None => Default::default(),
+        Some(Cors::Preflight(response)) => return response,
+        None => Default::default(),
     };
 
     let req = match auth::for_request(req, adapter, redis.clone()).await {

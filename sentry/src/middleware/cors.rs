@@ -1,26 +1,16 @@
 use hyper::header::{ACCESS_CONTROL_ALLOW_HEADERS, ACCESS_CONTROL_REQUEST_HEADERS};
 use hyper::{Body, HeaderMap, Method, Request, Response, StatusCode};
 
-pub enum CorsResult {
+pub enum Cors {
     Preflight(Response<Body>),
     Simple(HeaderMap),
-    None,
-}
-
-impl CorsResult {
-    pub fn is_none(&self) -> bool {
-        match self {
-            Self::None => true,
-            _ => false,
-        }
-    }
 }
 
 /// Cross-Origin Resource Sharing request handler
 /// Allows all origins and methods and supports Preflighted `OPTIONS` requests.
 /// On Simple CORS requests sets initial `HeaderMap` to be used in the routes handlers.
 /// Otherwise returns a `OPTION` Response.
-pub(crate) fn cors(req: &Request<Body>) -> CorsResult {
+pub(crate) fn cors(req: &Request<Body>) -> Option<Cors> {
     use hyper::header::{
         HeaderValue, ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN, CONTENT_LENGTH,
         ORIGIN,
@@ -62,11 +52,11 @@ pub(crate) fn cors(req: &Request<Body>) -> CorsResult {
         // set the headers of the Request
         *response.headers_mut() = headers;
 
-        CorsResult::Preflight(response)
+        Some(Cors::Preflight(response))
     } else if !headers.is_empty() {
-        CorsResult::Simple(headers)
+        Some(Cors::Simple(headers))
     } else {
-        CorsResult::None
+        None
     }
 }
 
@@ -87,7 +77,7 @@ mod test {
             .unwrap();
 
         let allowed_origin_headers = match cors(&cors_req) {
-            CorsResult::Simple(headers) => headers,
+            Some(Cors::Simple(headers)) => headers,
             _ => panic!("Simple CORS headers were expected"),
         };
         assert_eq!(
@@ -120,7 +110,7 @@ mod test {
             .unwrap();
 
         let response = match cors(&cors_req) {
-            CorsResult::Preflight(headers) => headers,
+            Some(Cors::Preflight(headers)) => headers,
             _ => panic!("Preflight CORS response was expected"),
         };
 
