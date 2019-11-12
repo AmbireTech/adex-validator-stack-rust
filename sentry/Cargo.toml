@@ -19,7 +19,7 @@ tokio = "0.2.0-alpha.6"
 hyper = {version = "=0.13.0-alpha.4", features = ["unstable-stream"]}
 regex = "1"
 # Database
-redis = {version = "0.13.1-alpha.0"}
+redis = {version = "0.13.1-alpha.0", features = ["tokio-executor"]}
 bb8 = {git = "https://github.com/djc/bb8", branch = "async-await"}
 bb8-postgres = {git = "https://github.com/djc/bb8", branch = "async-await"}
 # Logger
