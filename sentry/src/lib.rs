@@ -7,7 +7,7 @@ use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Error, Method, Request, Response, Server, StatusCode};
 use primitives::adapter::Adapter;
 use primitives::Config;
-use redis::aio::SharedConnection;
+use redis::aio::MultiplexedConnection;
 use slog::{error, info, Logger};
 
 pub mod middleware {
@@ -40,7 +40,7 @@ pub mod event_reducer;
 pub struct Application<A: Adapter> {
     adapter: A,
     logger: Logger,
-    redis: SharedConnection,
+    redis: MultiplexedConnection,
     _clustered: bool,
     port: u16,
     config: Config,
@@ -51,7 +51,7 @@ impl<A: Adapter + 'static> Application<A> {
         adapter: A,
         config: Config,
         logger: Logger,
-        redis: SharedConnection,
+        redis: MultiplexedConnection,
         clustered: bool,
         port: u16,
     ) -> Self {
@@ -120,7 +120,7 @@ where
 async fn handle_routing(
     req: Request<Body>,
     (adapter, config): (&impl Adapter, &Config),
-    redis: SharedConnection,
+    redis: MultiplexedConnection,
     logger: &Logger,
 ) -> Response<Body> {
     let headers = match cors(&req) {

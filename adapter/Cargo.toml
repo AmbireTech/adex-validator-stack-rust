@@ -20,8 +20,8 @@ web3 = { git = "https://github.com/tomusdrw/rust-web3" }
 eth_checksum = "0.1.1"
 ethabi = "8.0.1"
 tiny-keccak = "1.5"
-ethkey = { git = "https://github.com/paritytech/parity.git" }
-ethstore = { git = "https://github.com/paritytech/parity.git" }
+parity-crypto = { version = "0.4.2", features = ["publickey"], registry = "parity-common" }
+ethstore = { version = "0.2.1", registry = "parity-ethereum"}
 sha2 = "0.8.0"
 base64 = "0.10.1"
 lazy_static = "1.4.0"

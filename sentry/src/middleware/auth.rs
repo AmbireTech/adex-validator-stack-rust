@@ -2,7 +2,7 @@ use std::error;
 
 use hyper::header::AUTHORIZATION;
 use hyper::{Body, Request};
-use redis::aio::SharedConnection;
+use redis::aio::MultiplexedConnection;
 
 use primitives::adapter::{Adapter, Session as AdapterSession};
 
@@ -13,7 +13,7 @@ use crate::Session;
 pub(crate) async fn for_request(
     mut req: Request<Body>,
     adapter: &impl Adapter,
-    redis: SharedConnection,
+    redis: MultiplexedConnection,
 ) -> Result<Request<Body>, Box<dyn error::Error>> {
     let authorization = req.headers().get(AUTHORIZATION);
 
@@ -90,7 +90,7 @@ mod test {
 
     use super::*;
 
-    async fn setup() -> (DummyAdapter, SharedConnection) {
+    async fn setup() -> (DummyAdapter, MultiplexedConnection) {
         let adapter_options = DummyAdapterOptions {
             dummy_identity: IDS["leader"].clone(),
             dummy_auth: IDS.clone(),
