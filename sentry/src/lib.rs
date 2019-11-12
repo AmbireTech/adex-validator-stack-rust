@@ -3,11 +3,13 @@
 
 use crate::middleware::auth;
 use crate::middleware::cors::{cors, Cors};
+use bb8::Pool;
+use bb8_postgres::{tokio_postgres::NoTls, PostgresConnectionManager};
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Error, Method, Request, Response, Server, StatusCode};
 use primitives::adapter::Adapter;
 use primitives::Config;
-use redis::aio::SharedConnection;
+use redis::aio::MultiplexedConnection;
 use slog::{error, info, Logger};
 
 pub mod middleware {
@@ -40,7 +42,8 @@ pub mod event_reducer;
 pub struct Application<A: Adapter> {
     adapter: A,
     logger: Logger,
-    redis: SharedConnection,
+    redis: MultiplexedConnection,
+    _postgres: Pool<PostgresConnectionManager<NoTls>>,
     _clustered: bool,
     port: u16,
     config: Config,
@@ -51,7 +54,8 @@ impl<A: Adapter + 'static> Application<A> {
         adapter: A,
         config: Config,
         logger: Logger,
-        redis: SharedConnection,
+        redis: MultiplexedConnection,
+        postgres: Pool<PostgresConnectionManager<NoTls>>,
         clustered: bool,
         port: u16,
     ) -> Self {
@@ -60,6 +64,7 @@ impl<A: Adapter + 'static> Application<A> {
             config,
             logger,
             redis,
+            _postgres: postgres,
             _clustered: clustered,
             port,
         }
@@ -120,7 +125,7 @@ where
 async fn handle_routing(
     req: Request<Body>,
     (adapter, config): (&impl Adapter, &Config),
-    redis: SharedConnection,
+    redis: MultiplexedConnection,
     logger: &Logger,
 ) -> Response<Body> {
     let headers = match cors(&req) {

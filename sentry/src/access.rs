@@ -1,6 +1,6 @@
 use chrono::Utc;
 use futures::future::try_join_all;
-use redis::aio::SharedConnection;
+use redis::aio::MultiplexedConnection;
 
 use primitives::event_submission::{RateLimit, Rule};
 use primitives::sentry::Event;
@@ -18,7 +18,7 @@ pub enum Error {
 
 // @TODO: Make pub(crate)
 pub async fn check_access(
-    redis: &SharedConnection,
+    redis: &MultiplexedConnection,
     session: &Session,
     rate_limit: &RateLimit,
     channel: &Channel,
@@ -91,7 +91,7 @@ pub async fn check_access(
 }
 
 async fn apply_rule(
-    redis: SharedConnection,
+    redis: MultiplexedConnection,
     rule: &Rule,
     events: &[Event],
     channel: &Channel,
@@ -164,7 +164,7 @@ mod test {
 
     use super::*;
 
-    async fn setup() -> (Config, SharedConnection) {
+    async fn setup() -> (Config, MultiplexedConnection) {
         let mut redis = redis_connection().await.expect("Couldn't connect to Redis");
         let config = configuration("development", None).expect("Failed to get dev configuration");
 

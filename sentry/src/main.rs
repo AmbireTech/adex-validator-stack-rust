@@ -9,7 +9,7 @@ use primitives::config::configuration;
 use primitives::util::logging::{Async, PrefixedCompactFormat, TermDecorator};
 use primitives::util::tests::prep_db::{AUTH, IDS};
 use primitives::ValidatorId;
-use sentry::db::redis_connection;
+use sentry::db::{postgres_connection, redis_connection};
 use sentry::Application;
 use slog::{o, Drain, Logger};
 use std::convert::TryFrom;
@@ -98,15 +98,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let logger = logger();
     let redis = redis_connection().await?;
+    let postgres = postgres_connection().await?;
 
     match adapter {
         AdapterTypes::EthereumAdapter(adapter) => {
-            Application::new(*adapter, config, logger, redis, clustered, port)
+            Application::new(*adapter, config, logger, redis, postgres, clustered, port)
                 .run()
                 .await
         }
         AdapterTypes::DummyAdapter(adapter) => {
-            Application::new(*adapter, config, logger, redis, clustered, port)
+            Application::new(*adapter, config, logger, redis, postgres, clustered, port)
                 .run()
                 .await
         }
