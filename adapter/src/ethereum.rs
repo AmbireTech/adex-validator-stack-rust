@@ -1,9 +1,10 @@
 use crate::EthereumChannel;
 use chrono::Utc;
+use ethkey::Password;
 use ethstore::SafeAccount;
 use lazy_static::lazy_static;
 use parity_crypto::publickey::{
-    public_to_address, recover, verify_address, Address, Message, Password, Signature,
+    public_to_address, recover, verify_address, Address, Message, Signature,
 };
 use primitives::{
     adapter::{Adapter, AdapterError, AdapterResult, KeystoreOptions, Session},

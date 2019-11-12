@@ -1,3 +1,0 @@
-[registries]
-parity-common = { index = "https://github.com/paritytech/parity-common" }
-parity-ethereum = { index = "https://github.com/paritytech/parity-ethereum" }
