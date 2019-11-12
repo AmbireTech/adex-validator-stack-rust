@@ -1,10 +1,12 @@
+use std::error;
+
 use hyper::header::AUTHORIZATION;
 use hyper::{Body, Request};
 use redis::aio::SharedConnection;
 
 use primitives::adapter::{Adapter, Session as AdapterSession};
 
-use crate::{ResponseError, Session};
+use crate::Session;
 
 /// Check `Authorization` header for `Bearer` scheme with `Adapter::session_from_token`.
 /// If the `Adapter` fails to create an `AdapterSession`, `ResponseError::BadRequest` will be returned.
@@ -12,7 +14,7 @@ pub(crate) async fn for_request(
     mut req: Request<Body>,
     adapter: &impl Adapter,
     redis: SharedConnection,
-) -> Result<Request<Body>, ResponseError> {
+) -> Result<Request<Body>, Box<dyn error::Error>> {
     let authorization = req.headers().get(AUTHORIZATION);
 
     let prefix = "Bearer ";
@@ -36,16 +38,8 @@ pub(crate) async fn for_request(
             .arg(token)
             .query_async::<_, Option<String>>(&mut redis.clone())
             .await?
-            .and_then(|session_str| {
-                match serde_json::from_str::<AdapterSession>(&session_str) {
-                    Ok(session) => Some(session),
-                    Err(serde_error) => {
-                        // log message instead
-                        println!("{}", serde_error);
-                        None
-                    }
-                }
-            }) {
+            .and_then(|session_str| serde_json::from_str::<AdapterSession>(&session_str).ok())
+        {
             Some(adapter_session) => adapter_session,
             None => {
                 // If there was a problem with the Session or the Token, this will error
@@ -85,13 +79,16 @@ fn get_request_ip(req: &Request<Body>) -> Option<String> {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::db::redis_connection;
-    use adapter::DummyAdapter;
     use hyper::Request;
+
+    use adapter::DummyAdapter;
     use primitives::adapter::DummyAdapterOptions;
     use primitives::config::configuration;
     use primitives::util::tests::prep_db::{AUTH, IDS};
+
+    use crate::db::redis_connection;
+
+    use super::*;
 
     async fn setup() -> (DummyAdapter, SharedConnection) {
         let adapter_options = DummyAdapterOptions {
@@ -143,9 +140,9 @@ mod test {
             .body(Body::empty())
             .unwrap();
         match for_request(non_existent_token_req, &dummy_adapter, redis).await {
-            Err(ResponseError::BadRequest(error)) => {
+            Err(error) => {
                 assert!(error.to_string().contains("no session token for this auth: wrong-token"), "Wrong error received");
-            },
+            }
             _ => panic!("We shouldn't get a success response nor a different Error than BadRequest for this call"),
         };
     }

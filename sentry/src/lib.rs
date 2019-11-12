@@ -39,7 +39,7 @@ pub mod event_reducer;
 
 pub struct Application<A: Adapter> {
     adapter: A,
-    logger: slog::Logger,
+    logger: Logger,
     redis: SharedConnection,
     _clustered: bool,
     port: u16,
@@ -73,14 +73,21 @@ impl<A: Adapter + 'static> Application<A> {
         let make_service = make_service_fn(move |_| {
             let adapter_config = (self.adapter.clone(), self.config.clone());
             let redis = self.redis.clone();
+            let logger = self.logger.clone();
             async move {
                 Ok::<_, Error>(service_fn(move |req| {
                     let adapter_config = adapter_config.clone();
                     let redis = redis.clone();
+                    let logger = logger.clone();
                     async move {
                         Ok::<_, Error>(
-                            handle_routing(req, (&adapter_config.0, &adapter_config.1), redis)
-                                .await,
+                            handle_routing(
+                                req,
+                                (&adapter_config.0, &adapter_config.1),
+                                redis,
+                                &logger,
+                            )
+                            .await,
                         )
                     }
                 }))
@@ -114,6 +121,7 @@ async fn handle_routing(
     req: Request<Body>,
     (adapter, config): (&impl Adapter, &Config),
     redis: SharedConnection,
+    logger: &Logger,
 ) -> Response<Body> {
     let headers = match cors(&req) {
         Some(Cors::Simple(headers)) => headers,
@@ -124,7 +132,11 @@ async fn handle_routing(
 
     let req = match auth::for_request(req, adapter, redis.clone()).await {
         Ok(req) => req,
-        Err(response_error) => return map_response_error(response_error),
+        Err(error) => {
+            error!(&logger, "{}", &error; "module" => "middleware-auth");
+
+            return map_response_error(ResponseError::BadRequest(error));
+        }
     };
 
     let mut response = match (req.uri().path(), req.method()) {
@@ -155,8 +167,8 @@ pub fn not_found() -> Response<Body> {
     response
 }
 
-pub fn bad_request(error: Box<dyn std::error::Error>) -> Response<Body> {
-    let body = Body::from(format!("Bad Request: {}", error));
+pub fn bad_request(_: Box<dyn std::error::Error>) -> Response<Body> {
+    let body = Body::from("Bad Request: try again later");
     let mut response = Response::new(body);
     let status = response.status_mut();
     *status = StatusCode::BAD_REQUEST;
