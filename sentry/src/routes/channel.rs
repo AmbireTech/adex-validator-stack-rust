@@ -9,7 +9,7 @@ use crate::ResponseError;
 
 pub async fn handle_channel_routes(
     req: Request<Body>,
-    adapter: impl Adapter,
+    adapter: &impl Adapter,
 ) -> Result<Response<Body>, ResponseError> {
     // Channel Creates
     if req.uri().path() == "/channel" && req.method() == Method::POST {

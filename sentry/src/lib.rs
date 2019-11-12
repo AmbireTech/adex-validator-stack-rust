@@ -1,12 +1,19 @@
 #![deny(clippy::all)]
 #![deny(rust_2018_idioms)]
 
+use crate::middleware::auth;
+use crate::middleware::cors::{cors, Cors};
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Error, Method, Request, Response, Server, StatusCode};
 use primitives::adapter::Adapter;
 use primitives::Config;
+use redis::aio::SharedConnection;
 use slog::{error, info, Logger};
 
+pub mod middleware {
+    pub mod auth;
+    pub mod cors;
+}
 pub mod routes {
     pub mod channel;
     pub mod cfg {
@@ -32,33 +39,57 @@ pub mod event_reducer;
 
 pub struct Application<A: Adapter> {
     adapter: A,
-    logger: slog::Logger,
+    logger: Logger,
+    redis: SharedConnection,
     _clustered: bool,
     port: u16,
     config: Config,
 }
 
 impl<A: Adapter + 'static> Application<A> {
-    pub fn new(adapter: A, config: Config, logger: Logger, clustered: bool, port: u16) -> Self {
+    pub fn new(
+        adapter: A,
+        config: Config,
+        logger: Logger,
+        redis: SharedConnection,
+        clustered: bool,
+        port: u16,
+    ) -> Self {
         Self {
             adapter,
             config,
             logger,
+            redis,
             _clustered: clustered,
             port,
         }
     }
 
+    /// Starts the `hyper` `Server`.
     pub async fn run(&self) {
         let addr = ([127, 0, 0, 1], self.port).into();
         info!(&self.logger, "Listening on port {}!", self.port);
 
         let make_service = make_service_fn(move |_| {
             let adapter_config = (self.adapter.clone(), self.config.clone());
+            let redis = self.redis.clone();
+            let logger = self.logger.clone();
             async move {
                 Ok::<_, Error>(service_fn(move |req| {
                     let adapter_config = adapter_config.clone();
-                    async move { Ok::<_, Error>(handle_routing(req, adapter_config).await) }
+                    let redis = redis.clone();
+                    let logger = logger.clone();
+                    async move {
+                        Ok::<_, Error>(
+                            handle_routing(
+                                req,
+                                (&adapter_config.0, &adapter_config.1),
+                                redis,
+                                &logger,
+                            )
+                            .await,
+                        )
+                    }
                 }))
             }
         });
@@ -88,19 +119,45 @@ where
 
 async fn handle_routing(
     req: Request<Body>,
-    (adapter, config): (impl Adapter, Config),
+    (adapter, config): (&impl Adapter, &Config),
+    redis: SharedConnection,
+    logger: &Logger,
 ) -> Response<Body> {
-    match (req.uri().path(), req.method()) {
+    let headers = match cors(&req) {
+        Some(Cors::Simple(headers)) => headers,
+        // if we have a Preflight, just return the response directly
+        Some(Cors::Preflight(response)) => return response,
+        None => Default::default(),
+    };
+
+    let req = match auth::for_request(req, adapter, redis.clone()).await {
+        Ok(req) => req,
+        Err(error) => {
+            error!(&logger, "{}", &error; "module" => "middleware-auth");
+
+            return map_response_error(ResponseError::BadRequest(error));
+        }
+    };
+
+    let mut response = match (req.uri().path(), req.method()) {
         ("/cfg", &Method::GET) => crate::routes::cfg::return_config(&config),
         (route, _) if route.starts_with("/channel") => {
             crate::routes::channel::handle_channel_routes(req, adapter).await
         }
         _ => Err(ResponseError::NotFound),
     }
-    .unwrap_or_else(|response_err| match response_err {
+    .unwrap_or_else(map_response_error);
+
+    // extend the headers with the initial headers we have from CORS (if there are some)
+    response.headers_mut().extend(headers);
+    response
+}
+
+fn map_response_error(error: ResponseError) -> Response<Body> {
+    match error {
         ResponseError::NotFound => not_found(),
         ResponseError::BadRequest(error) => bad_request(error),
-    })
+    }
 }
 
 pub fn not_found() -> Response<Body> {
@@ -110,8 +167,8 @@ pub fn not_found() -> Response<Body> {
     response
 }
 
-pub fn bad_request(error: Box<dyn std::error::Error>) -> Response<Body> {
-    let body = Body::from(format!("Bad Request: {}", error));
+pub fn bad_request(_: Box<dyn std::error::Error>) -> Response<Body> {
+    let body = Body::from("Bad Request: try again later");
     let mut response = Response::new(body);
     let status = response.status_mut();
     *status = StatusCode::BAD_REQUEST;
@@ -123,5 +180,5 @@ pub fn bad_request(error: Box<dyn std::error::Error>) -> Response<Body> {
 pub struct Session {
     pub era: i64,
     pub uid: String,
-    pub ip: String,
+    pub ip: Option<String>,
 }
