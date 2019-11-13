@@ -10,11 +10,13 @@ use crate::big_num::BigNum;
 use crate::util::serde::ts_milliseconds_option;
 use crate::{AdUnit, EventSubmission, TargetingTag, ValidatorDesc, ValidatorId};
 
+pub type ChannelId = [u8; 32];
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Channel {
     #[serde(with = "SerHex::<StrictPfx>")]
-    pub id: [u8; 32],
+    pub id: ChannelId,
     pub creator: String,
     pub deposit_asset: String,
     pub deposit_amount: BigNum,
