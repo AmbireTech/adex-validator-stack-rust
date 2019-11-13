@@ -14,8 +14,10 @@ use slog::{error, info, Logger};
 
 pub mod middleware {
     pub mod auth;
+    pub mod channel;
     pub mod cors;
 }
+
 pub mod routes {
     pub mod channel;
     pub mod cfg {
