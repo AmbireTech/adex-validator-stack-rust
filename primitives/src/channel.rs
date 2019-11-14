@@ -10,10 +10,19 @@ use crate::big_num::BigNum;
 use crate::util::serde::ts_milliseconds_option;
 use crate::{AdUnit, EventSubmission, TargetingTag, ValidatorDesc, ValidatorId};
 use hex::{FromHex, FromHexError};
+use std::ops::Deref;
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Copy, Clone)]
 #[serde(transparent)]
 pub struct ChannelId(#[serde(with = "SerHex::<StrictPfx>")] [u8; 32]);
+
+impl Deref for ChannelId {
+    type Target = [u8];
+
+    fn deref(&self) -> &[u8] {
+        &self.0
+    }
+}
 
 impl From<[u8; 32]> for ChannelId {
     fn from(array: [u8; 32]) -> Self {
