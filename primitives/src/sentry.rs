@@ -1,8 +1,7 @@
 use crate::validator::{ApproveState, Heartbeat, MessageTypes, NewState};
-use crate::{BigNum, Channel};
+use crate::{BigNum, Channel, ChannelId};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_hex::{SerHex, StrictPfx};
 use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -63,8 +62,7 @@ pub struct Earner {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EventAggregate {
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub channel_id: [u8; 32],
+    pub channel_id: ChannelId,
     pub created: DateTime<Utc>,
     pub events: HashMap<String, AggregateEvents>,
 }
