@@ -1,9 +1,9 @@
 #![deny(clippy::all)]
 #![deny(rust_2018_idioms)]
 
+use crate::chain::chain;
 use crate::middleware::auth;
 use crate::middleware::cors::{cors, Cors};
-use crate::chain::chain;
 use bb8::Pool;
 use bb8_postgres::{tokio_postgres::NoTls, PostgresConnectionManager};
 use hyper::service::{make_service_fn, service_fn};
@@ -22,11 +22,14 @@ pub mod routes {
     pub mod cfg {
         use crate::ResponseError;
         use hyper::header::CONTENT_TYPE;
-        use hyper::{Body, Response, Request};
+        use hyper::{Body, Request, Response};
         use primitives::Config;
 
         pub async fn return_config(req: Request<Body>) -> Result<Response<Body>, ResponseError> {
-            let config = req.extensions().get::<Config>().expect("request should have config");
+            let config = req
+                .extensions()
+                .get::<Config>()
+                .expect("request should have config");
             let config_str = serde_json::to_string(config)?;
 
             Ok(Response::builder()
@@ -38,9 +41,9 @@ pub mod routes {
 }
 
 pub mod access;
+mod chain;
 pub mod db;
 pub mod event_reducer;
-mod chain;
 
 pub struct Application<A: Adapter> {
     adapter: A,
@@ -154,7 +157,14 @@ async fn handle_routing(
     };
 
     let mut response = match (req.uri().path(), req.method()) {
-        ("/cfg", &Method::GET) => chain(req, Some(vec![config_middleware]), crate::routes::cfg::return_config).await,
+        ("/cfg", &Method::GET) => {
+            chain(
+                req,
+                Some(vec![config_middleware]),
+                crate::routes::cfg::return_config,
+            )
+            .await
+        }
         (route, _) if route.starts_with("/channel") => {
             crate::routes::channel::handle_channel_routes(req, adapter).await
         }
