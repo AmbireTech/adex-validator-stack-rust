@@ -3,7 +3,10 @@ use std::future::Future;
 use crate::ResponseError;
 
 // middleware function signature
-// fn middleware(req: Request) -> Result<Request, ResponseError>
+// fn middleware(mut req: Request) -> Result<Request, ResponseError>
+//
+// handler function signature
+// fn middleware(mut req: Request) -> Result<Response<Body>, ResponseError>
 pub async fn chain<M, H, MF, HF>(req: Request<Body>, middlewares: Option<Vec<M>>, handler: H) -> Result<Response<Body>, ResponseError> 
 where
     HF: Future<Output=Result<Response<Body>, ResponseError>>,
