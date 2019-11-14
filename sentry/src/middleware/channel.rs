@@ -1,4 +1,4 @@
-use crate::db::field::{BigNumPg, ChannelIdPg};
+use primitives::postgres::field::{BigNumPg, ChannelIdPg};
 use crate::db::DbPool;
 use bb8_postgres::tokio_postgres::{types::Json, Row};
 use hyper::{Body, Request};
