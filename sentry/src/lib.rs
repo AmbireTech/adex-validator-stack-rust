@@ -3,6 +3,7 @@
 
 use crate::middleware::auth;
 use crate::middleware::cors::{cors, Cors};
+use crate::chain::chain;
 use bb8::Pool;
 use bb8_postgres::{tokio_postgres::NoTls, PostgresConnectionManager};
 use hyper::service::{make_service_fn, service_fn};
@@ -21,10 +22,11 @@ pub mod routes {
     pub mod cfg {
         use crate::ResponseError;
         use hyper::header::CONTENT_TYPE;
-        use hyper::{Body, Response};
+        use hyper::{Body, Response, Request};
         use primitives::Config;
 
-        pub fn return_config(config: &Config) -> Result<Response<Body>, ResponseError> {
+        pub async fn return_config(req: Request<Body>) -> Result<Response<Body>, ResponseError> {
+            let config = req.extensions().get::<Config>().expect("request should have config");
             let config_str = serde_json::to_string(config)?;
 
             Ok(Response::builder()
@@ -38,6 +40,7 @@ pub mod routes {
 pub mod access;
 pub mod db;
 pub mod event_reducer;
+mod chain;
 
 pub struct Application<A: Adapter> {
     adapter: A,
@@ -110,24 +113,30 @@ impl<A: Adapter + 'static> Application<A> {
 #[derive(Debug)]
 pub enum ResponseError {
     NotFound,
-    BadRequest(Box<dyn std::error::Error>),
+    BadRequest,
 }
 
 impl<T> From<T> for ResponseError
 where
     T: std::error::Error + 'static,
 {
-    fn from(error: T) -> Self {
-        ResponseError::BadRequest(error.into())
+    fn from(_: T) -> Self {
+        ResponseError::BadRequest
     }
 }
 
+async fn config_middleware(req: Request<Body>) -> Result<Request<Body>, ResponseError> {
+    Ok(req)
+}
+
 async fn handle_routing(
-    req: Request<Body>,
+    mut req: Request<Body>,
     (adapter, config): (&impl Adapter, &Config),
     redis: MultiplexedConnection,
     logger: &Logger,
 ) -> Response<Body> {
+    req.extensions_mut().insert(config.clone());
+
     let headers = match cors(&req) {
         Some(Cors::Simple(headers)) => headers,
         // if we have a Preflight, just return the response directly
@@ -140,12 +149,12 @@ async fn handle_routing(
         Err(error) => {
             error!(&logger, "{}", &error; "module" => "middleware-auth");
 
-            return map_response_error(ResponseError::BadRequest(error));
+            return map_response_error(ResponseError::BadRequest);
         }
     };
 
     let mut response = match (req.uri().path(), req.method()) {
-        ("/cfg", &Method::GET) => crate::routes::cfg::return_config(&config),
+        ("/cfg", &Method::GET) => chain(req, Some(vec![config_middleware]), crate::routes::cfg::return_config).await,
         (route, _) if route.starts_with("/channel") => {
             crate::routes::channel::handle_channel_routes(req, adapter).await
         }
@@ -161,7 +170,7 @@ async fn handle_routing(
 fn map_response_error(error: ResponseError) -> Response<Body> {
     match error {
         ResponseError::NotFound => not_found(),
-        ResponseError::BadRequest(error) => bad_request(error),
+        ResponseError::BadRequest => bad_request(),
     }
 }
 
@@ -172,7 +181,7 @@ pub fn not_found() -> Response<Body> {
     response
 }
 
-pub fn bad_request(_: Box<dyn std::error::Error>) -> Response<Body> {
+pub fn bad_request() -> Response<Body> {
     let body = Body::from("Bad Request: try again later");
     let mut response = Response::new(body);
     let status = response.status_mut();
