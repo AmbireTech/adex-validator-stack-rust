@@ -1,12 +1,12 @@
 use std::error::Error;
 
-use bb8_postgres::tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
+use postgres_types::{FromSql, IsNull, ToSql, Type};
 
+use crate::BigNum;
 use bytes::BytesMut;
-use primitives::BigNum;
 
 #[derive(Debug)]
-pub(crate) struct BigNumPg(BigNum);
+pub struct BigNumPg(BigNum);
 
 impl Into<BigNum> for BigNumPg {
     fn into(self) -> BigNum {

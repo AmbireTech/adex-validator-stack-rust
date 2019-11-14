@@ -8,14 +8,6 @@ use lazy_static::lazy_static;
 
 pub type DbPool = Pool<PostgresConnectionManager<NoTls>>;
 
-pub mod field {
-    pub(crate) use bignum::BigNumPg;
-    pub(crate) use channel_id::ChannelIdPg;
-
-    mod bignum;
-    mod channel_id;
-}
-
 lazy_static! {
     static ref REDIS_URL: String =
         std::env::var("REDIS_URL").unwrap_or_else(|_| String::from("redis://127.0.0.1:6379"));
