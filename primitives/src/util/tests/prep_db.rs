@@ -1,5 +1,6 @@
 use crate::{
-    BigNum, Channel, ChannelSpec, EventSubmission, SpecValidators, ValidatorDesc, ValidatorId,
+    BigNum, Channel, ChannelId, ChannelSpec, EventSubmission, SpecValidators, ValidatorDesc,
+    ValidatorId,
 };
 use chrono::{TimeZone, Utc};
 use fake::faker::{Faker, Number};
@@ -56,7 +57,7 @@ lazy_static! {
         let nonce = BigNum::from(<Faker as Number>::between(100_000_000, 999_999_999));
 
         Channel {
-            id: <[u8; 32]>::from_hex("061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088").expect("prep_db: failed to deserialize channel id"),
+            id: ChannelId::from_hex("061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088").expect("prep_db: failed to deserialize channel id"),
             creator: "0x033ed90e0fec3f3ea1c9b005c724d704501e0196".to_string(),
             deposit_asset: "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359".to_string(),
             deposit_amount: 1_000.into(),
