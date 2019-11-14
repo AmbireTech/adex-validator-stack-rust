@@ -1,10 +1,9 @@
 #![deny(clippy::all)]
 #![deny(rust_2018_idioms)]
 
+use crate::db::DbPool;
 use crate::middleware::auth;
 use crate::middleware::cors::{cors, Cors};
-use bb8::Pool;
-use bb8_postgres::{tokio_postgres::NoTls, PostgresConnectionManager};
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Error, Method, Request, Response, Server, StatusCode};
 use primitives::adapter::Adapter;
@@ -45,7 +44,7 @@ pub struct Application<A: Adapter> {
     adapter: A,
     logger: Logger,
     redis: MultiplexedConnection,
-    _postgres: Pool<PostgresConnectionManager<NoTls>>,
+    pool: DbPool,
     _clustered: bool,
     port: u16,
     config: Config,
@@ -57,7 +56,7 @@ impl<A: Adapter + 'static> Application<A> {
         config: Config,
         logger: Logger,
         redis: MultiplexedConnection,
-        postgres: Pool<PostgresConnectionManager<NoTls>>,
+        pool: DbPool,
         clustered: bool,
         port: u16,
     ) -> Self {
@@ -66,7 +65,7 @@ impl<A: Adapter + 'static> Application<A> {
             config,
             logger,
             redis,
-            _postgres: postgres,
+            pool,
             _clustered: clustered,
             port,
         }
@@ -81,17 +80,19 @@ impl<A: Adapter + 'static> Application<A> {
             let adapter_config = (self.adapter.clone(), self.config.clone());
             let redis = self.redis.clone();
             let logger = self.logger.clone();
+            let pool = self.pool.clone();
             async move {
                 Ok::<_, Error>(service_fn(move |req| {
                     let adapter_config = adapter_config.clone();
                     let redis = redis.clone();
                     let logger = logger.clone();
+                    let pool = pool.clone();
                     async move {
                         Ok::<_, Error>(
                             handle_routing(
                                 req,
                                 (&adapter_config.0, &adapter_config.1),
-                                redis,
+                                (pool, redis),
                                 &logger,
                             )
                             .await,
@@ -127,7 +128,7 @@ where
 async fn handle_routing(
     req: Request<Body>,
     (adapter, config): (&impl Adapter, &Config),
-    redis: MultiplexedConnection,
+    (pool, redis): (DbPool, MultiplexedConnection),
     logger: &Logger,
 ) -> Response<Body> {
     let headers = match cors(&req) {
@@ -149,7 +150,7 @@ async fn handle_routing(
     let mut response = match (req.uri().path(), req.method()) {
         ("/cfg", &Method::GET) => crate::routes::cfg::return_config(&config),
         (route, _) if route.starts_with("/channel") => {
-            crate::routes::channel::handle_channel_routes(req, adapter).await
+            crate::routes::channel::handle_channel_routes(req, (&pool, adapter)).await
         }
         _ => Err(ResponseError::NotFound),
     }
@@ -174,7 +175,8 @@ pub fn not_found() -> Response<Body> {
     response
 }
 
-pub fn bad_request(_: Box<dyn std::error::Error>) -> Response<Body> {
+pub fn bad_request(err: Box<dyn std::error::Error>) -> Response<Body> {
+    println!("{:#?}", err);
     let body = Body::from("Bad Request: try again later");
     let mut response = Response::new(body);
     let status = response.status_mut();
