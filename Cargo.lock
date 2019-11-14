@@ -1982,6 +1982,7 @@ dependencies = [
 name = "primitives"
 version = "0.1.0"
 dependencies = [
+ "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono 0.4.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "eth_checksum 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "fake 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1993,6 +1994,7 @@ dependencies = [
  "num-bigint 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-derive 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-traits 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "postgres-types 0.1.0-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.102 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde-hex 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2508,7 +2510,6 @@ dependencies = [
  "adapter 0.1.0",
  "bb8 0.3.2-pre (git+https://github.com/djc/bb8?branch=async-await)",
  "bb8-postgres 0.3.2-pre (git+https://github.com/djc/bb8?branch=async-await)",
- "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono 0.4.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-preview 0.3.0-alpha.19 (registry+https://github.com/rust-lang/crates.io-index)",

@@ -8,11 +8,10 @@ edition = "2018"
 # Futures
 futures-preview = { version = "=0.3.0-alpha.19", features = ["compat"]}
 # Primitives
-primitives = {path = "../primitives"}
+primitives = {path = "../primitives", features = ["postgres"]}
 adapter = { version = "0.1", path = "../adapter" }
 chrono = { version = "0.4", features = ["serde"] }
 hex = "0.3.2"
-bytes = "0.4.12"
 # CLI
 clap = "2.33.0"
 # Server
