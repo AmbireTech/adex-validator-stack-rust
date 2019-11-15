@@ -3,9 +3,7 @@ use crate::ResponseError;
 use bb8::RunError;
 use bb8_postgres::tokio_postgres::{types::Json, Row};
 use hyper::{Body, Request};
-use primitives::channel::ChannelId;
-use primitives::postgres::field::{BigNumPg, ChannelIdPg};
-use primitives::{Channel, ChannelSpec};
+use primitives::{Channel, ChannelId, ChannelSpec};
 
 pub async fn channel_load(
     mut req: Request<Body>,
@@ -44,10 +42,10 @@ pub async fn get_channel(
 
 fn channel_map(row: &Row) -> Channel {
     Channel {
-        id: row.get::<_, ChannelIdPg>("channel_id").into(),
+        id: row.get("channel_id"),
         creator: row.get("creator"),
         deposit_asset: row.get("deposit_asset"),
-        deposit_amount: row.get::<_, BigNumPg>("deposit_amount").into(),
+        deposit_amount: row.get("deposit_amount"),
         valid_until: row.get("valid_until"),
         spec: row.get::<_, Json<ChannelSpec>>("spec").0,
     }

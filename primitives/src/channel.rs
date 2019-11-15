@@ -193,3 +193,29 @@ impl Error for ChannelError {
         None
     }
 }
+
+#[cfg(feature = "postgres")]
+pub mod postgres {
+    use super::ChannelId;
+    use hex::FromHex;
+    use postgres_types::{FromSql, Type};
+    use std::error::Error;
+
+    impl<'a> FromSql<'a> for ChannelId {
+        fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+            let str_slice = <&str as FromSql>::from_sql(ty, raw)?;
+
+            // FromHex::from_hex for fixed-sized arrays will guard against the length of the string!
+            let id: [u8; 32] = <[u8; 32] as FromHex>::from_hex(str_slice)?;
+
+            Ok(ChannelId(id))
+        }
+
+        fn accepts(ty: &Type) -> bool {
+            match *ty {
+                Type::TEXT | Type::VARCHAR => true,
+                _ => false,
+            }
+        }
+    }
+}

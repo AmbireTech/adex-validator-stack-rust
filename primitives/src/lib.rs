@@ -25,16 +25,6 @@ pub mod util {
     pub mod serde;
 }
 pub mod validator;
-#[cfg(feature = "postgres")]
-pub mod postgres {
-    pub mod field {
-        pub use bignum::BigNumPg;
-        pub use channel_id::ChannelIdPg;
-
-        mod bignum;
-        mod channel_id;
-    }
-}
 
 pub use self::ad_unit::AdUnit;
 pub use self::balances_map::BalancesMap;
