@@ -16,7 +16,7 @@ CREATE INDEX idx_spec ON channels((spec->'validator'->>'id'));
 CREATE TABLE validator_messages
 (
     channel_id     VARCHAR(66)              NOT NULL,
-    "from"           VARCHAR(255)             NOT NULL,
+    "from"         VARCHAR(255)             NOT NULL,
     msg            JSONB                    NOT NULL,
     received       TIMESTAMP WITH TIME ZONE NOT NULL,
 

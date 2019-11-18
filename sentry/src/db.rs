@@ -1,6 +1,6 @@
 use bb8::Pool;
-use bb8_postgres::PostgresConnectionManager;
 use bb8_postgres::tokio_postgres::NoTls;
+use bb8_postgres::PostgresConnectionManager;
 use redis::aio::MultiplexedConnection;
 use redis::RedisError;
 use std::env;
@@ -10,11 +10,18 @@ use lazy_static::lazy_static;
 pub type DbPool = Pool<PostgresConnectionManager<NoTls>>;
 
 lazy_static! {
-    static ref REDIS_URL: String = env::var("REDIS_URL").unwrap_or_else(|_| String::from("redis://127.0.0.1:6379"));
-    static ref POSTGRES_USER: String = env::var("POSTGRES_USER").unwrap_or_else(|_| String::from("postgres"));
-    static ref POSTGRES_PASSWORD: String = env::var("POSTGRES_PASSWORD").unwrap_or_else(|_| String::from("postgres"));
-    static ref POSTGRES_HOST: String = env::var("POSTGRES_HOST").unwrap_or_else(|_| String::from("localhost"));
-    static ref POSTGRES_PORT: u16 = env::var("POSTGRES_PORT").unwrap_or("5432".to_string()).parse().unwrap();
+    static ref REDIS_URL: String =
+        env::var("REDIS_URL").unwrap_or_else(|_| String::from("redis://127.0.0.1:6379"));
+    static ref POSTGRES_USER: String =
+        env::var("POSTGRES_USER").unwrap_or_else(|_| String::from("postgres"));
+    static ref POSTGRES_PASSWORD: String =
+        env::var("POSTGRES_PASSWORD").unwrap_or_else(|_| String::from("postgres"));
+    static ref POSTGRES_HOST: String =
+        env::var("POSTGRES_HOST").unwrap_or_else(|_| String::from("localhost"));
+    static ref POSTGRES_PORT: u16 = env::var("POSTGRES_PORT")
+        .unwrap_or("5432".to_string())
+        .parse()
+        .unwrap();
     static ref POSTGRES_DB: Option<String> = env::var("POSTGRES_DB").ok();
 }
 
@@ -26,7 +33,8 @@ pub async fn redis_connection() -> Result<MultiplexedConnection, RedisError> {
 pub async fn postgres_connection() -> Result<DbPool, bb8_postgres::tokio_postgres::Error> {
     let mut config = bb8_postgres::tokio_postgres::Config::new();
 
-    config.user(POSTGRES_USER.as_str())
+    config
+        .user(POSTGRES_USER.as_str())
         .password(POSTGRES_PASSWORD.as_str())
         .host(POSTGRES_HOST.as_str())
         .port(POSTGRES_PORT.clone());
@@ -59,24 +67,16 @@ pub async fn setup_migrations() {
     macro_rules! make_migration {
         ($tag:expr) => {
             migrant_lib::EmbeddedMigration::with_tag($tag)
-                .up(include_str!(concat!(
-                    "../migrations/",
-                    $tag,
-                    "/up.sql"
-                )))
-                .down(include_str!(concat!(
-                    "../migrations/",
-                    $tag,
-                    "/down.sql"
-                )))
+                .up(include_str!(concat!("../migrations/", $tag, "/up.sql")))
+                .down(include_str!(concat!("../migrations/", $tag, "/down.sql")))
                 .boxed()
         };
     }
 
     // Define Migrations
-    config.use_migrations(&[
-        make_migration!("20190806011140_initial_tables"),
-    ]).expect("Loading migrations failed");
+    config
+        .use_migrations(&[make_migration!("20190806011140_initial_tables")])
+        .expect("Loading migrations failed");
 
     // Reload config, ping the database for applied migrations
     let config = config.reload().expect("Should reload applied migrations");
@@ -90,5 +90,7 @@ pub async fn setup_migrations() {
         .apply()
         .expect("Applying migrations failed");
 
-    let _config = config.reload().expect("Reloading config for migration failed");
+    let _config = config
+        .reload()
+        .expect("Reloading config for migration failed");
 }
