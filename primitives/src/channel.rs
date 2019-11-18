@@ -200,6 +200,8 @@ pub mod postgres {
     use hex::FromHex;
     use postgres_types::{FromSql, Type};
     use std::error::Error;
+    use bb8_postgres::tokio_postgres::{types::Json, Row};
+    use super::{Channel, ChannelSpec};
 
     impl<'a> FromSql<'a> for ChannelId {
         fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
@@ -218,4 +220,18 @@ pub mod postgres {
             }
         }
     }
+
+    impl From<Row> for Channel {
+        fn from(row: Row) -> Self {
+            Self {
+                id: row.get("channel_id"),
+                creator: row.get("creator"),
+                deposit_asset: row.get("deposit_asset"),
+                deposit_amount: row.get("deposit_amount"),
+                valid_until: row.get("valid_until"),
+                spec: row.get::<_, Json<ChannelSpec>>("spec").0,
+            }
+        }
+    }
+
 }

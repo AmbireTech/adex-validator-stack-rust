@@ -5,7 +5,7 @@ authors = ["Lachezar Lechev <lachezar@adex.network>, Omidiora Samuel <sam@adex.n
 edition = "2018"
 
 [features]
-postgres = ["postgres-types", "bytes"]
+postgres = ["postgres-types", "bytes", "bb8-postgres"]
 
 [dependencies]
 # Futures
@@ -39,5 +39,7 @@ rand = { version = "^0.6" }
 # postgres feature
 postgres-types = {version = "0.1.0-alpha.1", optional = true}
 bytes = { version = "0.4.12", optional = true}
+bb8-postgres = {git = "https://github.com/djc/bb8", branch = "async-await", features = ["with-chrono-0_4", "with-serde_json-1"], optional = true}
+
 # Other
 lazy_static = "1.4.0"

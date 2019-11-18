@@ -380,9 +380,7 @@ mod test {
     #[test]
     fn should_init_and_unlock_ethereum_adapter() {
         let mut eth_adapter = setup_eth_adapter();
-        let unlock = eth_adapter.unlock().expect("should unlock eth adapter");
-
-        assert_eq!((), unlock, "failed to unlock eth adapter");
+        eth_adapter.unlock().expect("should unlock eth adapter");
     }
 
     #[test]

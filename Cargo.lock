@@ -1982,6 +1982,7 @@ dependencies = [
 name = "primitives"
 version = "0.1.0"
 dependencies = [
+ "bb8-postgres 0.3.2-pre (git+https://github.com/djc/bb8?branch=async-await)",
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono 0.4.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "eth_checksum 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
