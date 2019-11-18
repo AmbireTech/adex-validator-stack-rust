@@ -14,7 +14,7 @@ use sentry::Application;
 use slog::{o, Drain, info, error, Logger};
 use std::convert::TryFrom;
 use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Error, Method, Request, Response, Server, StatusCode};
+use hyper::{Error, Server};
 
 const DEFAULT_PORT: u16 = 8005;
 
@@ -113,7 +113,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// Starts the `hyper` `Server`.
 async fn run<A: Adapter + 'static>(app: Application<A>) {
     let addr = ([127, 0, 0, 1], app.port).into();
-    info!(&app.logger, "Listening on port {}!", app.port);
+    let logger = app.logger.clone();
+    info!(&logger, "Listening on port {}!", app.port);
 
     let make_service = make_service_fn(move |_| {
         let server = app.clone();
@@ -135,7 +136,7 @@ async fn run<A: Adapter + 'static>(app: Application<A>) {
     let server = Server::bind(&addr).serve(make_service);
 
     if let Err(e) = server.await {
-        // error!(&self.logger, "server error: {}", e);
+        error!(&logger, "server error: {}", e);
     }
 }
 

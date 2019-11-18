@@ -35,7 +35,6 @@ lazy_static! {
         Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
     static ref LAST_APPROVED_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/last-approved?$").expect("The regex should be valid");
     static ref CHANNEL_STATUS_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/status?$").expect("The regex should be valid");
-
     // @TODO define other regex routes
 }
 

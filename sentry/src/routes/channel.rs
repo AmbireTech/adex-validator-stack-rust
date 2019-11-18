@@ -1,17 +1,12 @@
 use futures::TryStreamExt;
-use hyper::{Body, Method, Request, Response};
-
+use hyper::{Body, Request, Response};
 use primitives::adapter::Adapter;
 use primitives::{Channel, ChannelId};
-
 use self::channel_list::ChannelListQuery;
-use crate::db::DbPool;
 use crate::middleware::channel::get_channel;
 use crate::ResponseError;
 use crate::Application;
 use hex::FromHex;
-
-use regex::Regex;
 
 pub struct ChannelController<'a, A: Adapter> {
     pub app: &'a Application<A>
