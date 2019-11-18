@@ -8,7 +8,7 @@ use hyper::{Body, Method, Request, Response, StatusCode};
 use primitives::adapter::Adapter;
 use primitives::Config;
 use redis::aio::MultiplexedConnection;
-use slog::{error, info, Logger};
+use slog::{error, Logger};
 use lazy_static::lazy_static;
 use regex::Regex;
 use crate::chain::chain;
@@ -42,6 +42,18 @@ async fn config_middleware(req: Request<Body>) -> Result<Request<Body>, Response
     Ok(req)
 }
 
+#[derive(Debug)]
+pub struct RouteParams(Vec<String>);
+
+impl RouteParams {
+    pub fn get(&self, index: usize) -> Option<String> {
+        self.0.get(index).map(ToOwned::to_owned)
+    }
+
+    pub fn index(&self, i: usize) -> String {
+        self.0[i].clone()
+    }
+}
 
 #[derive(Clone)]
 pub struct Application<A: Adapter> {
@@ -86,7 +98,7 @@ impl<A: Adapter + 'static> Application<A> {
             None => Default::default(),
         };
     
-        let req = match auth::for_request(req, &self.adapter, self.redis.clone()).await {
+        let mut req = match auth::for_request(req, &self.adapter, self.redis.clone()).await {
             Ok(req) => req,
             Err(error) => {
                 error!(&self.logger, "{}", &error; "module" => "middleware-auth");
@@ -98,6 +110,7 @@ impl<A: Adapter + 'static> Application<A> {
         // if let (Some(caps), &Method::GET) = (CHANNEL_GET_BY_ID.captures(req.uri().path()), req.method())
 
         let config_controller = routes::cfg::ConfigController::new(&self);
+        let channel_controller = routes::channel::ChannelController::new(&self);
 
     
         let mut response = match (req.uri().path(), req.method()) {
@@ -115,12 +128,16 @@ impl<A: Adapter + 'static> Application<A> {
             },
             ("/channel/list", &Method::GET) => Err(ResponseError::NotFound),
             (route, method) if route.starts_with("/channel") => {
+                // example with 
+                // @TODO remove later
                 // regex matching for routes with params
-                // if let (Some(caps), &Method::GET) = (CHANNEL_GET_BY_ID.captures(route), method) {
-                    // crate::routes::cfg::return_config(&config)
-                // }
-                Err(ResponseError::NotFound)
-                // crate::routes::channel::handle_channel_routes(req, (&pool, adapter)).await
+                if let (Some(caps), &Method::GET) = (LAST_APPROVED_BY_CHANNEL_ID.captures(route), method) {
+                    let param = RouteParams(vec![ caps.get(1).map_or("".to_string(), |m| m.as_str().to_string()) ]);
+                    req.extensions_mut().insert(param);
+                    channel_controller.last_approved(req).await
+                } else {
+                    Err(ResponseError::NotFound)
+                }               
             }
             _ => Err(ResponseError::NotFound),
         }
