@@ -38,7 +38,7 @@ pub async fn postgres_connection() -> Result<DbPool, bb8_postgres::tokio_postgre
     Pool::builder().build(pg_mgr).await
 }
 
-pub async fn migrations() {
+pub async fn setup_migrations() {
     use migrant_lib::{Config, Direction, Migrator, Settings};
 
     let settings = Settings::configure_postgres()
@@ -46,10 +46,14 @@ pub async fn migrations() {
         .database_password(POSTGRES_PASSWORD.as_str())
         .database_host(POSTGRES_HOST.as_str())
         .database_port(POSTGRES_PORT.clone())
+        .database_name(&POSTGRES_DB.as_ref().unwrap_or(&POSTGRES_USER))
         .build()
         .expect("Should build migration settings");
 
     let mut config = Config::with_settings(&settings);
+    config.setup().expect("Should setup Postgres connection");
+    // Toggle setting so tags are validated in a cli compatible manner.
+    // This needs to happen before any call to `Config::use_migrations` or `Config::reload`
     config.use_cli_compatible_tags(true);
 
     macro_rules! make_migration {
@@ -72,14 +76,17 @@ pub async fn migrations() {
     // Define Migrations
     config.use_migrations(&[
         make_migration!("20190806011140_initial_tables"),
-    ])
-        .expect("Loading migrations failed");
+    ]).expect("Loading migrations failed");
+
+    // Reload config, ping the database for applied migrations
+    let config = config.reload().expect("Should reload applied migrations");
 
     Migrator::with_config(&config)
+        // set `swallow_completion` to `true`
+        // so no error will be returned if all migrations have already been ran
+        .swallow_completion(true)
         .direction(Direction::Up)
         .all(true)
-        // by default this will set the `swallow_completion` to `false`
-        // so no error will be returned if all migrations have already been ran
         .apply()
         .expect("Applying migrations failed");
 
