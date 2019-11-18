@@ -4,15 +4,17 @@
 use clap::{App, Arg};
 
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
-use primitives::adapter::{DummyAdapterOptions, KeystoreOptions};
+use primitives::adapter::{DummyAdapterOptions, KeystoreOptions, Adapter};
 use primitives::config::configuration;
 use primitives::util::logging::{Async, PrefixedCompactFormat, TermDecorator};
 use primitives::util::tests::prep_db::{AUTH, IDS};
 use primitives::ValidatorId;
 use sentry::db::{postgres_connection, redis_connection};
 use sentry::Application;
-use slog::{o, Drain, Logger};
+use slog::{o, Drain, info, error, Logger};
 use std::convert::TryFrom;
+use hyper::service::{make_service_fn, service_fn};
+use hyper::{Body, Error, Method, Request, Response, Server, StatusCode};
 
 const DEFAULT_PORT: u16 = 8005;
 
@@ -101,18 +103,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let postgres = postgres_connection().await?;
 
     match adapter {
-        AdapterTypes::EthereumAdapter(adapter) => {
-            Application::new(*adapter, config, logger, redis, postgres, clustered, port)
-                .run()
-                .await
-        }
-        AdapterTypes::DummyAdapter(adapter) => {
-            Application::new(*adapter, config, logger, redis, postgres, clustered, port)
-                .run()
-                .await
-        }
-    }
+        AdapterTypes::EthereumAdapter(adapter) => run(Application::new(*adapter, config, logger, redis, postgres, clustered, port)).await,
+        AdapterTypes::DummyAdapter(adapter) =>  run(Application::new(*adapter, config, logger, redis, postgres, clustered, port)).await
+    };
+
     Ok(())
+}
+
+/// Starts the `hyper` `Server`.
+async fn run<A: Adapter + 'static>(app: Application<A>) {
+    let addr = ([127, 0, 0, 1], app.port).into();
+    info!(&app.logger, "Listening on port {}!", app.port);
+
+    let make_service = make_service_fn(move |_| {
+        let server = app.clone();
+        async move {
+            Ok::<_, Error>(service_fn(move |req| {
+                let server = server.clone();
+                async move {
+                    Ok::<_, Error>(
+                        server.handle_routing(
+                            req
+                        )
+                        .await,
+                    )
+                }
+            }))
+        }
+    });
+
+    let server = Server::bind(&addr).serve(make_service);
+
+    if let Err(e) = server.await {
+        // error!(&self.logger, "server error: {}", e);
+    }
 }
 
 fn logger() -> Logger {
