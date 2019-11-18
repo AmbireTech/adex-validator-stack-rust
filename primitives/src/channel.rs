@@ -9,12 +9,47 @@ use serde_hex::{SerHex, StrictPfx};
 use crate::big_num::BigNum;
 use crate::util::serde::ts_milliseconds_option;
 use crate::{AdUnit, EventSubmission, TargetingTag, ValidatorDesc, ValidatorId};
+use hex::{FromHex, FromHexError};
+use std::ops::Deref;
+
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Copy, Clone)]
+#[serde(transparent)]
+pub struct ChannelId(#[serde(with = "SerHex::<StrictPfx>")] [u8; 32]);
+
+impl Deref for ChannelId {
+    type Target = [u8];
+
+    fn deref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl From<[u8; 32]> for ChannelId {
+    fn from(array: [u8; 32]) -> Self {
+        Self(array)
+    }
+}
+
+impl AsRef<[u8]> for ChannelId {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl FromHex for ChannelId {
+    type Error = FromHexError;
+
+    fn from_hex<T: AsRef<[u8]>>(hex: T) -> Result<Self, Self::Error> {
+        let array = hex::FromHex::from_hex(hex.as_ref())?;
+
+        Ok(Self(array))
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Channel {
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub id: [u8; 32],
+    pub id: ChannelId,
     pub creator: String,
     pub deposit_asset: String,
     pub deposit_amount: BigNum,
@@ -156,5 +191,31 @@ impl fmt::Display for ChannelError {
 impl Error for ChannelError {
     fn cause(&self) -> Option<&dyn Error> {
         None
+    }
+}
+
+#[cfg(feature = "postgres")]
+pub mod postgres {
+    use super::ChannelId;
+    use hex::FromHex;
+    use postgres_types::{FromSql, Type};
+    use std::error::Error;
+
+    impl<'a> FromSql<'a> for ChannelId {
+        fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+            let str_slice = <&str as FromSql>::from_sql(ty, raw)?;
+
+            // FromHex::from_hex for fixed-sized arrays will guard against the length of the string!
+            let id: [u8; 32] = <[u8; 32] as FromHex>::from_hex(str_slice)?;
+
+            Ok(ChannelId(id))
+        }
+
+        fn accepts(ty: &Type) -> bool {
+            match *ty {
+                Type::TEXT | Type::VARCHAR => true,
+                _ => false,
+            }
+        }
     }
 }

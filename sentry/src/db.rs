@@ -2,11 +2,11 @@ use redis::aio::MultiplexedConnection;
 use redis::RedisError;
 
 use bb8::Pool;
-use bb8_postgres::{
-    tokio_postgres::{Error as PostgresError, NoTls},
-    PostgresConnectionManager,
-};
+use bb8_postgres::tokio_postgres::NoTls;
+use bb8_postgres::PostgresConnectionManager;
 use lazy_static::lazy_static;
+
+pub type DbPool = Pool<PostgresConnectionManager<NoTls>>;
 
 lazy_static! {
     static ref REDIS_URL: String =
@@ -20,8 +20,7 @@ pub async fn redis_connection() -> Result<MultiplexedConnection, RedisError> {
     client.get_multiplexed_tokio_connection().await
 }
 
-pub async fn postgres_connection() -> Result<Pool<PostgresConnectionManager<NoTls>>, PostgresError>
-{
+pub async fn postgres_connection() -> Result<DbPool, bb8_postgres::tokio_postgres::Error> {
     let pg_mgr = PostgresConnectionManager::new_from_stringlike(POSTGRES_URL.as_str(), NoTls)?;
 
     Pool::builder().build(pg_mgr).await

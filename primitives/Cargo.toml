@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["Lachezar Lechev <lachezar@adex.network>, Omidiora Samuel <sam@adex.network>"]
 edition = "2018"
 
+[features]
+postgres = ["postgres-types", "bytes"]
+
 [dependencies]
 # Futures
 futures-preview = { version = "=0.3.0-alpha.19", features = ["compat"]}
@@ -33,5 +36,8 @@ num-derive = "0.2"
 # Fixtures
 fake = { version = "^1.3", features = ["chrono"] }
 rand = { version = "^0.6" }
+# postgres feature
+postgres-types = {version = "0.1.0-alpha.1", optional = true}
+bytes = { version = "0.4.12", optional = true}
 # Other
 lazy_static = "1.4.0"

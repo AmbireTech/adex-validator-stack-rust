@@ -29,7 +29,7 @@ pub mod validator;
 pub use self::ad_unit::AdUnit;
 pub use self::balances_map::BalancesMap;
 pub use self::big_num::BigNum;
-pub use self::channel::{Channel, ChannelSpec, SpecValidator, SpecValidators};
+pub use self::channel::{Channel, ChannelId, ChannelSpec, SpecValidator, SpecValidators};
 pub use self::config::Config;
 pub use self::event_submission::EventSubmission;
 pub use self::targeting_tag::TargetingTag;
