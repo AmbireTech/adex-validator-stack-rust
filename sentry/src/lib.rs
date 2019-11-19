@@ -12,7 +12,7 @@ use primitives::Config;
 use redis::aio::MultiplexedConnection;
 use regex::Regex;
 use routes::cfg::config;
-use routes::channel::ChannelController;
+use routes::channel::{create_channel, last_approved};
 use slog::{error, Logger};
 
 pub mod middleware {
@@ -91,8 +91,6 @@ impl<A: Adapter + 'static> Application<A> {
     }
 
     pub async fn handle_routing(&self, req: Request<Body>) -> Response<Body> {
-        let channel_controller = ChannelController::new(&self);
-
         let headers = match cors(&req) {
             Some(Cors::Simple(headers)) => headers,
             // if we have a Preflight, just return the response directly
@@ -119,8 +117,7 @@ impl<A: Adapter + 'static> Application<A> {
                         return map_response_error(error);
                     }
                 };
-
-                channel_controller.channel(req).await
+                create_channel(req, &self).await
             }
             ("/channel/list", &Method::GET) => Err(ResponseError::NotFound),
             // This is important becuase it prevents us from doing
@@ -136,7 +133,8 @@ impl<A: Adapter + 'static> Application<A> {
                         .get(1)
                         .map_or("".to_string(), |m| m.as_str().to_string())]);
                     req.extensions_mut().insert(param);
-                    channel_controller.last_approved(req).await
+
+                    last_approved(req, &self).await
                 } else {
                     Err(ResponseError::NotFound)
                 }
