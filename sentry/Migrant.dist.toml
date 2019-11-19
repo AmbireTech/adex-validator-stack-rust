@@ -1,0 +1,15 @@
+# Required, do not edit
+database_type = "postgres"
+
+# Required database info
+database_name = "postgres"
+database_user = "postgres"
+database_password = "docker"
+
+# Configurable database info
+# default "localhost"
+database_host = "localhost"
+# default "5432"
+database_port = "5432"
+# default "migrations"
+migration_location = "migrations"

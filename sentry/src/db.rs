@@ -19,14 +19,14 @@ lazy_static! {
     static ref POSTGRES_HOST: String =
         env::var("POSTGRES_HOST").unwrap_or_else(|_| String::from("localhost"));
     static ref POSTGRES_PORT: u16 = env::var("POSTGRES_PORT")
-        .unwrap_or("5432".to_string())
+        .unwrap_or_else(|_| String::from("5432"))
         .parse()
         .unwrap();
     static ref POSTGRES_DB: Option<String> = env::var("POSTGRES_DB").ok();
 }
 
 pub async fn redis_connection() -> Result<MultiplexedConnection, RedisError> {
-    let client = redis::Client::open(REDIS_URL.as_str()).expect("Wrong redis connection string");
+    let client = redis::Client::open(REDIS_URL.as_str()).expect("Wrong redis connection url");
     client.get_multiplexed_tokio_connection().await
 }
 
