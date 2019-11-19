@@ -36,6 +36,12 @@ impl ValidatorId {
     }
 }
 
+impl AsRef<[u8]> for ValidatorId {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
 impl TryFrom<&str> for ValidatorId {
     type Error = DomainError;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
@@ -146,4 +152,55 @@ pub enum MessageTypes {
     RejectState(RejectState),
     Heartbeat(Heartbeat),
     Accounting(Accounting),
+}
+
+#[cfg(feature = "postgres")]
+pub mod postgres {
+    use super::ValidatorId;
+    use bytes::BytesMut;
+    use postgres_types::{FromSql, IsNull, ToSql, Type};
+    use std::convert::TryFrom;
+    use std::error::Error;
+
+    impl<'a> FromSql<'a> for ValidatorId {
+        fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+            let str_slice = <&str as FromSql>::from_sql(ty, raw)?;
+
+            // FromHex::from_hex for fixed-sized arrays will guard against the length of the string!
+            Ok(ValidatorId::try_from(str_slice)?)
+        }
+
+        fn accepts(ty: &Type) -> bool {
+            match *ty {
+                Type::TEXT | Type::VARCHAR => true,
+                _ => false,
+            }
+        }
+    }
+
+    impl ToSql for ValidatorId {
+        fn to_sql(
+            &self,
+            ty: &Type,
+            w: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+            let string = format!("0x{}", self.to_hex_non_prefix_string());
+
+            <String as ToSql>::to_sql(&string, ty, w)
+        }
+
+        fn accepts(ty: &Type) -> bool {
+            <String as ToSql>::accepts(ty)
+        }
+
+        fn to_sql_checked(
+            &self,
+            ty: &Type,
+            out: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+            let string = format!("0x{}", self.to_hex_non_prefix_string());
+
+            <String as ToSql>::to_sql_checked(&string, ty, out)
+        }
+    }
 }

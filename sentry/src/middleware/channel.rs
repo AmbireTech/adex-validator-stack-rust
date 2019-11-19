@@ -23,8 +23,6 @@ pub async fn get_channel(
     pool: &DbPool,
     id: &ChannelId,
 ) -> Result<Option<Channel>, RunError<bb8_postgres::tokio_postgres::Error>> {
-    let id = hex::encode(id);
-
     pool
         .run(move |connection| {
             async move {
