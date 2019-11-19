@@ -197,18 +197,16 @@ impl Error for ChannelError {
 #[cfg(feature = "postgres")]
 pub mod postgres {
     use super::ChannelId;
+    use bytes::BytesMut;
     use hex::FromHex;
-    use postgres_types::{FromSql, Type};
+    use postgres_types::{FromSql, IsNull, ToSql, Type};
     use std::error::Error;
 
     impl<'a> FromSql<'a> for ChannelId {
         fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
             let str_slice = <&str as FromSql>::from_sql(ty, raw)?;
 
-            // FromHex::from_hex for fixed-sized arrays will guard against the length of the string!
-            let id: [u8; 32] = <[u8; 32] as FromHex>::from_hex(str_slice)?;
-
-            Ok(ChannelId(id))
+            Ok(ChannelId::from_hex(str_slice)?)
         }
 
         fn accepts(ty: &Type) -> bool {
@@ -216,6 +214,32 @@ pub mod postgres {
                 Type::TEXT | Type::VARCHAR => true,
                 _ => false,
             }
+        }
+    }
+
+    impl ToSql for ChannelId {
+        fn to_sql(
+            &self,
+            ty: &Type,
+            w: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+            let string = format!("0x{}", hex::encode(self));
+
+            <String as ToSql>::to_sql(&string, ty, w)
+        }
+
+        fn accepts(ty: &Type) -> bool {
+            <String as ToSql>::accepts(ty)
+        }
+
+        fn to_sql_checked(
+            &self,
+            ty: &Type,
+            out: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+            let string = format!("0x{}", hex::encode(self));
+
+            <String as ToSql>::to_sql_checked(&string, ty, out)
         }
     }
 }
