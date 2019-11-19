@@ -14,6 +14,6 @@ to create them for you.
     (for more options see the [migrant homepage](https://github.com/jaemk/migrant))
 
 2) And setup the `Migrant.toml` file, a reference to which you can find
-in (Migrant.dist.toml)[Migrant.dist.toml].
+in [Migrant.dist.toml](Migrant.dist.toml).
 
 For more information see [migrant homepage](https://github.com/jaemk/migrant).
