@@ -4,24 +4,12 @@ use hyper::{Body, Response, Request};
 use primitives::adapter::Adapter;
 use crate::Application;
 
-pub struct ConfigController<'a, A: Adapter> {
-    pub app: &'a Application<A>
+
+pub async fn config<A: Adapter>( _: Request<Body>, app: &Application<A>) -> Result<Response<Body>, ResponseError> {
+    let config_str = serde_json::to_string(&app.config)?;
+
+    Ok(Response::builder()
+        .header(CONTENT_TYPE, "application/json")
+        .body(Body::from(config_str))
+        .expect("Creating a response should never fail"))
 }
-
-impl<'a, A: Adapter> ConfigController<'a, A> {
-
-    pub fn new(app: &'a Application<A>) -> Self {
-        Self { app }
-    }
-
-    pub async fn config(&self, _: Request<Body>) -> Result<Response<Body>, ResponseError> {
-        let config_str = serde_json::to_string(&self.app.config)?;
-    
-        Ok(Response::builder()
-            .header(CONTENT_TYPE, "application/json")
-            .body(Body::from(config_str))
-            .expect("Creating a response should never fail"))
-    }
-
-}
-

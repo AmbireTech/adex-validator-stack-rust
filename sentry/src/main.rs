@@ -123,8 +123,7 @@ async fn run<A: Adapter + 'static>(app: Application<A>) {
                 let server = server.clone();
                 async move {
                     Ok::<_, Error>(
-                        server.handle_routing(
-                            req
+                        server.handle_routing(req
                         )
                         .await,
                     )

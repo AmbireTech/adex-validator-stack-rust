@@ -12,7 +12,8 @@ use slog::{error, Logger};
 use lazy_static::lazy_static;
 use regex::Regex;
 use crate::chain::chain;
-
+use routes::cfg::config;
+use routes::channel::ChannelController;
 
 pub mod middleware {
     pub mod auth;
@@ -64,6 +65,7 @@ pub struct Application<A: Adapter> {
     pub  _clustered: bool,
     pub port: u16,
     pub config: Config,
+    __secret: ()
 }
 
 impl<A: Adapter + 'static> Application<A> {
@@ -84,6 +86,7 @@ impl<A: Adapter + 'static> Application<A> {
             pool,
             _clustered: clustered,
             port,
+            __secret: ()
         }
     }
 
@@ -91,6 +94,8 @@ impl<A: Adapter + 'static> Application<A> {
         &self,
         req: Request<Body>
     ) -> Response<Body> {
+        let channel_controller = ChannelController::new(&self);
+       
         let headers = match cors(&req) {
             Some(Cors::Simple(headers)) => headers,
             // if we have a Preflight, just return the response directly
@@ -105,16 +110,9 @@ impl<A: Adapter + 'static> Application<A> {
                 return map_response_error(ResponseError::BadRequest(error));
             }
         };
-    
-        // req.uri().path() == "/channel" && req.method() == Method::POST 
-        // if let (Some(caps), &Method::GET) = (CHANNEL_GET_BY_ID.captures(req.uri().path()), req.method())
-
-        let config_controller = routes::cfg::ConfigController::new(&self);
-        let channel_controller = routes::channel::ChannelController::new(&self);
-
-    
+        
         let mut response = match (req.uri().path(), req.method()) {
-            ("/cfg", &Method::GET) => config_controller.config(req).await,
+            ("/cfg", &Method::GET) => config(req, &self).await,
             ("/channel", &Method::POST) => {
                 // example with middleware
                 // @TODO remove later
@@ -124,9 +122,12 @@ impl<A: Adapter + 'static> Application<A> {
                         return map_response_error(error);
                     }
                 };
-                config_controller.config(req).await
+
+                channel_controller.channel(req).await
             },
             ("/channel/list", &Method::GET) => Err(ResponseError::NotFound),
+            // This is important becuase it prevents us from doing 
+            // expensive regex matching for routes without /channel
             (route, method) if route.starts_with("/channel") => {
                 // example with 
                 // @TODO remove later
@@ -147,7 +148,6 @@ impl<A: Adapter + 'static> Application<A> {
         response.headers_mut().extend(headers);
         response
     }
-    
 }
 
 #[derive(Debug)]
