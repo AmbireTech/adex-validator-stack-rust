@@ -104,7 +104,7 @@ impl<A: Adapter + 'static> Application<A> {
             Ok(req) => req,
             Err(error) => {
                 error!(&self.logger, "{}", &error; "module" => "middleware-auth");
-                return map_response_error(ResponseError::BadRequest(error));
+                return map_response_error(ResponseError::BadRequest);
             }
         };
 
@@ -154,7 +154,7 @@ impl<A: Adapter + 'static> Application<A> {
 #[derive(Debug)]
 pub enum ResponseError {
     NotFound,
-    BadRequest(Box<dyn std::error::Error>),
+    BadRequest,
 }
 
 impl<T> From<T> for ResponseError
@@ -162,14 +162,16 @@ where
     T: std::error::Error + 'static,
 {
     fn from(error: T) -> Self {
-        ResponseError::BadRequest(error.into())
+        // @TODO use a error proper logger?
+        println!("{:#?}", error);
+        ResponseError::BadRequest
     }
 }
 
-fn map_response_error(error: ResponseError) -> Response<Body> {
+pub fn map_response_error(error: ResponseError) -> Response<Body> {
     match error {
         ResponseError::NotFound => not_found(),
-        ResponseError::BadRequest(error) => bad_request(error),
+        ResponseError::BadRequest => bad_request(),
     }
 }
 
@@ -180,8 +182,7 @@ pub fn not_found() -> Response<Body> {
     response
 }
 
-pub fn bad_request(err: Box<dyn std::error::Error>) -> Response<Body> {
-    println!("{:#?}", err);
+pub fn bad_request() -> Response<Body> {
     let body = Body::from("Bad Request: try again later");
     let mut response = Response::new(body);
     let status = response.status_mut();

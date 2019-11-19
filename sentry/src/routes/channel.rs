@@ -22,6 +22,8 @@ impl<'a, A: Adapter> ChannelController<'a, A> {
         let body = req.into_body().try_concat().await?;
         let channel = serde_json::from_slice::<Channel>(&body)?;
 
+        // insert into database
+
         let create_response = channel_create::ChannelCreateResponse {
             // @TODO get validate_channel response error
             success: self.app.adapter.validate_channel(&channel).unwrap_or(false),
