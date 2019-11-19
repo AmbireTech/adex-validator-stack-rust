@@ -1,15 +1,19 @@
 #![deny(clippy::all)]
 #![deny(rust_2018_idioms)]
 
+use crate::chain::chain;
 use crate::db::DbPool;
 use crate::middleware::auth;
 use crate::middleware::cors::{cors, Cors};
-use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Error, Method, Request, Response, Server, StatusCode};
+use hyper::{Body, Method, Request, Response, StatusCode};
+use lazy_static::lazy_static;
 use primitives::adapter::Adapter;
 use primitives::Config;
 use redis::aio::MultiplexedConnection;
-use slog::{error, info, Logger};
+use regex::Regex;
+use routes::cfg::config;
+use routes::channel::ChannelController;
+use slog::{error, Logger};
 
 pub mod middleware {
     pub mod auth;
@@ -18,36 +22,50 @@ pub mod middleware {
 }
 
 pub mod routes {
+    pub mod cfg;
     pub mod channel;
-    pub mod cfg {
-        use crate::ResponseError;
-        use hyper::header::CONTENT_TYPE;
-        use hyper::{Body, Response};
-        use primitives::Config;
-
-        pub fn return_config(config: &Config) -> Result<Response<Body>, ResponseError> {
-            let config_str = serde_json::to_string(config)?;
-
-            Ok(Response::builder()
-                .header(CONTENT_TYPE, "application/json")
-                .body(Body::from(config_str))
-                .expect("Creating a response should never fail"))
-        }
-    }
 }
 
 pub mod access;
+mod chain;
 pub mod db;
 pub mod event_reducer;
 
+lazy_static! {
+    static ref CHANNEL_GET_BY_ID: Regex =
+        Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
+    static ref LAST_APPROVED_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/last-approved?$").expect("The regex should be valid");
+    static ref CHANNEL_STATUS_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/status?$").expect("The regex should be valid");
+    // @TODO define other regex routes
+}
+
+async fn config_middleware(req: Request<Body>) -> Result<Request<Body>, ResponseError> {
+    Ok(req)
+}
+
+#[derive(Debug)]
+pub struct RouteParams(Vec<String>);
+
+impl RouteParams {
+    pub fn get(&self, index: usize) -> Option<String> {
+        self.0.get(index).map(ToOwned::to_owned)
+    }
+
+    pub fn index(&self, i: usize) -> String {
+        self.0[i].clone()
+    }
+}
+
+#[derive(Clone)]
 pub struct Application<A: Adapter> {
-    adapter: A,
-    logger: Logger,
-    redis: MultiplexedConnection,
-    pool: DbPool,
-    _clustered: bool,
-    port: u16,
-    config: Config,
+    pub adapter: A,
+    pub logger: Logger,
+    pub redis: MultiplexedConnection,
+    pub pool: DbPool,
+    pub _clustered: bool,
+    pub port: u16,
+    pub config: Config,
+    __secret: (),
 }
 
 impl<A: Adapter + 'static> Application<A> {
@@ -68,45 +86,68 @@ impl<A: Adapter + 'static> Application<A> {
             pool,
             _clustered: clustered,
             port,
+            __secret: (),
         }
     }
 
-    /// Starts the `hyper` `Server`.
-    pub async fn run(&self) {
-        let addr = ([127, 0, 0, 1], self.port).into();
-        info!(&self.logger, "Listening on port {}!", self.port);
+    pub async fn handle_routing(&self, req: Request<Body>) -> Response<Body> {
+        let channel_controller = ChannelController::new(&self);
 
-        let make_service = make_service_fn(move |_| {
-            let adapter_config = (self.adapter.clone(), self.config.clone());
-            let redis = self.redis.clone();
-            let logger = self.logger.clone();
-            let pool = self.pool.clone();
-            async move {
-                Ok::<_, Error>(service_fn(move |req| {
-                    let adapter_config = adapter_config.clone();
-                    let redis = redis.clone();
-                    let logger = logger.clone();
-                    let pool = pool.clone();
-                    async move {
-                        Ok::<_, Error>(
-                            handle_routing(
-                                req,
-                                (&adapter_config.0, &adapter_config.1),
-                                (pool, redis),
-                                &logger,
-                            )
-                            .await,
-                        )
-                    }
-                }))
+        let headers = match cors(&req) {
+            Some(Cors::Simple(headers)) => headers,
+            // if we have a Preflight, just return the response directly
+            Some(Cors::Preflight(response)) => return response,
+            None => Default::default(),
+        };
+
+        let mut req = match auth::for_request(req, &self.adapter, self.redis.clone()).await {
+            Ok(req) => req,
+            Err(error) => {
+                error!(&self.logger, "{}", &error; "module" => "middleware-auth");
+                return map_response_error(ResponseError::BadRequest(error));
             }
-        });
+        };
 
-        let server = Server::bind(&addr).serve(make_service);
+        let mut response = match (req.uri().path(), req.method()) {
+            ("/cfg", &Method::GET) => config(req, &self).await,
+            ("/channel", &Method::POST) => {
+                // example with middleware
+                // @TODO remove later
+                let req = match chain(req, vec![config_middleware]).await {
+                    Ok(req) => req,
+                    Err(error) => {
+                        return map_response_error(error);
+                    }
+                };
 
-        if let Err(e) = server.await {
-            error!(&self.logger, "server error: {}", e);
+                channel_controller.channel(req).await
+            }
+            ("/channel/list", &Method::GET) => Err(ResponseError::NotFound),
+            // This is important becuase it prevents us from doing
+            // expensive regex matching for routes without /channel
+            (route, method) if route.starts_with("/channel") => {
+                // example with
+                // @TODO remove later
+                // regex matching for routes with params
+                if let (Some(caps), &Method::GET) =
+                    (LAST_APPROVED_BY_CHANNEL_ID.captures(route), method)
+                {
+                    let param = RouteParams(vec![caps
+                        .get(1)
+                        .map_or("".to_string(), |m| m.as_str().to_string())]);
+                    req.extensions_mut().insert(param);
+                    channel_controller.last_approved(req).await
+                } else {
+                    Err(ResponseError::NotFound)
+                }
+            }
+            _ => Err(ResponseError::NotFound),
         }
+        .unwrap_or_else(map_response_error);
+
+        // extend the headers with the initial headers we have from CORS (if there are some)
+        response.headers_mut().extend(headers);
+        response
     }
 }
 
@@ -123,42 +164,6 @@ where
     fn from(error: T) -> Self {
         ResponseError::BadRequest(error.into())
     }
-}
-
-async fn handle_routing(
-    req: Request<Body>,
-    (adapter, config): (&impl Adapter, &Config),
-    (pool, redis): (DbPool, MultiplexedConnection),
-    logger: &Logger,
-) -> Response<Body> {
-    let headers = match cors(&req) {
-        Some(Cors::Simple(headers)) => headers,
-        // if we have a Preflight, just return the response directly
-        Some(Cors::Preflight(response)) => return response,
-        None => Default::default(),
-    };
-
-    let req = match auth::for_request(req, adapter, redis.clone()).await {
-        Ok(req) => req,
-        Err(error) => {
-            error!(&logger, "{}", &error; "module" => "middleware-auth");
-
-            return map_response_error(ResponseError::BadRequest(error));
-        }
-    };
-
-    let mut response = match (req.uri().path(), req.method()) {
-        ("/cfg", &Method::GET) => crate::routes::cfg::return_config(&config),
-        (route, _) if route.starts_with("/channel") => {
-            crate::routes::channel::handle_channel_routes(req, (&pool, adapter)).await
-        }
-        _ => Err(ResponseError::NotFound),
-    }
-    .unwrap_or_else(map_response_error);
-
-    // extend the headers with the initial headers we have from CORS (if there are some)
-    response.headers_mut().extend(headers);
-    response
 }
 
 fn map_response_error(error: ResponseError) -> Response<Body> {

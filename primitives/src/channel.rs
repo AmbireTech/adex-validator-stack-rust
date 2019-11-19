@@ -197,6 +197,8 @@ impl Error for ChannelError {
 #[cfg(feature = "postgres")]
 pub mod postgres {
     use super::ChannelId;
+    use super::{Channel, ChannelSpec};
+    use bb8_postgres::tokio_postgres::{types::Json, Row};
     use hex::FromHex;
     use postgres_types::{FromSql, Type};
     use std::error::Error;
@@ -215,6 +217,19 @@ pub mod postgres {
             match *ty {
                 Type::TEXT | Type::VARCHAR => true,
                 _ => false,
+            }
+        }
+    }
+
+    impl From<&Row> for Channel {
+        fn from(row: &Row) -> Self {
+            Self {
+                id: row.get("channel_id"),
+                creator: row.get("creator"),
+                deposit_asset: row.get("deposit_asset"),
+                deposit_amount: row.get("deposit_amount"),
+                valid_until: row.get("valid_until"),
+                spec: row.get::<_, Json<ChannelSpec>>("spec").0,
             }
         }
     }
