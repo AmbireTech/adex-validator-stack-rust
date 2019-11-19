@@ -40,7 +40,7 @@ impl FromHex for ChannelId {
     type Error = FromHexError;
 
     fn from_hex<T: AsRef<[u8]>>(hex: T) -> Result<Self, Self::Error> {
-        let array = hex::FromHex::from_hex(hex.as_ref())?;
+        let array = hex::FromHex::from_hex(hex)?;
 
         Ok(Self(array))
     }
