@@ -4,17 +4,17 @@
 use clap::{App, Arg};
 
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
-use primitives::adapter::{DummyAdapterOptions, KeystoreOptions, Adapter};
+use hyper::service::{make_service_fn, service_fn};
+use hyper::{Error, Server};
+use primitives::adapter::{Adapter, DummyAdapterOptions, KeystoreOptions};
 use primitives::config::configuration;
 use primitives::util::logging::{Async, PrefixedCompactFormat, TermDecorator};
 use primitives::util::tests::prep_db::{AUTH, IDS};
 use primitives::ValidatorId;
 use sentry::db::{postgres_connection, redis_connection};
 use sentry::Application;
-use slog::{o, Drain, info, error, Logger};
+use slog::{error, info, o, Drain, Logger};
 use std::convert::TryFrom;
-use hyper::service::{make_service_fn, service_fn};
-use hyper::{Error, Server};
 
 const DEFAULT_PORT: u16 = 8005;
 
@@ -103,8 +103,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let postgres = postgres_connection().await?;
 
     match adapter {
-        AdapterTypes::EthereumAdapter(adapter) => run(Application::new(*adapter, config, logger, redis, postgres, clustered, port)).await,
-        AdapterTypes::DummyAdapter(adapter) =>  run(Application::new(*adapter, config, logger, redis, postgres, clustered, port)).await
+        AdapterTypes::EthereumAdapter(adapter) => {
+            run(Application::new(
+                *adapter, config, logger, redis, postgres, clustered, port,
+            ))
+            .await
+        }
+        AdapterTypes::DummyAdapter(adapter) => {
+            run(Application::new(
+                *adapter, config, logger, redis, postgres, clustered, port,
+            ))
+            .await
+        }
     };
 
     Ok(())
@@ -121,13 +131,7 @@ async fn run<A: Adapter + 'static>(app: Application<A>) {
         async move {
             Ok::<_, Error>(service_fn(move |req| {
                 let server = server.clone();
-                async move {
-                    Ok::<_, Error>(
-                        server.handle_routing(req
-                        )
-                        .await,
-                    )
-                }
+                async move { Ok::<_, Error>(server.handle_routing(req).await) }
             }))
         }
     });

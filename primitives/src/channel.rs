@@ -197,11 +197,11 @@ impl Error for ChannelError {
 #[cfg(feature = "postgres")]
 pub mod postgres {
     use super::ChannelId;
+    use super::{Channel, ChannelSpec};
+    use bb8_postgres::tokio_postgres::{types::Json, Row};
     use hex::FromHex;
     use postgres_types::{FromSql, Type};
     use std::error::Error;
-    use bb8_postgres::tokio_postgres::{types::Json, Row};
-    use super::{Channel, ChannelSpec};
 
     impl<'a> FromSql<'a> for ChannelId {
         fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
@@ -233,5 +233,4 @@ pub mod postgres {
             }
         }
     }
-
 }

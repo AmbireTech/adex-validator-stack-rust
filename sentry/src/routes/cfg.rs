@@ -1,11 +1,13 @@
+use crate::Application;
 use crate::ResponseError;
 use hyper::header::CONTENT_TYPE;
-use hyper::{Body, Response, Request};
+use hyper::{Body, Request, Response};
 use primitives::adapter::Adapter;
-use crate::Application;
 
-
-pub async fn config<A: Adapter>( _: Request<Body>, app: &Application<A>) -> Result<Response<Body>, ResponseError> {
+pub async fn config<A: Adapter>(
+    _: Request<Body>,
+    app: &Application<A>,
+) -> Result<Response<Body>, ResponseError> {
     let config_str = serde_json::to_string(&app.config)?;
 
     Ok(Response::builder()

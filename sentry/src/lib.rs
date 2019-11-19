@@ -1,19 +1,19 @@
 #![deny(clippy::all)]
 #![deny(rust_2018_idioms)]
 
+use crate::chain::chain;
 use crate::db::DbPool;
 use crate::middleware::auth;
 use crate::middleware::cors::{cors, Cors};
 use hyper::{Body, Method, Request, Response, StatusCode};
+use lazy_static::lazy_static;
 use primitives::adapter::Adapter;
 use primitives::Config;
 use redis::aio::MultiplexedConnection;
-use slog::{error, Logger};
-use lazy_static::lazy_static;
 use regex::Regex;
-use crate::chain::chain;
 use routes::cfg::config;
 use routes::channel::ChannelController;
+use slog::{error, Logger};
 
 pub mod middleware {
     pub mod auth;
@@ -22,14 +22,14 @@ pub mod middleware {
 }
 
 pub mod routes {
-    pub mod channel;
     pub mod cfg;
+    pub mod channel;
 }
 
 pub mod access;
+mod chain;
 pub mod db;
 pub mod event_reducer;
-mod chain;
 
 lazy_static! {
     static ref CHANNEL_GET_BY_ID: Regex =
@@ -62,10 +62,10 @@ pub struct Application<A: Adapter> {
     pub logger: Logger,
     pub redis: MultiplexedConnection,
     pub pool: DbPool,
-    pub  _clustered: bool,
+    pub _clustered: bool,
     pub port: u16,
     pub config: Config,
-    __secret: ()
+    __secret: (),
 }
 
 impl<A: Adapter + 'static> Application<A> {
@@ -86,23 +86,20 @@ impl<A: Adapter + 'static> Application<A> {
             pool,
             _clustered: clustered,
             port,
-            __secret: ()
+            __secret: (),
         }
     }
 
-    pub async fn handle_routing(
-        &self,
-        req: Request<Body>
-    ) -> Response<Body> {
+    pub async fn handle_routing(&self, req: Request<Body>) -> Response<Body> {
         let channel_controller = ChannelController::new(&self);
-       
+
         let headers = match cors(&req) {
             Some(Cors::Simple(headers)) => headers,
             // if we have a Preflight, just return the response directly
             Some(Cors::Preflight(response)) => return response,
             None => Default::default(),
         };
-    
+
         let mut req = match auth::for_request(req, &self.adapter, self.redis.clone()).await {
             Ok(req) => req,
             Err(error) => {
@@ -110,7 +107,7 @@ impl<A: Adapter + 'static> Application<A> {
                 return map_response_error(ResponseError::BadRequest(error));
             }
         };
-        
+
         let mut response = match (req.uri().path(), req.method()) {
             ("/cfg", &Method::GET) => config(req, &self).await,
             ("/channel", &Method::POST) => {
@@ -124,26 +121,30 @@ impl<A: Adapter + 'static> Application<A> {
                 };
 
                 channel_controller.channel(req).await
-            },
+            }
             ("/channel/list", &Method::GET) => Err(ResponseError::NotFound),
-            // This is important becuase it prevents us from doing 
+            // This is important becuase it prevents us from doing
             // expensive regex matching for routes without /channel
             (route, method) if route.starts_with("/channel") => {
-                // example with 
+                // example with
                 // @TODO remove later
                 // regex matching for routes with params
-                if let (Some(caps), &Method::GET) = (LAST_APPROVED_BY_CHANNEL_ID.captures(route), method) {
-                    let param = RouteParams(vec![ caps.get(1).map_or("".to_string(), |m| m.as_str().to_string()) ]);
+                if let (Some(caps), &Method::GET) =
+                    (LAST_APPROVED_BY_CHANNEL_ID.captures(route), method)
+                {
+                    let param = RouteParams(vec![caps
+                        .get(1)
+                        .map_or("".to_string(), |m| m.as_str().to_string())]);
                     req.extensions_mut().insert(param);
                     channel_controller.last_approved(req).await
                 } else {
                     Err(ResponseError::NotFound)
-                }               
+                }
             }
             _ => Err(ResponseError::NotFound),
         }
         .unwrap_or_else(map_response_error);
-    
+
         // extend the headers with the initial headers we have from CORS (if there are some)
         response.headers_mut().extend(headers);
         response
