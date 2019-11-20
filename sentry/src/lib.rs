@@ -63,8 +63,6 @@ pub struct Application<A: Adapter> {
     pub logger: Logger,
     pub redis: MultiplexedConnection,
     pub pool: DbPool,
-    pub _clustered: bool,
-    pub port: u16,
     pub config: Config,
     __secret: (),
 }
@@ -76,8 +74,6 @@ impl<A: Adapter + 'static> Application<A> {
         logger: Logger,
         redis: MultiplexedConnection,
         pool: DbPool,
-        clustered: bool,
-        port: u16,
     ) -> Self {
         Self {
             adapter,
@@ -85,8 +81,6 @@ impl<A: Adapter + 'static> Application<A> {
             logger,
             redis,
             pool,
-            _clustered: clustered,
-            port,
             __secret: (),
         }
     }
