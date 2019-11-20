@@ -106,7 +106,7 @@ impl<A: Adapter + 'static> Application<A> {
                 return map_response_error(ResponseError::BadRequest("invalid auth".into()));
             }
         };
-        
+
         let mut response = match (req.uri().path(), req.method()) {
             ("/cfg", &Method::GET) => config(req, &self).await,
             ("/channel", &Method::POST) => create_channel(req, &self).await,
@@ -187,7 +187,9 @@ pub fn bad_response(response_body: String) -> Response<Body> {
     let body = Body::from(serde_json::to_string(&error_response).expect("serialise err response"));
 
     let mut response = Response::new(body);
-    response.headers_mut().insert("Content-type", "application/json".parse().unwrap());
+    response
+        .headers_mut()
+        .insert("Content-type", "application/json".parse().unwrap());
 
     let status = response.status_mut();
     *status = StatusCode::BAD_REQUEST;
@@ -199,7 +201,9 @@ pub fn success_response(response_body: String) -> Response<Body> {
     let body = Body::from(response_body);
 
     let mut response = Response::new(body);
-    response.headers_mut().insert("Content-type", "application/json".parse().unwrap());
+    response
+        .headers_mut()
+        .insert("Content-type", "application/json".parse().unwrap());
 
     let status = response.status_mut();
     *status = StatusCode::OK;

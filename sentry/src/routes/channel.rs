@@ -1,5 +1,6 @@
 use self::channel_list::ChannelListQuery;
 use crate::middleware::channel::get_channel;
+use crate::success_response;
 use crate::Application;
 use crate::ResponseError;
 use crate::RouteParams;
@@ -7,12 +8,14 @@ use futures::TryStreamExt;
 use hex::FromHex;
 use hyper::{Body, Request, Response};
 use primitives::adapter::Adapter;
+use primitives::sentry::SuccessResponse;
 use primitives::{Channel, ChannelId};
-use primitives::sentry::{SuccessResponse};
-use slog::{error};
-use crate::success_response;
+use slog::error;
 
-pub async fn create_channel<A: Adapter>(req: Request<Body>, app: &Application<A>) -> Result<Response<Body>, ResponseError> {
+pub async fn create_channel<A: Adapter>(
+    req: Request<Body>,
+    app: &Application<A>,
+) -> Result<Response<Body>, ResponseError> {
     let body = req.into_body().try_concat().await?;
 
     let channel = serde_json::from_slice::<Channel>(&body)?;
@@ -37,15 +40,15 @@ pub async fn create_channel<A: Adapter>(req: Request<Body>, app: &Application<A>
             }
         })
         .await;
-    
+
     if let Err(err) = result {
         error!(&app.logger, "{}", &err; "module" => "create_channel");
-        return Err(ResponseError::BadRequest("err occured; please try again later".into()));
+        return Err(ResponseError::BadRequest(
+            "err occured; please try again later".into(),
+        ));
     }
-    
-    let create_response = SuccessResponse {
-        success: true,
-    };
+
+    let create_response = SuccessResponse { success: true };
 
     Ok(success_response(serde_json::to_string(&create_response)?))
 }
@@ -54,8 +57,7 @@ pub async fn channel_list(req: Request<Body>) -> Result<Response<Body>, Response
     // @TODO: Get from Config
     let _channel_find_limit = 5;
 
-    let query =
-        serde_urlencoded::from_str::<ChannelListQuery>(&req.uri().query().unwrap_or(""))?;
+    let query = serde_urlencoded::from_str::<ChannelListQuery>(&req.uri().query().unwrap_or(""))?;
 
     // @TODO: List all channels returned from the DB
     println!("{:?}", query);
@@ -63,7 +65,10 @@ pub async fn channel_list(req: Request<Body>) -> Result<Response<Body>, Response
     Err(ResponseError::NotFound)
 }
 
-pub async fn last_approved<A: Adapter>(req: Request<Body>, app: &Application<A>) -> Result<Response<Body>, ResponseError> {
+pub async fn last_approved<A: Adapter>(
+    req: Request<Body>,
+    app: &Application<A>,
+) -> Result<Response<Body>, ResponseError> {
     // get request params
     let route_params = req
         .extensions()
@@ -77,7 +82,6 @@ pub async fn last_approved<A: Adapter>(req: Request<Body>, app: &Application<A>)
         .body(serde_json::to_string(&channel)?.into())
         .unwrap())
 }
-
 
 mod channel_list {
     use chrono::{DateTime, Utc};
