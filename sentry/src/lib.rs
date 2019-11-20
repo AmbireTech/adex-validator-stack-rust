@@ -12,8 +12,9 @@ use primitives::Config;
 use redis::aio::MultiplexedConnection;
 use regex::Regex;
 use routes::cfg::config;
-use routes::channel::ChannelController;
+use routes::channel::{create_channel, last_approved};
 use slog::{error, Logger};
+use std::collections::HashMap;
 
 pub mod middleware {
     pub mod auth;
@@ -91,8 +92,6 @@ impl<A: Adapter + 'static> Application<A> {
     }
 
     pub async fn handle_routing(&self, req: Request<Body>) -> Response<Body> {
-        let channel_controller = ChannelController::new(&self);
-
         let headers = match cors(&req) {
             Some(Cors::Simple(headers)) => headers,
             // if we have a Preflight, just return the response directly
@@ -104,24 +103,13 @@ impl<A: Adapter + 'static> Application<A> {
             Ok(req) => req,
             Err(error) => {
                 error!(&self.logger, "{}", &error; "module" => "middleware-auth");
-                return map_response_error(ResponseError::BadRequest(error));
+                return map_response_error(ResponseError::BadRequest("invalid auth".into()));
             }
         };
 
         let mut response = match (req.uri().path(), req.method()) {
             ("/cfg", &Method::GET) => config(req, &self).await,
-            ("/channel", &Method::POST) => {
-                // example with middleware
-                // @TODO remove later
-                let req = match chain(req, vec![config_middleware]).await {
-                    Ok(req) => req,
-                    Err(error) => {
-                        return map_response_error(error);
-                    }
-                };
-
-                channel_controller.channel(req).await
-            }
+            ("/channel", &Method::POST) => create_channel(req, &self).await,
             ("/channel/list", &Method::GET) => Err(ResponseError::NotFound),
             // This is important becuase it prevents us from doing
             // expensive regex matching for routes without /channel
@@ -136,7 +124,17 @@ impl<A: Adapter + 'static> Application<A> {
                         .get(1)
                         .map_or("".to_string(), |m| m.as_str().to_string())]);
                     req.extensions_mut().insert(param);
-                    channel_controller.last_approved(req).await
+
+                    // example with middleware
+                    // @TODO remove later
+                    let req = match chain(req, vec![config_middleware]).await {
+                        Ok(req) => req,
+                        Err(error) => {
+                            return map_response_error(error);
+                        }
+                    };
+
+                    last_approved(req, &self).await
                 } else {
                     Err(ResponseError::NotFound)
                 }
@@ -154,7 +152,7 @@ impl<A: Adapter + 'static> Application<A> {
 #[derive(Debug)]
 pub enum ResponseError {
     NotFound,
-    BadRequest(Box<dyn std::error::Error>),
+    BadRequest(String),
 }
 
 impl<T> From<T> for ResponseError
@@ -162,14 +160,16 @@ where
     T: std::error::Error + 'static,
 {
     fn from(error: T) -> Self {
-        ResponseError::BadRequest(error.into())
+        // @TODO use a error proper logger?
+        println!("{:#?}", error);
+        ResponseError::BadRequest("Bad Request: try again later".into())
     }
 }
 
-fn map_response_error(error: ResponseError) -> Response<Body> {
+pub fn map_response_error(error: ResponseError) -> Response<Body> {
     match error {
         ResponseError::NotFound => not_found(),
-        ResponseError::BadRequest(error) => bad_request(error),
+        ResponseError::BadRequest(e) => bad_response(e),
     }
 }
 
@@ -180,12 +180,34 @@ pub fn not_found() -> Response<Body> {
     response
 }
 
-pub fn bad_request(err: Box<dyn std::error::Error>) -> Response<Body> {
-    println!("{:#?}", err);
-    let body = Body::from("Bad Request: try again later");
+pub fn bad_response(response_body: String) -> Response<Body> {
+    let mut error_response = HashMap::new();
+    error_response.insert("error", response_body);
+
+    let body = Body::from(serde_json::to_string(&error_response).expect("serialise err response"));
+
     let mut response = Response::new(body);
+    response
+        .headers_mut()
+        .insert("Content-type", "application/json".parse().unwrap());
+
     let status = response.status_mut();
     *status = StatusCode::BAD_REQUEST;
+
+    response
+}
+
+pub fn success_response(response_body: String) -> Response<Body> {
+    let body = Body::from(response_body);
+
+    let mut response = Response::new(body);
+    response
+        .headers_mut()
+        .insert("Content-type", "application/json".parse().unwrap());
+
+    let status = response.status_mut();
+    *status = StatusCode::OK;
+
     response
 }
 

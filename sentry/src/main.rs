@@ -100,7 +100,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let logger = logger();
     let redis = redis_connection().await?;
-    // setup migrations before setting up Postgres
+    info!(&logger, "Checking connection and applying migrations...");
+    // Check connection and setup migrations before setting up Postgres
     setup_migrations().await;
     let postgres = postgres_connection().await?;
 

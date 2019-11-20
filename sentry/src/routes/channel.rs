@@ -1,5 +1,6 @@
 use self::channel_list::ChannelListQuery;
 use crate::middleware::channel::get_channel;
+use crate::success_response;
 use crate::Application;
 use crate::ResponseError;
 use crate::RouteParams;
@@ -7,66 +8,79 @@ use futures::TryStreamExt;
 use hex::FromHex;
 use hyper::{Body, Request, Response};
 use primitives::adapter::Adapter;
+use primitives::sentry::SuccessResponse;
 use primitives::{Channel, ChannelId};
+use slog::error;
 
-pub struct ChannelController<'a, A: Adapter> {
-    pub app: &'a Application<A>,
+pub async fn create_channel<A: Adapter>(
+    req: Request<Body>,
+    app: &Application<A>,
+) -> Result<Response<Body>, ResponseError> {
+    let body = req.into_body().try_concat().await?;
+
+    let channel = serde_json::from_slice::<Channel>(&body)?;
+
+    if let Err(e) = app.adapter.validate_channel(&channel) {
+        return Err(ResponseError::BadRequest(e.to_string()));
+    }
+
+    let spec = serde_json::to_string(&channel.spec)?;
+    let result = app.pool
+        .run(move |connection| {
+            async move {
+                match connection.prepare("INSERT INTO channels (channel_id, creator, deposit_asset, deposit_amount, valid_until, spec) values ($1, $2, $3, $4, $5, $6)").await {
+                    Ok(stmt) => match connection.execute(&stmt, &[&channel.id, &channel.creator, &channel.deposit_asset, &channel.deposit_amount, &channel.valid_until, &spec]).await {
+                        Ok(row) => {
+                            Ok((row, connection))
+                        },
+                        Err(e) => Err((e, connection)),
+                    },
+                    Err(e) => Err((e, connection)),
+                }
+            }
+        })
+        .await;
+
+    if let Err(err) = result {
+        error!(&app.logger, "{}", &err; "module" => "create_channel");
+        return Err(ResponseError::BadRequest(
+            "err occured; please try again later".into(),
+        ));
+    }
+
+    let create_response = SuccessResponse { success: true };
+
+    Ok(success_response(serde_json::to_string(&create_response)?))
 }
 
-impl<'a, A: Adapter> ChannelController<'a, A> {
-    pub fn new(app: &'a Application<A>) -> Self {
-        Self { app }
-    }
+pub async fn channel_list(req: Request<Body>) -> Result<Response<Body>, ResponseError> {
+    // @TODO: Get from Config
+    let _channel_find_limit = 5;
 
-    pub async fn channel(&self, req: Request<Body>) -> Result<Response<Body>, ResponseError> {
-        let body = req.into_body().try_concat().await?;
-        let channel = serde_json::from_slice::<Channel>(&body)?;
+    let query = serde_urlencoded::from_str::<ChannelListQuery>(&req.uri().query().unwrap_or(""))?;
 
-        let create_response = channel_create::ChannelCreateResponse {
-            // @TODO get validate_channel response error
-            success: self.app.adapter.validate_channel(&channel).unwrap_or(false),
-        };
-        let body = serde_json::to_string(&create_response)?.into();
+    // @TODO: List all channels returned from the DB
+    println!("{:?}", query);
 
-        Ok(Response::builder().status(200).body(body).unwrap())
-    }
-
-    pub async fn channel_list(&self, req: Request<Body>) -> Result<Response<Body>, ResponseError> {
-        // @TODO: Get from Config
-        let _channel_find_limit = 5;
-
-        let query =
-            serde_urlencoded::from_str::<ChannelListQuery>(&req.uri().query().unwrap_or(""))?;
-
-        // @TODO: List all channels returned from the DB
-        println!("{:?}", query);
-
-        Err(ResponseError::NotFound)
-    }
-
-    pub async fn last_approved(&self, req: Request<Body>) -> Result<Response<Body>, ResponseError> {
-        // get request params
-        let route_params = req
-            .extensions()
-            .get::<RouteParams>()
-            .expect("request should have route params");
-        let channel_id = ChannelId::from_hex(route_params.index(0))?;
-        let channel = get_channel(&self.app.pool, &channel_id).await?.unwrap();
-
-        Ok(Response::builder()
-            .header("Content-type", "application/json")
-            .body(serde_json::to_string(&channel)?.into())
-            .unwrap())
-    }
+    Err(ResponseError::NotFound)
 }
 
-mod channel_create {
-    use serde::Serialize;
+pub async fn last_approved<A: Adapter>(
+    req: Request<Body>,
+    app: &Application<A>,
+) -> Result<Response<Body>, ResponseError> {
+    // get request params
+    let route_params = req
+        .extensions()
+        .get::<RouteParams>()
+        .expect("request should have route params");
+    let channel_id = ChannelId::from_hex(route_params.index(0))?;
+    let channel = get_channel(&app.pool, &channel_id).await?.unwrap();
 
-    #[derive(Serialize)]
-    pub(crate) struct ChannelCreateResponse {
-        pub success: bool,
-    }
+    Ok(Response::builder()
+        .header("Content-type", "application/json")
+        .body(serde_json::to_string(&channel)?.into())
+        .unwrap())
 }
 
 mod channel_list {
