@@ -8,30 +8,46 @@ use hex::FromHex;
 use hyper::{Body, Request, Response};
 use primitives::adapter::Adapter;
 use primitives::{Channel, ChannelId};
-
-
-mod channel_create {
-    use serde::Serialize;
-
-    #[derive(Serialize)]
-    pub(crate) struct ChannelCreateResponse {
-        pub success: bool,
-    }
-}
+use primitives::sentry::{SuccessResponse};
+use slog::{error};
+use crate::success_response;
 
 pub async fn create_channel<A: Adapter>(req: Request<Body>, app: &Application<A>) -> Result<Response<Body>, ResponseError> {
     let body = req.into_body().try_concat().await?;
+
     let channel = serde_json::from_slice::<Channel>(&body)?;
-    // insert into database
 
+    if let Err(e) = app.adapter.validate_channel(&channel) {
+        return Err(ResponseError::BadRequest(e.to_string()));
+    }
 
-    let create_response = channel_create::ChannelCreateResponse {
-        // @TODO get validate_channel response error
-        success: app.adapter.validate_channel(&channel).unwrap_or(false),
+    let spec = serde_json::to_string(&channel.spec)?;
+    let result = app.pool
+        .run(move |connection| {
+            async move {
+                match connection.prepare("INSERT INTO channels (channel_id, creator, deposit_asset, deposit_amount, valid_until, spec) values ($1, $2, $3, $4, $5, $6)").await {
+                    Ok(stmt) => match connection.execute(&stmt, &[&channel.id, &channel.creator, &channel.deposit_asset, &channel.deposit_amount, &channel.valid_until, &spec]).await {
+                        Ok(row) => {
+                            Ok((row, connection))
+                        },
+                        Err(e) => Err((e, connection)),
+                    },
+                    Err(e) => Err((e, connection)),
+                }
+            }
+        })
+        .await;
+    
+    if let Err(err) = result {
+        error!(&app.logger, "{}", &err; "module" => "create_channel");
+        return Err(ResponseError::BadRequest("err occured; please try again later".into()));
+    }
+    
+    let create_response = SuccessResponse {
+        success: true,
     };
-    let body = serde_json::to_string(&create_response)?.into();
 
-    Ok(Response::builder().status(200).body(body).unwrap())
+    Ok(success_response(serde_json::to_string(&create_response)?))
 }
 
 pub async fn channel_list(req: Request<Body>) -> Result<Response<Body>, ResponseError> {

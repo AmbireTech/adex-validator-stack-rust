@@ -14,6 +14,7 @@ use regex::Regex;
 use routes::cfg::config;
 use routes::channel::{create_channel, last_approved};
 use slog::{error, Logger};
+use std::collections::HashMap;
 
 pub mod middleware {
     pub mod auth;
@@ -102,7 +103,7 @@ impl<A: Adapter + 'static> Application<A> {
             Ok(req) => req,
             Err(error) => {
                 error!(&self.logger, "{}", &error; "module" => "middleware-auth");
-                return map_response_error(ResponseError::BadRequest);
+                return map_response_error(ResponseError::BadRequest("invalid auth".into()));
             }
         };
 
@@ -152,7 +153,7 @@ impl<A: Adapter + 'static> Application<A> {
 #[derive(Debug)]
 pub enum ResponseError {
     NotFound,
-    BadRequest,
+    BadRequest(String),
 }
 
 impl<T> From<T> for ResponseError
@@ -162,14 +163,14 @@ where
     fn from(error: T) -> Self {
         // @TODO use a error proper logger?
         println!("{:#?}", error);
-        ResponseError::BadRequest
+        ResponseError::BadRequest("Bad Request: try again later".into())
     }
 }
 
 pub fn map_response_error(error: ResponseError) -> Response<Body> {
     match error {
         ResponseError::NotFound => not_found(),
-        ResponseError::BadRequest => bad_request(),
+        ResponseError::BadRequest(e) => bad_response(e),
     }
 }
 
@@ -180,11 +181,30 @@ pub fn not_found() -> Response<Body> {
     response
 }
 
-pub fn bad_request() -> Response<Body> {
-    let body = Body::from("Bad Request: try again later");
+pub fn bad_response(response_body: String) -> Response<Body> {
+    let mut error_response = HashMap::new();
+    error_response.insert("error", response_body);
+
+    let body = Body::from(serde_json::to_string(&error_response).expect("serialise err response"));
+
     let mut response = Response::new(body);
+    response.headers_mut().insert("Content-type", "application/json".parse().unwrap());
+
     let status = response.status_mut();
     *status = StatusCode::BAD_REQUEST;
+
+    response
+}
+
+pub fn success_response(response_body: String) -> Response<Body> {
+    let body = Body::from(response_body);
+
+    let mut response = Response::new(body);
+    response.headers_mut().insert("Content-type", "application/json".parse().unwrap());
+
+    let status = response.status_mut();
+    *status = StatusCode::OK;
+
     response
 }
 
