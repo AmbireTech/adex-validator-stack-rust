@@ -12,7 +12,7 @@ use primitives::Config;
 use redis::aio::MultiplexedConnection;
 use regex::Regex;
 use routes::cfg::config;
-use routes::channel::ChannelController;
+use routes::channel::{create_channel, last_approved};
 use slog::{error, Logger};
 
 pub mod middleware {
@@ -91,8 +91,6 @@ impl<A: Adapter + 'static> Application<A> {
     }
 
     pub async fn handle_routing(&self, req: Request<Body>) -> Response<Body> {
-        let channel_controller = ChannelController::new(&self);
-
         let headers = match cors(&req) {
             Some(Cors::Simple(headers)) => headers,
             // if we have a Preflight, just return the response directly
@@ -104,7 +102,7 @@ impl<A: Adapter + 'static> Application<A> {
             Ok(req) => req,
             Err(error) => {
                 error!(&self.logger, "{}", &error; "module" => "middleware-auth");
-                return map_response_error(ResponseError::BadRequest(error));
+                return map_response_error(ResponseError::BadRequest);
             }
         };
 
@@ -119,8 +117,7 @@ impl<A: Adapter + 'static> Application<A> {
                         return map_response_error(error);
                     }
                 };
-
-                channel_controller.channel(req).await
+                create_channel(req, &self).await
             }
             ("/channel/list", &Method::GET) => Err(ResponseError::NotFound),
             // This is important becuase it prevents us from doing
@@ -136,7 +133,8 @@ impl<A: Adapter + 'static> Application<A> {
                         .get(1)
                         .map_or("".to_string(), |m| m.as_str().to_string())]);
                     req.extensions_mut().insert(param);
-                    channel_controller.last_approved(req).await
+
+                    last_approved(req, &self).await
                 } else {
                     Err(ResponseError::NotFound)
                 }
@@ -154,7 +152,7 @@ impl<A: Adapter + 'static> Application<A> {
 #[derive(Debug)]
 pub enum ResponseError {
     NotFound,
-    BadRequest(Box<dyn std::error::Error>),
+    BadRequest,
 }
 
 impl<T> From<T> for ResponseError
@@ -162,14 +160,16 @@ where
     T: std::error::Error + 'static,
 {
     fn from(error: T) -> Self {
-        ResponseError::BadRequest(error.into())
+        // @TODO use a error proper logger?
+        println!("{:#?}", error);
+        ResponseError::BadRequest
     }
 }
 
-fn map_response_error(error: ResponseError) -> Response<Body> {
+pub fn map_response_error(error: ResponseError) -> Response<Body> {
     match error {
         ResponseError::NotFound => not_found(),
-        ResponseError::BadRequest(error) => bad_request(error),
+        ResponseError::BadRequest => bad_request(),
     }
 }
 
@@ -180,8 +180,7 @@ pub fn not_found() -> Response<Body> {
     response
 }
 
-pub fn bad_request(err: Box<dyn std::error::Error>) -> Response<Body> {
-    println!("{:#?}", err);
+pub fn bad_request() -> Response<Body> {
     let body = Body::from("Bad Request: try again later");
     let mut response = Response::new(body);
     let status = response.status_mut();

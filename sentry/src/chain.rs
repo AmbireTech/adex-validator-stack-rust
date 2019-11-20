@@ -12,10 +12,22 @@ pub async fn chain<M, MF>(
     middlewares: Vec<M>,
 ) -> Result<Request<Body>, ResponseError>
 where
-    MF: Future<Output = Result<Request<Body>, ResponseError>>,
+    MF: Future<Output = Result<Request<Body>, ResponseError>> + Send,
     M: FnMut(Request<Body>) -> MF,
 {
-    middlewares
-        .into_iter()
-        .try_fold(req, |req, mut mw| futures::executor::block_on(mw(req)))
+    let mut req = Ok(req);
+
+    for mut mw in middlewares.into_iter() {
+        match mw(req.unwrap()).await {
+            Ok(r) => {
+                req = Ok(r);
+            }
+            Err(e) => {
+                req = Err(e);
+                break;
+            }
+        }
+    }
+
+    req
 }
