@@ -219,6 +219,19 @@ pub mod postgres {
         }
     }
 
+    impl From<&Row> for Channel {
+        fn from(row: &Row) -> Self {
+            Self {
+                id: row.get("channel_id"),
+                creator: row.get("creator"),
+                deposit_asset: row.get("deposit_asset"),
+                deposit_amount: row.get("deposit_amount"),
+                valid_until: row.get("valid_until"),
+                spec: row.get::<_, Json<ChannelSpec>>("spec").0,
+            }
+        }
+    }
+
     impl ToSql for ChannelId {
         fn to_sql(
             &self,
@@ -242,19 +255,6 @@ pub mod postgres {
             let string = format!("0x{}", hex::encode(self));
 
             <String as ToSql>::to_sql_checked(&string, ty, out)
-        }
-    }
-
-    impl From<&Row> for Channel {
-        fn from(row: &Row) -> Self {
-            Self {
-                id: row.get("channel_id"),
-                creator: row.get("creator"),
-                deposit_asset: row.get("deposit_asset"),
-                deposit_amount: row.get("deposit_amount"),
-                valid_until: row.get("valid_until"),
-                spec: row.get::<_, Json<ChannelSpec>>("spec").0,
-            }
         }
     }
 }
