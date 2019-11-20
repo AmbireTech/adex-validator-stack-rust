@@ -85,6 +85,7 @@ pub async fn setup_migrations() {
         // set `swallow_completion` to `true`
         // so no error will be returned if all migrations have already been ran
         .swallow_completion(true)
+        .show_output(true)
         .direction(Direction::Up)
         .all(true)
         .apply()
