@@ -1,15 +1,22 @@
 use crate::db::DbPool;
-use crate::ResponseError;
+use crate::{ResponseError, Application, RouteParams};
 use bb8::RunError;
 use hyper::{Body, Request};
 use primitives::{Channel, ChannelId};
+use hex::FromHex;
+use primitives::adapter::Adapter;
 
-pub async fn channel_load(
+pub async fn channel_load<A: Adapter>(
     mut req: Request<Body>,
-    (pool, id): (&DbPool, &ChannelId),
+    app: &Application<A>,
 ) -> Result<Request<Body>, ResponseError> {
-    let channel = get_channel(pool, id)
-        .await?
+    let id = req.extensions().get::<RouteParams>()
+        .ok_or(ResponseError::BadRequest("Route params not found".to_string()))?
+        .get(0)
+        .ok_or(ResponseError::BadRequest("No id".to_string()))?;
+
+    let channel_id = ChannelId::from_hex(id).map_err(|_| ResponseError::BadRequest("Wrong Channel Id".to_string()))?;
+    let channel = get_channel(&app.pool, &channel_id).await?
         .ok_or(ResponseError::NotFound)?;
 
     req.extensions_mut().insert(channel);

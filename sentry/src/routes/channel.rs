@@ -1,5 +1,5 @@
 use self::channel_list::ChannelListQuery;
-use crate::middleware::channel::get_channel;
+use crate::db::get_channel_by_id;
 use crate::success_response;
 use crate::Application;
 use crate::ResponseError;
@@ -11,6 +11,29 @@ use primitives::adapter::Adapter;
 use primitives::sentry::SuccessResponse;
 use primitives::{Channel, ChannelId};
 use slog::error;
+
+pub async fn channel_status<A: Adapter>(
+    req: Request<Body>,
+    _: &Application<A>,
+) -> Result<Response<Body>, ResponseError> {
+    use serde::Serialize;
+    #[derive(Serialize)]
+    struct ChannelStatusResponse<'a> {
+        channel: &'a Channel,
+    }
+
+    // get request params
+    let channel = req
+        .extensions()
+        .get::<Channel>()
+        .expect("Request should have Channel");
+
+    let response = ChannelStatusResponse {
+        channel: channel,
+    };
+
+    Ok(success_response(serde_json::to_string(&response)?))
+}
 
 pub async fn create_channel<A: Adapter>(
     req: Request<Body>,
@@ -75,7 +98,7 @@ pub async fn last_approved<A: Adapter>(
         .get::<RouteParams>()
         .expect("request should have route params");
     let channel_id = ChannelId::from_hex(route_params.index(0))?;
-    let channel = get_channel(&app.pool, &channel_id).await?.unwrap();
+    let channel = get_channel_by_id(&app.pool, &channel_id).await?.unwrap();
 
     Ok(Response::builder()
         .header("Content-type", "application/json")
