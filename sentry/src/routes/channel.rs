@@ -28,9 +28,7 @@ pub async fn channel_status<A: Adapter>(
         .get::<Channel>()
         .expect("Request should have Channel");
 
-    let response = ChannelStatusResponse {
-        channel: channel,
-    };
+    let response = ChannelStatusResponse { channel };
 
     Ok(success_response(serde_json::to_string(&response)?))
 }

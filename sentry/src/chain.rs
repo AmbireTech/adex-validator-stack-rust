@@ -1,7 +1,7 @@
-use crate::{ResponseError, Application};
+use crate::{Application, ResponseError};
 use hyper::{Body, Request};
-use std::future::Future;
 use primitives::adapter::Adapter;
+use std::future::Future;
 
 // chain middleware function calls
 //

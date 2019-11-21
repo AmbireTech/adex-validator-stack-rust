@@ -4,6 +4,7 @@
 use crate::chain::chain;
 use crate::db::DbPool;
 use crate::middleware::auth;
+use crate::middleware::channel::channel_load;
 use crate::middleware::cors::{cors, Cors};
 use crate::routes::channel::channel_status;
 use hyper::{Body, Method, Request, Response, StatusCode};
@@ -16,7 +17,6 @@ use routes::cfg::config;
 use routes::channel::{create_channel, last_approved};
 use slog::{error, Logger};
 use std::collections::HashMap;
-use crate::middleware::channel::channel_load;
 
 pub mod middleware {
     pub mod auth;
@@ -42,7 +42,10 @@ lazy_static! {
     // @TODO define other regex routes
 }
 
-async fn config_middleware<A: Adapter>(req: Request<Body>, _: &Application<A>) -> Result<Request<Body>, ResponseError> {
+async fn config_middleware<A: Adapter>(
+    req: Request<Body>,
+    _: &Application<A>,
+) -> Result<Request<Body>, ResponseError> {
     Ok(req)
 }
 
@@ -123,7 +126,7 @@ impl<A: Adapter + 'static> Application<A> {
 
                     // example with middleware
                     // @TODO remove later
-                    let req = match chain(req, &self,vec![config_middleware]).await {
+                    let req = match chain(req, &self, vec![config_middleware]).await {
                         Ok(req) => req,
                         Err(error) => {
                             return map_response_error(error);
@@ -139,7 +142,7 @@ impl<A: Adapter + 'static> Application<A> {
                         .map_or("".to_string(), |m| m.as_str().to_string())]);
                     req.extensions_mut().insert(param);
 
-                    let req = match chain(req, &self,vec![channel_load]).await {
+                    let req = match chain(req, &self, vec![channel_load]).await {
                         Ok(req) => req,
                         Err(error) => {
                             return map_response_error(error);
