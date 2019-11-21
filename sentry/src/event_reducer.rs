@@ -65,7 +65,7 @@ mod test {
         let channel = channel;
 
         let mut event_aggr = EventAggregate {
-            channel_id: channel.id.clone(),
+            channel_id: channel.id,
             created: Utc::now(),
             events: Default::default(),
         };
