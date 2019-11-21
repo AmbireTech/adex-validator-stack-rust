@@ -222,7 +222,7 @@ pub mod postgres {
     impl From<&Row> for Channel {
         fn from(row: &Row) -> Self {
             Self {
-                id: row.get("channel_id"),
+                id: row.get("id"),
                 creator: row.get("creator"),
                 deposit_asset: row.get("deposit_asset"),
                 deposit_amount: row.get("deposit_amount"),

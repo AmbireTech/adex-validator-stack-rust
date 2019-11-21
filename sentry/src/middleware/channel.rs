@@ -25,7 +25,7 @@ pub async fn get_channel(
     pool
         .run(move |connection| {
             async move {
-                match connection.prepare("SELECT channel_id, creator, deposit_asset, deposit_amount, valid_until, spec FROM channels WHERE channel_id = $1 LIMIT 1").await {
+                match connection.prepare("SELECT id, creator, deposit_asset, deposit_amount, valid_until, spec FROM channels WHERE id = $1 LIMIT 1").await {
                     Ok(select) => match connection.query(&select, &[&id]).await {
                         Ok(results) => Ok(( results.get(0).map(Channel::from) , connection)),
                         Err(e) => Err((e, connection)),
