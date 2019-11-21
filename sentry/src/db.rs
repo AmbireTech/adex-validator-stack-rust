@@ -7,6 +7,9 @@ use std::env;
 
 use lazy_static::lazy_static;
 
+mod channel;
+pub use self::channel::*;
+
 pub type DbPool = Pool<PostgresConnectionManager<NoTls>>;
 
 lazy_static! {

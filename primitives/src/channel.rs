@@ -204,6 +204,19 @@ pub mod postgres {
     use std::error::Error;
     use tokio_postgres::{types::Json, Row};
 
+    impl From<&Row> for Channel {
+        fn from(row: &Row) -> Self {
+            Self {
+                id: row.get("id"),
+                creator: row.get("creator"),
+                deposit_asset: row.get("deposit_asset"),
+                deposit_amount: row.get("deposit_amount"),
+                valid_until: row.get("valid_until"),
+                spec: row.get::<_, Json<ChannelSpec>>("spec").0,
+            }
+        }
+    }
+
     impl<'a> FromSql<'a> for ChannelId {
         fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
             let str_slice = <&str as FromSql>::from_sql(ty, raw)?;
@@ -215,19 +228,6 @@ pub mod postgres {
             match *ty {
                 Type::TEXT | Type::VARCHAR => true,
                 _ => false,
-            }
-        }
-    }
-
-    impl From<&Row> for Channel {
-        fn from(row: &Row) -> Self {
-            Self {
-                id: row.get("id"),
-                creator: row.get("creator"),
-                deposit_asset: row.get("deposit_asset"),
-                deposit_amount: row.get("deposit_amount"),
-                valid_until: row.get("valid_until"),
-                spec: row.get::<_, Json<ChannelSpec>>("spec").0,
             }
         }
     }
