@@ -1,11 +1,12 @@
-use crate::db::DbPool;
+use crate::db::{get_channel_by_id, get_channel_by_id_and_validator};
 use crate::{Application, ResponseError, RouteParams};
-use bb8::RunError;
 use hex::FromHex;
 use hyper::{Body, Request};
 use primitives::adapter::Adapter;
-use primitives::{Channel, ChannelId};
+use primitives::{ChannelId, ValidatorId};
+use std::convert::TryFrom;
 
+/// channel_load & channel_if_exist
 pub async fn channel_load<A: Adapter>(
     mut req: Request<Body>,
     app: &Application<A>,
@@ -19,7 +20,7 @@ pub async fn channel_load<A: Adapter>(
 
     let channel_id = ChannelId::from_hex(id)
         .map_err(|_| ResponseError::BadRequest("Wrong Channel Id".to_string()))?;
-    let channel = get_channel(&app.pool, &channel_id)
+    let channel = get_channel_by_id(&app.pool, &channel_id)
         .await?
         .ok_or_else(|| ResponseError::NotFound)?;
 
@@ -28,22 +29,33 @@ pub async fn channel_load<A: Adapter>(
     Ok(req)
 }
 
-// @TODO: Maybe move this to more generic place?
-pub async fn get_channel(
-    pool: &DbPool,
-    id: &ChannelId,
-) -> Result<Option<Channel>, RunError<bb8_postgres::tokio_postgres::Error>> {
-    pool
-        .run(move |connection| {
-            async move {
-                match connection.prepare("SELECT id, creator, deposit_asset, deposit_amount, valid_until, spec FROM channels WHERE id = $1 LIMIT 1").await {
-                    Ok(select) => match connection.query(&select, &[&id]).await {
-                        Ok(results) => Ok(( results.get(0).map(Channel::from) , connection)),
-                        Err(e) => Err((e, connection)),
-                    },
-                    Err(e) => Err((e, connection)),
-                }
-            }
-        })
-        .await
+pub async fn channel_if_active<A: Adapter>(
+    mut req: Request<Body>,
+    app: &Application<A>,
+) -> Result<Request<Body>, ResponseError> {
+    let route_params = req
+        .extensions()
+        .get::<RouteParams>()
+        .ok_or_else(|| ResponseError::BadRequest("Route params not found".to_string()))?;
+
+    let id = route_params
+        .get(0)
+        .ok_or_else(|| ResponseError::BadRequest("No id".to_string()))?;
+
+    let channel_id = ChannelId::from_hex(id)
+        .map_err(|_| ResponseError::BadRequest("Wrong Channel Id".to_string()))?;
+
+    let validator_id = route_params
+        .get(1)
+        .ok_or_else(|| ResponseError::BadRequest("No Validator Id".to_string()))?;
+    let validator_id = ValidatorId::try_from(&validator_id)
+        .map_err(|_| ResponseError::BadRequest("Wrong Validator Id".to_string()))?;
+
+    let channel = get_channel_by_id_and_validator(&app.pool, &channel_id, &validator_id)
+        .await?
+        .ok_or_else(|| ResponseError::NotFound)?;
+
+    req.extensions_mut().insert(channel);
+
+    Ok(req)
 }

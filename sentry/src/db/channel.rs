@@ -25,12 +25,12 @@ pub async fn get_channel_by_id(
 pub async fn get_channel_by_id_and_validator(
     pool: &DbPool,
     id: &ChannelId,
-    validator: &ValidatorId,
+    validator_id: &ValidatorId,
 ) -> Result<Option<Channel>, RunError<bb8_postgres::tokio_postgres::Error>> {
     pool
         .run(move |connection| {
             async move {
-                let validator = serde_json::Value::from_str(&format!(r#"[{{"id": "{}"}}]"#, validator)).expect("Not a valid json");
+                let validator = serde_json::Value::from_str(&format!(r#"[{{"id": "{}"}}]"#, validator_id)).expect("Not a valid json");
                 let query = "SELECT id, creator, deposit_asset, deposit_amount, valid_until, spec FROM channels WHERE id = $1 AND spec->'validators' @> $2 LIMIT 1";
                 match connection.prepare(query).await {
                     Ok(select) => {
