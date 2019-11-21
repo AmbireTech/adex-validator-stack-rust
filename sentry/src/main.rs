@@ -107,15 +107,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match adapter {
         AdapterTypes::EthereumAdapter(adapter) => {
-            run(Application::new(
-                *adapter, config, logger, redis, postgres, clustered, port,
-            ))
+            run(
+                Application::new(*adapter, config, logger, redis, postgres),
+                clustered,
+                port,
+            )
             .await
         }
         AdapterTypes::DummyAdapter(adapter) => {
-            run(Application::new(
-                *adapter, config, logger, redis, postgres, clustered, port,
-            ))
+            run(
+                Application::new(*adapter, config, logger, redis, postgres),
+                clustered,
+                port,
+            )
             .await
         }
     };
@@ -124,10 +128,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Starts the `hyper` `Server`.
-async fn run<A: Adapter + 'static>(app: Application<A>) {
-    let addr = ([127, 0, 0, 1], app.port).into();
+async fn run<A: Adapter + 'static>(app: Application<A>, _clustered: bool, port: u16) {
+    let addr = ([127, 0, 0, 1], port).into();
     let logger = app.logger.clone();
-    info!(&logger, "Listening on port {}!", app.port);
+    info!(&logger, "Listening on port {}!", port);
 
     let make_service = make_service_fn(move |_| {
         let server = app.clone();
