@@ -208,7 +208,7 @@ pub mod postgres {
         fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
             let str_slice = <&str as FromSql>::from_sql(ty, raw)?;
 
-            Ok(ChannelId::from_hex(str_slice)?)
+            Ok(ChannelId::from_hex(&str_slice[2..])?)
         }
 
         fn accepts(ty: &Type) -> bool {
