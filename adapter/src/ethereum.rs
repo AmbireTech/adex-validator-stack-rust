@@ -123,7 +123,7 @@ impl Adapter for EthereumAdapter {
 
     fn validate_channel(&self, channel: &Channel) -> AdapterResult<bool> {
         // check if channel is valid
-        if let Err(e) = EthereumAdapter::is_channel_valid(&self.config, channel) {
+        if let Err(e) = EthereumAdapter::is_channel_valid(&self.config, self.whoami(), channel) {
             return Err(AdapterError::InvalidChannel(e.to_string()));
         }
 

@@ -5,12 +5,12 @@ use chrono::Utc;
 use std::convert::TryFrom;
 
 pub trait ChannelValidator {
-    fn is_channel_valid(config: &Config, channel: &Channel) -> Result<(), ChannelError> {
-        let identity = &config.clone().identity.unwrap_or_else(|| "".to_string());
-        let validator_identity = ValidatorId::try_from(identity).map_err(|_| {
-            ChannelError::InvalidArgument("Failed to deserialize identity".to_string())
-        })?;
-        let adapter_channel_validator = match channel.spec.validators.find(&validator_identity) {
+    fn is_channel_valid(
+        config: &Config,
+        validator_identity: &ValidatorId,
+        channel: &Channel,
+    ) -> Result<(), ChannelError> {
+        let adapter_channel_validator = match channel.spec.validators.find(validator_identity) {
             // check if the channel validators include our adapter identity
             SpecValidator::None => return Err(ChannelError::AdapterNotIncluded),
             SpecValidator::Leader(validator) | SpecValidator::Follower(validator) => validator,
