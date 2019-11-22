@@ -1,5 +1,5 @@
 use crate::event_submission::RateLimit;
-use crate::BigNum;
+use crate::{BigNum, ValidatorId};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -38,7 +38,7 @@ pub struct Config {
     pub token_address_whitelist: Vec<String>,
     pub ethereum_core_address: String,
     pub ethereum_network: String,
-    pub validators_whitelist: Vec<String>,
+    pub validators_whitelist: Vec<ValidatorId>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
