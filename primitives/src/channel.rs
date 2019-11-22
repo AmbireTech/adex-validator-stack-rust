@@ -200,9 +200,9 @@ pub mod postgres {
     use super::{Channel, ChannelSpec};
     use bytes::BytesMut;
     use hex::FromHex;
-    use postgres_types::{FromSql, IsNull, ToSql, Type};
+    use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
     use std::error::Error;
-    use tokio_postgres::{types::Json, Row};
+    use tokio_postgres::Row;
 
     impl From<&Row> for Channel {
         fn from(row: &Row) -> Self {
@@ -224,12 +224,7 @@ pub mod postgres {
             Ok(ChannelId::from_hex(&str_slice[2..])?)
         }
 
-        fn accepts(ty: &Type) -> bool {
-            match *ty {
-                Type::TEXT | Type::VARCHAR => true,
-                _ => false,
-            }
-        }
+        accepts!(TEXT, VARCHAR);
     }
 
     impl ToSql for ChannelId {
@@ -247,14 +242,19 @@ pub mod postgres {
             <String as ToSql>::accepts(ty)
         }
 
-        fn to_sql_checked(
+        to_sql_checked!();
+    }
+
+    impl ToSql for ChannelSpec {
+        fn to_sql(
             &self,
             ty: &Type,
-            out: &mut BytesMut,
+            w: &mut BytesMut,
         ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-            let string = format!("0x{}", hex::encode(self));
-
-            <String as ToSql>::to_sql_checked(&string, ty, out)
+            Json(self).to_sql(ty, w)
         }
+
+        accepts!(JSONB);
+        to_sql_checked!();
     }
 }
