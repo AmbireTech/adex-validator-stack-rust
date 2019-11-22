@@ -2,7 +2,6 @@ use crate::channel::{Channel, ChannelError, SpecValidator, SpecValidators};
 use crate::config::Config;
 use crate::ValidatorId;
 use chrono::Utc;
-use std::convert::TryFrom;
 
 pub trait ChannelValidator {
     fn is_channel_valid(
