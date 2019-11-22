@@ -4,7 +4,9 @@
 use crate::chain::chain;
 use crate::db::DbPool;
 use crate::middleware::auth;
+use crate::middleware::channel::channel_load;
 use crate::middleware::cors::{cors, Cors};
+use crate::routes::channel::channel_status;
 use hyper::{Body, Method, Request, Response, StatusCode};
 use lazy_static::lazy_static;
 use primitives::adapter::Adapter;
@@ -40,7 +42,10 @@ lazy_static! {
     // @TODO define other regex routes
 }
 
-async fn config_middleware(req: Request<Body>) -> Result<Request<Body>, ResponseError> {
+async fn config_middleware<A: Adapter>(
+    req: Request<Body>,
+    _: &Application<A>,
+) -> Result<Request<Body>, ResponseError> {
     Ok(req)
 }
 
@@ -121,7 +126,7 @@ impl<A: Adapter + 'static> Application<A> {
 
                     // example with middleware
                     // @TODO remove later
-                    let req = match chain(req, vec![config_middleware]).await {
+                    let req = match chain(req, &self, vec![config_middleware]).await {
                         Ok(req) => req,
                         Err(error) => {
                             return map_response_error(error);
@@ -129,6 +134,22 @@ impl<A: Adapter + 'static> Application<A> {
                     };
 
                     last_approved(req, &self).await
+                } else if let (Some(caps), &Method::GET) =
+                    (CHANNEL_STATUS_BY_CHANNEL_ID.captures(route), method)
+                {
+                    let param = RouteParams(vec![caps
+                        .get(1)
+                        .map_or("".to_string(), |m| m.as_str().to_string())]);
+                    req.extensions_mut().insert(param);
+
+                    let req = match chain(req, &self, vec![channel_load]).await {
+                        Ok(req) => req,
+                        Err(error) => {
+                            return map_response_error(error);
+                        }
+                    };
+
+                    channel_status(req, &self).await
                 } else {
                     Err(ResponseError::NotFound)
                 }

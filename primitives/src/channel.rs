@@ -40,7 +40,7 @@ impl FromHex for ChannelId {
     type Error = FromHexError;
 
     fn from_hex<T: AsRef<[u8]>>(hex: T) -> Result<Self, Self::Error> {
-        let array = hex::FromHex::from_hex(hex.as_ref())?;
+        let array = hex::FromHex::from_hex(hex)?;
 
         Ok(Self(array))
     }
@@ -200,24 +200,9 @@ pub mod postgres {
     use super::{Channel, ChannelSpec};
     use bytes::BytesMut;
     use hex::FromHex;
-    use postgres_types::{FromSql, IsNull, ToSql, Type};
+    use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
     use std::error::Error;
-    use tokio_postgres::{types::Json, Row};
-
-    impl<'a> FromSql<'a> for ChannelId {
-        fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
-            let str_slice = <&str as FromSql>::from_sql(ty, raw)?;
-
-            Ok(ChannelId::from_hex(&str_slice[2..])?)
-        }
-
-        fn accepts(ty: &Type) -> bool {
-            match *ty {
-                Type::TEXT | Type::VARCHAR => true,
-                _ => false,
-            }
-        }
-    }
+    use tokio_postgres::Row;
 
     impl From<&Row> for Channel {
         fn from(row: &Row) -> Self {
@@ -230,6 +215,16 @@ pub mod postgres {
                 spec: row.get::<_, Json<ChannelSpec>>("spec").0,
             }
         }
+    }
+
+    impl<'a> FromSql<'a> for ChannelId {
+        fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+            let str_slice = <&str as FromSql>::from_sql(ty, raw)?;
+
+            Ok(ChannelId::from_hex(&str_slice[2..])?)
+        }
+
+        accepts!(TEXT, VARCHAR);
     }
 
     impl ToSql for ChannelId {
@@ -247,14 +242,19 @@ pub mod postgres {
             <String as ToSql>::accepts(ty)
         }
 
-        fn to_sql_checked(
+        to_sql_checked!();
+    }
+
+    impl ToSql for ChannelSpec {
+        fn to_sql(
             &self,
             ty: &Type,
-            out: &mut BytesMut,
+            w: &mut BytesMut,
         ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-            let string = format!("0x{}", hex::encode(self));
-
-            <String as ToSql>::to_sql_checked(&string, ty, out)
+            Json(self).to_sql(ty, w)
         }
+
+        accepts!(JSONB);
+        to_sql_checked!();
     }
 }

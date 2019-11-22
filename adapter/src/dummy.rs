@@ -64,7 +64,7 @@ impl Adapter for DummyAdapter {
     }
 
     fn validate_channel(&self, channel: &Channel) -> AdapterResult<bool> {
-        match DummyAdapter::is_channel_valid(&self.config, channel) {
+        match DummyAdapter::is_channel_valid(&self.config, self.whoami(), channel) {
             Ok(_) => Ok(true),
             Err(e) => Err(AdapterError::InvalidChannel(e.to_string())),
         }

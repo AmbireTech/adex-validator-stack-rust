@@ -1,5 +1,5 @@
 use self::channel_list::ChannelListQuery;
-use crate::middleware::channel::get_channel;
+use crate::db::{get_channel_by_id, insert_channel};
 use crate::success_response;
 use crate::Application;
 use crate::ResponseError;
@@ -11,6 +11,26 @@ use primitives::adapter::Adapter;
 use primitives::sentry::SuccessResponse;
 use primitives::{Channel, ChannelId};
 use slog::error;
+
+pub async fn channel_status<A: Adapter>(
+    req: Request<Body>,
+    _: &Application<A>,
+) -> Result<Response<Body>, ResponseError> {
+    use serde::Serialize;
+    #[derive(Serialize)]
+    struct ChannelStatusResponse<'a> {
+        channel: &'a Channel,
+    }
+
+    let channel = req
+        .extensions()
+        .get::<Channel>()
+        .expect("Request should have Channel");
+
+    let response = ChannelStatusResponse { channel };
+
+    Ok(success_response(serde_json::to_string(&response)?))
+}
 
 pub async fn create_channel<A: Adapter>(
     req: Request<Body>,
@@ -24,29 +44,18 @@ pub async fn create_channel<A: Adapter>(
         return Err(ResponseError::BadRequest(e.to_string()));
     }
 
-    let spec = serde_json::to_string(&channel.spec)?;
-    let result = app.pool
-        .run(move |connection| {
-            async move {
-                match connection.prepare("INSERT INTO channels (channel_id, creator, deposit_asset, deposit_amount, valid_until, spec) values ($1, $2, $3, $4, $5, $6)").await {
-                    Ok(stmt) => match connection.execute(&stmt, &[&channel.id, &channel.creator, &channel.deposit_asset, &channel.deposit_amount, &channel.valid_until, &spec]).await {
-                        Ok(row) => {
-                            Ok((row, connection))
-                        },
-                        Err(e) => Err((e, connection)),
-                    },
-                    Err(e) => Err((e, connection)),
-                }
-            }
-        })
-        .await;
-
-    if let Err(err) = result {
-        error!(&app.logger, "{}", &err; "module" => "create_channel");
-        return Err(ResponseError::BadRequest(
-            "err occured; please try again later".into(),
-        ));
-    }
+    match insert_channel(&app.pool, &channel).await {
+        Err(err) => {
+            error!(&app.logger, "{}", &err; "module" => "create_channel");
+            Err(ResponseError::BadRequest(
+                "err occurred; please try again later".into(),
+            ))
+        }
+        Ok(false) => Err(ResponseError::BadRequest(
+            "err occurred; please try again later".into(),
+        )),
+        _ => Ok(()),
+    }?;
 
     let create_response = SuccessResponse { success: true };
 
@@ -75,7 +84,7 @@ pub async fn last_approved<A: Adapter>(
         .get::<RouteParams>()
         .expect("request should have route params");
     let channel_id = ChannelId::from_hex(route_params.index(0))?;
-    let channel = get_channel(&app.pool, &channel_id).await?.unwrap();
+    let channel = get_channel_by_id(&app.pool, &channel_id).await?.unwrap();
 
     Ok(Response::builder()
         .header("Content-type", "application/json")
