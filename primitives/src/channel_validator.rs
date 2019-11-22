@@ -44,14 +44,13 @@ pub trait ChannelValidator {
     }
 }
 
-pub fn all_validators_listed(validators: &SpecValidators, whitelist: &[String]) -> bool {
+pub fn all_validators_listed(validators: &SpecValidators, whitelist: &[ValidatorId]) -> bool {
     if whitelist.is_empty() {
         true
     } else {
         let found_validators = whitelist
             .iter()
-            .filter_map(|identity| ValidatorId::try_from(identity).ok())
-            .filter(|allowed| {
+            .filter(|&allowed| {
                 allowed == &validators.leader().id || allowed == &validators.follower().id
             })
             // this will ensure that if we find the 2 validators earlier
