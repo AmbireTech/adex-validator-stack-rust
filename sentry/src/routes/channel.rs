@@ -50,11 +50,11 @@ pub async fn create_channel<A: Adapter>(
             Err(ResponseError::BadRequest(
                 "err occurred; please try again later".into(),
             ))
-        },
+        }
         Ok(false) => Err(ResponseError::BadRequest(
             "err occurred; please try again later".into(),
         )),
-        _ => Ok(())
+        _ => Ok(()),
     }?;
 
     let create_response = SuccessResponse { success: true };

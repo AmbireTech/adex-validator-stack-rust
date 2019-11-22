@@ -46,7 +46,10 @@ pub async fn get_channel_by_id_and_validator(
         .await
 }
 
-pub async fn insert_channel(pool: &DbPool, channel: &Channel) -> Result<bool, RunError<bb8_postgres::tokio_postgres::Error>> {
+pub async fn insert_channel(
+    pool: &DbPool,
+    channel: &Channel,
+) -> Result<bool, RunError<bb8_postgres::tokio_postgres::Error>> {
     pool
         .run(move |connection| {
             async move {
