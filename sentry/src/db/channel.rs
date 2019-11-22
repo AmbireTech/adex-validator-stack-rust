@@ -45,3 +45,22 @@ pub async fn get_channel_by_id_and_validator(
         })
         .await
 }
+
+pub async fn insert_channel(pool: &DbPool, channel: &Channel) -> Result<bool, RunError<bb8_postgres::tokio_postgres::Error>> {
+    pool
+        .run(move |connection| {
+            async move {
+                match connection.prepare("INSERT INTO channels (id, creator, deposit_asset, deposit_amount, valid_until, spec) values ($1, $2, $3, $4, $5, $6)").await {
+                    Ok(stmt) => match connection.execute(&stmt, &[&channel.id, &channel.creator, &channel.deposit_asset, &channel.deposit_amount, &channel.valid_until, &channel.spec]).await {
+                        Ok(row) => {
+                            let inserted = row == 1;
+                            Ok((inserted, connection))
+                        },
+                        Err(e) => Err((e, connection)),
+                    },
+                    Err(e) => Err((e, connection)),
+                }
+            }
+        })
+        .await
+}
