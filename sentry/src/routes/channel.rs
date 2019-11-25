@@ -1,5 +1,6 @@
 use self::channel_list::ChannelListQuery;
-use crate::db::{get_channel_by_id, insert_channel};
+use crate::db::{get_channel_by_id, insert_channel, list_channels, list_channels_total_pages};
+use crate::routes::channel::channel_list::ChannelListResponse;
 use crate::success_response;
 use crate::Application;
 use crate::ResponseError;
@@ -62,16 +63,39 @@ pub async fn create_channel<A: Adapter>(
     Ok(success_response(serde_json::to_string(&create_response)?))
 }
 
-pub async fn channel_list(req: Request<Body>) -> Result<Response<Body>, ResponseError> {
-    // @TODO: Get from Config
-    let _channel_find_limit = 5;
-
+pub async fn channel_list<A: Adapter>(
+    req: Request<Body>,
+    app: &Application<A>,
+) -> Result<Response<Body>, ResponseError> {
     let query = serde_urlencoded::from_str::<ChannelListQuery>(&req.uri().query().unwrap_or(""))?;
+    let skip = query
+        .page
+        .checked_mul(app.config.channels_find_limit.into())
+        .ok_or_else(|| ResponseError::BadRequest("Page and/or limit is too large".into()))?;
 
-    // @TODO: List all channels returned from the DB
-    println!("{:?}", query);
+    let channels = list_channels(
+        &app.pool,
+        skip,
+        app.config.channels_find_limit,
+        &query.creator,
+        &query.validator,
+        &query.valid_until_ge,
+    )
+    .await?;
+    let total_pages = list_channels_total_pages(
+        &app.pool,
+        &query.creator,
+        &query.validator,
+        &query.valid_until_ge,
+    )
+    .await?;
 
-    Err(ResponseError::NotFound)
+    let list_response = ChannelListResponse {
+        channels,
+        total_pages,
+    };
+
+    Ok(success_response(serde_json::to_string(&list_response)?))
 }
 
 pub async fn last_approved<A: Adapter>(
@@ -94,39 +118,29 @@ pub async fn last_approved<A: Adapter>(
 
 mod channel_list {
     use chrono::{DateTime, Utc};
-    use serde::{Deserialize, Deserializer};
+    use primitives::{Channel, ValidatorId};
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Debug, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub(super) struct ChannelListResponse {
+        pub channels: Vec<Channel>,
+        pub total_pages: u64,
+    }
 
     #[derive(Debug, Deserialize)]
-    pub(crate) struct ChannelListQuery {
-        /// page to show, should be >= 1
+    pub(super) struct ChannelListQuery {
         #[serde(default = "default_page")]
         pub page: u64,
-        /// channels limit per page, should be >= 1
-        #[serde(default = "default_limit")]
-        pub limit: u32,
         /// filters the list on `valid_until >= valid_until_ge`
         #[serde(default = "Utc::now")]
         pub valid_until_ge: DateTime<Utc>,
+        pub creator: Option<String>,
         /// filters the channels containing a specific validator if provided
-        #[serde(default, deserialize_with = "deserialize_validator")]
-        pub validator: Option<String>,
-    }
-
-    /// Deserialize the `Option<String>`, but if the `String` is empty it will return `None`
-    fn deserialize_validator<'de, D>(de: D) -> Result<Option<String>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let value: String = Deserialize::deserialize(de)?;
-        let option = Some(value).filter(|string| !string.is_empty());
-        Ok(option)
-    }
-
-    fn default_limit() -> u32 {
-        1
+        pub validator: Option<ValidatorId>,
     }
 
     fn default_page() -> u64 {
-        1
+        0
     }
 }
