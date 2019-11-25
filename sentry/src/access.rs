@@ -12,7 +12,7 @@ use crate::Session;
 pub enum Error {
     OnlyCreatorCanCloseChannel,
     ChannelIsExpired,
-    ChannelIsPastWithdrawPeriod,
+    ChannelIsInWithdrawPeriod,
     RulesError(String),
 }
 
@@ -28,21 +28,27 @@ pub async fn check_access(
         Event::Close => true,
         _ => false,
     };
+    let current_time = Utc::now();
+    let is_in_withdraw_period = current_time > channel.spec.withdraw_period_start;
 
-    // Check basic access rules
-    // only the creator can send a CLOSE
+    // We're only sending a CLOSE
+    // That's allowed for the creator normally, and for everyone during the withdraw period
+    if events.iter().all(is_close_event) && (session.uid == channel.creator || is_in_withdraw_period) {
+        return Ok(());
+    }
+
+    // Only the creator can send a CLOSE
     if session.uid != channel.creator && events.iter().any(is_close_event) {
         return Err(Error::OnlyCreatorCanCloseChannel);
     }
 
-    let current_time = Utc::now();
 
     if current_time > channel.valid_until {
         return Err(Error::ChannelIsExpired);
     }
 
-    if current_time > channel.spec.withdraw_period_start && !events.iter().all(is_close_event) {
-        return Err(Error::ChannelIsPastWithdrawPeriod);
+    if is_in_withdraw_period {
+        return Err(Error::ChannelIsInWithdrawPeriod);
     }
 
     let default_rules = [
