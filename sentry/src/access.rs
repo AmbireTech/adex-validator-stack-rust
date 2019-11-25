@@ -31,6 +31,10 @@ pub async fn check_access(
     let current_time = Utc::now();
     let is_in_withdraw_period = current_time > channel.spec.withdraw_period_start;
 
+    if current_time > channel.valid_until {
+        return Err(Error::ChannelIsExpired);
+    }
+
     // We're only sending a CLOSE
     // That's allowed for the creator normally, and for everyone during the withdraw period
     if events.iter().all(is_close_event)
@@ -42,10 +46,6 @@ pub async fn check_access(
     // Only the creator can send a CLOSE
     if session.uid != channel.creator && events.iter().any(is_close_event) {
         return Err(Error::OnlyCreatorCanCloseChannel);
-    }
-
-    if current_time > channel.valid_until {
-        return Err(Error::ChannelIsExpired);
     }
 
     if is_in_withdraw_period {
