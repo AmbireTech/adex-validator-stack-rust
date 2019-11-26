@@ -1,5 +1,5 @@
 use crate::validator::{ApproveState, Heartbeat, MessageTypes, NewState};
-use crate::{BigNum, Channel, ChannelId};
+use crate::{BigNum, Channel, ChannelId, ValidatorId};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -96,7 +96,7 @@ pub struct SuccessResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ValidatorMessage {
-    pub from: String,
+    pub from: ValidatorId,
     pub received: DateTime<Utc>,
     pub msg: MessageTypes,
 }
