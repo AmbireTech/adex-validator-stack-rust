@@ -1,13 +1,17 @@
 use crate::db::DbPool;
 use bb8::RunError;
-use bb8_postgres::tokio_postgres::types::{accepts, FromSql, ToSql, Type};
+use bb8_postgres::tokio_postgres::{
+    types::{accepts, FromSql, Json, ToSql, Type},
+    Row,
+};
 use chrono::{DateTime, Utc};
 use primitives::{Channel, ChannelId, ValidatorId};
+use serde::Deserialize;
 use std::error::Error;
 use std::str::FromStr;
 
-struct TotalPages(pub u64);
-impl<'a> FromSql<'a> for TotalPages {
+struct TotalCount(pub u64);
+impl<'a> FromSql<'a> for TotalCount {
     fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
         let str_slice = <&str as FromSql>::from_sql(ty, raw)?;
 
@@ -83,6 +87,24 @@ pub async fn insert_channel(
         .await
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ListChannels {
+    pub total_count: u64,
+    pub channels: Vec<Channel>,
+}
+
+impl From<&Row> for ListChannels {
+    fn from(row: &Row) -> Self {
+        let total_count = row.get::<_, TotalCount>(0).0;
+        let channels = row.get::<_, Json<Vec<Channel>>>(1).0;
+
+        Self {
+            channels,
+            total_count,
+        }
+    }
+}
+
 pub async fn list_channels(
     pool: &DbPool,
     skip: u64,
@@ -90,19 +112,20 @@ pub async fn list_channels(
     creator: &Option<String>,
     validator: &Option<ValidatorId>,
     valid_until_ge: &DateTime<Utc>,
-) -> Result<Vec<Channel>, RunError<bb8_postgres::tokio_postgres::Error>> {
+) -> Result<ListChannels, RunError<bb8_postgres::tokio_postgres::Error>> {
     let validator = validator.as_ref().map(|validator_id| {
         serde_json::Value::from_str(&format!(r#"[{{"id": "{}"}}]"#, validator_id))
             .expect("Not a valid json")
     });
     let (where_clauses, params) =
         channel_list_query_params(creator, validator.as_ref(), valid_until_ge);
+    let total_count_params = (where_clauses.clone(), params.clone());
 
-    pool
+    let channels = pool
         .run(move |connection| {
             async move {
                 // To understand why we use Order by, see Postgres Documentation: https://www.postgresql.org/docs/8.1/queries-limit.html
-                let statement = format!("SELECT id, creator, deposit_asset, deposit_amount, valid_until, spec FROM channels WHERE {} ORDER BY id DESC LIMIT {} OFFSET {}", where_clauses.join(" AND "), limit, skip);
+                let statement = format!("SELECT id, creator, deposit_asset, deposit_amount, valid_until, spec FROM channels WHERE {} ORDER BY spec->>'created' DESC LIMIT {} OFFSET {}", where_clauses.join(" AND "), limit, skip);
                 match connection.prepare(&statement).await {
                     Ok(stmt) => {
                         match connection.query(&stmt, params.as_slice()).await {
@@ -118,22 +141,22 @@ pub async fn list_channels(
                 }
             }
         })
-        .await
+        .await?;
+
+    Ok(ListChannels {
+        total_count: list_channels_total_count(
+            &pool,
+            (&total_count_params.0, total_count_params.1),
+        )
+        .await?,
+        channels,
+    })
 }
 
-pub async fn list_channels_total_pages(
+async fn list_channels_total_count<'a>(
     pool: &DbPool,
-    creator: &Option<String>,
-    validator: &Option<ValidatorId>,
-    valid_until_ge: &DateTime<Utc>,
+    (where_clauses, params): (&'a [String], Vec<&'a (dyn ToSql + Sync)>),
 ) -> Result<u64, RunError<bb8_postgres::tokio_postgres::Error>> {
-    let validator = validator.as_ref().map(|validator_id| {
-        serde_json::Value::from_str(&format!(r#"[{{"id": "{}"}}]"#, validator_id))
-            .expect("Not a valid json")
-    });
-    let (where_clauses, params) =
-        channel_list_query_params(creator, validator.as_ref(), valid_until_ge);
-
     pool.run(move |connection| {
         async move {
             let statement = format!(
@@ -142,7 +165,7 @@ pub async fn list_channels_total_pages(
             );
             match connection.prepare(&statement).await {
                 Ok(stmt) => match connection.query_one(&stmt, params.as_slice()).await {
-                    Ok(row) => Ok((row.get::<_, TotalPages>(0).0, connection)),
+                    Ok(row) => Ok((row.get::<_, TotalCount>(0).0, connection)),
                     Err(e) => Err((e, connection)),
                 },
                 Err(e) => Err((e, connection)),

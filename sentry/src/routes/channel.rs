@@ -1,5 +1,5 @@
 use self::channel_list::ChannelListQuery;
-use crate::db::{get_channel_by_id, insert_channel, list_channels, list_channels_total_pages};
+use crate::db::{get_channel_by_id, insert_channel, list_channels};
 use crate::routes::channel::channel_list::ChannelListResponse;
 use crate::success_response;
 use crate::Application;
@@ -73,7 +73,7 @@ pub async fn channel_list<A: Adapter>(
         .checked_mul(app.config.channels_find_limit.into())
         .ok_or_else(|| ResponseError::BadRequest("Page and/or limit is too large".into()))?;
 
-    let channels = list_channels(
+    let list_channels = list_channels(
         &app.pool,
         skip,
         app.config.channels_find_limit,
@@ -82,16 +82,16 @@ pub async fn channel_list<A: Adapter>(
         &query.valid_until_ge,
     )
     .await?;
-    let total_pages = list_channels_total_pages(
-        &app.pool,
-        &query.creator,
-        &query.validator,
-        &query.valid_until_ge,
-    )
-    .await?;
+
+    // fast ceil for total_pages
+    let total_pages = if list_channels.total_count == 0 {
+        1
+    } else {
+        1 + ((list_channels.total_count - 1) / app.config.channels_find_limit as u64)
+    };
 
     let list_response = ChannelListResponse {
-        channels,
+        channels: list_channels.channels,
         total_pages,
     };
 
