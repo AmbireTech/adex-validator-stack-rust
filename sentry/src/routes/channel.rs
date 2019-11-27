@@ -117,6 +117,7 @@ pub async fn last_approved<A: Adapter>(
 }
 
 mod channel_list {
+    use chrono::serde::ts_seconds::deserialize as ts_seconds;
     use chrono::{DateTime, Utc};
     use primitives::{Channel, ValidatorId};
     use serde::{Deserialize, Serialize};
@@ -133,7 +134,12 @@ mod channel_list {
         #[serde(default = "default_page")]
         pub page: u64,
         /// filters the list on `valid_until >= valid_until_ge`
-        #[serde(default = "Utc::now")]
+        /// It should be the same timestamp format as the `Channel.valid_until`: **seconds**
+        #[serde(
+            deserialize_with = "ts_seconds",
+            default = "Utc::now",
+            rename = "validUntil"
+        )]
         pub valid_until_ge: DateTime<Utc>,
         pub creator: Option<String>,
         /// filters the channels containing a specific validator if provided
