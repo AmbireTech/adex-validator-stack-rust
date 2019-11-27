@@ -1,26 +1,9 @@
 use crate::db::DbPool;
 use bb8::RunError;
-use bb8_postgres::tokio_postgres::{
-    types::{accepts, FromSql, Json, ToSql, Type},
-    Row,
-};
-use chrono::{DateTime, Utc};
 use primitives::{Channel, ChannelId, ValidatorId};
-use serde::Deserialize;
-use std::error::Error;
 use std::str::FromStr;
 
-struct TotalCount(pub u64);
-impl<'a> FromSql<'a> for TotalCount {
-    fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
-        let str_slice = <&str as FromSql>::from_sql(ty, raw)?;
-
-        Ok(Self(u64::from_str(str_slice)?))
-    }
-
-    // Use a varchar or text, since otherwise `int8` fails deserialization
-    accepts!(VARCHAR, TEXT);
-}
+pub use list_channels::{list_channels, ListChannels};
 
 pub async fn get_channel_by_id(
     pool: &DbPool,
@@ -87,111 +70,121 @@ pub async fn insert_channel(
         .await
 }
 
-#[derive(Debug, Deserialize)]
-pub struct ListChannels {
-    pub total_count: u64,
-    pub channels: Vec<Channel>,
-}
+mod list_channels {
+    use crate::db::DbPool;
+    use bb8::RunError;
+    use bb8_postgres::tokio_postgres::types::{accepts, FromSql, ToSql, Type};
+    use chrono::{DateTime, Utc};
+    use primitives::{Channel, ValidatorId};
+    use std::error::Error;
+    use std::str::FromStr;
 
-impl From<&Row> for ListChannels {
-    fn from(row: &Row) -> Self {
-        let total_count = row.get::<_, TotalCount>(0).0;
-        let channels = row.get::<_, Json<Vec<Channel>>>(1).0;
+    struct TotalCount(pub u64);
+    impl<'a> FromSql<'a> for TotalCount {
+        fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+            let str_slice = <&str as FromSql>::from_sql(ty, raw)?;
 
-        Self {
-            channels,
-            total_count,
+            Ok(Self(u64::from_str(str_slice)?))
         }
+
+        // Use a varchar or text, since otherwise `int8` fails deserialization
+        accepts!(VARCHAR, TEXT);
     }
-}
 
-pub async fn list_channels(
-    pool: &DbPool,
-    skip: u64,
-    limit: u32,
-    creator: &Option<String>,
-    validator: &Option<ValidatorId>,
-    valid_until_ge: &DateTime<Utc>,
-) -> Result<ListChannels, RunError<bb8_postgres::tokio_postgres::Error>> {
-    let validator = validator.as_ref().map(|validator_id| {
-        serde_json::Value::from_str(&format!(r#"[{{"id": "{}"}}]"#, validator_id))
-            .expect("Not a valid json")
-    });
-    let (where_clauses, params) =
-        channel_list_query_params(creator, validator.as_ref(), valid_until_ge);
-    let total_count_params = (where_clauses.clone(), params.clone());
+    #[derive(Debug)]
+    pub struct ListChannels {
+        pub total_count: u64,
+        pub channels: Vec<Channel>,
+    }
 
-    let channels = pool
-        .run(move |connection| {
+    pub async fn list_channels(
+        pool: &DbPool,
+        skip: u64,
+        limit: u32,
+        creator: &Option<String>,
+        validator: &Option<ValidatorId>,
+        valid_until_ge: &DateTime<Utc>,
+    ) -> Result<ListChannels, RunError<bb8_postgres::tokio_postgres::Error>> {
+        let validator = validator.as_ref().map(|validator_id| {
+            serde_json::Value::from_str(&format!(r#"[{{"id": "{}"}}]"#, validator_id))
+                .expect("Not a valid json")
+        });
+        let (where_clauses, params) =
+            channel_list_query_params(creator, validator.as_ref(), valid_until_ge);
+        let total_count_params = (where_clauses.clone(), params.clone());
+
+        let channels = pool
+            .run(move |connection| {
+                async move {
+                    // To understand why we use Order by, see Postgres Documentation: https://www.postgresql.org/docs/8.1/queries-limit.html
+                    let statement = format!("SELECT id, creator, deposit_asset, deposit_amount, valid_until, spec FROM channels WHERE {} ORDER BY spec->>'created' DESC LIMIT {} OFFSET {}", where_clauses.join(" AND "), limit, skip);
+                    match connection.prepare(&statement).await {
+                        Ok(stmt) => {
+                            match connection.query(&stmt, params.as_slice()).await {
+                                Ok(rows) => {
+                                    let channels = rows.iter().map(Channel::from).collect();
+
+                                    Ok((channels, connection))
+                                },
+                                Err(e) => Err((e, connection)),
+                            }
+                        },
+                        Err(e) => Err((e, connection)),
+                    }
+                }
+            })
+            .await?;
+
+        Ok(ListChannels {
+            total_count: list_channels_total_count(
+                &pool,
+                (&total_count_params.0, total_count_params.1),
+            )
+            .await?,
+            channels,
+        })
+    }
+
+    async fn list_channels_total_count<'a>(
+        pool: &DbPool,
+        (where_clauses, params): (&'a [String], Vec<&'a (dyn ToSql + Sync)>),
+    ) -> Result<u64, RunError<bb8_postgres::tokio_postgres::Error>> {
+        pool.run(move |connection| {
             async move {
-                // To understand why we use Order by, see Postgres Documentation: https://www.postgresql.org/docs/8.1/queries-limit.html
-                let statement = format!("SELECT id, creator, deposit_asset, deposit_amount, valid_until, spec FROM channels WHERE {} ORDER BY spec->>'created' DESC LIMIT {} OFFSET {}", where_clauses.join(" AND "), limit, skip);
+                let statement = format!(
+                    "SELECT COUNT(id)::varchar FROM channels WHERE {}",
+                    where_clauses.join(" AND ")
+                );
                 match connection.prepare(&statement).await {
-                    Ok(stmt) => {
-                        match connection.query(&stmt, params.as_slice()).await {
-                            Ok(rows) => {
-                                let channels = rows.iter().map(Channel::from).collect();
-
-                                Ok((channels, connection))
-                            },
-                            Err(e) => Err((e, connection)),
-                        }
+                    Ok(stmt) => match connection.query_one(&stmt, params.as_slice()).await {
+                        Ok(row) => Ok((row.get::<_, TotalCount>(0).0, connection)),
+                        Err(e) => Err((e, connection)),
                     },
                     Err(e) => Err((e, connection)),
                 }
             }
         })
-        .await?;
+        .await
+    }
 
-    Ok(ListChannels {
-        total_count: list_channels_total_count(
-            &pool,
-            (&total_count_params.0, total_count_params.1),
-        )
-        .await?,
-        channels,
-    })
-}
+    fn channel_list_query_params<'a>(
+        creator: &'a Option<String>,
+        validator: Option<&'a serde_json::Value>,
+        valid_until_ge: &'a DateTime<Utc>,
+    ) -> (Vec<String>, Vec<&'a (dyn ToSql + Sync)>) {
+        let mut where_clauses = vec!["valid_until >= $1".to_string()];
+        let mut params: Vec<&(dyn ToSql + Sync)> = vec![valid_until_ge];
 
-async fn list_channels_total_count<'a>(
-    pool: &DbPool,
-    (where_clauses, params): (&'a [String], Vec<&'a (dyn ToSql + Sync)>),
-) -> Result<u64, RunError<bb8_postgres::tokio_postgres::Error>> {
-    pool.run(move |connection| {
-        async move {
-            let statement = format!(
-                "SELECT COUNT(id)::varchar FROM channels WHERE {}",
-                where_clauses.join(" AND ")
-            );
-            match connection.prepare(&statement).await {
-                Ok(stmt) => match connection.query_one(&stmt, params.as_slice()).await {
-                    Ok(row) => Ok((row.get::<_, TotalCount>(0).0, connection)),
-                    Err(e) => Err((e, connection)),
-                },
-                Err(e) => Err((e, connection)),
-            }
+        if let Some(creator) = creator {
+            where_clauses.push(format!("creator = ${}", params.len() + 1));
+            params.push(creator);
         }
-    })
-    .await
-}
 
-fn channel_list_query_params<'a>(
-    creator: &'a Option<String>,
-    validator: Option<&'a serde_json::Value>,
-    valid_until_ge: &'a DateTime<Utc>,
-) -> (Vec<String>, Vec<&'a (dyn ToSql + Sync)>) {
-    let mut where_clauses = vec!["valid_until >= $1".to_string()];
-    let mut params: Vec<&(dyn ToSql + Sync)> = vec![valid_until_ge];
+        if let Some(validator) = validator {
+            where_clauses.push(format!("spec->'validators' @> ${}", params.len() + 1));
+            params.push(validator);
+        }
 
-    if let Some(creator) = creator {
-        where_clauses.push(format!("creator = ${}", params.len() + 1));
-        params.push(creator);
+        (where_clauses, params)
     }
-
-    if let Some(validator) = validator {
-        where_clauses.push(format!("spec->'validators' @> ${}", params.len() + 1));
-        params.push(validator);
-    }
-
-    (where_clauses, params)
 }
