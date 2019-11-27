@@ -1,13 +1,12 @@
 use std::error::Error;
 use std::fmt;
 
-use chrono::serde::{ts_milliseconds, ts_seconds};
+use chrono::serde::{ts_milliseconds, ts_milliseconds_option, ts_seconds};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 
 use crate::big_num::BigNum;
-use crate::util::serde::ts_milliseconds_option;
 use crate::{AdUnit, EventSubmission, TargetingTag, ValidatorDesc, ValidatorId};
 use hex::{FromHex, FromHexError};
 use std::ops::Deref;

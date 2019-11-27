@@ -22,7 +22,6 @@ pub mod util {
     }
 
     pub mod logging;
-    pub mod serde;
 }
 pub mod validator;
 
