@@ -6,7 +6,7 @@ use futures_legacy::Future as LegacyFuture;
 use primitives::adapter::Adapter;
 use primitives::channel::SpecValidator;
 use primitives::sentry::{
-    ChannelAllResponse, EventAggregateResponse, LastApprovedResponse, SuccessResponse,
+    ChannelListResponse, EventAggregateResponse, LastApprovedResponse, SuccessResponse,
     ValidatorMessageResponse,
 };
 use primitives::validator::MessageTypes;
@@ -230,7 +230,7 @@ pub async fn all_channels(
     if first_page.total_pages < 2 {
         Ok(first_page.channels)
     } else {
-        let mut all: Vec<ChannelAllResponse> = try_join_all(
+        let mut all: Vec<ChannelListResponse> = try_join_all(
             (1..first_page.total_pages).map(|i| fetch_page(url.clone(), i, whoami.clone())),
         )
         .await?;
@@ -248,7 +248,7 @@ async fn fetch_page(
     sentry_url: String,
     page: u64,
     validator: String,
-) -> Result<ChannelAllResponse, reqwest::Error> {
+) -> Result<ChannelListResponse, reqwest::Error> {
     let client = Client::new();
 
     let mut query = vec![format!("page={}", page)];
@@ -257,7 +257,7 @@ async fn fetch_page(
     let future = client
         .get(format!("{}/channel/list?{}", sentry_url, query.join("&")).as_str())
         .send()
-        .and_then(|mut res: Response| res.json::<ChannelAllResponse>());
+        .and_then(|mut res: Response| res.json::<ChannelListResponse>());
 
     future.compat().await
 }

@@ -1,6 +1,5 @@
 use self::channel_list::ChannelListQuery;
 use crate::db::{get_channel_by_id, insert_channel, list_channels};
-use crate::routes::channel::channel_list::ChannelListResponse;
 use crate::success_response;
 use crate::Application;
 use crate::ResponseError;
@@ -9,7 +8,7 @@ use futures::TryStreamExt;
 use hex::FromHex;
 use hyper::{Body, Request, Response};
 use primitives::adapter::Adapter;
-use primitives::sentry::SuccessResponse;
+use primitives::sentry::{ChannelListResponse, SuccessResponse};
 use primitives::{Channel, ChannelId};
 use slog::error;
 
@@ -119,15 +118,8 @@ pub async fn last_approved<A: Adapter>(
 mod channel_list {
     use chrono::serde::ts_seconds::deserialize as ts_seconds;
     use chrono::{DateTime, Utc};
-    use primitives::{Channel, ValidatorId};
-    use serde::{Deserialize, Serialize};
-
-    #[derive(Debug, Serialize)]
-    #[serde(rename_all = "camelCase")]
-    pub(super) struct ChannelListResponse {
-        pub channels: Vec<Channel>,
-        pub total_pages: u64,
-    }
+    use primitives::ValidatorId;
+    use serde::Deserialize;
 
     #[derive(Debug, Deserialize)]
     pub(super) struct ChannelListQuery {
