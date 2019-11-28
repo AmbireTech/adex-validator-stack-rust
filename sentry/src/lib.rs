@@ -29,6 +29,7 @@ pub mod routes {
     pub mod cfg;
     pub mod channel;
     pub mod validator_message;
+    pub mod analytics;
 }
 
 pub mod access;
