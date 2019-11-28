@@ -15,7 +15,7 @@ use primitives::Config;
 use redis::aio::MultiplexedConnection;
 use regex::Regex;
 use routes::cfg::config;
-use routes::channel::{create_channel, last_approved};
+use routes::channel::{channel_list, create_channel, last_approved};
 use slog::{error, Logger};
 use std::collections::HashMap;
 
@@ -114,7 +114,7 @@ impl<A: Adapter + 'static> Application<A> {
         let mut response = match (path.as_ref(), req.method()) {
             ("/cfg", &Method::GET) => config(req, &self).await,
             ("/channel", &Method::POST) => create_channel(req, &self).await,
-            ("/channel/list", &Method::GET) => Err(ResponseError::NotFound),
+            ("/channel/list", &Method::GET) => channel_list(req, &self).await,
             // This is important becuase it prevents us from doing
             // expensive regex matching for routes without /channel
             (path, method) if path.starts_with("/channel") => {

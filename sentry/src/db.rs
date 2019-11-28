@@ -81,7 +81,7 @@ pub async fn setup_migrations() {
 
     // Define Migrations
     config
-        .use_migrations(&[make_migration!("20190806011140_initial_tables")])
+        .use_migrations(&[make_migration!("20190806011140_initial-tables")])
         .expect("Loading migrations failed");
 
     // Reload config, ping the database for applied migrations

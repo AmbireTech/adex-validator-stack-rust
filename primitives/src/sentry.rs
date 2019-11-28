@@ -75,9 +75,9 @@ pub struct AggregateEvents {
     pub event_payouts: HashMap<String, BigNum>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ChannelAllResponse {
+pub struct ChannelListResponse {
     pub channels: Vec<Channel>,
     pub total_pages: u64,
 }
