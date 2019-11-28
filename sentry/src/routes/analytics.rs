@@ -61,32 +61,37 @@ pub async fn publisher_analytics<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>,
 ) ->  Result<Response<Body>, ResponseError>  {
-    process_analytics(req, app, false, false).await
+    process_analytics(req, app, false, false, false, 0).await
 }
 
 pub async fn analytics<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError>   {
-    process_analytics(req, app, false, true).await
+    let request_uri = req.uri().to_string();
+    if let Ok(response) = app.pool.redis::cmd("EXISTS")
+        .arg(&request_uri)
+        .query_async::<_, String>(&mut redis.clone())
+        .await 
+    {
+        Ok(success_response(response))
+    } else {
+        process_analytics(req, app, false, true, true, 300).await
+    }
 }
 
 pub async fn advertiser_analytics<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>
 ) ->  Result<Response<Body>, ResponseError> {
-    process_analytics(req, app, true, true).await
+    process_analytics(req, app, true, true, false, 0).await
 }
 
-// select SUM((events->'IMPRESSION'->'eventCounts'->>'test1')::numeric) as value, extract(year from created) as time from event_aggregates where channel_id = 'p' AND created > TO_TIMESTAMP('2017-03-30 9:30:20','YYYY-MM-DD HH:MI:SS') AND events->'IMPRESSION'->'eventCounts'->'test1' IS NOT NULL GROUP BY time;
-// select SUM(value::numeric) as value, extract(year from created) as time from event_aggregates, jsonb_each_text(events->'IMPRESSION'->'eventCounts') where channel_id = 'p' AND created > TO_TIMESTAMP('2017-03-30 9:30:20','YYYY-MM-DD HH:MI:SS') AND events->'IMPRESSION'->'eventCounts' IS NOT NULL GROUP BY time;
-
-
-pub async fn process_analytics<A: Adapter>(req: Request<Body>,  app: &Application<A>, advertiser_channels: bool, skip_publisher: bool ) -> Result<Response<Body>, ResponseError>  {
+pub async fn process_analytics<A: Adapter>(req: Request<Body>,  app: &Application<A>, advertiser_channels: bool, skip_publisher: bool, should_cache: bool, cache_timeframe: i32 ) -> Result<Response<Body>, ResponseError>  {
     let query = serde_urlencoded::from_str::<AnalyticsQuery>(&req.uri().query().unwrap_or(""))?;
     let applied_limit = cmp::min(query.limit, 200);
     let (interval, period) = get_time_frame(&query.timeframe);
-    let time_limit = Utc::now().timestamp() as u64 - period;
+    let time_limit = Utc::now().timestamp() - period;
     let sess = req.extensions().get::<Session>();
 
     let mut where_clauses = vec![format!("created > to_timestamp({})", time_limit)];
@@ -108,11 +113,11 @@ pub async fn process_analytics<A: Adapter>(req: Request<Body>,  app: &Applicatio
 
     let select_query = match (skip_publisher, sess) {
         (false, Some(session)) => {
-            where_clauses.push(format!("events->{}->{}->{} IS NOT NULL", query.event_type, query.metric, session.uid));
+            where_clauses.push(format!("events->'{}'->'{}'->'{}' IS NOT NULL", query.event_type, query.metric, session.uid));
             format!("select SUM((events->'{}'->'{}'->>'{}')::numeric) as value, extract({} from created) as time from event_aggregates", query.event_type, query.metric, session.uid, interval)
         }
         _ => {
-            where_clauses.push(format!("events->{}->{} IS NOT NULL", query.event_type, query.metric));
+            where_clauses.push(format!("events->'{}'->'{}' IS NOT NULL", query.event_type, query.metric));
             format!("select SUM(value::numeric)::varchar as value, extract({} from created) as time from event_aggregates, jsonb_each_text(events->'{}'->'{}')", interval, query.event_type, query.metric)
         }
     };
@@ -120,6 +125,7 @@ pub async fn process_analytics<A: Adapter>(req: Request<Body>,  app: &Applicatio
     let sql_query = format!("{} WHERE {} GROUP BY time LIMIT {}", select_query, where_clauses.join(" AND "), applied_limit);
 
     // log the query here
+    println!("{}", sql_query);
 
     // execute query
     let result = app.pool
@@ -138,11 +144,30 @@ pub async fn process_analytics<A: Adapter>(req: Request<Body>,  app: &Applicatio
             }
         }).await?;
     
-    Ok(success_response(serde_json::to_string(&result)?))
+    let response = serde_json::to_string(&result)?;
+
+    if should_cache {
+        let key = req.uri().to_string();
+        app.redis::cmd("SETEX")
+                .arg(&key)
+                .arg(cache_timeframe)
+                .arg(response)
+                .query_async::<_, ()>(&mut redis.clone())
+                .await
+                .map_err(|error| format!("{}", error))
+
+    }
+    
+    // Ok(success_response(response))
+    Ok(success_response("hello".to_string()))
+}
+
+async fn cache_response() {
+
 }
 
 
-fn get_time_frame(timeframe: &str) -> (String, u64) {
+fn get_time_frame(timeframe: &str) -> (String, i64) {
     let minute = 60 * 1000;
     let hour = 60 * minute;
     let day = 24 * hour;
@@ -150,7 +175,7 @@ fn get_time_frame(timeframe: &str) -> (String, u64) {
     match timeframe {
         "year"  =>  ("month".into(), 365 * day),
         "month" =>  ("day".into(), 30 * day),
-        "week"  =>  ("".into(), 7 * day),
+        "week"  =>  ("week".into(), 7 * day),
         "day"   =>  ("hour".into(), day),
         "hour"  =>  ("minute".into(), hour),
         _       =>  ("hour".into(), day),

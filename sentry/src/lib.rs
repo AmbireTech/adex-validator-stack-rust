@@ -16,6 +16,7 @@ use redis::aio::MultiplexedConnection;
 use regex::Regex;
 use routes::cfg::config;
 use routes::channel::{channel_list, create_channel, last_approved};
+use routes::analytics::{publisher_analytics, analytics, advertiser_analytics};
 use slog::{error, Logger};
 use std::collections::HashMap;
 
@@ -45,6 +46,9 @@ lazy_static! {
     // Only the initial Regex to be matched.
     static ref CHANNEL_VALIDATOR_MESSAGES: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/validator-messages(/.*)?$").expect("The regex should be valid");
     // @TODO define other regex routes
+    static ref ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
+    static ref PUBLISHER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-publisher/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
+
 }
 
 async fn config_middleware<A: Adapter>(
@@ -53,6 +57,19 @@ async fn config_middleware<A: Adapter>(
 ) -> Result<Request<Body>, ResponseError> {
     Ok(req)
 }
+
+async fn auth_required_middleware<A: Adapter>(
+    req: Request<Body>,
+    _: &Application<A>
+) -> Result<Request<Body>, ResponseError> {
+    if req.extensions().get::<Session>().is_some() {
+        Ok(req)
+    } else {
+        Err(ResponseError::BadRequest("auth required".to_string()))
+    }
+}
+
+
 
 #[derive(Debug)]
 pub struct RouteParams(Vec<String>);
@@ -116,6 +133,13 @@ impl<A: Adapter + 'static> Application<A> {
             ("/cfg", &Method::GET) => config(req, &self).await,
             ("/channel", &Method::POST) => create_channel(req, &self).await,
             ("/channel/list", &Method::GET) => channel_list(req, &self).await,
+
+            ("/analytics", &Method::GET) => analytics(req, &self).await,
+            ("/analytics/for-advertiser", &Method::GET) => {
+                advertiser_analytics(req, &self).await
+            },
+            ("/analytics/for-publisher", &Method::GET) => publisher_analytics(req, &self).await,
+            (route, _) if route.starts_with("/analytics") => analytics_router(req, &self).await,
             // This is important becuase it prevents us from doing
             // expensive regex matching for routes without /channel
             (path, method) if path.starts_with("/channel") => {
@@ -192,6 +216,35 @@ impl<A: Adapter + 'static> Application<A> {
         // extend the headers with the initial headers we have from CORS (if there are some)
         response.headers_mut().extend(headers);
         response
+    }
+}
+
+async fn analytics_router<A: Adapter>(mut req: Request<Body>, app: &Application<A>) -> Result<Response<Body>, ResponseError> {
+    let (route, method) = (req.uri().path(), req.method());
+    
+    match *method {
+        Method::GET => {
+            if let Some(caps) = ANALYTICS_BY_CHANNEL_ID.captures(route) {
+                let param = RouteParams(vec![caps.get(1)
+                    .map_or("".to_string(), |m| m.as_str().to_string())]);
+                req.extensions_mut().insert(param);
+
+                // let req = chain(req, app, vec![channel_load]).await?;
+
+                analytics(req, app).await
+            } else if let Some(caps) = PUBLISHER_ANALYTICS_BY_CHANNEL_ID.captures(route) {
+                let param = RouteParams(vec![caps.get(1)
+                    .map_or("".to_string(), |m| m.as_str().to_string())]);
+                req.extensions_mut().insert(param);
+
+                let req = chain(req, app, vec![auth_required_middleware]).await?;
+
+                publisher_analytics(req, app).await
+            } else {
+                Err(ResponseError::NotFound)
+            }
+        },
+        _ => Err(ResponseError::NotFound)
     }
 }
 
