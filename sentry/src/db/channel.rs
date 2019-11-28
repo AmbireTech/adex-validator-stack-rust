@@ -3,7 +3,7 @@ use bb8::RunError;
 use primitives::{Channel, ChannelId, ValidatorId};
 use std::str::FromStr;
 
-pub use list_channels::{list_channels, ListChannels};
+pub use list_channels::list_channels;
 
 pub async fn get_channel_by_id(
     pool: &DbPool,
@@ -75,6 +75,7 @@ mod list_channels {
     use bb8::RunError;
     use bb8_postgres::tokio_postgres::types::{accepts, FromSql, ToSql, Type};
     use chrono::{DateTime, Utc};
+    use primitives::sentry::ChannelListResponse;
     use primitives::{Channel, ValidatorId};
     use std::error::Error;
     use std::str::FromStr;
@@ -91,12 +92,6 @@ mod list_channels {
         accepts!(VARCHAR, TEXT);
     }
 
-    #[derive(Debug)]
-    pub struct ListChannels {
-        pub total_count: u64,
-        pub channels: Vec<Channel>,
-    }
-
     pub async fn list_channels(
         pool: &DbPool,
         skip: u64,
@@ -104,7 +99,7 @@ mod list_channels {
         creator: &Option<String>,
         validator: &Option<ValidatorId>,
         valid_until_ge: &DateTime<Utc>,
-    ) -> Result<ListChannels, RunError<bb8_postgres::tokio_postgres::Error>> {
+    ) -> Result<ChannelListResponse, RunError<bb8_postgres::tokio_postgres::Error>> {
         let validator = validator.as_ref().map(|validator_id| {
             serde_json::Value::from_str(&format!(r#"[{{"id": "{}"}}]"#, validator_id))
                 .expect("Not a valid json")
@@ -135,12 +130,18 @@ mod list_channels {
             })
             .await?;
 
-        Ok(ListChannels {
-            total_count: list_channels_total_count(
-                &pool,
-                (&total_count_params.0, total_count_params.1),
-            )
-            .await?,
+        let total_count =
+            list_channels_total_count(&pool, (&total_count_params.0, total_count_params.1)).await?;
+
+        // fast ceil for total_pages
+        let total_pages = if total_count == 0 {
+            1
+        } else {
+            1 + ((total_count - 1) / limit as u64)
+        };
+
+        Ok(ChannelListResponse {
+            total_pages,
             channels,
         })
     }

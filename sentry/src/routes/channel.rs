@@ -8,7 +8,7 @@ use futures::TryStreamExt;
 use hex::FromHex;
 use hyper::{Body, Request, Response};
 use primitives::adapter::Adapter;
-use primitives::sentry::{ChannelListResponse, SuccessResponse};
+use primitives::sentry::SuccessResponse;
 use primitives::{Channel, ChannelId};
 use slog::error;
 
@@ -72,7 +72,7 @@ pub async fn channel_list<A: Adapter>(
         .checked_mul(app.config.channels_find_limit.into())
         .ok_or_else(|| ResponseError::BadRequest("Page and/or limit is too large".into()))?;
 
-    let list_channels = list_channels(
+    let list_response = list_channels(
         &app.pool,
         skip,
         app.config.channels_find_limit,
@@ -81,18 +81,6 @@ pub async fn channel_list<A: Adapter>(
         &query.valid_until_ge,
     )
     .await?;
-
-    // fast ceil for total_pages
-    let total_pages = if list_channels.total_count == 0 {
-        1
-    } else {
-        1 + ((list_channels.total_count - 1) / app.config.channels_find_limit as u64)
-    };
-
-    let list_response = ChannelListResponse {
-        channels: list_channels.channels,
-        total_pages,
-    };
 
     Ok(success_response(serde_json::to_string(&list_response)?))
 }
