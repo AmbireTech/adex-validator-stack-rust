@@ -2,17 +2,15 @@ use crate::Application;
 use crate::ResponseError;
 use hyper::{Body, Request, Response};
 use primitives::adapter::Adapter;
-use primitives::sentry::SuccessResponse;
-use primitives::{Channel, ChannelId};
-use std::collections::HashMap;
 use crate::RouteParams;
 use chrono::{Utc};
 use crate::Session;
-use crate::db::channel::get_channel_by_creator;
 use serde::{Serialize, Deserialize};
 use bb8_postgres::tokio_postgres::Row;
 use crate::success_response;
 use std::cmp;
+use slog::error;
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct AnalyticsResponse {
@@ -69,15 +67,22 @@ pub async fn analytics<A: Adapter>(
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError>   {
     let request_uri = req.uri().to_string();
-    if let Ok(response) = app.pool.redis::cmd("EXISTS")
-        .arg(&request_uri)
+    let redis = app.redis.clone();
+
+    match redis::cmd("EXISTS").arg(&request_uri)
         .query_async::<_, String>(&mut redis.clone())
         .await 
     {
-        Ok(success_response(response))
-    } else {
-        process_analytics(req, app, false, true, true, 300).await
+        Ok(response) => Ok(success_response(response)),
+        _ => {
+            let cache_timeframe = match req.extensions().get::<RouteParams>() {
+                Some(_) => 600,
+                None => 300
+            };
+            process_analytics(req, app, false, true, true, cache_timeframe).await
+        }
     }
+
 }
 
 pub async fn advertiser_analytics<A: Adapter>(
@@ -148,13 +153,17 @@ pub async fn process_analytics<A: Adapter>(req: Request<Body>,  app: &Applicatio
 
     if should_cache {
         let key = req.uri().to_string();
-        app.redis::cmd("SETEX")
-                .arg(&key)
-                .arg(cache_timeframe)
-                .arg(response)
-                .query_async::<_, ()>(&mut redis.clone())
-                .await
-                .map_err(|error| format!("{}", error))
+        let redis = app.redis.clone();
+        // log error
+        if Err(err) = redis::cmd("SETEX")
+            .arg(&key)
+            .arg(cache_timeframe)
+            .arg(response)
+            .query_async::<_, ()>(&mut redis.clone())
+            .await {
+                error!(&app.logger, "{}", &err; "module" => "create_channel");
+
+            }
 
     }
     
