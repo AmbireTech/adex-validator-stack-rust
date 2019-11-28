@@ -17,7 +17,6 @@ use regex::Regex;
 use routes::analytics::{advertiser_analytics, analytics, publisher_analytics};
 use routes::cfg::config;
 use routes::channel::{channel_list, create_channel, last_approved};
-use routes::analytics::{publisher_analytics, analytics, advertiser_analytics};
 use slog::{error, Logger};
 use std::collections::HashMap;
 
