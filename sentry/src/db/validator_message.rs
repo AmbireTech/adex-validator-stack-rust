@@ -39,7 +39,11 @@ pub async fn get_validator_messages(
         .await
 }
 
-fn add_message_types_params<'a>(where_clauses: &mut Vec<String>, params: &mut Vec<&'a (dyn ToSql + Sync)>, message_types: &'a [String]) {
+fn add_message_types_params<'a>(
+    where_clauses: &mut Vec<String>,
+    params: &mut Vec<&'a (dyn ToSql + Sync)>,
+    message_types: &'a [String],
+) {
     let mut msg_prep = vec![];
     for message_type in message_types.iter() {
         msg_prep.push(format!("${}", params.len() + 1));
