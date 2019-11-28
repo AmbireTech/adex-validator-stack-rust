@@ -8,7 +8,10 @@ use std::env;
 use lazy_static::lazy_static;
 
 mod channel;
+mod validator_message;
+
 pub use self::channel::*;
+pub use self::validator_message::*;
 
 pub type DbPool = Pool<PostgresConnectionManager<NoTls>>;
 

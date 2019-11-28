@@ -7,6 +7,7 @@ use crate::middleware::auth;
 use crate::middleware::channel::channel_load;
 use crate::middleware::cors::{cors, Cors};
 use crate::routes::channel::channel_status;
+use crate::routes::validator_message::{extract_params, list_validator_messages};
 use hyper::{Body, Method, Request, Response, StatusCode};
 use lazy_static::lazy_static;
 use primitives::adapter::Adapter;
@@ -27,6 +28,7 @@ pub mod middleware {
 pub mod routes {
     pub mod cfg;
     pub mod channel;
+    pub mod validator_message;
 }
 
 pub mod access;
@@ -39,6 +41,8 @@ lazy_static! {
         Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
     static ref LAST_APPROVED_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/last-approved/?$").expect("The regex should be valid");
     static ref CHANNEL_STATUS_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/status/?$").expect("The regex should be valid");
+    // Only the initial Regex to be matched.
+    static ref CHANNEL_VALIDATOR_MESSAGES: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/validator-messages(/.*)?$").expect("The regex should be valid");
     // @TODO define other regex routes
 }
 
@@ -106,18 +110,19 @@ impl<A: Adapter + 'static> Application<A> {
             }
         };
 
-        let mut response = match (req.uri().path(), req.method()) {
+        let path = req.uri().path().to_string();
+        let mut response = match (path.as_ref(), req.method()) {
             ("/cfg", &Method::GET) => config(req, &self).await,
             ("/channel", &Method::POST) => create_channel(req, &self).await,
             ("/channel/list", &Method::GET) => Err(ResponseError::NotFound),
             // This is important becuase it prevents us from doing
             // expensive regex matching for routes without /channel
-            (route, method) if route.starts_with("/channel") => {
+            (path, method) if path.starts_with("/channel") => {
                 // example with
                 // @TODO remove later
                 // regex matching for routes with params
                 if let (Some(caps), &Method::GET) =
-                    (LAST_APPROVED_BY_CHANNEL_ID.captures(route), method)
+                    (LAST_APPROVED_BY_CHANNEL_ID.captures(path), method)
                 {
                     let param = RouteParams(vec![caps
                         .get(1)
@@ -135,7 +140,7 @@ impl<A: Adapter + 'static> Application<A> {
 
                     last_approved(req, &self).await
                 } else if let (Some(caps), &Method::GET) =
-                    (CHANNEL_STATUS_BY_CHANNEL_ID.captures(route), method)
+                    (CHANNEL_STATUS_BY_CHANNEL_ID.captures(path), method)
                 {
                     let param = RouteParams(vec![caps
                         .get(1)
@@ -150,6 +155,31 @@ impl<A: Adapter + 'static> Application<A> {
                     };
 
                     channel_status(req, &self).await
+                } else if let (Some(caps), &Method::GET) =
+                    (CHANNEL_VALIDATOR_MESSAGES.captures(path), method)
+                {
+                    let param = RouteParams(vec![caps
+                        .get(1)
+                        .map_or("".to_string(), |m| m.as_str().to_string())]);
+                    req.extensions_mut().insert(param);
+
+                    let req = match chain(req, &self, vec![channel_load]).await {
+                        Ok(req) => req,
+                        Err(error) => {
+                            return map_response_error(error);
+                        }
+                    };
+
+                    // @TODO: Move this to a middleware?!
+                    let extract_params =
+                        match extract_params(caps.get(2).map_or("", |m| m.as_str())) {
+                            Ok(params) => params,
+                            Err(error) => {
+                                return map_response_error(error.into());
+                            }
+                        };
+
+                    list_validator_messages(req, &self, &extract_params.0, &extract_params.1).await
                 } else {
                     Err(ResponseError::NotFound)
                 }

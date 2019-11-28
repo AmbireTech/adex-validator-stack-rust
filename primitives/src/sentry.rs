@@ -111,3 +111,36 @@ pub struct ValidatorMessageResponse {
 pub struct EventAggregateResponse {
     pub events: Vec<EventAggregate>,
 }
+
+#[cfg(feature = "postgres")]
+mod postgres {
+    use super::ValidatorMessage;
+    use crate::validator::MessageTypes;
+    use bytes::BytesMut;
+    use postgres_types::{accepts, to_sql_checked, IsNull, Json, ToSql, Type};
+    use std::error::Error;
+    use tokio_postgres::Row;
+
+    impl From<&Row> for ValidatorMessage {
+        fn from(row: &Row) -> Self {
+            Self {
+                from: row.get("from"),
+                received: row.get("received"),
+                msg: row.get::<_, Json<MessageTypes>>("msg").0,
+            }
+        }
+    }
+
+    impl ToSql for MessageTypes {
+        fn to_sql(
+            &self,
+            ty: &Type,
+            w: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+            Json(self).to_sql(ty, w)
+        }
+
+        accepts!(JSONB);
+        to_sql_checked!();
+    }
+}
