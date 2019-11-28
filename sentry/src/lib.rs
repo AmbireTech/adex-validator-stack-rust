@@ -136,9 +136,24 @@ impl<A: Adapter + 'static> Application<A> {
 
             ("/analytics", &Method::GET) => analytics(req, &self).await,
             ("/analytics/for-advertiser", &Method::GET) => {
+                let req = match chain(req, &self, vec![auth_required_middleware]).await {
+                    Ok(req) => req,
+                    Err(error) => {
+                        return map_response_error(error);
+                    }
+                };
                 advertiser_analytics(req, &self).await
             },
-            ("/analytics/for-publisher", &Method::GET) => publisher_analytics(req, &self).await,
+            ("/analytics/for-publisher", &Method::GET) => {
+                let req = match chain(req, &self, vec![auth_required_middleware]).await {
+                    Ok(req) => req,
+                    Err(error) => {
+                        return map_response_error(error);
+                    }
+                };
+                
+                publisher_analytics(req, &self).await
+            },
             (route, _) if route.starts_with("/analytics") => analytics_router(req, &self).await,
             // This is important becuase it prevents us from doing
             // expensive regex matching for routes without /channel
@@ -229,9 +244,9 @@ async fn analytics_router<A: Adapter>(mut req: Request<Body>, app: &Application<
                     .map_or("".to_string(), |m| m.as_str().to_string())]);
                 req.extensions_mut().insert(param);
 
-                // let req = chain(req, app, vec![channel_load]).await?;
-
+                let req = chain(req, app, vec![channel_load]).await?;
                 analytics(req, app).await
+
             } else if let Some(caps) = PUBLISHER_ANALYTICS_BY_CHANNEL_ID.captures(route) {
                 let param = RouteParams(vec![caps.get(1)
                     .map_or("".to_string(), |m| m.as_str().to_string())]);

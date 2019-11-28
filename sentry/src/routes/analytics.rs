@@ -9,7 +9,7 @@ use serde::{Serialize, Deserialize};
 use bb8_postgres::tokio_postgres::Row;
 use crate::success_response;
 use std::cmp;
-use slog::error;
+use redis::aio::MultiplexedConnection;
 
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -59,7 +59,7 @@ pub async fn publisher_analytics<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>,
 ) ->  Result<Response<Body>, ResponseError>  {
-    process_analytics(req, app, false, false, false, 0).await
+    process_analytics(req, app, false, false).await.map(success_response)
 }
 
 pub async fn analytics<A: Adapter>(
@@ -79,7 +79,9 @@ pub async fn analytics<A: Adapter>(
                 Some(_) => 600,
                 None => 300
             };
-            process_analytics(req, app, false, true, true, cache_timeframe).await
+            let response = process_analytics(req, app, false, true).await?;
+            cache(&redis.clone(), request_uri, &response, cache_timeframe).await;        
+            Ok(success_response(response))
         }
     }
 
@@ -89,10 +91,10 @@ pub async fn advertiser_analytics<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>
 ) ->  Result<Response<Body>, ResponseError> {
-    process_analytics(req, app, true, true, false, 0).await
+    process_analytics(req, app, true, true).await.map(success_response)
 }
 
-pub async fn process_analytics<A: Adapter>(req: Request<Body>,  app: &Application<A>, advertiser_channels: bool, skip_publisher: bool, should_cache: bool, cache_timeframe: i32 ) -> Result<Response<Body>, ResponseError>  {
+pub async fn process_analytics<A: Adapter>(req: Request<Body>,  app: &Application<A>, is_advertiser: bool, skip_publisher: bool) -> Result<String, ResponseError>  {
     let query = serde_urlencoded::from_str::<AnalyticsQuery>(&req.uri().query().unwrap_or(""))?;
     let applied_limit = cmp::min(query.limit, 200);
     let (interval, period) = get_time_frame(&query.timeframe);
@@ -101,19 +103,15 @@ pub async fn process_analytics<A: Adapter>(req: Request<Body>,  app: &Applicatio
 
     let mut where_clauses = vec![format!("created > to_timestamp({})", time_limit)];
 
-    if advertiser_channels {
+    if is_advertiser {
         match req.extensions().get::<RouteParams>() {
             Some(params) => where_clauses.push(format!("channel_id IN ({})", params.index(0))),
             None => where_clauses.push(format!("channel_id IN (SELECT id FROM channels WHERE creator = {})", sess.unwrap().uid.to_string()))
-        }        
-    } else {
-        let id = match req.extensions().get::<RouteParams>() {
-            Some(params) => params.get(0).map(|id| format!("channel_id = {}", id)),
-            _ => None
+        };      
+    } else if let Some(params) = req.extensions().get::<RouteParams>() {
+        if let Some(id) = params.get(0) {
+            where_clauses.push(format!("channel_id = {}", id));
         };
-        if let Some(query) = id {
-            where_clauses.push(query);
-        }
     }
 
     let select_query = match (skip_publisher, sess) {
@@ -149,32 +147,20 @@ pub async fn process_analytics<A: Adapter>(req: Request<Body>,  app: &Applicatio
             }
         }).await?;
     
-    let response = serde_json::to_string(&result)?;
+    serde_json::to_string(&result).map_err(|_| ResponseError::BadRequest("error occurred; try again later".to_string()))
+}
 
-    if should_cache {
-        let key = req.uri().to_string();
-        let redis = app.redis.clone();
-        // log error
-        if Err(err) = redis::cmd("SETEX")
-            .arg(&key)
-            .arg(cache_timeframe)
-            .arg(response)
-            .query_async::<_, ()>(&mut redis.clone())
-            .await {
-                error!(&app.logger, "{}", &err; "module" => "create_channel");
-
-            }
-
+async fn cache(redis: &MultiplexedConnection, key: String, value: &str, timeframe: i32) {
+    if let Err(err) = redis::cmd("SETEX")
+        .arg(&key)
+        .arg(timeframe)
+        .arg(value)
+        .query_async::<_, ()>(&mut redis.clone())
+        .await 
+    {
+        println!("{:?}", err);
     }
-    
-    // Ok(success_response(response))
-    Ok(success_response("hello".to_string()))
 }
-
-async fn cache_response() {
-
-}
-
 
 fn get_time_frame(timeframe: &str) -> (String, i64) {
     let minute = 60 * 1000;
