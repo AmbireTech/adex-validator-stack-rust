@@ -184,9 +184,6 @@ pub async fn process_analytics<A: Adapter>(
         applied_limit
     );
 
-    // log the query here
-    println!("{}", sql_query);
-
     // execute query
     let result = app
         .pool

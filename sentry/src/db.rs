@@ -7,13 +7,13 @@ use std::env;
 
 use lazy_static::lazy_static;
 
-<<<<<<< HEAD
 mod channel;
 mod validator_message;
 
-=======
+
 pub mod channel;
->>>>>>> a4456f2... add: /analytics route
+// mod channel;
+
 pub use self::channel::*;
 pub use self::validator_message::*;
 
