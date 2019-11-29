@@ -38,6 +38,33 @@ struct AnalyticsQuery {
     pub timeframe: String,
 }
 
+impl AnalyticsQuery {
+    pub fn is_valid(&self) -> Result<(), ResponseError> {
+        let valid_event_types = ["IMPRESSION"];
+        let valid_metric = ["eventPayouts", "eventCounts"];
+        let valid_timeframe = ["year", "month", "week", "day", "hour"];
+
+        if !valid_event_types.iter().any(|e| *e == &self.event_type[..]) {
+            Err(ResponseError::BadRequest(format!(
+                "invalid event_type, possible values are: {}",
+                valid_event_types.join(" ,")
+            )))
+        } else if !valid_metric.iter().any(|e| *e == &self.metric[..]) {
+            Err(ResponseError::BadRequest(format!(
+                "invalid metric, possible values are: {}",
+                valid_metric.join(" ,")
+            )))
+        } else if !valid_timeframe.iter().any(|e| *e == &self.timeframe[..]) {
+            Err(ResponseError::BadRequest(format!(
+                "invalid timeframe, possible values are: {}",
+                valid_timeframe.join(" ,")
+            )))
+        } else {
+            Ok(())
+        }
+    }
+}
+
 fn default_limit() -> u32 {
     100
 }
@@ -104,6 +131,8 @@ pub async fn process_analytics<A: Adapter>(
     skip_publisher: bool,
 ) -> Result<String, ResponseError> {
     let query = serde_urlencoded::from_str::<AnalyticsQuery>(&req.uri().query().unwrap_or(""))?;
+    query.is_valid()?;
+
     let applied_limit = cmp::min(query.limit, 200);
     let (interval, period) = get_time_frame(&query.timeframe);
     let time_limit = Utc::now().timestamp() - period;
@@ -132,7 +161,7 @@ pub async fn process_analytics<A: Adapter>(
                 query.event_type, query.metric, session.uid
             ));
             format!(
-                "select SUM((events->'{}'->'{}'->>'{}')::numeric) as value, extract({} from created) as time from event_aggregates", 
+                "select SUM((events->'{}'->'{}'->>'{}')::numeric) as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time from event_aggregates", 
                 query.event_type, query.metric, session.uid, interval
             )
         }
@@ -142,7 +171,7 @@ pub async fn process_analytics<A: Adapter>(
                 query.event_type, query.metric
             ));
             format!(
-                "select SUM(value::numeric)::varchar as value, extract({} from created) as time from event_aggregates, jsonb_each_text(events->'{}'->'{}')", 
+                "select SUM(value::numeric)::varchar as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time from event_aggregates, jsonb_each_text(events->'{}'->'{}')", 
                 interval, query.event_type, query.metric
             )
         }
@@ -194,17 +223,17 @@ async fn cache(redis: &MultiplexedConnection, key: String, value: &str, timefram
     }
 }
 
-fn get_time_frame(timeframe: &str) -> (String, i64) {
+fn get_time_frame(timeframe: &str) -> (i64, i64) {
     let minute = 60 * 1000;
     let hour = 60 * minute;
     let day = 24 * hour;
 
     match timeframe {
-        "year" => ("month".into(), 365 * day),
-        "month" => ("day".into(), 30 * day),
-        "week" => ("week".into(), 7 * day),
-        "day" => ("hour".into(), day),
-        "hour" => ("minute".into(), hour),
-        _ => ("hour".into(), day),
+        "year" => (30 * day, 365 * day),
+        "month" => (day, 30 * day),
+        "week" => (6 * hour, 7 * day),
+        "day" => (hour, day),
+        "hour" => (minute, hour),
+        _ => (hour, day),
     }
 }

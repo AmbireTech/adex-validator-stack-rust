@@ -70,7 +70,6 @@ pub async fn insert_channel(
         .await
 }
 
-
 pub async fn get_channel_by_creator(
     pool: &DbPool,
     id: &ChannelId,
@@ -91,7 +90,6 @@ pub async fn get_channel_by_creator(
     })
     .await
 }
-
 
 mod list_channels {
     use crate::db::DbPool;
