@@ -128,7 +128,7 @@ pub async fn process_analytics<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>,
     is_advertiser: bool,
-    skip_publisher: bool,
+    skip_publisher_filter: bool,
 ) -> Result<String, ResponseError> {
     let query = serde_urlencoded::from_str::<AnalyticsQuery>(&req.uri().query().unwrap_or(""))?;
     query.is_valid()?;
@@ -154,7 +154,7 @@ pub async fn process_analytics<A: Adapter>(
         };
     }
 
-    let select_query = match (skip_publisher, sess) {
+    let select_query = match (skip_publisher_filter, sess) {
         (false, Some(session)) => {
             where_clauses.push(format!(
                 "events->'{}'->'{}'->'{}' IS NOT NULL",
