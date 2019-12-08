@@ -35,6 +35,9 @@ pub enum Event {
         publisher: String,
         ad_unit: Option<String>,
     },
+    Click {
+        publisher: String,
+    },
     ImpressionWithCommission {
         earners: Vec<Earner>,
     },
