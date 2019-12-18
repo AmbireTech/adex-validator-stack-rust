@@ -10,7 +10,7 @@ pub fn get_balances_after_fees_tree(
 
     let total_distributed = balances.iter().map(|(_, balance)| balance).sum::<BigNum>();
 
-    let validators_iter = channel.spec.validators.into_iter();
+    let validators_iter = channel.spec.validators.iter();
     let total_validators_fee = validators_iter
         .map(|validator| &validator.fee)
         .sum::<BigNum>();
@@ -54,7 +54,7 @@ pub fn get_balances_after_fees_tree(
         balances_after_fees,
         rounding_error,
         fee_ratio,
-        channel.spec.validators.into_iter(),
+        channel.spec.validators.iter(),
     );
 
     Ok(balances_after_fees)

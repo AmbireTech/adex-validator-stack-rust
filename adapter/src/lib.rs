@@ -87,7 +87,7 @@ impl TryFrom<&Channel> for EthereumChannel {
         let validators = channel
             .spec
             .validators
-            .into_iter()
+            .iter()
             .map(|v| &v.id)
             .collect::<Vec<_>>();
 

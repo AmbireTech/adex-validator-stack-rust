@@ -148,6 +148,10 @@ impl SpecValidators {
             SpecValidator::None
         }
     }
+
+    pub fn iter(&self) -> Iter<'_> {
+        Iter::new(&self)
+    }
 }
 
 impl From<(ValidatorDesc, ValidatorDesc)> for SpecValidators {
@@ -159,10 +163,44 @@ impl From<(ValidatorDesc, ValidatorDesc)> for SpecValidators {
 /// Fixed size iterator of 2, as we need an iterator in couple of occasions
 impl<'a> IntoIterator for &'a SpecValidators {
     type Item = &'a ValidatorDesc;
-    type IntoIter = ::std::vec::IntoIter<Self::Item>;
+    type IntoIter = Iter<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        vec![self.leader(), self.follower()].into_iter()
+        self.iter()
+    }
+}
+
+pub struct Iter<'a> {
+    validators: &'a SpecValidators,
+    index: u8,
+}
+
+impl<'a> Iter<'a> {
+    fn new(validators: &'a SpecValidators) -> Self {
+        Self {
+            validators,
+            index: 0,
+        }
+    }
+}
+
+impl<'a> Iterator for Iter<'a> {
+    type Item = &'a ValidatorDesc;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.index {
+            0 => {
+                self.index += 1;
+
+                Some(self.validators.leader())
+            }
+            1 => {
+                self.index += 1;
+
+                Some(self.validators.follower())
+            }
+            _ => None,
+        }
     }
 }
 
