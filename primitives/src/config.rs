@@ -23,6 +23,7 @@ pub struct Config {
     pub heartbeat_time: u32, // in milliseconds
     pub channels_find_limit: u32,
     pub events_find_limit: u32,
+    pub msgs_find_limit: u32,
     pub health_threshold_promilles: u32,
     pub health_unsignable_promilles: u32,
     pub propagation_timeout: u32,
