@@ -132,7 +132,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
         let future = self
             .client
             .get(&format!(
-                "{}/last-approved?withHearbeat=true",
+                "{}/last-approved?withHeartbeat=true",
                 self.validator_url
             ))
             .send()
