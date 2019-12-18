@@ -88,15 +88,15 @@ impl TryFrom<&Channel> for EthereumChannel {
             .spec
             .validators
             .into_iter()
-            .map(|v| v.id.to_string())
-            .collect();
+            .map(|v| &v.id)
+            .collect::<Vec<_>>();
 
         EthereumChannel::new(
             &channel.creator,
             &channel.deposit_asset,
             &channel.deposit_amount.to_string(),
             channel.valid_until,
-            validators,
+            &validators,
             &spec_hash,
         )
     }
@@ -108,10 +108,10 @@ impl EthereumChannel {
         token_addr: &str,
         token_amount: &str,
         valid_until: DateTime<Utc>,
-        validators: Vec<String>,
+        validators: &[&ValidatorId],
         spec: &str,
     ) -> Result<Self, ChannelError> {
-        // check creator addres
+        // check creator address
         if creator != eth_checksum::checksum(creator) {
             return Err(ChannelError::InvalidArgument(
                 "Invalid creator address".into(),
@@ -120,7 +120,7 @@ impl EthereumChannel {
 
         if token_addr != eth_checksum::checksum(token_addr) {
             return Err(ChannelError::InvalidArgument(
-                "invalid token addresss".into(),
+                "invalid token address".into(),
             ));
         }
 
@@ -134,18 +134,19 @@ impl EthereumChannel {
             ));
         }
 
-        if validators.iter().any(|v| *v != eth_checksum::checksum(v)) {
-            return Err(ChannelError::InvalidArgument(
-                "invalid validator address: must start with a 0x and be 42 characters long".into(),
-            ));
-        }
-
         Ok(Self {
             creator: creator.to_owned(),
             token_addr: token_addr.to_owned(),
             token_amount: token_amount.to_owned(),
             valid_until: valid_until.timestamp_millis(),
-            validators: format!("[{}]", validators.join(",")),
+            validators: format!(
+                "[{}]",
+                validators
+                    .iter()
+                    .map(|v_id| v_id.to_hex_checksummed_string())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            ),
             spec: spec.to_owned(),
         })
     }
