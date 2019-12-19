@@ -38,7 +38,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
         let client = Client::builder()
             .timeout(Duration::from_secs(config.fetch_timeout.into()))
             .build()
-            .unwrap();
+            .map_err(|e| ValidatorWorker::Failed(format!("building Client error: {}", e)))?;
 
         // validate that we are to validate the channel
         match channel.spec.validators.find(&whoami) {
