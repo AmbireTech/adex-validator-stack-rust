@@ -14,12 +14,12 @@ use primitives::{
     Channel, ValidatorId,
 };
 use serde::{Deserialize, Serialize};
+use serde_hex::{SerHexOpt, StrictPfx};
 use serde_json::Value;
 use std::convert::TryFrom;
 use std::error::Error;
 use std::fs;
 use tiny_keccak::Keccak;
-use web3::transports::Http;
 use web3::{
     contract::{Contract, Options},
     futures::Future,
@@ -205,9 +205,11 @@ impl Adapter for EthereumAdapter {
             Some(identity) => {
 
                 let contract_address = Address::from_slice(identity);
-                let (_eloop, transport) = web3::transports::Http::new(&self.config.ethereum_network)?;
+                let (_eloop, transport) = web3::transports::Http::new(&self.config.ethereum_network)
+                    .map_err(|_| map_error("failed to init http transport"))?;
                 let web3 = web3::Web3::new(transport);
-                let contract = Contract::from_json(web3.eth(), contract_address, &IDENTITY_ABI)?;
+                let contract = Contract::from_json(web3.eth(), contract_address, &IDENTITY_ABI)
+                    .map_err(|_| map_error("failed to init identity contract"))?;
 
                 let privilege_level: U256 = contract
                     .query(
@@ -275,18 +277,6 @@ fn hash_message(message: &str) -> [u8; 32] {
 
 fn map_error(err: &str) -> AdapterError {
     AdapterError::Failed(err.to_string())
-}
-
-fn get_contract(
-    config: &Config,
-    contract_address: Address,
-    abi: &[u8],
-) -> Result<Contract<Http>, Box<dyn Error>> {
-    let (_eloop, transport) = web3::transports::Http::new(&config.ethereum_network)?;
-    let web3 = web3::Web3::new(transport);
-    let contract = Contract::from_json(web3.eth(), contract_address, abi)?;
-
-    Ok(contract)
 }
 
 // Ethereum Web Tokens
