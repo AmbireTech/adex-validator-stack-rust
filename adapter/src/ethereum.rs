@@ -135,11 +135,7 @@ impl Adapter for EthereumAdapter {
             .hash_hex(&self.config.ethereum_core_address)
             .map_err(|_| map_error("Failed to hash the channel id"))?;
 
-        println!("checking1");
-        println!("checking2");
         let our_channel_id = format!("0x{}", hex::encode(channel.id));
-        println!(" our_channel_id {}", our_channel_id);
-        println!(" channel_id {}", channel_id);
         if channel_id != our_channel_id {
             return Err(AdapterError::Configuration(
                 "channel.id is not valid".to_string(),
@@ -164,12 +160,8 @@ impl Adapter for EthereumAdapter {
                 None,
             )
             .wait()
-            .map_err(|e| {
-                println!("{:?}", e);
-                map_error("contract channel status query failed")
-            })?;
+            .map_err(|e| map_error("contract channel status query failed"))?;
 
-        println!(" channel_status {}", channel_status);
         if channel_status != *CHANNEL_STATE_ACTIVE {
             return Err(AdapterError::Configuration(
                 "channel is not Active on the ethereum network".to_string(),
@@ -525,7 +517,6 @@ mod test {
             .wait()
             .expect("failed to init adex contract");
 
-        println!("adex_contract address {:?}", adex_contract.address());
         // contract call set balance
         token_contract
             .call(
@@ -536,7 +527,6 @@ mod test {
             )
             .wait()
             .expect("Failed to set balance");
-        println!("token address {}", token_contract.address());
 
         let leader_validator_desc = ValidatorDesc {
             // keystore.json addresss (same with js)
@@ -601,7 +591,6 @@ mod test {
             .expect("failed to deserialise contract addr");
 
         let channel_id = eth_channel.hash(&contract_addr).expect("hash hex");
-        println!("channel_id {}", hex::encode(channel_id));
         // set id to proper id
         valid_channel.id = ChannelId::from_hex(hex::encode(channel_id))
             .expect("prep_db: failed to deserialize channel id");

@@ -131,8 +131,6 @@ impl EthereumChannel {
             .iter()
             .map(|v| Address::from_slice(v.inner()))
             .collect();
-        // let validator1 =  hex::decode("2bdeafae53940669daa6f519373f686c1f3d3393").expect("should deserialize v1");
-        // let validator2 =  hex::decode("6704Fbfcd5Ef766B287262fA2281C105d57246a6").expect("should deserialize v2");
 
         Ok(Self {
             creator,
@@ -145,10 +143,6 @@ impl EthereumChannel {
     }
 
     pub fn hash(&self, contract_addr: &[u8; 20]) -> Result<[u8; 32], Box<dyn Error>> {
-        // println!("hash {} {}, {} {}, {} {}",&self.creator[2..], &self.creator[2..].len(), contract_addr, contract_addr.len(), &self.token_addr[2..], &self.token_addr[2..].len());
-
-        // println!("deposit amount 2 {}", self.token_amount);
-        // println!("valid_until 2 {}", self.valid_until);
         let tokens = [
             Token::Address(Address::from_slice(contract_addr)),
             Token::Address(self.creator.to_owned()),
@@ -228,7 +222,6 @@ fn encode_params(params: &[(ParamType, &str)], lenient: bool) -> Result<Vec<u8>,
     let tokens = params
         .iter()
         .map(|(param, value)| {
-            println!("{}", value);
             if lenient {
                 LenientTokenizer::tokenize(param, value)
             } else {
@@ -236,8 +229,7 @@ fn encode_params(params: &[(ParamType, &str)], lenient: bool) -> Result<Vec<u8>,
             }
         })
         .collect::<Result<Vec<_>, _>>()?;
-
-    println!("{:?}", tokens);
+        
     Ok(encode(&tokens).to_vec())
 }
 
