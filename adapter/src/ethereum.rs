@@ -146,8 +146,10 @@ impl Adapter for EthereumAdapter {
             ));
         }
 
+        let contract_address = Address::from_slice(&self.config.ethereum_core_address);
+
         let (_eloop, transport) = web3::transports::Http::new(&self.config.ethereum_network)
-            .map_err(|_| map_error("failed to init core contract"))?;
+            .map_err(|_| map_error("failed to init http transport"))?;
         let web3 = web3::Web3::new(transport);
 
         let contract = Contract::from_json(web3.eth(), contract_address, &ADEXCORE_ABI)
