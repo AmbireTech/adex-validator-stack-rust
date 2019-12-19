@@ -14,9 +14,9 @@ serde =  {version = "^1.0", features = ['derive']}
 serde_json = "1.0"
 serde-hex = "0.1.0"
 # Ethereum
-web3 = { git = "https://github.com/tomusdrw/rust-web3" }
+web3 = { git = "https://github.com/samparsky/rust-web3" }
 eth_checksum = "0.1.1"
-ethabi = "8.0.1"
+ethabi = { git = "https://github.com/samparsky/ethabi", branch = "graph-patches" }
 tiny-keccak = "1.5"
 parity-crypto = { version = "0.4.2", features = ["publickey"], git = "https://github.com/paritytech/parity-common" }
 ethstore = { version = "0.2.1", git = "https://github.com/paritytech/parity-ethereum"}

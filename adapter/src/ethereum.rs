@@ -24,6 +24,7 @@ use web3::{
     futures::Future,
     types::U256,
 };
+use ethabi::token::Token;
 
 lazy_static! {
     static ref ADEXCORE_ABI: &'static [u8] =
@@ -133,24 +134,34 @@ impl Adapter for EthereumAdapter {
         let channel_id = eth_channel
             .hash_hex(&self.config.ethereum_core_address)
             .map_err(|_| map_error("Failed to hash the channel id"))?;
-
+        
+        println!("checking1");
+        println!("checking2");
         let our_channel_id = format!("0x{}", hex::encode(channel.id));
+        println!(" our_channel_id {}", our_channel_id);
+        println!(" channel_id {}", channel_id);
         if channel_id != our_channel_id {
             return Err(AdapterError::Configuration(
                 "channel.id is not valid".to_string(),
             ));
         }
 
-        // query the blockchain for the channel status
-        let contract_address = Address::from_slice(self.config.ethereum_core_address.as_bytes());
-        let contract = get_contract(&self.config, contract_address, &ADEXCORE_ABI)
+        let (_eloop, transport) = web3::transports::Http::new(&self.config.ethereum_network)
+            .map_err(|_| map_error("failed to init core contract"))?;
+        let web3 = web3::Web3::new(transport);
+
+        let contract = Contract::from_json(web3.eth(), contract_address, &ADEXCORE_ABI)
             .map_err(|_| map_error("failed to init core contract"))?;
 
         let channel_status: U256 = contract
-            .query("states", channel_id, None, Options::default(), None)
+            .query("states", (Token::FixedBytes(channel.id.as_ref().to_vec()),), None, Options::default(), None)
             .wait()
-            .map_err(|_| map_error("contract channel status query failed"))?;
-
+            .map_err(|e| {
+                println!("{:?}", e);
+                map_error("contract channel status query failed")
+            })?;
+        
+        println!(" channel_status {}", channel_status);
         if channel_status != *CHANNEL_STATE_ACTIVE {
             return Err(AdapterError::Configuration(
                 "channel is not Active on the ethereum network".to_string(),
@@ -366,27 +377,39 @@ mod test {
     use super::*;
     use primitives::adapter::KeystoreOptions;
     use primitives::config::configuration;
+    use primitives::ChannelId;
+    use primitives::{SpecValidators, ValidatorDesc, ChannelSpec, EventSubmission};
+    use chrono::{Duration, TimeZone, Utc};
+    use std::convert::TryFrom;
+    use hex::FromHex;
+    use ethabi::token::{Token};
+    use crate::EthereumChannel;
 
-    fn setup_eth_adapter() -> EthereumAdapter {
-        let config = configuration("development", None).expect("failed parse config");
+
+    fn setup_eth_adapter(contract_address: Option<[u8; 20]>) -> EthereumAdapter {
+        let mut config = configuration("development", None).expect("failed parse config");
         let keystore_options = KeystoreOptions {
             keystore_file: "./test/resources/keystore.json".to_string(),
             keystore_pwd: "adexvalidator".to_string(),
         };
+
+        if let Some(ct_address) =  contract_address {
+            config.ethereum_core_address = ct_address;
+        }
 
         EthereumAdapter::init(keystore_options, &config).expect("should init ethereum adapter")
     }
 
     #[test]
     fn should_init_and_unlock_ethereum_adapter() {
-        let mut eth_adapter = setup_eth_adapter();
+        let mut eth_adapter = setup_eth_adapter(None);
         eth_adapter.unlock().expect("should unlock eth adapter");
     }
 
     #[test]
     fn should_get_whoami_sign_and_verify_messages() {
         // whoami
-        let mut eth_adapter = setup_eth_adapter();
+        let mut eth_adapter = setup_eth_adapter(None);
         let whoami = eth_adapter.whoami();
         assert_eq!(
             whoami.to_string(),
@@ -419,7 +442,7 @@ mod test {
 
     #[test]
     fn should_generate_correct_ewt_sign_and_verify() {
-        let mut eth_adapter = setup_eth_adapter();
+        let mut eth_adapter = setup_eth_adapter(None);
         eth_adapter.unlock().expect("should unlock eth adapter");
 
         let payload = Payload {
@@ -445,5 +468,126 @@ mod test {
             format!("{:?}", verification),
             "generated wrong verification payload"
         );
+    }
+
+    #[test]
+    fn should_validate_channel_properly() {
+        let (eloop, http) = web3::transports::Http::new("http://localhost:8545").expect("failed to init transport");
+        eloop.into_remote();
+
+        let web3 = web3::Web3::new(http);
+        let leader_account: Address = "Df08F82De32B8d460adbE8D72043E3a7e25A3B39".parse().expect("failed to parse leader account");
+        let follower_account: Address = "6704Fbfcd5Ef766B287262fA2281C105d57246a6".parse().expect("failed to parse leader account");
+
+        // tokenbytecode.json
+        let token_bytecode = include_str!("../test/resources/tokenbytecode.json");
+        // token_abi.json
+        let token_abi = include_bytes!("../test/resources/tokenabi.json");
+        // adexbytecode.json
+        let adex_bytecode = include_str!("../../lib/protocol-eth/resources/bytecode/AdExCore.json");
+        // adexabi.json
+        let adex_abi = include_bytes!("../../lib/protocol-eth/abi/AdExCore.json");
+
+        // deploy contracts
+        let token_contract = Contract::deploy(web3.eth(), token_abi)
+            .expect("invalid token token contract")
+            .confirmations(0)
+            .options(
+                Options::with(|opt| {
+                    opt.gas_price = Some(1.into());
+                    opt.gas = Some(6_721_975.into());
+                })
+            )
+            .execute(
+                token_bytecode,
+                (),
+                leader_account,
+            )
+            .expect("Correct parameters are passed to the constructor.")
+            .wait()
+            .expect("failed to wait");
+        
+        let adex_contract = Contract::deploy(web3.eth(), adex_abi)
+            .expect("invalid adex contract")
+            .confirmations(0)
+            .options(
+                Options::with(|opt| {
+                    opt.gas_price = Some(1.into());
+                    opt.gas = Some(6_721_975.into());
+                })
+            )
+            .execute(
+                adex_bytecode,
+                (),
+                leader_account,
+            )
+            .expect("Correct parameters are passed to the constructor.")
+            .wait()
+            .expect("failed to init adex contract");
+        
+        println!("adex_contract address {:?}", adex_contract.address());
+        // contract call set balance 
+        token_contract.call("setBalanceTo", (Token::Address(leader_account), Token::Uint(2000.into())), leader_account, Options::default()).wait()
+            .expect("Failed to set balance");
+        println!("token address {}", token_contract.address());
+
+        let leader_validator_desc = ValidatorDesc {
+            // keystore.json addresss (same with js)
+            id: ValidatorId::try_from("2bdeafae53940669daa6f519373f686c1f3d3393").expect("failed to create id"),
+            url: "http://localhost:8005".to_string(),
+            fee: 100.into(),
+        };
+
+        let follower_validator_desc = ValidatorDesc {
+            // keystore2.json addresss (same with js)
+            id: ValidatorId::try_from("6704Fbfcd5Ef766B287262fA2281C105d57246a6").expect("failed to create id"),
+            url: "http://localhost:8006".to_string(),
+            fee: 100.into(),
+        };
+
+        let mut valid_channel = Channel {
+            // to be replace with the proper id
+            id: ChannelId::from_hex("061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088").expect("prep_db: failed to deserialize channel id"),
+            // leader_account
+            creator: "0xDf08F82De32B8d460adbE8D72043E3a7e25A3B39".to_string(),
+            deposit_asset: eth_checksum::checksum(&format!("{:?}", token_contract.address())),
+            deposit_amount: 2_000.into(),
+            valid_until: Utc::now() + Duration::days(2),
+            spec: ChannelSpec {
+                title: None,
+                validators: SpecValidators::new(leader_validator_desc, follower_validator_desc),
+                max_per_impression: 10.into(),
+                min_per_impression: 10.into(),
+                targeting: vec![],
+                min_targeting_score: None,
+                event_submission: Some(EventSubmission { allow: vec![] }),
+                created: Some(Utc::now()),
+                active_from: None,
+                nonce: None,
+                withdraw_period_start: Utc::now() + Duration::days(1),
+                ad_units: vec![],
+            },
+        };
+
+        // convert to eth channel
+        let eth_channel = EthereumChannel::try_from(&valid_channel).expect("failed to create eth channel");
+        let sol_tuple = eth_channel.to_solidity_tuple();
+
+         // contract call open channel
+        adex_contract.call("channelOpen", (sol_tuple,), leader_account, Options::default()).wait()
+            .expect("open channel");
+
+        let contract_addr = <[u8; 20]>::from_hex(&format!("{:?}", adex_contract.address())[2..]).expect("failed to deserialise contract addr");
+
+        let channel_id = eth_channel.hash(&contract_addr).expect("hash hex");
+        println!("channel_id {}", hex::encode(channel_id));
+        // set id to proper id
+        valid_channel.id = ChannelId::from_hex(hex::encode(channel_id)).expect("prep_db: failed to deserialize channel id");
+
+        // eth adapter
+        let mut eth_adapter = setup_eth_adapter(Some(contract_addr));
+        eth_adapter.unlock().expect("should unlock eth adapter");
+        // validate channel
+        eth_adapter.validate_channel(&valid_channel).expect("failed to validate channel");
     }
 }
