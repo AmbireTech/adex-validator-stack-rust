@@ -7,7 +7,7 @@ use std::error::Error;
 use chrono::{DateTime, Utc};
 use ethabi::encode;
 use ethabi::param_type::ParamType;
-use ethabi::token::{LenientTokenizer, StrictTokenizer, Tokenizer, Token};
+use ethabi::token::{LenientTokenizer, StrictTokenizer, Token, Tokenizer};
 use hex::FromHex;
 use primitives::channel::ChannelError;
 use primitives::BigNum;
@@ -16,7 +16,6 @@ use sha2::{Digest, Sha256};
 use std::convert::TryFrom;
 use tiny_keccak::Keccak;
 use web3::types::{Address, U256};
-
 
 pub use self::dummy::DummyAdapter;
 pub use self::ethereum::EthereumAdapter;
@@ -110,9 +109,9 @@ impl TryFrom<&Channel> for EthereumChannel {
 
 impl EthereumChannel {
     pub fn new(
-        creator: &[u8; 20], // 0x prefixed using string helps check if valid eth address
+        creator: &[u8; 20],    // 0x prefixed using string helps check if valid eth address
         token_addr: &[u8; 20], // 0x prefixed using string helps check if valid eth address
-        token_amount: &str, // big num string
+        token_amount: &str,    // big num string
         valid_until: DateTime<Utc>,
         validators: &[ValidatorId],
         spec: &[u8; 32],
@@ -125,10 +124,13 @@ impl EthereumChannel {
         let token_addr = Address::from_slice(token_addr);
         let token_amount = U256::from_dec_str(&token_amount)
             .map_err(|_| ChannelError::InvalidArgument("failed to parse token amount".into()))?;
-        let valid_until =  U256::from_dec_str(&valid_until.timestamp().to_string())
+        let valid_until = U256::from_dec_str(&valid_until.timestamp().to_string())
             .map_err(|_| ChannelError::InvalidArgument("failed to parse valid until".into()))?;
 
-        let validators = validators.iter().map(|v| Address::from_slice(v.inner())).collect();
+        let validators = validators
+            .iter()
+            .map(|v| Address::from_slice(v.inner()))
+            .collect();
         // let validator1 =  hex::decode("2bdeafae53940669daa6f519373f686c1f3d3393").expect("should deserialize v1");
         // let validator2 =  hex::decode("6704Fbfcd5Ef766B287262fA2281C105d57246a6").expect("should deserialize v2");
 
@@ -138,13 +140,13 @@ impl EthereumChannel {
             token_amount,
             valid_until,
             validators,
-            spec: spec.to_owned()
+            spec: spec.to_owned(),
         })
     }
 
     pub fn hash(&self, contract_addr: &[u8; 20]) -> Result<[u8; 32], Box<dyn Error>> {
         // println!("hash {} {}, {} {}, {} {}",&self.creator[2..], &self.creator[2..].len(), contract_addr, contract_addr.len(), &self.token_addr[2..], &self.token_addr[2..].len());
-        
+
         // println!("deposit amount 2 {}", self.token_amount);
         // println!("valid_until 2 {}", self.valid_until);
         let tokens = [
@@ -153,7 +155,12 @@ impl EthereumChannel {
             Token::Address(self.token_addr.to_owned()),
             Token::Uint(self.token_amount.to_owned()),
             Token::Uint(self.valid_until.to_owned()),
-            Token::Array(self.validators.iter().map(|v| Token::Address(v.to_owned())).collect()),
+            Token::Array(
+                self.validators
+                    .iter()
+                    .map(|v| Token::Address(v.to_owned()))
+                    .collect(),
+            ),
             Token::FixedBytes(self.spec.to_vec()),
         ];
 
@@ -181,13 +188,18 @@ impl EthereumChannel {
 
         // let validator1 =  hex::decode("2bdeafae53940669daa6f519373f686c1f3d3393").expect("should deserialize v1");
         // let validator2 =  hex::decode("6704Fbfcd5Ef766B287262fA2281C105d57246a6").expect("should deserialize v2");
-        
+
         Token::Tuple(vec![
             Token::Address(self.creator.to_owned()),
             Token::Address(self.token_addr.to_owned()),
             Token::Uint(self.token_amount.to_owned()),
             Token::Uint(self.valid_until.to_owned()),
-            Token::Array(self.validators.iter().map(|v| Token::Address(v.to_owned())).collect()),
+            Token::Array(
+                self.validators
+                    .iter()
+                    .map(|v| Token::Address(v.to_owned()))
+                    .collect(),
+            ),
             Token::FixedBytes(self.spec.to_vec()),
         ])
     }
@@ -224,8 +236,8 @@ fn encode_params(params: &[(ParamType, &str)], lenient: bool) -> Result<Vec<u8>,
             }
         })
         .collect::<Result<Vec<_>, _>>()?;
-    
-    println!("{:?}", tokens );
+
+    println!("{:?}", tokens);
     Ok(encode(&tokens).to_vec())
 }
 

@@ -2,6 +2,11 @@
 CARGO_MAKE_EXTEND_WORKSPACE_MAKEFILE = "true"
 CARGO_MAKE_CLIPPY_ARGS = "--all-features -- -D warnings"
 
+[tasks.pre-test]
+scripts = [
+    "./scripts/ethereum.sh"
+]
+
 [tasks.dev-test-flow]
 dependencies = [
     "format-flow",

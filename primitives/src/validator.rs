@@ -23,6 +23,10 @@ impl ValidatorId {
         &self.0
     }
 
+    pub fn copy(&self) -> &[u8] {
+        &self.0
+    }
+
     pub fn to_hex_non_prefix_string(&self) -> String {
         hex::encode(self.0)
     }

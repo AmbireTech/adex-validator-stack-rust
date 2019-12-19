@@ -2,6 +2,7 @@ use crate::event_submission::RateLimit;
 use crate::{BigNum, ValidatorId};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use serde_hex::{SerHex, StrictPfx};
 use std::fs;
 use toml;
 
@@ -36,7 +37,8 @@ pub struct Config {
     pub minimal_deposit: BigNum,
     pub minimal_fee: BigNum,
     pub token_address_whitelist: Vec<String>,
-    pub ethereum_core_address: String,
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub ethereum_core_address: [u8; 20],
     pub ethereum_network: String,
     pub validators_whitelist: Vec<ValidatorId>,
 }
