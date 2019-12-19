@@ -23,13 +23,10 @@ impl ValidatorId {
         &self.0
     }
 
-    pub fn copy(&self) -> &[u8] {
-        &self.0
-    }
-
     pub fn to_hex_non_prefix_string(&self) -> String {
         hex::encode(self.0)
     }
+
     pub fn to_hex_checksummed_string(&self) -> String {
         eth_checksum::checksum(&format!("0x{}", hex::encode(self.0)))
     }
@@ -38,6 +35,12 @@ impl ValidatorId {
 impl AsRef<[u8]> for ValidatorId {
     fn as_ref(&self) -> &[u8] {
         &self.0
+    }
+}
+
+impl From<&[u8; 20]> for ValidatorId {
+    fn from(bytes: &[u8; 20]) -> Self {
+        Self(*bytes)
     }
 }
 

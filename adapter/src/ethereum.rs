@@ -160,7 +160,7 @@ impl Adapter for EthereumAdapter {
                 None,
             )
             .wait()
-            .map_err(|e| map_error("contract channel status query failed"))?;
+            .map_err(|_| map_error("contract channel status query failed"))?;
 
         if channel_status != *CHANNEL_STATE_ACTIVE {
             return Err(AdapterError::Configuration(
@@ -203,14 +203,16 @@ impl Adapter for EthereumAdapter {
 
         let sess = match &verified.payload.identity {
             Some(identity) => {
-                let contract_address = Address::from_slice(identity.as_bytes());
-                let contract = get_contract(&self.config, contract_address, &IDENTITY_ABI)
-                    .map_err(|_| map_error("failed to init identity contract"))?;
+
+                let contract_address = Address::from_slice(identity);
+                let (_eloop, transport) = web3::transports::Http::new(&self.config.ethereum_network)?;
+                let web3 = web3::Web3::new(transport);
+                let contract = Contract::from_json(web3.eth(), contract_address, &IDENTITY_ABI)?;
 
                 let privilege_level: U256 = contract
                     .query(
                         "privileges",
-                        verified.from.to_string(),
+                        (verified.from.to_string(),),
                         None,
                         Options::default(),
                         None,
@@ -225,7 +227,7 @@ impl Adapter for EthereumAdapter {
                 }
                 Session {
                     era: verified.payload.era,
-                    uid: ValidatorId::try_from(identity)?,
+                    uid: identity.into(),
                 }
             }
             None => Session {
@@ -293,8 +295,12 @@ pub struct Payload {
     pub id: String,
     pub era: i64,
     pub address: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub identity: Option<String>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "SerHexOpt::<StrictPfx>"
+    )]
+    pub identity: Option<[u8; 20]>,
 }
 
 #[derive(Clone, Debug)]

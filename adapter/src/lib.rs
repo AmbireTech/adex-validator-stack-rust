@@ -109,9 +109,9 @@ impl TryFrom<&Channel> for EthereumChannel {
 
 impl EthereumChannel {
     pub fn new(
-        creator: &[u8; 20],    // 0x prefixed using string helps check if valid eth address
-        token_addr: &[u8; 20], // 0x prefixed using string helps check if valid eth address
-        token_amount: &str,    // big num string
+        creator: &[u8; 20],
+        token_addr: &[u8; 20],
+        token_amount: &str, // big num string
         valid_until: DateTime<Utc>,
         validators: &[ValidatorId],
         spec: &[u8; 32],
@@ -174,15 +174,6 @@ impl EthereumChannel {
     }
 
     pub fn to_solidity_tuple(&self) -> Token {
-        // let spec_h256 = hex::decode(&self.spec).expect("should deserialize spec");
-        // let creator = hex::decode(&self.creator[2..]).expect("should deserialize creator");
-        // let token_addr = hex::decode(&self.token_addr[2..]).expect("should deserialize token addr");
-        // let token_amount = U256::from_dec_str(&self.token_amount).expect("should deserialize token amount");
-        // let valid_until =  U256::from_dec_str(&self.valid_until).expect("should deserialize valid until");
-
-        // let validator1 =  hex::decode("2bdeafae53940669daa6f519373f686c1f3d3393").expect("should deserialize v1");
-        // let validator2 =  hex::decode("6704Fbfcd5Ef766B287262fA2281C105d57246a6").expect("should deserialize v2");
-
         Token::Tuple(vec![
             Token::Address(self.creator.to_owned()),
             Token::Address(self.token_addr.to_owned()),
@@ -229,7 +220,7 @@ fn encode_params(params: &[(ParamType, &str)], lenient: bool) -> Result<Vec<u8>,
             }
         })
         .collect::<Result<Vec<_>, _>>()?;
-        
+
     Ok(encode(&tokens).to_vec())
 }
 
