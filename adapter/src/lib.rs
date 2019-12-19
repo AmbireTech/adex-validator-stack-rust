@@ -150,9 +150,10 @@ impl EthereumChannel {
         })
     }
 
-    pub fn hash(&self, contract_addr: &str) -> Result<[u8; 32], Box<dyn Error>> {
+    pub fn hash(&self, contract_addr: &[u8; 20]) -> Result<[u8; 32], Box<dyn Error>> {
+        let contract_addr = format!("0x{}", hex::encode(contract_addr));
         let params = [
-            (ParamType::Address, contract_addr),
+            (ParamType::Address, contract_addr.as_str()),
             (ParamType::Address, &self.creator),
             (ParamType::Address, &self.token_addr),
             (ParamType::Uint(256), &self.token_amount),
@@ -174,7 +175,7 @@ impl EthereumChannel {
         Ok(res)
     }
 
-    pub fn hash_hex(&self, contract_addr: &str) -> Result<String, Box<dyn Error>> {
+    pub fn hash_hex(&self, contract_addr: &[u8; 20]) -> Result<String, Box<dyn Error>> {
         let result = self.hash(contract_addr)?;
         Ok(format!("0x{}", hex::encode(result)))
     }

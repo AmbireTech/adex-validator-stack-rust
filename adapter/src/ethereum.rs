@@ -13,6 +13,7 @@ use primitives::{
     Channel, ValidatorId,
 };
 use serde::{Deserialize, Serialize};
+use serde_hex::{SerHexOpt, StrictPfx};
 use serde_json::Value;
 use std::convert::TryFrom;
 use std::error::Error;
@@ -142,7 +143,7 @@ impl Adapter for EthereumAdapter {
         }
 
         // query the blockchain for the channel status
-        let contract_address = Address::from_slice(self.config.ethereum_core_address.as_bytes());
+        let contract_address: Address = self.config.ethereum_core_address.into();
         let contract = get_contract(&self.config, contract_address, &ADEXCORE_ABI)
             .map_err(|_| map_error("failed to init core contract"))?;
 
@@ -192,7 +193,7 @@ impl Adapter for EthereumAdapter {
 
         let sess = match &verified.payload.identity {
             Some(identity) => {
-                let contract_address = Address::from_slice(identity.as_bytes());
+                let contract_address: Address = identity.into();
                 let contract = get_contract(&self.config, contract_address, &IDENTITY_ABI)
                     .map_err(|_| map_error("failed to init identity contract"))?;
 
@@ -214,7 +215,7 @@ impl Adapter for EthereumAdapter {
                 }
                 Session {
                     era: verified.payload.era,
-                    uid: ValidatorId::try_from(identity)?,
+                    uid: identity.into(),
                 }
             }
             None => Session {
@@ -282,8 +283,12 @@ pub struct Payload {
     pub id: String,
     pub era: i64,
     pub address: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub identity: Option<String>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "SerHexOpt::<StrictPfx>"
+    )]
+    pub identity: Option<[u8; 20]>,
 }
 
 #[derive(Clone, Debug)]
