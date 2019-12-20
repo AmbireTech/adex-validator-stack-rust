@@ -203,7 +203,6 @@ impl Adapter for EthereumAdapter {
 
         let sess = match &verified.payload.identity {
             Some(identity) => {
-
                 let contract_address = Address::from_slice(identity);
                 let (_eloop, transport) = web3::transports::Http::new(&self.config.ethereum_network)
                     .map_err(|_| map_error("failed to init http transport"))?;
@@ -214,7 +213,7 @@ impl Adapter for EthereumAdapter {
                 let privilege_level: U256 = contract
                     .query(
                         "privileges",
-                        (verified.from.to_string(),),
+                        (Token::Address(Address::from_slice(verified.from.inner())),),
                         None,
                         Options::default(),
                         None,
@@ -466,7 +465,7 @@ mod test {
     }
 
     #[test]
-    fn should_validate_channel_properly() {
+    fn should_validate_valid_channel_properly() {
         let (eloop, http) =
             web3::transports::Http::new("http://localhost:8545").expect("failed to init transport");
         eloop.into_remote();
@@ -599,4 +598,62 @@ mod test {
             .validate_channel(&valid_channel)
             .expect("failed to validate channel");
     }
+
+    #[test]
+    fn should_generate_session_from_token_with_identity() {
+        // setup test payload
+        let mut eth_adapter = setup_eth_adapter(None);
+        eth_adapter.unlock().expect("should unlock eth adapter");
+
+        // deploy identity contract
+        let (eloop, http) =
+        web3::transports::Http::new("http://localhost:8545").expect("failed to init transport");
+        eloop.into_remote();
+
+        let web3 = web3::Web3::new(http);
+        // part of address used in initializing ganache-cli
+        let leader_account: Address = "Df08F82De32B8d460adbE8D72043E3a7e25A3B39"
+            .parse()
+            .expect("failed to parse leader account");
+        
+        let eth_adapter_address: Address = eth_adapter.whoami().to_hex_non_prefix_string().parse().expect("failed to parse eth adapter address");
+        
+        let identity_bytecode = include_str!("../test/resources/identitybytecode.json");
+
+        // deploy identity contract
+        let identity_contract = Contract::deploy(web3.eth(), &IDENTITY_ABI)
+            .expect("invalid token token contract")
+            .confirmations(0)
+            .options(Options::with(|opt| {
+                opt.gas_price = Some(1.into());
+                opt.gas = Some(6_721_975.into());
+            }))
+            .execute(identity_bytecode, (
+                Token::Array(vec![Token::Address(eth_adapter_address)]),
+                Token::Array(vec![Token::Uint(1.into())])
+            ), leader_account)
+            .expect("Correct parameters are passed to the constructor.")
+            .wait()
+            .expect("failed to wait");
+
+        // identity contract address
+        let identity =  <[u8; 20]>::from_hex(&format!("{:?}", identity_contract.address())[2..]).expect("failed to deserialize address");
+        
+        let payload = Payload {
+            id: eth_adapter.whoami().to_hex_checksummed_string(),
+            era: 100_000,
+            address: format!("{:?}", leader_account),
+            identity: Some(identity),
+        };
+
+        let wallet = eth_adapter.wallet.clone();
+        let response = ewt_sign(&wallet.unwrap(), &eth_adapter.keystore_pwd, &payload)
+            .expect("failed to generate ewt signature");
+        
+        // verify since its with identity
+        let session = eth_adapter.session_from_token(&response).expect("failed generate session");
+        assert_eq!(session.uid.inner(), &identity);
+    }
+
+
 }

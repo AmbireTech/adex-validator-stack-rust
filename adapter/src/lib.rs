@@ -6,8 +6,7 @@ use std::error::Error;
 
 use chrono::{DateTime, Utc};
 use ethabi::encode;
-use ethabi::param_type::ParamType;
-use ethabi::token::{LenientTokenizer, StrictTokenizer, Token, Tokenizer};
+use ethabi::token::{Token};
 use hex::FromHex;
 use primitives::channel::ChannelError;
 use primitives::BigNum;
@@ -32,11 +31,12 @@ pub fn get_signable_state_root(
     channel_id: &[u8],
     balance_root: &[u8; 32],
 ) -> Result<[u8; 32], Box<dyn Error>> {
-    let params = [
-        (ParamType::FixedBytes(32), &hex::encode(channel_id)[..]),
-        (ParamType::FixedBytes(32), &hex::encode(balance_root)[..]),
+    let tokens = [
+        Token::FixedBytes(channel_id.to_vec()),
+        Token::FixedBytes(balance_root.to_vec())
     ];
-    let encoded = encode_params(&params, true)?;
+
+    let encoded = encode(&tokens).to_vec();
 
     let mut result = Keccak::new_keccak256();
     result.update(&encoded);
@@ -48,11 +48,14 @@ pub fn get_signable_state_root(
 }
 
 pub fn get_balance_leaf(acc: &ValidatorId, amnt: &BigNum) -> Result<[u8; 32], Box<dyn Error>> {
-    let params = [
-        (ParamType::Address, &acc.to_hex_non_prefix_string()[..]),
-        (ParamType::Uint(256), &amnt.to_str_radix(10)[..]),
+    let tokens = [
+        Token::Address(Address::from_slice(acc.inner())),
+        Token::Uint(
+            U256::from_dec_str(&amnt.to_str_radix(10))
+                .map_err(|_| ChannelError::InvalidArgument("failed to parse amt".into()))?
+        )
     ];
-    let encoded = encode_params(&params, true)?;
+    let encoded = encode(&tokens).to_vec();
 
     let mut result = Keccak::new_keccak256();
     result.update(&encoded);
@@ -207,21 +210,6 @@ impl EthereumChannel {
         let result = self.hash_to_sign(contract_addr, balance_root)?;
         Ok(format!("0x{}", hex::encode(result)))
     }
-}
-
-fn encode_params(params: &[(ParamType, &str)], lenient: bool) -> Result<Vec<u8>, Box<dyn Error>> {
-    let tokens = params
-        .iter()
-        .map(|(param, value)| {
-            if lenient {
-                LenientTokenizer::tokenize(param, value)
-            } else {
-                StrictTokenizer::tokenize(param, value)
-            }
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-
-    Ok(encode(&tokens).to_vec())
 }
 
 #[cfg(test)]
