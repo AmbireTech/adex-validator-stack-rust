@@ -121,16 +121,15 @@ fn run<A: Adapter + 'static>(
     is_single_tick: bool,
     sentry_url: &str,
     config: &Config,
-    adapter: A,
+    mut adapter: A,
 ) -> Result<(), Box<dyn Error>> {
-    let mut sentry_adapter = adapter.clone();
     // unlock adapter
-    sentry_adapter.unlock()?;
+    adapter.unlock()?;
 
     let args = Args {
         sentry_url: sentry_url.to_owned(),
         config: config.to_owned(),
-        adapter: sentry_adapter,
+        adapter,
     };
 
     if is_single_tick {
