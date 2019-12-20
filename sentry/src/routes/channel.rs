@@ -4,7 +4,6 @@ use crate::success_response;
 use crate::Application;
 use crate::ResponseError;
 use crate::RouteParams;
-use futures::TryStreamExt;
 use hex::FromHex;
 use hyper::{Body, Request, Response};
 use primitives::adapter::Adapter;
@@ -36,7 +35,7 @@ pub async fn create_channel<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
-    let body = req.into_body().try_concat().await?;
+    let body = hyper::body::to_bytes(req.into_body()).await?;
 
     let channel = serde_json::from_slice::<Channel>(&body)?;
 

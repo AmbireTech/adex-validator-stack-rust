@@ -6,8 +6,6 @@ edition = "2018"
 
 [dependencies]
 primitives = {path = "../primitives"}
-# Futures
-futures-preview = {version = "=0.3.0-alpha.19"}
 # Time handling
 chrono = "0.4"
 # To/From Hex
