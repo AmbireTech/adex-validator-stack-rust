@@ -6,7 +6,7 @@ use std::error::Error;
 
 use chrono::{DateTime, Utc};
 use ethabi::encode;
-use ethabi::token::{Token};
+use ethabi::token::Token;
 use hex::FromHex;
 use primitives::channel::ChannelError;
 use primitives::BigNum;
@@ -33,7 +33,7 @@ pub fn get_signable_state_root(
 ) -> Result<[u8; 32], Box<dyn Error>> {
     let tokens = [
         Token::FixedBytes(channel_id.to_vec()),
-        Token::FixedBytes(balance_root.to_vec())
+        Token::FixedBytes(balance_root.to_vec()),
     ];
 
     let encoded = encode(&tokens).to_vec();
@@ -52,8 +52,8 @@ pub fn get_balance_leaf(acc: &ValidatorId, amnt: &BigNum) -> Result<[u8; 32], Bo
         Token::Address(Address::from_slice(acc.inner())),
         Token::Uint(
             U256::from_dec_str(&amnt.to_str_radix(10))
-                .map_err(|_| ChannelError::InvalidArgument("failed to parse amt".into()))?
-        )
+                .map_err(|_| ChannelError::InvalidArgument("failed to parse amt".into()))?,
+        ),
     ];
     let encoded = encode(&tokens).to_vec();
 

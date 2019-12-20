@@ -204,8 +204,9 @@ impl Adapter for EthereumAdapter {
         let sess = match &verified.payload.identity {
             Some(identity) => {
                 let contract_address = Address::from_slice(identity);
-                let (_eloop, transport) = web3::transports::Http::new(&self.config.ethereum_network)
-                    .map_err(|_| map_error("failed to init http transport"))?;
+                let (_eloop, transport) =
+                    web3::transports::Http::new(&self.config.ethereum_network)
+                        .map_err(|_| map_error("failed to init http transport"))?;
                 let web3 = web3::Web3::new(transport);
                 let contract = Contract::from_json(web3.eth(), contract_address, &IDENTITY_ABI)
                     .map_err(|_| map_error("failed to init identity contract"))?;
@@ -607,7 +608,7 @@ mod test {
 
         // deploy identity contract
         let (eloop, http) =
-        web3::transports::Http::new("http://localhost:8545").expect("failed to init transport");
+            web3::transports::Http::new("http://localhost:8545").expect("failed to init transport");
         eloop.into_remote();
 
         let web3 = web3::Web3::new(http);
@@ -615,9 +616,13 @@ mod test {
         let leader_account: Address = "Df08F82De32B8d460adbE8D72043E3a7e25A3B39"
             .parse()
             .expect("failed to parse leader account");
-        
-        let eth_adapter_address: Address = eth_adapter.whoami().to_hex_non_prefix_string().parse().expect("failed to parse eth adapter address");
-        
+
+        let eth_adapter_address: Address = eth_adapter
+            .whoami()
+            .to_hex_non_prefix_string()
+            .parse()
+            .expect("failed to parse eth adapter address");
+
         let identity_bytecode = include_str!("../test/resources/identitybytecode.json");
 
         // deploy identity contract
@@ -628,17 +633,22 @@ mod test {
                 opt.gas_price = Some(1.into());
                 opt.gas = Some(6_721_975.into());
             }))
-            .execute(identity_bytecode, (
-                Token::Array(vec![Token::Address(eth_adapter_address)]),
-                Token::Array(vec![Token::Uint(1.into())])
-            ), leader_account)
+            .execute(
+                identity_bytecode,
+                (
+                    Token::Array(vec![Token::Address(eth_adapter_address)]),
+                    Token::Array(vec![Token::Uint(1.into())]),
+                ),
+                leader_account,
+            )
             .expect("Correct parameters are passed to the constructor.")
             .wait()
             .expect("failed to wait");
 
         // identity contract address
-        let identity =  <[u8; 20]>::from_hex(&format!("{:?}", identity_contract.address())[2..]).expect("failed to deserialize address");
-        
+        let identity = <[u8; 20]>::from_hex(&format!("{:?}", identity_contract.address())[2..])
+            .expect("failed to deserialize address");
+
         let payload = Payload {
             id: eth_adapter.whoami().to_hex_checksummed_string(),
             era: 100_000,
@@ -649,11 +659,11 @@ mod test {
         let wallet = eth_adapter.wallet.clone();
         let response = ewt_sign(&wallet.unwrap(), &eth_adapter.keystore_pwd, &payload)
             .expect("failed to generate ewt signature");
-        
+
         // verify since its with identity
-        let session = eth_adapter.session_from_token(&response).expect("failed generate session");
+        let session = eth_adapter
+            .session_from_token(&response)
+            .expect("failed generate session");
         assert_eq!(session.uid.inner(), &identity);
     }
-
-
 }

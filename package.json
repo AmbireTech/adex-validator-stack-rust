@@ -1,0 +1,27 @@
+{
+  "name": "adex-validator-stack-rust",
+  "version": "1.0.0",
+  "description": "AdEx protocol on Ethereum",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "lib": "lib"
+  },
+  "dependencies": {
+    "ganache-cli": "^6.7.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AdExNetwork/adex-validator-stack-rust.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/AdExNetwork/adex-validator-stack-rust/issues"
+  },
+  "homepage": "https://github.com/AdExNetwork/adex-validator-stack-rust#readme"
+}
