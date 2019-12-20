@@ -20,7 +20,7 @@ start_testrpc(){
         --account="0x2bdd21761a483f71054e14f5b827213567971c676928d9a1808cbfa4b7501208,9000000000000000000000000000"
         --account="0x2bdd21761a483f71054e14f5b827213567971c676928d9a1808cbfa4b7501209,9000000000000000000000000000"
     )
-    node_modules/.bin/ganache-cli --port $testrpc_port --gasLimit 0xfffffffffffff "${accounts[@]}" > /dev/null &
+    ../node_modules/.bin/ganache-cli --port $testrpc_port --gasLimit 0xfffffffffffff "${accounts[@]}" > /dev/null &
     testrpc_pid=$!
 }
 
@@ -29,7 +29,6 @@ if testrpc_running; then
 else
   echo "Starting our own testrpc instance"
   start_testrpc
+  # the ganache-cli need time to start up
+  sleep 5
 fi
-
-# the ganache-cli need time to start up
-sleep 5

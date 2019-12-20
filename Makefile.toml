@@ -5,7 +5,7 @@ CARGO_MAKE_CLIPPY_ARGS = "--all-features -- -D warnings"
 [tasks.pre-test]
 script = [
     "npm install",
-    "./scripts/ethereum.sh"
+    "../scripts/ethereum.sh"
 ]
 
 [tasks.dev-test-flow]
