@@ -485,8 +485,6 @@ mod test {
         let token_abi = include_bytes!("../test/resources/tokenabi.json");
         // adexbytecode.json
         let adex_bytecode = include_str!("../../lib/protocol-eth/resources/bytecode/AdExCore.json");
-        // adexabi.json
-        let adex_abi = include_bytes!("../../lib/protocol-eth/abi/AdExCore.json");
 
         // deploy contracts
         let token_contract = Contract::deploy(web3.eth(), token_abi)
@@ -501,7 +499,7 @@ mod test {
             .wait()
             .expect("failed to wait");
 
-        let adex_contract = Contract::deploy(web3.eth(), adex_abi)
+        let adex_contract = Contract::deploy(web3.eth(), &ADEXCORE_ABI)
             .expect("invalid adex contract")
             .confirmations(0)
             .options(Options::with(|opt| {
