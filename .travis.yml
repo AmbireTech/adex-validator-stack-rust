@@ -1,6 +1,8 @@
 language: rust
 rust:
   - stable
+# add nodejs for ganche-cli
+node_js: "12.12.0"
 # Need to cache the whole `.cargo` directory to keep .crates.toml for
 # cargo-update to work
 cache:
