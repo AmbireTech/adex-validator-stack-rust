@@ -1,7 +1,4 @@
-use std::pin::Pin;
-
 use chrono::{DateTime, Utc};
-use futures::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 use std::fmt;
@@ -16,8 +13,6 @@ pub enum ValidatorError {
     InvalidSignature,
     InvalidTransition,
 }
-
-pub type ValidatorFuture<T> = Pin<Box<dyn Future<Output = Result<T, ValidatorError>> + Send>>;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(transparent)]
