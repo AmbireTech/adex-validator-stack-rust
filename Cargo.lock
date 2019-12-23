@@ -12,7 +12,6 @@ dependencies = [
  "ethkey 0.4.0 (git+https://github.com/paritytech/parity-ethereum)",
  "ethstore 0.2.1 (git+https://github.com/paritytech/parity-ethereum)",
  "futures 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures-preview 0.3.0-alpha.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "hex 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "parity-crypto 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1030,6 +1029,7 @@ name = "futures-util"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
+ "futures 0.1.29 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-channel 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-core 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-io 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
