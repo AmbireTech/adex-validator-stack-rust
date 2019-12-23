@@ -6,6 +6,7 @@ use std::convert::From;
 use std::error::Error;
 use std::fmt;
 use std::fmt::Debug;
+use futures::future::{BoxFuture};
 
 pub type AdapterResult<T> = Result<T, AdapterError>;
 
@@ -79,10 +80,10 @@ pub trait Adapter: ChannelValidator + Send + Sync + Clone + Debug {
     ) -> AdapterResult<bool>;
 
     /// Validate a channel
-    fn validate_channel(&self, channel: &Channel) -> AdapterResult<bool>;
+    fn validate_channel<'a>(&'a self, channel: &'a Channel) -> BoxFuture<'a, AdapterResult<bool>>;
 
     /// Get user session from token
-    fn session_from_token(&self, token: &str) -> AdapterResult<Session>;
+    fn session_from_token<'a>(&'a self, token: &'a str) -> BoxFuture<'a, AdapterResult<Session>>;
 
     /// Gets authentication for specific validator
     fn get_auth(&self, validator_id: &ValidatorId) -> AdapterResult<String>;

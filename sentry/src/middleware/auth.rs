@@ -44,7 +44,7 @@ pub(crate) async fn for_request(
             None => {
                 // If there was a problem with the Session or the Token, this will error
                 // and a BadRequest response will be returned
-                let adapter_session = adapter.session_from_token(token)?;
+                let adapter_session = adapter.session_from_token(token).await?;
 
                 // save the Adapter Session to Redis for the next request
                 // if serde errors on deserialization this will override the value inside
