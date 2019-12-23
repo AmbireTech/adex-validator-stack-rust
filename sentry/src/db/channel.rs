@@ -70,27 +70,6 @@ pub async fn insert_channel(
         .await
 }
 
-pub async fn get_channel_by_creator(
-    pool: &DbPool,
-    id: &ChannelId,
-) -> Result<Vec<Channel>, RunError<bb8_postgres::tokio_postgres::Error>> {
-    pool.run(move |connection| {
-        async move {
-            match connection
-                .prepare("SELECT id FROM channels WHERE creator = $1")
-                .await
-            {
-                Ok(select) => match connection.query(&select, &[&id]).await {
-                    Ok(results) => Ok((results.iter().map(Channel::from).collect(), connection)),
-                    Err(e) => Err((e, connection)),
-                },
-                Err(e) => Err((e, connection)),
-            }
-        }
-    })
-    .await
-}
-
 mod list_channels {
     use crate::db::DbPool;
     use bb8::RunError;
