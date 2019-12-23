@@ -3,6 +3,8 @@ use chrono::Utc;
 use ethabi::token::Token;
 use ethkey::Password;
 use ethstore::SafeAccount;
+use futures::compat::Future01CompatExt;
+use futures::future::BoxFuture;
 use lazy_static::lazy_static;
 use parity_crypto::publickey::{
     public_to_address, recover, verify_address, Address, Message, Signature,
@@ -24,8 +26,6 @@ use web3::{
     contract::{Contract, Options},
     types::U256,
 };
-use futures::future::{BoxFuture};
-use futures::compat::Future01CompatExt;
 
 lazy_static! {
     static ref ADEXCORE_ABI: &'static [u8] =
@@ -124,132 +124,129 @@ impl Adapter for EthereumAdapter {
     }
 
     fn validate_channel<'a>(&'a self, channel: &'a Channel) -> BoxFuture<'a, AdapterResult<bool>> {
-        Box::pin(
-            async move {
-                // check if channel is valid
-                if let Err(e) = EthereumAdapter::is_channel_valid(&self.config, self.whoami(), channel) {
-                    return Err(AdapterError::InvalidChannel(e.to_string()));
-                }
-
-                let eth_channel = EthereumChannel::try_from(channel)
-                    .map_err(|e| AdapterError::InvalidChannel(e.to_string()))?;
-
-                let channel_id = eth_channel
-                    .hash_hex(&self.config.ethereum_core_address)
-                    .map_err(|_| map_error("Failed to hash the channel id"))?;
-
-                let our_channel_id = format!("0x{}", hex::encode(channel.id));
-                if channel_id != our_channel_id {
-                    return Err(AdapterError::Configuration(
-                        "channel.id is not valid".to_string(),
-                    ));
-                }
-
-                let contract_address = Address::from_slice(&self.config.ethereum_core_address);
-
-                let (_eloop, transport) = web3::transports::Http::new(&self.config.ethereum_network)
-                    .map_err(|_| map_error("failed to init http transport"))?;
-                let web3 = web3::Web3::new(transport);
-
-                let contract = Contract::from_json(web3.eth(), contract_address, &ADEXCORE_ABI)
-                    .map_err(|_| map_error("failed to init core contract"))?;
-
-                let channel_status: U256 = contract
-                    .query(
-                        "states",
-                        (Token::FixedBytes(channel.id.as_ref().to_vec()),),
-                        None,
-                        Options::default(),
-                        None,
-                    )
-                    .compat()
-                    .await
-                    .map_err(|_| map_error("contract channel status query failed"))?;
-
-                if channel_status != *CHANNEL_STATE_ACTIVE {
-                    return Err(AdapterError::Configuration(
-                        "channel is not Active on the ethereum network".to_string(),
-                    ));
-                }
-
-                Ok(true)
+        Box::pin(async move {
+            // check if channel is valid
+            if let Err(e) = EthereumAdapter::is_channel_valid(&self.config, self.whoami(), channel)
+            {
+                return Err(AdapterError::InvalidChannel(e.to_string()));
             }
-        )
+
+            let eth_channel = EthereumChannel::try_from(channel)
+                .map_err(|e| AdapterError::InvalidChannel(e.to_string()))?;
+
+            let channel_id = eth_channel
+                .hash_hex(&self.config.ethereum_core_address)
+                .map_err(|_| map_error("Failed to hash the channel id"))?;
+
+            let our_channel_id = format!("0x{}", hex::encode(channel.id));
+            if channel_id != our_channel_id {
+                return Err(AdapterError::Configuration(
+                    "channel.id is not valid".to_string(),
+                ));
+            }
+
+            let contract_address = Address::from_slice(&self.config.ethereum_core_address);
+
+            let (_eloop, transport) = web3::transports::Http::new(&self.config.ethereum_network)
+                .map_err(|_| map_error("failed to init http transport"))?;
+            let web3 = web3::Web3::new(transport);
+
+            let contract = Contract::from_json(web3.eth(), contract_address, &ADEXCORE_ABI)
+                .map_err(|_| map_error("failed to init core contract"))?;
+
+            let channel_status: U256 = contract
+                .query(
+                    "states",
+                    (Token::FixedBytes(channel.id.as_ref().to_vec()),),
+                    None,
+                    Options::default(),
+                    None,
+                )
+                .compat()
+                .await
+                .map_err(|_| map_error("contract channel status query failed"))?;
+
+            if channel_status != *CHANNEL_STATE_ACTIVE {
+                return Err(AdapterError::Configuration(
+                    "channel is not Active on the ethereum network".to_string(),
+                ));
+            }
+
+            Ok(true)
+        })
     }
 
     /// Creates a `Session` from a provided Token by calling the Contract.
     /// Does **not** cache the (`Token`, `Session`) pair.
     fn session_from_token<'a>(&'a self, token: &'a str) -> BoxFuture<'a, AdapterResult<Session>> {
-        Box::pin(
-            async move {
-                if token.len() < 16 {
-                    return Err(AdapterError::Failed("invalid token id".to_string()));
-                }
-        
-                let parts: Vec<&str> = token.split('.').collect();
-                let (header_encoded, payload_encoded, token_encoded) =
-                    match (parts.get(0), parts.get(1), parts.get(2)) {
-                        (Some(header_encoded), Some(payload_encoded), Some(token_encoded)) => {
-                            (header_encoded, payload_encoded, token_encoded)
-                        }
-                        _ => {
-                            return Err(AdapterError::Failed(format!(
-                                "{} token string is incorrect",
-                                token
-                            )))
-                        }
-                    };
-        
-                let verified = ewt_verify(header_encoded, payload_encoded, token_encoded)
-                    .map_err(|e| map_error(&e.to_string()))?;
-        
-                if self.whoami().to_hex_checksummed_string() != verified.payload.id {
-                    return Err(AdapterError::Configuration(
-                        "token payload.id !== whoami(): token was not intended for us".to_string(),
-                    ));
-                }
-        
-                let sess = match &verified.payload.identity {
-                    Some(identity) => {
-                        let contract_address = Address::from_slice(identity);
-                        let (_eloop, transport) =
-                            web3::transports::Http::new(&self.config.ethereum_network)
-                                .map_err(|_| map_error("failed to init http transport"))?;
-                        let web3 = web3::Web3::new(transport);
-                        let contract = Contract::from_json(web3.eth(), contract_address, &IDENTITY_ABI)
-                            .map_err(|_| map_error("failed to init identity contract"))?;
-        
-                        let privilege_level: U256 = contract
-                            .query(
-                                "privileges",
-                                (Token::Address(Address::from_slice(verified.from.inner())),),
-                                None,
-                                Options::default(),
-                                None,
-                            )
-                            .compat()
-                            .await
-                            .map_err(|_| map_error("failed query priviledge level on contract"))?;
-        
-                        if privilege_level == *PRIVILEGE_LEVEL_NONE {
-                            return Err(AdapterError::Authorization(
-                                "insufficient privilege".to_string(),
-                            ));
-                        }
-                        Session {
-                            era: verified.payload.era,
-                            uid: identity.into(),
-                        }
-                    }
-                    None => Session {
-                        era: verified.payload.era,
-                        uid: verified.from,
-                    },
-                };
-        
-                Ok(sess)
+        Box::pin(async move {
+            if token.len() < 16 {
+                return Err(AdapterError::Failed("invalid token id".to_string()));
             }
-        )
+
+            let parts: Vec<&str> = token.split('.').collect();
+            let (header_encoded, payload_encoded, token_encoded) =
+                match (parts.get(0), parts.get(1), parts.get(2)) {
+                    (Some(header_encoded), Some(payload_encoded), Some(token_encoded)) => {
+                        (header_encoded, payload_encoded, token_encoded)
+                    }
+                    _ => {
+                        return Err(AdapterError::Failed(format!(
+                            "{} token string is incorrect",
+                            token
+                        )))
+                    }
+                };
+
+            let verified = ewt_verify(header_encoded, payload_encoded, token_encoded)
+                .map_err(|e| map_error(&e.to_string()))?;
+
+            if self.whoami().to_hex_checksummed_string() != verified.payload.id {
+                return Err(AdapterError::Configuration(
+                    "token payload.id !== whoami(): token was not intended for us".to_string(),
+                ));
+            }
+
+            let sess = match &verified.payload.identity {
+                Some(identity) => {
+                    let contract_address = Address::from_slice(identity);
+                    let (_eloop, transport) =
+                        web3::transports::Http::new(&self.config.ethereum_network)
+                            .map_err(|_| map_error("failed to init http transport"))?;
+                    let web3 = web3::Web3::new(transport);
+                    let contract = Contract::from_json(web3.eth(), contract_address, &IDENTITY_ABI)
+                        .map_err(|_| map_error("failed to init identity contract"))?;
+
+                    let privilege_level: U256 = contract
+                        .query(
+                            "privileges",
+                            (Token::Address(Address::from_slice(verified.from.inner())),),
+                            None,
+                            Options::default(),
+                            None,
+                        )
+                        .compat()
+                        .await
+                        .map_err(|_| map_error("failed query priviledge level on contract"))?;
+
+                    if privilege_level == *PRIVILEGE_LEVEL_NONE {
+                        return Err(AdapterError::Authorization(
+                            "insufficient privilege".to_string(),
+                        ));
+                    }
+                    Session {
+                        era: verified.payload.era,
+                        uid: identity.into(),
+                    }
+                }
+                None => Session {
+                    era: verified.payload.era,
+                    uid: verified.from,
+                },
+            };
+
+            Ok(sess)
+        })
     }
 
     fn get_auth(&self, validator: &ValidatorId) -> AdapterResult<String> {

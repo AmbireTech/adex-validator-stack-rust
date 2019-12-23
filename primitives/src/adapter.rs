@@ -1,12 +1,12 @@
 use crate::channel_validator::ChannelValidator;
 use crate::{Channel, DomainError, ValidatorId};
+use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::From;
 use std::error::Error;
 use std::fmt;
 use std::fmt::Debug;
-use futures::future::{BoxFuture};
 
 pub type AdapterResult<T> = Result<T, AdapterError>;
 
