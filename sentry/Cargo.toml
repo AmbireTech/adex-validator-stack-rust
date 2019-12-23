@@ -15,11 +15,11 @@ hex = "0.3.2"
 # CLI
 clap = "2.33.0"
 # Server
-tokio = "0.2.0-alpha.6"
-hyper = {version = "=0.13.0-alpha.4", features = ["unstable-stream"]}
+tokio = { version = "0.2", features = ["macros"] }
+hyper = { version = "0.13", features = ["stream"] }
 regex = "1"
 # Database
-redis = {version = "0.13.1-alpha.0"}
+redis = { version = "0.13.1-alpha.0", features = ["tokio-rt-core"] }
 bb8 = { git = "https://github.com/djc/bb8", branch = "async-await" }
 bb8-postgres = { git = "https://github.com/djc/bb8", branch = "async-await", features = ["with-chrono-0_4", "with-serde_json-1"] }
 # Migrations
