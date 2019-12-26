@@ -24,6 +24,9 @@ ethkey = { version = "0.4.0", git = "https://github.com/paritytech/parity-ethere
 sha2 = "0.8.0"
 base64 = "0.10.1"
 lazy_static = "1.4.0"
+# Futures
+futures = { version = "0.3.1", features = ["compat"] }
 
 [dev-dependencies]
 byteorder = "1.3"
+tokio = { version = "0.2", features = ["macros", "rt-core"] }

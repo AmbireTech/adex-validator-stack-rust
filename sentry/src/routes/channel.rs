@@ -39,7 +39,7 @@ pub async fn create_channel<A: Adapter>(
 
     let channel = serde_json::from_slice::<Channel>(&body)?;
 
-    if let Err(e) = app.adapter.validate_channel(&channel) {
+    if let Err(e) = app.adapter.validate_channel(&channel).await {
         return Err(ResponseError::BadRequest(e.to_string()));
     }
 
