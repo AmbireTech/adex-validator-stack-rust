@@ -1,17 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize)]
-pub struct AnalyticsQuery {
-    #[serde(default = "default_limit")]
-    pub limit: u32,
-    #[serde(default = "default_event_type")]
-    pub event_type: String,
-    #[serde(default = "default_metric")]
-    pub metric: String,
-    #[serde(default = "default_timeframe")]
-    pub timeframe: String,
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AnalyticsResponse {
     time: u32,
@@ -33,23 +21,35 @@ pub mod postgres {
     }
 }
 
+#[derive(Debug, Deserialize)]
+pub struct AnalyticsQuery {
+    #[serde(default = "default_limit")]
+    pub limit: u32,
+    #[serde(default = "default_event_type")]
+    pub event_type: String,
+    #[serde(default = "default_metric")]
+    pub metric: String,
+    #[serde(default = "default_timeframe")]
+    pub timeframe: String,
+}
+
 impl AnalyticsQuery {
     pub fn is_valid(&self) -> Result<(), String> {
         let valid_event_types = ["IMPRESSION"];
         let valid_metric = ["eventPayouts", "eventCounts"];
         let valid_timeframe = ["year", "month", "week", "day", "hour"];
 
-        if !valid_event_types.iter().any(|e| *e == &self.event_type[..]) {
+        if !valid_event_types.contains(&self.event_type.as_str()) {
             Err(format!(
                 "invalid event_type, possible values are: {}",
                 valid_event_types.join(" ,")
             ))
-        } else if !valid_metric.iter().any(|e| *e == &self.metric[..]) {
+        } else if !valid_metric.contains(&self.metric.as_str()) {
             Err(format!(
                 "invalid metric, possible values are: {}",
                 valid_metric.join(" ,")
             ))
-        } else if !valid_timeframe.iter().any(|e| *e == &self.timeframe[..]) {
+        } else if !valid_timeframe.contains(&self.timeframe.as_str()) {
             Err(format!(
                 "invalid timeframe, possible values are: {}",
                 valid_timeframe.join(" ,")
