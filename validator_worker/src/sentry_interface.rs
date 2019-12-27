@@ -23,7 +23,6 @@ pub struct SentryApi<T: Adapter> {
     pub logging: bool,
     pub channel: Channel,
     pub config: Config,
-    pub whoami: ValidatorId,
     pub propagate_to: Vec<(ValidatorDesc, String)>,
 }
 
@@ -33,7 +32,6 @@ impl<T: Adapter + 'static> SentryApi<T> {
         channel: &Channel,
         config: &Config,
         logging: bool,
-        whoami: &ValidatorId,
     ) -> Result<Self, ValidatorWorker> {
         let client = Client::builder()
             .timeout(Duration::from_secs(config.fetch_timeout.into()))
@@ -41,7 +39,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
             .unwrap();
 
         // validate that we are to validate the channel
-        match channel.spec.validators.find(&whoami) {
+        match channel.spec.validators.find(adapter.whoami()) {
             SpecValidator::Leader(v) | SpecValidator::Follower(v) => {
                 let channel_id = format!("0x{}", hex::encode(&channel.id));
                 let validator_url = format!("{}/channel/{}", v.url, channel_id);
@@ -70,7 +68,6 @@ impl<T: Adapter + 'static> SentryApi<T> {
                     propagate_to,
                     channel: channel.to_owned(),
                     config: config.to_owned(),
-                    whoami: whoami.to_owned(),
                 })
             }
             SpecValidator::None => Err(ValidatorWorker::Failed(
@@ -92,13 +89,15 @@ impl<T: Adapter + 'static> SentryApi<T> {
 
     pub async fn get_latest_msg(
         &self,
-        from: String,
+        from: &ValidatorId,
         message_types: &[&str],
     ) -> Result<Option<MessageTypes>, reqwest::Error> {
         let message_type = message_types.join("+");
         let url = format!(
             "{}/validator-messages/{}/{}?limit=1",
-            self.validator_url, from, message_type
+            self.validator_url,
+            from.to_string(),
+            message_type
         );
         let result = self
             .client
@@ -115,7 +114,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
         &self,
         message_types: &[&str],
     ) -> Result<Option<MessageTypes>, reqwest::Error> {
-        self.get_latest_msg(self.whoami.to_string(), message_types)
+        self.get_latest_msg(self.adapter.whoami(), message_types)
             .await
     }
 
@@ -133,7 +132,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
         let future = self
             .client
             .get(&format!(
-                "{}/last-approved?withHearbeat=true",
+                "{}/last-approved?withHeartbeat=true",
                 self.validator_url
             ))
             .send()
@@ -148,7 +147,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
     ) -> Result<EventAggregateResponse, Box<ValidatorWorker>> {
         let auth_token = self
             .adapter
-            .get_auth(&self.whoami)
+            .get_auth(self.adapter.whoami())
             .map_err(|e| Box::new(ValidatorWorker::Failed(e.to_string())))?;
 
         let url = format!(
@@ -222,18 +221,17 @@ fn handle_http_error(e: reqwest::Error) {
 
 pub async fn all_channels(
     sentry_url: &str,
-    whoami: String,
+    whoami: &ValidatorId,
 ) -> Result<Vec<Channel>, reqwest::Error> {
     let url = sentry_url.to_owned();
-    let first_page = fetch_page(url.clone(), 0, whoami.clone()).await?;
+    let first_page = fetch_page(url.clone(), 0, &whoami).await?;
 
     if first_page.total_pages < 2 {
         Ok(first_page.channels)
     } else {
-        let mut all: Vec<ChannelListResponse> = try_join_all(
-            (1..first_page.total_pages).map(|i| fetch_page(url.clone(), i, whoami.clone())),
-        )
-        .await?;
+        let mut all: Vec<ChannelListResponse> =
+            try_join_all((1..first_page.total_pages).map(|i| fetch_page(url.clone(), i, &whoami)))
+                .await?;
 
         all.push(first_page);
         let result_all: Vec<Channel> = all
@@ -247,15 +245,18 @@ pub async fn all_channels(
 async fn fetch_page(
     sentry_url: String,
     page: u64,
-    validator: String,
+    validator: &ValidatorId,
 ) -> Result<ChannelListResponse, reqwest::Error> {
     let client = Client::new();
 
-    let mut query = vec![format!("page={}", page)];
-    query.push(format!("validator={}", validator.to_string()));
+    let query = [
+        format!("page={}", page),
+        format!("validator={}", validator.to_hex_checksummed_string()),
+    ]
+    .join("&");
 
     let future = client
-        .get(format!("{}/channel/list?{}", sentry_url, query.join("&")).as_str())
+        .get(&format!("{}/channel/list?{}", sentry_url, query))
         .send()
         .and_then(|mut res: Response| res.json::<ChannelListResponse>());
 

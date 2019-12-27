@@ -1,5 +1,6 @@
 use crate::channel_validator::ChannelValidator;
 use crate::{Channel, DomainError, ValidatorId};
+use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::From;
@@ -79,10 +80,10 @@ pub trait Adapter: ChannelValidator + Send + Sync + Clone + Debug {
     ) -> AdapterResult<bool>;
 
     /// Validate a channel
-    fn validate_channel(&self, channel: &Channel) -> AdapterResult<bool>;
+    fn validate_channel<'a>(&'a self, channel: &'a Channel) -> BoxFuture<'a, AdapterResult<bool>>;
 
     /// Get user session from token
-    fn session_from_token(&self, token: &str) -> AdapterResult<Session>;
+    fn session_from_token<'a>(&'a self, token: &'a str) -> BoxFuture<'a, AdapterResult<Session>>;
 
     /// Gets authentication for specific validator
     fn get_auth(&self, validator_id: &ValidatorId) -> AdapterResult<String>;

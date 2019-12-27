@@ -1,3 +1,4 @@
+use futures::future::BoxFuture;
 use primitives::adapter::{Adapter, AdapterError, AdapterResult, DummyAdapterOptions, Session};
 use primitives::channel_validator::ChannelValidator;
 use primitives::config::Config;
@@ -63,29 +64,33 @@ impl Adapter for DummyAdapter {
         Ok(is_same)
     }
 
-    fn validate_channel(&self, channel: &Channel) -> AdapterResult<bool> {
-        match DummyAdapter::is_channel_valid(&self.config, self.whoami(), channel) {
-            Ok(_) => Ok(true),
-            Err(e) => Err(AdapterError::InvalidChannel(e.to_string())),
-        }
+    fn validate_channel<'a>(&'a self, channel: &'a Channel) -> BoxFuture<'a, AdapterResult<bool>> {
+        Box::pin(async move {
+            match DummyAdapter::is_channel_valid(&self.config, self.whoami(), channel) {
+                Ok(_) => Ok(true),
+                Err(e) => Err(AdapterError::InvalidChannel(e.to_string())),
+            }
+        })
     }
 
-    fn session_from_token(&self, token: &str) -> AdapterResult<Session> {
-        let identity = self
-            .authorization_tokens
-            .iter()
-            .find(|(_, id)| *id == token);
+    fn session_from_token<'a>(&'a self, token: &'a str) -> BoxFuture<'a, AdapterResult<Session>> {
+        Box::pin(async move {
+            let identity = self
+                .authorization_tokens
+                .iter()
+                .find(|(_, id)| *id == token);
 
-        match identity {
-            Some((id, _)) => Ok(Session {
-                uid: self.session_tokens[id].clone(),
-                era: 0,
-            }),
-            None => Err(AdapterError::Authentication(format!(
-                "no session token for this auth: {}",
-                token
-            ))),
-        }
+            match identity {
+                Some((id, _)) => Ok(Session {
+                    uid: self.session_tokens[id].clone(),
+                    era: 0,
+                }),
+                None => Err(AdapterError::Authentication(format!(
+                    "no session token for this auth: {}",
+                    token
+                ))),
+            }
+        })
     }
 
     fn get_auth(&self, _validator: &ValidatorId) -> AdapterResult<String> {

@@ -19,7 +19,7 @@ ip_rate_limit = {type='ip', timeframe=20000}
 sid_rate_limit = {type='sid', timeframe=20000}
 
 ethereum_core_address = '0x333420fc6a897356e69b62417cd17ff012177d2b'
-ethereum_network = 'goerli'
+ethereum_network = 'http://localhost:8545'
 
 creators_whitelist = []
 minimal_deposit = "0"
