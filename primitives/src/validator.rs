@@ -44,12 +44,6 @@ impl AsRef<[u8]> for ValidatorId {
     }
 }
 
-impl From<&[u8; 20]> for ValidatorId {
-    fn from(bytes: &[u8; 20]) -> Self {
-        Self(*bytes)
-    }
-}
-
 impl TryFrom<&str> for ValidatorId {
     type Error = DomainError;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
