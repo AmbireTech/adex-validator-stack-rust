@@ -1,12 +1,9 @@
-use hyper::{Body, Request, Response};
 use crate::db::DbPool;
-use bb8::RunError;
-use primitives::{Channel, ChannelId, ValidatorId};
-use primitives::analytics::{AnalyticsResponse, AnalyticsQuery};
 use crate::RouteParams;
 use crate::Session;
-use crate::ResponseError;
+use bb8::RunError;
 use chrono::Utc;
+use primitives::analytics::{AnalyticsQuery, AnalyticsResponse};
 
 pub async fn get_analytics(
     query: AnalyticsQuery,
@@ -15,7 +12,7 @@ pub async fn get_analytics(
     pool: &DbPool,
     is_advertiser: bool,
     skip_publisher_filter: bool,
-) -> Result<Vec<AnalyticsResponse>, ResponseError> {
+) -> Result<Vec<AnalyticsResponse>, RunError<bb8_postgres::tokio_postgres::Error>> {
     let applied_limit = query.limit.min(200);
     let (interval, period) = get_time_frame(&query.timeframe);
     let time_limit = Utc::now().timestamp() - period;
@@ -67,25 +64,23 @@ pub async fn get_analytics(
     );
 
     // execute query
-    pool
-        .run(move |connection| {
-            async move {
-                match connection.prepare(&sql_query).await {
-                    Ok(stmt) => match connection.query(&stmt, &[]).await {
-                        Ok(rows) => {
-                            let analytics: Vec<AnalyticsResponse> =
-                                rows.iter().map(AnalyticsResponse::from).collect();
-                            Ok((analytics, connection))
-                        }
-                        Err(e) => Err((e, connection)),
-                    },
+    pool.run(move |connection| {
+        async move {
+            match connection.prepare(&sql_query).await {
+                Ok(stmt) => match connection.query(&stmt, &[]).await {
+                    Ok(rows) => {
+                        let analytics: Vec<AnalyticsResponse> =
+                            rows.iter().map(AnalyticsResponse::from).collect();
+                        Ok((analytics, connection))
+                    }
                     Err(e) => Err((e, connection)),
-                }
+                },
+                Err(e) => Err((e, connection)),
             }
-        })
-        .await;
+        }
+    })
+    .await
 }
-
 
 fn get_time_frame(timeframe: &str) -> (i64, i64) {
     let minute = 60 * 1000;

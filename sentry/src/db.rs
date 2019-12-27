@@ -7,13 +7,9 @@ use std::env;
 
 use lazy_static::lazy_static;
 
+pub mod analytics;
 mod channel;
 mod validator_message;
-
-
-pub mod channel;
-// mod channel;
-pub mod analytics;
 
 pub use self::channel::*;
 pub use self::validator_message::*;

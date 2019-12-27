@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-
 #[derive(Debug, Deserialize)]
 pub struct AnalyticsQuery {
     #[serde(default = "default_limit")]
@@ -21,6 +20,7 @@ pub struct AnalyticsResponse {
 
 #[cfg(feature = "postgres")]
 pub mod postgres {
+    use super::AnalyticsResponse;
     use tokio_postgres::Row;
 
     impl From<&Row> for AnalyticsResponse {

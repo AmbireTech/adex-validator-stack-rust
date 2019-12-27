@@ -239,7 +239,7 @@ pub mod postgres {
     use hex::FromHex;
     use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
     use std::error::Error;
-  
+    use tokio_postgres::Row;
 
     impl From<&Row> for Channel {
         fn from(row: &Row) -> Self {

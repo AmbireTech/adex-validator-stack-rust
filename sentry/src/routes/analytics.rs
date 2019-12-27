@@ -1,15 +1,13 @@
+use crate::db::analytics::get_analytics;
 use crate::success_response;
 use crate::Application;
 use crate::ResponseError;
 use crate::RouteParams;
 use crate::Session;
-use bb8_postgres::tokio_postgres::Row;
 use hyper::{Body, Request, Response};
 use primitives::adapter::Adapter;
+use primitives::analytics::AnalyticsQuery;
 use redis::aio::MultiplexedConnection;
-use serde::{Deserialize, Serialize};
-use crate::db::analytics::get_analytics;
-
 
 pub async fn publisher_analytics<A: Adapter>(
     req: Request<Body>,
@@ -61,7 +59,10 @@ pub async fn process_analytics<A: Adapter>(
     skip_publisher_filter: bool,
 ) -> Result<String, ResponseError> {
     let query = serde_urlencoded::from_str::<AnalyticsQuery>(&req.uri().query().unwrap_or(""))?;
-    query.is_valid()?;
+    query
+        .is_valid()
+        .map_err(|e| ResponseError::BadRequest(e.to_string()))?;
+
     let sess = req.extensions().get::<Session>();
     let params = req.extensions().get::<RouteParams>();
 
@@ -71,12 +72,12 @@ pub async fn process_analytics<A: Adapter>(
         sess,
         &app.pool,
         is_advertiser,
-        skip_publisher_filter
-    ).await?;
+        skip_publisher_filter,
+    )
+    .await?;
 
     serde_json::to_string(&result)
         .map_err(|_| ResponseError::BadRequest("error occurred; try again later".to_string()))
-
 }
 
 async fn cache(redis: &MultiplexedConnection, key: String, value: &str, timeframe: i32) {
@@ -90,4 +91,3 @@ async fn cache(redis: &MultiplexedConnection, key: String, value: &str, timefram
         println!("{:?}", err);
     }
 }
-

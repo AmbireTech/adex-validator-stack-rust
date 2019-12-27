@@ -31,7 +31,6 @@ pub mod routes {
     pub mod cfg;
     pub mod channel;
     pub mod validator_message;
-    pub mod analytics;
 }
 
 pub mod access;
@@ -119,7 +118,7 @@ impl<A: Adapter + 'static> Application<A> {
             None => Default::default(),
         };
 
-        let mut req = match auth::for_request(req, &self.adapter, self.redis.clone()).await {
+        let req = match auth::for_request(req, &self.adapter, self.redis.clone()).await {
             Ok(req) => req,
             Err(error) => {
                 error!(&self.logger, "{}", &error; "module" => "middleware-auth");
@@ -156,73 +155,7 @@ impl<A: Adapter + 'static> Application<A> {
             (route, _) if route.starts_with("/analytics") => analytics_router(req, &self).await,
             // This is important becuase it prevents us from doing
             // expensive regex matching for routes without /channel
-            (path, method) if path.starts_with("/channel") => {
-                // example with
-                // @TODO remove later
-                // regex matching for routes with params
-                if let (Some(caps), &Method::GET) =
-                    (LAST_APPROVED_BY_CHANNEL_ID.captures(path), method)
-                {
-                    let param = RouteParams(vec![caps
-                        .get(1)
-                        .map_or("".to_string(), |m| m.as_str().to_string())]);
-                    req.extensions_mut().insert(param);
-
-                    // example with middleware
-                    // @TODO remove later
-                    let req = match chain(req, &self, vec![config_middleware]).await {
-                        Ok(req) => req,
-                        Err(error) => {
-                            return map_response_error(error);
-                        }
-                    };
-
-                    last_approved(req, &self).await
-                } else if let (Some(caps), &Method::GET) =
-                    (CHANNEL_STATUS_BY_CHANNEL_ID.captures(path), method)
-                {
-                    let param = RouteParams(vec![caps
-                        .get(1)
-                        .map_or("".to_string(), |m| m.as_str().to_string())]);
-                    req.extensions_mut().insert(param);
-
-                    let req = match chain(req, &self, vec![channel_load]).await {
-                        Ok(req) => req,
-                        Err(error) => {
-                            return map_response_error(error);
-                        }
-                    };
-
-                    channel_status(req, &self).await
-                } else if let (Some(caps), &Method::GET) =
-                    (CHANNEL_VALIDATOR_MESSAGES.captures(path), method)
-                {
-                    let param = RouteParams(vec![caps
-                        .get(1)
-                        .map_or("".to_string(), |m| m.as_str().to_string())]);
-                    req.extensions_mut().insert(param);
-
-                    let req = match chain(req, &self, vec![channel_load]).await {
-                        Ok(req) => req,
-                        Err(error) => {
-                            return map_response_error(error);
-                        }
-                    };
-
-                    // @TODO: Move this to a middleware?!
-                    let extract_params =
-                        match extract_params(caps.get(2).map_or("", |m| m.as_str())) {
-                            Ok(params) => params,
-                            Err(error) => {
-                                return map_response_error(error.into());
-                            }
-                        };
-
-                    list_validator_messages(req, &self, &extract_params.0, &extract_params.1).await
-                } else {
-                    Err(ResponseError::NotFound)
-                }
-            }
+            (path, _) if path.starts_with("/channel") => channels_router(req, &self).await,
             _ => Err(ResponseError::NotFound),
         }
         .unwrap_or_else(map_response_error);
@@ -263,6 +196,76 @@ async fn analytics_router<A: Adapter>(
             }
         }
         _ => Err(ResponseError::NotFound),
+    }
+}
+
+async fn channels_router<A: Adapter>(
+    mut req: Request<Body>,
+    app: &Application<A>,
+) -> Result<Response<Body>, ResponseError> {
+    let (path, method) = (req.uri().path().to_owned(), req.method());
+
+    // example with
+    // @TODO remove later
+    // regex matching for routes with params
+    if let (Some(caps), &Method::GET) = (LAST_APPROVED_BY_CHANNEL_ID.captures(&path), method) {
+        let param = RouteParams(vec![caps
+            .get(1)
+            .map_or("".to_string(), |m| m.as_str().to_string())]);
+        req.extensions_mut().insert(param);
+
+        // example with middleware
+        // @TODO remove later
+        let req = match chain(req, &app, vec![config_middleware]).await {
+            Ok(req) => req,
+            Err(error) => {
+                return Err(error);
+            }
+        };
+
+        last_approved(req, &app).await
+    } else if let (Some(caps), &Method::GET) =
+        (CHANNEL_STATUS_BY_CHANNEL_ID.captures(&path), method)
+    {
+        let param = RouteParams(vec![caps
+            .get(1)
+            .map_or("".to_string(), |m| m.as_str().to_string())]);
+        req.extensions_mut().insert(param);
+
+        let req = match chain(req, &app, vec![channel_load]).await {
+            Ok(req) => req,
+            Err(error) => {
+                return Err(error);
+            }
+        };
+
+        channel_status(req, &app).await
+    } else if let (Some(caps), &Method::GET) = (CHANNEL_VALIDATOR_MESSAGES.captures(&path), method)
+    {
+        let param = RouteParams(vec![caps
+            .get(1)
+            .map_or("".to_string(), |m| m.as_str().to_string())]);
+
+        req.extensions_mut().insert(param);
+
+        let req = match chain(req, &app, vec![channel_load]).await {
+            Ok(req) => req,
+            Err(error) => {
+                return Err(error);
+            }
+        };
+
+        // @TODO: Move this to a middleware?!
+        let extract_params = match extract_params(caps.get(2).map_or("", |m| m.as_str())) {
+            Ok(params) => params,
+            Err(error) => {
+                return Err(error.into());
+            }
+        };
+
+        list_validator_messages(req, &app, &extract_params.0, &extract_params.1).await
+    } else {
+        Err(ResponseError::NotFound)
     }
 }
 
