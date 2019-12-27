@@ -172,7 +172,7 @@ impl EthereumChannel {
     }
 
     pub fn hash_hex(&self, contract_addr: &[u8; 20]) -> Result<String, Box<dyn Error>> {
-        let result = self.hash(&contract_addr)?;
+        let result = self.hash(contract_addr)?;
         Ok(format!("0x{}", hex::encode(result)))
     }
 
