@@ -32,15 +32,15 @@ impl ValidatorId {
     }
 }
 
-impl AsRef<[u8]> for ValidatorId {
-    fn as_ref(&self) -> &[u8] {
-        &self.0
-    }
-}
-
 impl From<&[u8; 20]> for ValidatorId {
     fn from(bytes: &[u8; 20]) -> Self {
         Self(*bytes)
+    }
+}
+
+impl AsRef<[u8]> for ValidatorId {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
     }
 }
 
