@@ -57,9 +57,8 @@ mod test {
         };
         let config = configuration("development", None).expect("Dev config should be available");
         let dummy_adapter = DummyAdapter::init(adapter_options, &config);
-        let whoami = dummy_adapter.whoami().clone();
 
-        SentryApi::init(dummy_adapter, &channel, &config, false, &whoami).expect("should succeed")
+        SentryApi::init(dummy_adapter, &channel, &config, false).expect("should succeed")
     }
 
     #[test]

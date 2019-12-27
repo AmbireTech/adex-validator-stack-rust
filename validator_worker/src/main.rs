@@ -25,7 +25,6 @@ struct Args<A: Adapter> {
     sentry_url: String,
     config: Config,
     adapter: A,
-    whoami: ValidatorId,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -122,18 +121,15 @@ fn run<A: Adapter + 'static>(
     is_single_tick: bool,
     sentry_url: &str,
     config: &Config,
-    adapter: A,
+    mut adapter: A,
 ) -> Result<(), Box<dyn Error>> {
-    let mut sentry_adapter = adapter.clone();
     // unlock adapter
-    sentry_adapter.unlock()?;
-    let whoami = adapter.whoami().to_owned();
+    adapter.unlock()?;
 
     let args = Args {
         sentry_url: sentry_url.to_owned(),
         config: config.to_owned(),
-        adapter: sentry_adapter,
-        whoami,
+        adapter,
     };
 
     if is_single_tick {
@@ -158,7 +154,7 @@ async fn infinite<A: Adapter + 'static>(args: Args<A>) -> Result<(), ()> {
 }
 
 async fn iterate_channels<A: Adapter + 'static>(args: Args<A>) -> Result<(), ()> {
-    let result = all_channels(&args.sentry_url, args.whoami.to_string()).await;
+    let result = all_channels(&args.sentry_url, args.adapter.whoami()).await;
 
     if let Err(e) = result {
         eprintln!("Failed to get channels {}", e);
@@ -168,11 +164,12 @@ async fn iterate_channels<A: Adapter + 'static>(args: Args<A>) -> Result<(), ()>
     let channels = result.unwrap();
     let channels_size = channels.len();
 
-    let tick =
-        try_join_all(channels.into_iter().map(|channel| {
-            validator_tick(args.adapter.clone(), channel, &args.config, &args.whoami)
-        }))
-        .await;
+    let tick = try_join_all(
+        channels
+            .into_iter()
+            .map(|channel| validator_tick(args.adapter.clone(), channel, &args.config)),
+    )
+    .await;
 
     if let Err(e) = tick {
         eprintln!("An occurred while processing channels {}", e);
@@ -191,9 +188,9 @@ async fn validator_tick<A: Adapter + 'static>(
     adapter: A,
     channel: Channel,
     config: &Config,
-    whoami: &ValidatorId,
 ) -> Result<(), ValidatorWorkerError> {
-    let sentry = SentryApi::init(adapter, &channel, &config, true, whoami)?;
+    let whoami = adapter.whoami().clone();
+    let sentry = SentryApi::init(adapter, &channel, &config, true)?;
     let duration = Duration::from_secs(config.validator_tick_timeout as u64);
 
     match channel.spec.validators.find(&whoami) {

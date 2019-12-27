@@ -1,7 +1,4 @@
-use std::pin::Pin;
-
 use chrono::{DateTime, Utc};
-use futures::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 use std::fmt;
@@ -17,8 +14,6 @@ pub enum ValidatorError {
     InvalidTransition,
 }
 
-pub type ValidatorFuture<T> = Pin<Box<dyn Future<Output = Result<T, ValidatorError>> + Send>>;
-
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(transparent)]
 pub struct ValidatorId(#[serde(with = "SerHex::<StrictPfx>")] [u8; 20]);
@@ -31,6 +26,7 @@ impl ValidatorId {
     pub fn to_hex_non_prefix_string(&self) -> String {
         hex::encode(self.0)
     }
+
     pub fn to_hex_checksummed_string(&self) -> String {
         eth_checksum::checksum(&format!("0x{}", hex::encode(self.0)))
     }
@@ -45,6 +41,12 @@ impl From<&[u8; 20]> for ValidatorId {
 impl AsRef<[u8]> for ValidatorId {
     fn as_ref(&self) -> &[u8] {
         &self.0
+    }
+}
+
+impl From<&[u8; 20]> for ValidatorId {
+    fn from(bytes: &[u8; 20]) -> Self {
+        Self(*bytes)
     }
 }
 
