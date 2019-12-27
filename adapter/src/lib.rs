@@ -87,7 +87,7 @@ impl TryFrom<&Channel> for EthereumChannel {
         hash.input(spec);
         let spec_hash: [u8; 32] = hash.result().into();
 
-        let validators: Vec<ValidatorId> = channel
+        let validators = channel
             .spec
             .validators
             .iter()
