@@ -145,7 +145,7 @@ impl Adapter for EthereumAdapter {
                 ));
             }
 
-        let contract_address: Address = self.config.ethereum_core_address.into();
+            let contract_address: Address = self.config.ethereum_core_address.into();
 
             let (_eloop, transport) = web3::transports::Http::new(&self.config.ethereum_network)
                 .map_err(|_| map_error("failed to init http transport"))?;
@@ -209,7 +209,7 @@ impl Adapter for EthereumAdapter {
 
             let sess = match &verified.payload.identity {
                 Some(identity) => {
-                let contract_address: Address = identity.into();
+                    let contract_address: Address = identity.into();
                     let (_eloop, transport) =
                         web3::transports::Http::new(&self.config.ethereum_network)
                             .map_err(|_| map_error("failed to init http transport"))?;
