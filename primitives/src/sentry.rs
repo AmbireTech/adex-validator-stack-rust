@@ -62,6 +62,9 @@ pub struct Earner {
     pub promilles: u64,
 }
 
+#[derive(Serialize, Dserialize)]
+pub struct EarnerAddress(#[serde(with = "SerHex::<StrictPfx>")] [u8; 20]);
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EventAggregate {
