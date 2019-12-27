@@ -24,6 +24,7 @@ pub mod util {
     pub mod logging;
 }
 pub mod validator;
+pub mod analytics;
 
 pub use self::ad_unit::AdUnit;
 pub use self::balances_map::BalancesMap;
