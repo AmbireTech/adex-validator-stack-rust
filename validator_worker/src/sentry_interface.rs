@@ -46,7 +46,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
                 let propagate_to = channel
                     .spec
                     .validators
-                    .into_iter()
+                    .iter()
                     .map(|validator| {
                         adapter
                             .get_auth(&validator.id)

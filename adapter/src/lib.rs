@@ -87,12 +87,12 @@ impl TryFrom<&Channel> for EthereumChannel {
         hash.input(spec);
         let spec_hash: [u8; 32] = hash.result().into();
 
-        let validators: Vec<ValidatorId> = channel
+        let validators = channel
             .spec
             .validators
-            .into_iter()
-            .map(|v| v.id.clone())
-            .collect();
+            .iter()
+            .map(|v| &v.id)
+            .collect::<Vec<_>>();
 
         let creator = <[u8; 20]>::from_hex(&channel.creator[2..])
             .map_err(|_| ChannelError::InvalidArgument("failed to parse creator".into()))?;
@@ -104,7 +104,7 @@ impl TryFrom<&Channel> for EthereumChannel {
             &deposit_asset,
             &channel.deposit_amount.to_string(),
             channel.valid_until,
-            &validators.as_slice(),
+            &validators,
             &spec_hash,
         )
     }
@@ -116,7 +116,7 @@ impl EthereumChannel {
         token_addr: &[u8; 20],
         token_amount: &str, // big num string
         valid_until: DateTime<Utc>,
-        validators: &[ValidatorId],
+        validators: &[&ValidatorId],
         spec: &[u8; 32],
     ) -> Result<Self, ChannelError> {
         if BigNum::try_from(token_amount).is_err() {
