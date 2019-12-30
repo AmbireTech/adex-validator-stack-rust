@@ -47,6 +47,7 @@ lazy_static! {
     static ref CHANNEL_VALIDATOR_MESSAGES: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/validator-messages(/.*)?$").expect("The regex should be valid");
     // @TODO define other regex routes
     static ref ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
+    static ref ADVERTISER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-advertiser/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
     static ref PUBLISHER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-publisher/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
 
 }
@@ -134,6 +135,7 @@ impl<A: Adapter + 'static> Application<A> {
 
             ("/analytics", &Method::GET) => analytics(req, &self).await,
             ("/analytics/for-advertiser", &Method::GET) => {
+                // @TODO get advertiser channels
                 let req = match chain(req, &self, vec![auth_required_middleware]).await {
                     Ok(req) => req,
                     Err(error) => {
@@ -191,6 +193,14 @@ async fn analytics_router<A: Adapter>(
                 let req = chain(req, app, vec![auth_required_middleware]).await?;
 
                 publisher_analytics(req, app).await
+            } else if let Some(caps) = ADVERTISER_ANALYTICS_BY_CHANNEL_ID.captures(route) {
+                let param = RouteParams(vec![caps
+                    .get(1)
+                    .map_or("".to_string(), |m| m.as_str().to_string())]);
+                req.extensions_mut().insert(param);
+
+                let req = chain(req, app, vec![auth_required_middleware]).await?;
+                advertiser_analytics(req, app).await
             } else {
                 Err(ResponseError::NotFound)
             }

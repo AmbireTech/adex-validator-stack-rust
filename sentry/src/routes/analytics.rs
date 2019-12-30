@@ -32,6 +32,7 @@ pub async fn analytics<A: Adapter>(
     {
         Ok(response) => Ok(success_response(response)),
         _ => {
+            // checks if /:id route param is present cache
             let cache_timeframe = match req.extensions().get::<RouteParams>() {
                 Some(_) => 600,
                 None => 300,
@@ -64,11 +65,14 @@ pub async fn process_analytics<A: Adapter>(
         .map_err(|e| ResponseError::BadRequest(e.to_string()))?;
 
     let sess = req.extensions().get::<Session>();
-    let params = req.extensions().get::<RouteParams>();
+    let channels = match req.extensions().get::<RouteParams>() {
+        Some(param) => param.get(0),
+        None => None,
+    };
 
     let result = get_analytics(
         query,
-        params,
+        channels,
         sess,
         &app.pool,
         is_advertiser,

@@ -1,5 +1,4 @@
 use crate::db::DbPool;
-use crate::RouteParams;
 use crate::Session;
 use bb8::RunError;
 use chrono::Utc;
@@ -7,7 +6,7 @@ use primitives::analytics::{AnalyticsQuery, AnalyticsResponse};
 
 pub async fn get_analytics(
     query: AnalyticsQuery,
-    route_params: Option<&RouteParams>,
+    channels: Option<String>,
     sess: Option<&Session>,
     pool: &DbPool,
     is_advertiser: bool,
@@ -20,17 +19,15 @@ pub async fn get_analytics(
     let mut where_clauses = vec![format!("created > to_timestamp({})", time_limit)];
 
     if is_advertiser {
-        match route_params {
-            Some(params) => where_clauses.push(format!("channel_id IN ({})", params.index(0))),
+        match channels {
+            Some(id) => where_clauses.push(format!("channel_id IN ({})", id)),
             None => where_clauses.push(format!(
                 "channel_id IN (SELECT id FROM channels WHERE creator = {})",
                 sess.unwrap().uid.to_string()
             )),
         };
-    } else if let Some(params) = route_params {
-        if let Some(id) = params.get(0) {
-            where_clauses.push(format!("channel_id = {}", id));
-        };
+    } else if let Some(id) = channels {
+        where_clauses.push(format!("channel_id = {}", id));
     }
 
     let select_query = match (skip_publisher_filter, sess) {
