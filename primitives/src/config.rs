@@ -33,7 +33,7 @@ pub struct Config {
     pub validator_tick_timeout: u32,
     pub ip_rate_limit: RateLimit,  // HashMap??
     pub sid_rate_limit: RateLimit, // HashMap ??
-    pub creators_whitelist: Vec<String>,
+    pub creators_whitelist: Vec<ValidatorId>,
     pub minimal_deposit: BigNum,
     pub minimal_fee: BigNum,
     pub token_address_whitelist: Vec<String>,

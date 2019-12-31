@@ -557,7 +557,8 @@ mod test {
             )
             .expect("prep_db: failed to deserialize channel id"),
             // leader_account
-            creator: "0xDf08F82De32B8d460adbE8D72043E3a7e25A3B39".to_string(),
+            creator: ValidatorId::try_from("Df08F82De32B8d460adbE8D72043E3a7e25A3B39")
+                .expect("should be valid ValidatorId"),
             deposit_asset: eth_checksum::checksum(&format!("{:?}", token_contract.address())),
             deposit_amount: 2_000.into(),
             valid_until: Utc::now() + Duration::days(2),

@@ -94,8 +94,7 @@ impl TryFrom<&Channel> for EthereumChannel {
             .map(|v| v.id.clone())
             .collect();
 
-        let creator = <[u8; 20]>::from_hex(&channel.creator[2..])
-            .map_err(|_| ChannelError::InvalidArgument("failed to parse creator".into()))?;
+        let creator = channel.creator.inner();
         let deposit_asset = <[u8; 20]>::from_hex(&channel.deposit_asset[2..])
             .map_err(|_| ChannelError::InvalidArgument("failed to parse deposit asset".into()))?;
 
