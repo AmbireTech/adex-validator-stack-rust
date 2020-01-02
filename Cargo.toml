@@ -1,11 +1,11 @@
 [workspace]
 
 members = [
-    "adapter",
     "primitives",
+    "adapter",
+    "adview-manager",
     "validator_worker",
     "sentry",
-    "adview-manager",
 ]
 
 [patch.crates-io]
