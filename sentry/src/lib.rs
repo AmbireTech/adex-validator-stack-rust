@@ -64,8 +64,7 @@ async fn auth_required_middleware<A: Adapter>(
     if req.extensions().get::<Session>().is_some() {
         Ok(req)
     } else {
-        Ok(req)
-        // Err(ResponseError::BadRequest("auth required".to_string()))
+        Err(ResponseError::UnAuthorized)
     }
 }
 
@@ -274,6 +273,7 @@ async fn channels_router<A: Adapter>(
 pub enum ResponseError {
     NotFound,
     BadRequest(String),
+    UnAuthorized,
 }
 
 impl<T> From<T> for ResponseError
@@ -290,7 +290,8 @@ where
 pub fn map_response_error(error: ResponseError) -> Response<Body> {
     match error {
         ResponseError::NotFound => not_found(),
-        ResponseError::BadRequest(e) => bad_response(e),
+        ResponseError::BadRequest(e) => bad_response(e, StatusCode::BAD_REQUEST),
+        ResponseError::UnAuthorized => bad_response("invalid authorization".to_string(), StatusCode::UNAUTHORIZED),
     }
 }
 
@@ -301,7 +302,7 @@ pub fn not_found() -> Response<Body> {
     response
 }
 
-pub fn bad_response(response_body: String) -> Response<Body> {
+pub fn bad_response(response_body: String, status_code: StatusCode) -> Response<Body> {
     let mut error_response = HashMap::new();
     error_response.insert("error", response_body);
 
@@ -312,11 +313,11 @@ pub fn bad_response(response_body: String) -> Response<Body> {
         .headers_mut()
         .insert("Content-type", "application/json".parse().unwrap());
 
-    let status = response.status_mut();
-    *status = StatusCode::BAD_REQUEST;
-
+    *response.status_mut() = status_code;
+    
     response
 }
+
 
 pub fn success_response(response_body: String) -> Response<Body> {
     let body = Body::from(response_body);

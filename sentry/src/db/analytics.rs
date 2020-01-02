@@ -2,7 +2,7 @@ use crate::db::DbPool;
 use crate::Session;
 use bb8::RunError;
 use chrono::Utc;
-use primitives::analytics::{AnalyticsQuery, AnalyticsResponse};
+use primitives::analytics::{AnalyticsQuery, AnalyticsResponse, ANALYTICS_QUERY_LIMIT};
 
 pub async fn get_analytics(
     query: AnalyticsQuery,
@@ -12,7 +12,7 @@ pub async fn get_analytics(
     is_advertiser: bool,
     filter_publisher: bool,
 ) -> Result<Vec<AnalyticsResponse>, RunError<bb8_postgres::tokio_postgres::Error>> {
-    let applied_limit = query.limit.min(200);
+    let applied_limit = query.limit.min(ANALYTICS_QUERY_LIMIT);
     let (interval, period) = get_time_frame(&query.timeframe);
     let time_limit = Utc::now().timestamp() - period;
 
