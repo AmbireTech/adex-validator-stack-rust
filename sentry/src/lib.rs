@@ -48,8 +48,6 @@ lazy_static! {
     // @TODO define other regex routes
     static ref ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
     static ref ADVERTISER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-advertiser/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
-    static ref PUBLISHER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-publisher/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
-
 }
 
 async fn config_middleware<A: Adapter>(
@@ -66,7 +64,8 @@ async fn auth_required_middleware<A: Adapter>(
     if req.extensions().get::<Session>().is_some() {
         Ok(req)
     } else {
-        Err(ResponseError::BadRequest("auth required".to_string()))
+        Ok(req)
+        // Err(ResponseError::BadRequest("auth required".to_string()))
     }
 }
 
@@ -184,15 +183,7 @@ async fn analytics_router<A: Adapter>(
 
                 let req = chain(req, app, vec![channel_load]).await?;
                 analytics(req, app).await
-            } else if let Some(caps) = PUBLISHER_ANALYTICS_BY_CHANNEL_ID.captures(route) {
-                let param = RouteParams(vec![caps
-                    .get(1)
-                    .map_or("".to_string(), |m| m.as_str().to_string())]);
-                req.extensions_mut().insert(param);
 
-                let req = chain(req, app, vec![auth_required_middleware]).await?;
-
-                publisher_analytics(req, app).await
             } else if let Some(caps) = ADVERTISER_ANALYTICS_BY_CHANNEL_ID.captures(route) {
                 let param = RouteParams(vec![caps
                     .get(1)

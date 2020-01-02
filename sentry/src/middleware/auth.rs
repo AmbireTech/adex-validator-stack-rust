@@ -53,7 +53,7 @@ pub(crate) async fn for_request(
                     .arg(serde_json::to_string(&adapter_session)?)
                     .query_async(&mut redis.clone())
                     .await?;
-
+                
                 adapter_session
             }
         };
