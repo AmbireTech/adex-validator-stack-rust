@@ -1,6 +1,8 @@
 use crate::DomainError;
 use serde::{Deserialize, Serialize};
 
+pub const ANALYTICS_QUERY_LIMIT: u32 = 200;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AnalyticsResponse {
     time: u32,
@@ -36,7 +38,7 @@ pub struct AnalyticsQuery {
 
 impl AnalyticsQuery {
     pub fn is_valid(&self) -> Result<(), DomainError> {
-        let valid_event_types = ["IMPRESSION"];
+        let valid_event_types = ["IMPRESSION", "CLICK"];
         let valid_metric = ["eventPayouts", "eventCounts"];
         let valid_timeframe = ["year", "month", "week", "day", "hour"];
 
@@ -54,6 +56,11 @@ impl AnalyticsQuery {
             Err(DomainError::InvalidArgument(format!(
                 "invalid timeframe, possible values are: {}",
                 valid_timeframe.join(" ,")
+            )))
+        } else if self.limit > ANALYTICS_QUERY_LIMIT {
+            Err(DomainError::InvalidArgument(format!(
+                "invalid limit {}, maximum value 200",
+                self.limit
             )))
         } else {
             Ok(())

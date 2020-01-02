@@ -1,4 +1,4 @@
-use crate::db::analytics::get_analytics;
+use crate::db::analytics::{get_analytics, AnalyticsType};
 use crate::success_response;
 use crate::Application;
 use crate::ResponseError;
@@ -14,7 +14,17 @@ pub async fn publisher_analytics<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
-    process_analytics(req, app, false, true)
+    let sess = req.extensions().get::<Session>();
+    let channel = match req.extensions().get::<RouteParams>() {
+        Some(param) => param.get(0),
+        None => None,
+    };
+    let analytics_type = AnalyticsType::Publisher {
+        session: sess.cloned().ok_or(ResponseError::UnAuthorized)?,
+        channel,
+    };
+
+    process_analytics(req, app, analytics_type)
         .await
         .map(success_response)
 }
@@ -38,8 +48,15 @@ pub async fn analytics<A: Adapter>(
                 Some(_) => 600,
                 None => 300,
             };
-            let response = process_analytics(req, app, false, false).await?;
-            cache(&redis.clone(), request_uri, &response, cache_timeframe, &app.logger).await;
+            let response = process_analytics(req, app, AnalyticsType::Global).await?;
+            cache(
+                &redis.clone(),
+                request_uri,
+                &response,
+                cache_timeframe,
+                &app.logger,
+            )
+            .await;
             Ok(success_response(response))
         }
     }
@@ -49,7 +66,17 @@ pub async fn advertiser_analytics<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
-    process_analytics(req, app, true, false)
+    let sess = req.extensions().get::<Session>();
+    let channel = match req.extensions().get::<RouteParams>() {
+        Some(param) => param.get(0),
+        None => None,
+    };
+    let analytics_type = AnalyticsType::Advertiser {
+        session: sess.ok_or(ResponseError::UnAuthorized)?.to_owned(),
+        channel,
+    };
+
+    process_analytics(req, app, analytics_type)
         .await
         .map(success_response)
 }
@@ -57,35 +84,26 @@ pub async fn advertiser_analytics<A: Adapter>(
 pub async fn process_analytics<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>,
-    is_advertiser: bool,
-    filter_publisher: bool,
+    analytics_type: AnalyticsType,
 ) -> Result<String, ResponseError> {
     let query = serde_urlencoded::from_str::<AnalyticsQuery>(&req.uri().query().unwrap_or(""))?;
     query
         .is_valid()
         .map_err(|e| ResponseError::BadRequest(e.to_string()))?;
 
-    let sess = req.extensions().get::<Session>();
-    let channels = match req.extensions().get::<RouteParams>() {
-        Some(param) => param.get(0),
-        None => None,
-    };
-
-    let result = get_analytics(
-        query,
-        channels,
-        sess,
-        &app.pool,
-        is_advertiser,
-        filter_publisher,
-    )
-    .await?;
+    let result = get_analytics(query, &app.pool, analytics_type).await?;
 
     serde_json::to_string(&result)
         .map_err(|_| ResponseError::BadRequest("error occurred; try again later".to_string()))
 }
 
-async fn cache(redis: &MultiplexedConnection, key: String, value: &str, timeframe: i32, logger: &Logger) {
+async fn cache(
+    redis: &MultiplexedConnection,
+    key: String,
+    value: &str,
+    timeframe: i32,
+    logger: &Logger,
+) {
     if let Err(err) = redis::cmd("SETEX")
         .arg(&key)
         .arg(timeframe)

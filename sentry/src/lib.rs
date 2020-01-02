@@ -182,7 +182,6 @@ async fn analytics_router<A: Adapter>(
 
                 let req = chain(req, app, vec![channel_load]).await?;
                 analytics(req, app).await
-
             } else if let Some(caps) = ADVERTISER_ANALYTICS_BY_CHANNEL_ID.captures(route) {
                 let param = RouteParams(vec![caps
                     .get(1)
@@ -291,7 +290,10 @@ pub fn map_response_error(error: ResponseError) -> Response<Body> {
     match error {
         ResponseError::NotFound => not_found(),
         ResponseError::BadRequest(e) => bad_response(e, StatusCode::BAD_REQUEST),
-        ResponseError::UnAuthorized => bad_response("invalid authorization".to_string(), StatusCode::UNAUTHORIZED),
+        ResponseError::UnAuthorized => bad_response(
+            "invalid authorization".to_string(),
+            StatusCode::UNAUTHORIZED,
+        ),
     }
 }
 
@@ -314,10 +316,9 @@ pub fn bad_response(response_body: String, status_code: StatusCode) -> Response<
         .insert("Content-type", "application/json".parse().unwrap());
 
     *response.status_mut() = status_code;
-    
+
     response
 }
-
 
 pub fn success_response(response_body: String) -> Response<Body> {
     let body = Body::from(response_body);
