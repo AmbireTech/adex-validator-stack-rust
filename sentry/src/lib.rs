@@ -7,11 +7,12 @@ use crate::middleware::auth;
 use crate::middleware::channel::channel_load;
 use crate::middleware::cors::{cors, Cors};
 use crate::routes::channel::channel_status;
+use crate::routes::event_aggregate::list_channel_event_aggregates;
 use crate::routes::validator_message::{extract_params, list_validator_messages};
 use hyper::{Body, Method, Request, Response, StatusCode};
 use lazy_static::lazy_static;
 use primitives::adapter::Adapter;
-use primitives::Config;
+use primitives::{Config, ValidatorId};
 use redis::aio::MultiplexedConnection;
 use regex::Regex;
 use routes::cfg::config;
@@ -23,11 +24,13 @@ pub mod middleware {
     pub mod auth;
     pub mod channel;
     pub mod cors;
+    pub mod event_aggregate;
 }
 
 pub mod routes {
     pub mod cfg;
     pub mod channel;
+    pub mod event_aggregate;
     pub mod validator_message;
 }
 
@@ -43,6 +46,7 @@ lazy_static! {
     static ref CHANNEL_STATUS_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/status/?$").expect("The regex should be valid");
     // Only the initial Regex to be matched.
     static ref CHANNEL_VALIDATOR_MESSAGES: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/validator-messages(/.*)?$").expect("The regex should be valid");
+    static ref CHANNEL_EVENT_AGGREGATES: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/event-aggregates(/|/0x[a-zA-Z0-9]{40}/?)?$").expect("The regex should be valid");
     // @TODO define other regex routes
 }
 
@@ -180,6 +184,29 @@ impl<A: Adapter + 'static> Application<A> {
                         };
 
                     list_validator_messages(req, &self, &extract_params.0, &extract_params.1).await
+                } else if let (Some(caps), &Method::GET) =
+                    (CHANNEL_EVENT_AGGREGATES.captures(path), method)
+                {
+                    if req.extensions().get::<Session>().is_none() {
+                        return map_response_error(ResponseError::Unauthorized);
+                    }
+
+                    let param = RouteParams(vec![
+                        caps.get(1)
+                            .map_or("".to_string(), |m| m.as_str().to_string()),
+                        caps.get(2)
+                            .map_or("".to_string(), |m| m.as_str().trim_matches('/').to_string()),
+                    ]);
+                    req.extensions_mut().insert(param);
+
+                    let req = match chain(req, &self, vec![channel_load]).await {
+                        Ok(req) => req,
+                        Err(error) => {
+                            return map_response_error(error);
+                        }
+                    };
+
+                    list_channel_event_aggregates(req, &self).await
                 } else {
                     Err(ResponseError::NotFound)
                 }
@@ -198,6 +225,7 @@ impl<A: Adapter + 'static> Application<A> {
 pub enum ResponseError {
     NotFound,
     BadRequest(String),
+    Unauthorized,
 }
 
 impl<T> From<T> for ResponseError
@@ -215,6 +243,7 @@ pub fn map_response_error(error: ResponseError) -> Response<Body> {
     match error {
         ResponseError::NotFound => not_found(),
         ResponseError::BadRequest(e) => bad_response(e),
+        ResponseError::Unauthorized => unauthorized(),
     }
 }
 
@@ -242,6 +271,13 @@ pub fn bad_response(response_body: String) -> Response<Body> {
     response
 }
 
+pub fn unauthorized() -> Response<Body> {
+    let mut response = Response::new(Body::from("Unauthorized"));
+    let status = response.status_mut();
+    *status = StatusCode::UNAUTHORIZED;
+    response
+}
+
 pub fn success_response(response_body: String) -> Response<Body> {
     let body = Body::from(response_body);
 
@@ -260,6 +296,6 @@ pub fn success_response(response_body: String) -> Response<Body> {
 #[derive(Debug, Clone)]
 pub struct Session {
     pub era: i64,
-    pub uid: String,
+    pub uid: ValidatorId,
     pub ip: Option<String>,
 }
