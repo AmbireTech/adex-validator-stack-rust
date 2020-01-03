@@ -68,7 +68,7 @@ async fn auth_required_middleware<A: Adapter>(
     if req.extensions().get::<Session>().is_some() {
         Ok(req)
     } else {
-        Err(ResponseError::UnAuthorized)
+        Err(ResponseError::Unauthorized)
     }
 }
 
@@ -219,14 +219,14 @@ async fn channels_router<A: Adapter>(
 
         // example with middleware
         // @TODO remove later
-        let req = match chain(req, &app, vec![config_middleware]).await {
+        let req = match chain(req, app, vec![config_middleware]).await {
             Ok(req) => req,
             Err(error) => {
                 return Err(error);
             }
         };
 
-        last_approved(req, &app).await
+        last_approved(req, app).await
     } else if let (Some(caps), &Method::GET) =
         (CHANNEL_STATUS_BY_CHANNEL_ID.captures(&path), method)
     {
@@ -235,14 +235,14 @@ async fn channels_router<A: Adapter>(
             .map_or("".to_string(), |m| m.as_str().to_string())]);
         req.extensions_mut().insert(param);
 
-        let req = match chain(req, &app, vec![channel_load]).await {
+        let req = match chain(req, app, vec![channel_load]).await {
             Ok(req) => req,
             Err(error) => {
                 return Err(error);
             }
         };
 
-        channel_status(req, &app).await
+        channel_status(req, app).await
     } else if let (Some(caps), &Method::GET) = (CHANNEL_VALIDATOR_MESSAGES.captures(&path), method)
     {
         let param = RouteParams(vec![caps
@@ -251,7 +251,7 @@ async fn channels_router<A: Adapter>(
 
         req.extensions_mut().insert(param);
 
-        let req = match chain(req, &app, vec![channel_load]).await {
+        let req = match chain(req, app, vec![channel_load]).await {
             Ok(req) => req,
             Err(error) => {
                 return Err(error);
@@ -267,11 +267,9 @@ async fn channels_router<A: Adapter>(
         };
 
         list_validator_messages(req, &app, &extract_params.0, &extract_params.1).await
-    }  else if let (Some(caps), &Method::GET) =
-        (CHANNEL_EVENTS_AGGREGATES.captures(path), method)
-    {
+    } else if let (Some(caps), &Method::GET) = (CHANNEL_EVENTS_AGGREGATES.captures(&path), method) {
         if req.extensions().get::<Session>().is_none() {
-            return map_response_error(ResponseError::Unauthorized);
+            return Err(ResponseError::Unauthorized);
         }
 
         let param = RouteParams(vec![
@@ -282,14 +280,9 @@ async fn channels_router<A: Adapter>(
         ]);
         req.extensions_mut().insert(param);
 
-        let req = match chain(req, &self, vec![channel_load]).await {
-            Ok(req) => req,
-            Err(error) => {
-                return map_response_error(error);
-            }
-        };
+        let req = chain(req, app, vec![channel_load]).await?;
 
-        list_channel_event_aggregates(req, &self).await
+        list_channel_event_aggregates(req, app).await
     } else {
         Err(ResponseError::NotFound)
     }
@@ -299,7 +292,7 @@ async fn channels_router<A: Adapter>(
 pub enum ResponseError {
     NotFound,
     BadRequest(String),
-    UnAuthorized,
+    Unauthorized,
 }
 
 impl<T> From<T> for ResponseError
@@ -317,7 +310,7 @@ pub fn map_response_error(error: ResponseError) -> Response<Body> {
     match error {
         ResponseError::NotFound => not_found(),
         ResponseError::BadRequest(e) => bad_response(e, StatusCode::BAD_REQUEST),
-        ResponseError::UnAuthorized => bad_response(
+        ResponseError::Unauthorized => bad_response(
             "invalid authorization".to_string(),
             StatusCode::UNAUTHORIZED,
         ),

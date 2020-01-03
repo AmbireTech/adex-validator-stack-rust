@@ -20,7 +20,7 @@ pub async fn publisher_analytics<A: Adapter>(
         None => None,
     };
     let analytics_type = AnalyticsType::Publisher {
-        session: sess.cloned().ok_or(ResponseError::UnAuthorized)?,
+        session: sess.cloned().ok_or(ResponseError::Unauthorized)?,
         channel,
     };
 
@@ -72,7 +72,7 @@ pub async fn advertiser_analytics<A: Adapter>(
         None => None,
     };
     let analytics_type = AnalyticsType::Advertiser {
-        session: sess.ok_or(ResponseError::UnAuthorized)?.to_owned(),
+        session: sess.ok_or(ResponseError::Unauthorized)?.to_owned(),
         channel,
     };
 
