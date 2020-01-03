@@ -4,7 +4,7 @@ use ethabi::token::Token;
 use ethkey::Password;
 use ethstore::SafeAccount;
 use futures::compat::Future01CompatExt;
-use futures::future::BoxFuture;
+use futures::future::{BoxFuture, FutureExt};
 use lazy_static::lazy_static;
 use parity_crypto::publickey::{
     public_to_address, recover, verify_address, Address, Message, Signature,
@@ -21,10 +21,14 @@ use serde_json::Value;
 use std::convert::TryFrom;
 use std::error::Error;
 use std::fs;
+use std::sync::Arc;
 use tiny_keccak::Keccak;
 use web3::{
     contract::{Contract, Options},
+    transports::EventLoopHandle,
+    transports::Http,
     types::U256,
+    Web3,
 };
 
 lazy_static! {
@@ -43,6 +47,8 @@ pub struct EthereumAdapter {
     keystore_pwd: Password,
     config: Config,
     wallet: Option<SafeAccount>,
+    event_loop: Arc<EventLoopHandle>,
+    web3: Web3<Http>,
 }
 
 // Enables EthereumAdapter to be able to
@@ -68,12 +74,19 @@ impl EthereumAdapter {
 
         let address = ValidatorId::try_from(&address)?;
 
+        let (eloop, transport) = web3::transports::Http::new(&config.ethereum_network)
+            .map_err(|_| map_error("failed to init http transport"))?;
+        let event_loop = Arc::new(eloop);
+        let web3 = web3::Web3::new(transport);
+
         Ok(Self {
             address,
             keystore_json,
             keystore_pwd: opts.keystore_pwd.into(),
             wallet: None,
             config: config.to_owned(),
+            event_loop,
+            web3,
         })
     }
 }
@@ -124,7 +137,7 @@ impl Adapter for EthereumAdapter {
     }
 
     fn validate_channel<'a>(&'a self, channel: &'a Channel) -> BoxFuture<'a, AdapterResult<bool>> {
-        Box::pin(async move {
+        async move {
             // check if channel is valid
             if let Err(e) = EthereumAdapter::is_channel_valid(&self.config, self.whoami(), channel)
             {
@@ -147,11 +160,7 @@ impl Adapter for EthereumAdapter {
 
             let contract_address: Address = self.config.ethereum_core_address.into();
 
-            let (_eloop, transport) = web3::transports::Http::new(&self.config.ethereum_network)
-                .map_err(|_| map_error("failed to init http transport"))?;
-            let web3 = web3::Web3::new(transport);
-
-            let contract = Contract::from_json(web3.eth(), contract_address, &ADEXCORE_ABI)
+            let contract = Contract::from_json(self.web3.eth(), contract_address, &ADEXCORE_ABI)
                 .map_err(|_| map_error("failed to init core contract"))?;
 
             let channel_status: U256 = contract
@@ -173,13 +182,14 @@ impl Adapter for EthereumAdapter {
             }
 
             Ok(true)
-        })
+        }
+        .boxed()
     }
 
     /// Creates a `Session` from a provided Token by calling the Contract.
     /// Does **not** cache the (`Token`, `Session`) pair.
     fn session_from_token<'a>(&'a self, token: &'a str) -> BoxFuture<'a, AdapterResult<Session>> {
-        Box::pin(async move {
+        async move {
             if token.len() < 16 {
                 return Err(AdapterError::Failed("invalid token id".to_string()));
             }
@@ -210,12 +220,9 @@ impl Adapter for EthereumAdapter {
             let sess = match &verified.payload.identity {
                 Some(identity) => {
                     let contract_address: Address = identity.into();
-                    let (_eloop, transport) =
-                        web3::transports::Http::new(&self.config.ethereum_network)
-                            .map_err(|_| map_error("failed to init http transport"))?;
-                    let web3 = web3::Web3::new(transport);
-                    let contract = Contract::from_json(web3.eth(), contract_address, &IDENTITY_ABI)
-                        .map_err(|_| map_error("failed to init identity contract"))?;
+                    let contract =
+                        Contract::from_json(self.web3.eth(), contract_address, &IDENTITY_ABI)
+                            .map_err(|_| map_error("failed to init identity contract"))?;
 
                     let privilege_level: U256 = contract
                         .query(
@@ -246,7 +253,8 @@ impl Adapter for EthereumAdapter {
             };
 
             Ok(sess)
-        })
+        }
+        .boxed()
     }
 
     fn get_auth(&self, validator: &ValidatorId) -> AdapterResult<String> {
@@ -476,9 +484,8 @@ mod test {
 
     #[tokio::test]
     async fn should_validate_valid_channel_properly() {
-        let (eloop, http) =
+        let (_eloop, http) =
             web3::transports::Http::new("http://localhost:8545").expect("failed to init transport");
-        eloop.into_remote();
 
         let web3 = web3::Web3::new(http);
         let leader_account: Address = "Df08F82De32B8d460adbE8D72043E3a7e25A3B39"
@@ -621,12 +628,6 @@ mod test {
         let mut eth_adapter = setup_eth_adapter(None);
         eth_adapter.unlock().expect("should unlock eth adapter");
 
-        // deploy identity contract
-        let (eloop, http) =
-            web3::transports::Http::new("http://localhost:8545").expect("failed to init transport");
-        eloop.into_remote();
-
-        let web3 = web3::Web3::new(http);
         // part of address used in initializing ganache-cli
         let leader_account: Address = "Df08F82De32B8d460adbE8D72043E3a7e25A3B39"
             .parse()
@@ -641,7 +642,7 @@ mod test {
         let identity_bytecode = include_str!("../test/resources/identitybytecode.json");
 
         // deploy identity contract
-        let identity_contract = Contract::deploy(web3.eth(), &IDENTITY_ABI)
+        let identity_contract = Contract::deploy(eth_adapter.web3.eth(), &IDENTITY_ABI)
             .expect("invalid token token contract")
             .confirmations(0)
             .options(Options::with(|opt| {

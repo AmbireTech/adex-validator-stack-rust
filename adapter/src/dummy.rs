@@ -1,4 +1,4 @@
-use futures::future::BoxFuture;
+use futures::future::{BoxFuture, FutureExt};
 use primitives::adapter::{Adapter, AdapterError, AdapterResult, DummyAdapterOptions, Session};
 use primitives::channel_validator::ChannelValidator;
 use primitives::config::Config;
@@ -65,16 +65,17 @@ impl Adapter for DummyAdapter {
     }
 
     fn validate_channel<'a>(&'a self, channel: &'a Channel) -> BoxFuture<'a, AdapterResult<bool>> {
-        Box::pin(async move {
+        async move {
             match DummyAdapter::is_channel_valid(&self.config, self.whoami(), channel) {
                 Ok(_) => Ok(true),
                 Err(e) => Err(AdapterError::InvalidChannel(e.to_string())),
             }
-        })
+        }
+        .boxed()
     }
 
     fn session_from_token<'a>(&'a self, token: &'a str) -> BoxFuture<'a, AdapterResult<Session>> {
-        Box::pin(async move {
+        async move {
             let identity = self
                 .authorization_tokens
                 .iter()
@@ -90,7 +91,8 @@ impl Adapter for DummyAdapter {
                     token
                 ))),
             }
-        })
+        }
+        .boxed()
     }
 
     fn get_auth(&self, _validator: &ValidatorId) -> AdapterResult<String> {
