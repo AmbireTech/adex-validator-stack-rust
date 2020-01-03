@@ -46,7 +46,7 @@ lazy_static! {
     static ref CHANNEL_STATUS_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/status/?$").expect("The regex should be valid");
     // Only the initial Regex to be matched.
     static ref CHANNEL_VALIDATOR_MESSAGES: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/validator-messages(/.*)?$").expect("The regex should be valid");
-    static ref CHANNEL_EVENT_AGGREGATES: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/event-aggregates(/|/0x[a-zA-Z0-9]{40}/?)?$").expect("The regex should be valid");
+    static ref CHANNEL_EVENTS_AGGREGATES: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events-aggregates(/|/0x[a-zA-Z0-9]{40}/?)?$").expect("The regex should be valid");
     // @TODO define other regex routes
 }
 
@@ -185,7 +185,7 @@ impl<A: Adapter + 'static> Application<A> {
 
                     list_validator_messages(req, &self, &extract_params.0, &extract_params.1).await
                 } else if let (Some(caps), &Method::GET) =
-                    (CHANNEL_EVENT_AGGREGATES.captures(path), method)
+                    (CHANNEL_EVENTS_AGGREGATES.captures(path), method)
                 {
                     if req.extensions().get::<Session>().is_none() {
                         return map_response_error(ResponseError::Unauthorized);
