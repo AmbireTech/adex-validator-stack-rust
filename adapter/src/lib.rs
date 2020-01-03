@@ -87,12 +87,12 @@ impl TryFrom<&Channel> for EthereumChannel {
         hash.input(spec);
         let spec_hash: [u8; 32] = hash.result().into();
 
-        let validators: Vec<ValidatorId> = channel
+        let validators = channel
             .spec
             .validators
-            .into_iter()
-            .map(|v| v.id.clone())
-            .collect();
+            .iter()
+            .map(|v| &v.id)
+            .collect::<Vec<_>>();
 
         let creator = channel.creator.inner();
         let deposit_asset = <[u8; 20]>::from_hex(&channel.deposit_asset[2..])
@@ -103,7 +103,7 @@ impl TryFrom<&Channel> for EthereumChannel {
             &deposit_asset,
             &channel.deposit_amount.to_string(),
             channel.valid_until,
-            &validators.as_slice(),
+            &validators,
             &spec_hash,
         )
     }
@@ -115,7 +115,7 @@ impl EthereumChannel {
         token_addr: &[u8; 20],
         token_amount: &str, // big num string
         valid_until: DateTime<Utc>,
-        validators: &[ValidatorId],
+        validators: &[&ValidatorId],
         spec: &[u8; 32],
     ) -> Result<Self, ChannelError> {
         if BigNum::try_from(token_amount).is_err() {
@@ -171,7 +171,7 @@ impl EthereumChannel {
     }
 
     pub fn hash_hex(&self, contract_addr: &[u8; 20]) -> Result<String, Box<dyn Error>> {
-        let result = self.hash(&contract_addr)?;
+        let result = self.hash(contract_addr)?;
         Ok(format!("0x{}", hex::encode(result)))
     }
 
