@@ -13,7 +13,7 @@ pub(crate) fn reduce(channel: &Channel, initial_aggr: &mut EventAggregate, ev: &
             initial_aggr.events.insert("IMPRESSION".to_owned(), merge);
         }
         Event::Close => {
-            let creator = channel.creator.clone();
+            let creator = channel.creator.to_string();
             let close_event = AggregateEvents {
                 event_counts: Some(vec![(creator.clone(), 1.into())].into_iter().collect()),
                 event_payouts: vec![(creator, channel.deposit_amount.clone())]
@@ -36,14 +36,14 @@ fn merge_impression_ev(
     let event_count = impression
         .event_counts
         .get_or_insert_with(Default::default)
-        .entry(earner.into())
+        .entry(earner.to_string())
         .or_insert_with(|| 0.into());
 
     *event_count += &1.into();
 
     let event_payouts = impression
         .event_payouts
-        .entry(earner.into())
+        .entry(earner.to_string())
         .or_insert_with(|| 0.into());
     *event_payouts += &channel.spec.min_per_impression;
 

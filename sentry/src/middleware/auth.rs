@@ -60,7 +60,7 @@ pub(crate) async fn for_request(
 
         let session = Session {
             era: adapter_session.era,
-            uid: adapter_session.uid.to_hex_non_prefix_string(),
+            uid: adapter_session.uid,
             ip: get_request_ip(&req),
         };
 
@@ -165,8 +165,8 @@ mod test {
             .extensions()
             .get::<Session>()
             .expect("There should be a Session set inside the request");
-        let leader_id = IDS["leader"].to_hex_non_prefix_string();
-        assert_eq!(leader_id, session.uid);
+
+        assert_eq!(IDS["leader"], session.uid);
         assert!(session.ip.is_none());
     }
 }

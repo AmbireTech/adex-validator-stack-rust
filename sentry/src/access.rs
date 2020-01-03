@@ -5,6 +5,7 @@ use redis::aio::MultiplexedConnection;
 use primitives::event_submission::{RateLimit, Rule};
 use primitives::sentry::Event;
 use primitives::Channel;
+use std::cmp::PartialEq;
 
 use crate::Session;
 
@@ -54,7 +55,7 @@ pub async fn check_access(
 
     let default_rules = [
         Rule {
-            uids: Some(vec![channel.creator.clone()]),
+            uids: Some(vec![channel.creator.to_string()]),
             rate_limit: None,
         },
         Rule {
@@ -74,7 +75,7 @@ pub async fn check_access(
     let rules = allow_rules
         .iter()
         .filter(|r| match &r.uids {
-            Some(uids) => uids.iter().any(|uid| &session.uid == uid),
+            Some(uids) => uids.iter().any(|uid| uid.eq(&session.uid.to_string())),
             None => true,
         })
         .collect::<Vec<_>>();
@@ -107,16 +108,11 @@ async fn apply_rule(
     match &rule.rate_limit {
         Some(rate_limit) => {
             let key = if &rate_limit.limit_type == "sid" {
-                // @TODO: Is this really necessary?
-                if session.uid.is_empty() {
-                    Err("rateLimit: unauthenticated request".to_string())
-                } else {
-                    Ok(format!(
-                        "adexRateLimit:{}:{}",
-                        hex::encode(channel.id),
-                        session.uid
-                    ))
-                }
+                Ok(format!(
+                    "adexRateLimit:{}:{}",
+                    hex::encode(channel.id),
+                    session.uid
+                ))
             } else if &rate_limit.limit_type == "ip" {
                 if events.len() != 1 {
                     Err("rateLimit: only allows 1 event".to_string())
@@ -163,7 +159,7 @@ mod test {
     use primitives::config::configuration;
     use primitives::event_submission::{RateLimit, Rule};
     use primitives::sentry::Event;
-    use primitives::util::tests::prep_db::DUMMY_CHANNEL;
+    use primitives::util::tests::prep_db::{DUMMY_CHANNEL, IDS};
     use primitives::{Channel, Config, EventSubmission};
 
     use crate::db::redis_connection;
@@ -207,7 +203,7 @@ mod test {
 
         let session = Session {
             era: 0,
-            uid: "response".to_string(),
+            uid: IDS["follower"].clone(),
             ip: Default::default(),
         };
 
@@ -241,7 +237,7 @@ mod test {
 
         let session = Session {
             era: 0,
-            uid: "response".to_string(),
+            uid: IDS["follower"].clone(),
             ip: Default::default(),
         };
 
