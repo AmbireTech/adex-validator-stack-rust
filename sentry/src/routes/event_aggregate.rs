@@ -1,24 +1,47 @@
-use crate::{Application, ResponseError, Session};
+use chrono::{serde::ts_milliseconds_option, DateTime, Utc};
 use hyper::{Body, Request, Response};
-use primitives::adapter::Adapter;
-use primitives::Channel;
+use serde::Deserialize;
+
+use primitives::{adapter::Adapter, sentry::EventAggregateResponse, Channel};
+
+use crate::{db::list_event_aggregates, success_response, Application, ResponseError, Session};
+
+#[derive(Deserialize)]
+pub struct EventAggregatesQuery {
+    #[serde(default, with = "ts_milliseconds_option")]
+    after: Option<DateTime<Utc>>,
+}
 
 pub async fn list_channel_event_aggregates<A: Adapter>(
     req: Request<Body>,
-    _app: &Application<A>,
+    app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
     let channel = req
         .extensions()
         .get::<Channel>()
         .expect("Request should have Channel");
 
-    // TODO: Auth required middleware
     let session = req
         .extensions()
         .get::<Session>()
         .ok_or_else(|| ResponseError::Unauthorized)?;
 
-    let _is_superuser = channel.spec.validators.find(&session.uid).is_some();
+    let query =
+        serde_urlencoded::from_str::<EventAggregatesQuery>(req.uri().query().unwrap_or(""))?;
 
-    unimplemented!("Still need to finish it")
+    let from = if channel.spec.validators.find(&session.uid).is_some() {
+        Some(session.uid.clone())
+    } else {
+        None
+    };
+
+    let event_aggregates =
+        list_event_aggregates(&app.pool, app.config.events_find_limit, &from, &query.after).await?;
+
+    let response = EventAggregateResponse {
+        channel: channel.clone(),
+        events: event_aggregates,
+    };
+
+    Ok(success_response(serde_json::to_string(&response)?))
 }
