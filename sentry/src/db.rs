@@ -8,9 +8,11 @@ use std::env;
 use lazy_static::lazy_static;
 
 mod channel;
+mod event_aggregate;
 mod validator_message;
 
 pub use self::channel::*;
+pub use self::event_aggregate::*;
 pub use self::validator_message::*;
 
 pub type DbPool = Pool<PostgresConnectionManager<NoTls>>;
