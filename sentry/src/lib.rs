@@ -7,11 +7,12 @@ use crate::middleware::auth;
 use crate::middleware::channel::channel_load;
 use crate::middleware::cors::{cors, Cors};
 use crate::routes::channel::channel_status;
+use crate::routes::event_aggregate::list_channel_event_aggregates;
 use crate::routes::validator_message::{extract_params, list_validator_messages};
 use hyper::{Body, Method, Request, Response, StatusCode};
 use lazy_static::lazy_static;
 use primitives::adapter::Adapter;
-use primitives::Config;
+use primitives::{Config, ValidatorId};
 use redis::aio::MultiplexedConnection;
 use regex::Regex;
 use routes::analytics::{advertiser_analytics, analytics, publisher_analytics};
@@ -24,12 +25,14 @@ pub mod middleware {
     pub mod auth;
     pub mod channel;
     pub mod cors;
+    pub mod event_aggregate;
 }
 
 pub mod routes {
     pub mod analytics;
     pub mod cfg;
     pub mod channel;
+    pub mod event_aggregate;
     pub mod validator_message;
 }
 
@@ -45,6 +48,7 @@ lazy_static! {
     static ref CHANNEL_STATUS_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/status/?$").expect("The regex should be valid");
     // Only the initial Regex to be matched.
     static ref CHANNEL_VALIDATOR_MESSAGES: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/validator-messages(/.*)?$").expect("The regex should be valid");
+    static ref CHANNEL_EVENTS_AGGREGATES: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events-aggregates(/|/0x[a-zA-Z0-9]{40}/?)?$").expect("The regex should be valid");
     // @TODO define other regex routes
     static ref ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
     static ref ADVERTISER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-advertiser/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
@@ -64,7 +68,7 @@ async fn auth_required_middleware<A: Adapter>(
     if req.extensions().get::<Session>().is_some() {
         Ok(req)
     } else {
-        Err(ResponseError::UnAuthorized)
+        Err(ResponseError::Unauthorized)
     }
 }
 
@@ -215,14 +219,14 @@ async fn channels_router<A: Adapter>(
 
         // example with middleware
         // @TODO remove later
-        let req = match chain(req, &app, vec![config_middleware]).await {
+        let req = match chain(req, app, vec![config_middleware]).await {
             Ok(req) => req,
             Err(error) => {
                 return Err(error);
             }
         };
 
-        last_approved(req, &app).await
+        last_approved(req, app).await
     } else if let (Some(caps), &Method::GET) =
         (CHANNEL_STATUS_BY_CHANNEL_ID.captures(&path), method)
     {
@@ -231,14 +235,14 @@ async fn channels_router<A: Adapter>(
             .map_or("".to_string(), |m| m.as_str().to_string())]);
         req.extensions_mut().insert(param);
 
-        let req = match chain(req, &app, vec![channel_load]).await {
+        let req = match chain(req, app, vec![channel_load]).await {
             Ok(req) => req,
             Err(error) => {
                 return Err(error);
             }
         };
 
-        channel_status(req, &app).await
+        channel_status(req, app).await
     } else if let (Some(caps), &Method::GET) = (CHANNEL_VALIDATOR_MESSAGES.captures(&path), method)
     {
         let param = RouteParams(vec![caps
@@ -247,7 +251,7 @@ async fn channels_router<A: Adapter>(
 
         req.extensions_mut().insert(param);
 
-        let req = match chain(req, &app, vec![channel_load]).await {
+        let req = match chain(req, app, vec![channel_load]).await {
             Ok(req) => req,
             Err(error) => {
                 return Err(error);
@@ -263,6 +267,22 @@ async fn channels_router<A: Adapter>(
         };
 
         list_validator_messages(req, &app, &extract_params.0, &extract_params.1).await
+    } else if let (Some(caps), &Method::GET) = (CHANNEL_EVENTS_AGGREGATES.captures(&path), method) {
+        if req.extensions().get::<Session>().is_none() {
+            return Err(ResponseError::Unauthorized);
+        }
+
+        let param = RouteParams(vec![
+            caps.get(1)
+                .map_or("".to_string(), |m| m.as_str().to_string()),
+            caps.get(2)
+                .map_or("".to_string(), |m| m.as_str().trim_matches('/').to_string()),
+        ]);
+        req.extensions_mut().insert(param);
+
+        let req = chain(req, app, vec![channel_load]).await?;
+
+        list_channel_event_aggregates(req, app).await
     } else {
         Err(ResponseError::NotFound)
     }
@@ -272,7 +292,7 @@ async fn channels_router<A: Adapter>(
 pub enum ResponseError {
     NotFound,
     BadRequest(String),
-    UnAuthorized,
+    Unauthorized,
 }
 
 impl<T> From<T> for ResponseError
@@ -290,7 +310,7 @@ pub fn map_response_error(error: ResponseError) -> Response<Body> {
     match error {
         ResponseError::NotFound => not_found(),
         ResponseError::BadRequest(e) => bad_response(e, StatusCode::BAD_REQUEST),
-        ResponseError::UnAuthorized => bad_response(
+        ResponseError::Unauthorized => bad_response(
             "invalid authorization".to_string(),
             StatusCode::UNAUTHORIZED,
         ),
@@ -338,6 +358,6 @@ pub fn success_response(response_body: String) -> Response<Body> {
 #[derive(Debug, Clone)]
 pub struct Session {
     pub era: i64,
-    pub uid: String,
+    pub uid: ValidatorId,
     pub ip: Option<String>,
 }

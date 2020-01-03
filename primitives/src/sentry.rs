@@ -62,6 +62,8 @@ pub struct Earner {
     pub promilles: u64,
 }
 
+pub type EarnerAddress = ValidatorId;
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EventAggregate {
@@ -112,17 +114,29 @@ pub struct ValidatorMessageResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct EventAggregateResponse {
+    pub channel: Channel,
     pub events: Vec<EventAggregate>,
 }
 
 #[cfg(feature = "postgres")]
 mod postgres {
     use super::ValidatorMessage;
+    use crate::sentry::EventAggregate;
     use crate::validator::MessageTypes;
     use bytes::BytesMut;
     use postgres_types::{accepts, to_sql_checked, IsNull, Json, ToSql, Type};
     use std::error::Error;
     use tokio_postgres::Row;
+
+    impl From<&Row> for EventAggregate {
+        fn from(row: &Row) -> Self {
+            Self {
+                channel_id: row.get("channel_id"),
+                created: row.get("created"),
+                events: row.get::<_, Json<_>>("events").0,
+            }
+        }
+    }
 
     impl From<&Row> for ValidatorMessage {
         fn from(row: &Row) -> Self {

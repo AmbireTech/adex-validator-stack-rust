@@ -2,6 +2,7 @@ use crate::channel::{Channel, ChannelError, SpecValidator, SpecValidators};
 use crate::config::Config;
 use crate::ValidatorId;
 use chrono::Utc;
+use std::cmp::PartialEq;
 
 pub trait ChannelValidator {
     fn is_channel_valid(
@@ -60,10 +61,10 @@ pub fn all_validators_listed(validators: &SpecValidators, whitelist: &[Validator
     }
 }
 
-pub fn creator_listed(channel: &Channel, whitelist: &[String]) -> bool {
+pub fn creator_listed(channel: &Channel, whitelist: &[ValidatorId]) -> bool {
     // if the list is empty, return true, as we don't have a whitelist to restrict us to
     // or if we have a list, check if it includes the `channel.creator`
-    whitelist.is_empty() || whitelist.iter().any(|allowed| allowed == &channel.creator)
+    whitelist.is_empty() || whitelist.iter().any(|allowed| allowed.eq(&channel.creator))
 }
 
 pub fn asset_listed(channel: &Channel, whitelist: &[String]) -> bool {

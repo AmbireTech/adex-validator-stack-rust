@@ -49,7 +49,7 @@ impl FromHex for ChannelId {
 #[serde(rename_all = "camelCase")]
 pub struct Channel {
     pub id: ChannelId,
-    pub creator: String,
+    pub creator: ValidatorId,
     pub deposit_asset: String,
     pub deposit_amount: BigNum,
     #[serde(with = "ts_seconds")]
