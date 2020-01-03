@@ -7,6 +7,7 @@ use std::env;
 
 use lazy_static::lazy_static;
 
+pub mod analytics;
 mod channel;
 mod validator_message;
 

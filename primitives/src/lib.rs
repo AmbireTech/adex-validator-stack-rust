@@ -23,6 +23,7 @@ pub mod util {
 
     pub mod logging;
 }
+pub mod analytics;
 pub mod validator;
 
 pub use self::ad_unit::AdUnit;
@@ -42,7 +43,10 @@ pub enum DomainError {
 
 impl fmt::Display for DomainError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Domain error",)
+        match self {
+            DomainError::InvalidArgument(err) => write!(f, "{}", err),
+            DomainError::RuleViolation(err) => write!(f, "{}", err),
+        }
     }
 }
 
