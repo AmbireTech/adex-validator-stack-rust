@@ -28,7 +28,7 @@ impl ValidatorId {
     }
 
     pub fn to_hex_checksummed_string(&self) -> String {
-        eth_checksum::checksum(&format!("0x{}", hex::encode(self.0)))
+        eth_checksum::checksum(&format!("0x{}", self.to_hex_non_prefix_string()))
     }
 }
 
@@ -79,7 +79,7 @@ impl TryFrom<&String> for ValidatorId {
 
 impl fmt::Display for ValidatorId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", format!("0x{}", hex::encode(self.0)))
+        write!(f, "{}", format!("0x{}", self.to_hex_non_prefix_string()))
     }
 }
 
