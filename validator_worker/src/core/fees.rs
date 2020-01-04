@@ -77,9 +77,7 @@ fn distribute_fee<'a>(
 
         if fee_rounded > 0.into() {
             let addr = validator.fee_addr.as_ref().unwrap_or(&validator.id);
-            let entry = balances
-                .entry(addr.to_string())
-                .or_insert_with(|| 0.into());
+            let entry = balances.entry(addr.to_string()).or_insert_with(|| 0.into());
 
             *entry += &fee_rounded;
         }
