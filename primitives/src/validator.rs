@@ -87,6 +87,7 @@ impl fmt::Display for ValidatorId {
 #[serde(rename_all = "camelCase")]
 pub struct ValidatorDesc {
     pub id: ValidatorId,
+    pub fee_addr: Option<ValidatorId>,
     pub url: String,
     pub fee: BigNum,
 }

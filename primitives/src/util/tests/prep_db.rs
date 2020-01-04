@@ -45,12 +45,14 @@ lazy_static! {
         id:  ValidatorId::try_from("ce07CbB7e054514D590a0262C93070D838bFBA2e").expect("Failed to parse DUMMY_VALIDATOR_LEADER id "),
         url: "http://localhost:8005".to_string(),
         fee: 100.into(),
+        fee_addr: None,
     };
 
     pub static ref DUMMY_VALIDATOR_FOLLOWER: ValidatorDesc = ValidatorDesc {
         id:  ValidatorId::try_from("c91763d7f14ac5c5ddfbcd012e0d2a61ab9bded3").expect("Failed to parse DUMMY_VALIDATOR_FOLLOWER id "),
         url: "http://localhost:8006".to_string(),
         fee: 100.into(),
+        fee_addr: None,
     };
 
     pub static ref DUMMY_CHANNEL: Channel = {
