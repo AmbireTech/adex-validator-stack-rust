@@ -95,7 +95,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
         let url = format!(
             "{}/validator-messages/{}/{}?limit=1",
             self.validator_url,
-            from.to_string(),
+            from.to_hex_checksummed_string(),
             message_type
         );
         let result = self
