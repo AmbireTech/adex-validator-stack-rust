@@ -1,22 +1,20 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
 
+use std::convert::TryFrom;
+use std::error::Error;
+use std::time::Duration;
+
 use clap::{App, Arg};
+use futures::future::{join, try_join_all};
+use tokio::runtime::Runtime;
+use tokio::time::{delay_for, timeout};
 
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
-use futures::compat::Future01CompatExt;
-use futures::future::try_join_all;
-use futures::future::{join, FutureExt, TryFutureExt};
 use primitives::adapter::{Adapter, DummyAdapterOptions, KeystoreOptions};
 use primitives::config::{configuration, Config};
 use primitives::util::tests::prep_db::{AUTH, IDS};
 use primitives::{Channel, SpecValidator, ValidatorId};
-use std::convert::TryFrom;
-use std::error::Error;
-use std::ops::Add;
-use std::time::{Duration, Instant};
-use tokio::timer::Delay;
-use tokio::util::FutureExt as TokioFutureExt;
 use validator_worker::error::ValidatorWorker as ValidatorWorkerError;
 use validator_worker::{all_channels, follower, leader, SentryApi};
 
@@ -132,36 +130,37 @@ fn run<A: Adapter + 'static>(
         adapter,
     };
 
+    // Create the runtime
+    let mut rt = Runtime::new()?;
+
     if is_single_tick {
-        tokio::run(iterate_channels(args).boxed().compat());
+        rt.block_on(iterate_channels(args));
     } else {
-        tokio::run(infinite(args).boxed().compat());
+        rt.block_on(infinite(args));
     }
 
     Ok(())
 }
 
-async fn infinite<A: Adapter + 'static>(args: Args<A>) -> Result<(), ()> {
+async fn infinite<A: Adapter + 'static>(args: Args<A>) {
     loop {
         let arg = args.clone();
-        let delay_future =
-            Delay::new(Instant::now().add(Duration::from_secs(arg.config.wait_time as u64)));
-        let joined = join(iterate_channels(arg), delay_future.compat());
-        if let (_, Err(e)) = joined.await {
-            eprintln!("{}", e);
-        }
+        let delay_future = delay_for(Duration::from_secs(arg.config.wait_time as u64));
+        let _result = join(iterate_channels(arg), delay_future).await;
     }
 }
 
-async fn iterate_channels<A: Adapter + 'static>(args: Args<A>) -> Result<(), ()> {
+async fn iterate_channels<A: Adapter + 'static>(args: Args<A>) {
     let result = all_channels(&args.sentry_url, args.adapter.whoami()).await;
 
-    if let Err(e) = result {
-        eprintln!("Failed to get channels {}", e);
-        return Ok(());
-    }
+    let channels = match result {
+        Ok(channels) => channels,
+        Err(e) => {
+            eprintln!("Failed to get channels {}", e);
+            return;
+        }
+    };
 
-    let channels = result.unwrap();
     let channels_size = channels.len();
 
     let tick = try_join_all(
@@ -181,7 +180,6 @@ async fn iterate_channels<A: Adapter + 'static>(args: Args<A>) -> Result<(), ()>
             args.config.max_channels
         )
     }
-    Ok(())
 }
 
 async fn validator_tick<A: Adapter + 'static>(
@@ -195,24 +193,12 @@ async fn validator_tick<A: Adapter + 'static>(
 
     match channel.spec.validators.find(&whoami) {
         SpecValidator::Leader(_) => {
-            if let Err(e) = leader::tick(&sentry)
-                .boxed()
-                .compat()
-                .timeout(duration)
-                .compat()
-                .await
-            {
+            if let Err(e) = timeout(duration, leader::tick(&sentry)).await {
                 return Err(ValidatorWorkerError::Failed(e.to_string()));
             }
         }
         SpecValidator::Follower(_) => {
-            if let Err(e) = follower::tick(&sentry)
-                .boxed()
-                .compat()
-                .timeout(duration)
-                .compat()
-                .await
-            {
+            if let Err(e) = timeout(duration, follower::tick(&sentry)).await {
                 return Err(ValidatorWorkerError::Failed(e.to_string()));
             }
         }
