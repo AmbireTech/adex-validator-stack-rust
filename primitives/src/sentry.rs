@@ -62,8 +62,6 @@ pub struct Earner {
     pub promilles: u64,
 }
 
-pub type EarnerAddress = ValidatorId;
-
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EventAggregate {
