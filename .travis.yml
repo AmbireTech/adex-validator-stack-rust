@@ -8,9 +8,6 @@ node_js: "12.12.0"
 cache:
   directories:
     - /home/travis/.cargo
-# But don't cache the cargo registry
-before_cache:
-  - rm -rf /home/travis/.cargo/registry
 env:
   global:
     - CARGO_MAKE_RUN_CHECK_FORMAT="true"
@@ -19,6 +16,29 @@ services:
   - redis-server
 matrix:
   fast_finish: true
+
+# Job lifecycle
 script:
   - which cargo-make || cargo install cargo-make
   - cargo make ci-flow
+# But don't cache the cargo registry
+before_cache:
+  - rm -rf /home/travis/.cargo/registry
+# End Job lifecycle
+
+jobs:
+  include:
+    - stage: deploy
+      if: tag IS present
+      before_deploy:
+        - cargo build -p validator_worker --release --all-features --target x86_64-unknown-linux-gnu
+        - cp target/x86_64-unknown-linux-gnu/release/validator_worker validator_worker-v$TRAVIS_TAG
+      deploy:
+        provider: releases
+        api_key: $GITHUB_API_TOKEN
+        file: $TRAVIS_BUILD_DIR/validator_worker-v$TRAVIS_TAG
+        skip_cleanup: true
+        draft: true
+        on:
+          tags: true
+          all_branches: true
