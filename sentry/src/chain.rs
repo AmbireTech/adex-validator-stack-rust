@@ -1,22 +1,24 @@
 use crate::{Application, ResponseError};
+use futures::future::BoxFuture;
 use hyper::{Body, Request};
 use primitives::adapter::Adapter;
-use std::future::Future;
 
 // chain middleware function calls
 //
 // function signature
 // fn middleware(mut req: Request) -> Result<Request, ResponseError>
 
-pub async fn chain<'a, A, M, MF>(
+pub async fn chain<'a, A: Adapter + 'static, M>(
     req: Request<Body>,
     app: &'a Application<A>,
     middlewares: Vec<M>,
 ) -> Result<Request<Body>, ResponseError>
 where
-    A: Adapter,
-    MF: Future<Output = Result<Request<Body>, ResponseError>> + Send,
-    M: FnMut(Request<Body>, &'a Application<A>) -> MF,
+    M: FnMut(
+            Request<Body>,
+            &'a Application<A>,
+        ) -> BoxFuture<'a, Result<Request<Body>, ResponseError>>
+        + 'static,
 {
     let mut req = Ok(req);
 

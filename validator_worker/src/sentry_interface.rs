@@ -1,8 +1,7 @@
 use crate::error::ValidatorWorker;
 use chrono::{DateTime, Utc};
-use futures::compat::Future01CompatExt;
 use futures::future::try_join_all;
-use futures_legacy::Future as LegacyFuture;
+use futures::future::TryFutureExt;
 use primitives::adapter::Adapter;
 use primitives::channel::SpecValidator;
 use primitives::sentry::{
@@ -11,7 +10,7 @@ use primitives::sentry::{
 };
 use primitives::validator::MessageTypes;
 use primitives::{Channel, Config, ValidatorDesc, ValidatorId};
-use reqwest::r#async::{Client, Response};
+use reqwest::{Client, Response};
 use std::collections::HashMap;
 use std::time::Duration;
 
@@ -83,7 +82,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
         }))
         .await
         {
-            handle_http_error(e);
+            println!("Propagation error: {}", e);
         }
     }
 
@@ -96,15 +95,14 @@ impl<T: Adapter + 'static> SentryApi<T> {
         let url = format!(
             "{}/validator-messages/{}/{}?limit=1",
             self.validator_url,
-            from.to_string(),
+            from.to_hex_checksummed_string(),
             message_type
         );
         let result = self
             .client
             .get(&url)
             .send()
-            .and_then(|mut res: Response| res.json::<ValidatorMessageResponse>())
-            .compat()
+            .and_then(|res: Response| res.json::<ValidatorMessageResponse>())
             .await?;
 
         Ok(result.validator_messages.first().map(|m| m.msg.clone()))
@@ -119,26 +117,22 @@ impl<T: Adapter + 'static> SentryApi<T> {
     }
 
     pub async fn get_last_approved(&self) -> Result<LastApprovedResponse, reqwest::Error> {
-        let future = self
-            .client
+        self.client
             .get(&format!("{}/last-approved", self.validator_url))
             .send()
-            .and_then(|mut res: Response| res.json::<LastApprovedResponse>());
-
-        future.compat().await
+            .and_then(|res: Response| res.json::<LastApprovedResponse>())
+            .await
     }
 
     pub async fn get_last_msgs(&self) -> Result<LastApprovedResponse, reqwest::Error> {
-        let future = self
-            .client
+        self.client
             .get(&format!(
                 "{}/last-approved?withHeartbeat=true",
                 self.validator_url
             ))
             .send()
-            .and_then(|mut res: Response| res.json::<LastApprovedResponse>());
-
-        future.compat().await
+            .and_then(|res: Response| res.json::<LastApprovedResponse>())
+            .await
     }
 
     pub async fn get_event_aggregates(
@@ -161,11 +155,9 @@ impl<T: Adapter + 'static> SentryApi<T> {
             .bearer_auth(&auth_token)
             .send()
             .map_err(|e| Box::new(ValidatorWorker::Failed(e.to_string())))
-            .compat()
             .await?
             .json()
             .map_err(|e| Box::new(ValidatorWorker::Failed(e.to_string())))
-            .compat()
             .await
     }
 }
@@ -189,34 +181,11 @@ async fn propagate_to(
         .bearer_auth(&auth_token)
         .json(&body)
         .send()
-        .compat()
         .await?
         .json()
-        .compat()
         .await?;
 
     Ok(())
-}
-
-fn handle_http_error(e: reqwest::Error) {
-    if e.is_http() {
-        match e.url() {
-            None => println!("No Url given"),
-            Some(url) => println!("erorr sending http request for validator {}", url),
-        }
-    }
-    // Inspect the internal error and output it
-    if e.is_serialization() {
-        let serde_error = match e.get_ref() {
-            None => return,
-            Some(err) => err,
-        };
-        println!("problem parsing information {}", serde_error);
-    }
-
-    if e.is_redirect() {
-        println!("server redirecting too many times or making loop");
-    }
 }
 
 pub async fn all_channels(
@@ -255,10 +224,9 @@ async fn fetch_page(
     ]
     .join("&");
 
-    let future = client
+    client
         .get(&format!("{}/channel/list?{}", sentry_url, query))
         .send()
-        .and_then(|mut res: Response| res.json::<ChannelListResponse>());
-
-    future.compat().await
+        .and_then(|res: Response| res.json::<ChannelListResponse>())
+        .await
 }

@@ -547,6 +547,7 @@ mod test {
                 .expect("failed to create id"),
             url: "http://localhost:8005".to_string(),
             fee: 100.into(),
+            fee_addr: None,
         };
 
         let follower_validator_desc = ValidatorDesc {
@@ -555,6 +556,7 @@ mod test {
                 .expect("failed to create id"),
             url: "http://localhost:8006".to_string(),
             fee: 100.into(),
+            fee_addr: None,
         };
 
         let mut valid_channel = Channel {
