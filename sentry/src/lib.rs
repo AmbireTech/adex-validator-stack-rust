@@ -9,6 +9,7 @@ use crate::middleware::cors::{cors, Cors};
 use crate::routes::channel::channel_status;
 use crate::routes::event_aggregate::list_channel_event_aggregates;
 use crate::routes::validator_message::{extract_params, list_validator_messages};
+use futures::future::{BoxFuture, FutureExt};
 use hyper::{Body, Method, Request, Response, StatusCode};
 use lazy_static::lazy_static;
 use primitives::adapter::Adapter;
@@ -20,7 +21,6 @@ use routes::cfg::config;
 use routes::channel::{channel_list, create_channel, last_approved};
 use slog::{error, Logger};
 use std::collections::HashMap;
-
 pub mod middleware {
     pub mod auth;
     pub mod channel;
@@ -54,22 +54,18 @@ lazy_static! {
     static ref ADVERTISER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-advertiser/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
 }
 
-async fn config_middleware<A: Adapter>(
+fn auth_required_middleware<'a, A: Adapter>(
     req: Request<Body>,
     _: &Application<A>,
-) -> Result<Request<Body>, ResponseError> {
-    Ok(req)
-}
-
-async fn auth_required_middleware<A: Adapter>(
-    req: Request<Body>,
-    _: &Application<A>,
-) -> Result<Request<Body>, ResponseError> {
-    if req.extensions().get::<Session>().is_some() {
-        Ok(req)
-    } else {
-        Err(ResponseError::Unauthorized)
+) -> BoxFuture<'a, Result<Request<Body>, ResponseError>> {
+    async move {
+        if req.extensions().get::<Session>().is_some() {
+            Ok(req)
+        } else {
+            Err(ResponseError::Unauthorized)
+        }
     }
+    .boxed()
 }
 
 #[derive(Debug)]
@@ -137,8 +133,7 @@ impl<A: Adapter + 'static> Application<A> {
 
             ("/analytics", &Method::GET) => analytics(req, &self).await,
             ("/analytics/for-advertiser", &Method::GET) => {
-                // @TODO get advertiser channels
-                let req = match chain(req, &self, vec![auth_required_middleware]).await {
+                let req = match chain(req, &self, vec![Box::new(auth_required_middleware)]).await {
                     Ok(req) => req,
                     Err(error) => {
                         return map_response_error(error);
@@ -147,7 +142,7 @@ impl<A: Adapter + 'static> Application<A> {
                 advertiser_analytics(req, &self).await
             }
             ("/analytics/for-publisher", &Method::GET) => {
-                let req = match chain(req, &self, vec![auth_required_middleware]).await {
+                let req = match chain(req, &self, vec![Box::new(auth_required_middleware)]).await {
                     Ok(req) => req,
                     Err(error) => {
                         return map_response_error(error);
@@ -170,7 +165,7 @@ impl<A: Adapter + 'static> Application<A> {
     }
 }
 
-async fn analytics_router<A: Adapter>(
+async fn analytics_router<A: Adapter + 'static>(
     mut req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
@@ -184,7 +179,7 @@ async fn analytics_router<A: Adapter>(
                     .map_or("".to_string(), |m| m.as_str().to_string())]);
                 req.extensions_mut().insert(param);
 
-                let req = chain(req, app, vec![channel_load]).await?;
+                let req = chain(req, app, vec![Box::new(channel_load)]).await?;
                 analytics(req, app).await
             } else if let Some(caps) = ADVERTISER_ANALYTICS_BY_CHANNEL_ID.captures(route) {
                 let param = RouteParams(vec![caps
@@ -192,7 +187,7 @@ async fn analytics_router<A: Adapter>(
                     .map_or("".to_string(), |m| m.as_str().to_string())]);
                 req.extensions_mut().insert(param);
 
-                let req = chain(req, app, vec![auth_required_middleware]).await?;
+                let req = auth_required_middleware(req, app).await?;
                 advertiser_analytics(req, app).await
             } else {
                 Err(ResponseError::NotFound)
@@ -202,7 +197,7 @@ async fn analytics_router<A: Adapter>(
     }
 }
 
-async fn channels_router<A: Adapter>(
+async fn channels_router<A: Adapter + 'static>(
     mut req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
@@ -217,15 +212,6 @@ async fn channels_router<A: Adapter>(
             .map_or("".to_string(), |m| m.as_str().to_string())]);
         req.extensions_mut().insert(param);
 
-        // example with middleware
-        // @TODO remove later
-        let req = match chain(req, app, vec![config_middleware]).await {
-            Ok(req) => req,
-            Err(error) => {
-                return Err(error);
-            }
-        };
-
         last_approved(req, app).await
     } else if let (Some(caps), &Method::GET) =
         (CHANNEL_STATUS_BY_CHANNEL_ID.captures(&path), method)
@@ -235,13 +221,7 @@ async fn channels_router<A: Adapter>(
             .map_or("".to_string(), |m| m.as_str().to_string())]);
         req.extensions_mut().insert(param);
 
-        let req = match chain(req, app, vec![channel_load]).await {
-            Ok(req) => req,
-            Err(error) => {
-                return Err(error);
-            }
-        };
-
+        let req = channel_load(req, app).await?;
         channel_status(req, app).await
     } else if let (Some(caps), &Method::GET) = (CHANNEL_VALIDATOR_MESSAGES.captures(&path), method)
     {
@@ -251,7 +231,7 @@ async fn channels_router<A: Adapter>(
 
         req.extensions_mut().insert(param);
 
-        let req = match chain(req, app, vec![channel_load]).await {
+        let req = match chain(req, app, vec![Box::new(channel_load)]).await {
             Ok(req) => req,
             Err(error) => {
                 return Err(error);
@@ -280,7 +260,7 @@ async fn channels_router<A: Adapter>(
         ]);
         req.extensions_mut().insert(param);
 
-        let req = chain(req, app, vec![channel_load]).await?;
+        let req = chain(req, app, vec![Box::new(channel_load)]).await?;
 
         list_channel_event_aggregates(req, app).await
     } else {
