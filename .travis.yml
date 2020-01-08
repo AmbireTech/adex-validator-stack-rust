@@ -17,17 +17,19 @@ services:
 matrix:
   fast_finish: true
 
-# Job lifecycle
-script:
-  - which cargo-make || cargo install cargo-make
-  - cargo make ci-flow
-# But don't cache the cargo registry
-before_cache:
-  - rm -rf /home/travis/.cargo/registry
-# End Job lifecycle
+stages:
+  - test
+  - deploy
 
 jobs:
   include:
+    - stage: test
+      script:
+        - which cargo-make || cargo install cargo-make
+        - cargo make ci-flow
+      # But don't cache the cargo registry
+      before_cache:
+        - rm -rf /home/travis/.cargo/registry
     - stage: deploy
       if: tag IS present
       before_deploy:
