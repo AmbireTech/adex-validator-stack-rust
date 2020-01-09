@@ -19,7 +19,7 @@ tokio = { version = "0.2", features = ["macros"] }
 hyper = { version = "0.13", features = ["stream"] }
 regex = "1"
 # Database
-redis = { version = "0.13.1-alpha.0", features = ["tokio-rt-core"] }
+redis = { version = "0.14", features = ["tokio-rt-core"] }
 bb8 = { git = "https://github.com/khuey/bb8" }
 bb8-postgres = { git = "https://github.com/khuey/bb8", features = ["with-chrono-0_4", "with-serde_json-1"] }
 # Migrations
