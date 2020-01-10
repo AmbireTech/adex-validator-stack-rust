@@ -9,8 +9,8 @@ dependencies = [
  "chrono 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "eth_checksum 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "ethabi 8.0.0 (git+https://github.com/samparsky/ethabi?branch=graph-patches)",
- "ethkey 0.4.0 (git+https://github.com/paritytech/parity-ethereum)",
- "ethstore 0.2.1 (git+https://github.com/paritytech/parity-ethereum)",
+ "ethkey 0.4.0 (git+https://github.com/elpiel/parity-ethereum)",
+ "ethstore 0.2.1 (git+https://github.com/elpiel/parity-ethereum)",
  "futures 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "hex 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -570,12 +570,12 @@ dependencies = [
 [[package]]
 name = "dir"
 version = "0.1.2"
-source = "git+https://github.com/paritytech/parity-ethereum#b9f9d11929d57114067fb85bcf0bd4112f1d4d69"
+source = "git+https://github.com/elpiel/parity-ethereum#ac65dcd424bd121bb9478056a0b165e12c13643b"
 dependencies = [
  "app_dirs 1.2.1 (git+https://github.com/paritytech/app-dirs-rs)",
  "ethereum-types 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "home 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "journaldb 0.2.0 (git+https://github.com/paritytech/parity-ethereum)",
+ "journaldb 0.2.0 (git+https://github.com/elpiel/parity-ethereum)",
 ]
 
 [[package]]
@@ -694,7 +694,7 @@ dependencies = [
 [[package]]
 name = "ethkey"
 version = "0.4.0"
-source = "git+https://github.com/paritytech/parity-ethereum#b9f9d11929d57114067fb85bcf0bd4112f1d4d69"
+source = "git+https://github.com/elpiel/parity-ethereum#ac65dcd424bd121bb9478056a0b165e12c13643b"
 dependencies = [
  "edit-distance 2.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -735,11 +735,11 @@ dependencies = [
 [[package]]
 name = "ethstore"
 version = "0.2.1"
-source = "git+https://github.com/paritytech/parity-ethereum#b9f9d11929d57114067fb85bcf0bd4112f1d4d69"
+source = "git+https://github.com/elpiel/parity-ethereum#ac65dcd424bd121bb9478056a0b165e12c13643b"
 dependencies = [
- "dir 0.1.2 (git+https://github.com/paritytech/parity-ethereum)",
+ "dir 0.1.2 (git+https://github.com/elpiel/parity-ethereum)",
  "ethereum-types 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ethkey 0.4.0 (git+https://github.com/paritytech/parity-ethereum)",
+ "ethkey 0.4.0 (git+https://github.com/elpiel/parity-ethereum)",
  "itertools 0.5.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.66 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -804,7 +804,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "fastmap"
 version = "0.1.0"
-source = "git+https://github.com/paritytech/parity-ethereum#b9f9d11929d57114067fb85bcf0bd4112f1d4d69"
+source = "git+https://github.com/elpiel/parity-ethereum#ac65dcd424bd121bb9478056a0b165e12c13643b"
 dependencies = [
  "ethereum-types 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "plain_hasher 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1329,12 +1329,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "journaldb"
 version = "0.2.0"
-source = "git+https://github.com/paritytech/parity-ethereum#b9f9d11929d57114067fb85bcf0bd4112f1d4d69"
+source = "git+https://github.com/elpiel/parity-ethereum#ac65dcd424bd121bb9478056a0b165e12c13643b"
 dependencies = [
  "ethereum-types 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "fastmap 0.1.0 (git+https://github.com/paritytech/parity-ethereum)",
+ "fastmap 0.1.0 (git+https://github.com/elpiel/parity-ethereum)",
  "hash-db 0.15.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "keccak-hasher 0.1.1 (git+https://github.com/paritytech/parity-ethereum)",
+ "keccak-hasher 0.1.1 (git+https://github.com/elpiel/parity-ethereum)",
  "kvdb 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory-db 0.18.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1367,7 +1367,7 @@ dependencies = [
 [[package]]
 name = "keccak-hasher"
 version = "0.1.1"
-source = "git+https://github.com/paritytech/parity-ethereum#b9f9d11929d57114067fb85bcf0bd4112f1d4d69"
+source = "git+https://github.com/elpiel/parity-ethereum#ac65dcd424bd121bb9478056a0b165e12c13643b"
 dependencies = [
  "ethereum-types 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "hash-db 0.15.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3807,7 +3807,7 @@ dependencies = [
 "checksum derive_more 0.99.2 (registry+https://github.com/rust-lang/crates.io-index)" = "2159be042979966de68315bce7034bb000c775f22e3e834e1c52ff78f041cae8"
 "checksum digest 0.7.6 (registry+https://github.com/rust-lang/crates.io-index)" = "03b072242a8cbaf9c145665af9d250c59af3b958f83ed6824e13533cf76d5b90"
 "checksum digest 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)" = "f3d0c8c8752312f9713efd397ff63acb9f85585afbf179282e720e7704954dd5"
-"checksum dir 0.1.2 (git+https://github.com/paritytech/parity-ethereum)" = "<none>"
+"checksum dir 0.1.2 (git+https://github.com/elpiel/parity-ethereum)" = "<none>"
 "checksum dirs 2.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "13aea89a5c93364a98e9b37b2fa237effbb694d5cfe01c5b70941f7eb087d5e3"
 "checksum dirs-sys 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)" = "afa0b23de8fd801745c471deffa6e12d248f962c9fd4b4c33787b055599bde7b"
 "checksum dtoa 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)" = "ea57b42383d091c85abcc2706240b94ab2a8fa1fc81c10ff23c4de06e2a90b5e"
@@ -3820,17 +3820,17 @@ dependencies = [
 "checksum ethbloom 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)" = "32cfe1c169414b709cf28aa30c74060bdb830a03a8ba473314d079ac79d80a5f"
 "checksum ethereum-transaction 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "6689c8377635a1878c1216b8cb5496a36c3009e85425f55e4a562421b35df38d"
 "checksum ethereum-types 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ba744248e3553a393143d5ebb68939fc3a4ec0c22a269682535f5ffe7fed728c"
-"checksum ethkey 0.4.0 (git+https://github.com/paritytech/parity-ethereum)" = "<none>"
+"checksum ethkey 0.4.0 (git+https://github.com/elpiel/parity-ethereum)" = "<none>"
 "checksum ethsign 0.7.3 (registry+https://github.com/rust-lang/crates.io-index)" = "b656fefa0b59f41b39000532c69359e927c0f1850186808ccf1586734ac3365f"
 "checksum ethsign-crypto 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "4e62e068d05d580a2504f51e2a242a9ea4a0cd2a6ba378e13de390efcc1b1753"
-"checksum ethstore 0.2.1 (git+https://github.com/paritytech/parity-ethereum)" = "<none>"
+"checksum ethstore 0.2.1 (git+https://github.com/elpiel/parity-ethereum)" = "<none>"
 "checksum failure 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "f8273f13c977665c5db7eb2b99ae520952fe5ac831ae4cd09d80c4c7042b5ed9"
 "checksum failure_derive 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "0bc225b78e0391e4b8683440bf2e63c2deeeb2ce5189eab46e2b68c6d3725d08"
 "checksum fake 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b7e5932b40ab216d69bca7d228fa0bf754c44b70ed97fcc70fdc1b66d6214f51"
 "checksum fake-simd 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "e88a8acf291dafb59c2d96e8f59828f3838bb1a70398823ade51a84de6a6deed"
 "checksum fallible-iterator 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "eb7217124812dc5672b7476d0c2d20cfe9f7c0f1ba0904b674a9762a0212f72e"
 "checksum fallible-iterator 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "4443176a9f2c162692bd3d352d745ef9413eec5782a80d8fd6f8a1ac692a07f7"
-"checksum fastmap 0.1.0 (git+https://github.com/paritytech/parity-ethereum)" = "<none>"
+"checksum fastmap 0.1.0 (git+https://github.com/elpiel/parity-ethereum)" = "<none>"
 "checksum fixed-hash 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "3367952ceb191f4ab95dd5685dc163ac539e36202f9fcfd0cb22f9f9c542fefc"
 "checksum fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)" = "2fad85553e09a6f881f739c29f0b00b0f01357c743266d478b68951ce23285f3"
 "checksum foreign-types 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "f6f339eb8adc052cd2ca78910fda869aefa38d22d5cb648e6485e4d3fc06f3b1"
@@ -3886,10 +3886,10 @@ dependencies = [
 "checksum iovec 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "b2b3ea6ff95e175473f8ffe6a7eb7c00d054240321b84c57051175fe3c1e075e"
 "checksum itertools 0.5.10 (registry+https://github.com/rust-lang/crates.io-index)" = "4833d6978da405305126af4ac88569b5d71ff758581ce5a987dbfa3755f694fc"
 "checksum itoa 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)" = "501266b7edd0174f8530248f87f99c88fbe60ca4ef3dd486835b8d8d53136f7f"
-"checksum journaldb 0.2.0 (git+https://github.com/paritytech/parity-ethereum)" = "<none>"
+"checksum journaldb 0.2.0 (git+https://github.com/elpiel/parity-ethereum)" = "<none>"
 "checksum js-sys 0.3.33 (registry+https://github.com/rust-lang/crates.io-index)" = "367647c532db6f1555d7151e619540ec5f713328235b8c062c6b4f63e84adfe3"
 "checksum jsonrpc-core 14.0.5 (registry+https://github.com/rust-lang/crates.io-index)" = "fe3b688648f1ef5d5072229e2d672ecb92cbff7d1c79bcf3fd5898f3f3df0970"
-"checksum keccak-hasher 0.1.1 (git+https://github.com/paritytech/parity-ethereum)" = "<none>"
+"checksum keccak-hasher 0.1.1 (git+https://github.com/elpiel/parity-ethereum)" = "<none>"
 "checksum kernel32-sys 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7507624b29483431c0ba2d82aece8ca6cdba9382bff4ddd0f7490560c056098d"
 "checksum kvdb 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "cecee8d85a74f6b8284710d52a7d1196f09e31f8217e1f184a475b509d360554"
 "checksum language-tags 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "a91d884b6667cd606bb5a69aa0c99ba811a115fc68915e7056ec08a46e93199a"
