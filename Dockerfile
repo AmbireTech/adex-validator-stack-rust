@@ -32,20 +32,14 @@ ENV SENTRY_URL=
 # default: `infinite`
 ENV SINGLE_TICK=
 
-RUN echo ${KEYSTORE_FILE:+-k $KEYSTORE_FILE} ${SENTRY_URL:+-u $SENTRY_URL}
-
 WORKDIR /usr/local/bin
 
 RUN apt update && apt-get install -y libssl-dev
 
 COPY --from=builder /usr/local/bin/validator_worker .
 
-ENTRYPOINT [ \
-    "sh", "-c", \
-    "validator_worker", \
-    "-a", "${ADAPTER:-ethereum}", \
-    "${DUMMY_IDENTITY:+-i $DUMMY_IDENTITY}", \
-    "${KEYSTORE_FILE:+-k $KEYSTORE_FILE}", \
-    "${SINGLE_TICK:+-t}", \
-    "${SENTRY_URL:+-u $SENTRY_URL}", "${CONFIG}" \
-]
+ENTRYPOINT validator_worker -a ${ADAPTER:-ethereum} \
+            ${KEYSTORE_FILE:+-k $KEYSTORE_FILE} \
+            ${DUMMY_IDENTITY:+-i $DUMMY_IDENTITY} \
+            ${SINGLE_TICK:+-t} \
+            ${SENTRY_URL:+-u $SENTRY_URL} ${CONFIG}
