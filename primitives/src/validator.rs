@@ -32,11 +32,6 @@ impl ValidatorId {
     pub fn to_hex_prefix_string(&self) -> String {
         format!("0x{}", self.to_hex_non_prefix_string())
     }
-
-    // To Hex `0x` prefixed string **with** **Checksum**ing the string
-    pub fn to_hex_checksummed_string(&self) -> String {
-        eth_checksum::checksum(&format!("0x{}", self.to_hex_non_prefix_string()))
-    }
 }
 
 impl ToETHChecksum for ValidatorId {}
