@@ -13,7 +13,7 @@ use primitives::{
     adapter::{Adapter, AdapterError, AdapterResult, KeystoreOptions, Session},
     channel_validator::ChannelValidator,
     config::Config,
-    Channel, ValidatorId,
+    Channel, ToETHChecksum, ValidatorId,
 };
 use serde::{Deserialize, Serialize};
 use serde_hex::{SerHexOpt, StrictPfx};
@@ -211,7 +211,7 @@ impl Adapter for EthereumAdapter {
             let verified = ewt_verify(header_encoded, payload_encoded, token_encoded)
                 .map_err(|e| map_error(&e.to_string()))?;
 
-            if self.whoami().to_hex_checksummed_string() != verified.payload.id {
+            if self.whoami().to_checksum() != verified.payload.id {
                 return Err(AdapterError::Configuration(
                     "token payload.id !== whoami(): token was not intended for us".to_string(),
                 ));
@@ -265,10 +265,10 @@ impl Adapter for EthereumAdapter {
 
         let era = Utc::now().timestamp_millis() as f64 / 60000.0;
         let payload = Payload {
-            id: validator.to_hex_checksummed_string(),
+            id: validator.to_checksum(),
             era: era.floor() as i64,
             identity: None,
-            address: self.whoami().to_hex_checksummed_string(),
+            address: self.whoami().to_checksum(),
         };
 
         ewt_sign(&wallet, &self.keystore_pwd, &payload)
@@ -460,7 +460,7 @@ mod test {
         let payload = Payload {
             id: "awesomeValidator".into(),
             era: 100_000,
-            address: eth_adapter.whoami().to_hex_checksummed_string(),
+            address: eth_adapter.whoami().to_checksum(),
             identity: None,
         };
         let wallet = eth_adapter.wallet.clone();
@@ -669,7 +669,7 @@ mod test {
             .expect("failed to deserialize address");
 
         let payload = Payload {
-            id: eth_adapter.whoami().to_hex_checksummed_string(),
+            id: eth_adapter.whoami().to_checksum(),
             era: 100_000,
             address: format!("{:?}", leader_account),
             identity: Some(identity),

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 use std::fmt;
 
-use crate::{BalancesMap, BigNum, DomainError};
+use crate::{BalancesMap, BigNum, DomainError, ToETHChecksum};
 use std::convert::TryFrom;
 
 #[derive(Debug)]
@@ -23,14 +23,23 @@ impl ValidatorId {
         &self.0
     }
 
+    /// To Hex non-`0x` prefixed string without **Checksum**ing the string
     pub fn to_hex_non_prefix_string(&self) -> String {
         hex::encode(self.0)
     }
 
+    /// To Hex `0x` prefixed string **without** __Checksum__ing the string
+    pub fn to_hex_prefix_string(&self) -> String {
+        format!("0x{}", self.to_hex_non_prefix_string())
+    }
+
+    // To Hex `0x` prefixed string **with** **Checksum**ing the string
     pub fn to_hex_checksummed_string(&self) -> String {
         eth_checksum::checksum(&format!("0x{}", self.to_hex_non_prefix_string()))
     }
 }
+
+impl ToETHChecksum for ValidatorId {}
 
 impl From<&[u8; 20]> for ValidatorId {
     fn from(bytes: &[u8; 20]) -> Self {
@@ -79,7 +88,7 @@ impl TryFrom<&String> for ValidatorId {
 
 impl fmt::Display for ValidatorId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", format!("0x{}", self.to_hex_non_prefix_string()))
+        write!(f, "{}", self.to_checksum())
     }
 }
 
