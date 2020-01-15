@@ -39,6 +39,8 @@ pub mod access;
 mod chain;
 pub mod db;
 pub mod event_reducer;
+pub mod event_aggregator;
+
 
 lazy_static! {
     static ref CHANNEL_GET_BY_ID: Regex =
@@ -50,6 +52,7 @@ lazy_static! {
     static ref CHANNEL_EVENTS_AGGREGATES: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events-aggregates/?$").expect("The regex should be valid");
     static ref ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
     static ref ADVERTISER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-advertiser/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
+    static ref CREATE_EVENTS_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events(/.*)?$").expect("The regex should be valid");
 }
 
 fn auth_required_middleware<'a, A: Adapter>(
@@ -262,6 +265,8 @@ async fn channels_router<A: Adapter + 'static>(
 
         list_channel_event_aggregates(req, app).await
     } else {
+    // else if let (Some(caps), &Method::POST) = (CREATE_EVENTS_BY_CHANNEL_ID.captures(&path) ,method) {
+    //} else {
         Err(ResponseError::NotFound)
     }
 }

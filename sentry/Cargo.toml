@@ -7,6 +7,7 @@ edition = "2018"
 [dependencies]
 # Futures
 futures = "0.3.1"
+async-std = "1.4.0"
 # Primitives
 primitives = { path = "../primitives", features = ["postgres"] }
 adapter = { version = "0.1", path = "../adapter" }
@@ -25,7 +26,7 @@ bb8-postgres = { git = "https://github.com/khuey/bb8", features = ["with-chrono-
 # Migrations
 migrant_lib = { version = "0.27", features = ["d-postgres"] }
 # Logger
-slog = { version = "^2.2.3" , features = ["max_level_trace"] }
+slog = { version = "^2.2.3", features = ["max_level_trace"] }
 # Serde
 serde = { version = "^1.0", features = ['derive'] }
 serde_json = "^1.0"

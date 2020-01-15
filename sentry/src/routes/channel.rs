@@ -7,7 +7,7 @@ use crate::RouteParams;
 use hex::FromHex;
 use hyper::{Body, Request, Response};
 use primitives::adapter::Adapter;
-use primitives::sentry::SuccessResponse;
+use primitives::sentry::{SuccessResponse, Event};
 use primitives::{Channel, ChannelId};
 use slog::error;
 
@@ -100,6 +100,34 @@ pub async fn last_approved<A: Adapter>(
         .header("Content-type", "application/json")
         .body(serde_json::to_string(&channel)?.into())
         .unwrap())
+}
+
+pub async fn events<A: Adapter>(
+    req: Request<Body>,
+    app: &Application<A>,
+) -> Result<Response<Body>, ResponseError> {
+    let ip = if let Some(xforwardedfor) =  req.headers().get("x-forwarded-for") {
+        let ip: Vec<&str> = xforwardedfor.to_str()?.split(',').collect();
+        Some(ip[0])
+    } else if let Some(trueip) = req.headers().get("true-client-ip") {
+        Some(trueip.to_str()?)
+    } else {
+        None
+    };
+
+    let body = hyper::body::to_bytes(req.into_body()).await?;
+    let events = serde_json::from_slice::<Vec<Event>>(&body)?;
+
+    
+    
+
+
+
+    Ok(Response::builder()
+        .header("Content-type", "application/json")
+        .body(serde_json::to_string(&events)?.into())
+        .unwrap())
+
 }
 
 mod channel_list {
