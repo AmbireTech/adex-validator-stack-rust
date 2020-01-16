@@ -6,15 +6,12 @@ use std::collections::btree_map::{Entry, Iter, Values};
 
 use serde::{Deserialize, Serialize};
 use std::iter::FromIterator;
-use std::ops::Deref;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
 #[serde(transparent)]
 pub struct BalancesKey(#[serde(with = "SerHexSeq::<StrictPfx>")] Vec<u8>);
-impl Deref for BalancesKey {
-    type Target = Vec<u8>;
-
-    fn deref(&self) -> &Self::Target {
+impl AsRef<[u8]> for BalancesKey {
+    fn as_ref(&self) -> &[u8] {
         &self.0
     }
 }
@@ -82,7 +79,7 @@ mod test {
         let actual_json = serde_json::to_string(&balances_map).expect("Should serialize it");
 
         let balances_map_from_json: BalancesMap =
-            serde_json::from_str(&string).expect("Should deserialize it");
+            serde_json::from_str(&actual_json).expect("Should deserialize it");
 
         assert_eq!(balances_map, balances_map_from_json);
     }
