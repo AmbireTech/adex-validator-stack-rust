@@ -7,6 +7,3 @@ members = [
     "validator_worker",
     "sentry",
 ]
-
-[patch.crates-io]
-redis = {version = "0.13.1-alpha.0", git = "https://github.com/mitsuhiko/redis-rs"}
