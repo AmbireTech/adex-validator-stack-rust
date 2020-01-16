@@ -19,7 +19,6 @@ use std::sync::{Arc};
 
 #[derive(Default, Clone)]
 pub struct EventAggregator {
-    // recorder: HashMap<ChannelId, FnMut(&Session, &str) -> BoxFuture>,
     aggregate: Arc<RwLock<HashMap<String, EventAggregate>>>
 }
 
@@ -32,12 +31,14 @@ pub fn new_aggr(channel_id: &ChannelId) -> EventAggregate {
 }
 
 async fn store(db: &DbPool, channel_id: &ChannelId, aggr: Arc<RwLock<HashMap<String, EventAggregate>>>) {
-    let recorder = aggr.write().await;
+    let mut recorder = aggr.write().await;
     let ev_aggr: Option<&EventAggregate> = recorder.get(&channel_id.to_string());
     if let Some(data) = ev_aggr {
         if let Err(e) = insert_event_aggregate(&db, &channel_id, data).await {
             eprintln!("{}", e);
         };
+        // reset aggr
+        recorder.insert(channel_id.to_string(), new_aggr(&channel_id));
     }
 }
 
