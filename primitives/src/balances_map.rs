@@ -67,24 +67,23 @@ impl Serialize for BalancesMap {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::util::tests::prep_db::IDS;
     use crate::BigNum;
 
     #[test]
-    fn test_map() {
+    fn test_balances_map_serialization() {
         let data = vec![
-            (
-                "0xce07CbB7e054514D590a0262C93070D838bFBA2e".to_string(),
-                BigNum::from(50_u64),
-            ),
-            (
-                "0x061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088".to_string(),
-                BigNum::from(100_u64),
-            ),
+            (IDS["leader"].clone(), BigNum::from(50_u64)),
+            (IDS["follower"].clone(), BigNum::from(100_u64)),
         ];
 
         let balances_map: BalancesMap = data.into_iter().collect();
 
         let actual_json = serde_json::to_string(&balances_map).expect("Should serialize it");
+        // should be all lowercase!
+        let expected_json = r#"{"0xc91763d7f14ac5c5ddfbcd012e0d2a61ab9bded3":"100","0xce07cbb7e054514d590a0262c93070d838bfba2e":"50"}"#;
+
+        assert_eq!(expected_json, actual_json);
 
         let balances_map_from_json: BalancesMap =
             serde_json::from_str(&actual_json).expect("Should deserialize it");
