@@ -5,17 +5,15 @@ use crate::event_reducer;
 use crate::Application;
 use crate::ResponseError;
 use crate::Session;
+use async_std::sync::RwLock;
 use chrono::{Duration, Utc};
 use primitives::adapter::Adapter;
 use primitives::sentry::{Event, EventAggregate};
 use primitives::{Channel, ChannelId};
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration as TimeDuration;
 use tokio::time::delay_for;
-
-// use futures::
-use async_std::sync::RwLock;
-use std::sync::Arc;
 
 #[derive(Default, Clone)]
 pub struct EventAggregator {
