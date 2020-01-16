@@ -36,6 +36,7 @@ async fn store(db: &DbPool, channel_id: &ChannelId, aggr: Arc<RwLock<HashMap<Str
     if let Some(data) = ev_aggr {
         if let Err(e) = insert_event_aggregate(&db, &channel_id, data).await {
             eprintln!("{}", e);
+            return;
         };
         // reset aggr
         recorder.insert(channel_id.to_string(), new_aggr(&channel_id));
@@ -72,6 +73,13 @@ impl EventAggregator {
         // drop write access to RwLock
         // this is required to prevent a deadlock in store
         drop(recorder);
+
+        // Checks if aggr_throttle is set
+        // and if current time is greater than aggr.created plus throttle seconds
+        // 
+        // This approach spawns an async task every > AGGR_THROTTLE seconds
+        // Each spawned task resolves after AGGR_THROTTLE seconds
+        // 
 
         if app.config.aggr_throttle > 0
             &&
