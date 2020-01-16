@@ -1,0 +1,12 @@
+version: '3.7'
+
+services:
+  validator:
+    build: .
+    container_name: 'adex-network-validator'
+    restart: always
+    # For Ethereum adapter
+    #volumes:
+    #  - "/root/keystore.json:/app/keystore.json"
+    env_file:
+      - validator.env
