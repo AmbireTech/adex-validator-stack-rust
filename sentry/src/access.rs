@@ -2,12 +2,12 @@ use chrono::Utc;
 use futures::future::try_join_all;
 use redis::aio::MultiplexedConnection;
 
+use crate::Session;
 use primitives::event_submission::{RateLimit, Rule};
 use primitives::sentry::Event;
 use primitives::Channel;
 use std::cmp::PartialEq;
 use std::error::Error;
-use crate::Session;
 use std::fmt;
 
 #[derive(Debug, PartialEq, Eq)]

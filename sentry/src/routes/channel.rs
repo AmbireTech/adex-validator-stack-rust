@@ -8,7 +8,7 @@ use crate::Session;
 use hex::FromHex;
 use hyper::{Body, Request, Response};
 use primitives::adapter::Adapter;
-use primitives::sentry::{SuccessResponse, Event};
+use primitives::sentry::{Event, SuccessResponse};
 use primitives::{Channel, ChannelId};
 use slog::error;
 
@@ -103,9 +103,9 @@ pub async fn last_approved<A: Adapter>(
         .unwrap())
 }
 
-pub async fn events<A: Adapter>(
+pub async fn insert_events<A: Adapter + 'static>(
     req: Request<Body>,
-    app: &'static Application<A>,
+    app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
     let session = req
         .extensions()
@@ -122,14 +122,14 @@ pub async fn events<A: Adapter>(
     let body = hyper::body::to_bytes(into_body).await?;
     let events = serde_json::from_slice::<Vec<Event>>(&body)?;
 
-    
-    app.event_aggregator.record(app, channel, session, &events.as_slice()).await?;
+    app.event_aggregator
+        .record(app, channel, session, &events.as_slice())
+        .await?;
 
     Ok(Response::builder()
         .header("Content-type", "application/json")
-        .body(serde_json::to_string(&SuccessResponse { success: true})?.into())
+        .body(serde_json::to_string(&SuccessResponse { success: true })?.into())
         .unwrap())
-
 }
 
 mod channel_list {

@@ -3,6 +3,7 @@
 
 use crate::chain::chain;
 use crate::db::DbPool;
+use crate::event_aggregator::EventAggregator;
 use crate::middleware::auth;
 use crate::middleware::channel::channel_load;
 use crate::middleware::cors::{cors, Cors};
@@ -18,11 +19,9 @@ use redis::aio::MultiplexedConnection;
 use regex::Regex;
 use routes::analytics::{advertiser_analytics, analytics, publisher_analytics};
 use routes::cfg::config;
-use routes::channel::{channel_list, create_channel, last_approved};
+use routes::channel::{channel_list, create_channel, insert_events, last_approved};
 use slog::{error, Logger};
 use std::collections::HashMap;
-use crate::event_aggregator::EventAggregator;
-
 
 pub mod middleware {
     pub mod auth;
@@ -41,9 +40,8 @@ pub mod routes {
 pub mod access;
 mod chain;
 pub mod db;
-pub mod event_reducer;
 pub mod event_aggregator;
-
+pub mod event_reducer;
 
 lazy_static! {
     static ref CHANNEL_GET_BY_ID: Regex =
@@ -269,9 +267,23 @@ async fn channels_router<A: Adapter + 'static>(
         let req = chain(req, app, vec![Box::new(channel_load)]).await?;
 
         list_channel_event_aggregates(req, app).await
+    } else if let (Some(caps), &Method::POST) =
+        (CREATE_EVENTS_BY_CHANNEL_ID.captures(&path), method)
+    {
+        if req.extensions().get::<Session>().is_none() {
+            return Err(ResponseError::Unauthorized);
+        }
+
+        let param = RouteParams(vec![caps
+            .get(1)
+            .map_or("".to_string(), |m| m.as_str().to_string())]);
+
+        req.extensions_mut().insert(param);
+
+        let req = chain(req, app, vec![Box::new(channel_load)]).await?;
+
+        insert_events(req, app).await
     } else {
-    // else if let (Some(caps), &Method::POST) = (CREATE_EVENTS_BY_CHANNEL_ID.captures(&path) ,method) {
-    //} else {
         Err(ResponseError::NotFound)
     }
 }
