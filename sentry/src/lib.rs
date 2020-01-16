@@ -21,6 +21,9 @@ use routes::cfg::config;
 use routes::channel::{channel_list, create_channel, last_approved};
 use slog::{error, Logger};
 use std::collections::HashMap;
+use crate::event_aggregator::EventAggregator;
+
+
 pub mod middleware {
     pub mod auth;
     pub mod channel;
@@ -89,6 +92,7 @@ pub struct Application<A: Adapter> {
     pub redis: MultiplexedConnection,
     pub pool: DbPool,
     pub config: Config,
+    pub event_aggregator: EventAggregator,
     __secret: (),
 }
 
@@ -106,6 +110,7 @@ impl<A: Adapter + 'static> Application<A> {
             logger,
             redis,
             pool,
+            event_aggregator: Default::default(),
             __secret: (),
         }
     }

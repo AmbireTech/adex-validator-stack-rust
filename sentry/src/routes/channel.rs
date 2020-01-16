@@ -4,6 +4,7 @@ use crate::success_response;
 use crate::Application;
 use crate::ResponseError;
 use crate::RouteParams;
+use crate::Session;
 use hex::FromHex;
 use hyper::{Body, Request, Response};
 use primitives::adapter::Adapter;
@@ -104,28 +105,29 @@ pub async fn last_approved<A: Adapter>(
 
 pub async fn events<A: Adapter>(
     req: Request<Body>,
-    app: &Application<A>,
+    app: &'static Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
-    let ip = if let Some(xforwardedfor) =  req.headers().get("x-forwarded-for") {
-        let ip: Vec<&str> = xforwardedfor.to_str()?.split(',').collect();
-        Some(ip[0])
-    } else if let Some(trueip) = req.headers().get("true-client-ip") {
-        Some(trueip.to_str()?)
-    } else {
-        None
-    };
+    let session = req
+        .extensions()
+        .get::<Session>()
+        .expect("request session")
+        .to_owned();
+    let channel = req
+        .extensions()
+        .get::<Channel>()
+        .expect("Request should have Channel")
+        .to_owned();
 
-    let body = hyper::body::to_bytes(req.into_body()).await?;
+    let into_body = req.into_body();
+    let body = hyper::body::to_bytes(into_body).await?;
     let events = serde_json::from_slice::<Vec<Event>>(&body)?;
 
     
-    
-
-
+    app.event_aggregator.record(app, channel, session, &events.as_slice()).await?;
 
     Ok(Response::builder()
         .header("Content-type", "application/json")
-        .body(serde_json::to_string(&events)?.into())
+        .body(serde_json::to_string(&SuccessResponse { success: true})?.into())
         .unwrap())
 
 }

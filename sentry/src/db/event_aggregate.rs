@@ -1,7 +1,7 @@
 use crate::db::DbPool;
 use bb8::RunError;
 use bb8_postgres::tokio_postgres::types::ToSql;
-use chrono::{DateTime, Utc, Date};
+use chrono::{DateTime, Utc};
 use primitives::sentry::EventAggregate;
 use primitives::{ValidatorId, ChannelId};
 
@@ -58,35 +58,44 @@ pub async fn insert_event_aggregate(
     channel_id: &ChannelId,
     event: &EventAggregate
 ) -> Result<bool, RunError<bb8_postgres::tokio_postgres::Error>>  {
-
-    let mut inserts : Vec<String> = Vec::new();
     let mut values = Vec::new();
     let mut index = 0;
     let id = channel_id.to_string();
 
-    for (event_type, aggr) in event.events {
-        if let Some(event_counts) = aggr.event_counts {
+    let mut data: Vec<String> = Vec::new();
+
+    for (event_type, aggr) in &event.events {
+        if let Some(event_counts) = &aggr.event_counts {
             for (earner, value) in event_counts {
-                let data =  vec![id.clone(), event_type.clone(), earner, value.to_string(), aggr.event_payouts[&earner].to_string()];
-                inserts.extend(data);
+                let event_count = value.to_string();
+                let event_payout = aggr.event_payouts[earner].to_string();
+
+                data.extend(vec![id.clone(), event_type.clone(), earner.clone(), event_count, event_payout]);
                 //
                 // this is a work around for bulk inserts
                 // rust-postgres does not have native support for bulk inserts
                 // so we have to manually build up a query string dynamically based on
                 // how many things we want to insert
-                //
+                // i.e.
+                // INSERT INTO event_aggregates (_, _) VALUES ($1, $2), ($3, $4), ($5, $6)
+
                 values.push(format!("(${}, ${}, ${}, ${}, ${})", index+1, index+2, index+3, index+4, index+5));
                 index += 5;
             }
         }
     }
 
+    let inserts: Vec<&(dyn ToSql + Sync)> = data.iter().map(|x| x as &(dyn ToSql + Sync)).collect();
+
+
     //    the created field is supplied by postgres Default
-     pool
+    let query = format!("INSERT INTO event_aggregates (channel_id, event_type, earner, event_counts, event_payouts) values {}", values.join(" ,"));
+
+    let result = pool
         .run(
             move |connection | {
                 async move {
-                    match connection.prepare(&format!("INSERT INTO event_aggregates (channel_id, event_type, earner, event_counts, event_payouts) values {}", values.join(" ,"))).await {
+                    match connection.prepare(&query).await {
                         Ok(stmt) => match connection.execute(&stmt, &inserts.as_slice()).await {
                             Ok(row) => {
                                 let inserted = row == (index / 5);
@@ -98,5 +107,7 @@ pub async fn insert_event_aggregate(
                     }
                 }
             }
-        ).await
+        ).await?;
+
+    Ok(result)
 }

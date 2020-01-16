@@ -75,6 +75,7 @@ fn get_request_ip(req: &Request<Body>) -> Option<String> {
         .get("true-client-ip")
         .or_else(|| req.headers().get("x-forwarded-for"))
         .and_then(|hv| hv.to_str().map(ToString::to_string).ok())
+        .map(|token| token.split(',').collect::<Vec<&str>>()[0].to_string())
 }
 
 #[cfg(test)]

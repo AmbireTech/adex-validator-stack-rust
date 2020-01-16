@@ -8,8 +8,8 @@ use std::env;
 use lazy_static::lazy_static;
 
 pub mod analytics;
+pub mod event_aggregate;
 mod channel;
-mod event_aggregate;
 mod validator_message;
 
 pub use self::channel::*;
