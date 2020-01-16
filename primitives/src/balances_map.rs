@@ -1,58 +1,66 @@
 use std::collections::BTreeMap;
 
-use crate::BigNum;
-use serde_hex::{SerHexSeq, StrictPfx};
+use crate::{BigNum, ValidatorId};
 use std::collections::btree_map::{Entry, Iter, Values};
 
-use serde::{Deserialize, Serialize};
+use serde::{ser::SerializeMap, Deserialize, Serialize, Serializer};
 use std::iter::FromIterator;
+use std::ops::Index;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
 #[serde(transparent)]
-pub struct BalancesKey(#[serde(with = "SerHexSeq::<StrictPfx>")] Vec<u8>);
-impl AsRef<[u8]> for BalancesKey {
-    fn as_ref(&self) -> &[u8] {
-        &self.0
+pub struct BalancesMap(BTreeMap<ValidatorId, BigNum>);
+
+impl Index<&'_ ValidatorId> for BalancesMap {
+    type Output = BigNum;
+
+    fn index(&self, index: &ValidatorId) -> &Self::Output {
+        self.0.index(index)
     }
 }
 
-type BalancesValue = BigNum;
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(transparent)]
-pub struct BalancesMap(BTreeMap<BalancesKey, BalancesValue>);
-
 impl BalancesMap {
-    pub fn iter(&self) -> Iter<'_, BalancesKey, BalancesValue> {
+    pub fn iter(&self) -> Iter<'_, ValidatorId, BigNum> {
         self.0.iter()
     }
 
-    pub fn values(&self) -> Values<'_, BalancesKey, BalancesValue> {
+    pub fn values(&self) -> Values<'_, ValidatorId, BigNum> {
         self.0.values()
     }
 
-    pub fn get(&self, key: &BalancesKey) -> Option<&BalancesValue> {
+    pub fn get(&self, key: &ValidatorId) -> Option<&BigNum> {
         self.0.get(key)
     }
 
-    pub fn entry(&mut self, key: BalancesKey) -> Entry<'_, BalancesKey, BalancesValue> {
+    pub fn entry(&mut self, key: ValidatorId) -> Entry<'_, ValidatorId, BigNum> {
         self.0.entry(key)
     }
 
-    pub fn insert(&mut self, key: BalancesKey, value: BalancesValue) -> Option<BalancesValue> {
+    pub fn insert(&mut self, key: ValidatorId, value: BigNum) -> Option<BigNum> {
         self.0.insert(key, value)
     }
 }
 
-impl<K: AsRef<[u8]>> FromIterator<(K, BalancesValue)> for BalancesMap {
-    fn from_iter<I: IntoIterator<Item = (K, BalancesValue)>>(iter: I) -> Self {
+impl FromIterator<(ValidatorId, BigNum)> for BalancesMap {
+    fn from_iter<I: IntoIterator<Item = (ValidatorId, BigNum)>>(iter: I) -> Self {
         // @TODO: Is there better way to do this?
-        let btree_map: BTreeMap<BalancesKey, BalancesValue> = iter
-            .into_iter()
-            .map(|(k, v)| (BalancesKey(k.as_ref().to_vec()), v))
-            .collect();
+        let btree_map: BTreeMap<ValidatorId, BigNum> = iter.into_iter().collect();
 
         BalancesMap(btree_map)
+    }
+}
+
+impl Serialize for BalancesMap {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut map = serializer.serialize_map(Some(self.0.len()))?;
+
+        for (key, big_num) in self.0.iter() {
+            map.serialize_entry(&key.to_hex_prefix_string(), big_num)?;
+        }
+        map.end()
     }
 }
 
