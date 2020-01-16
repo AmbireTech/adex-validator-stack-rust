@@ -51,14 +51,6 @@ impl EventAggregator {
         events: &'a [Event],
         ) -> Result<(), ResponseError>
     {
-        // eventAggrCol
-        // channelsCol
-        // try getting aggr if none create and store new aggr
-        // redis: &MultiplexedConnection,
-        // session: &Session,
-        // rate_limit: &RateLimit,
-        // channel: &Channel,
-        // events: &[Event]
         let has_access = check_access(&app.redis, &session, &app.config.ip_rate_limit, &channel, events).await;
         if let Err(e) = has_access {
             return Err(ResponseError::BadRequest(e.to_string()));
@@ -74,19 +66,18 @@ impl EventAggregator {
         };
 
         // if aggr is none
-        // spawn a tokio task for saving to database
         events.iter().for_each( | ev| event_reducer::reduce(&channel, &mut aggr, ev));
         let created = aggr.created;
 
-        // drop write access to RwLock and mut access to aggr
-        // we don't need it anymore
+        // drop write access to RwLock
+        // this is required to prevent a deadlock in store
         drop(recorder);
 
         if app.config.aggr_throttle > 0
             &&
             Utc::now() > (created + Duration::seconds(app.config.aggr_throttle as i64))
         {
-
+            // spawn a tokio task for saving to database
             tokio::spawn(
                 async move {
                     delay_for(TimeDuration::from_secs(app.config.aggr_throttle as u64)).await;
