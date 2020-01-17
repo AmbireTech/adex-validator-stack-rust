@@ -32,7 +32,7 @@ pub struct ApproveStateValidatorMessage {
 pub enum Event {
     #[serde(rename_all = "camelCase")]
     Impression {
-        publisher: String,
+        publisher: ValidatorId,
         ad_unit: Option<String>,
     },
     Click {
