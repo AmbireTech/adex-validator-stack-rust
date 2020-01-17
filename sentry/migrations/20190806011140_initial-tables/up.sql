@@ -31,8 +31,8 @@ CREATE TABLE event_aggregates
     created    TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     event_type VARCHAR(255)             NOT NULL,
     earner     VARCHAR(255)             NOT NULL,
-    event_counts TEXT                   NOT NULL,
-    event_payouts TEXT                  NOT NULL,
+    event_counts VARCHAR                   NOT NULL,
+    event_payouts VARCHAR                  NOT NULL,
 );
 
 CREATE INDEX idx_event_aggregates_created ON event_aggregates (created);
