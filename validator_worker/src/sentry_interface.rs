@@ -11,7 +11,7 @@ use primitives::sentry::{
 use primitives::validator::MessageTypes;
 use primitives::{Channel, Config, ValidatorDesc, ValidatorId};
 use reqwest::{Client, Response};
-use slog::Logger;
+use slog::{error, Logger};
 use std::collections::HashMap;
 use std::time::Duration;
 
@@ -53,7 +53,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
                             .map(|auth| (validator.to_owned(), auth))
                             .map_err(|e| {
                                 ValidatorWorker::Failed(format!(
-                                    "propagate error: get auth failed {}",
+                                    "Propagation error: get auth failed {}",
                                     e
                                 ))
                             })
@@ -71,7 +71,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
                 })
             }
             SpecValidator::None => Err(ValidatorWorker::Failed(
-                "we can not find validator entry for whoami".to_string(),
+                "We can not find validator entry for whoami".to_string(),
             )),
         }
     }
@@ -83,7 +83,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
         }))
         .await
         {
-            println!("Propagation error: {}", e);
+            error!(&self.logger, "Propagation error: {}", e; "module" => "sentry_interface", "in" => "SentryApi");
         }
     }
 
