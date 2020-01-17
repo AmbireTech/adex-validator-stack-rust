@@ -8,12 +8,11 @@ use hyper::service::{make_service_fn, service_fn};
 use hyper::{Error, Server};
 use primitives::adapter::{Adapter, DummyAdapterOptions, KeystoreOptions};
 use primitives::config::configuration;
-use primitives::util::logging::{Async, PrefixedCompactFormat, TermDecorator};
 use primitives::util::tests::prep_db::{AUTH, IDS};
 use primitives::ValidatorId;
 use sentry::db::{postgres_connection, redis_connection, setup_migrations};
 use sentry::Application;
-use slog::{error, info, o, Drain, Logger};
+use slog::{error, info, Logger};
 use std::convert::TryFrom;
 
 const DEFAULT_PORT: u16 = 8005;
@@ -151,6 +150,9 @@ async fn run<A: Adapter + 'static>(app: Application<A>, _clustered: bool, port: 
 }
 
 fn logger() -> Logger {
+    use primitives::util::logging::{Async, PrefixedCompactFormat, TermDecorator};
+    use slog::{o, Drain};
+
     let decorator = TermDecorator::new().build();
     let drain = PrefixedCompactFormat::new("sentry", decorator).fuse();
     let drain = Async::new(drain).build().fuse();
