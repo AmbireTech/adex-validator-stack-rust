@@ -221,3 +221,19 @@ pub mod postgres {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn validator_id_is_checksummed_when_serialized() {
+        let validator_id_checksum_str = "0xce07CbB7e054514D590a0262C93070D838bFBA2e";
+
+        let validator_id =
+            ValidatorId::try_from(validator_id_checksum_str).expect("Valid string was provided");
+        let actual_json = serde_json::to_string(&validator_id).expect("Should serialize");
+        let expected_json = format!(r#""{}""#, validator_id_checksum_str);
+        assert_eq!(expected_json, actual_json);
+    }
+}
