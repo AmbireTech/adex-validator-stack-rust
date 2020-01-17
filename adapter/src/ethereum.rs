@@ -13,7 +13,7 @@ use primitives::{
     adapter::{Adapter, AdapterError, AdapterResult, KeystoreOptions, Session},
     channel_validator::ChannelValidator,
     config::Config,
-    Channel, ValidatorId,
+    Channel, ToETHChecksum, ValidatorId,
 };
 use serde::{Deserialize, Serialize};
 use serde_hex::{SerHexOpt, StrictPfx};
@@ -211,7 +211,7 @@ impl Adapter for EthereumAdapter {
             let verified = ewt_verify(header_encoded, payload_encoded, token_encoded)
                 .map_err(|e| map_error(&e.to_string()))?;
 
-            if self.whoami().to_hex_checksummed_string() != verified.payload.id {
+            if self.whoami().to_checksum() != verified.payload.id {
                 return Err(AdapterError::Configuration(
                     "token payload.id !== whoami(): token was not intended for us".to_string(),
                 ));
@@ -265,10 +265,10 @@ impl Adapter for EthereumAdapter {
 
         let era = Utc::now().timestamp_millis() as f64 / 60000.0;
         let payload = Payload {
-            id: validator.to_hex_checksummed_string(),
+            id: validator.to_checksum(),
             era: era.floor() as i64,
             identity: None,
-            address: self.whoami().to_hex_checksummed_string(),
+            address: self.whoami().to_checksum(),
         };
 
         ewt_sign(&wallet, &self.keystore_pwd, &payload)
@@ -424,7 +424,7 @@ mod test {
         let whoami = eth_adapter.whoami();
         assert_eq!(
             whoami.to_string(),
-            "0x2bdeafae53940669daa6f519373f686c1f3d3393",
+            "0x2bDeAFAE53940669DaA6F519373f686c1f3d3393",
             "failed to get correct whoami"
         );
 
@@ -460,7 +460,7 @@ mod test {
         let payload = Payload {
             id: "awesomeValidator".into(),
             era: 100_000,
-            address: eth_adapter.whoami().to_hex_checksummed_string(),
+            address: eth_adapter.whoami().to_checksum(),
             identity: None,
         };
         let wallet = eth_adapter.wallet.clone();
@@ -542,7 +542,7 @@ mod test {
             .expect("Failed to set balance");
 
         let leader_validator_desc = ValidatorDesc {
-            // keystore.json addresss (same with js)
+            // keystore.json address (same with js)
             id: ValidatorId::try_from("2bdeafae53940669daa6f519373f686c1f3d3393")
                 .expect("failed to create id"),
             url: "http://localhost:8005".to_string(),
@@ -551,7 +551,7 @@ mod test {
         };
 
         let follower_validator_desc = ValidatorDesc {
-            // keystore2.json addresss (same with js)
+            // keystore2.json address (same with js)
             id: ValidatorId::try_from("6704Fbfcd5Ef766B287262fA2281C105d57246a6")
                 .expect("failed to create id"),
             url: "http://localhost:8006".to_string(),
@@ -605,7 +605,7 @@ mod test {
             .expect("open channel");
 
         let contract_addr = <[u8; 20]>::from_hex(&format!("{:?}", adex_contract.address())[2..])
-            .expect("failed to deserialise contract addr");
+            .expect("failed to deserialize contract addr");
 
         let channel_id = eth_channel.hash(&contract_addr).expect("hash hex");
         // set id to proper id
@@ -669,7 +669,7 @@ mod test {
             .expect("failed to deserialize address");
 
         let payload = Payload {
-            id: eth_adapter.whoami().to_hex_checksummed_string(),
+            id: eth_adapter.whoami().to_checksum(),
             era: 100_000,
             address: format!("{:?}", leader_account),
             identity: Some(identity),

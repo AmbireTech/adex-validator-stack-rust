@@ -32,7 +32,7 @@ pub struct ApproveStateValidatorMessage {
 pub enum Event {
     #[serde(rename_all = "camelCase")]
     Impression {
-        publisher: String,
+        publisher: ValidatorId,
         ad_unit: Option<String>,
     },
     Click {
@@ -74,8 +74,8 @@ pub struct EventAggregate {
 #[serde(rename_all = "camelCase")]
 pub struct AggregateEvents {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub event_counts: Option<HashMap<String, BigNum>>,
-    pub event_payouts: HashMap<String, BigNum>,
+    pub event_counts: Option<HashMap<ValidatorId, BigNum>>,
+    pub event_payouts: HashMap<ValidatorId, BigNum>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
