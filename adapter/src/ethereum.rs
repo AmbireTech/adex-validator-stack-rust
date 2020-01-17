@@ -424,7 +424,7 @@ mod test {
         let whoami = eth_adapter.whoami();
         assert_eq!(
             whoami.to_string(),
-            "0x2bdeafae53940669daa6f519373f686c1f3d3393",
+            "0x2bDeAFAE53940669DaA6F519373f686c1f3d3393",
             "failed to get correct whoami"
         );
 
@@ -542,7 +542,7 @@ mod test {
             .expect("Failed to set balance");
 
         let leader_validator_desc = ValidatorDesc {
-            // keystore.json addresss (same with js)
+            // keystore.json address (same with js)
             id: ValidatorId::try_from("2bdeafae53940669daa6f519373f686c1f3d3393")
                 .expect("failed to create id"),
             url: "http://localhost:8005".to_string(),
@@ -551,7 +551,7 @@ mod test {
         };
 
         let follower_validator_desc = ValidatorDesc {
-            // keystore2.json addresss (same with js)
+            // keystore2.json address (same with js)
             id: ValidatorId::try_from("6704Fbfcd5Ef766B287262fA2281C105d57246a6")
                 .expect("failed to create id"),
             url: "http://localhost:8006".to_string(),
@@ -605,7 +605,7 @@ mod test {
             .expect("open channel");
 
         let contract_addr = <[u8; 20]>::from_hex(&format!("{:?}", adex_contract.address())[2..])
-            .expect("failed to deserialise contract addr");
+            .expect("failed to deserialize contract addr");
 
         let channel_id = eth_channel.hash(&contract_addr).expect("hash hex");
         // set id to proper id

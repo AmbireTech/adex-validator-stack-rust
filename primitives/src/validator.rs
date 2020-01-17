@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 use serde_hex::{SerHex, StrictPfx};
 use std::fmt;
 
@@ -14,7 +14,7 @@ pub enum ValidatorError {
     InvalidTransition,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[serde(transparent)]
 pub struct ValidatorId(#[serde(with = "SerHex::<StrictPfx>")] [u8; 20]);
 
@@ -35,6 +35,16 @@ impl ValidatorId {
 }
 
 impl ToETHChecksum for ValidatorId {}
+
+impl Serialize for ValidatorId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let checksum = self.to_checksum();
+        serializer.serialize_str(&checksum)
+    }
+}
 
 impl From<&[u8; 20]> for ValidatorId {
     fn from(bytes: &[u8; 20]) -> Self {
