@@ -16,7 +16,7 @@ hex = "0.3.2"
 # CLI
 clap = "2.33.0"
 # Server
-tokio = { version = "0.2", features = ["macros"] }
+tokio = { version = "0.2.9", features = ["macros", "rt-core"] }
 hyper = { version = "0.13", features = ["stream"] }
 regex = "1"
 # Database
