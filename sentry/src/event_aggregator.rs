@@ -6,13 +6,13 @@ use crate::Application;
 use crate::ResponseError;
 use crate::Session;
 use async_std::sync::RwLock;
-use chrono::{Duration, Utc};
+use chrono::Utc;
 use primitives::adapter::Adapter;
 use primitives::sentry::{Event, EventAggregate};
 use primitives::{Channel, ChannelId};
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Duration as TimeDuration;
+use std::time::Duration;
 use tokio::time::delay_for;
 
 #[derive(Default, Clone)]
@@ -66,45 +66,54 @@ impl EventAggregator {
         }
 
         let mut recorder = self.aggregate.write().await;
+        let aggr_throttle = app.config.aggr_throttle;
+        let dbpool = app.pool.clone();
+        let aggregate = self.aggregate.clone();
+        let withdraw_period_start = channel.spec.withdraw_period_start;
+        let channel_id = channel.id;
+
         let mut aggr: &mut EventAggregate =
             if let Some(aggr) = recorder.get_mut(&channel.id.to_string()) {
                 aggr
             } else {
                 // insert into
                 recorder.insert(channel.id.to_string(), new_aggr(&channel.id));
+
+                // spawn async task that persists
+                // the channel events to database
+                if aggr_throttle > 0 {
+                    tokio::spawn(async move {
+                        loop {
+                            // break loop if the
+                            // channel withdraw period has started
+                            // since no event is allowed once a channel
+                            // is in withdraw period
+
+                            if Utc::now() > withdraw_period_start {
+                                break;
+                            }
+
+                            delay_for(Duration::from_secs(aggr_throttle as u64)).await;
+                            store(&dbpool, &channel_id, aggregate.clone()).await;
+                        }
+                    });
+                }
+
                 recorder
                     .get_mut(&channel.id.to_string())
                     .expect("should have aggr, we just inserted")
             };
 
-        // if aggr is none
         events
             .iter()
             .for_each(|ev| event_reducer::reduce(&channel, &mut aggr, ev));
-        let created = aggr.created;
-        let dbpool = app.pool.clone();
-        let aggr_throttle = app.config.aggr_throttle;
-        let aggregate = self.aggregate.clone();
 
         // drop write access to RwLock
         // this is required to prevent a deadlock in store
         drop(recorder);
 
-        // Checks if aggr_throttle is set
-        // and if current time is greater than aggr.created plus throttle seconds
-        //
-        // This approach spawns an async task every > AGGR_THROTTLE seconds
-        // Each spawned task resolves after AGGR_THROTTLE seconds
-        //
-
-        if aggr_throttle > 0 && Utc::now() > (created + Duration::seconds(aggr_throttle as i64)) {
-            // spawn a tokio task for saving to database
-            tokio::spawn(async move {
-                delay_for(TimeDuration::from_secs(aggr_throttle as u64)).await;
-                store(&dbpool, &channel.id, aggregate).await;
-            });
-        } else {
-            store(&app.pool, &channel.id, aggregate).await;
+        if aggr_throttle == 0 {
+            store(&app.pool, &channel.id, self.aggregate.clone()).await;
         }
 
         Ok(())
