@@ -111,6 +111,6 @@ async fn cache(
         .query_async::<_, ()>(&mut redis.clone())
         .await
     {
-        error!(&logger, "server error: {}", err);
+        error!(&logger, "Server error: {}", err; "module" => "analytics-cache");
     }
 }

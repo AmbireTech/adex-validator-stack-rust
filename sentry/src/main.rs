@@ -145,7 +145,7 @@ async fn run<A: Adapter + 'static>(app: Application<A>, _clustered: bool, port: 
     let server = Server::bind(&addr).serve(make_service);
 
     if let Err(e) = server.await {
-        error!(&logger, "server error: {}", e);
+        error!(&logger, "server error: {}", e; "main" => "run");
     }
 }
 
