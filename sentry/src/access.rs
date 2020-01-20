@@ -188,10 +188,11 @@ mod test {
 
         channel
     }
+
     fn get_impression_events(count: i8) -> Vec<Event> {
         (0..count)
             .map(|_| Event::Impression {
-                publisher: "working".to_string(),
+                publisher: IDS["publisher2"].clone(),
                 ad_unit: None,
             })
             .collect()

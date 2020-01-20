@@ -35,7 +35,7 @@ pub fn get_health(channel: &Channel, our: &BalancesMap, approved: &BalancesMap) 
 
 #[cfg(test)]
 mod test {
-    use primitives::util::tests::prep_db::DUMMY_CHANNEL;
+    use primitives::util::tests::prep_db::{DUMMY_CHANNEL, IDS};
 
     use super::*;
 
@@ -62,7 +62,9 @@ mod test {
 
     #[test]
     fn is_valid_transition_a_valid_transition() {
-        let next = vec![("a".into(), 100.into())].into_iter().collect();
+        let next = vec![(IDS["publisher"].clone(), 100.into())]
+            .into_iter()
+            .collect();
 
         assert!(
             is_valid_transition(&get_dummy_channel(100), &BalancesMap::default(), &next,),
@@ -72,9 +74,12 @@ mod test {
 
     #[test]
     fn is_valid_transition_more_funds_than_dummy_channel() {
-        let next = vec![("a".into(), 51.into()), ("b".into(), 50.into())]
-            .into_iter()
-            .collect();
+        let next = vec![
+            (IDS["publisher"].clone(), 51.into()),
+            (IDS["publisher2"].clone(), 50.into()),
+        ]
+        .into_iter()
+        .collect();
 
         assert!(
             !is_valid_transition(&get_dummy_channel(100), &BalancesMap::default(), &next),
@@ -84,9 +89,13 @@ mod test {
 
     #[test]
     fn is_valid_transition_single_value_is_lower() {
-        let prev = vec![("a".into(), 55.into())].into_iter().collect();
+        let prev = vec![(IDS["publisher"].clone(), 55.into())]
+            .into_iter()
+            .collect();
 
-        let next = vec![("a".into(), 54.into())].into_iter().collect();
+        let next = vec![(IDS["publisher"].clone(), 54.into())]
+            .into_iter()
+            .collect();
 
         assert!(
             !is_valid_transition(&get_dummy_channel(100), &prev, &next),
@@ -96,11 +105,16 @@ mod test {
 
     #[test]
     fn is_valid_transition_a_value_is_lower_but_overall_sum_is_higher() {
-        let prev = vec![("a".into(), 55.into())].into_iter().collect();
-
-        let next = vec![("a".into(), 54.into()), ("b".into(), 3.into())]
+        let prev = vec![(IDS["publisher"].clone(), 55.into())]
             .into_iter()
             .collect();
+
+        let next = vec![
+            (IDS["publisher"].clone(), 54.into()),
+            (IDS["publisher2"].clone(), 3.into()),
+        ]
+        .into_iter()
+        .collect();
 
         assert!(
             !is_valid_transition(&get_dummy_channel(100), &prev, &next),
@@ -110,11 +124,16 @@ mod test {
 
     #[test]
     fn is_valid_transition_overall_sum_is_lower() {
-        let prev = vec![("a".into(), 54.into()), ("b".into(), 3.into())]
+        let prev = vec![
+            (IDS["publisher"].clone(), 54.into()),
+            (IDS["publisher2"].clone(), 3.into()),
+        ]
+        .into_iter()
+        .collect();
+
+        let next = vec![(IDS["publisher"].clone(), 54.into())]
             .into_iter()
             .collect();
-
-        let next = vec![("a".into(), 54.into())].into_iter().collect();
 
         assert!(
             !is_valid_transition(&get_dummy_channel(100), &prev, &next),
@@ -124,11 +143,16 @@ mod test {
 
     #[test]
     fn is_valid_transition_overall_sum_is_the_same_but_we_remove_an_entry() {
-        let prev = vec![("a".into(), 54.into()), ("b".into(), 3.into())]
+        let prev = vec![
+            (IDS["publisher"].clone(), 54.into()),
+            (IDS["publisher2"].clone(), 3.into()),
+        ]
+        .into_iter()
+        .collect();
+
+        let next = vec![(IDS["publisher"].clone(), 57.into())]
             .into_iter()
             .collect();
-
-        let next = vec![("a".into(), 57.into())].into_iter().collect();
 
         assert!(
             !is_valid_transition(&get_dummy_channel(100), &prev, &next),
@@ -138,11 +162,16 @@ mod test {
 
     #[test]
     fn is_valid_transition_transition_to_a_state_with_a_negative_number() {
-        let prev = vec![("a".into(), 54.into()), ("b".into(), 3.into())]
+        let prev = vec![
+            (IDS["publisher"].clone(), 54.into()),
+            (IDS["publisher2"].clone(), 3.into()),
+        ]
+        .into_iter()
+        .collect();
+
+        let next = vec![(IDS["publisher"].clone(), 57.into())]
             .into_iter()
             .collect();
-
-        let next = vec![("a".into(), 57.into())].into_iter().collect();
 
         assert!(
             !is_valid_transition(&get_dummy_channel(100), &prev, &next),
@@ -153,21 +182,27 @@ mod test {
     #[test]
     fn get_health_the_approved_balance_tree_gte_our_accounting_is_healthy() {
         let channel = get_dummy_channel(50);
-        let our = vec![("a".into(), 50.into())].into_iter().collect();
+        let our = vec![(IDS["publisher"].clone(), 50.into())]
+            .into_iter()
+            .collect();
         assert!(get_health(&channel, &our, &our) >= HEALTH_THRESHOLD);
 
         assert!(
             get_health(
                 &channel,
                 &our,
-                &vec![("a".into(), 60.into())].into_iter().collect()
+                &vec![(IDS["publisher"].clone(), 60.into())]
+                    .into_iter()
+                    .collect()
             ) >= HEALTH_THRESHOLD
         );
     }
 
     #[test]
     fn get_health_the_approved_balance_tree_is_positive_our_accounting_is_0_and_it_is_healthy() {
-        let approved = vec![("a".into(), 50.into())].into_iter().collect();
+        let approved = vec![(IDS["publisher"].clone(), 50.into())]
+            .into_iter()
+            .collect();
 
         assert!(
             get_health(&get_dummy_channel(50), &BalancesMap::default(), &approved)
@@ -182,16 +217,24 @@ mod test {
         assert!(
             get_health(
                 &channel,
-                &vec![("a".into(), 80.into())].into_iter().collect(),
-                &vec![("a".into(), 79.into())].into_iter().collect()
+                &vec![(IDS["publisher"].clone(), 80.into())]
+                    .into_iter()
+                    .collect(),
+                &vec![(IDS["publisher"].clone(), 79.into())]
+                    .into_iter()
+                    .collect()
             ) >= HEALTH_THRESHOLD
         );
 
         assert!(
             get_health(
                 &channel,
-                &vec![("a".into(), 2.into())].into_iter().collect(),
-                &vec![("a".into(), 1.into())].into_iter().collect()
+                &vec![(IDS["publisher"].clone(), 2.into())]
+                    .into_iter()
+                    .collect(),
+                &vec![(IDS["publisher"].clone(), 1.into())]
+                    .into_iter()
+                    .collect()
             ) >= HEALTH_THRESHOLD
         );
     }
@@ -203,8 +246,12 @@ mod test {
         assert!(
             get_health(
                 &channel,
-                &vec![("a".into(), 80.into())].into_iter().collect(),
-                &vec![("a".into(), 70.into())].into_iter().collect()
+                &vec![(IDS["publisher"].clone(), 80.into())]
+                    .into_iter()
+                    .collect(),
+                &vec![(IDS["publisher"].clone(), 70.into())]
+                    .into_iter()
+                    .collect()
             ) < HEALTH_THRESHOLD
         );
     }
@@ -216,16 +263,10 @@ mod test {
         assert!(
             get_health(
                 &channel,
-                &vec![("a".into(), 80.into())].into_iter().collect(),
-                &vec![("b".into(), 80.into())].into_iter().collect()
-            ) < HEALTH_THRESHOLD
-        );
-
-        assert!(
-            get_health(
-                &channel,
-                &vec![("a".into(), 80.into())].into_iter().collect(),
-                &vec![("b".into(), 40.into()), ("a".into(), 40.into())]
+                &vec![(IDS["publisher"].clone(), 80.into())]
+                    .into_iter()
+                    .collect(),
+                &vec![(IDS["publisher2"].clone(), 80.into())]
                     .into_iter()
                     .collect()
             ) < HEALTH_THRESHOLD
@@ -234,30 +275,60 @@ mod test {
         assert!(
             get_health(
                 &channel,
-                &vec![("a".into(), 80.into())].into_iter().collect(),
-                &vec![("b".into(), 20.into()), ("a".into(), 60.into())]
+                &vec![(IDS["publisher"].clone(), 80.into())]
                     .into_iter()
-                    .collect()
+                    .collect(),
+                &vec![
+                    (IDS["publisher2"].clone(), 40.into()),
+                    (IDS["publisher"].clone(), 40.into())
+                ]
+                .into_iter()
+                .collect()
             ) < HEALTH_THRESHOLD
         );
 
         assert!(
             get_health(
                 &channel,
-                &vec![("a".into(), 80.into())].into_iter().collect(),
-                &vec![("b".into(), 2.into()), ("a".into(), 78.into())]
+                &vec![(IDS["publisher"].clone(), 80.into())]
                     .into_iter()
-                    .collect()
+                    .collect(),
+                &vec![
+                    (IDS["publisher2"].clone(), 20.into()),
+                    (IDS["publisher"].clone(), 60.into())
+                ]
+                .into_iter()
+                .collect()
+            ) < HEALTH_THRESHOLD
+        );
+
+        assert!(
+            get_health(
+                &channel,
+                &vec![(IDS["publisher"].clone(), 80.into())]
+                    .into_iter()
+                    .collect(),
+                &vec![
+                    (IDS["publisher2"].clone(), 2.into()),
+                    (IDS["publisher"].clone(), 78.into())
+                ]
+                .into_iter()
+                .collect()
             ) >= HEALTH_THRESHOLD
         );
 
         assert!(
             get_health(
                 &channel,
-                &vec![("a".into(), 100.into()), ("b".into(), 1.into())]
+                &vec![
+                    (IDS["publisher"].clone(), 100.into()),
+                    (IDS["publisher2"].clone(), 1.into())
+                ]
+                .into_iter()
+                .collect(),
+                &vec![(IDS["publisher"].clone(), 100.into())]
                     .into_iter()
-                    .collect(),
-                &vec![("a".into(), 100.into())].into_iter().collect()
+                    .collect()
             ) >= HEALTH_THRESHOLD
         );
     }

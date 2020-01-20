@@ -55,3 +55,11 @@ impl error::Error for DomainError {
         None
     }
 }
+
+/// Trait that creates a String which is `0x` prefixed and encodes the bytes by `eth_checksum`
+pub trait ToETHChecksum: AsRef<[u8]> {
+    fn to_checksum(&self) -> String {
+        // checksum replaces `0x` prefix and adds one itself
+        eth_checksum::checksum(&hex::encode(self.as_ref()))
+    }
+}

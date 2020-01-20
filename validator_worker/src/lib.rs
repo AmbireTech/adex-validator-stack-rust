@@ -6,8 +6,7 @@ use std::error::Error;
 use adapter::{get_balance_leaf, get_signable_state_root};
 use primitives::adapter::Adapter;
 use primitives::merkle_tree::MerkleTree;
-use primitives::{BalancesMap, ValidatorId};
-use std::convert::TryFrom;
+use primitives::BalancesMap;
 
 pub use self::sentry_interface::{all_channels, SentryApi};
 
@@ -31,7 +30,7 @@ pub(crate) fn get_state_root_hash<A: Adapter + 'static>(
     // Note: MerkleTree takes care of deduplicating and sorting
     let elems: Vec<[u8; 32]> = balances
         .iter()
-        .map(|(acc, amount)| get_balance_leaf(&ValidatorId::try_from(acc)?, amount))
+        .map(|(acc, amount)| get_balance_leaf(acc, amount))
         .collect::<Result<_, _>>()?;
 
     let tree = MerkleTree::new(&elems);
@@ -70,8 +69,8 @@ mod test {
         let iface = setup_iface(&channel);
 
         let balances: BalancesMap = vec![
-            (IDS["publisher"].to_string(), 1.into()),
-            (IDS["tester"].to_string(), 2.into()),
+            (IDS["publisher"].clone(), 1.into()),
+            (IDS["tester"].clone(), 2.into()),
         ]
         .into_iter()
         .collect();
@@ -91,7 +90,7 @@ mod test {
 
         let iface = setup_iface(&channel);
 
-        let balances: BalancesMap = vec![(IDS["publisher"].to_string(), 0.into())]
+        let balances: BalancesMap = vec![(IDS["publisher"].clone(), 0.into())]
             .into_iter()
             .collect();
 

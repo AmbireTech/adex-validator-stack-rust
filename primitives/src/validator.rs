@@ -1,9 +1,9 @@
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 use serde_hex::{SerHex, StrictPfx};
 use std::fmt;
 
-use crate::{BalancesMap, BigNum, DomainError};
+use crate::{BalancesMap, BigNum, DomainError, ToETHChecksum};
 use std::convert::TryFrom;
 
 #[derive(Debug)]
@@ -14,7 +14,7 @@ pub enum ValidatorError {
     InvalidTransition,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[serde(transparent)]
 pub struct ValidatorId(#[serde(with = "SerHex::<StrictPfx>")] [u8; 20]);
 
@@ -23,12 +23,26 @@ impl ValidatorId {
         &self.0
     }
 
+    /// To Hex non-`0x` prefixed string without **Checksum**ing the string
     pub fn to_hex_non_prefix_string(&self) -> String {
         hex::encode(self.0)
     }
 
-    pub fn to_hex_checksummed_string(&self) -> String {
-        eth_checksum::checksum(&format!("0x{}", self.to_hex_non_prefix_string()))
+    /// To Hex `0x` prefixed string **without** __Checksum__ing the string
+    pub fn to_hex_prefix_string(&self) -> String {
+        format!("0x{}", self.to_hex_non_prefix_string())
+    }
+}
+
+impl ToETHChecksum for ValidatorId {}
+
+impl Serialize for ValidatorId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let checksum = self.to_checksum();
+        serializer.serialize_str(&checksum)
     }
 }
 
@@ -79,7 +93,7 @@ impl TryFrom<&String> for ValidatorId {
 
 impl fmt::Display for ValidatorId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", format!("0x{}", self.to_hex_non_prefix_string()))
+        write!(f, "{}", self.to_checksum())
     }
 }
 
@@ -205,5 +219,21 @@ pub mod postgres {
 
             <String as ToSql>::to_sql_checked(&string, ty, out)
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn validator_id_is_checksummed_when_serialized() {
+        let validator_id_checksum_str = "0xce07CbB7e054514D590a0262C93070D838bFBA2e";
+
+        let validator_id =
+            ValidatorId::try_from(validator_id_checksum_str).expect("Valid string was provided");
+        let actual_json = serde_json::to_string(&validator_id).expect("Should serialize");
+        let expected_json = format!(r#""{}""#, validator_id_checksum_str);
+        assert_eq!(expected_json, actual_json);
     }
 }

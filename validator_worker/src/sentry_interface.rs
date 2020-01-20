@@ -9,7 +9,7 @@ use primitives::sentry::{
     ValidatorMessageResponse,
 };
 use primitives::validator::MessageTypes;
-use primitives::{Channel, Config, ValidatorDesc, ValidatorId};
+use primitives::{Channel, Config, ToETHChecksum, ValidatorDesc, ValidatorId};
 use reqwest::{Client, Response};
 use slog::{error, Logger};
 use std::collections::HashMap;
@@ -96,7 +96,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
         let url = format!(
             "{}/validator-messages/{}/{}?limit=1",
             self.validator_url,
-            from.to_hex_checksummed_string(),
+            from.to_checksum(),
             message_type
         );
         let result = self
@@ -221,7 +221,7 @@ async fn fetch_page(
 
     let query = [
         format!("page={}", page),
-        format!("validator={}", validator.to_hex_checksummed_string()),
+        format!("validator={}", validator.to_checksum()),
     ]
     .join("&");
 
