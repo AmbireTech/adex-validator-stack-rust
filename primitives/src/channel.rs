@@ -47,7 +47,7 @@ impl FromHex for ChannelId {
 
 impl fmt::Display for ChannelId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", format!("0x{}", hex::encode(self.0)))
+        write!(f, "0x{}", hex::encode(self.0))
     }
 }
 
