@@ -91,7 +91,7 @@ pub async fn setup_migrations(environment: &str) {
 
     // Define Migrations
     config
-        .use_migrations(&migrations.as_slice())
+        .use_migrations(&migrations)
         .expect("Loading migrations failed");
 
     // Reload config, ping the database for applied migrations

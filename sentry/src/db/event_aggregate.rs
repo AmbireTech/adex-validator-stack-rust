@@ -1,7 +1,7 @@
 use crate::db::DbPool;
 use bb8::RunError;
 use bb8_postgres::tokio_postgres::binary_copy::BinaryCopyInWriter;
-use bb8_postgres::tokio_postgres::types::{Type, ToSql};
+use bb8_postgres::tokio_postgres::types::{ToSql, Type};
 use bb8_postgres::tokio_postgres::Error;
 use chrono::{DateTime, Utc};
 use futures::pin_mut;
@@ -52,13 +52,13 @@ pub async fn list_event_aggregates(
                                     'eventCounts',
                                     jsonb_object_agg(
                                         jsonb_build_object(
-                                            earner, event_counts
+                                            earner, count::text
                                         )
                                     ),
                                     'eventPayouts',
                                     jsonb_object_agg(
                                         jsonb_build_object(
-                                            earner, event_payouts
+                                            earner, payout::text
                                         )
                                     )    
                                 )
@@ -92,8 +92,8 @@ struct EventData {
     id: String,
     event_type: String,
     earner: Option<String>,
-    event_count: String,
-    event_payout: String,
+    event_count: BigNum,
+    event_payout: BigNum,
     created: DateTime<Utc>,
 }
 
@@ -113,28 +113,29 @@ pub async fn insert_event_aggregate(
             let mut total_event_payouts: BigNum = 0.into();
             for (earner, event_count) in event_counts {
                 let event_payout = aggr.event_payouts[earner].clone();
-                data.extend(vec![EventData {
+
+                data.push(EventData {
                     id: id.clone(),
                     event_type: event_type.clone(),
                     earner: Some(earner.to_string()),
-                    event_count: event_count.to_string(),
-                    event_payout: event_payout.to_string(),
+                    event_count: event_count.to_owned(),
+                    event_payout: event_payout.clone(),
                     created,
-                }]);
+                });
 
                 // total sum
                 total_event_counts = event_count.add(&total_event_counts);
-                total_event_payouts = total_event_payouts.add(event_payout);
+                total_event_payouts = event_payout.add(total_event_payouts);
             }
 
-            data.extend(vec![EventData {
+            data.push(EventData {
                 id: id.clone(),
                 event_type: event_type.clone(),
                 earner: None,
-                event_count: total_event_counts.to_string(),
-                event_payout: total_event_payouts.to_string(),
+                event_count: total_event_counts,
+                event_payout: total_event_payouts,
                 created,
-            }]);
+            });
         }
     }
 
@@ -142,15 +143,15 @@ pub async fn insert_event_aggregate(
         .run(move |connection| {
             async move {
                 let mut err: Option<Error> = None;
-                let sink = match connection.copy_in("COPY event_aggregates(channel_id, created, event_type, event_counts, event_payouts, earner) FROM STDIN BINARY").await {
+                let sink = match connection.copy_in("COPY event_aggregates(channel_id, created, event_type, count, payout, earner) FROM STDIN BINARY").await {
                     Ok(sink) => sink,
                     Err(e) => return Err((e, connection))
                 };
 
-                let writer = BinaryCopyInWriter::new(sink, &[Type::VARCHAR, Type::TIMESTAMPTZ, Type::VARCHAR, Type::VARCHAR, Type::VARCHAR, Type::VARCHAR]);
+                let writer = BinaryCopyInWriter::new(sink, &[Type::VARCHAR, Type::TIMESTAMPTZ, Type::VARCHAR, Type::INT8, Type::INT8, Type::VARCHAR]);
                 pin_mut!(writer);
                 for item in data {
-                    if let Err(e) = writer.as_mut().write(&[&item.id, &item.created, &item.event_type, &item.event_count, &item.event_payout, &item.earner]).await {
+                    if let Err(e) = writer.as_mut().write(&[&item.id, &item.created, &item.event_type, &item.event_count.to_i64().expect("should have i64"), &item.event_payout.to_i64().expect("should have i64"), &item.earner]).await {
                             err = Some(e);
                             break;
                     }

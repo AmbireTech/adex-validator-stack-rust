@@ -128,7 +128,7 @@ pub async fn insert_events<A: Adapter + 'static>(
         .ok_or_else(|| ResponseError::BadRequest("invalid request".to_string()))?;
 
     app.event_aggregator
-        .record(app, &channel, &session, &events.as_slice())
+        .record(app, &channel, &session, &events)
         .await?;
 
     Ok(Response::builder()
