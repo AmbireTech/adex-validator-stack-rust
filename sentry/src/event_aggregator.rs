@@ -39,7 +39,7 @@ async fn store(
     let ev_aggr: Option<&EventAggregate> = recorder.get(&channel_id.to_string());
     if let Some(data) = ev_aggr {
         if let Err(e) = insert_event_aggregate(&db, &channel_id, data).await {
-            error!(&logger, "event-aggregates store error {}", e);
+            error!(&logger, "{}", e; "eventaggregator" => "store");
         } else {
             // reset aggr
             recorder.insert(channel_id.to_string(), new_aggr(&channel_id));
