@@ -16,9 +16,11 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::delay_for;
 
+pub(crate) type Aggregate = Arc<RwLock<HashMap<ChannelId, EventAggregate>>>;
+
 #[derive(Default, Clone)]
 pub struct EventAggregator {
-    aggregate: Arc<RwLock<HashMap<String, EventAggregate>>>,
+    aggregate: Aggregate,
 }
 
 pub fn new_aggr(channel_id: &ChannelId) -> EventAggregate {
@@ -33,16 +35,16 @@ async fn store(
     db: &DbPool,
     channel_id: &ChannelId,
     logger: &Logger,
-    aggr: Arc<RwLock<HashMap<String, EventAggregate>>>,
+    aggr: Aggregate,
 ) {
     let mut recorder = aggr.write().await;
-    let ev_aggr: Option<&EventAggregate> = recorder.get(&channel_id.to_string());
+    let ev_aggr: Option<&EventAggregate> = recorder.get(channel_id);
     if let Some(data) = ev_aggr {
         if let Err(e) = insert_event_aggregate(&db, &channel_id, data).await {
             error!(&logger, "{}", e; "eventaggregator" => "store");
         } else {
             // reset aggr
-            recorder.insert(channel_id.to_string(), new_aggr(&channel_id));
+            recorder.insert(channel_id.to_owned(), new_aggr(&channel_id));
         };
     }
 }
@@ -75,11 +77,11 @@ impl EventAggregator {
         let channel_id = channel.id;
         let logger = app.logger.clone();
 
-        let mut aggr: &mut EventAggregate = match recorder.get_mut(&channel.id.to_string()) {
+        let mut aggr: &mut EventAggregate = match recorder.get_mut(&channel.id) {
             Some(aggr) => aggr,
             None => {
                 // insert into
-                recorder.insert(channel.id.to_string(), new_aggr(&channel.id));
+                recorder.insert(channel.id, new_aggr(&channel.id));
 
                 // spawn async task that persists
                 // the channel events to database
@@ -102,7 +104,7 @@ impl EventAggregator {
                 }
 
                 recorder
-                    .get_mut(&channel.id.to_string())
+                    .get_mut(&channel.id)
                     .expect("should have aggr, we just inserted")
             }
         };
