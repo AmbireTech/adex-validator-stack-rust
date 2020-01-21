@@ -8,6 +8,7 @@ use primitives::BalancesMap;
 
 use crate::core::events::merge_aggrs;
 use crate::sentry_interface::SentryApi;
+use slog::info;
 
 pub type Result = std::result::Result<(BalancesMap, Option<Accounting>), Box<dyn Error>>;
 
@@ -28,7 +29,12 @@ pub async fn tick<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result {
         .await?;
 
     if !aggrs.events.is_empty() {
-        // TODO: Log the merge
+        info!(
+            iface.logger,
+            "channel {}: processing {} event aggregates",
+            iface.channel.id,
+            aggrs.events.len()
+        );
         let (balances, new_accounting) = merge_aggrs(&accounting, &aggrs.events, &iface.channel)?;
 
         let message_types = MessageTypes::Accounting(new_accounting.clone());

@@ -1,6 +1,7 @@
 language: rust
 rust:
   - stable
+os: linux
 # add nodejs for ganche-cli
 node_js: "12.12.0"
 # Need to cache the whole `.cargo` directory to keep .crates.toml for
@@ -13,15 +14,14 @@ env:
     - CARGO_MAKE_RUN_CHECK_FORMAT="true"
     - CARGO_MAKE_RUN_CLIPPY="true"
 services:
-  - redis-server
-matrix:
-  fast_finish: true
+  - redis
 
 stages:
   - test
   - deploy
 
 jobs:
+  fast_finish: true
   include:
     - stage: test
       script:

@@ -11,6 +11,7 @@ use primitives::sentry::{
 use primitives::validator::MessageTypes;
 use primitives::{Channel, Config, ToETHChecksum, ValidatorDesc, ValidatorId};
 use reqwest::{Client, Response};
+use slog::{error, Logger};
 use std::collections::HashMap;
 use std::time::Duration;
 
@@ -19,7 +20,7 @@ pub struct SentryApi<T: Adapter> {
     pub adapter: T,
     pub validator_url: String,
     pub client: Client,
-    pub logging: bool,
+    pub logger: Logger,
     pub channel: Channel,
     pub config: Config,
     pub propagate_to: Vec<(ValidatorDesc, String)>,
@@ -30,7 +31,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
         adapter: T,
         channel: &Channel,
         config: &Config,
-        logging: bool,
+        logger: Logger,
     ) -> Result<Self, ValidatorWorker> {
         let client = Client::builder()
             .timeout(Duration::from_secs(config.fetch_timeout.into()))
@@ -52,7 +53,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
                             .map(|auth| (validator.to_owned(), auth))
                             .map_err(|e| {
                                 ValidatorWorker::Failed(format!(
-                                    "propagate error: get auth failed {}",
+                                    "Propagation error: get auth failed {}",
                                     e
                                 ))
                             })
@@ -63,14 +64,14 @@ impl<T: Adapter + 'static> SentryApi<T> {
                     adapter,
                     validator_url,
                     client,
-                    logging,
+                    logger,
                     propagate_to,
                     channel: channel.to_owned(),
                     config: config.to_owned(),
                 })
             }
             SpecValidator::None => Err(ValidatorWorker::Failed(
-                "we can not find validator entry for whoami".to_string(),
+                "We can not find validator entry for whoami".to_string(),
             )),
         }
     }
@@ -82,7 +83,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
         }))
         .await
         {
-            println!("Propagation error: {}", e);
+            error!(&self.logger, "Propagation error: {}", e; "module" => "sentry_interface", "in" => "SentryApi");
         }
     }
 
