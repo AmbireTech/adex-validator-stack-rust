@@ -14,6 +14,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::delay_for;
+use slog::{error, Logger};
+
 
 #[derive(Default, Clone)]
 pub struct EventAggregator {
@@ -31,17 +33,18 @@ pub fn new_aggr(channel_id: &ChannelId) -> EventAggregate {
 async fn store(
     db: &DbPool,
     channel_id: &ChannelId,
+    logger: &Logger,
     aggr: Arc<RwLock<HashMap<String, EventAggregate>>>,
 ) {
     let mut recorder = aggr.write().await;
     let ev_aggr: Option<&EventAggregate> = recorder.get(&channel_id.to_string());
     if let Some(data) = ev_aggr {
         if let Err(e) = insert_event_aggregate(&db, &channel_id, data).await {
-            eprintln!("{}", e);
-            return;
+            error!(&logger, "event-aggregates store error {}", e);
+        } else {
+            // reset aggr
+            recorder.insert(channel_id.to_string(), new_aggr(&channel_id));
         };
-        // reset aggr
-        recorder.insert(channel_id.to_string(), new_aggr(&channel_id));
     }
 }
 
@@ -71,6 +74,7 @@ impl EventAggregator {
         let aggregate = self.aggregate.clone();
         let withdraw_period_start = channel.spec.withdraw_period_start;
         let channel_id = channel.id;
+        let logger = app.logger.clone();
 
         let mut aggr: &mut EventAggregate = match recorder.get_mut(&channel.id.to_string()) {
             Some(aggr) => aggr,
@@ -93,7 +97,7 @@ impl EventAggregator {
                             }
 
                             delay_for(Duration::from_secs(aggr_throttle as u64)).await;
-                            store(&dbpool, &channel_id, aggregate.clone()).await;
+                            store(&dbpool, &channel_id, &logger, aggregate.clone()).await;
                         }
                     });
                 }
@@ -113,11 +117,8 @@ impl EventAggregator {
         drop(recorder);
 
         if aggr_throttle == 0 {
-            println!("storing data in ");
-            store(&app.pool, &channel.id, self.aggregate.clone()).await;
+            store(&app.pool, &channel.id, &app.logger.clone(), self.aggregate.clone()).await;
         }
-
-        println!("finished succesfully");
 
         Ok(())
     }

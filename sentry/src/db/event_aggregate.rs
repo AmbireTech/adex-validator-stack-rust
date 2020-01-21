@@ -1,6 +1,5 @@
 use crate::db::DbPool;
 use bb8::RunError;
-// use bb8_postgres::tokio_postgres::types::{ToSql, FromSql};
 use bb8_postgres::tokio_postgres::binary_copy::BinaryCopyInWriter;
 use bb8_postgres::tokio_postgres::types::Type;
 use bb8_postgres::tokio_postgres::Error;

@@ -126,9 +126,7 @@ pub async fn insert_events<A: Adapter + 'static>(
     let events = request_body
         .get("events")
         .ok_or_else(|| ResponseError::BadRequest("invalid request".to_string()))?;
-
-    println!("working on something");
-
+    
     app.event_aggregator
         .record(app, &channel, &session, &events.as_slice())
         .await?;
