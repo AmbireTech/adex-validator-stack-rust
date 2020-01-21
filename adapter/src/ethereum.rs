@@ -5,6 +5,7 @@ use ethkey::Password;
 use ethstore::SafeAccount;
 use futures::compat::Future01CompatExt;
 use futures::future::{BoxFuture, FutureExt};
+use futures::TryFutureExt;
 use lazy_static::lazy_static;
 use parity_crypto::publickey::{
     public_to_address, recover, verify_address, Address, Message, Signature,
@@ -15,6 +16,7 @@ use primitives::{
     config::Config,
     Channel, ToETHChecksum, ValidatorId,
 };
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_hex::{SerHexOpt, StrictPfx};
 use serde_json::Value;
@@ -34,10 +36,8 @@ use web3::{
 lazy_static! {
     static ref ADEXCORE_ABI: &'static [u8] =
         include_bytes!("../../lib/protocol-eth/abi/AdExCore.json");
-    static ref IDENTITY_ABI: &'static [u8] =
-        include_bytes!("../../lib/protocol-eth/abi/Identity.json");
     static ref CHANNEL_STATE_ACTIVE: U256 = 1.into();
-    static ref PRIVILEGE_LEVEL_NONE: U256 = 0.into();
+    static ref PRIVILEGE_LEVEL_NONE: u8 = 0;
 }
 
 #[derive(Debug, Clone)]
@@ -49,6 +49,7 @@ pub struct EthereumAdapter {
     wallet: Option<SafeAccount>,
     event_loop: Arc<EventLoopHandle>,
     web3: Web3<Http>,
+    relayer: RelayerClient,
 }
 
 // Enables EthereumAdapter to be able to
@@ -78,6 +79,8 @@ impl EthereumAdapter {
             .map_err(|_| map_error("failed to init http transport"))?;
         let event_loop = Arc::new(eloop);
         let web3 = web3::Web3::new(transport);
+        let relayer = RelayerClient::new(&config.ethereum_adapter_relayer)
+            .map_err(|_| map_error("Client for Relayer couldn't be built"))?;
 
         Ok(Self {
             address,
@@ -87,6 +90,7 @@ impl EthereumAdapter {
             config: config.to_owned(),
             event_loop,
             web3,
+            relayer,
         })
     }
 }
@@ -219,31 +223,17 @@ impl Adapter for EthereumAdapter {
 
             let sess = match &verified.payload.identity {
                 Some(identity) => {
-                    let contract_address: Address = identity.into();
-                    let contract =
-                        Contract::from_json(self.web3.eth(), contract_address, &IDENTITY_ABI)
-                            .map_err(|_| map_error("failed to init identity contract"))?;
+                    let privilege = self.relayer.get_privilege(identity).await?;
 
-                    let privilege_level: U256 = contract
-                        .query(
-                            "privileges",
-                            (Token::Address(Address::from_slice(verified.from.inner())),),
-                            None,
-                            Options::default(),
-                            None,
-                        )
-                        .compat()
-                        .await
-                        .map_err(|_| map_error("failed query priviledge level on contract"))?;
-
-                    if privilege_level == *PRIVILEGE_LEVEL_NONE {
+                    if privilege > *PRIVILEGE_LEVEL_NONE {
                         return Err(AdapterError::Authorization(
                             "insufficient privilege".to_string(),
                         ));
-                    }
-                    Session {
-                        era: verified.payload.era,
-                        uid: identity.into(),
+                    } else {
+                        Session {
+                            era: verified.payload.era,
+                            uid: identity.into(),
+                        }
                     }
                 }
                 None => Session {
@@ -273,6 +263,49 @@ impl Adapter for EthereumAdapter {
 
         ewt_sign(&wallet, &self.keystore_pwd, &payload)
             .map_err(|_| map_error("Failed to sign token"))
+    }
+}
+
+#[derive(Debug, Clone)]
+struct RelayerClient {
+    client: Client,
+    relayer_url: String,
+}
+
+impl RelayerClient {
+    pub fn new(relayer_url: &str) -> Result<Self, reqwest::Error> {
+        let client = Client::builder().build()?;
+
+        Ok(Self {
+            relayer_url: relayer_url.to_string(),
+            client,
+        })
+    }
+
+    pub async fn get_privilege(&self, identity: &[u8; 20]) -> Result<u8, AdapterError> {
+        use reqwest::Response;
+        use std::collections::HashMap;
+
+        let relay_url = format!(
+            "{}/identity/by-owner/{}",
+            self.relayer_url,
+            hex::encode(identity)
+        );
+
+        let identities_owned: HashMap<[u8; 20], u8> = self
+            .client
+            .get(&relay_url)
+            .send()
+            .and_then(|res: Response| res.json())
+            .await
+            .map_err(|_| map_error("Fetching privileges failed"))?;
+
+        let privilege = identities_owned
+            .get(identity)
+            .copied()
+            .unwrap_or_else(|| 0_u8);
+
+        Ok(privilege)
     }
 }
 
@@ -377,7 +410,7 @@ pub fn ewt_verify(
     let payload: Payload = serde_json::from_str(&payload_string)?;
 
     let verified_payload = VerifyPayload {
-        from: ValidatorId::try_from(&format!("{:?}", address))?,
+        from: ValidatorId::from(address.as_fixed_bytes()),
         payload,
     };
 
@@ -604,13 +637,10 @@ mod test {
             .await
             .expect("open channel");
 
-        let contract_addr = <[u8; 20]>::from_hex(&format!("{:?}", adex_contract.address())[2..])
-            .expect("failed to deserialize contract addr");
-
+        let contract_addr = adex_contract.address().to_fixed_bytes();
         let channel_id = eth_channel.hash(&contract_addr).expect("hash hex");
         // set id to proper id
-        valid_channel.id = ChannelId::from_hex(hex::encode(channel_id))
-            .expect("prep_db: failed to deserialize channel id");
+        valid_channel.id = ChannelId::from(channel_id);
 
         // eth adapter
         let mut eth_adapter = setup_eth_adapter(Some(contract_addr));
@@ -622,69 +652,5 @@ mod test {
             .expect("failed to validate channel");
 
         assert_eq!(result, true, "should validate valid channel correctly");
-    }
-
-    #[tokio::test]
-    async fn should_generate_session_from_token_with_identity() {
-        // setup test payload
-        let mut eth_adapter = setup_eth_adapter(None);
-        eth_adapter.unlock().expect("should unlock eth adapter");
-
-        // part of address used in initializing ganache-cli
-        let leader_account: Address = "Df08F82De32B8d460adbE8D72043E3a7e25A3B39"
-            .parse()
-            .expect("failed to parse leader account");
-
-        let eth_adapter_address: Address = eth_adapter
-            .whoami()
-            .to_hex_non_prefix_string()
-            .parse()
-            .expect("failed to parse eth adapter address");
-
-        let identity_bytecode = include_str!("../test/resources/identitybytecode.json");
-
-        // deploy identity contract
-        let identity_contract = Contract::deploy(eth_adapter.web3.eth(), &IDENTITY_ABI)
-            .expect("invalid token token contract")
-            .confirmations(0)
-            .options(Options::with(|opt| {
-                opt.gas_price = Some(1.into());
-                opt.gas = Some(6_721_975.into());
-            }))
-            .execute(
-                identity_bytecode,
-                (
-                    Token::Array(vec![Token::Address(eth_adapter_address)]),
-                    Token::Array(vec![Token::Uint(1.into())]),
-                ),
-                leader_account,
-            )
-            .expect("Correct parameters are passed to the constructor.")
-            .compat()
-            .await
-            .expect("failed to initialize identity contract");
-
-        // identity contract address
-        let identity = <[u8; 20]>::from_hex(&format!("{:?}", identity_contract.address())[2..])
-            .expect("failed to deserialize address");
-
-        let payload = Payload {
-            id: eth_adapter.whoami().to_checksum(),
-            era: 100_000,
-            address: format!("{:?}", leader_account),
-            identity: Some(identity),
-        };
-
-        let wallet = eth_adapter.wallet.clone();
-        let response = ewt_sign(&wallet.unwrap(), &eth_adapter.keystore_pwd, &payload)
-            .expect("failed to generate ewt signature");
-
-        // verify since its with identity
-        let session = eth_adapter
-            .session_from_token(&response)
-            .await
-            .expect("failed generate session");
-
-        assert_eq!(session.uid.inner(), &identity);
     }
 }
