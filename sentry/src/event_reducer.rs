@@ -1,5 +1,5 @@
 use primitives::sentry::{AggregateEvents, Event, EventAggregate};
-use primitives::Channel;
+use primitives::{Channel, ValidatorId};
 
 // @TODO: Remove attribute once we use this function!
 #[allow(dead_code)]

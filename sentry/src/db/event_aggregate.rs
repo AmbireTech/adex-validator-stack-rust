@@ -117,7 +117,7 @@ pub async fn insert_event_aggregate(
                 data.extend(vec![EventData {
                     id: id.clone(),
                     event_type: event_type.clone(),
-                    earner: Some(earner.clone()),
+                    earner: Some(earner.to_string()),
                     event_count: event_count.to_string(),
                     event_payout: event_payout.to_string(),
                     created,
