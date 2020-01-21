@@ -10,12 +10,11 @@ use chrono::Utc;
 use primitives::adapter::Adapter;
 use primitives::sentry::{Event, EventAggregate};
 use primitives::{Channel, ChannelId};
+use slog::{error, Logger};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::delay_for;
-use slog::{error, Logger};
-
 
 #[derive(Default, Clone)]
 pub struct EventAggregator {
@@ -117,7 +116,13 @@ impl EventAggregator {
         drop(recorder);
 
         if aggr_throttle == 0 {
-            store(&app.pool, &channel.id, &app.logger.clone(), self.aggregate.clone()).await;
+            store(
+                &app.pool,
+                &channel.id,
+                &app.logger.clone(),
+                self.aggregate.clone(),
+            )
+            .await;
         }
 
         Ok(())
