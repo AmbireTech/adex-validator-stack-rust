@@ -80,8 +80,8 @@ fn get_request_ip(req: &Request<Body>) -> Option<String> {
                 .split(',')
                 .nth(0)
                 .map(ToString::to_string)
-                .expect("should have ip")
         })
+        .flatten()
 }
 
 #[cfg(test)]
