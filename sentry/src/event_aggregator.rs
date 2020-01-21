@@ -31,12 +31,7 @@ pub fn new_aggr(channel_id: &ChannelId) -> EventAggregate {
     }
 }
 
-async fn store(
-    db: &DbPool,
-    channel_id: &ChannelId,
-    logger: &Logger,
-    aggr: Aggregate,
-) {
+async fn store(db: &DbPool, channel_id: &ChannelId, logger: &Logger, aggr: Aggregate) {
     let mut recorder = aggr.write().await;
     let ev_aggr: Option<&EventAggregate> = recorder.get(channel_id);
     if let Some(data) = ev_aggr {
