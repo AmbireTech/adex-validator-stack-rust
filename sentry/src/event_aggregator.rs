@@ -49,8 +49,8 @@ impl EventAggregator {
     pub async fn record<'a, A: Adapter>(
         &self,
         app: &'a Application<A>,
-        channel: Channel,
-        session: Session,
+        channel: &Channel,
+        session: &Session,
         events: &'a [Event],
     ) -> Result<(), ResponseError> {
         let has_access = check_access(
@@ -72,10 +72,9 @@ impl EventAggregator {
         let withdraw_period_start = channel.spec.withdraw_period_start;
         let channel_id = channel.id;
 
-        let mut aggr: &mut EventAggregate =
-            if let Some(aggr) = recorder.get_mut(&channel.id.to_string()) {
-                aggr
-            } else {
+        let mut aggr: &mut EventAggregate = match recorder.get_mut(&channel.id.to_string()) {
+            Some(aggr) => aggr,
+            None => {
                 // insert into
                 recorder.insert(channel.id.to_string(), new_aggr(&channel.id));
 
@@ -102,7 +101,8 @@ impl EventAggregator {
                 recorder
                     .get_mut(&channel.id.to_string())
                     .expect("should have aggr, we just inserted")
-            };
+            }
+        };
 
         events
             .iter()
@@ -113,8 +113,11 @@ impl EventAggregator {
         drop(recorder);
 
         if aggr_throttle == 0 {
+            println!("storing data in ");
             store(&app.pool, &channel.id, self.aggregate.clone()).await;
         }
+        
+        println!("finished succesfully");
 
         Ok(())
     }

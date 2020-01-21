@@ -36,7 +36,7 @@ pub async fn list_channel_event_aggregates<A: Adapter>(
     };
 
     let event_aggregates =
-        list_event_aggregates(&app.pool, app.config.events_find_limit, &from, &query.after).await?;
+        list_event_aggregates(&app.pool, &channel.id, app.config.events_find_limit, &from, &query.after).await?;
 
     let response = EventAggregateResponse {
         channel: channel.clone(),

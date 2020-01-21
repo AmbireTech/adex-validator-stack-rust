@@ -11,6 +11,7 @@ use primitives::adapter::Adapter;
 use primitives::sentry::{Event, SuccessResponse};
 use primitives::{Channel, ChannelId};
 use slog::error;
+use std::collections::HashMap;
 
 pub async fn channel_status<A: Adapter>(
     req: Request<Body>,
@@ -112,6 +113,7 @@ pub async fn insert_events<A: Adapter + 'static>(
         .get::<Session>()
         .expect("request session")
         .to_owned();
+
     let channel = req
         .extensions()
         .get::<Channel>()
@@ -120,10 +122,13 @@ pub async fn insert_events<A: Adapter + 'static>(
 
     let into_body = req.into_body();
     let body = hyper::body::to_bytes(into_body).await?;
-    let events = serde_json::from_slice::<Vec<Event>>(&body)?;
+    let request_body = serde_json::from_slice::<HashMap<String, Vec<Event>>>(&body)?;
+    let events = request_body.get("events").ok_or_else(|| ResponseError::BadRequest("invalid request".to_string()))?;
+    
+    println!("working on something");
 
     app.event_aggregator
-        .record(app, channel, session, &events.as_slice())
+        .record(app, &channel, &session, &events.as_slice())
         .await?;
 
     Ok(Response::builder()
