@@ -30,9 +30,9 @@ pub async fn list_channel_event_aggregates<A: Adapter>(
         serde_urlencoded::from_str::<EventAggregatesQuery>(req.uri().query().unwrap_or(""))?;
 
     let from = if channel.spec.validators.find(&session.uid).is_some() {
-        Some(session.uid.clone())
-    } else {
         None
+    } else {
+        Some(session.uid.clone())  
     };
 
     let event_aggregates =
