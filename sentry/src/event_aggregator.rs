@@ -116,7 +116,7 @@ impl EventAggregator {
             println!("storing data in ");
             store(&app.pool, &channel.id, self.aggregate.clone()).await;
         }
-        
+
         println!("finished succesfully");
 
         Ok(())

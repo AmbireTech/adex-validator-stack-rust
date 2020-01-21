@@ -32,11 +32,17 @@ pub async fn list_channel_event_aggregates<A: Adapter>(
     let from = if channel.spec.validators.find(&session.uid).is_some() {
         None
     } else {
-        Some(session.uid.clone())  
+        Some(session.uid.clone())
     };
 
-    let event_aggregates =
-        list_event_aggregates(&app.pool, &channel.id, app.config.events_find_limit, &from, &query.after).await?;
+    let event_aggregates = list_event_aggregates(
+        &app.pool,
+        &channel.id,
+        app.config.events_find_limit,
+        &from,
+        &query.after,
+    )
+    .await?;
 
     let response = EventAggregateResponse {
         channel: channel.clone(),

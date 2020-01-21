@@ -84,7 +84,7 @@ pub async fn check_access(
         .as_ref()
         .map(|ev_sub| ev_sub.allow.as_slice())
         .unwrap_or_else(|| &default_rules);
-    
+
     // first, find an applicable access rule
     let rules = allow_rules
         .iter()

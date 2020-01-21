@@ -82,9 +82,7 @@ pub async fn setup_migrations(environment: &str) {
         };
     }
 
-    let mut migrations = vec![
-        make_migration!("20190806011140_initial-tables")
-    ];
+    let mut migrations = vec![make_migration!("20190806011140_initial-tables")];
 
     if environment == "development" {
         // seeds database tables for testing

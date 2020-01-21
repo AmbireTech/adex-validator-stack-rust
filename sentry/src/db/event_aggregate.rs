@@ -1,17 +1,16 @@
 use crate::db::DbPool;
 use bb8::RunError;
 // use bb8_postgres::tokio_postgres::types::{ToSql, FromSql};
+use bb8_postgres::tokio_postgres::binary_copy::BinaryCopyInWriter;
+use bb8_postgres::tokio_postgres::types::Type;
+use bb8_postgres::tokio_postgres::Error;
 use chrono::{DateTime, Utc};
+use futures::pin_mut;
 use postgres_types::{FromSql, ToSql};
 use primitives::sentry::EventAggregate;
 use primitives::BigNum;
 use primitives::{ChannelId, ValidatorId};
 use std::ops::Add;
-use bb8_postgres::tokio_postgres::binary_copy::BinaryCopyInWriter;
-use bb8_postgres::tokio_postgres::types::{Type};
-use futures::{pin_mut};
-use bb8_postgres::tokio_postgres::{Error};
-
 
 pub async fn list_event_aggregates(
     pool: &DbPool,
@@ -25,10 +24,7 @@ pub async fn list_event_aggregates(
     where_clauses.push(format!("channel_id = '{}'", id));
 
     if let Some(from) = from {
-        where_clauses.push(format!(
-            "earner = '{}'",
-            from.to_string()
-        ));
+        where_clauses.push(format!("earner = '{}'", from.to_string()));
         where_clauses.push("event_type = 'IMPRESSION'".to_string());
     } else {
         where_clauses.push("earner is NOT NULL".to_string());
@@ -71,9 +67,8 @@ pub async fn list_event_aggregates(
                                 as data
                             FROM event_aggregates WHERE {} GROUP BY channel_id, event_type, created ORDER BY created DESC LIMIT {}
                         ) SELECT channel_id, created, jsonb_object_agg(event_type , data) as events FROM aggregates GROUP BY channel_id, created
-                    "
-                    , where_clause, limit);
-                
+                    ", where_clause, limit);
+
                 match connection.prepare(&statement).await {
                     Ok(stmt) => {
                         match connection.query(&stmt, params.as_slice()).await {
@@ -101,7 +96,7 @@ struct EventData {
     earner: Option<String>,
     event_count: String,
     event_payout: String,
-    created: DateTime<Utc>
+    created: DateTime<Utc>,
 }
 
 pub async fn insert_event_aggregate(
@@ -132,7 +127,6 @@ pub async fn insert_event_aggregate(
                 // total sum
                 total_event_counts = event_count.add(&total_event_counts);
                 total_event_payouts = total_event_payouts.add(event_payout);
-
             }
 
             data.extend(vec![EventData {
@@ -145,7 +139,6 @@ pub async fn insert_event_aggregate(
             }]);
         }
     }
-
 
     let result = pool
         .run(move |connection| {
@@ -174,7 +167,6 @@ pub async fn insert_event_aggregate(
                         Ok((true, connection))
                     }
                 }
-                
             }
         })
         .await?;
