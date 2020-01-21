@@ -1,11 +1,10 @@
 use crate::db::DbPool;
 use bb8::RunError;
 use bb8_postgres::tokio_postgres::binary_copy::BinaryCopyInWriter;
-use bb8_postgres::tokio_postgres::types::Type;
+use bb8_postgres::tokio_postgres::types::{Type, ToSql};
 use bb8_postgres::tokio_postgres::Error;
 use chrono::{DateTime, Utc};
 use futures::pin_mut;
-use postgres_types::{FromSql, ToSql};
 use primitives::sentry::EventAggregate;
 use primitives::BigNum;
 use primitives::{ChannelId, ValidatorId};
@@ -88,7 +87,7 @@ pub async fn list_event_aggregates(
     Ok(event_aggregates)
 }
 
-#[derive(Debug, ToSql, FromSql)]
+#[derive(Debug)]
 struct EventData {
     id: String,
     event_type: String,
