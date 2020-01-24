@@ -15,12 +15,21 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::delay_for;
+use crate::db::{get_channel_by_id};
 
-pub(crate) type Aggregate = Arc<RwLock<HashMap<ChannelId, EventAggregate>>>;
+
+#[derive(Debug)]
+struct Record {
+    channel: Channel,
+    aggregate: EventAggregate
+}
+
+type Recorder =  Arc<RwLock<HashMap<ChannelId, Record>>>;
 
 #[derive(Default, Clone)]
 pub struct EventAggregator {
-    aggregate: Aggregate,
+    // aggregate: Aggregate,
+    recorder: Recorder
 }
 
 pub fn new_aggr(channel_id: &ChannelId) -> EventAggregate {
@@ -31,15 +40,19 @@ pub fn new_aggr(channel_id: &ChannelId) -> EventAggregate {
     }
 }
 
-async fn store(db: &DbPool, channel_id: &ChannelId, logger: &Logger, aggr: Aggregate) {
-    let mut recorder = aggr.write().await;
-    let ev_aggr: Option<&EventAggregate> = recorder.get(channel_id);
-    if let Some(data) = ev_aggr {
-        if let Err(e) = insert_event_aggregate(&db, &channel_id, data).await {
-            error!(&logger, "{}", e; "eventaggregator" => "store");
+async fn store(db: &DbPool, channel_id: &ChannelId, logger: &Logger, recorder: Recorder) {
+    let mut channel_recorder = recorder.write().await;
+    let record: Option<&Record> = channel_recorder.get(channel_id);
+    if let Some(data) = record {
+        if let Err(e) = insert_event_aggregate(&db, &channel_id, &data.aggregate).await {
+            error!(&logger, "{}", e; "event_aggregator" => "store");
         } else {
-            // reset aggr
-            recorder.insert(channel_id.to_owned(), new_aggr(&channel_id));
+            // reset aggr record
+            let record = Record {
+                channel: data.channel.to_owned(),
+                aggregate: new_aggr(&channel_id)
+            };
+            channel_recorder.insert(channel_id.to_owned(), record);
         };
     }
 }
@@ -48,38 +61,38 @@ impl EventAggregator {
     pub async fn record<'a, A: Adapter>(
         &self,
         app: &'a Application<A>,
-        channel: &Channel,
+        channel_id: &ChannelId,
         session: &Session,
         events: &'a [Event],
     ) -> Result<(), ResponseError> {
-        let has_access = check_access(
-            &app.redis,
-            &session,
-            &app.config.ip_rate_limit,
-            &channel,
-            events,
-        )
-        .await;
-        if let Err(e) = has_access {
-            return Err(ResponseError::BadRequest(e.to_string()));
-        }
-
-        let mut recorder = self.aggregate.write().await;
+        let recorder = self.recorder.clone();
         let aggr_throttle = app.config.aggr_throttle;
         let dbpool = app.pool.clone();
-        let aggregate = self.aggregate.clone();
-        let withdraw_period_start = channel.spec.withdraw_period_start;
-        let channel_id = channel.id;
         let logger = app.logger.clone();
 
-        let mut aggr: &mut EventAggregate = match recorder.get_mut(&channel.id) {
-            Some(aggr) => aggr,
+        let mut channel_recorder = self.recorder.write().await;
+        let record: &mut Record = match channel_recorder.get_mut(&channel_id) {
+            Some(record) => record,
             None => {
-                // insert into
-                recorder.insert(channel.id, new_aggr(&channel.id));
+                // fetch channel
+                let channel = get_channel_by_id(&app.pool, &channel_id)
+                .await?
+                .ok_or_else(|| ResponseError::NotFound)?;
 
+                let withdraw_period_start = channel.spec.withdraw_period_start;
+                let channel_id = channel.id;
+                let record = Record {
+                    channel,
+                    aggregate: new_aggr(&channel_id)
+                };
+
+                // insert into
+                channel_recorder.insert(channel_id.to_owned(), record);
+
+                // 
                 // spawn async task that persists
                 // the channel events to database
+                let recorder = recorder.clone();
                 if aggr_throttle > 0 {
                     tokio::spawn(async move {
                         loop {
@@ -93,31 +106,43 @@ impl EventAggregator {
                             }
 
                             delay_for(Duration::from_secs(aggr_throttle as u64)).await;
-                            store(&dbpool, &channel_id, &logger, aggregate.clone()).await;
+                            store(&dbpool, &channel_id, &logger, recorder.clone()).await;
                         }
                     });
                 }
 
-                recorder
-                    .get_mut(&channel.id)
+                channel_recorder
+                    .get_mut(&channel_id)
                     .expect("should have aggr, we just inserted")
             }
         };
 
+        let has_access = check_access(
+            &app.redis,
+            &session,
+            &app.config.ip_rate_limit,
+            &record.channel,
+            events,
+        )
+        .await;
+        if let Err(e) = has_access {
+            return Err(ResponseError::BadRequest(e.to_string()));
+        }
+
         events
             .iter()
-            .for_each(|ev| event_reducer::reduce(&channel, &mut aggr, ev));
+            .for_each(|ev| event_reducer::reduce(&record.channel, &mut record.aggregate, ev));
 
         // drop write access to RwLock
         // this is required to prevent a deadlock in store
-        drop(recorder);
+        drop(channel_recorder);
 
         if aggr_throttle == 0 {
             store(
                 &app.pool,
-                &channel.id,
+                &channel_id,
                 &app.logger.clone(),
-                self.aggregate.clone(),
+                recorder.clone(),
             )
             .await;
         }

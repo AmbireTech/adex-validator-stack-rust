@@ -114,11 +114,12 @@ pub async fn insert_events<A: Adapter + 'static>(
         .expect("request session")
         .to_owned();
 
-    let channel = req
+    let route_params = req
         .extensions()
-        .get::<Channel>()
-        .expect("Request should have Channel")
-        .to_owned();
+        .get::<RouteParams>()
+        .expect("request should have route params");
+
+    let channel_id = ChannelId::from_hex(route_params.index(0))?;
 
     let into_body = req.into_body();
     let body = hyper::body::to_bytes(into_body).await?;
@@ -128,7 +129,7 @@ pub async fn insert_events<A: Adapter + 'static>(
         .ok_or_else(|| ResponseError::BadRequest("invalid request".to_string()))?;
 
     app.event_aggregator
-        .record(app, &channel, &session, &events)
+        .record(app, &channel_id, &session, &events)
         .await?;
 
     Ok(Response::builder()
