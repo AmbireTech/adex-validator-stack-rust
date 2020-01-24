@@ -264,6 +264,8 @@ async fn channels_router<A: Adapter + 'static>(
         ]);
         req.extensions_mut().insert(param);
 
+        let req = chain(req, app, vec![Box::new(channel_load)]).await?;
+
         list_channel_event_aggregates(req, app).await
     } else if let (Some(caps), &Method::POST) =
         (CREATE_EVENTS_BY_CHANNEL_ID.captures(&path), method)
@@ -277,8 +279,6 @@ async fn channels_router<A: Adapter + 'static>(
             .map_or("".to_string(), |m| m.as_str().to_string())]);
 
         req.extensions_mut().insert(param);
-
-        let req = chain(req, app, vec![Box::new(channel_load)]).await?;
 
         insert_events(req, app).await
     } else {
