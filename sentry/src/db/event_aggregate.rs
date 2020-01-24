@@ -89,9 +89,9 @@ pub async fn list_event_aggregates(
 
 #[derive(Debug)]
 struct EventData {
-    id: String,
+    id: ChannelId,
     event_type: String,
-    earner: Option<String>,
+    earner: Option<ValidatorId>,
     event_count: BigNum,
     event_payout: BigNum,
     created: DateTime<Utc>,
@@ -102,7 +102,6 @@ pub async fn insert_event_aggregate(
     channel_id: &ChannelId,
     event: &EventAggregate,
 ) -> Result<bool, RunError<bb8_postgres::tokio_postgres::Error>> {
-    let id = channel_id.to_string();
     let created = Utc::now();
 
     let mut data: Vec<EventData> = Vec::new();
@@ -115,9 +114,9 @@ pub async fn insert_event_aggregate(
                 let event_payout = aggr.event_payouts[earner].clone();
 
                 data.push(EventData {
-                    id: id.clone(),
+                    id: channel_id.to_owned(),
                     event_type: event_type.clone(),
-                    earner: Some(earner.to_string()),
+                    earner: Some(earner.clone()),
                     event_count: event_count.to_owned(),
                     event_payout: event_payout.clone(),
                     created,
@@ -129,7 +128,7 @@ pub async fn insert_event_aggregate(
             }
 
             data.push(EventData {
-                id: id.clone(),
+                id: channel_id.to_owned(),
                 event_type: event_type.clone(),
                 earner: None,
                 event_count: total_event_counts,
@@ -148,10 +147,10 @@ pub async fn insert_event_aggregate(
                     Err(e) => return Err((e, connection))
                 };
 
-                let writer = BinaryCopyInWriter::new(sink, &[Type::VARCHAR, Type::TIMESTAMPTZ, Type::VARCHAR, Type::INT8, Type::INT8, Type::VARCHAR]);
+                let writer = BinaryCopyInWriter::new(sink, &[Type::VARCHAR, Type::TIMESTAMPTZ, Type::VARCHAR, Type::VARCHAR, Type::VARCHAR, Type::VARCHAR]);
                 pin_mut!(writer);
                 for item in data {
-                    if let Err(e) = writer.as_mut().write(&[&item.id, &item.created, &item.event_type, &item.event_count.to_i64().expect("should have i64"), &item.event_payout.to_i64().expect("should have i64"), &item.earner]).await {
+                    if let Err(e) = writer.as_mut().write(&[&item.id, &item.created, &item.event_type, &item.event_count, &item.event_payout, &item.earner]).await {
                             err = Some(e);
                             break;
                     }
