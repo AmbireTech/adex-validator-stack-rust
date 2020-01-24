@@ -7,26 +7,26 @@ use primitives::event_submission::{RateLimit, Rule};
 use primitives::sentry::Event;
 use primitives::Channel;
 use std::cmp::PartialEq;
-use std::error::Error;
+use std::error;
 use std::fmt;
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum AccessError {
+pub enum Error {
     OnlyCreatorCanCloseChannel,
     ChannelIsExpired,
     ChannelIsInWithdrawPeriod,
     RulesError(String),
 }
 
-impl Error for AccessError {}
+impl error::Error for Error {}
 
-impl fmt::Display for AccessError {
+impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            AccessError::OnlyCreatorCanCloseChannel => write!(f, "only creator can create channel"),
-            AccessError::ChannelIsExpired => write!(f, "channel has expired"),
-            AccessError::ChannelIsInWithdrawPeriod => write!(f, "channel is in withdraw period"),
-            AccessError::RulesError(error) => write!(f, "{}", error),
+            Error::OnlyCreatorCanCloseChannel => write!(f, "only creator can create channel"),
+            Error::ChannelIsExpired => write!(f, "channel has expired"),
+            Error::ChannelIsInWithdrawPeriod => write!(f, "channel is in withdraw period"),
+            Error::RulesError(error) => write!(f, "{}", error),
         }
     }
 }
@@ -38,7 +38,7 @@ pub async fn check_access(
     rate_limit: &RateLimit,
     channel: &Channel,
     events: &[Event],
-) -> Result<(), AccessError> {
+) -> Result<(), Error> {
     let is_close_event = |e: &Event| match e {
         Event::Close => true,
         _ => false,
@@ -47,7 +47,7 @@ pub async fn check_access(
     let is_in_withdraw_period = current_time > channel.spec.withdraw_period_start;
 
     if current_time > channel.valid_until {
-        return Err(AccessError::ChannelIsExpired);
+        return Err(Error::ChannelIsExpired);
     }
 
     // We're only sending a CLOSE
@@ -60,11 +60,11 @@ pub async fn check_access(
 
     // Only the creator can send a CLOSE
     if session.uid != channel.creator && events.iter().any(is_close_event) {
-        return Err(AccessError::OnlyCreatorCanCloseChannel);
+        return Err(Error::OnlyCreatorCanCloseChannel);
     }
 
     if is_in_withdraw_period {
-        return Err(AccessError::ChannelIsInWithdrawPeriod);
+        return Err(Error::ChannelIsInWithdrawPeriod);
     }
 
     let default_rules = [
@@ -106,7 +106,7 @@ pub async fn check_access(
     );
 
     if let Err(rule_error) = apply_all_rules.await {
-        Err(AccessError::RulesError(rule_error))
+        Err(Error::RulesError(rule_error))
     } else {
         Ok(())
     }
@@ -239,7 +239,7 @@ mod test {
         let err_response =
             check_access(&redis, &session, &config.ip_rate_limit, &channel, &events).await;
         assert_eq!(
-            Err(AccessError::RulesError(
+            Err(Error::RulesError(
                 "rateLimit: too many requests".to_string()
             )),
             err_response
@@ -275,7 +275,7 @@ mod test {
         .await;
 
         assert_eq!(
-            Err(AccessError::RulesError(
+            Err(Error::RulesError(
                 "rateLimit: only allows 1 event".to_string()
             )),
             err_response
