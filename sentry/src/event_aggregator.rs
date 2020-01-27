@@ -1,5 +1,6 @@
 use crate::access::check_access;
 use crate::db::event_aggregate::insert_event_aggregate;
+use crate::db::get_channel_by_id;
 use crate::db::DbPool;
 use crate::event_reducer;
 use crate::Application;
@@ -15,21 +16,18 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::delay_for;
-use crate::db::{get_channel_by_id};
-
 
 #[derive(Debug)]
 struct Record {
     channel: Channel,
-    aggregate: EventAggregate
+    aggregate: EventAggregate,
 }
 
-type Recorder =  Arc<RwLock<HashMap<ChannelId, Record>>>;
+type Recorder = Arc<RwLock<HashMap<ChannelId, Record>>>;
 
 #[derive(Default, Clone)]
 pub struct EventAggregator {
-    // aggregate: Aggregate,
-    recorder: Recorder
+    recorder: Recorder,
 }
 
 pub fn new_aggr(channel_id: &ChannelId) -> EventAggregate {
@@ -45,12 +43,12 @@ async fn store(db: &DbPool, channel_id: &ChannelId, logger: &Logger, recorder: R
     let record: Option<&Record> = channel_recorder.get(channel_id);
     if let Some(data) = record {
         if let Err(e) = insert_event_aggregate(&db, &channel_id, &data.aggregate).await {
-            error!(&logger, "{}", e; "event_aggregator" => "store");
+            error!(&logger, "{}", e; "module" => "event_aggregator", "in" => "store");
         } else {
             // reset aggr record
             let record = Record {
                 channel: data.channel.to_owned(),
-                aggregate: new_aggr(&channel_id)
+                aggregate: new_aggr(&channel_id),
             };
             channel_recorder.insert(channel_id.to_owned(), record);
         };
@@ -76,24 +74,24 @@ impl EventAggregator {
             None => {
                 // fetch channel
                 let channel = get_channel_by_id(&app.pool, &channel_id)
-                .await?
-                .ok_or_else(|| ResponseError::NotFound)?;
+                    .await?
+                    .ok_or_else(|| ResponseError::NotFound)?;
 
                 let withdraw_period_start = channel.spec.withdraw_period_start;
                 let channel_id = channel.id;
                 let record = Record {
                     channel,
-                    aggregate: new_aggr(&channel_id)
+                    aggregate: new_aggr(&channel_id),
                 };
 
                 // insert into
                 channel_recorder.insert(channel_id.to_owned(), record);
 
-                // 
+                //
                 // spawn async task that persists
                 // the channel events to database
-                let recorder = recorder.clone();
                 if aggr_throttle > 0 {
+                    let recorder = recorder.clone();
                     tokio::spawn(async move {
                         loop {
                             // break loop if the

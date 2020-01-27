@@ -19,11 +19,13 @@ pub async fn list_event_aggregates(
 ) -> Result<Vec<EventAggregate>, RunError<bb8_postgres::tokio_postgres::Error>> {
     let (mut where_clauses, mut params) = (vec![], Vec::<&(dyn ToSql + Sync)>::new());
     let id = channel_id.to_string();
-    where_clauses.push(format!("channel_id = '{}'", id));
+    params.push(&id);
+    where_clauses.push(format!("channel_id = ${}", params.len()));
 
     if let Some(from) = from {
         where_clauses.push(format!("earner = '{}'", from.to_string()));
-        where_clauses.push("event_type = 'IMPRESSION'".to_string());
+        params.push(&"IMPRESSION");
+        where_clauses.push(format!("event_type = ${}", params.len()));
     } else {
         where_clauses.push("earner is NOT NULL".to_string());
     }
@@ -52,13 +54,13 @@ pub async fn list_event_aggregates(
                                     'eventCounts',
                                     jsonb_object_agg(
                                         jsonb_build_object(
-                                            earner, count::text
+                                            earner, count
                                         )
                                     ),
                                     'eventPayouts',
                                     jsonb_object_agg(
                                         jsonb_build_object(
-                                            earner, payout::text
+                                            earner, payout
                                         )
                                     )    
                                 )
