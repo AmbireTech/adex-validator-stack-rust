@@ -1,21 +1,20 @@
 use self::channel_list::ChannelListQuery;
-use crate::db::{get_channel_by_id, insert_channel, list_channels, insert_validator_messages};
+use crate::db::{get_channel_by_id, insert_channel, insert_validator_messages, list_channels};
 use crate::success_response;
 use crate::Application;
 use crate::ResponseError;
 use crate::RouteParams;
 use crate::Session;
+use futures::future::try_join_all;
 use hex::FromHex;
 use hyper::{Body, Request, Response};
 use primitives::adapter::Adapter;
+use primitives::channel::SpecValidator;
 use primitives::sentry::{Event, SuccessResponse};
+use primitives::validator::MessageTypes;
 use primitives::{Channel, ChannelId};
 use slog::error;
 use std::collections::HashMap;
-use primitives::channel::SpecValidator;
-use primitives::validator::MessageTypes;
-use futures::future::try_join_all;
-
 
 pub async fn channel_status<A: Adapter>(
     req: Request<Body>,
@@ -142,9 +141,9 @@ pub async fn insert_events<A: Adapter + 'static>(
         .unwrap())
 }
 
-pub async fn validator_messages<A: Adapter + 'static>(
+pub async fn create_validator_messages<A: Adapter + 'static>(
     req: Request<Body>,
-    app: &Application<A>
+    app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
     let session = req
         .extensions()
@@ -157,22 +156,27 @@ pub async fn validator_messages<A: Adapter + 'static>(
         .get::<Channel>()
         .expect("Request should have Channel")
         .to_owned();
-    
+
     let into_body = req.into_body();
     let body = hyper::body::to_bytes(into_body).await?;
-    let messages = serde_json::from_slice::<Vec<MessageTypes>>(&body)?;
-    
+    let request_body = serde_json::from_slice::<HashMap<String, Vec<MessageTypes>>>(&body)?;
+    let messages = request_body
+        .get("messages")
+        .ok_or_else(|| ResponseError::BadRequest("missing messages body".to_string()))?;
+
     match channel.spec.validators.find(&session.uid) {
         SpecValidator::None => Err(ResponseError::Unauthorized),
-        _  => {
-            try_join_all(messages.iter().map(
-                |message| insert_validator_messages(&app.pool, &channel, &session.uid, &message)
-            )).await?;
+        _ => {
+            try_join_all(messages.iter().map(|message| {
+                insert_validator_messages(&app.pool, &channel, &session.uid, &message)
+            }))
+            .await?;
 
-            Ok(success_response(serde_json::to_string(&SuccessResponse { success: true })?))
+            Ok(success_response(serde_json::to_string(&SuccessResponse {
+                success: true,
+            })?))
         }
     }
-    
 }
 
 mod channel_list {

@@ -1,9 +1,9 @@
 use crate::db::DbPool;
 use bb8::RunError;
-use primitives::{Channel, ChannelId, ValidatorId,};
-use primitives::validator::MessageTypes;
-use std::str::FromStr;
 use chrono::Utc;
+use primitives::validator::MessageTypes;
+use primitives::{Channel, ChannelId, ValidatorId};
+use std::str::FromStr;
 
 pub use list_channels::list_channels;
 
@@ -72,17 +72,16 @@ pub async fn insert_channel(
         .await
 }
 
-
 pub async fn insert_validator_messages(
     pool: &DbPool,
     channel: &Channel,
     from: &ValidatorId,
-    validator_message: &MessageTypes
+    validator_message: &MessageTypes,
 ) -> Result<bool, RunError<bb8_postgres::tokio_postgres::Error>> {
     pool
         .run(move | connection| {
             async move {
-                match connection.prepare("INSERT INTO validator_messages(channel_id, from, msg, received) values ($1, $2, $3, $4)").await {
+                match connection.prepare("INSERT INTO validator_messages (channel_id, \"from\", msg, received) values ($1, $2, $3, $4)").await {
                     Ok(stmt) => match connection.execute(&stmt, &[&channel.id, &from, &validator_message, &Utc::now()]).await {
                         Ok(row) => {
                             let inserted = row == 1;
