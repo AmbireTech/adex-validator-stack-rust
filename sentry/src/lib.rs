@@ -3,6 +3,7 @@
 
 use crate::chain::chain;
 use crate::db::DbPool;
+use crate::event_aggregator::EventAggregator;
 use crate::middleware::auth;
 use crate::middleware::channel::channel_load;
 use crate::middleware::cors::{cors, Cors};
@@ -18,9 +19,10 @@ use redis::aio::MultiplexedConnection;
 use regex::Regex;
 use routes::analytics::{advertiser_analytics, analytics, publisher_analytics};
 use routes::cfg::config;
-use routes::channel::{channel_list, create_channel, last_approved};
+use routes::channel::{channel_list, create_channel, insert_events, last_approved};
 use slog::{error, Logger};
 use std::collections::HashMap;
+
 pub mod middleware {
     pub mod auth;
     pub mod channel;
@@ -38,6 +40,7 @@ pub mod routes {
 pub mod access;
 mod chain;
 pub mod db;
+pub mod event_aggregator;
 pub mod event_reducer;
 
 lazy_static! {
@@ -50,6 +53,7 @@ lazy_static! {
     static ref CHANNEL_EVENTS_AGGREGATES: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events-aggregates/?$").expect("The regex should be valid");
     static ref ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
     static ref ADVERTISER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-advertiser/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
+    static ref CREATE_EVENTS_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events(/.*)?$").expect("The regex should be valid");
 }
 
 fn auth_required_middleware<'a, A: Adapter>(
@@ -86,6 +90,7 @@ pub struct Application<A: Adapter> {
     pub redis: MultiplexedConnection,
     pub pool: DbPool,
     pub config: Config,
+    pub event_aggregator: EventAggregator,
     __secret: (),
 }
 
@@ -103,6 +108,7 @@ impl<A: Adapter + 'static> Application<A> {
             logger,
             redis,
             pool,
+            event_aggregator: Default::default(),
             __secret: (),
         }
     }
@@ -261,6 +267,20 @@ async fn channels_router<A: Adapter + 'static>(
         let req = chain(req, app, vec![Box::new(channel_load)]).await?;
 
         list_channel_event_aggregates(req, app).await
+    } else if let (Some(caps), &Method::POST) =
+        (CREATE_EVENTS_BY_CHANNEL_ID.captures(&path), method)
+    {
+        if req.extensions().get::<Session>().is_none() {
+            return Err(ResponseError::Unauthorized);
+        }
+
+        let param = RouteParams(vec![caps
+            .get(1)
+            .map_or("".to_string(), |m| m.as_str().to_string())]);
+
+        req.extensions_mut().insert(param);
+
+        insert_events(req, app).await
     } else {
         Err(ResponseError::NotFound)
     }
