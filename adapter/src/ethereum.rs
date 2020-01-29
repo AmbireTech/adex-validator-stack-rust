@@ -18,7 +18,6 @@ use primitives::{
 };
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use serde_hex::{SerHexOpt, StrictPfx};
 use serde_json::Value;
 use std::convert::TryFrom;
 use std::error::Error;
@@ -223,17 +222,19 @@ impl Adapter for EthereumAdapter {
 
             let sess = match &verified.payload.identity {
                 Some(identity) => {
-                    let privilege = self.relayer.get_privilege(identity).await?;
-
-                    if privilege > *PRIVILEGE_LEVEL_NONE {
+                    if self
+                        .relayer
+                        .has_privileges(&verified.from, identity)
+                        .await?
+                    {
+                        Session {
+                            era: verified.payload.era,
+                            uid: identity.to_owned(),
+                        }
+                    } else {
                         return Err(AdapterError::Authorization(
                             "insufficient privilege".to_string(),
                         ));
-                    } else {
-                        Session {
-                            era: verified.payload.era,
-                            uid: identity.into(),
-                        }
                     }
                 }
                 None => Session {
@@ -282,17 +283,22 @@ impl RelayerClient {
         })
     }
 
-    pub async fn get_privilege(&self, identity: &[u8; 20]) -> Result<u8, AdapterError> {
+    /// Checks whether there are any privileges (i.e. > 0)
+    pub async fn has_privileges(
+        &self,
+        from: &ValidatorId,
+        identity: &ValidatorId,
+    ) -> Result<bool, AdapterError> {
         use reqwest::Response;
         use std::collections::HashMap;
 
         let relay_url = format!(
             "{}/identity/by-owner/{}",
             self.relayer_url,
-            hex::encode(identity)
+            from.to_checksum()
         );
 
-        let identities_owned: HashMap<[u8; 20], u8> = self
+        let identities_owned: HashMap<ValidatorId, u8> = self
             .client
             .get(&relay_url)
             .send()
@@ -300,12 +306,11 @@ impl RelayerClient {
             .await
             .map_err(|_| map_error("Fetching privileges failed"))?;
 
-        let privilege = identities_owned
+        let has_privileges = identities_owned
             .get(identity)
-            .copied()
-            .unwrap_or_else(|| 0_u8);
+            .map_or(false, |privileges| *privileges > 0);
 
-        Ok(privilege)
+        Ok(has_privileges)
     }
 }
 
@@ -334,12 +339,8 @@ pub struct Payload {
     pub id: String,
     pub era: i64,
     pub address: String,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "SerHexOpt::<StrictPfx>"
-    )]
-    pub identity: Option<[u8; 20]>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub identity: Option<ValidatorId>,
 }
 
 #[derive(Clone, Debug)]
@@ -513,6 +514,33 @@ mod test {
             format!("{:?}", verification),
             "generated wrong verification payload"
         );
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_session_from_token() {
+        use primitives::ToETHChecksum;
+        let identity = ValidatorId::try_from("0x5B04DBc513F90CaAFAa09307Ad5e3C65EB4b26F0").unwrap();
+
+        let mut eth_adapter = setup_eth_adapter(None);
+        eth_adapter.unlock().expect("should unlock eth adapter");
+        let wallet = eth_adapter.wallet.clone();
+
+        let era = Utc::now().timestamp_millis() as f64 / 60000.0;
+        let payload = Payload {
+            id: eth_adapter.whoami().to_checksum(),
+            era: era.floor() as i64,
+            identity: Some(identity.clone()),
+            address: eth_adapter.whoami().to_checksum(),
+        };
+
+        let token = ewt_sign(&wallet.unwrap(), &eth_adapter.keystore_pwd, &payload)
+            .map_err(|_| map_error("Failed to sign token"))
+            .unwrap();
+
+        let session: Session = eth_adapter.session_from_token(&token).await.unwrap();
+
+        assert_eq!(session.uid, identity);
     }
 
     #[tokio::test]
