@@ -2,12 +2,13 @@ use chrono::Utc;
 use futures::future::try_join_all;
 use redis::aio::MultiplexedConnection;
 
+use crate::Session;
 use primitives::event_submission::{RateLimit, Rule};
 use primitives::sentry::Event;
 use primitives::Channel;
 use std::cmp::PartialEq;
-
-use crate::Session;
+use std::error;
+use std::fmt;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Error {
@@ -15,6 +16,19 @@ pub enum Error {
     ChannelIsExpired,
     ChannelIsInWithdrawPeriod,
     RulesError(String),
+}
+
+impl error::Error for Error {}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Error::OnlyCreatorCanCloseChannel => write!(f, "only creator can create channel"),
+            Error::ChannelIsExpired => write!(f, "channel has expired"),
+            Error::ChannelIsInWithdrawPeriod => write!(f, "channel is in withdraw period"),
+            Error::RulesError(error) => write!(f, "{}", error),
+        }
+    }
 }
 
 // @TODO: Make pub(crate)

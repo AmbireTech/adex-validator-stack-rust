@@ -9,7 +9,7 @@ use lazy_static::lazy_static;
 
 pub mod analytics;
 mod channel;
-mod event_aggregate;
+pub mod event_aggregate;
 mod validator_message;
 
 pub use self::channel::*;
@@ -55,7 +55,7 @@ pub async fn postgres_connection() -> Result<DbPool, bb8_postgres::tokio_postgre
     Pool::builder().build(pg_mgr).await
 }
 
-pub async fn setup_migrations() {
+pub async fn setup_migrations(environment: &str) {
     use migrant_lib::{Config, Direction, Migrator, Settings};
 
     let settings = Settings::configure_postgres()
@@ -82,9 +82,16 @@ pub async fn setup_migrations() {
         };
     }
 
+    let mut migrations = vec![make_migration!("20190806011140_initial-tables")];
+
+    if environment == "development" {
+        // seeds database tables for testing
+        migrations.push(make_migration!("20190806011140_initial-tables/seed"))
+    }
+
     // Define Migrations
     config
-        .use_migrations(&[make_migration!("20190806011140_initial-tables")])
+        .use_migrations(&migrations)
         .expect("Loading migrations failed");
 
     // Reload config, ping the database for applied migrations

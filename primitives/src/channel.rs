@@ -11,7 +11,7 @@ use crate::{AdUnit, EventSubmission, TargetingTag, ValidatorDesc, ValidatorId};
 use hex::{FromHex, FromHexError};
 use std::ops::Deref;
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Copy, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Copy, Clone, Hash)]
 #[serde(transparent)]
 pub struct ChannelId(#[serde(with = "SerHex::<StrictPfx>")] [u8; 32]);
 

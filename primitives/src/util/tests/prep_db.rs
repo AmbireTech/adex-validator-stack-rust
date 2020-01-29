@@ -20,7 +20,7 @@ lazy_static! {
         ids.insert("user".into(), ValidatorId::try_from("0x20754168c00a6e58116ccfd0a5f7d1bb66c5de9d").expect("failed to parse id"));
         ids.insert("publisher".into(), ValidatorId::try_from("0xb7d3f81e857692d13e9d63b232a90f4a1793189e").expect("failed to parse id"));
         ids.insert("publisher2".into(), ValidatorId::try_from("0x2054b0c1339309597ad04ba47f4590f8cdb4e305").expect("failed to parse id"));
-        ids.insert("creator".into(), ValidatorId::try_from("0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359").expect("failed to parse id"));
+        ids.insert("creator".into(), ValidatorId::try_from("0x033ed90e0fec3f3ea1c9b005c724d704501e0196").expect("failed to parse id"));
         ids.insert("tester".into(), ValidatorId::try_from("0x2892f6C41E0718eeeDd49D98D648C789668cA67d").expect("failed to parse id"));
 
         ids

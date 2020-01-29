@@ -28,8 +28,19 @@ CREATE INDEX idx_validator_messages_msg_state_root ON validator_messages ((msg -
 CREATE TABLE event_aggregates
 (
     channel_id VARCHAR(66)              NOT NULL REFERENCES channels (id) ON DELETE RESTRICT,
-    created    TIMESTAMP WITH TIME ZONE NOT NULL,
-    events     JSONB                    NOT NULL
+    created    TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    event_type VARCHAR(255)             NOT NULL,
+    earner     VARCHAR(255),
+    count      VARCHAR                   NOT NULL,
+    payout     VARCHAR                   NOT NULL
 );
 
 CREATE INDEX idx_event_aggregates_created ON event_aggregates (created);
+CREATE INDEX idx_event_aggregates_channel ON event_aggregates (channel_id);
+CREATE INDEX idx_event_aggregates_event_type ON event_aggregates (event_type);
+
+CREATE AGGREGATE jsonb_object_agg(jsonb) (
+  SFUNC = 'jsonb_concat',
+  STYPE = jsonb,
+  INITCOND = '{}'
+);

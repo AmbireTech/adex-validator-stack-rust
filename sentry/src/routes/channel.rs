@@ -4,12 +4,14 @@ use crate::success_response;
 use crate::Application;
 use crate::ResponseError;
 use crate::RouteParams;
+use crate::Session;
 use hex::FromHex;
 use hyper::{Body, Request, Response};
 use primitives::adapter::Adapter;
-use primitives::sentry::SuccessResponse;
+use primitives::sentry::{Event, SuccessResponse};
 use primitives::{Channel, ChannelId};
 use slog::error;
+use std::collections::HashMap;
 
 pub async fn channel_status<A: Adapter>(
     req: Request<Body>,
@@ -99,6 +101,40 @@ pub async fn last_approved<A: Adapter>(
     Ok(Response::builder()
         .header("Content-type", "application/json")
         .body(serde_json::to_string(&channel)?.into())
+        .unwrap())
+}
+
+pub async fn insert_events<A: Adapter + 'static>(
+    req: Request<Body>,
+    app: &Application<A>,
+) -> Result<Response<Body>, ResponseError> {
+    let session = req
+        .extensions()
+        .get::<Session>()
+        .expect("request session")
+        .to_owned();
+
+    let route_params = req
+        .extensions()
+        .get::<RouteParams>()
+        .expect("request should have route params");
+
+    let channel_id = ChannelId::from_hex(route_params.index(0))?;
+
+    let into_body = req.into_body();
+    let body = hyper::body::to_bytes(into_body).await?;
+    let request_body = serde_json::from_slice::<HashMap<String, Vec<Event>>>(&body)?;
+    let events = request_body
+        .get("events")
+        .ok_or_else(|| ResponseError::BadRequest("invalid request".to_string()))?;
+
+    app.event_aggregator
+        .record(app, &channel_id, &session, &events)
+        .await?;
+
+    Ok(Response::builder()
+        .header("Content-type", "application/json")
+        .body(serde_json::to_string(&SuccessResponse { success: true })?.into())
         .unwrap())
 }
 
