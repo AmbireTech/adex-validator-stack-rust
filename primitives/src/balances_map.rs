@@ -66,7 +66,6 @@ mod test {
         let balances_map: BalancesMap = data.into_iter().collect();
 
         let actual_json = serde_json::to_string(&balances_map).expect("Should serialize it");
-        // should be all lowercase!
         let expected_json = r#"{"0xC91763D7F14ac5c5dDfBCD012e0D2A61ab9bDED3":"100","0xce07CbB7e054514D590a0262C93070D838bFBA2e":"50"}"#;
 
         assert_eq!(expected_json, actual_json);
@@ -75,5 +74,24 @@ mod test {
             serde_json::from_str(&actual_json).expect("Should deserialize it");
 
         assert_eq!(balances_map, balances_map_from_json);
+    }
+
+    #[test]
+    fn test_balances_map_deserialization_with_same_keys() {
+        // the first is ETH Checksummed, the second is lowercase!
+        let json = r#"{"0xC91763D7F14ac5c5dDfBCD012e0D2A61ab9bDED3":"100","0xc91763d7f14ac5c5ddfbcd012e0d2a61ab9bded3":"20","0xce07CbB7e054514D590a0262C93070D838bFBA2e":"50"}"#;
+
+        let actual_deserialized: BalancesMap =
+            serde_json::from_str(&json).expect("Should deserialize it");
+
+        let expected_deserialized: BalancesMap = vec![
+            (IDS["leader"].clone(), BigNum::from(50_u64)),
+            // only the second should be accepted, as it appears second in the string and it's the latest one
+            (IDS["follower"].clone(), BigNum::from(20_u64)),
+        ]
+        .into_iter()
+        .collect();
+
+        assert_eq!(expected_deserialized, actual_deserialized);
     }
 }
