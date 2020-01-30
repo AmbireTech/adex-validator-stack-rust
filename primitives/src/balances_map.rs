@@ -3,11 +3,11 @@ use std::collections::BTreeMap;
 use crate::{BigNum, ValidatorId};
 use std::collections::btree_map::{Entry, Iter, Values};
 
-use serde::{ser::SerializeMap, Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use std::iter::FromIterator;
 use std::ops::Index;
 
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(transparent)]
 pub struct BalancesMap(BTreeMap<ValidatorId, BigNum>);
 
@@ -50,20 +50,6 @@ impl FromIterator<(ValidatorId, BigNum)> for BalancesMap {
     }
 }
 
-impl Serialize for BalancesMap {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut map = serializer.serialize_map(Some(self.0.len()))?;
-
-        for (key, big_num) in self.0.iter() {
-            map.serialize_entry(&key.to_hex_prefix_string(), big_num)?;
-        }
-        map.end()
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -80,8 +66,7 @@ mod test {
         let balances_map: BalancesMap = data.into_iter().collect();
 
         let actual_json = serde_json::to_string(&balances_map).expect("Should serialize it");
-        // should be all lowercase!
-        let expected_json = r#"{"0xc91763d7f14ac5c5ddfbcd012e0d2a61ab9bded3":"100","0xce07cbb7e054514d590a0262c93070d838bfba2e":"50"}"#;
+        let expected_json = r#"{"0xC91763D7F14ac5c5dDfBCD012e0D2A61ab9bDED3":"100","0xce07CbB7e054514D590a0262C93070D838bFBA2e":"50"}"#;
 
         assert_eq!(expected_json, actual_json);
 
@@ -89,5 +74,24 @@ mod test {
             serde_json::from_str(&actual_json).expect("Should deserialize it");
 
         assert_eq!(balances_map, balances_map_from_json);
+    }
+
+    #[test]
+    fn test_balances_map_deserialization_with_same_keys() {
+        // the first is ETH Checksummed, the second is lowercase!
+        let json = r#"{"0xC91763D7F14ac5c5dDfBCD012e0D2A61ab9bDED3":"100","0xc91763d7f14ac5c5ddfbcd012e0d2a61ab9bded3":"20","0xce07CbB7e054514D590a0262C93070D838bFBA2e":"50"}"#;
+
+        let actual_deserialized: BalancesMap =
+            serde_json::from_str(&json).expect("Should deserialize it");
+
+        let expected_deserialized: BalancesMap = vec![
+            (IDS["leader"].clone(), BigNum::from(50_u64)),
+            // only the second should be accepted, as it appears second in the string and it's the latest one
+            (IDS["follower"].clone(), BigNum::from(20_u64)),
+        ]
+        .into_iter()
+        .collect();
+
+        assert_eq!(expected_deserialized, actual_deserialized);
     }
 }
