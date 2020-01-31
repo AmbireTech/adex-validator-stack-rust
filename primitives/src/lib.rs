@@ -63,3 +63,5 @@ pub trait ToETHChecksum: AsRef<[u8]> {
         eth_checksum::checksum(&hex::encode(self.as_ref()))
     }
 }
+
+impl ToETHChecksum for &[u8; 20] {}
