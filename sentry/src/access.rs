@@ -260,7 +260,7 @@ mod test {
             uids: None,
             rate_limit: Some(RateLimit {
                 limit_type: "ip".to_string(),
-                time_frame: Duration::from_millis(20_000),
+                time_frame: Duration::from_millis(1),
             }),
         };
         let channel = get_channel(rule);
