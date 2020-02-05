@@ -83,19 +83,17 @@ pub async fn get_analytics(
     );
 
     // execute query
-    pool.run(move |connection| {
-        async move {
-            match connection.prepare(&sql_query).await {
-                Ok(stmt) => match connection.query(&stmt, &[]).await {
-                    Ok(rows) => {
-                        let analytics: Vec<AnalyticsResponse> =
-                            rows.iter().map(AnalyticsResponse::from).collect();
-                        Ok((analytics, connection))
-                    }
-                    Err(e) => Err((e, connection)),
-                },
+    pool.run(move |connection| async move {
+        match connection.prepare(&sql_query).await {
+            Ok(stmt) => match connection.query(&stmt, &[]).await {
+                Ok(rows) => {
+                    let analytics: Vec<AnalyticsResponse> =
+                        rows.iter().map(AnalyticsResponse::from).collect();
+                    Ok((analytics, connection))
+                }
                 Err(e) => Err((e, connection)),
-            }
+            },
+            Err(e) => Err((e, connection)),
         }
     })
     .await
