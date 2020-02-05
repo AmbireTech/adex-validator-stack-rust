@@ -150,19 +150,17 @@ mod list_channels {
         pool: &DbPool,
         (where_clauses, params): (&'a [String], Vec<&'a (dyn ToSql + Sync)>),
     ) -> Result<u64, RunError<bb8_postgres::tokio_postgres::Error>> {
-        pool.run(move |connection| {
-            async move {
-                let statement = format!(
-                    "SELECT COUNT(id)::varchar FROM channels WHERE {}",
-                    where_clauses.join(" AND ")
-                );
-                match connection.prepare(&statement).await {
-                    Ok(stmt) => match connection.query_one(&stmt, params.as_slice()).await {
-                        Ok(row) => Ok((row.get::<_, TotalCount>(0).0, connection)),
-                        Err(e) => Err((e, connection)),
-                    },
+        pool.run(move |connection| async move {
+            let statement = format!(
+                "SELECT COUNT(id)::varchar FROM channels WHERE {}",
+                where_clauses.join(" AND ")
+            );
+            match connection.prepare(&statement).await {
+                Ok(stmt) => match connection.query_one(&stmt, params.as_slice()).await {
+                    Ok(row) => Ok((row.get::<_, TotalCount>(0).0, connection)),
                     Err(e) => Err((e, connection)),
-                }
+                },
+                Err(e) => Err((e, connection)),
             }
         })
         .await
