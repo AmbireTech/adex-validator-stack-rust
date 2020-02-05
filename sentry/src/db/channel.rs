@@ -1,5 +1,7 @@
 use crate::db::DbPool;
 use bb8::RunError;
+use chrono::Utc;
+use primitives::validator::MessageTypes;
 use primitives::{Channel, ChannelId, ValidatorId};
 use std::str::FromStr;
 
@@ -57,6 +59,30 @@ pub async fn insert_channel(
             async move {
                 match connection.prepare("INSERT INTO channels (id, creator, deposit_asset, deposit_amount, valid_until, spec) values ($1, $2, $3, $4, $5, $6)").await {
                     Ok(stmt) => match connection.execute(&stmt, &[&channel.id, &channel.creator, &channel.deposit_asset, &channel.deposit_amount, &channel.valid_until, &channel.spec]).await {
+                        Ok(row) => {
+                            let inserted = row == 1;
+                            Ok((inserted, connection))
+                        },
+                        Err(e) => Err((e, connection)),
+                    },
+                    Err(e) => Err((e, connection)),
+                }
+            }
+        })
+        .await
+}
+
+pub async fn insert_validator_messages(
+    pool: &DbPool,
+    channel: &Channel,
+    from: &ValidatorId,
+    validator_message: &MessageTypes,
+) -> Result<bool, RunError<bb8_postgres::tokio_postgres::Error>> {
+    pool
+        .run(move | connection| {
+            async move {
+                match connection.prepare("INSERT INTO validator_messages (channel_id, \"from\", msg, received) values ($1, $2, $3, $4)").await {
+                    Ok(stmt) => match connection.execute(&stmt, &[&channel.id, &from, &validator_message, &Utc::now()]).await {
                         Ok(row) => {
                             let inserted = row == 1;
                             Ok((inserted, connection))

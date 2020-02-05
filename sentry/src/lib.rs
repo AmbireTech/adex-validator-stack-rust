@@ -19,7 +19,9 @@ use redis::aio::MultiplexedConnection;
 use regex::Regex;
 use routes::analytics::{advertiser_analytics, analytics, publisher_analytics};
 use routes::cfg::config;
-use routes::channel::{channel_list, create_channel, insert_events, last_approved};
+use routes::channel::{
+    channel_list, create_channel, create_validator_messages, insert_events, last_approved,
+};
 use slog::{error, Logger};
 use std::collections::HashMap;
 
@@ -54,6 +56,7 @@ lazy_static! {
     static ref ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
     static ref ADVERTISER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-advertiser/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
     static ref CREATE_EVENTS_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events(/.*)?$").expect("The regex should be valid");
+
 }
 
 fn auth_required_middleware<'a, A: Adapter>(
@@ -251,6 +254,28 @@ async fn channels_router<A: Adapter + 'static>(
         };
 
         list_validator_messages(req, &app, &extract_params.0, &extract_params.1).await
+    } else if let (Some(caps), &Method::POST) = (CHANNEL_VALIDATOR_MESSAGES.captures(&path), method)
+    {
+        let param = RouteParams(vec![caps
+            .get(1)
+            .map_or("".to_string(), |m| m.as_str().to_string())]);
+
+        req.extensions_mut().insert(param);
+
+        let req = match chain(
+            req,
+            app,
+            vec![Box::new(auth_required_middleware), Box::new(channel_load)],
+        )
+        .await
+        {
+            Ok(req) => req,
+            Err(error) => {
+                return Err(error);
+            }
+        };
+
+        create_validator_messages(req, &app).await
     } else if let (Some(caps), &Method::GET) = (CHANNEL_EVENTS_AGGREGATES.captures(&path), method) {
         if req.extensions().get::<Session>().is_none() {
             return Err(ResponseError::Unauthorized);
