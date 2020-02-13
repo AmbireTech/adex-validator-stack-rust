@@ -16,6 +16,14 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::delay_for;
+use lazy_static::lazy_static;
+use std::env;
+use crate::analytics_recorder;
+
+lazy_static! {
+    pub static ref ANALYTICS_RECORDER: String =
+        env::var("ANALYTICS_RECORDER").unwrap_or_else(|_| "false".to_string());
+}
 
 #[derive(Debug)]
 struct Record {
@@ -125,6 +133,10 @@ impl EventAggregator {
         .await;
         if let Err(e) = has_access {
             return Err(ResponseError::BadRequest(e.to_string()));
+        }
+
+        if ANALYTICS_RECORDER.ne(&"false".to_string()) {
+            analytics_recorder::record(app.redis.clone(), &record.channel, &session, &events, &app.logger).await
         }
 
         events
