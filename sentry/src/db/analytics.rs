@@ -44,6 +44,7 @@ pub async fn advertiser_channel_ids(
     })
     .await
 }
+
 pub async fn get_analytics(
     query: AnalyticsQuery,
     pool: &DbPool,
@@ -55,8 +56,8 @@ pub async fn get_analytics(
     let time_limit = Utc::now().timestamp() - period;
 
     let mut where_clauses = vec![format!("created > to_timestamp({})", time_limit)];
-
-    let select_query = match analytics_type {
+    let mut group_clause = "time".to_string();
+    let mut select_clause = match analytics_type {
         AnalyticsType::Advertiser { session, channel } => {
             if let Some(id) = channel {
                 where_clauses.push(format!("channel_id = {}", id));
@@ -73,7 +74,7 @@ pub async fn get_analytics(
             ));
 
             format!(
-                "select SUM(value::numeric)::varchar as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time from event_aggregates, jsonb_each_text(events->'{}'->'{}')", 
+                "SUM(value::numeric)::varchar as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time from event_aggregates, jsonb_each_text(events->'{}'->'{}')", 
                 interval, query.event_type, query.metric
             )
         }
@@ -83,7 +84,7 @@ pub async fn get_analytics(
                 query.event_type, query.metric
             ));
             format!(
-                "select SUM(value::numeric)::varchar as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time from event_aggregates, jsonb_each_text(events->'{}'->'{}')", 
+                "SUM(value::numeric)::varchar as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time from event_aggregates, jsonb_each_text(events->'{}'->'{}')", 
                 interval, query.event_type, query.metric
             )
         }
@@ -98,23 +99,22 @@ pub async fn get_analytics(
             ));
 
             format!(
-                "select SUM((events->'{}'->'{}'->>'{}')::numeric) as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time from event_aggregates", 
+                "SUM((events->'{}'->'{}'->>'{}')::numeric) as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time from event_aggregates", 
                 query.event_type, query.metric, session.uid, interval
             )
         }
     };
 
-    let group = if segment_by_channel {
-        "time, channelId"
-    } else {
-        "time"
-    };
+    if segment_by_channel {
+        select_clause = format!("{}, channelId", select_clause);
+        group_clause = format!("{}, channelId", group_clause);
+    }
 
     let sql_query = format!(
-        "{} WHERE {} GROUP BY {} LIMIT {}",
-        select_query,
+        "SELECT {} WHERE {} GROUP BY {} LIMIT {}",
+        select_clause,
         where_clauses.join(" AND "),
-        group,
+        group_clause,
         applied_limit,
     );
 
