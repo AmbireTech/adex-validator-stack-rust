@@ -48,6 +48,7 @@ pub async fn get_analytics(
     query: AnalyticsQuery,
     pool: &DbPool,
     analytics_type: AnalyticsType,
+    segment_by_channel: bool,
 ) -> Result<Vec<AnalyticsResponse>, RunError<bb8_postgres::tokio_postgres::Error>> {
     let applied_limit = query.limit.min(ANALYTICS_QUERY_LIMIT);
     let (interval, period) = get_time_frame(&query.timeframe);
@@ -103,11 +104,18 @@ pub async fn get_analytics(
         }
     };
 
+    let group = if segment_by_channel {
+        "time, channelId"
+    } else {
+        "time"
+    };
+
     let sql_query = format!(
-        "{} WHERE {} GROUP BY time LIMIT {}",
+        "{} WHERE {} GROUP BY {} LIMIT {}",
         select_query,
         where_clauses.join(" AND "),
-        applied_limit
+        group,
+        applied_limit,
     );
 
     // execute query

@@ -93,7 +93,9 @@ pub async fn process_analytics<A: Adapter>(
         .is_valid()
         .map_err(|e| ResponseError::BadRequest(e.to_string()))?;
 
-    let result = get_analytics(query, &app.pool, analytics_type).await?;
+    let segment_channel = query.segment_by_channel.clone().map(|_| true).unwrap_or_else(|| false);
+
+    let result = get_analytics(query, &app.pool, analytics_type, segment_channel).await?;
 
     serde_json::to_string(&result)
         .map_err(|_| ResponseError::BadRequest("error occurred; try again later".to_string()))

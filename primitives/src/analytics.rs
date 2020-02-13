@@ -25,6 +25,7 @@ pub mod postgres {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AnalyticsQuery {
     #[serde(default = "default_limit")]
     pub limit: u32,
@@ -34,6 +35,7 @@ pub struct AnalyticsQuery {
     pub metric: String,
     #[serde(default = "default_timeframe")]
     pub timeframe: String,
+    pub segment_by_channel: Option<String>
 }
 
 impl AnalyticsQuery {
