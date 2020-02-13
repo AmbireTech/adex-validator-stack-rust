@@ -5,15 +5,17 @@ use bb8_postgres::tokio_postgres::types::{ToSql, Type};
 use bb8_postgres::tokio_postgres::Error;
 use chrono::{DateTime, Utc};
 use futures::pin_mut;
-use primitives::sentry::{EventAggregate, ApproveStateValidatorMessage, NewStateValidatorMessage, HeartbeatValidatorMessage};
+use primitives::sentry::{
+    ApproveStateValidatorMessage, EventAggregate, HeartbeatValidatorMessage,
+    NewStateValidatorMessage,
+};
 use primitives::BigNum;
-use primitives::{ChannelId, ValidatorId, Channel};
+use primitives::{Channel, ChannelId, ValidatorId};
 use std::ops::Add;
 
-
-pub async fn lastest_approve_state( 
+pub async fn lastest_approve_state(
     pool: &DbPool,
-    channel: &Channel
+    channel: &Channel,
 ) -> Result<Option<ApproveStateValidatorMessage>, RunError<bb8_postgres::tokio_postgres::Error>> {
     pool
         .run(move |connection| {
@@ -53,7 +55,7 @@ pub async fn latest_new_state(
 pub async fn latest_heartbeats(
     pool: &DbPool,
     channel_id: &ChannelId,
-    validator_id: ValidatorId
+    validator_id: ValidatorId,
 ) -> Result<Vec<HeartbeatValidatorMessage>, RunError<bb8_postgres::tokio_postgres::Error>> {
     pool
     .run(move |connection| {
