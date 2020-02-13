@@ -10,6 +10,7 @@ use crate::middleware::cors::{cors, Cors};
 use crate::routes::channel::channel_status;
 use crate::routes::event_aggregate::list_channel_event_aggregates;
 use crate::routes::validator_message::{extract_params, list_validator_messages};
+use chrono::Utc;
 use futures::future::{BoxFuture, FutureExt};
 use hyper::{Body, Method, Request, Response, StatusCode};
 use lazy_static::lazy_static;
@@ -24,8 +25,6 @@ use routes::channel::{
 };
 use slog::{error, Logger};
 use std::collections::HashMap;
-use chrono::Utc;
-
 
 pub mod middleware {
     pub mod auth;

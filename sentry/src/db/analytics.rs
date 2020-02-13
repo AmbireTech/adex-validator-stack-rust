@@ -1,20 +1,19 @@
 use crate::db::DbPool;
+use crate::epoch;
 use crate::Session;
 use bb8::RunError;
 use chrono::Utc;
-use primitives::analytics::{AnalyticsQuery, AnalyticsResponse, ANALYTICS_QUERY_LIMIT};
-use primitives::{ValidatorId, ChannelId};
-use primitives::sentry::{Event, AdvancedAnalyticsResponse};
-use redis::aio::MultiplexedConnection;
-use crate::{ epoch };
-use redis::AsyncCommands;
-use redis::Commands;
-use redis;
-use std::collections::HashMap;
-use std::error::Error;
 use futures::future::try_join_all;
 use futures::future::TryFutureExt;
-
+use primitives::analytics::{AnalyticsQuery, AnalyticsResponse, ANALYTICS_QUERY_LIMIT};
+use primitives::sentry::{AdvancedAnalyticsResponse, ChannelReport, Event, PublisherReport};
+use primitives::{ChannelId, ValidatorId};
+use redis;
+use redis::aio::MultiplexedConnection;
+use redis::AsyncCommands;
+use redis::Commands;
+use std::collections::HashMap;
+use std::error::Error;
 
 pub enum AnalyticsType {
     Advertiser {
@@ -126,64 +125,79 @@ fn get_time_frame(timeframe: &str) -> (i64, i64) {
     }
 }
 
-async fn stat_pair(conn: MultiplexedConnection, key: &str ) -> Result<HashMap<String, String>, Box<dyn Error>> {
+async fn stat_pair(
+    conn: MultiplexedConnection,
+    key: &str,
+) -> Result<HashMap<String, f64>, Box<dyn Error>> {
     let data = redis::cmd("ZRANGE")
-                    .arg(key)
-                    .arg(0 as u64)
-                    .arg(-1 as i64)
-                    .arg("WITHSCORES")
-                    .query_async::<_, Vec<String>>(&mut conn.clone())
-                    .await?;
+        .arg(key)
+        .arg(0 as u64)
+        .arg(-1 as i64)
+        .arg("WITHSCORES")
+        .query_async::<_, Vec<String>>(&mut conn.clone())
+        .await?;
 
-    let stats = data.chunks(2).map(|&chunk|(chunk[0], chunk[1]));
-    let result: HashMap<String, String> = stats.into_iter().collect();
-
-    Ok(result)
+    Ok(data
+        .chunks(2)
+        .map(|chunk: &[String]| {
+            (
+                chunk[0].clone(),
+                chunk[1].parse::<f64>().expect("should parse value"),
+            )
+        })
+        .collect())
 }
 
-pub async fn get_advanced_reports(redis: &MultiplexedConnection,  event: &Event, publisher: &ValidatorId, channelIds: &[ChannelId]) -> Result<AdvancedAnalyticsResponse, Box<dyn Error>> {
-    let publisher_keys = [
-        format!("reportPublisherToAdUnit:{}:{}", event, publisher),
-        format!("reportPublisherToAdSlot:{}:{}", event, publisher),
-        format!("reportPublisherToAdSlotPay:{}:{}", event, publisher),
-        format!("reportPublisherToCountry:{}:{}", event, publisher),
-        format!("reportPublisherToHostname:{}:{}", event, publisher),
+pub async fn get_advanced_reports(
+    redis: &MultiplexedConnection,
+    event: &Event,
+    publisher: &ValidatorId,
+    channel_ids: &[ChannelId],
+) -> Result<AdvancedAnalyticsResponse, Box<dyn Error>> {
+    let publisher_reports = [
+        PublisherReport::ReportPublisherToAdUnit,
+        PublisherReport::ReportPublisherToAdSlot,
+        PublisherReport::ReportPublisherToAdSlotPay,
+        PublisherReport::ReportPublisherToCountry,
+        PublisherReport::ReportPublisherToHostname,
     ];
 
-    let publisher_stats = HashMap::new();
+    let mut publisher_stats = HashMap::new();
 
-    for publisher_key in publisher_keys.iter()  {
-        let result  = stat_pair(redis.clone(), &publisher_key).await?;
-        publisher_stats.insert(
-            publisher_key.split(":").nth(0).expect("should always have key").to_string(), 
-            result
-        );
+    for publisher_report in publisher_reports.iter() {
+        let result = stat_pair(
+            redis.clone(),
+            &format!("{}:{}:{}", publisher_report, event, publisher),
+        )
+        .await?;
+        publisher_stats.insert(publisher_report.clone(), result);
     }
 
-    let by_channel_stats = HashMap::new();
+    let mut by_channel_stats = HashMap::new();
 
-    for channelId in channelIds {
-        let keys = [
-            format!("reportChannelToAdUnit:{}:{}", event, channelId),
-            format!("reportChannelToHostname:{}:{}", event, channelId),
-            format!("reportChannelToHostnamePay:{}:{}", event, channelId),
-        ];
-        
-        let channel_stat = HashMap::new();
+    let channel_reports = [
+        ChannelReport::ReportChannelToAdUnit,
+        ChannelReport::ReportChannelToHostname,
+        ChannelReport::ReportChannelToHostnamePay,
+    ];
 
-        for key in keys.iter()  {
-            let result = stat_pair(redis.clone(), &key).await?;
-            channel_stat.insert(
-                key.split(":").nth(0).expect("should always have key").to_string(),
-                result
-            );
+    for channel_id in channel_ids {
+        let mut channel_stat = HashMap::new();
+
+        for channel_report in channel_reports.iter() {
+            let result = stat_pair(
+                redis.clone(),
+                &format!("{}:{}:{}", channel_report, event, channel_id),
+            )
+            .await?;
+            channel_stat.insert(channel_report.clone(), result);
         }
 
-        by_channel_stats.insert(channelId.to_owned(), channel_stat);
+        by_channel_stats.insert(channel_id.to_owned(), channel_stat);
     }
 
     Ok(AdvancedAnalyticsResponse {
         publisher_stats,
-        by_channel_stats
+        by_channel_stats,
     })
 }

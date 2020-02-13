@@ -4,6 +4,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
+use std::hash::Hash;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -152,11 +153,51 @@ pub struct EventAggregateResponse {
     pub events: Vec<EventAggregate>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AdvancedAnalyticsResponse {
-    pub publisher_stats: HashMap<String, HashMap<String, String>>,
-    pub by_channel_stats: HashMap<ChannelId, HashMap<String, HashMap<String, String>>>
+    pub by_channel_stats: HashMap<ChannelId, HashMap<ChannelReport, HashMap<String, f64>>>,
+    pub publisher_stats: HashMap<PublisherReport, HashMap<String, f64>>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Hash, PartialEq, Eq, Clone)]
+#[serde(rename_all = "camelCase")]
+pub enum PublisherReport {
+    ReportPublisherToAdUnit,
+    ReportPublisherToAdSlot,
+    ReportPublisherToAdSlotPay,
+    ReportPublisherToCountry,
+    ReportPublisherToHostname,
+}
+
+impl fmt::Display for PublisherReport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            PublisherReport::ReportPublisherToAdUnit => write!(f, "reportPublisherToAdUnit"),
+            PublisherReport::ReportPublisherToAdSlot => write!(f, "reportPublisherToAdSlot"),
+            PublisherReport::ReportPublisherToAdSlotPay => write!(f, "reportPublisherToAdSlotPay"),
+            PublisherReport::ReportPublisherToCountry => write!(f, "reportPublisherToCountry"),
+            PublisherReport::ReportPublisherToHostname => write!(f, "reportPublisherToHostname"),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Hash, PartialEq, Eq, Clone)]
+#[serde(rename_all = "camelCase")]
+pub enum ChannelReport {
+    ReportChannelToAdUnit,
+    ReportChannelToHostname,
+    ReportChannelToHostnamePay,
+}
+
+impl fmt::Display for ChannelReport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            ChannelReport::ReportChannelToAdUnit => write!(f, "reportPublisherToAdUnit"),
+            ChannelReport::ReportChannelToHostname => write!(f, "reportChannelToHostname"),
+            ChannelReport::ReportChannelToHostnamePay => write!(f, "reportChannelToHostnamePay"),
+        }
+    }
 }
 
 #[cfg(feature = "postgres")]
