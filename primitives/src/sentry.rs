@@ -3,6 +3,7 @@ use crate::{BigNum, Channel, ChannelId, ValidatorId};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -34,9 +35,14 @@ pub enum Event {
     Impression {
         publisher: ValidatorId,
         ad_unit: Option<String>,
+        ad_slot: Option<String>,
+        referrer: Option<String>,
     },
     Click {
-        publisher: String,
+        publisher: ValidatorId,
+        ad_unit: Option<String>,
+        ad_slot: Option<String>,
+        referrer: Option<String>,
     },
     ImpressionWithCommission {
         earners: Vec<Earner>,
@@ -53,6 +59,36 @@ pub enum Event {
     PauseChannel,
     /// only the creator can send this event
     Close,
+}
+
+impl Event {
+    pub fn is_click_event(&self) -> bool {
+        match *self {
+            Event::Click { .. } => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_impression_event(&self) -> bool {
+        match *self {
+            Event::Impression { .. } => true,
+            _ => false,
+        }
+    }
+}
+
+impl fmt::Display for Event {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            Event::Impression { .. } => write!(f, "IMPRESSION"),
+            Event::Click { .. } => write!(f, "CLICK"),
+            Event::ImpressionWithCommission { .. } => write!(f, "IMPRESSION_WITH_COMMMISION"),
+            Event::UpdateImpressionPrice { .. } => write!(f, "UPDATE_IMPRESSION_PRICE"),
+            Event::Pay { .. } => write!(f, "PAY"),
+            Event::PauseChannel => write!(f, "PAUSE_CHANNEL"),
+            Event::Close => write!(f, "CLOSE"),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -114,6 +150,13 @@ pub struct ValidatorMessageResponse {
 pub struct EventAggregateResponse {
     pub channel: Channel,
     pub events: Vec<EventAggregate>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AdvancedAnalyticsResponse {
+    pub publisher_stats: HashMap<String, HashMap<String, String>>,
+    pub by_channel_stats: HashMap<ChannelId, HashMap<String, HashMap<String, String>>>
 }
 
 #[cfg(feature = "postgres")]

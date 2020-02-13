@@ -3,6 +3,18 @@ use crate::Session;
 use bb8::RunError;
 use chrono::Utc;
 use primitives::analytics::{AnalyticsQuery, AnalyticsResponse, ANALYTICS_QUERY_LIMIT};
+use primitives::{ValidatorId, ChannelId};
+use primitives::sentry::{Event, AdvancedAnalyticsResponse};
+use redis::aio::MultiplexedConnection;
+use crate::{ epoch };
+use redis::AsyncCommands;
+use redis::Commands;
+use redis;
+use std::collections::HashMap;
+use std::error::Error;
+use futures::future::try_join_all;
+use futures::future::TryFutureExt;
+
 
 pub enum AnalyticsType {
     Advertiser {
@@ -112,4 +124,66 @@ fn get_time_frame(timeframe: &str) -> (i64, i64) {
         "hour" => (minute, hour),
         _ => (hour, day),
     }
+}
+
+async fn stat_pair(conn: MultiplexedConnection, key: &str ) -> Result<HashMap<String, String>, Box<dyn Error>> {
+    let data = redis::cmd("ZRANGE")
+                    .arg(key)
+                    .arg(0 as u64)
+                    .arg(-1 as i64)
+                    .arg("WITHSCORES")
+                    .query_async::<_, Vec<String>>(&mut conn.clone())
+                    .await?;
+
+    let stats = data.chunks(2).map(|&chunk|(chunk[0], chunk[1]));
+    let result: HashMap<String, String> = stats.into_iter().collect();
+
+    Ok(result)
+}
+
+pub async fn get_advanced_reports(redis: &MultiplexedConnection,  event: &Event, publisher: &ValidatorId, channelIds: &[ChannelId]) -> Result<AdvancedAnalyticsResponse, Box<dyn Error>> {
+    let publisher_keys = [
+        format!("reportPublisherToAdUnit:{}:{}", event, publisher),
+        format!("reportPublisherToAdSlot:{}:{}", event, publisher),
+        format!("reportPublisherToAdSlotPay:{}:{}", event, publisher),
+        format!("reportPublisherToCountry:{}:{}", event, publisher),
+        format!("reportPublisherToHostname:{}:{}", event, publisher),
+    ];
+
+    let publisher_stats = HashMap::new();
+
+    for publisher_key in publisher_keys.iter()  {
+        let result  = stat_pair(redis.clone(), &publisher_key).await?;
+        publisher_stats.insert(
+            publisher_key.split(":").nth(0).expect("should always have key").to_string(), 
+            result
+        );
+    }
+
+    let by_channel_stats = HashMap::new();
+
+    for channelId in channelIds {
+        let keys = [
+            format!("reportChannelToAdUnit:{}:{}", event, channelId),
+            format!("reportChannelToHostname:{}:{}", event, channelId),
+            format!("reportChannelToHostnamePay:{}:{}", event, channelId),
+        ];
+        
+        let channel_stat = HashMap::new();
+
+        for key in keys.iter()  {
+            let result = stat_pair(redis.clone(), &key).await?;
+            channel_stat.insert(
+                key.split(":").nth(0).expect("should always have key").to_string(),
+                result
+            );
+        }
+
+        by_channel_stats.insert(channelId.to_owned(), channel_stat);
+    }
+
+    Ok(AdvancedAnalyticsResponse {
+        publisher_stats,
+        by_channel_stats
+    })
 }

@@ -24,6 +24,8 @@ use routes::channel::{
 };
 use slog::{error, Logger};
 use std::collections::HashMap;
+use chrono::Utc;
+
 
 pub mod middleware {
     pub mod auth;
@@ -40,6 +42,7 @@ pub mod routes {
 }
 
 pub mod access;
+pub mod analytics_recorder;
 mod chain;
 pub mod db;
 pub mod event_aggregator;
@@ -377,10 +380,16 @@ pub fn success_response(response_body: String) -> Response<Body> {
     response
 }
 
+pub fn epoch() -> f64 {
+    (Utc::now().timestamp() / 2_628_000_000) as f64
+}
+
 // @TODO: Make pub(crate)
 #[derive(Debug, Clone)]
 pub struct Session {
     pub era: i64,
     pub uid: ValidatorId,
     pub ip: Option<String>,
+    pub country: Option<String>,
+    pub referrer_header: Option<String>,
 }

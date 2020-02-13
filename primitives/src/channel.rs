@@ -64,6 +64,19 @@ pub struct Channel {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Pricing {
+    pub max: BigNum,
+    pub min: BigNum,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "UPPERCASE")]
+pub struct PricingBounds {
+    pub impression: Pricing,
+    pub click: Pricing,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ChannelSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -73,6 +86,8 @@ pub struct ChannelSpec {
     pub max_per_impression: BigNum,
     /// Minimum payment offered per impression
     pub min_per_impression: BigNum,
+    // Event pricing bounds
+    pub pricing_bounds: Option<PricingBounds>,
     /// An array of TargetingTag (optional)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub targeting: Vec<TargetingTag>,

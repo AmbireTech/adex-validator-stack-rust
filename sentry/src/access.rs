@@ -208,6 +208,7 @@ mod test {
             .map(|_| Event::Impression {
                 publisher: IDS["publisher2"].clone(),
                 ad_unit: None,
+                ad_slot: None,
             })
             .collect()
     }
