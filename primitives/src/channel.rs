@@ -285,6 +285,12 @@ pub mod postgres {
         accepts!(TEXT, VARCHAR);
     }
 
+    impl From<&Row> for ChannelId {
+        fn from(row: &Row) -> Self {
+            row.get("id")
+        }
+    }
+
     impl ToSql for ChannelId {
         fn to_sql(
             &self,

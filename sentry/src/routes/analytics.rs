@@ -1,4 +1,4 @@
-use crate::db::analytics::{get_analytics, AnalyticsType};
+use crate::db::analytics::{get_analytics, AnalyticsType, advertiser_channel_ids, get_advanced_reports};
 use crate::success_response;
 use crate::Application;
 use crate::ResponseError;
@@ -95,6 +95,29 @@ pub async fn process_analytics<A: Adapter>(
 
     serde_json::to_string(&result)
         .map_err(|_| ResponseError::BadRequest("error occurred; try again later".to_string()))
+}
+
+
+pub async fn advanced_analytics<A: Adapter>(
+    req: Request<Body>,
+    app: &Application<A>,
+) -> Result<Response<Body>, ResponseError> {
+    let sess = req.extensions().get::<Session>().expect("auth is required");
+    let advertiser_channels = advertiser_channel_ids(&app.pool, &sess.uid).await?;
+
+    let event_type = serde_urlencoded::from_str::<String>(&req.uri().query().unwrap_or(""))?;
+
+    let response = get_advanced_reports(
+        &app.redis,
+        &event_type,
+        &sess.uid,
+        &advertiser_channels
+    )
+    .await
+    .map_err(|_| ResponseError::BadRequest("error occurred; try again later".to_string()))?;
+
+    Ok(success_response(serde_json::to_string(&response)?))
+
 }
 
 async fn cache(

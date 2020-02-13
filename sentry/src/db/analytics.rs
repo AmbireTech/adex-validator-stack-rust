@@ -4,7 +4,7 @@ use crate::Session;
 use bb8::RunError;
 use chrono::Utc;
 use primitives::analytics::{AnalyticsQuery, AnalyticsResponse, ANALYTICS_QUERY_LIMIT};
-use primitives::sentry::{AdvancedAnalyticsResponse, ChannelReport, Event, PublisherReport};
+use primitives::sentry::{AdvancedAnalyticsResponse, ChannelReport, PublisherReport};
 use primitives::{ChannelId, ValidatorId};
 use redis;
 use redis::aio::MultiplexedConnection;
@@ -23,6 +23,24 @@ pub enum AnalyticsType {
     },
 }
 
+pub async fn advertiser_channel_ids(
+    pool: &DbPool,
+    creator: &ValidatorId
+) -> Result<Vec<ChannelId>, RunError<bb8_postgres::tokio_postgres::Error>> {
+    pool.run(move |connection| async move {
+        match connection.prepare("SELECT id FROM channels WHERE creator = {}").await {
+            Ok(stmt) => match connection.query(&stmt, &[creator]).await {
+                Ok(rows) => {
+                    let channel_ids: Vec<ChannelId> = rows.iter().map(ChannelId::from).collect();
+                    Ok((channel_ids, connection))
+                },
+                Err(e) => Err((e, connection)),
+            },
+            Err(e) => Err((e, connection)),
+        }
+    })
+    .await
+}
 pub async fn get_analytics(
     query: AnalyticsQuery,
     pool: &DbPool,
@@ -146,7 +164,7 @@ async fn stat_pair(
 
 pub async fn get_advanced_reports(
     redis: &MultiplexedConnection,
-    event: &Event,
+    event_type: &str,
     publisher: &ValidatorId,
     channel_ids: &[ChannelId],
 ) -> Result<AdvancedAnalyticsResponse, Box<dyn Error>> {
@@ -166,10 +184,10 @@ pub async fn get_advanced_reports(
                 "{}:{}:{}:{}",
                 epoch().floor(),
                 publisher_report,
-                event,
+                event_type,
                 publisher
             ),
-            _ => format!("{}:{}:{}", publisher_report, event, publisher),
+            _ => format!("{}:{}:{}", publisher_report, event_type, publisher),
         };
         let result = stat_pair(redis.clone(), &pair).await?;
         publisher_stats.insert(publisher_report.clone(), result);
@@ -189,7 +207,7 @@ pub async fn get_advanced_reports(
         for channel_report in channel_reports.iter() {
             let result = stat_pair(
                 redis.clone(),
-                &format!("{}:{}:{}", channel_report, event, channel_id),
+                &format!("{}:{}:{}", channel_report, event_type, channel_id),
             )
             .await?;
             channel_stat.insert(channel_report.clone(), result);
