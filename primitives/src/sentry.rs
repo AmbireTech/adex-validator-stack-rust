@@ -30,7 +30,7 @@ pub struct ApproveStateValidatorMessage {
 }
 
 #[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub enum Event {
     #[serde(rename_all = "camelCase")]
     Impression {
@@ -92,7 +92,7 @@ impl fmt::Display for Event {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Earner {
     #[serde(rename = "publisher")]
     pub address: String,

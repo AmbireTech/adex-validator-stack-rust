@@ -23,10 +23,10 @@ fn get_payout(channel: &Channel, event: &Event) -> BigNum {
 
 pub async fn record(
     mut conn: MultiplexedConnection,
-    channel: &Channel,
-    session: &Session,
-    events: &[Event],
-    logger: &Logger,
+    channel: Channel,
+    session: Session,
+    events: Vec<Event>,
+    logger: Logger,
 ) {
     let mut db = redis::pipe();
 
@@ -47,7 +47,7 @@ pub async fn record(
                 referrer,
             } => {
                 let divisor = BigNum::from(10u64.pow(18));
-                let pay_amount = get_payout(channel, event)
+                let pay_amount = get_payout(&channel, event)
                     .div_floor(&divisor)
                     .to_u64()
                     .expect("should always have a payout");

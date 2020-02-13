@@ -18,7 +18,7 @@ use primitives::adapter::Adapter;
 use primitives::{Config, ValidatorId};
 use redis::aio::MultiplexedConnection;
 use regex::Regex;
-use routes::analytics::{advertiser_analytics, analytics, publisher_analytics, advanced_analytics};
+use routes::analytics::{advanced_analytics, advertiser_analytics, analytics, publisher_analytics};
 use routes::cfg::config;
 use routes::channel::{
     channel_list, create_channel, create_validator_messages, insert_events, last_approved,
@@ -141,7 +141,7 @@ impl<A: Adapter + 'static> Application<A> {
             ("/channel/list", &Method::GET) => channel_list(req, &self).await,
 
             ("/analytics", &Method::GET) => analytics(req, &self).await,
-            ("/analytics/advanced", &Method::GET) =>  {
+            ("/analytics/advanced", &Method::GET) => {
                 let req = match chain(req, &self, vec![Box::new(auth_required_middleware)]).await {
                     Ok(req) => req,
                     Err(error) => {
@@ -150,7 +150,7 @@ impl<A: Adapter + 'static> Application<A> {
                 };
 
                 advanced_analytics(req, &self).await
-            },
+            }
             ("/analytics/for-advertiser", &Method::GET) => {
                 let req = match chain(req, &self, vec![Box::new(auth_required_middleware)]).await {
                     Ok(req) => req,

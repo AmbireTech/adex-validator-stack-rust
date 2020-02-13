@@ -25,15 +25,18 @@ pub enum AnalyticsType {
 
 pub async fn advertiser_channel_ids(
     pool: &DbPool,
-    creator: &ValidatorId
+    creator: &ValidatorId,
 ) -> Result<Vec<ChannelId>, RunError<bb8_postgres::tokio_postgres::Error>> {
     pool.run(move |connection| async move {
-        match connection.prepare("SELECT id FROM channels WHERE creator = {}").await {
+        match connection
+            .prepare("SELECT id FROM channels WHERE creator = {}")
+            .await
+        {
             Ok(stmt) => match connection.query(&stmt, &[creator]).await {
                 Ok(rows) => {
                     let channel_ids: Vec<ChannelId> = rows.iter().map(ChannelId::from).collect();
                     Ok((channel_ids, connection))
-                },
+                }
                 Err(e) => Err((e, connection)),
             },
             Err(e) => Err((e, connection)),
