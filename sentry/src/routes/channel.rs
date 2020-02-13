@@ -101,6 +101,8 @@ pub async fn last_approved<A: Adapter>(
     let channel_id = ChannelId::from_hex(route_params.index(0))?;
     let channel = get_channel_by_id(&app.pool, &channel_id).await?.unwrap();
 
+    
+
     Ok(Response::builder()
         .header("Content-type", "application/json")
         .body(serde_json::to_string(&channel)?.into())
@@ -126,7 +128,9 @@ pub async fn insert_events<A: Adapter + 'static>(
 
     let into_body = req.into_body();
     let body = hyper::body::to_bytes(into_body).await?;
+    println!("deserializing request body");
     let request_body = serde_json::from_slice::<HashMap<String, Vec<Event>>>(&body)?;
+    println!("deserializing request body 2");
     let events = request_body
         .get("events")
         .ok_or_else(|| ResponseError::BadRequest("invalid request".to_string()))?;

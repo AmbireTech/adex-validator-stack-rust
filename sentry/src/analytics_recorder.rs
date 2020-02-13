@@ -12,7 +12,11 @@ fn get_payout(channel: &Channel, event: &Event) -> BigNum {
         Event::Impression { .. } => channel.spec.min_per_impression.clone(),
         Event::Click { .. } => {
             if let Some(pricing) = channel.spec.pricing_bounds.clone() {
-                pricing.click.min
+                if let Some(click) = pricing.click {
+                    click.min
+                } else {
+                    BigNum::from(0)
+                }
             } else {
                 BigNum::from(0)
             }
