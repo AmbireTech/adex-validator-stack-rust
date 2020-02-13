@@ -7,7 +7,61 @@ use std::str::FromStr;
 use num::rational::Ratio;
 use num::{BigUint, CheckedSub, Integer};
 use num_derive::{Num, NumOps, One, Zero};
+use num_traits::Pow;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+/// DAI has precision of 18 decimals
+/// For CPM we have 3 decimals precision, but that's for 1000 (3 decimals more)
+/// This in terms means we need 18 - (3 + 3) = 12 decimals precision
+pub const GLOBAL_MULTIPLIER: Multiplier = Multiplier(12);
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+/// Multiplier - Pow of 10 (10**n)
+pub struct Multiplier(u64);
+
+impl Mul<PrecisionU64> for Multiplier {
+    type Output = BigUint;
+
+    fn mul(self, rhs: PrecisionU64) -> Self::Output {
+        let real_multiplier = BigUint::from(10u8).pow(BigUint::from(GLOBAL_MULTIPLIER.0));
+
+        real_multiplier * rhs.0
+    }
+}
+
+impl Into<BigNum> for Multiplier {
+    fn into(self) -> BigNum {
+        BigNum(self.into())
+    }
+}
+
+impl Into<BigUint> for Multiplier {
+    fn into(self) -> BigUint {
+        BigUint::from(10u8).pow(BigUint::from(self.0))
+    }
+}
+
+///
+// @TODO: (De)serialize
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PrecisionU64(u64);
+
+impl Into<BigNum> for PrecisionU64 {
+    fn into(self) -> BigNum {
+        BigNum(GLOBAL_MULTIPLIER * self)
+    }
+}
+
+impl From<BigNum> for PrecisionU64 {
+    fn from(bignum: BigNum) -> Self {
+        let precision = bignum
+            .div_floor(&GLOBAL_MULTIPLIER.into())
+            .to_u64()
+            .unwrap_or(0);
+
+        Self(precision)
+    }
+}
 
 #[derive(
     Serialize,
@@ -294,5 +348,25 @@ mod test {
 
         let expected: BigNum = 11.into();
         assert_eq!(expected, &big_num * &ratio);
+    }
+
+    #[test]
+    fn precision_u64_to_bignum() {
+        let precision = PrecisionU64(5);
+        let bignum = precision.into();
+
+        assert_eq!(BigNum::from(5_000_000_000_000), bignum)
+    }
+
+    #[test]
+    fn bignum_to_precision_u64() {
+        // less than the multiplier 12
+        let zero_bignum = BigNum::from(900_000_000_000);
+        // it should floor to 0
+        assert_eq!(PrecisionU64(0), PrecisionU64::from(zero_bignum));
+
+        let bignum = BigNum::from(5_000_000_000_000);
+
+        assert_eq!(PrecisionU64(5), PrecisionU64::from(bignum))
     }
 }
