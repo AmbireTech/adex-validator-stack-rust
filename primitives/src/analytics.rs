@@ -35,7 +35,7 @@ pub struct AnalyticsQuery {
     pub metric: String,
     #[serde(default = "default_timeframe")]
     pub timeframe: String,
-    pub segment_by_channel: Option<String>
+    pub segment_by_channel: Option<String>,
 }
 
 impl AnalyticsQuery {
