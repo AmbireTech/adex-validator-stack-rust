@@ -5,7 +5,7 @@ use bb8_postgres::tokio_postgres::types::{ToSql, Type};
 use bb8_postgres::tokio_postgres::Error;
 use chrono::{DateTime, Utc};
 use futures::pin_mut;
-use primitives::sentry::{EventAggregate, LastApprovedResponse, ApproveStateValidatorMessage, NewStateValidatorMessage, HeartbeatValidatorMessage};
+use primitives::sentry::{EventAggregate, ApproveStateValidatorMessage, NewStateValidatorMessage, HeartbeatValidatorMessage};
 use primitives::BigNum;
 use primitives::{ChannelId, ValidatorId, Channel};
 use std::ops::Add;
@@ -15,12 +15,10 @@ pub async fn lastest_approve_state(
     pool: &DbPool,
     channel: &Channel
 ) -> Result<Option<ApproveStateValidatorMessage>, RunError<bb8_postgres::tokio_postgres::Error>> {
-    /// select (from, msg, received) from validator_messages where channel_id = channel_id, from = from, msg ->> 'type'->>'ApproveState'
-    /// select (from, msg, received)  from validator_messages where channel_id = channel_id, from = from, msg ->> 'type'->>'NewState', msg ->> 'stateRoot'->>'0xx' 
     pool
         .run(move |connection| {
             async move {
-                match connection.prepare("SELECT from, msg, received FROM validator_messages WHERE channel_id = $1 AND from = $2 AND msg ->> 'type' = 'ApproveState' ORDER BY received DESC LIMIT 1").await {
+                match connection.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'ApproveState' ORDER BY received DESC LIMIT 1").await {
                     Ok(select) => match connection.query(&select, &[&channel.id, &channel.spec.validators.follower().id]).await {
                         Ok(rows) => Ok((rows.get(0).map(ApproveStateValidatorMessage::from), connection)),
                         Err(e) => Err((e, connection)),
@@ -40,7 +38,7 @@ pub async fn latest_new_state(
     pool
     .run(move |connection| {
         async move {
-            match connection.prepare("SELECT from, msg, received FROM validator_messages WHERE channel_id = $1 AND from = $2 AND msg ->> 'type' = 'NewState' AND msg->> 'stateRoot' = $3 ORDER BY received DESC LIMIT 1").await {
+            match connection.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'NewState' AND msg->> 'stateRoot' = $3 ORDER BY received DESC LIMIT 1").await {
                 Ok(select) => match connection.query(&select, &[&channel.id, &channel.spec.validators.leader().id, &state_root]).await {
                     Ok(rows) => Ok((rows.get(0).map(NewStateValidatorMessage::from), connection)),
                     Err(e) => Err((e, connection)),
@@ -60,7 +58,7 @@ pub async fn latest_heartbeats(
     pool
     .run(move |connection| {
         async move {
-            match connection.prepare("SELECT from, msg, received FROM validator_messages WHERE channel_id = $1 AND from = $2 AND msg ->> 'type' = 'Heartbeat' ORDER BY received DESC LIMIT 2").await {
+            match connection.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'Heartbeat' ORDER BY received DESC LIMIT 2").await {
                 Ok(select) => match connection.query(&select, &[&channel_id, &validator_id]).await {
                     Ok(rows) => Ok((rows.iter().map(HeartbeatValidatorMessage::from).collect(), connection)),
                     Err(e) => Err((e, connection)),

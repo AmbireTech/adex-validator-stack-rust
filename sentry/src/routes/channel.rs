@@ -99,6 +99,7 @@ pub async fn last_approved<A: Adapter>(
         .extensions()
         .get::<RouteParams>()
         .expect("request should have route params");
+        
     let channel_id = ChannelId::from_hex(route_params.index(0))?;
     let channel = get_channel_by_id(&app.pool, &channel_id).await?.unwrap();
 
