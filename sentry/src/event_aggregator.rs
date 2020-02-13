@@ -156,7 +156,6 @@ impl EventAggregator {
         drop(channel_recorder);
 
         if aggr_throttle == 0 {
-            println!("in store");
             store(
                 &app.pool,
                 &channel_id,
