@@ -1,5 +1,6 @@
-use self::channel_list::ChannelListQuery;
+use self::channel_list::{ChannelListQuery, LastApprovedQuery};
 use crate::db::{get_channel_by_id, insert_channel, insert_validator_messages, list_channels};
+use crate::db::event_aggregate::{ lastest_approve_state, latest_new_state, latest_heartbeats};
 use crate::success_response;
 use crate::Application;
 use crate::ResponseError;
@@ -10,7 +11,7 @@ use hex::FromHex;
 use hyper::{Body, Request, Response};
 use primitives::adapter::Adapter;
 use primitives::channel::SpecValidator;
-use primitives::sentry::{Event, SuccessResponse};
+use primitives::sentry::{Event, SuccessResponse, LastApprovedResponse, LastApproved};
 use primitives::validator::MessageTypes;
 use primitives::{Channel, ChannelId};
 use slog::error;
@@ -101,11 +102,39 @@ pub async fn last_approved<A: Adapter>(
     let channel_id = ChannelId::from_hex(route_params.index(0))?;
     let channel = get_channel_by_id(&app.pool, &channel_id).await?.unwrap();
 
-    
+    let approve_state = lastest_approve_state(&app.pool, &channel).await?;
+    if approve_state.is_none() {
+        return Ok(Response::builder()
+        .header("Content-type", "application/json")
+        .body(serde_json::to_string(&LastApprovedResponse{ last_approved: None, heartbeats: None  })?.into())
+        .unwrap())
+    }
+
+    let state_root = approve_state.as_ref().expect("value should be present").msg.state_root.clone();
+    let new_state = latest_new_state(&app.pool, &channel, &state_root).await?;
+    if new_state.is_none() {
+        return Ok(Response::builder()
+        .header("Content-type", "application/json")
+        .body(serde_json::to_string(&LastApprovedResponse{ last_approved: None, heartbeats: None  })?.into())
+        .unwrap())
+    }
+
+    let query = serde_urlencoded::from_str::<LastApprovedQuery>(&req.uri().query().unwrap_or(""))?;
+    let validators =  channel.spec.validators;
+    let channel_id = channel.id;
+    let heartbeats = if query.with_heartbeat.is_some() {
+        let result = try_join_all(
+            validators.into_iter()
+                .map(|validator| latest_heartbeats(&app.pool, &channel_id, validator.id.clone()))
+        ).await?;
+        Some(result.into_iter().flatten().collect::<Vec<_>>())
+    } else {
+        None
+    };
 
     Ok(Response::builder()
         .header("Content-type", "application/json")
-        .body(serde_json::to_string(&channel)?.into())
+        .body(serde_json::to_string(&&LastApprovedResponse{ last_approved: Some(LastApproved { new_state, approve_state }), heartbeats })?.into())
         .unwrap())
 }
 
@@ -206,6 +235,12 @@ mod channel_list {
         pub validator: Option<ValidatorId>,
     }
 
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub(super) struct LastApprovedQuery {
+        pub with_heartbeat: Option<String>
+    }
+    
     fn default_page() -> u64 {
         0
     }

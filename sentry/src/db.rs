@@ -99,7 +99,7 @@ pub async fn setup_migrations(environment: &str) {
     let config = config.reload().expect("Should reload applied migrations");
 
     if environment == "development" {
-        // delete all existing data  to make tests reproducible
+        // delete all existing data to make tests reproducible
         Migrator::with_config(&config)
             .all(true)
             .direction(Direction::Down)
@@ -107,7 +107,7 @@ pub async fn setup_migrations(environment: &str) {
             .apply()
             .expect("Applying migrations failed");
     }
-    
+
     let config = config.reload().expect("Should reload applied migrations");
 
     Migrator::with_config(&config)

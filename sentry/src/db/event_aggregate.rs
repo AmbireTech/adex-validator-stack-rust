@@ -11,18 +11,18 @@ use primitives::{ChannelId, ValidatorId, Channel};
 use std::ops::Add;
 
 
-pub async fn approve_state( 
+pub async fn lastest_approve_state( 
     pool: &DbPool,
     channel: &Channel
-) -> Result<Vec<ApproveStateValidatorMessage>, RunError<bb8_postgres::tokio_postgres::Error>> {
+) -> Result<Option<ApproveStateValidatorMessage>, RunError<bb8_postgres::tokio_postgres::Error>> {
     /// select (from, msg, received) from validator_messages where channel_id = channel_id, from = from, msg ->> 'type'->>'ApproveState'
     /// select (from, msg, received)  from validator_messages where channel_id = channel_id, from = from, msg ->> 'type'->>'NewState', msg ->> 'stateRoot'->>'0xx' 
     pool
         .run(move |connection| {
             async move {
-                match connection.prepare("SELECT from, msg, received FROM validator_messages WHERE channel_id = $1 AND from = $2 AND msg ->> 'type' = 'ApproveState' ORDER BY received DESC").await {
+                match connection.prepare("SELECT from, msg, received FROM validator_messages WHERE channel_id = $1 AND from = $2 AND msg ->> 'type' = 'ApproveState' ORDER BY received DESC LIMIT 1").await {
                     Ok(select) => match connection.query(&select, &[&channel.id, &channel.spec.validators.follower().id]).await {
-                        Ok(rows) => Ok((rows.iter().map(ApproveStateValidatorMessage::from).collect(), connection)),
+                        Ok(rows) => Ok((rows.get(0).map(ApproveStateValidatorMessage::from), connection)),
                         Err(e) => Err((e, connection)),
                     },
                     Err(e) => Err((e, connection)),
@@ -52,10 +52,10 @@ pub async fn latest_new_state(
     .await
 }
 
-pub async fn last_heartbeats(
+pub async fn latest_heartbeats(
     pool: &DbPool,
     channel_id: &ChannelId,
-    validator_id: &ValidatorId
+    validator_id: ValidatorId
 ) -> Result<Vec<HeartbeatValidatorMessage>, RunError<bb8_postgres::tokio_postgres::Error>> {
     pool
     .run(move |connection| {
