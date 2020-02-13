@@ -74,7 +74,7 @@ mod test {
             publisher: IDS["publisher"].clone(),
             ad_unit: None,
             ad_slot: None,
-            referrer: None
+            referrer: None,
         };
 
         for _ in 0..101 {

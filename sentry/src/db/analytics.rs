@@ -3,15 +3,11 @@ use crate::epoch;
 use crate::Session;
 use bb8::RunError;
 use chrono::Utc;
-use futures::future::try_join_all;
-use futures::future::TryFutureExt;
 use primitives::analytics::{AnalyticsQuery, AnalyticsResponse, ANALYTICS_QUERY_LIMIT};
 use primitives::sentry::{AdvancedAnalyticsResponse, ChannelReport, Event, PublisherReport};
 use primitives::{ChannelId, ValidatorId};
 use redis;
 use redis::aio::MultiplexedConnection;
-use redis::AsyncCommands;
-use redis::Commands;
 use std::collections::HashMap;
 use std::error::Error;
 
@@ -165,11 +161,17 @@ pub async fn get_advanced_reports(
     let mut publisher_stats = HashMap::new();
 
     for publisher_report in publisher_reports.iter() {
-        let result = stat_pair(
-            redis.clone(),
-            &format!("{}:{}:{}", publisher_report, event, publisher),
-        )
-        .await?;
+        let pair = match publisher_report {
+            PublisherReport::ReportPublisherToCountry => format!(
+                "{}:{}:{}:{}",
+                epoch().floor(),
+                publisher_report,
+                event,
+                publisher
+            ),
+            _ => format!("{}:{}:{}", publisher_report, event, publisher),
+        };
+        let result = stat_pair(redis.clone(), &pair).await?;
         publisher_stats.insert(publisher_report.clone(), result);
     }
 

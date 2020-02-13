@@ -209,7 +209,7 @@ mod test {
                 publisher: IDS["publisher2"].clone(),
                 ad_unit: None,
                 ad_slot: None,
-                referrer: None
+                referrer: None,
             })
             .collect()
     }
@@ -223,7 +223,7 @@ mod test {
             uid: IDS["follower"].clone(),
             ip: Default::default(),
             referrer_header: None,
-            country: None
+            country: None,
         };
 
         let rule = Rule {
@@ -259,7 +259,7 @@ mod test {
             uid: IDS["follower"].clone(),
             ip: Default::default(),
             country: None,
-            referrer_header: None
+            referrer_header: None,
         };
 
         let rule = Rule {

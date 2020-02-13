@@ -1,11 +1,12 @@
 use crate::epoch;
 use crate::Session;
 use primitives::sentry::Event;
+use primitives::sentry::{ChannelReport, PublisherReport};
 use primitives::{BigNum, Channel};
 use redis;
 use redis::aio::MultiplexedConnection;
-use primitives::sentry::{ChannelReport, PublisherReport};
 
+use slog::{error, Logger};
 
 fn get_payout(channel: &Channel, event: &Event) -> BigNum {
     match event {
@@ -16,8 +17,8 @@ fn get_payout(channel: &Channel, event: &Event) -> BigNum {
             } else {
                 BigNum::from(0)
             }
-        },
-        _ => BigNum::from(0)
+        }
+        _ => BigNum::from(0),
     }
 }
 
@@ -26,6 +27,7 @@ pub async fn record(
     channel: &Channel,
     session: &Session,
     events: &[Event],
+    logger: &Logger,
 ) {
     let mut db = redis::pipe();
 
@@ -48,17 +50,27 @@ pub async fn record(
                 let payout = get_payout(channel, event)
                     .to_u64()
                     .expect("should always have a payout");
-                let payAmount = payout / 10u64.pow(18);
+                let pay_amount = payout / 10u64.pow(18);
 
                 if let Some(ad_unit) = ad_unit {
                     db.zincr(
-                        format!("{}:{}:{}", PublisherReport::ReportPublisherToAdUnit, event, publisher),
+                        format!(
+                            "{}:{}:{}",
+                            PublisherReport::ReportPublisherToAdUnit,
+                            event,
+                            publisher
+                        ),
                         ad_unit,
                         1,
                     )
                     .ignore();
                     db.zincr(
-                        format!("{}:{}:{}", ChannelReport::ReportChannelToAdUnit, event, publisher),
+                        format!(
+                            "{}:{}:{}",
+                            ChannelReport::ReportChannelToAdUnit,
+                            event,
+                            publisher
+                        ),
                         ad_unit,
                         1,
                     )
@@ -67,15 +79,25 @@ pub async fn record(
 
                 if let Some(ad_slot) = ad_slot {
                     db.zincr(
-                        format!("{}:{}:{}", PublisherReport::ReportPublisherToAdSlot, event, publisher),
+                        format!(
+                            "{}:{}:{}",
+                            PublisherReport::ReportPublisherToAdSlot,
+                            event,
+                            publisher
+                        ),
                         ad_slot,
                         1,
                     )
                     .ignore();
                     db.zincr(
-                        format!("{}:{}:{}", PublisherReport::ReportPublisherToAdSlotPay, event, publisher),
+                        format!(
+                            "{}:{}:{}",
+                            PublisherReport::ReportPublisherToAdSlotPay,
+                            event,
+                            publisher
+                        ),
                         ad_slot,
-                        payAmount,
+                        pay_amount,
                     )
                     .ignore();
                 }
@@ -98,25 +120,40 @@ pub async fn record(
                 let hostname = match (referrer, &session.referrer_header) {
                     (Some(referrer), _) | (_, Some(referrer)) => {
                         referrer.split('/').nth(2).map(ToString::to_string)
-                    },
-                    _ => None
+                    }
+                    _ => None,
                 };
 
                 if let Some(hostname) = &hostname {
                     db.zincr(
-                        format!("{}:{}:{}", PublisherReport::ReportPublisherToHostname,event, publisher),
+                        format!(
+                            "{}:{}:{}",
+                            PublisherReport::ReportPublisherToHostname,
+                            event,
+                            publisher
+                        ),
                         hostname,
                         1,
                     )
                     .ignore();
                     db.zincr(
-                        format!("{}:{}:{}", ChannelReport::ReportChannelToHostname, event, channel.id),
+                        format!(
+                            "{}:{}:{}",
+                            ChannelReport::ReportChannelToHostname,
+                            event,
+                            channel.id
+                        ),
                         hostname,
                         1,
                     )
                     .ignore();
                     db.zincr(
-                        format!("{}:{}:{}", ChannelReport::ReportChannelToHostnamePay, event, channel.id),
+                        format!(
+                            "{}:{}:{}",
+                            ChannelReport::ReportChannelToHostnamePay,
+                            event,
+                            channel.id
+                        ),
                         hostname,
                         1,
                     )
@@ -126,7 +163,7 @@ pub async fn record(
             _ => {}
         });
 
-    if let Err(e) = db.query_async::<_, Option<String>>(&mut conn).await {
-        // log error
+    if let Err(err) = db.query_async::<_, Option<String>>(&mut conn).await {
+        error!(&logger, "Server error: {}", err; "module" => "analytics-recorder");
     }
 }
