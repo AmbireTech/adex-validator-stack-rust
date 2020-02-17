@@ -66,3 +66,24 @@ pub fn channel_if_active<'a, A: Adapter + 'static>(
     }
     .boxed()
 }
+
+
+pub fn get_channel_id<'a, A: Adapter + 'static>(
+    mut req: Request<Body>,
+    _: &'a Application<A> 
+) -> BoxFuture<'a, Result<Request<Body>, ResponseError>> {
+    async move {
+        match req.extensions().get::<RouteParams>() {
+                Some(param) => {
+                    let id = param.get(0).expect("should have channel id");
+                    let channel_id = ChannelId::from_hex(id)
+                            .map_err(|_| ResponseError::BadRequest("Invalid Channel Id".to_string()))?;
+                    req.extensions_mut().insert(channel_id);
+
+                    Ok(req)
+                },
+                None => Ok(req),
+        }
+    }
+    .boxed()
+}

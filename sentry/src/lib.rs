@@ -5,7 +5,7 @@ use crate::chain::chain;
 use crate::db::DbPool;
 use crate::event_aggregator::EventAggregator;
 use crate::middleware::auth;
-use crate::middleware::channel::channel_load;
+use crate::middleware::channel::{channel_load, get_channel_id};
 use crate::middleware::cors::{cors, Cors};
 use crate::routes::channel::channel_status;
 use crate::routes::event_aggregate::list_channel_event_aggregates;
@@ -198,7 +198,11 @@ async fn analytics_router<A: Adapter + 'static>(
                     .map_or("".to_string(), |m| m.as_str().to_string())]);
                 req.extensions_mut().insert(param);
 
-                let req = chain(req, app, vec![Box::new(channel_load)]).await?;
+                let req = chain(req, app, vec![
+                    Box::new(channel_load),
+                    Box::new(get_channel_id)
+                ]).await?;
+
                 analytics(req, app).await
             } else if let Some(caps) = ADVERTISER_ANALYTICS_BY_CHANNEL_ID.captures(route) {
                 let param = RouteParams(vec![caps
@@ -206,7 +210,11 @@ async fn analytics_router<A: Adapter + 'static>(
                     .map_or("".to_string(), |m| m.as_str().to_string())]);
                 req.extensions_mut().insert(param);
 
-                let req = auth_required_middleware(req, app).await?;
+                let req = chain(req, app, vec![
+                    Box::new(auth_required_middleware),
+                    Box::new(get_channel_id)
+                ]).await?;
+
                 advertiser_analytics(req, app).await
             } else {
                 Err(ResponseError::NotFound)

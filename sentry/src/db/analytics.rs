@@ -3,7 +3,7 @@ use crate::epoch;
 use crate::Session;
 use bb8::RunError;
 use chrono::Utc;
-use primitives::analytics::{AnalyticsQuery, AnalyticsResponse, ANALYTICS_QUERY_LIMIT};
+use primitives::analytics::{AnalyticsQuery, AnalyticsData, ANALYTICS_QUERY_LIMIT};
 use primitives::sentry::{AdvancedAnalyticsResponse, ChannelReport, PublisherReport};
 use primitives::{ChannelId, ValidatorId};
 use redis;
@@ -14,12 +14,10 @@ use std::error::Error;
 pub enum AnalyticsType {
     Advertiser {
         session: Session,
-        channel: Option<String>,
     },
     Global,
     Publisher {
         session: Session,
-        channel: Option<String>,
     },
 }
 
@@ -50,18 +48,21 @@ pub async fn get_analytics(
     pool: &DbPool,
     analytics_type: AnalyticsType,
     segment_by_channel: bool,
-) -> Result<Vec<AnalyticsResponse>, RunError<bb8_postgres::tokio_postgres::Error>> {
+    channel_id: Option<&ChannelId>,
+) -> Result<Vec<AnalyticsData>, RunError<bb8_postgres::tokio_postgres::Error>> {
     let applied_limit = query.limit.min(ANALYTICS_QUERY_LIMIT);
     let (interval, period) = get_time_frame(&query.timeframe);
     let time_limit = Utc::now().timestamp() - period;
 
     let mut where_clauses = vec![format!("created > to_timestamp({})", time_limit)];
+    if let Some(id) = channel_id {
+        where_clauses.push(format!("channel_id = {}", id));
+    }
+
     let mut group_clause = "time".to_string();
     let mut select_clause = match analytics_type {
-        AnalyticsType::Advertiser { session, channel } => {
-            if let Some(id) = channel {
-                where_clauses.push(format!("channel_id = {}", id));
-            } else {
+        AnalyticsType::Advertiser { session } => {
+            if channel_id.is_none() {
                 where_clauses.push(format!(
                     "channel_id IN (SELECT id FROM channels WHERE creator = {})",
                     session.uid
@@ -69,38 +70,63 @@ pub async fn get_analytics(
             }
 
             where_clauses.push(format!(
-                "events->'{}'->'{}' IS NOT NULL",
-                query.event_type, query.metric
+                "event_type = '{}'",
+                query.event_type
             ));
-
-            format!(
-                "SUM(value::numeric)::varchar as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time from event_aggregates, jsonb_each_text(events->'{}'->'{}')", 
-                interval, query.event_type, query.metric
-            )
-        }
-        AnalyticsType::Global => {
-            where_clauses.push(format!(
-                "events->'{}'->'{}' IS NOT NULL",
-                query.event_type, query.metric
-            ));
-            format!(
-                "SUM(value::numeric)::varchar as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time from event_aggregates, jsonb_each_text(events->'{}'->'{}')", 
-                interval, query.event_type, query.metric
-            )
-        }
-        AnalyticsType::Publisher { session, channel } => {
-            if let Some(id) = channel {
-                where_clauses.push(format!("channel_id = {}", id));
-            }
 
             where_clauses.push(format!(
-                "events->'{}'->'{}'->'{}' IS NOT NULL",
-                query.event_type, query.metric, session.uid
+                "{} IS NOT NULL",
+                query.metric
             ));
 
             format!(
-                "SUM((events->'{}'->'{}'->>'{}')::numeric) as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time from event_aggregates", 
-                query.event_type, query.metric, session.uid, interval
+                "SUM({}::numeric)::varchar as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time from event_aggregates", 
+                query.metric, interval
+            )
+        }
+        AnalyticsType::Global  => {
+            where_clauses.push(format!(
+                "event_type = '{}'",
+                query.event_type
+            ));
+
+            where_clauses.push(format!(
+                "{} IS NOT NULL",
+                query.metric
+            ));
+
+            where_clauses.push("earner IS NULL".to_string());
+
+            format!(
+                "SUM({}::numeric)::varchar as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time from event_aggregates", 
+                query.metric, interval
+            )
+        }
+        AnalyticsType::Publisher { session } => {
+            where_clauses.push(format!(
+                "event_type = '{}'",
+                query.event_type
+            ));
+
+            where_clauses.push(format!(
+                "{} IS NOT NULL",
+                query.metric
+            ));
+
+            where_clauses.push(format!(
+                "earner = '{}'",
+                session.uid
+            ));
+            
+
+            // where_clauses.push(format!(
+            //     "events->'{}'->'{}'->'{}' IS NOT NULL",
+            //     query.event_type, query.metric, session.uid
+            // ));
+
+            format!(
+                "SUM(({}::numeric) as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time from event_aggregates", 
+                query.metric, interval
             )
         }
     };
@@ -118,13 +144,15 @@ pub async fn get_analytics(
         applied_limit,
     );
 
+    println!("{}", sql_query);
+
     // execute query
     pool.run(move |connection| async move {
         match connection.prepare(&sql_query).await {
             Ok(stmt) => match connection.query(&stmt, &[]).await {
                 Ok(rows) => {
-                    let analytics: Vec<AnalyticsResponse> =
-                        rows.iter().map(AnalyticsResponse::from).collect();
+                    let analytics: Vec<AnalyticsData> =
+                        rows.iter().map(AnalyticsData::from).collect();
                     Ok((analytics, connection))
                 }
                 Err(e) => Err((e, connection)),
