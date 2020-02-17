@@ -117,9 +117,14 @@ pub async fn last_approved<A: Adapter>(
             .unwrap());
     }
 
-    let state_root = match approve_state.as_ref().expect("value should be present").msg.clone() {
+    let state_root = match approve_state
+        .as_ref()
+        .expect("value should be present")
+        .msg
+        .clone()
+    {
         MessageTypes::ApproveState(approve_state) => approve_state.state_root,
-        _ => return Err(ResponseError::BadRequest("invalid request".to_string()))
+        _ => return Err(ResponseError::BadRequest("invalid request".to_string())),
     };
 
     let new_state = latest_new_state(&app.pool, &channel, &state_root).await?;

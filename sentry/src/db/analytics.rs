@@ -114,7 +114,7 @@ pub async fn get_analytics(
         applied_limit,
     );
 
-    println!("{}", sql_query );
+    println!("{}", sql_query);
 
     // execute query
     pool.run(move |connection| async move {

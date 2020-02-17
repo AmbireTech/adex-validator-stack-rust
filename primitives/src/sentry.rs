@@ -6,7 +6,6 @@ use std::collections::HashMap;
 use std::fmt;
 use std::hash::Hash;
 
-
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct LastApproved {

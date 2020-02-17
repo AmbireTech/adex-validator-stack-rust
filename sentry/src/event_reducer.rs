@@ -1,6 +1,6 @@
-use primitives::sentry::{AggregateEvents, Event, EventAggregate};
-use primitives::{Channel, ValidatorId, BigNum};
 use crate::analytics_recorder::get_payout;
+use primitives::sentry::{AggregateEvents, Event, EventAggregate};
+use primitives::{BigNum, Channel, ValidatorId};
 
 // @TODO: Remove attribute once we use this function!
 #[allow(dead_code)]
@@ -19,7 +19,6 @@ pub(crate) fn reduce(channel: &Channel, initial_aggr: &mut EventAggregate, ev: &
             let merge = merge_impression_ev(clicks, &publisher, &payout);
 
             initial_aggr.events.insert("CLICK".to_owned(), merge);
-
         }
         Event::Close => {
             let creator = channel.creator.clone();
@@ -38,7 +37,7 @@ pub(crate) fn reduce(channel: &Channel, initial_aggr: &mut EventAggregate, ev: &
 fn merge_impression_ev(
     impression: Option<&AggregateEvents>,
     earner: &ValidatorId,
-    payout: &BigNum
+    payout: &BigNum,
 ) -> AggregateEvents {
     let mut impression = impression.map(Clone::clone).unwrap_or_default();
 
