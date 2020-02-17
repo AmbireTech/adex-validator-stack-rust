@@ -45,7 +45,7 @@ pub async fn analytics<A: Adapter>(
         _ => {
             // checks if /:id route param is present
             let cache_timeframe= match req.extensions().get::<RouteParams>() {
-                Some(param) => 600,
+                Some(_) => 600,
                 None => 300,
             };
             let response = process_analytics(req, app, AnalyticsType::Global).await?;

@@ -55,8 +55,9 @@ pub async fn get_analytics(
     let time_limit = Utc::now().timestamp() - period;
 
     let mut where_clauses = vec![format!("created > to_timestamp({})", time_limit)];
+
     if let Some(id) = channel_id {
-        where_clauses.push(format!("channel_id = {}", id));
+        where_clauses.push(format!("channel_id = '{}'", id));
     }
 
     let mut group_clause = "time".to_string();
@@ -64,7 +65,7 @@ pub async fn get_analytics(
         AnalyticsType::Advertiser { session } => {
             if channel_id.is_none() {
                 where_clauses.push(format!(
-                    "channel_id IN (SELECT id FROM channels WHERE creator = {})",
+                    "channel_id IN (SELECT id FROM channels WHERE creator = '{}')",
                     session.uid
                 ));
             }
@@ -125,7 +126,7 @@ pub async fn get_analytics(
             // ));
 
             format!(
-                "SUM(({}::numeric) as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time from event_aggregates", 
+                "SUM({}::numeric)::varchar as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time from event_aggregates", 
                 query.metric, interval
             )
         }

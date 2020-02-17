@@ -594,7 +594,10 @@ mod test {
         token_contract
             .call(
                 "setBalanceTo",
-                (Token::Address(leader_account), Token::Uint(U256::from(2000 as u64))),
+                (
+                    Token::Address(leader_account),
+                    Token::Uint(U256::from(2000 as u64)),
+                ),
                 leader_account,
                 Options::default(),
             )
@@ -645,7 +648,7 @@ mod test {
                 nonce: None,
                 withdraw_period_start: Utc::now() + Duration::days(1),
                 ad_units: vec![],
-                pricing_bounds: None
+                pricing_bounds: None,
             },
         };
 

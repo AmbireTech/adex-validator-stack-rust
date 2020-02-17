@@ -72,8 +72,8 @@ pub struct Pricing {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "UPPERCASE")]
 pub struct PricingBounds {
-    pub impression: Pricing,
-    pub click: Pricing,
+    pub impression: Option<Pricing>,
+    pub click: Option<Pricing>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

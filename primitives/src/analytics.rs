@@ -4,17 +4,23 @@ use serde::{Deserialize, Serialize};
 pub const ANALYTICS_QUERY_LIMIT: u32 = 200;
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct AnalyticsData {
+    pub time: f64,
+    pub value: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AnalyticsResponse {
-    time: u32,
-    value: String,
+    pub aggr: Vec<AnalyticsData>,
+    pub limit: u32
 }
 
 #[cfg(feature = "postgres")]
 pub mod postgres {
-    use super::AnalyticsResponse;
+    use super::AnalyticsData;
     use tokio_postgres::Row;
 
-    impl From<&Row> for AnalyticsResponse {
+    impl From<&Row> for AnalyticsData {
         fn from(row: &Row) -> Self {
             Self {
                 time: row.get("time"),
@@ -39,6 +45,13 @@ pub struct AnalyticsQuery {
 }
 
 impl AnalyticsQuery {
+    pub fn metric_to_column(&mut self) {
+        self.metric = match self.metric.as_str() {
+            "eventCounts"=> "count".to_string(),
+            "eventPayouts" => "payout".to_string(),
+            _ => "count".to_string(),
+        };
+    }
     pub fn is_valid(&self) -> Result<(), DomainError> {
         let valid_event_types = ["IMPRESSION", "CLICK"];
         let valid_metric = ["eventPayouts", "eventCounts"];
