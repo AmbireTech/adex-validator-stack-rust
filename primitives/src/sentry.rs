@@ -1,4 +1,4 @@
-use crate::validator::{ApproveState, Heartbeat, MessageTypes, NewState};
+use crate::validator::MessageTypes;
 use crate::{BigNum, Channel, ChannelId, ValidatorId};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -214,7 +214,7 @@ mod postgres {
         ValidatorMessage,
     };
     use crate::sentry::EventAggregate;
-    use crate::validator::{ApproveState, Heartbeat, MessageTypes, NewState};
+    use crate::validator::MessageTypes;
     use bytes::BytesMut;
     use postgres_types::{accepts, to_sql_checked, IsNull, Json, ToSql, Type};
     use std::error::Error;
