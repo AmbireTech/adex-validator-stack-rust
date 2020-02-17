@@ -1,5 +1,5 @@
 use crate::db::analytics::{
-    advertiser_channel_ids, get_advanced_reports, get_analytics, AnalyticsType
+    advertiser_channel_ids, get_advanced_reports, get_analytics, AnalyticsType,
 };
 use crate::success_response;
 use crate::Application;
@@ -7,12 +7,11 @@ use crate::ResponseError;
 use crate::RouteParams;
 use crate::Session;
 use hyper::{Body, Request, Response};
-use primitives::ChannelId;
 use primitives::adapter::Adapter;
 use primitives::analytics::{AnalyticsQuery, AnalyticsResponse};
+use primitives::ChannelId;
 use redis::aio::MultiplexedConnection;
 use slog::{error, Logger};
-
 
 pub async fn publisher_analytics<A: Adapter>(
     req: Request<Body>,
@@ -44,7 +43,7 @@ pub async fn analytics<A: Adapter>(
         Ok(Some(response)) => Ok(success_response(response)),
         _ => {
             // checks if /:id route param is present
-            let cache_timeframe= match req.extensions().get::<RouteParams>() {
+            let cache_timeframe = match req.extensions().get::<RouteParams>() {
                 Some(_) => 600,
                 None => 300,
             };
@@ -85,7 +84,7 @@ pub async fn process_analytics<A: Adapter>(
     query
         .is_valid()
         .map_err(|e| ResponseError::BadRequest(e.to_string()))?;
-    
+
     query.metric_to_column();
 
     let channel_id = req.extensions().get::<ChannelId>();
@@ -97,12 +96,16 @@ pub async fn process_analytics<A: Adapter>(
         .unwrap_or_else(|| false);
     let limit = query.limit;
 
-    let aggr = get_analytics(query, &app.pool, analytics_type, segment_channel, channel_id).await?;
+    let aggr = get_analytics(
+        query,
+        &app.pool,
+        analytics_type,
+        segment_channel,
+        channel_id,
+    )
+    .await?;
 
-    let response = AnalyticsResponse {
-        limit,
-        aggr
-    };
+    let response = AnalyticsResponse { limit, aggr };
 
     serde_json::to_string(&response)
         .map_err(|_| ResponseError::BadRequest("error occurred; try again later".to_string()))
@@ -117,9 +120,14 @@ pub async fn advanced_analytics<A: Adapter>(
 
     let query = serde_urlencoded::from_str::<AnalyticsQuery>(&req.uri().query().unwrap_or(""))?;
 
-    let response = get_advanced_reports(&app.redis, &query.event_type, &sess.uid, &advertiser_channels)
-        .await
-        .map_err(|_| ResponseError::BadRequest("error occurred; try again later".to_string()))?;
+    let response = get_advanced_reports(
+        &app.redis,
+        &query.event_type,
+        &sess.uid,
+        &advertiser_channels,
+    )
+    .await
+    .map_err(|_| ResponseError::BadRequest("error occurred; try again later".to_string()))?;
 
     Ok(success_response(serde_json::to_string(&response)?))
 }

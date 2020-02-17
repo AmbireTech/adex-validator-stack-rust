@@ -1,6 +1,6 @@
+use crate::ChannelId;
 use crate::DomainError;
 use serde::{Deserialize, Serialize};
-use crate::ChannelId;
 
 pub const ANALYTICS_QUERY_LIMIT: u32 = 200;
 
@@ -10,7 +10,7 @@ pub struct AnalyticsData {
     pub time: f64,
     pub value: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub channel_id: Option<ChannelId>
+    pub channel_id: Option<ChannelId>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -52,7 +52,7 @@ pub struct AnalyticsQuery {
 impl AnalyticsQuery {
     pub fn metric_to_column(&mut self) {
         self.metric = match self.metric.as_str() {
-            "eventCounts"=> "count".to_string(),
+            "eventCounts" => "count".to_string(),
             "eventPayouts" => "payout".to_string(),
             _ => "count".to_string(),
         };

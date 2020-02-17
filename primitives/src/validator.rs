@@ -174,11 +174,11 @@ pub enum MessageTypes {
 #[cfg(feature = "postgres")]
 pub mod postgres {
     use super::ValidatorId;
+    use crate::ToETHChecksum;
     use bytes::BytesMut;
     use postgres_types::{FromSql, IsNull, ToSql, Type};
     use std::convert::TryFrom;
     use std::error::Error;
-    use crate::ToETHChecksum;
 
     impl<'a> FromSql<'a> for ValidatorId {
         fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {

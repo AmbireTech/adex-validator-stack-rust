@@ -187,7 +187,7 @@ pub async fn insert_events<A: Adapter + 'static>(
     let into_body = req.into_body();
     let body = hyper::body::to_bytes(into_body).await?;
     let request_body = serde_json::from_slice::<HashMap<String, Vec<Event>>>(&body)?;
-    
+
     let events = request_body
         .get("events")
         .ok_or_else(|| ResponseError::BadRequest("invalid request".to_string()))?;

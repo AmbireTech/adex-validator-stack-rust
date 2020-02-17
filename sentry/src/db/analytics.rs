@@ -3,7 +3,7 @@ use crate::epoch;
 use crate::Session;
 use bb8::RunError;
 use chrono::Utc;
-use primitives::analytics::{AnalyticsQuery, AnalyticsData, ANALYTICS_QUERY_LIMIT};
+use primitives::analytics::{AnalyticsData, AnalyticsQuery, ANALYTICS_QUERY_LIMIT};
 use primitives::sentry::{AdvancedAnalyticsResponse, ChannelReport, PublisherReport};
 use primitives::{ChannelId, ValidatorId};
 use redis;
@@ -12,13 +12,9 @@ use std::collections::HashMap;
 use std::error::Error;
 
 pub enum AnalyticsType {
-    Advertiser {
-        session: Session,
-    },
+    Advertiser { session: Session },
     Global,
-    Publisher {
-        session: Session,
-    },
+    Publisher { session: Session },
 }
 
 pub async fn advertiser_channel_ids(
@@ -70,31 +66,19 @@ pub async fn get_analytics(
                 ));
             }
 
-            where_clauses.push(format!(
-                "event_type = '{}'",
-                query.event_type
-            ));
+            where_clauses.push(format!("event_type = '{}'", query.event_type));
 
-            where_clauses.push(format!(
-                "{} IS NOT NULL",
-                query.metric
-            ));
+            where_clauses.push(format!("{} IS NOT NULL", query.metric));
 
             format!(
                 "SUM({}::numeric)::varchar as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time", 
                 query.metric, interval
             )
         }
-        AnalyticsType::Global  => {
-            where_clauses.push(format!(
-                "event_type = '{}'",
-                query.event_type
-            ));
+        AnalyticsType::Global => {
+            where_clauses.push(format!("event_type = '{}'", query.event_type));
 
-            where_clauses.push(format!(
-                "{} IS NOT NULL",
-                query.metric
-            ));
+            where_clauses.push(format!("{} IS NOT NULL", query.metric));
 
             where_clauses.push("earner IS NULL".to_string());
 
@@ -104,21 +88,12 @@ pub async fn get_analytics(
             )
         }
         AnalyticsType::Publisher { session } => {
-            where_clauses.push(format!(
-                "event_type = '{}'",
-                query.event_type
-            ));
+            where_clauses.push(format!("event_type = '{}'", query.event_type));
 
-            where_clauses.push(format!(
-                "{} IS NOT NULL",
-                query.metric
-            ));
+            where_clauses.push(format!("{} IS NOT NULL", query.metric));
 
-            where_clauses.push(format!(
-                "earner = '{}'",
-                session.uid
-            ));
-            
+            where_clauses.push(format!("earner = '{}'", session.uid));
+
             format!(
                 "SUM({}::numeric)::varchar as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time", 
                 query.metric, interval
@@ -138,8 +113,6 @@ pub async fn get_analytics(
         group_clause,
         applied_limit,
     );
-
-    println!("{}", sql_query);
 
     // execute query
     pool.run(move |connection| async move {
@@ -202,7 +175,6 @@ pub async fn get_advanced_reports(
     publisher: &ValidatorId,
     channel_ids: &[ChannelId],
 ) -> Result<AdvancedAnalyticsResponse, Box<dyn Error>> {
-    println!("get advnaces");
     let publisher_reports = [
         PublisherReport::ReportPublisherToAdUnit,
         PublisherReport::ReportPublisherToAdSlot,
@@ -250,7 +222,6 @@ pub async fn get_advanced_reports(
 
         by_channel_stats.insert(channel_id.to_owned(), channel_stat);
     }
-    
 
     Ok(AdvancedAnalyticsResponse {
         publisher_stats,

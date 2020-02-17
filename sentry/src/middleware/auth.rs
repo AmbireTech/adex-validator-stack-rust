@@ -23,7 +23,6 @@ pub(crate) async fn for_request(
         .and_then(|hv| {
             hv.to_str()
                 .map(|token_str| {
-                    println!("token str {}", token_str );
                     if token_str.starts_with(prefix) {
                         Some(token_str[prefix.len()..].to_string())
                     } else {
