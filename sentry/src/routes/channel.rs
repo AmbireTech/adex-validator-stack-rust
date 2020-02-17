@@ -220,6 +220,7 @@ pub async fn create_validator_messages<A: Adapter + 'static>(
 
     let into_body = req.into_body();
     let body = hyper::body::to_bytes(into_body).await?;
+
     let request_body = serde_json::from_slice::<HashMap<String, Vec<MessageTypes>>>(&body)?;
     let messages = request_body
         .get("messages")
