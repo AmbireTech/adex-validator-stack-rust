@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::hash::Hash;
 
+
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct LastApproved {
@@ -19,21 +20,21 @@ pub struct LastApproved {
 pub struct NewStateValidatorMessage {
     pub from: String,
     pub received: DateTime<Utc>,
-    pub msg: NewState,
+    pub msg: MessageTypes,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ApproveStateValidatorMessage {
     pub from: String,
     pub received: DateTime<Utc>,
-    pub msg: ApproveState,
+    pub msg: MessageTypes,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct HeartbeatValidatorMessage {
     pub from: String,
     pub received: DateTime<Utc>,
-    pub msg: Heartbeat,
+    pub msg: MessageTypes,
 }
 
 #[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
@@ -245,7 +246,7 @@ mod postgres {
             Self {
                 from: row.get("from"),
                 received: row.get("received"),
-                msg: row.get::<_, Json<ApproveState>>("msg").0,
+                msg: row.get::<_, Json<MessageTypes>>("msg").0,
             }
         }
     }
@@ -255,7 +256,7 @@ mod postgres {
             Self {
                 from: row.get("from"),
                 received: row.get("received"),
-                msg: row.get::<_, Json<NewState>>("msg").0,
+                msg: row.get::<_, Json<MessageTypes>>("msg").0,
             }
         }
     }
@@ -265,7 +266,7 @@ mod postgres {
             Self {
                 from: row.get("from"),
                 received: row.get("received"),
-                msg: row.get::<_, Json<Heartbeat>>("msg").0,
+                msg: row.get::<_, Json<MessageTypes>>("msg").0,
             }
         }
     }
