@@ -57,6 +57,7 @@ lazy_static! {
     static ref CHANNEL_EVENTS_AGGREGATES: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events-aggregates/?$").expect("The regex should be valid");
     static ref ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
     static ref ADVERTISER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-advertiser/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
+    static ref PUBLISHER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-publisher/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");    
     static ref CREATE_EVENTS_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events(/.*)?$").expect("The regex should be valid");
 
 }
@@ -216,6 +217,18 @@ async fn analytics_router<A: Adapter + 'static>(
                 ]).await?;
 
                 advertiser_analytics(req, app).await
+            } else if let Some(caps) = PUBLISHER_ANALYTICS_BY_CHANNEL_ID.captures(route) {
+                let param = RouteParams(vec![caps
+                    .get(1)
+                    .map_or("".to_string(), |m| m.as_str().to_string())]);
+                req.extensions_mut().insert(param);
+
+                let req = chain(req, app, vec![
+                    Box::new(auth_required_middleware),
+                    Box::new(get_channel_id)
+                ]).await?;
+
+                publisher_analytics(req, app).await
             } else {
                 Err(ResponseError::NotFound)
             }

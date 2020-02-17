@@ -1,18 +1,22 @@
 use crate::DomainError;
 use serde::{Deserialize, Serialize};
+use crate::ChannelId;
 
 pub const ANALYTICS_QUERY_LIMIT: u32 = 200;
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AnalyticsData {
     pub time: f64,
     pub value: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub channel_id: Option<ChannelId>
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AnalyticsResponse {
     pub aggr: Vec<AnalyticsData>,
-    pub limit: u32
+    pub limit: u32,
 }
 
 #[cfg(feature = "postgres")]
@@ -25,6 +29,7 @@ pub mod postgres {
             Self {
                 time: row.get("time"),
                 value: row.get("value"),
+                channel_id: row.try_get("channel_id").ok(),
             }
         }
     }

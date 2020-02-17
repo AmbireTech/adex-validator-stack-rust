@@ -115,9 +115,9 @@ pub async fn advanced_analytics<A: Adapter>(
     let sess = req.extensions().get::<Session>().expect("auth is required");
     let advertiser_channels = advertiser_channel_ids(&app.pool, &sess.uid).await?;
 
-    let event_type = serde_urlencoded::from_str::<String>(&req.uri().query().unwrap_or(""))?;
+    let query = serde_urlencoded::from_str::<AnalyticsQuery>(&req.uri().query().unwrap_or(""))?;
 
-    let response = get_advanced_reports(&app.redis, &event_type, &sess.uid, &advertiser_channels)
+    let response = get_advanced_reports(&app.redis, &query.event_type, &sess.uid, &advertiser_channels)
         .await
         .map_err(|_| ResponseError::BadRequest("error occurred; try again later".to_string()))?;
 

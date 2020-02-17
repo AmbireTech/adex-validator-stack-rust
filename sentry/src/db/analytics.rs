@@ -27,7 +27,7 @@ pub async fn advertiser_channel_ids(
 ) -> Result<Vec<ChannelId>, RunError<bb8_postgres::tokio_postgres::Error>> {
     pool.run(move |connection| async move {
         match connection
-            .prepare("SELECT id FROM channels WHERE creator = {}")
+            .prepare("SELECT id FROM channels WHERE creator = $1")
             .await
         {
             Ok(stmt) => match connection.query(&stmt, &[creator]).await {
@@ -81,7 +81,7 @@ pub async fn get_analytics(
             ));
 
             format!(
-                "SUM({}::numeric)::varchar as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time from event_aggregates", 
+                "SUM({}::numeric)::varchar as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time", 
                 query.metric, interval
             )
         }
@@ -99,7 +99,7 @@ pub async fn get_analytics(
             where_clauses.push("earner IS NULL".to_string());
 
             format!(
-                "SUM({}::numeric)::varchar as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time from event_aggregates", 
+                "SUM({}::numeric)::varchar as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time", 
                 query.metric, interval
             )
         }
@@ -119,26 +119,20 @@ pub async fn get_analytics(
                 session.uid
             ));
             
-
-            // where_clauses.push(format!(
-            //     "events->'{}'->'{}'->'{}' IS NOT NULL",
-            //     query.event_type, query.metric, session.uid
-            // ));
-
             format!(
-                "SUM({}::numeric)::varchar as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time from event_aggregates", 
+                "SUM({}::numeric)::varchar as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time", 
                 query.metric, interval
             )
         }
     };
 
     if segment_by_channel {
-        select_clause = format!("{}, channelId", select_clause);
-        group_clause = format!("{}, channelId", group_clause);
+        select_clause = format!("{}, channel_id", select_clause);
+        group_clause = format!("{}, channel_id", group_clause);
     }
 
     let sql_query = format!(
-        "SELECT {} WHERE {} GROUP BY {} LIMIT {}",
+        "SELECT {} FROM event_aggregates WHERE {} GROUP BY {} LIMIT {}",
         select_clause,
         where_clauses.join(" AND "),
         group_clause,
@@ -208,6 +202,7 @@ pub async fn get_advanced_reports(
     publisher: &ValidatorId,
     channel_ids: &[ChannelId],
 ) -> Result<AdvancedAnalyticsResponse, Box<dyn Error>> {
+    println!("get advnaces");
     let publisher_reports = [
         PublisherReport::ReportPublisherToAdUnit,
         PublisherReport::ReportPublisherToAdSlot,
@@ -216,7 +211,7 @@ pub async fn get_advanced_reports(
         PublisherReport::ReportPublisherToHostname,
     ];
 
-    let mut publisher_stats = HashMap::new();
+    let mut publisher_stats: HashMap<PublisherReport, HashMap<String, f64>> = HashMap::new();
 
     for publisher_report in publisher_reports.iter() {
         let pair = match publisher_report {
@@ -255,6 +250,7 @@ pub async fn get_advanced_reports(
 
         by_channel_stats.insert(channel_id.to_owned(), channel_stat);
     }
+    
 
     Ok(AdvancedAnalyticsResponse {
         publisher_stats,
