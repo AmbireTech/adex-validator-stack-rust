@@ -7,7 +7,7 @@ use redis;
 use redis::aio::MultiplexedConnection;
 use slog::{error, Logger};
 
-fn get_payout(channel: &Channel, event: &Event) -> BigNum {
+pub fn get_payout(channel: &Channel, event: &Event) -> BigNum {
     match event {
         Event::Impression { .. } => channel.spec.min_per_impression.clone(),
         Event::Click { .. } => {

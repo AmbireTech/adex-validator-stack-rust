@@ -158,7 +158,6 @@ struct EventData {
     earner: Option<ValidatorId>,
     event_count: BigNum,
     event_payout: BigNum,
-    created: DateTime<Utc>,
 }
 
 pub async fn insert_event_aggregate(
@@ -166,8 +165,6 @@ pub async fn insert_event_aggregate(
     channel_id: &ChannelId,
     event: &EventAggregate,
 ) -> Result<bool, RunError<bb8_postgres::tokio_postgres::Error>> {
-    let created = Utc::now();
-
     let mut data: Vec<EventData> = Vec::new();
 
     for (event_type, aggr) in &event.events {
@@ -183,7 +180,6 @@ pub async fn insert_event_aggregate(
                     earner: Some(earner.clone()),
                     event_count: event_count.to_owned(),
                     event_payout: event_payout.clone(),
-                    created,
                 });
 
                 // total sum
@@ -197,7 +193,6 @@ pub async fn insert_event_aggregate(
                 earner: None,
                 event_count: total_event_counts,
                 event_payout: total_event_payouts,
-                created,
             });
         }
     }
@@ -211,10 +206,12 @@ pub async fn insert_event_aggregate(
                     Err(e) => return Err((e, connection))
                 };
 
+                let created = Utc::now(); // time discrepancy
+
                 let writer = BinaryCopyInWriter::new(sink, &[Type::VARCHAR, Type::TIMESTAMPTZ, Type::VARCHAR, Type::VARCHAR, Type::VARCHAR, Type::VARCHAR]);
                 pin_mut!(writer);
                 for item in data {
-                    if let Err(e) = writer.as_mut().write(&[&item.id, &item.created, &item.event_type, &item.event_count, &item.event_payout, &item.earner]).await {
+                    if let Err(e) = writer.as_mut().write(&[&item.id, &created, &item.event_type, &item.event_count, &item.event_payout, &item.earner]).await {
                         err = Some(e);
                         break;
                     }
