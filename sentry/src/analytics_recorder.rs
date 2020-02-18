@@ -53,9 +53,8 @@ pub async fn record(
                 let divisor = BigNum::from(10u64.pow(18));
                 let pay_amount = get_payout(&channel, event)
                     .div_floor(&divisor)
-                    .to_u64()
+                    .to_f64()
                     .expect("should always have a payout");
-                // let pay_amount = payout / 10u64.pow(18);
 
                 if let Some(ad_unit) = ad_unit {
                     db.zincr(
