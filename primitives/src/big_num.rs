@@ -10,7 +10,19 @@ use num_derive::{Num, NumOps, One, Zero};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(
-    Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, NumOps, One, Zero, Num, Default
+    Serialize,
+    Deserialize,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    NumOps,
+    One,
+    Zero,
+    Num,
+    Default,
 )]
 pub struct BigNum(
     #[serde(

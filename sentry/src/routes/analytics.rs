@@ -87,10 +87,8 @@ pub async fn process_analytics<A: Adapter>(
 
     let channel_id = req.extensions().get::<ChannelId>();
 
-    let segment_channel = query
-        .segment_by_channel
-        .is_some();
-        
+    let segment_channel = query.segment_by_channel.is_some();
+
     let limit = query.limit;
 
     let aggr = get_analytics(

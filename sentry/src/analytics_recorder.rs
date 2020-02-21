@@ -3,8 +3,8 @@ use crate::Session;
 use primitives::sentry::Event;
 use primitives::sentry::{ChannelReport, PublisherReport};
 use primitives::{BigNum, Channel};
-use redis::pipe;
 use redis::aio::MultiplexedConnection;
+use redis::pipe;
 use slog::{error, Logger};
 
 pub fn get_payout(channel: &Channel, event: &Event) -> BigNum {
@@ -16,7 +16,7 @@ pub fn get_payout(channel: &Channel, event: &Event) -> BigNum {
                     return click.min;
                 }
             }
-            
+
             Default::default()
         }
         _ => Default::default(),
@@ -56,23 +56,13 @@ pub async fn record(
 
                 if let Some(ad_unit) = ad_unit {
                     db.zincr(
-                        format!(
-                            "{}:{}:{}",
-                            PublisherReport::AdUnit,
-                            event,
-                            publisher
-                        ),
+                        format!("{}:{}:{}", PublisherReport::AdUnit, event, publisher),
                         ad_unit,
                         1,
                     )
                     .ignore();
                     db.zincr(
-                        format!(
-                            "{}:{}:{}",
-                            ChannelReport::AdUnit,
-                            event,
-                            publisher
-                        ),
+                        format!("{}:{}:{}", ChannelReport::AdUnit, event, publisher),
                         ad_unit,
                         1,
                     )
@@ -81,23 +71,13 @@ pub async fn record(
 
                 if let Some(ad_slot) = ad_slot {
                     db.zincr(
-                        format!(
-                            "{}:{}:{}",
-                            PublisherReport::AdSlot,
-                            event,
-                            publisher
-                        ),
+                        format!("{}:{}:{}", PublisherReport::AdSlot, event, publisher),
                         ad_slot,
                         1,
                     )
                     .ignore();
                     db.zincr(
-                        format!(
-                            "{}:{}:{}",
-                            PublisherReport::AdSlotPay,
-                            event,
-                            publisher
-                        ),
+                        format!("{}:{}:{}", PublisherReport::AdSlotPay, event, publisher),
                         ad_slot,
                         pay_amount,
                     )
@@ -120,40 +100,25 @@ pub async fn record(
                 }
 
                 let hostname = (referrer.as_ref())
-                                .or_else(|| session.referrer_header.as_ref())
-                                .map(|rf| rf.split('/').nth(2).map(ToString::to_string))
-                                .flatten();
+                    .or_else(|| session.referrer_header.as_ref())
+                    .map(|rf| rf.split('/').nth(2).map(ToString::to_string))
+                    .flatten();
 
                 if let Some(hostname) = &hostname {
                     db.zincr(
-                        format!(
-                            "{}:{}:{}",
-                            PublisherReport::Hostname,
-                            event,
-                            publisher
-                        ),
+                        format!("{}:{}:{}", PublisherReport::Hostname, event, publisher),
                         hostname,
                         1,
                     )
                     .ignore();
                     db.zincr(
-                        format!(
-                            "{}:{}:{}",
-                            ChannelReport::Hostname,
-                            event,
-                            channel.id
-                        ),
+                        format!("{}:{}:{}", ChannelReport::Hostname, event, channel.id),
                         hostname,
                         1,
                     )
                     .ignore();
                     db.zincr(
-                        format!(
-                            "{}:{}:{}",
-                            ChannelReport::HostnamePay,
-                            event,
-                            channel.id
-                        ),
+                        format!("{}:{}:{}", ChannelReport::HostnamePay, event, channel.id),
                         hostname,
                         1,
                     )

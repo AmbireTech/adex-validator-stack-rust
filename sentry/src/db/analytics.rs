@@ -2,13 +2,13 @@ use crate::db::DbPool;
 use crate::epoch;
 use crate::Session;
 use bb8::RunError;
+use bb8_postgres::tokio_postgres::types::ToSql;
 use chrono::Utc;
 use primitives::analytics::{AnalyticsData, AnalyticsQuery, ANALYTICS_QUERY_LIMIT};
 use primitives::sentry::{AdvancedAnalyticsResponse, ChannelReport, PublisherReport};
-use bb8_postgres::tokio_postgres::types::{ToSql};
 use primitives::{ChannelId, ValidatorId};
-use redis::cmd;
 use redis::aio::MultiplexedConnection;
+use redis::cmd;
 use std::collections::HashMap;
 use std::error::Error;
 
@@ -69,7 +69,7 @@ pub async fn get_analytics(
 
     where_clauses.extend(vec![
         format!("event_type = ${}", params.len()),
-        format!("{} IS NOT NULL", metric)
+        format!("{} IS NOT NULL", metric),
     ]);
 
     if let Some(id) = channel_id {
@@ -80,12 +80,10 @@ pub async fn get_analytics(
     let mut select_clause = match analytics_type {
         AnalyticsType::Advertiser { session } => {
             if channel_id.is_none() {
-                where_clauses.push(
-                    format!(
-                        "channel_id IN (SELECT id FROM channels WHERE creator = '{}')",
-                        session.uid
-                    )
-                );
+                where_clauses.push(format!(
+                    "channel_id IN (SELECT id FROM channels WHERE creator = '{}')",
+                    session.uid
+                ));
             }
 
             format!(
