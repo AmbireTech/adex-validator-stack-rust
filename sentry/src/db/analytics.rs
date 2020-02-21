@@ -186,18 +186,18 @@ pub async fn get_advanced_reports(
     channel_ids: &[ChannelId],
 ) -> Result<AdvancedAnalyticsResponse, Box<dyn Error>> {
     let publisher_reports = [
-        PublisherReport::ReportPublisherToAdUnit,
-        PublisherReport::ReportPublisherToAdSlot,
-        PublisherReport::ReportPublisherToAdSlotPay,
-        PublisherReport::ReportPublisherToCountry,
-        PublisherReport::ReportPublisherToHostname,
+        PublisherReport::AdUnit,
+        PublisherReport::AdSlot,
+        PublisherReport::AdSlotPay,
+        PublisherReport::Country,
+        PublisherReport::Hostname,
     ];
 
     let mut publisher_stats: HashMap<PublisherReport, HashMap<String, f64>> = HashMap::new();
 
     for publisher_report in publisher_reports.iter() {
         let pair = match publisher_report {
-            PublisherReport::ReportPublisherToCountry => format!(
+            PublisherReport::Country => format!(
                 "{}:{}:{}:{}",
                 epoch().floor(),
                 publisher_report,
@@ -213,9 +213,9 @@ pub async fn get_advanced_reports(
     let mut by_channel_stats = HashMap::new();
 
     let channel_reports = [
-        ChannelReport::ReportChannelToAdUnit,
-        ChannelReport::ReportChannelToHostname,
-        ChannelReport::ReportChannelToHostnamePay,
+        ChannelReport::AdUnit,
+        ChannelReport::Hostname,
+        ChannelReport::HostnamePay,
     ];
 
     for channel_id in channel_ids {

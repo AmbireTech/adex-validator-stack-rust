@@ -13,13 +13,11 @@ pub fn get_payout(channel: &Channel, event: &Event) -> BigNum {
         Event::Click { .. } => {
             if let Some(pricing) = channel.spec.pricing_bounds.clone() {
                 if let Some(click) = pricing.click {
-                    click.min
-                } else {
-                    BigNum::from(0)
+                    return click.min;
                 }
-            } else {
-                BigNum::from(0)
             }
+            
+            BigNum::from(0)
         }
         _ => BigNum::from(0),
     }
@@ -60,7 +58,7 @@ pub async fn record(
                     db.zincr(
                         format!(
                             "{}:{}:{}",
-                            PublisherReport::ReportPublisherToAdUnit,
+                            PublisherReport::AdUnit,
                             event,
                             publisher
                         ),
@@ -71,7 +69,7 @@ pub async fn record(
                     db.zincr(
                         format!(
                             "{}:{}:{}",
-                            ChannelReport::ReportChannelToAdUnit,
+                            ChannelReport::AdUnit,
                             event,
                             publisher
                         ),
@@ -85,7 +83,7 @@ pub async fn record(
                     db.zincr(
                         format!(
                             "{}:{}:{}",
-                            PublisherReport::ReportPublisherToAdSlot,
+                            PublisherReport::AdSlot,
                             event,
                             publisher
                         ),
@@ -96,7 +94,7 @@ pub async fn record(
                     db.zincr(
                         format!(
                             "{}:{}:{}",
-                            PublisherReport::ReportPublisherToAdSlotPay,
+                            PublisherReport::AdSlotPay,
                             event,
                             publisher
                         ),
@@ -110,7 +108,7 @@ pub async fn record(
                     db.zincr(
                         format!(
                             "{}:{}:{}:{}",
-                            PublisherReport::ReportPublisherToCountry,
+                            PublisherReport::Country,
                             epoch().floor(),
                             event,
                             publisher
@@ -130,7 +128,7 @@ pub async fn record(
                     db.zincr(
                         format!(
                             "{}:{}:{}",
-                            PublisherReport::ReportPublisherToHostname,
+                            PublisherReport::Hostname,
                             event,
                             publisher
                         ),
@@ -141,7 +139,7 @@ pub async fn record(
                     db.zincr(
                         format!(
                             "{}:{}:{}",
-                            ChannelReport::ReportChannelToHostname,
+                            ChannelReport::Hostname,
                             event,
                             channel.id
                         ),
@@ -152,7 +150,7 @@ pub async fn record(
                     db.zincr(
                         format!(
                             "{}:{}:{}",
-                            ChannelReport::ReportChannelToHostnamePay,
+                            ChannelReport::HostnamePay,
                             event,
                             channel.id
                         ),

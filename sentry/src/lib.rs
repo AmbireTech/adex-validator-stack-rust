@@ -417,7 +417,7 @@ pub fn success_response(response_body: String) -> Response<Body> {
 }
 
 pub fn epoch() -> f64 {
-    (Utc::now().timestamp() / 2_628_000_000) as f64
+    Utc::now().timestamp() as f64 / 2_628_000_000.0
 }
 
 // @TODO: Make pub(crate)

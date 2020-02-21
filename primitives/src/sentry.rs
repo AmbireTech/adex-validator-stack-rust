@@ -17,14 +17,14 @@ pub struct LastApproved {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NewStateValidatorMessage {
-    pub from: String,
+    pub from: ValidatorId,
     pub received: DateTime<Utc>,
     pub msg: MessageTypes,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ApproveStateValidatorMessage {
-    pub from: String,
+    pub from: ValidatorId,
     pub received: DateTime<Utc>,
     pub msg: MessageTypes,
 }
@@ -170,21 +170,21 @@ pub struct AdvancedAnalyticsResponse {
 #[derive(Serialize, Deserialize, Debug, Hash, PartialEq, Eq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub enum PublisherReport {
-    ReportPublisherToAdUnit,
-    ReportPublisherToAdSlot,
-    ReportPublisherToAdSlotPay,
-    ReportPublisherToCountry,
-    ReportPublisherToHostname,
+    AdUnit,
+    AdSlot,
+    AdSlotPay,
+    Country,
+    Hostname,
 }
 
 impl fmt::Display for PublisherReport {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
-            PublisherReport::ReportPublisherToAdUnit => write!(f, "reportPublisherToAdUnit"),
-            PublisherReport::ReportPublisherToAdSlot => write!(f, "reportPublisherToAdSlot"),
-            PublisherReport::ReportPublisherToAdSlotPay => write!(f, "reportPublisherToAdSlotPay"),
-            PublisherReport::ReportPublisherToCountry => write!(f, "reportPublisherToCountry"),
-            PublisherReport::ReportPublisherToHostname => write!(f, "reportPublisherToHostname"),
+            PublisherReport::AdUnit => write!(f, "reportPublisherToAdUnit"),
+            PublisherReport::AdSlot => write!(f, "reportPublisherToAdSlot"),
+            PublisherReport::AdSlotPay => write!(f, "reportPublisherToAdSlotPay"),
+            PublisherReport::Country => write!(f, "reportPublisherToCountry"),
+            PublisherReport::Hostname => write!(f, "reportPublisherToHostname"),
         }
     }
 }
@@ -192,17 +192,17 @@ impl fmt::Display for PublisherReport {
 #[derive(Serialize, Deserialize, Debug, Hash, PartialEq, Eq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub enum ChannelReport {
-    ReportChannelToAdUnit,
-    ReportChannelToHostname,
-    ReportChannelToHostnamePay,
+    AdUnit,
+    Hostname,
+    HostnamePay,
 }
 
 impl fmt::Display for ChannelReport {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
-            ChannelReport::ReportChannelToAdUnit => write!(f, "reportPublisherToAdUnit"),
-            ChannelReport::ReportChannelToHostname => write!(f, "reportChannelToHostname"),
-            ChannelReport::ReportChannelToHostnamePay => write!(f, "reportChannelToHostnamePay"),
+            ChannelReport::AdUnit => write!(f, "reportPublisherToAdUnit"),
+            ChannelReport::Hostname => write!(f, "reportChannelToHostname"),
+            ChannelReport::HostnamePay => write!(f, "reportChannelToHostnamePay"),
         }
     }
 }
