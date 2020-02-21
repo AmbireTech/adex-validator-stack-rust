@@ -50,13 +50,6 @@ pub struct AnalyticsQuery {
 }
 
 impl AnalyticsQuery {
-    pub fn metric_to_column(&mut self) {
-        self.metric = match self.metric.as_str() {
-            "eventCounts" => "count".to_string(),
-            "eventPayouts" => "payout".to_string(),
-            _ => "count".to_string(),
-        };
-    }
     pub fn is_valid(&self) -> Result<(), DomainError> {
         let valid_event_types = ["IMPRESSION", "CLICK"];
         let valid_metric = ["eventPayouts", "eventCounts"];

@@ -31,7 +31,7 @@ pub struct ApproveStateValidatorMessage {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct HeartbeatValidatorMessage {
-    pub from: String,
+    pub from: ValidatorId,
     pub received: DateTime<Utc>,
     pub msg: MessageTypes,
 }
