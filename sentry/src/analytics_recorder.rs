@@ -3,7 +3,7 @@ use crate::Session;
 use primitives::sentry::Event;
 use primitives::sentry::{ChannelReport, PublisherReport};
 use primitives::{BigNum, Channel};
-use redis;
+use redis::pipe;
 use redis::aio::MultiplexedConnection;
 use slog::{error, Logger};
 
@@ -32,7 +32,7 @@ pub async fn record(
     events: Vec<Event>,
     logger: Logger,
 ) {
-    let mut db = redis::pipe();
+    let mut db = pipe();
 
     events
         .iter()
@@ -121,12 +121,10 @@ pub async fn record(
                     .ignore();
                 }
 
-                let hostname = match (referrer, &session.referrer_header) {
-                    (Some(referrer), _) | (_, Some(referrer)) => {
-                        referrer.split('/').nth(2).map(ToString::to_string)
-                    }
-                    _ => None,
-                };
+                let hostname = (referrer.as_ref())
+                                .or_else(|| session.referrer_header.as_ref())
+                                .map(|rf| rf.split('/').nth(2).map(ToString::to_string))
+                                .flatten();
 
                 if let Some(hostname) = &hostname {
                     db.zincr(

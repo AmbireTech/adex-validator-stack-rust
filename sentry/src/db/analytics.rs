@@ -40,15 +40,23 @@ pub async fn advertiser_channel_ids(
     .await
 }
 
+fn metric_to_column(metric: &str) -> String {
+    match metric {
+        "eventCounts" => "count".to_string(),
+        "eventPayouts" => "payout".to_string(),
+        _ => "count".to_string(),
+    }
+}
+
 pub async fn get_analytics(
-    mut query: AnalyticsQuery,
+    query: AnalyticsQuery,
     pool: &DbPool,
     analytics_type: AnalyticsType,
     segment_by_channel: bool,
     channel_id: Option<&ChannelId>,
 ) -> Result<Vec<AnalyticsData>, RunError<bb8_postgres::tokio_postgres::Error>> {
     // converts metric to column
-    query.metric_to_column();
+    let metric = metric_to_column(&query.metric);
 
     let mut params = Vec::<&(dyn ToSql + Sync)>::new();
     let applied_limit = query.limit.min(ANALYTICS_QUERY_LIMIT);
@@ -61,7 +69,7 @@ pub async fn get_analytics(
 
     where_clauses.extend(vec![
         format!("event_type = ${}", params.len()),
-        format!("{} IS NOT NULL", query.metric)
+        format!("{} IS NOT NULL", metric)
     ]);
 
     if let Some(id) = channel_id {
@@ -82,7 +90,7 @@ pub async fn get_analytics(
 
             format!(
                 "SUM({}::numeric)::varchar as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time", 
-                query.metric, interval
+                metric, interval
             )
         }
         AnalyticsType::Global => {
@@ -90,7 +98,7 @@ pub async fn get_analytics(
 
             format!(
                 "SUM({}::numeric)::varchar as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time", 
-                query.metric, interval
+                metric, interval
             )
         }
         AnalyticsType::Publisher { session } => {
@@ -98,7 +106,7 @@ pub async fn get_analytics(
 
             format!(
                 "SUM({}::numeric)::varchar as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time", 
-                query.metric, interval
+                metric, interval
             )
         }
     };

@@ -80,7 +80,7 @@ pub async fn process_analytics<A: Adapter>(
     app: &Application<A>,
     analytics_type: AnalyticsType,
 ) -> Result<String, ResponseError> {
-    let mut query = serde_urlencoded::from_str::<AnalyticsQuery>(&req.uri().query().unwrap_or(""))?;
+    let query = serde_urlencoded::from_str::<AnalyticsQuery>(&req.uri().query().unwrap_or(""))?;
     query
         .is_valid()
         .map_err(|e| ResponseError::BadRequest(e.to_string()))?;
