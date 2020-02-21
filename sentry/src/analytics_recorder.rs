@@ -17,9 +17,9 @@ pub fn get_payout(channel: &Channel, event: &Event) -> BigNum {
                 }
             }
             
-            BigNum::from(0)
+            Default::default()
         }
-        _ => BigNum::from(0),
+        _ => Default::default(),
     }
 }
 

@@ -89,9 +89,8 @@ pub async fn process_analytics<A: Adapter>(
 
     let segment_channel = query
         .segment_by_channel
-        .clone()
-        .map(|_| true)
-        .unwrap_or_else(|| false);
+        .is_some();
+        
     let limit = query.limit;
 
     let aggr = get_analytics(

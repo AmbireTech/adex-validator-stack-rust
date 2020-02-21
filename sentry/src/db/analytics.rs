@@ -7,7 +7,7 @@ use primitives::analytics::{AnalyticsData, AnalyticsQuery, ANALYTICS_QUERY_LIMIT
 use primitives::sentry::{AdvancedAnalyticsResponse, ChannelReport, PublisherReport};
 use bb8_postgres::tokio_postgres::types::{ToSql};
 use primitives::{ChannelId, ValidatorId};
-use redis;
+use redis::cmd;
 use redis::aio::MultiplexedConnection;
 use std::collections::HashMap;
 use std::error::Error;
@@ -157,15 +157,15 @@ fn get_time_frame(timeframe: &str) -> (i64, i64) {
 }
 
 async fn stat_pair(
-    conn: MultiplexedConnection,
+    mut conn: MultiplexedConnection,
     key: &str,
 ) -> Result<HashMap<String, f64>, Box<dyn Error>> {
-    let data = redis::cmd("ZRANGE")
+    let data = cmd("ZRANGE")
         .arg(key)
         .arg(0 as u64)
         .arg(-1 as i64)
         .arg("WITHSCORES")
-        .query_async::<_, Vec<String>>(&mut conn.clone())
+        .query_async::<_, Vec<String>>(&mut conn)
         .await?;
 
     Ok(data

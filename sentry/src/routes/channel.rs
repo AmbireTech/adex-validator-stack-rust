@@ -103,42 +103,30 @@ pub async fn last_approved<A: Adapter>(
     let channel_id = ChannelId::from_hex(route_params.index(0))?;
     let channel = get_channel_by_id(&app.pool, &channel_id).await?.unwrap();
 
-    let approve_state = lastest_approve_state(&app.pool, &channel).await?;
-    if approve_state.is_none() {
-        return Ok(Response::builder()
-            .header("Content-type", "application/json")
-            .body(
-                serde_json::to_string(&LastApprovedResponse {
-                    last_approved: None,
-                    heartbeats: None,
-                })?
-                .into(),
-            )
-            .unwrap());
-    }
+    let default_response = Response::builder()
+        .header("Content-type", "application/json")
+        .body(
+            serde_json::to_string(&LastApprovedResponse {
+                last_approved: None,
+                heartbeats: None,
+            })?
+            .into(),
+        )
+        .expect("should build response");
 
-    let state_root = match approve_state
-        .as_ref()
-        .expect("value should be present")
-        .msg
-        .clone()
-    {
+    let approve_state = match lastest_approve_state(&app.pool, &channel).await? {
+        Some(approve_state) => approve_state,
+        None => return Ok(default_response)
+    };
+
+    let state_root = match approve_state.msg.clone() {
         MessageTypes::ApproveState(approve_state) => approve_state.state_root,
         _ => return Err(ResponseError::BadRequest("invalid request".to_string())),
     };
 
     let new_state = latest_new_state(&app.pool, &channel, &state_root).await?;
     if new_state.is_none() {
-        return Ok(Response::builder()
-            .header("Content-type", "application/json")
-            .body(
-                serde_json::to_string(&LastApprovedResponse {
-                    last_approved: None,
-                    heartbeats: None,
-                })?
-                .into(),
-            )
-            .unwrap());
+        return Ok(default_response);
     }
 
     let query = serde_urlencoded::from_str::<LastApprovedQuery>(&req.uri().query().unwrap_or(""))?;
@@ -159,10 +147,10 @@ pub async fn last_approved<A: Adapter>(
     Ok(Response::builder()
         .header("Content-type", "application/json")
         .body(
-            serde_json::to_string(&&LastApprovedResponse {
+            serde_json::to_string(&LastApprovedResponse {
                 last_approved: Some(LastApproved {
                     new_state,
-                    approve_state,
+                    approve_state: Some(approve_state),
                 }),
                 heartbeats,
             })?

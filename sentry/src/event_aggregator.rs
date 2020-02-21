@@ -21,8 +21,7 @@ use std::time::Duration;
 use tokio::time::delay_for;
 
 lazy_static! {
-    pub static ref ANALYTICS_RECORDER: String =
-        env::var("ANALYTICS_RECORDER").unwrap_or_else(|_| "false".to_string());
+    pub static ref ANALYTICS_RECORDER: Option<String> = env::var("ANALYTICS_RECORDER").ok();
 }
 
 #[derive(Debug)]
@@ -140,7 +139,7 @@ impl EventAggregator {
             .iter()
             .for_each(|ev| event_reducer::reduce(&record.channel, &mut record.aggregate, ev));
 
-        if ANALYTICS_RECORDER.ne(&"false".to_string()) {
+        if ANALYTICS_RECORDER.is_some() {
             let logger = app.logger.clone();
             tokio::spawn(analytics_recorder::record(
                 redis.clone(),

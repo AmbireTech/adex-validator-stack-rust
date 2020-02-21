@@ -82,7 +82,6 @@ async fn on_new_state<'a, A: Adapter + 'static>(
         },
         _ => Default::default(),
     };
-    // .map_or(Default::default(), |new_state| new_state.msg.balances);
 
     if !is_valid_transition(&iface.channel, &prev_balances, &proposed_balances) {
         return Ok(on_error(&iface, &new_state, InvalidNewState::Transition).await);
