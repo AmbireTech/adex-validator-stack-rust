@@ -18,9 +18,9 @@ web3 = { git = "https://github.com/samparsky/rust-web3" }
 eth_checksum = "0.1.1"
 ethabi = { git = "https://github.com/samparsky/ethabi", branch = "graph-patches" }
 tiny-keccak = "1.5"
-parity-crypto = { version = "0.4.2", features = ["publickey"] }
-ethstore = { version = "0.2.1", git = "https://github.com/elpiel/parity-ethereum"}
-ethkey = { version = "0.4.0", git = "https://github.com/elpiel/parity-ethereum"}
+parity-crypto = { version = "0.5.0", features = ["publickey"] }
+ethstore = { version = "0.2.1", git = "https://github.com/paritytech/parity-ethereum"}
+ethkey = { version = "0.4.0", git = "https://github.com/paritytech/parity-ethereum"}
 # API client
 reqwest = { version = "0.10", features = ["json"] }
 
