@@ -85,8 +85,6 @@ pub async fn process_analytics<A: Adapter>(
         .is_valid()
         .map_err(|e| ResponseError::BadRequest(e.to_string()))?;
 
-    query.metric_to_column();
-
     let channel_id = req.extensions().get::<ChannelId>();
 
     let segment_channel = query

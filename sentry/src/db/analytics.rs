@@ -5,6 +5,7 @@ use bb8::RunError;
 use chrono::Utc;
 use primitives::analytics::{AnalyticsData, AnalyticsQuery, ANALYTICS_QUERY_LIMIT};
 use primitives::sentry::{AdvancedAnalyticsResponse, ChannelReport, PublisherReport};
+use bb8_postgres::tokio_postgres::types::{ToSql};
 use primitives::{ChannelId, ValidatorId};
 use redis;
 use redis::aio::MultiplexedConnection;
@@ -40,17 +41,28 @@ pub async fn advertiser_channel_ids(
 }
 
 pub async fn get_analytics(
-    query: AnalyticsQuery,
+    mut query: AnalyticsQuery,
     pool: &DbPool,
     analytics_type: AnalyticsType,
     segment_by_channel: bool,
     channel_id: Option<&ChannelId>,
 ) -> Result<Vec<AnalyticsData>, RunError<bb8_postgres::tokio_postgres::Error>> {
+    // converts metric to column
+    query.metric_to_column();
+
+    let mut params = Vec::<&(dyn ToSql + Sync)>::new();
     let applied_limit = query.limit.min(ANALYTICS_QUERY_LIMIT);
     let (interval, period) = get_time_frame(&query.timeframe);
     let time_limit = Utc::now().timestamp() - period;
 
     let mut where_clauses = vec![format!("created > to_timestamp({})", time_limit)];
+
+    params.push(&query.event_type);
+
+    where_clauses.extend(vec![
+        format!("event_type = ${}", params.len()),
+        format!("{} IS NOT NULL", query.metric)
+    ]);
 
     if let Some(id) = channel_id {
         where_clauses.push(format!("channel_id = '{}'", id));
@@ -60,15 +72,13 @@ pub async fn get_analytics(
     let mut select_clause = match analytics_type {
         AnalyticsType::Advertiser { session } => {
             if channel_id.is_none() {
-                where_clauses.push(format!(
-                    "channel_id IN (SELECT id FROM channels WHERE creator = '{}')",
-                    session.uid
-                ));
+                where_clauses.push(
+                    format!(
+                        "channel_id IN (SELECT id FROM channels WHERE creator = '{}')",
+                        session.uid
+                    )
+                );
             }
-
-            where_clauses.push(format!("event_type = '{}'", query.event_type));
-
-            where_clauses.push(format!("{} IS NOT NULL", query.metric));
 
             format!(
                 "SUM({}::numeric)::varchar as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time", 
@@ -76,10 +86,6 @@ pub async fn get_analytics(
             )
         }
         AnalyticsType::Global => {
-            where_clauses.push(format!("event_type = '{}'", query.event_type));
-
-            where_clauses.push(format!("{} IS NOT NULL", query.metric));
-
             where_clauses.push("earner IS NULL".to_string());
 
             format!(
@@ -88,10 +94,6 @@ pub async fn get_analytics(
             )
         }
         AnalyticsType::Publisher { session } => {
-            where_clauses.push(format!("event_type = '{}'", query.event_type));
-
-            where_clauses.push(format!("{} IS NOT NULL", query.metric));
-
             where_clauses.push(format!("earner = '{}'", session.uid));
 
             format!(
@@ -114,12 +116,10 @@ pub async fn get_analytics(
         applied_limit,
     );
 
-    println!("{}", sql_query);
-
     // execute query
     pool.run(move |connection| async move {
         match connection.prepare(&sql_query).await {
-            Ok(stmt) => match connection.query(&stmt, &[]).await {
+            Ok(stmt) => match connection.query(&stmt, &params).await {
                 Ok(rows) => {
                     let analytics: Vec<AnalyticsData> =
                         rows.iter().map(AnalyticsData::from).collect();
