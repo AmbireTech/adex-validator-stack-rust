@@ -1,8 +1,7 @@
 use crate::validator::{ApproveState, Heartbeat, MessageTypes, NewState};
-use crate::{BigNum, Channel};
+use crate::{BigNum, Channel, ChannelId, ValidatorId};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_hex::{SerHex, StrictPfx};
 use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -33,8 +32,11 @@ pub struct ApproveStateValidatorMessage {
 pub enum Event {
     #[serde(rename_all = "camelCase")]
     Impression {
-        publisher: String,
+        publisher: ValidatorId,
         ad_unit: Option<String>,
+    },
+    Click {
+        publisher: String,
     },
     ImpressionWithCommission {
         earners: Vec<Earner>,
@@ -63,8 +65,7 @@ pub struct Earner {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EventAggregate {
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub channel_id: [u8; 32],
+    pub channel_id: ChannelId,
     pub created: DateTime<Utc>,
     pub events: HashMap<String, AggregateEvents>,
 }
@@ -73,13 +74,13 @@ pub struct EventAggregate {
 #[serde(rename_all = "camelCase")]
 pub struct AggregateEvents {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub event_counts: Option<HashMap<String, BigNum>>,
-    pub event_payouts: HashMap<String, BigNum>,
+    pub event_counts: Option<HashMap<ValidatorId, BigNum>>,
+    pub event_payouts: HashMap<ValidatorId, BigNum>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ChannelAllResponse {
+pub struct ChannelListResponse {
     pub channels: Vec<Channel>,
     pub total_pages: u64,
 }
@@ -98,7 +99,7 @@ pub struct SuccessResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ValidatorMessage {
-    pub from: String,
+    pub from: ValidatorId,
     pub received: DateTime<Utc>,
     pub msg: MessageTypes,
 }
@@ -111,5 +112,50 @@ pub struct ValidatorMessageResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct EventAggregateResponse {
+    pub channel: Channel,
     pub events: Vec<EventAggregate>,
+}
+
+#[cfg(feature = "postgres")]
+mod postgres {
+    use super::ValidatorMessage;
+    use crate::sentry::EventAggregate;
+    use crate::validator::MessageTypes;
+    use bytes::BytesMut;
+    use postgres_types::{accepts, to_sql_checked, IsNull, Json, ToSql, Type};
+    use std::error::Error;
+    use tokio_postgres::Row;
+
+    impl From<&Row> for EventAggregate {
+        fn from(row: &Row) -> Self {
+            Self {
+                channel_id: row.get("channel_id"),
+                created: row.get("created"),
+                events: row.get::<_, Json<_>>("events").0,
+            }
+        }
+    }
+
+    impl From<&Row> for ValidatorMessage {
+        fn from(row: &Row) -> Self {
+            Self {
+                from: row.get("from"),
+                received: row.get("received"),
+                msg: row.get::<_, Json<MessageTypes>>("msg").0,
+            }
+        }
+    }
+
+    impl ToSql for MessageTypes {
+        fn to_sql(
+            &self,
+            ty: &Type,
+            w: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+            Json(self).to_sql(ty, w)
+        }
+
+        accepts!(JSONB);
+        to_sql_checked!();
+    }
 }

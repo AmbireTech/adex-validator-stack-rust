@@ -1,0 +1,5 @@
+[tasks.pre-test]
+script = [
+    "npm install",
+    "../scripts/ethereum.sh"
+]

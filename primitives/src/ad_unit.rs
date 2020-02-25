@@ -1,8 +1,7 @@
-use chrono::serde::ts_milliseconds;
+use chrono::serde::{ts_milliseconds, ts_milliseconds_option};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::util::serde::ts_milliseconds_option;
 use crate::TargetingTag;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

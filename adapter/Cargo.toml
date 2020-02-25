@@ -6,26 +6,30 @@ edition = "2018"
 
 [dependencies]
 primitives = {path = "../primitives"}
-# Futures
-futures-preview = {version = "=0.3.0-alpha.19"}
 # Time handling
 chrono = "0.4"
-time = "0.1.42"
 # To/From Hex
 hex = "0.3.2"
 serde =  {version = "^1.0", features = ['derive']}
 serde_json = "1.0"
 serde-hex = "0.1.0"
 # Ethereum
-web3 = { git = "https://github.com/tomusdrw/rust-web3" }
+web3 = { git = "https://github.com/samparsky/rust-web3" }
 eth_checksum = "0.1.1"
-ethabi = "8.0.1"
+ethabi = { git = "https://github.com/samparsky/ethabi", branch = "graph-patches" }
 tiny-keccak = "1.5"
-ethkey = { git = "https://github.com/paritytech/parity.git" }
-ethstore = { git = "https://github.com/paritytech/parity.git" }
+parity-crypto = { version = "0.5.0", features = ["publickey"] }
+ethstore = { version = "0.2.1", git = "https://github.com/paritytech/parity-ethereum"}
+ethkey = { version = "0.4.0", git = "https://github.com/paritytech/parity-ethereum"}
+# API client
+reqwest = { version = "0.10", features = ["json"] }
+
 sha2 = "0.8.0"
 base64 = "0.10.1"
 lazy_static = "1.4.0"
+# Futures
+futures = { version = "0.3.1", features = ["compat"] }
 
 [dev-dependencies]
 byteorder = "1.3"
+tokio = { version = "0.2", features = ["macros", "rt-core"] }

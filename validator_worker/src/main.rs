@@ -1,22 +1,21 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
 
+use std::convert::TryFrom;
+use std::error::Error;
+use std::time::Duration;
+
 use clap::{App, Arg};
+use futures::future::{join, try_join_all};
+use tokio::runtime::Runtime;
+use tokio::time::{delay_for, timeout};
 
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
-use futures::compat::Future01CompatExt;
-use futures::future::try_join_all;
-use futures::future::{join, FutureExt, TryFutureExt};
 use primitives::adapter::{Adapter, DummyAdapterOptions, KeystoreOptions};
 use primitives::config::{configuration, Config};
 use primitives::util::tests::prep_db::{AUTH, IDS};
 use primitives::{Channel, SpecValidator, ValidatorId};
-use std::convert::TryFrom;
-use std::error::Error;
-use std::ops::Add;
-use std::time::{Duration, Instant};
-use tokio::timer::Delay;
-use tokio::util::FutureExt as TokioFutureExt;
+use slog::{error, Logger};
 use validator_worker::error::ValidatorWorker as ValidatorWorkerError;
 use validator_worker::{all_channels, follower, leader, SentryApi};
 
@@ -25,7 +24,6 @@ struct Args<A: Adapter> {
     sentry_url: String,
     config: Config,
     adapter: A,
-    whoami: ValidatorId,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -108,12 +106,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         _ => panic!("We don't have any other adapters implemented yet!"),
     };
 
+    let logger = logger();
+
     match adapter {
         AdapterTypes::EthereumAdapter(ethadapter) => {
-            run(is_single_tick, &sentry_url, &config, *ethadapter)
+            run(is_single_tick, &sentry_url, &config, *ethadapter, &logger)
         }
         AdapterTypes::DummyAdapter(dummyadapter) => {
-            run(is_single_tick, &sentry_url, &config, *dummyadapter)
+            run(is_single_tick, &sentry_url, &config, *dummyadapter, &logger)
         }
     }
 }
@@ -122,100 +122,86 @@ fn run<A: Adapter + 'static>(
     is_single_tick: bool,
     sentry_url: &str,
     config: &Config,
-    adapter: A,
+    mut adapter: A,
+    logger: &Logger,
 ) -> Result<(), Box<dyn Error>> {
-    let mut sentry_adapter = adapter.clone();
     // unlock adapter
-    sentry_adapter.unlock()?;
-    let whoami = adapter.whoami().to_owned();
+    adapter.unlock()?;
 
     let args = Args {
         sentry_url: sentry_url.to_owned(),
         config: config.to_owned(),
-        adapter: sentry_adapter,
-        whoami,
+        adapter,
     };
 
+    // Create the runtime
+    let mut rt = Runtime::new()?;
+
     if is_single_tick {
-        tokio::run(iterate_channels(args).boxed().compat());
+        rt.block_on(iterate_channels(args, &logger));
     } else {
-        tokio::run(infinite(args).boxed().compat());
+        rt.block_on(infinite(args, &logger));
     }
 
     Ok(())
 }
 
-async fn infinite<A: Adapter + 'static>(args: Args<A>) -> Result<(), ()> {
+async fn infinite<A: Adapter + 'static>(args: Args<A>, logger: &Logger) {
     loop {
         let arg = args.clone();
-        let delay_future =
-            Delay::new(Instant::now().add(Duration::from_secs(arg.config.wait_time as u64)));
-        let joined = join(iterate_channels(arg), delay_future.compat());
-        if let (_, Err(e)) = joined.await {
-            eprintln!("{}", e);
-        }
+        let delay_future = delay_for(Duration::from_secs(arg.config.wait_time as u64));
+        let _result = join(iterate_channels(arg, logger), delay_future).await;
     }
 }
 
-async fn iterate_channels<A: Adapter + 'static>(args: Args<A>) -> Result<(), ()> {
-    let result = all_channels(&args.sentry_url, args.whoami.to_string()).await;
+async fn iterate_channels<A: Adapter + 'static>(args: Args<A>, logger: &Logger) {
+    let result = all_channels(&args.sentry_url, args.adapter.whoami()).await;
 
-    if let Err(e) = result {
-        eprintln!("Failed to get channels {}", e);
-        return Ok(());
-    }
+    let channels = match result {
+        Ok(channels) => channels,
+        Err(e) => {
+            error!(logger, "Failed to get channels {}", &e; "main" => "iterate_channels");
+            return;
+        }
+    };
 
-    let channels = result.unwrap();
     let channels_size = channels.len();
 
-    let tick =
-        try_join_all(channels.into_iter().map(|channel| {
-            validator_tick(args.adapter.clone(), channel, &args.config, &args.whoami)
-        }))
-        .await;
+    let tick = try_join_all(
+        channels
+            .into_iter()
+            .map(|channel| validator_tick(args.adapter.clone(), channel, &args.config, logger)),
+    )
+    .await;
 
     if let Err(e) = tick {
-        eprintln!("An occurred while processing channels {}", e);
+        error!(logger, "An occurred while processing channels {}", &e; "main" => "iterate_channels");
     }
 
     if channels_size >= args.config.max_channels as usize {
-        eprintln!(
-            "WARNING: channel limit cfg.MAX_CHANNELS={} reached",
-            args.config.max_channels
-        )
+        error!(logger, "WARNING: channel limit cfg.MAX_CHANNELS={} reached", &args.config.max_channels; "main" => "iterate_channels");
     }
-    Ok(())
 }
 
 async fn validator_tick<A: Adapter + 'static>(
     adapter: A,
     channel: Channel,
     config: &Config,
-    whoami: &ValidatorId,
+    logger: &Logger,
 ) -> Result<(), ValidatorWorkerError> {
-    let sentry = SentryApi::init(adapter, &channel, &config, true, whoami)?;
+    let whoami = adapter.whoami().clone();
+    // Cloning the `Logger` is cheap, see documentation for more info
+    let sentry = SentryApi::init(adapter, &channel, &config, logger.clone())?;
     let duration = Duration::from_secs(config.validator_tick_timeout as u64);
 
     match channel.spec.validators.find(&whoami) {
         SpecValidator::Leader(_) => {
-            if let Err(e) = leader::tick(&sentry)
-                .boxed()
-                .compat()
-                .timeout(duration)
-                .compat()
-                .await
-            {
+            if let Err(e) = timeout(duration, leader::tick(&sentry)).await {
                 return Err(ValidatorWorkerError::Failed(e.to_string()));
             }
         }
         SpecValidator::Follower(_) => {
-            if let Err(e) = follower::tick(&sentry)
-                .boxed()
-                .compat()
-                .timeout(duration)
-                .compat()
-                .await
-            {
+            if let Err(e) = timeout(duration, follower::tick(&sentry)).await {
                 return Err(ValidatorWorkerError::Failed(e.to_string()));
             }
         }
@@ -226,4 +212,15 @@ async fn validator_tick<A: Adapter + 'static>(
         }
     };
     Ok(())
+}
+
+fn logger() -> Logger {
+    use primitives::util::logging::{Async, PrefixedCompactFormat, TermDecorator};
+    use slog::{o, Drain};
+
+    let decorator = TermDecorator::new().build();
+    let drain = PrefixedCompactFormat::new("validator_worker", decorator).fuse();
+    let drain = Async::new(drain).build().fuse();
+
+    Logger::root(drain, o!())
 }

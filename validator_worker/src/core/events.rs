@@ -77,9 +77,9 @@ mod test {
     use chrono::Utc;
 
     use primitives::util::tests::prep_db::{
-        DUMMY_CHANNEL, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER,
+        DUMMY_CHANNEL, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, IDS,
     };
-    use primitives::{Channel, ChannelSpec, ValidatorDesc};
+    use primitives::{Channel, ChannelSpec, ValidatorDesc, ValidatorId};
 
     use super::*;
 
@@ -102,10 +102,12 @@ mod test {
         };
         channel.spec.validators = (leader, follower).into();
 
-        let balances_before_fees: BalancesMap =
-            vec![("a".to_string(), 100.into()), ("b".to_string(), 200.into())]
-                .into_iter()
-                .collect();
+        let balances_before_fees: BalancesMap = vec![
+            (IDS["publisher"].clone(), 100.into()),
+            (IDS["publisher2"].clone(), 200.into()),
+        ]
+        .into_iter()
+        .collect();
 
         let acc = Accounting {
             last_event_aggregate: Utc::now(),
@@ -114,16 +116,17 @@ mod test {
         };
 
         let (balances, new_accounting) =
-            merge_aggrs(&acc, &[gen_ev_aggr(5, "a")], &channel).expect("Something went wrong");
+            merge_aggrs(&acc, &[gen_ev_aggr(5, &IDS["publisher"])], &channel)
+                .expect("Something went wrong");
 
         assert_eq!(balances, new_accounting.balances, "balances is the same");
         assert_eq!(
-            new_accounting.balances_before_fees["a"],
+            new_accounting.balances_before_fees[&IDS["publisher"]],
             150.into(),
             "balance of recipient incremented accordingly"
         );
         assert_eq!(
-            new_accounting.balances["a"],
+            new_accounting.balances[&IDS["publisher"]],
             148.into(),
             "balanceAfterFees is ok"
         );
@@ -150,10 +153,12 @@ mod test {
             ..DUMMY_CHANNEL.clone()
         };
 
-        let balances_before_fees: BalancesMap =
-            vec![("a".to_string(), 100.into()), ("b".to_string(), 200.into())]
-                .into_iter()
-                .collect();
+        let balances_before_fees: BalancesMap = vec![
+            (IDS["publisher"].clone(), 100.into()),
+            (IDS["publisher2"].clone(), 200.into()),
+        ]
+        .into_iter()
+        .collect();
 
         let acc = Accounting {
             last_event_aggregate: Utc::now(),
@@ -162,21 +167,22 @@ mod test {
         };
 
         let (balances, new_accounting) =
-            merge_aggrs(&acc, &[gen_ev_aggr(1_001, "a")], &channel).expect("Something went wrong");
+            merge_aggrs(&acc, &[gen_ev_aggr(1_001, &IDS["publisher"])], &channel)
+                .expect("Something went wrong");
 
         assert_eq!(balances, new_accounting.balances, "balances is the same");
         assert_eq!(
-            new_accounting.balances_before_fees["a"],
+            new_accounting.balances_before_fees[&IDS["publisher"]],
             9_800.into(),
             "balance of recipient incremented accordingly"
         );
         assert_eq!(
-            new_accounting.balances_before_fees["b"],
+            new_accounting.balances_before_fees[&IDS["publisher2"]],
             200.into(),
             "balances of non-recipient remains the same"
         );
         assert_eq!(
-            new_accounting.balances["a"],
+            new_accounting.balances[&IDS["publisher"]],
             9_702.into(),
             "balanceAfterFees is ok"
         );
@@ -192,14 +198,14 @@ mod test {
         );
     }
 
-    fn gen_ev_aggr(count: u64, recipient: &str) -> EventAggregate {
+    fn gen_ev_aggr(count: u64, recipient: &ValidatorId) -> EventAggregate {
         let aggregate_events = AggregateEvents {
             event_counts: Some(
-                vec![(recipient.to_string(), count.into())]
+                vec![(recipient.clone(), count.into())]
                     .into_iter()
                     .collect(),
             ),
-            event_payouts: vec![(recipient.to_string(), (count * 10).into())]
+            event_payouts: vec![(recipient.clone(), (count * 10).into())]
                 .into_iter()
                 .collect(),
         };

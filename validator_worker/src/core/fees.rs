@@ -10,7 +10,7 @@ pub fn get_balances_after_fees_tree(
 
     let total_distributed = balances.iter().map(|(_, balance)| balance).sum::<BigNum>();
 
-    let validators_iter = channel.spec.validators.into_iter();
+    let validators_iter = channel.spec.validators.iter();
     let total_validators_fee = validators_iter
         .map(|validator| &validator.fee)
         .sum::<BigNum>();
@@ -54,7 +54,7 @@ pub fn get_balances_after_fees_tree(
         balances_after_fees,
         rounding_error,
         fee_ratio,
-        channel.spec.validators.into_iter(),
+        channel.spec.validators.iter(),
     );
 
     Ok(balances_after_fees)
@@ -76,9 +76,8 @@ fn distribute_fee<'a>(
         };
 
         if fee_rounded > 0.into() {
-            let entry = balances
-                .entry(validator.id.to_string())
-                .or_insert_with(|| 0.into());
+            let addr = validator.fee_addr.as_ref().unwrap_or(&validator.id);
+            let entry = balances.entry(addr.to_owned()).or_insert_with(|| 0.into());
 
             *entry += &fee_rounded;
         }
@@ -106,9 +105,9 @@ mod test {
         #[test]
         fn case_1_three_values() {
             let balances_map: BalancesMap = vec![
-                ("a".to_string(), 1001.into()),
-                ("b".to_string(), 3124.into()),
-                ("c".to_string(), 122.into()),
+                (IDS["publisher"].clone(), 1001.into()),
+                (IDS["publisher2"].clone(), 3124.into()),
+                (IDS["tester"].clone(), 122.into()),
             ]
             .into_iter()
             .collect();
@@ -119,9 +118,9 @@ mod test {
         #[test]
         fn case_2_three_simple_values() {
             let balances_map: BalancesMap = vec![
-                ("a".to_string(), 1.into()),
-                ("b".to_string(), 2.into()),
-                ("c".to_string(), 3.into()),
+                (IDS["publisher"].clone(), 1.into()),
+                (IDS["publisher2"].clone(), 2.into()),
+                (IDS["tester"].clone(), 3.into()),
             ]
             .into_iter()
             .collect();
@@ -131,7 +130,7 @@ mod test {
 
         #[test]
         fn case_3_one_value() {
-            let balances_map = vec![("a".to_string(), BigNum::from(1))]
+            let balances_map = vec![(IDS["publisher"].clone(), BigNum::from(1))]
                 .into_iter()
                 .collect();
 
@@ -141,8 +140,8 @@ mod test {
         #[test]
         fn case_4_two_values() {
             let balances_map = vec![
-                ("a".to_string(), 1.into()),
-                ("b".to_string(), 99_999.into()),
+                (IDS["publisher"].clone(), 1.into()),
+                (IDS["publisher2"].clone(), 99_999.into()),
             ]
             .into_iter()
             .collect();
@@ -200,17 +199,17 @@ mod test {
         #[test]
         fn case_1_partially_distributed() {
             let balances_map = vec![
-                ("a".to_string(), 1_000.into()),
-                ("b".to_string(), 1_200.into()),
+                (IDS["publisher"].clone(), 1_000.into()),
+                (IDS["publisher2"].clone(), 1_200.into()),
             ]
             .into_iter()
             .collect();
 
             let expected_balances: BalancesMap = vec![
-                ("a".to_string(), 990.into()),
-                ("b".to_string(), 1_188.into()),
-                (IDS.get("leader").unwrap().to_string(), 11.into()),
-                (IDS.get("follower").unwrap().to_string(), 11.into()),
+                (IDS["publisher"].clone(), 990.into()),
+                (IDS["publisher2"].clone(), 1_188.into()),
+                (IDS["leader"].clone(), 11.into()),
+                (IDS["follower"].clone(), 11.into()),
             ]
             .into_iter()
             .collect();
@@ -231,18 +230,18 @@ mod test {
         #[test]
         fn case_2_partially_distributed_with_validator_in_the_input_balances_map() {
             let balances_map = vec![
-                ("a".to_string(), 100.into()),
-                ("b".to_string(), 2_000.into()),
-                (IDS.get("leader").unwrap().to_string(), 200.into()),
+                (IDS["publisher"].clone(), 100.into()),
+                (IDS["publisher2"].clone(), 2_000.into()),
+                (IDS["leader"].clone(), 200.into()),
             ]
             .into_iter()
             .collect();
 
             let expected_balances: BalancesMap = vec![
-                ("a".to_string(), 99.into()),
-                ("b".to_string(), 1_980.into()),
-                (IDS.get("leader").unwrap().to_string(), 209.into()),
-                (IDS.get("follower").unwrap().to_string(), 11.into()),
+                (IDS["publisher"].clone(), 99.into()),
+                (IDS["publisher2"].clone(), 1_980.into()),
+                (IDS["leader"].clone(), 209.into()),
+                (IDS["follower"].clone(), 11.into()),
             ]
             .into_iter()
             .collect();
@@ -264,23 +263,23 @@ mod test {
         /// also testing the rounding error correction
         fn case_3_fully_distributed() {
             let balances_map = vec![
-                ("a".to_string(), 105.into()),
-                ("b".to_string(), 195.into()),
-                ("c".to_string(), 700.into()),
-                ("d".to_string(), 5_000.into()),
-                ("e".to_string(), 4_000.into()),
+                (IDS["publisher"].clone(), 105.into()),
+                (IDS["publisher2"].clone(), 195.into()),
+                (IDS["tester"].clone(), 700.into()),
+                (IDS["user"].clone(), 5_000.into()),
+                (IDS["creator"].clone(), 4_000.into()),
             ]
             .into_iter()
             .collect();
 
             let expected_balances: BalancesMap = vec![
-                ("a".to_string(), 103.into()),
-                ("b".to_string(), 193.into()),
-                ("c".to_string(), 693.into()),
-                ("d".to_string(), 4_950.into()),
-                ("e".to_string(), 3_960.into()),
-                (IDS.get("leader").unwrap().to_string(), 51.into()),
-                (IDS.get("follower").unwrap().to_string(), 50.into()),
+                (IDS["publisher"].clone(), 103.into()),
+                (IDS["publisher2"].clone(), 193.into()),
+                (IDS["tester"].clone(), 693.into()),
+                (IDS["user"].clone(), 4_950.into()),
+                (IDS["creator"].clone(), 3_960.into()),
+                (IDS["leader"].clone(), 51.into()),
+                (IDS["follower"].clone(), 50.into()),
             ]
             .into_iter()
             .collect();
@@ -301,9 +300,12 @@ mod test {
 
     #[test]
     fn errors_when_fees_larger_that_deposit() {
-        let balances_map = vec![("a".to_string(), 10.into()), ("b".to_string(), 10.into())]
-            .into_iter()
-            .collect();
+        let balances_map = vec![
+            (IDS["publisher"].clone(), 10.into()),
+            (IDS["publisher2"].clone(), 10.into()),
+        ]
+        .into_iter()
+        .collect();
 
         let leader = ValidatorDesc {
             fee: 600.into(),

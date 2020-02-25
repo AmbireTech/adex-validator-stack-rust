@@ -1,4 +1,6 @@
-max_channels=512
+# Maximum number of channels to return per request
+max_channels = 512
+
 channels_find_limit = 200
 wait_time = 500
 
@@ -8,17 +10,19 @@ msgs_find_limit = 10
 
 heartbeat_time = 30000
 health_threshold_promilles = 950
+health_unsignable_promilles = 750
 propagation_timeout = 1000
 
 list_timeout = 5000
 fetch_timeout = 5000
 validator_tick_timeout = 5000
 
-ip_rate_limit = {type='ip', timeframe=20000}
-sid_rate_limit = {type='sid', timeframe=20000}
+ip_rate_limit = { type = 'ip', timeframe = 20000 }
+sid_rate_limit = { type = 'sid', timeframe = 20000 }
 
 ethereum_core_address = '0x333420fc6a897356e69b62417cd17ff012177d2b'
-ethereum_network = 'goerli'
+ethereum_network = 'http://localhost:8545'
+ethereum_adapter_relayer = 'https://goerli-relayer.adex.network'
 
 creators_whitelist = []
 minimal_deposit = "0"

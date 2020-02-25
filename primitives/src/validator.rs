@@ -1,12 +1,9 @@
-use std::pin::Pin;
-
 use chrono::{DateTime, Utc};
-use futures::prelude::*;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 use serde_hex::{SerHex, StrictPfx};
 use std::fmt;
 
-use crate::{BalancesMap, BigNum, DomainError};
+use crate::{BalancesMap, BigNum, DomainError, ToETHChecksum};
 use std::convert::TryFrom;
 
 #[derive(Debug)]
@@ -17,9 +14,7 @@ pub enum ValidatorError {
     InvalidTransition,
 }
 
-pub type ValidatorFuture<T> = Pin<Box<dyn Future<Output = Result<T, ValidatorError>> + Send>>;
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[serde(transparent)]
 pub struct ValidatorId(#[serde(with = "SerHex::<StrictPfx>")] [u8; 20]);
 
@@ -28,11 +23,38 @@ impl ValidatorId {
         &self.0
     }
 
+    /// To Hex non-`0x` prefixed string without **Checksum**ing the string
     pub fn to_hex_non_prefix_string(&self) -> String {
         hex::encode(self.0)
     }
-    pub fn to_hex_checksummed_string(&self) -> String {
-        eth_checksum::checksum(&format!("0x{}", hex::encode(self.0)))
+
+    /// To Hex `0x` prefixed string **without** __Checksum__ing the string
+    pub fn to_hex_prefix_string(&self) -> String {
+        format!("0x{}", self.to_hex_non_prefix_string())
+    }
+}
+
+impl ToETHChecksum for ValidatorId {}
+
+impl Serialize for ValidatorId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let checksum = self.to_checksum();
+        serializer.serialize_str(&checksum)
+    }
+}
+
+impl From<&[u8; 20]> for ValidatorId {
+    fn from(bytes: &[u8; 20]) -> Self {
+        Self(*bytes)
+    }
+}
+
+impl AsRef<[u8]> for ValidatorId {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
     }
 }
 
@@ -71,7 +93,7 @@ impl TryFrom<&String> for ValidatorId {
 
 impl fmt::Display for ValidatorId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", format!("0x{}", hex::encode(self.0)))
+        write!(f, "{}", self.to_checksum())
     }
 }
 
@@ -79,6 +101,7 @@ impl fmt::Display for ValidatorId {
 #[serde(rename_all = "camelCase")]
 pub struct ValidatorDesc {
     pub id: ValidatorId,
+    pub fee_addr: Option<ValidatorId>,
     pub url: String,
     pub fee: BigNum,
 }
@@ -146,4 +169,71 @@ pub enum MessageTypes {
     RejectState(RejectState),
     Heartbeat(Heartbeat),
     Accounting(Accounting),
+}
+
+#[cfg(feature = "postgres")]
+pub mod postgres {
+    use super::ValidatorId;
+    use bytes::BytesMut;
+    use postgres_types::{FromSql, IsNull, ToSql, Type};
+    use std::convert::TryFrom;
+    use std::error::Error;
+
+    impl<'a> FromSql<'a> for ValidatorId {
+        fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+            let str_slice = <&str as FromSql>::from_sql(ty, raw)?;
+
+            // FromHex::from_hex for fixed-sized arrays will guard against the length of the string!
+            Ok(ValidatorId::try_from(str_slice)?)
+        }
+
+        fn accepts(ty: &Type) -> bool {
+            match *ty {
+                Type::TEXT | Type::VARCHAR => true,
+                _ => false,
+            }
+        }
+    }
+
+    impl ToSql for ValidatorId {
+        fn to_sql(
+            &self,
+            ty: &Type,
+            w: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+            let string = format!("0x{}", self.to_hex_non_prefix_string());
+
+            <String as ToSql>::to_sql(&string, ty, w)
+        }
+
+        fn accepts(ty: &Type) -> bool {
+            <String as ToSql>::accepts(ty)
+        }
+
+        fn to_sql_checked(
+            &self,
+            ty: &Type,
+            out: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+            let string = format!("0x{}", self.to_hex_non_prefix_string());
+
+            <String as ToSql>::to_sql_checked(&string, ty, out)
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn validator_id_is_checksummed_when_serialized() {
+        let validator_id_checksum_str = "0xce07CbB7e054514D590a0262C93070D838bFBA2e";
+
+        let validator_id =
+            ValidatorId::try_from(validator_id_checksum_str).expect("Valid string was provided");
+        let actual_json = serde_json::to_string(&validator_id).expect("Should serialize");
+        let expected_json = format!(r#""{}""#, validator_id_checksum_str);
+        assert_eq!(expected_json, actual_json);
+    }
 }

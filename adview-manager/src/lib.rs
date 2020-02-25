@@ -234,7 +234,7 @@ pub fn get_html(
         }],
     };
 
-    let on_load: String = validators.into_iter().map(|validator| {
+    let on_load: String = validators.iter().map(|validator| {
         let fetch_opts = "{ method: 'POST', headers: { 'content-type': 'application/json' }, body: this.dataset.eventBody }";
         let fetch_url = format!("{}/channel/{}/events", validator.url, channel_id);
 

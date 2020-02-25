@@ -1,5 +1,6 @@
 use crate::{
-    BigNum, Channel, ChannelSpec, EventSubmission, SpecValidators, ValidatorDesc, ValidatorId,
+    BigNum, Channel, ChannelId, ChannelSpec, EventSubmission, SpecValidators, ValidatorDesc,
+    ValidatorId,
 };
 use chrono::{TimeZone, Utc};
 use fake::faker::{Faker, Number};
@@ -19,7 +20,7 @@ lazy_static! {
         ids.insert("user".into(), ValidatorId::try_from("0x20754168c00a6e58116ccfd0a5f7d1bb66c5de9d").expect("failed to parse id"));
         ids.insert("publisher".into(), ValidatorId::try_from("0xb7d3f81e857692d13e9d63b232a90f4a1793189e").expect("failed to parse id"));
         ids.insert("publisher2".into(), ValidatorId::try_from("0x2054b0c1339309597ad04ba47f4590f8cdb4e305").expect("failed to parse id"));
-        ids.insert("creator".into(), ValidatorId::try_from("0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359").expect("failed to parse id"));
+        ids.insert("creator".into(), ValidatorId::try_from("0x033ed90e0fec3f3ea1c9b005c724d704501e0196").expect("failed to parse id"));
         ids.insert("tester".into(), ValidatorId::try_from("0x2892f6C41E0718eeeDd49D98D648C789668cA67d").expect("failed to parse id"));
 
         ids
@@ -34,7 +35,7 @@ lazy_static! {
         auth.insert("user".into(), "x8c9v1b2".into());
         auth.insert("publisher".into(), "testing".into());
         auth.insert("publisher2".into(), "testing2".into());
-        auth.insert("creator".into(), "awesomeCreator".into());
+        auth.insert("creator".into(), "0x033ed90e0fec3f3ea1c9b005c724d704501e0196".into());
         auth.insert("tester".into(), "AUTH_awesomeTester".into());
 
         auth
@@ -44,20 +45,22 @@ lazy_static! {
         id:  ValidatorId::try_from("ce07CbB7e054514D590a0262C93070D838bFBA2e").expect("Failed to parse DUMMY_VALIDATOR_LEADER id "),
         url: "http://localhost:8005".to_string(),
         fee: 100.into(),
+        fee_addr: None,
     };
 
     pub static ref DUMMY_VALIDATOR_FOLLOWER: ValidatorDesc = ValidatorDesc {
         id:  ValidatorId::try_from("c91763d7f14ac5c5ddfbcd012e0d2a61ab9bded3").expect("Failed to parse DUMMY_VALIDATOR_FOLLOWER id "),
         url: "http://localhost:8006".to_string(),
         fee: 100.into(),
+        fee_addr: None,
     };
 
     pub static ref DUMMY_CHANNEL: Channel = {
         let nonce = BigNum::from(<Faker as Number>::between(100_000_000, 999_999_999));
 
         Channel {
-            id: <[u8; 32]>::from_hex("061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088").expect("prep_db: failed to deserialize channel id"),
-            creator: "0x033ed90e0fec3f3ea1c9b005c724d704501e0196".to_string(),
+            id: ChannelId::from_hex("061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088").expect("prep_db: failed to deserialize channel id"),
+            creator: ValidatorId::try_from("033ed90e0fec3f3ea1c9b005c724d704501e0196").expect("Should be valid ValidatorId"),
             deposit_asset: "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359".to_string(),
             deposit_amount: 1_000.into(),
             // UNIX timestamp for 2100-01-01

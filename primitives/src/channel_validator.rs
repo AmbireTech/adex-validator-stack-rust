@@ -2,15 +2,15 @@ use crate::channel::{Channel, ChannelError, SpecValidator, SpecValidators};
 use crate::config::Config;
 use crate::ValidatorId;
 use chrono::Utc;
-use std::convert::TryFrom;
+use std::cmp::PartialEq;
 
 pub trait ChannelValidator {
-    fn is_channel_valid(config: &Config, channel: &Channel) -> Result<(), ChannelError> {
-        let identity = &config.clone().identity.unwrap_or_else(|| "".to_string());
-        let validator_identity = ValidatorId::try_from(identity).map_err(|_| {
-            ChannelError::InvalidArgument("Failed to deserialize identity".to_string())
-        })?;
-        let adapter_channel_validator = match channel.spec.validators.find(&validator_identity) {
+    fn is_channel_valid(
+        config: &Config,
+        validator_identity: &ValidatorId,
+        channel: &Channel,
+    ) -> Result<(), ChannelError> {
+        let adapter_channel_validator = match channel.spec.validators.find(validator_identity) {
             // check if the channel validators include our adapter identity
             SpecValidator::None => return Err(ChannelError::AdapterNotIncluded),
             SpecValidator::Leader(validator) | SpecValidator::Follower(validator) => validator,
@@ -44,14 +44,13 @@ pub trait ChannelValidator {
     }
 }
 
-pub fn all_validators_listed(validators: &SpecValidators, whitelist: &[String]) -> bool {
+pub fn all_validators_listed(validators: &SpecValidators, whitelist: &[ValidatorId]) -> bool {
     if whitelist.is_empty() {
         true
     } else {
         let found_validators = whitelist
             .iter()
-            .filter_map(|identity| ValidatorId::try_from(identity).ok())
-            .filter(|allowed| {
+            .filter(|&allowed| {
                 allowed == &validators.leader().id || allowed == &validators.follower().id
             })
             // this will ensure that if we find the 2 validators earlier
@@ -62,10 +61,10 @@ pub fn all_validators_listed(validators: &SpecValidators, whitelist: &[String]) 
     }
 }
 
-pub fn creator_listed(channel: &Channel, whitelist: &[String]) -> bool {
+pub fn creator_listed(channel: &Channel, whitelist: &[ValidatorId]) -> bool {
     // if the list is empty, return true, as we don't have a whitelist to restrict us to
     // or if we have a list, check if it includes the `channel.creator`
-    whitelist.is_empty() || whitelist.iter().any(|allowed| allowed == &channel.creator)
+    whitelist.is_empty() || whitelist.iter().any(|allowed| allowed.eq(&channel.creator))
 }
 
 pub fn asset_listed(channel: &Channel, whitelist: &[String]) -> bool {

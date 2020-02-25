@@ -1,12 +1,9 @@
 [workspace]
 
 members = [
-    "adapter",
     "primitives",
+    "adapter",
+    "adview-manager",
     "validator_worker",
     "sentry",
-    "adview-manager",
 ]
-
-[patch.crates-io]
-redis = {version = "0.13.1-alpha.0", git = "https://github.com/Marwes/redis-rs", branch = "async_await_api"}

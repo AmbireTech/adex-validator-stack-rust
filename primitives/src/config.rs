@@ -1,7 +1,8 @@
 use crate::event_submission::RateLimit;
-use crate::BigNum;
+use crate::{BigNum, ValidatorId};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use serde_hex::{SerHex, StrictPfx};
 use std::fs;
 use toml;
 
@@ -17,27 +18,30 @@ lazy_static! {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all(serialize = "SCREAMING_SNAKE_CASE"))]
 pub struct Config {
-    pub identity: Option<String>, // should not be here maybe?
     pub max_channels: u32,
     pub wait_time: u32,
     pub aggr_throttle: u32,
     pub heartbeat_time: u32, // in milliseconds
     pub channels_find_limit: u32,
     pub events_find_limit: u32,
+    pub msgs_find_limit: u32,
     pub health_threshold_promilles: u32,
+    pub health_unsignable_promilles: u32,
     pub propagation_timeout: u32,
     pub fetch_timeout: u32,
     pub list_timeout: u32,
     pub validator_tick_timeout: u32,
     pub ip_rate_limit: RateLimit,  // HashMap??
     pub sid_rate_limit: RateLimit, // HashMap ??
-    pub creators_whitelist: Vec<String>,
+    pub creators_whitelist: Vec<ValidatorId>,
     pub minimal_deposit: BigNum,
     pub minimal_fee: BigNum,
     pub token_address_whitelist: Vec<String>,
-    pub ethereum_core_address: String,
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub ethereum_core_address: [u8; 20],
     pub ethereum_network: String,
-    pub validators_whitelist: Vec<String>,
+    pub ethereum_adapter_relayer: String,
+    pub validators_whitelist: Vec<ValidatorId>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

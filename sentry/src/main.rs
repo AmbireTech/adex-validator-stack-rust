@@ -4,19 +4,21 @@
 use clap::{App, Arg};
 
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
-use primitives::adapter::{DummyAdapterOptions, KeystoreOptions};
+use hyper::service::{make_service_fn, service_fn};
+use hyper::{Error, Server};
+use primitives::adapter::{Adapter, DummyAdapterOptions, KeystoreOptions};
 use primitives::config::configuration;
-use primitives::util::logging::{Async, PrefixedCompactFormat, TermDecorator};
 use primitives::util::tests::prep_db::{AUTH, IDS};
 use primitives::ValidatorId;
+use sentry::db::{postgres_connection, redis_connection, setup_migrations};
 use sentry::Application;
-use slog::{o, Drain, Logger};
+use slog::{error, info, Logger};
 use std::convert::TryFrom;
 
 const DEFAULT_PORT: u16 = 8005;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = App::new("Sentry")
         .version("0.1")
         .arg(
@@ -96,22 +98,61 @@ async fn main() {
     };
 
     let logger = logger();
+    let redis = redis_connection().await?;
+    info!(&logger, "Checking connection and applying migrations...");
+    // Check connection and setup migrations before setting up Postgres
+    setup_migrations(&environment).await;
+    let postgres = postgres_connection().await?;
 
     match adapter {
         AdapterTypes::EthereumAdapter(adapter) => {
-            Application::new(*adapter, config, logger, clustered, port)
-                .run()
-                .await
+            run(
+                Application::new(*adapter, config, logger, redis, postgres),
+                clustered,
+                port,
+            )
+            .await
         }
         AdapterTypes::DummyAdapter(adapter) => {
-            Application::new(*adapter, config, logger, clustered, port)
-                .run()
-                .await
+            run(
+                Application::new(*adapter, config, logger, redis, postgres),
+                clustered,
+                port,
+            )
+            .await
         }
+    };
+
+    Ok(())
+}
+
+/// Starts the `hyper` `Server`.
+async fn run<A: Adapter + 'static>(app: Application<A>, _clustered: bool, port: u16) {
+    let addr = ([127, 0, 0, 1], port).into();
+    let logger = app.logger.clone();
+    info!(&logger, "Listening on port {}!", port);
+
+    let make_service = make_service_fn(move |_| {
+        let server = app.clone();
+        async move {
+            Ok::<_, Error>(service_fn(move |req| {
+                let server = server.clone();
+                async move { Ok::<_, Error>(server.handle_routing(req).await) }
+            }))
+        }
+    });
+
+    let server = Server::bind(&addr).serve(make_service);
+
+    if let Err(e) = server.await {
+        error!(&logger, "server error: {}", e; "main" => "run");
     }
 }
 
 fn logger() -> Logger {
+    use primitives::util::logging::{Async, PrefixedCompactFormat, TermDecorator};
+    use slog::{o, Drain};
+
     let decorator = TermDecorator::new().build();
     let drain = PrefixedCompactFormat::new("sentry", decorator).fuse();
     let drain = Async::new(drain).build().fuse();

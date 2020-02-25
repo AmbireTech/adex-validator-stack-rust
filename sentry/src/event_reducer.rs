@@ -1,5 +1,5 @@
 use primitives::sentry::{AggregateEvents, Event, EventAggregate};
-use primitives::Channel;
+use primitives::{Channel, ValidatorId};
 
 // @TODO: Remove attribute once we use this function!
 #[allow(dead_code)]
@@ -28,7 +28,7 @@ pub(crate) fn reduce(channel: &Channel, initial_aggr: &mut EventAggregate, ev: &
 
 fn merge_impression_ev(
     impression: Option<&AggregateEvents>,
-    earner: &str,
+    earner: &ValidatorId,
     channel: &Channel,
 ) -> AggregateEvents {
     let mut impression = impression.map(Clone::clone).unwrap_or_default();
@@ -36,14 +36,14 @@ fn merge_impression_ev(
     let event_count = impression
         .event_counts
         .get_or_insert_with(Default::default)
-        .entry(earner.into())
+        .entry(earner.clone())
         .or_insert_with(|| 0.into());
 
     *event_count += &1.into();
 
     let event_payouts = impression
         .event_payouts
-        .entry(earner.into())
+        .entry(earner.clone())
         .or_insert_with(|| 0.into());
     *event_payouts += &channel.spec.min_per_impression;
 
@@ -54,7 +54,7 @@ fn merge_impression_ev(
 mod test {
     use super::*;
     use chrono::Utc;
-    use primitives::util::tests::prep_db::DUMMY_CHANNEL;
+    use primitives::util::tests::prep_db::{DUMMY_CHANNEL, IDS};
     use primitives::BigNum;
 
     #[test]
@@ -65,13 +65,13 @@ mod test {
         let channel = channel;
 
         let mut event_aggr = EventAggregate {
-            channel_id: channel.id.clone(),
+            channel_id: channel.id,
             created: Utc::now(),
             events: Default::default(),
         };
 
         let event = Event::Impression {
-            publisher: "myAwesomePublisher".to_string(),
+            publisher: IDS["publisher"].clone(),
             ad_unit: None,
         };
 
@@ -90,7 +90,7 @@ mod test {
             .event_counts
             .as_ref()
             .expect("there should be event_counts set")
-            .get("myAwesomePublisher")
+            .get(&IDS["publisher"])
             .expect("There should be myAwesomePublisher event_counts key");
         assert_eq!(event_counts, &BigNum::from(101));
 
@@ -98,7 +98,7 @@ mod test {
             .event_counts
             .as_ref()
             .expect("there should be event_counts set")
-            .get("myAwesomePublisher")
+            .get(&IDS["publisher"])
             .expect("There should be myAwesomePublisher event_payouts key");
         assert_eq!(event_payouts, &BigNum::from(101));
     }
