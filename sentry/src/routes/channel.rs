@@ -138,8 +138,8 @@ pub async fn last_approved<A: Adapter>(
     let heartbeats = if query.with_heartbeat.is_some() {
         let result = try_join_all(
             validators
-                .into_iter()
-                .map(|validator| latest_heartbeats(&app.pool, &channel_id, validator.id.clone())),
+                .iter()
+                .map(|validator| latest_heartbeats(&app.pool, &channel_id, &validator.id)),
         )
         .await?;
         Some(result.into_iter().flatten().collect::<Vec<_>>())

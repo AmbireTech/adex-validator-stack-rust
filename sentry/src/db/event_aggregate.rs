@@ -55,7 +55,7 @@ pub async fn latest_new_state(
 pub async fn latest_heartbeats(
     pool: &DbPool,
     channel_id: &ChannelId,
-    validator_id: ValidatorId,
+    validator_id: &ValidatorId,
 ) -> Result<Vec<HeartbeatValidatorMessage>, RunError<bb8_postgres::tokio_postgres::Error>> {
     pool
     .run(move |connection| {

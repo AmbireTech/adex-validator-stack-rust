@@ -10,15 +10,13 @@ use slog::{error, Logger};
 pub fn get_payout(channel: &Channel, event: &Event) -> BigNum {
     match event {
         Event::Impression { .. } => channel.spec.min_per_impression.clone(),
-        Event::Click { .. } => {
-            if let Some(pricing) = channel.spec.pricing_bounds.clone() {
-                if let Some(click) = pricing.click {
-                    return click.min;
-                }
-            }
-
-            Default::default()
-        }
+        Event::Click { .. } => channel
+            .spec
+            .pricing_bounds
+            .as_ref()
+            .and_then(|pricing_bound| pricing_bound.click.as_ref())
+            .map(|click| click.min.clone())
+            .unwrap_or_default(),
         _ => Default::default(),
     }
 }
@@ -84,7 +82,7 @@ pub async fn record(
                     .ignore();
                 }
 
-                if let Some(country) = session.country.clone() {
+                if let Some(country) = &session.country {
                     db.zincr(
                         format!(
                             "{}:{}:{}:{}",
@@ -129,6 +127,6 @@ pub async fn record(
         });
 
     if let Err(err) = db.query_async::<_, Option<String>>(&mut conn).await {
-        error!(&logger, "Server error: {}", err; "module" => "analytics-recorder");
+        error!(&logger, "Redis Database error: {}", err; "module" => "analytics-recorder");
     }
 }
