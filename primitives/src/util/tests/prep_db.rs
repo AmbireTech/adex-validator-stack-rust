@@ -79,6 +79,7 @@ lazy_static! {
                 nonce: Some(nonce),
                 withdraw_period_start: Utc.timestamp_millis(4_073_414_400_000),
                 ad_units: vec![],
+                pricing_bounds: None,
             },
         }
     };

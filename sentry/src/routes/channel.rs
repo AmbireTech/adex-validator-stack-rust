@@ -1,4 +1,5 @@
-use self::channel_list::ChannelListQuery;
+use self::channel_list::{ChannelListQuery, LastApprovedQuery};
+use crate::db::event_aggregate::{lastest_approve_state, latest_heartbeats, latest_new_state};
 use crate::db::{get_channel_by_id, insert_channel, insert_validator_messages, list_channels};
 use crate::success_response;
 use crate::Application;
@@ -10,7 +11,7 @@ use hex::FromHex;
 use hyper::{Body, Request, Response};
 use primitives::adapter::Adapter;
 use primitives::channel::SpecValidator;
-use primitives::sentry::{Event, SuccessResponse};
+use primitives::sentry::{Event, LastApproved, LastApprovedResponse, SuccessResponse};
 use primitives::validator::MessageTypes;
 use primitives::{Channel, ChannelId};
 use slog::error;
@@ -98,12 +99,66 @@ pub async fn last_approved<A: Adapter>(
         .extensions()
         .get::<RouteParams>()
         .expect("request should have route params");
+
     let channel_id = ChannelId::from_hex(route_params.index(0))?;
     let channel = get_channel_by_id(&app.pool, &channel_id).await?.unwrap();
 
+    let default_response = Response::builder()
+        .header("Content-type", "application/json")
+        .body(
+            serde_json::to_string(&LastApprovedResponse {
+                last_approved: None,
+                heartbeats: None,
+            })?
+            .into(),
+        )
+        .expect("should build response");
+
+    let approve_state = match lastest_approve_state(&app.pool, &channel).await? {
+        Some(approve_state) => approve_state,
+        None => return Ok(default_response),
+    };
+
+    let state_root = match approve_state.msg.clone() {
+        MessageTypes::ApproveState(approve_state) => approve_state.state_root,
+        _ => {
+            error!(&app.logger, "{}", "failed to retrieve approved"; "module" => "last_approved");
+            return Err(ResponseError::BadRequest("an error occured".to_string()));
+        }
+    };
+
+    let new_state = latest_new_state(&app.pool, &channel, &state_root).await?;
+    if new_state.is_none() {
+        return Ok(default_response);
+    }
+
+    let query = serde_urlencoded::from_str::<LastApprovedQuery>(&req.uri().query().unwrap_or(""))?;
+    let validators = channel.spec.validators;
+    let channel_id = channel.id;
+    let heartbeats = if query.with_heartbeat.is_some() {
+        let result = try_join_all(
+            validators
+                .iter()
+                .map(|validator| latest_heartbeats(&app.pool, &channel_id, &validator.id)),
+        )
+        .await?;
+        Some(result.into_iter().flatten().collect::<Vec<_>>())
+    } else {
+        None
+    };
+
     Ok(Response::builder()
         .header("Content-type", "application/json")
-        .body(serde_json::to_string(&channel)?.into())
+        .body(
+            serde_json::to_string(&LastApprovedResponse {
+                last_approved: Some(LastApproved {
+                    new_state,
+                    approve_state: Some(approve_state),
+                }),
+                heartbeats,
+            })?
+            .into(),
+        )
         .unwrap())
 }
 
@@ -127,6 +182,7 @@ pub async fn insert_events<A: Adapter + 'static>(
     let into_body = req.into_body();
     let body = hyper::body::to_bytes(into_body).await?;
     let request_body = serde_json::from_slice::<HashMap<String, Vec<Event>>>(&body)?;
+
     let events = request_body
         .get("events")
         .ok_or_else(|| ResponseError::BadRequest("invalid request".to_string()))?;
@@ -159,6 +215,7 @@ pub async fn create_validator_messages<A: Adapter + 'static>(
 
     let into_body = req.into_body();
     let body = hyper::body::to_bytes(into_body).await?;
+
     let request_body = serde_json::from_slice::<HashMap<String, Vec<MessageTypes>>>(&body)?;
     let messages = request_body
         .get("messages")
@@ -200,6 +257,12 @@ mod channel_list {
         pub creator: Option<String>,
         /// filters the channels containing a specific validator if provided
         pub validator: Option<ValidatorId>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub(super) struct LastApprovedQuery {
+        pub with_heartbeat: Option<String>,
     }
 
     fn default_page() -> u64 {
