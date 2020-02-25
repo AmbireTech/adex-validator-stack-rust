@@ -140,13 +140,12 @@ impl EventAggregator {
             .for_each(|ev| event_reducer::reduce(&record.channel, &mut record.aggregate, ev));
 
         if ANALYTICS_RECORDER.is_some() {
-            let logger = app.logger.clone();
             tokio::spawn(analytics_recorder::record(
                 redis.clone(),
                 record.channel.clone(),
                 session.clone(),
                 events.to_owned().to_vec(),
-                logger,
+                app.logger.clone(),
             ));
         }
 
@@ -155,13 +154,7 @@ impl EventAggregator {
         drop(channel_recorder);
 
         if aggr_throttle == 0 {
-            store(
-                &app.pool,
-                &channel_id,
-                &app.logger.clone(),
-                recorder.clone(),
-            )
-            .await;
+            store(&app.pool, &channel_id, &app.logger, recorder.clone()).await;
         }
 
         Ok(())
