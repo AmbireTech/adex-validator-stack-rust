@@ -111,7 +111,7 @@ impl EventAggregator {
                                 break;
                             }
 
-                            delay_for(Duration::from_secs(aggr_throttle as u64)).await;
+                            delay_for(Duration::from_millis(aggr_throttle as u64)).await;
                             store(&dbpool, &channel_id, &logger, recorder.clone()).await;
                         }
                     });

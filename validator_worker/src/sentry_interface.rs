@@ -34,7 +34,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
         logger: Logger,
     ) -> Result<Self, ValidatorWorker> {
         let client = Client::builder()
-            .timeout(Duration::from_secs(config.fetch_timeout.into()))
+            .timeout(Duration::from_millis(config.fetch_timeout.into()))
             .build()
             .map_err(|e| ValidatorWorker::Failed(format!("building Client error: {}", e)))?;
 
