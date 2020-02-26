@@ -15,7 +15,7 @@ use primitives::adapter::{Adapter, DummyAdapterOptions, KeystoreOptions};
 use primitives::config::{configuration, Config};
 use primitives::util::tests::prep_db::{AUTH, IDS};
 use primitives::{Channel, SpecValidator, ValidatorId};
-use slog::{error, Logger};
+use slog::{error, info, Logger};
 use validator_worker::error::ValidatorWorker as ValidatorWorkerError;
 use validator_worker::{all_channels, follower, leader, SentryApi};
 
@@ -173,6 +173,8 @@ async fn iterate_channels<A: Adapter + 'static>(args: Args<A>, logger: &Logger) 
             .map(|channel| validator_tick(args.adapter.clone(), channel, &args.config, logger)),
     )
     .await;
+
+    info!(logger, "processed {} channels", channels_size);
 
     if let Err(e) = tick {
         error!(logger, "An occurred while processing channels {}", &e; "main" => "iterate_channels");
