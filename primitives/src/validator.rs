@@ -174,6 +174,7 @@ pub enum MessageTypes {
 #[cfg(feature = "postgres")]
 pub mod postgres {
     use super::ValidatorId;
+    use crate::ToETHChecksum;
     use bytes::BytesMut;
     use postgres_types::{FromSql, IsNull, ToSql, Type};
     use std::convert::TryFrom;
@@ -201,7 +202,7 @@ pub mod postgres {
             ty: &Type,
             w: &mut BytesMut,
         ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-            let string = format!("0x{}", self.to_hex_non_prefix_string());
+            let string = self.to_checksum();
 
             <String as ToSql>::to_sql(&string, ty, w)
         }
@@ -215,7 +216,7 @@ pub mod postgres {
             ty: &Type,
             out: &mut BytesMut,
         ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-            let string = format!("0x{}", self.to_hex_non_prefix_string());
+            let string = self.to_checksum();
 
             <String as ToSql>::to_sql_checked(&string, ty, out)
         }
