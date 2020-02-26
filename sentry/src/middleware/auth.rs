@@ -1,6 +1,6 @@
 use std::error;
 
-use hyper::header::AUTHORIZATION;
+use hyper::header::{AUTHORIZATION, REFERER};
 use hyper::{Body, Request};
 use redis::aio::MultiplexedConnection;
 
@@ -57,13 +57,15 @@ pub(crate) async fn for_request(
                 adapter_session
             }
         };
+    
+        let referrer = req.headers().get(REFERER).map(|hv| hv.to_str().ok().map(ToString::to_string)).flatten();
 
         let session = Session {
             era: adapter_session.era,
             uid: adapter_session.uid,
             ip: get_request_ip(&req),
             country: None,
-            referrer_header: None,
+            referrer_header: referrer,
         };
 
         req.extensions_mut().insert(session);

@@ -132,7 +132,13 @@ impl EventAggregator {
         )
         .await;
         if let Err(e) = has_access {
-            return Err(ResponseError::BadRequest(e.to_string()));
+            let err = match e {
+                Error::OnlyCreatorCanCloseChannel => ResponseError::Forbidden(e.to_string()),
+                Error::ChannelIsExpired => write!(f, "channel has expired"),
+                Error::ChannelIsInWithdrawPeriod => write!(f, "channel is in withdraw period"),
+                Error::RulesError(error) => write!(f, "{}", error),
+            }
+            return Err(err);
         }
 
         events

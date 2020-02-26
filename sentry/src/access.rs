@@ -15,6 +15,7 @@ pub enum Error {
     OnlyCreatorCanCloseChannel,
     ChannelIsExpired,
     ChannelIsInWithdrawPeriod,
+    ForbiddenReferrer,
     RulesError(String),
 }
 
@@ -26,6 +27,7 @@ impl fmt::Display for Error {
             Error::OnlyCreatorCanCloseChannel => write!(f, "only creator can create channel"),
             Error::ChannelIsExpired => write!(f, "channel has expired"),
             Error::ChannelIsInWithdrawPeriod => write!(f, "channel is in withdraw period"),
+            Error::ForbiddenReferrer => write!(f, "event submission restricted"),
             Error::RulesError(error) => write!(f, "{}", error),
         }
     }
@@ -164,6 +166,13 @@ async fn apply_rule(
         }
         None => Ok(()),
     }
+}
+
+
+fn forbidden_referrer(session: &Session) {
+    session
+        .referrer_header
+        
 }
 
 #[cfg(test)]

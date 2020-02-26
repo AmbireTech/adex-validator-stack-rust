@@ -131,7 +131,7 @@ impl<A: Adapter + 'static> Application<A> {
             Ok(req) => req,
             Err(error) => {
                 error!(&self.logger, "{}", &error; "module" => "middleware-auth");
-                return map_response_error(ResponseError::BadRequest("invalid auth".into()));
+                return map_response_error(ResponseError::Unauthorized);
             }
         };
 
@@ -355,6 +355,7 @@ pub enum ResponseError {
     NotFound,
     BadRequest(String),
     Unauthorized,
+    Forbidden(String),
 }
 
 impl<T> From<T> for ResponseError
@@ -376,6 +377,7 @@ pub fn map_response_error(error: ResponseError) -> Response<Body> {
             "invalid authorization".to_string(),
             StatusCode::UNAUTHORIZED,
         ),
+        ResponseError::Forbidden(e) => bad_response(e, StatusCode::FORBIDDEN),
     }
 }
 
