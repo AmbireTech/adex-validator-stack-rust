@@ -6,6 +6,7 @@ use crate::db::DbPool;
 use crate::event_reducer;
 use crate::Application;
 use crate::ResponseError;
+use crate::access::Error as AccessError;
 use crate::Session;
 use async_std::sync::RwLock;
 use chrono::Utc;
@@ -133,11 +134,9 @@ impl EventAggregator {
         .await;
         if let Err(e) = has_access {
             let err = match e {
-                Error::OnlyCreatorCanCloseChannel => ResponseError::Forbidden(e.to_string()),
-                Error::ChannelIsExpired => write!(f, "channel has expired"),
-                Error::ChannelIsInWithdrawPeriod => write!(f, "channel is in withdraw period"),
-                Error::RulesError(error) => write!(f, "{}", error),
-            }
+                AccessError::OnlyCreatorCanCloseChannel | AccessError::ForbiddenReferrer => ResponseError::Forbidden(e.to_string()),
+                _ => ResponseError::BadRequest(e.to_string()),
+            };
             return Err(err);
         }
 
