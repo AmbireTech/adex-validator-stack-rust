@@ -90,6 +90,18 @@ pub async fn channel_list<A: Adapter>(
     Ok(success_response(serde_json::to_string(&list_response)?))
 }
 
+pub async fn channel_validate<A: Adapter>(
+    req: Request<Body>,
+    _: &Application<A>
+) -> Result<Response<Body>, ResponseError> {
+    let body = hyper::body::to_bytes(req.into_body()).await?;
+    let _channel = serde_json::from_slice::<Channel>(&body)
+        .map_err(|e| ResponseError::FailedValidation(e.to_string()))?;
+    let create_response = SuccessResponse { success: true };
+    Ok(success_response(serde_json::to_string(&create_response)?))
+
+}
+
 pub async fn last_approved<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>,

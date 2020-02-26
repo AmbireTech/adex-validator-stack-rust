@@ -16,12 +16,13 @@ use hyper::{Body, Method, Request, Response, StatusCode};
 use lazy_static::lazy_static;
 use primitives::adapter::Adapter;
 use primitives::{Config, ValidatorId};
+use primitives::sentry::{ValidationErrorResponse};
 use redis::aio::MultiplexedConnection;
 use regex::Regex;
 use routes::analytics::{advanced_analytics, advertiser_analytics, analytics, publisher_analytics};
 use routes::cfg::config;
 use routes::channel::{
-    channel_list, create_channel, create_validator_messages, insert_events, last_approved,
+    channel_list, create_channel, create_validator_messages, insert_events, last_approved, channel_validate
 };
 use slog::{error, Logger};
 use std::collections::HashMap;
@@ -140,6 +141,7 @@ impl<A: Adapter + 'static> Application<A> {
             ("/cfg", &Method::GET) => config(req, &self).await,
             ("/channel", &Method::POST) => create_channel(req, &self).await,
             ("/channel/list", &Method::GET) => channel_list(req, &self).await,
+            ("/channel/validate", &Method::POST) => channel_validate(req, &self).await,
 
             ("/analytics", &Method::GET) => analytics(req, &self).await,
             ("/analytics/advanced", &Method::GET) => {
@@ -354,6 +356,7 @@ async fn channels_router<A: Adapter + 'static>(
 pub enum ResponseError {
     NotFound,
     BadRequest(String),
+    FailedValidation(String),
     Unauthorized,
     Forbidden(String),
 }
@@ -378,6 +381,7 @@ pub fn map_response_error(error: ResponseError) -> Response<Body> {
             StatusCode::UNAUTHORIZED,
         ),
         ResponseError::Forbidden(e) => bad_response(e, StatusCode::FORBIDDEN),
+        ResponseError::FailedValidation(e) => bad_validation_response(e)
     }
 }
 
@@ -400,6 +404,24 @@ pub fn bad_response(response_body: String, status_code: StatusCode) -> Response<
         .insert("Content-type", "application/json".parse().unwrap());
 
     *response.status_mut() = status_code;
+
+    response
+}
+
+pub fn bad_validation_response(response_body: String) -> Response<Body> {
+    let error_response = ValidationErrorResponse {
+        status_code: 400,
+        validation: vec![response_body]
+    };
+
+    let body = Body::from(serde_json::to_string(&error_response).expect("serialise err response"));
+
+    let mut response = Response::new(body);
+    response
+        .headers_mut()
+        .insert("Content-type", "application/json".parse().unwrap());
+
+    *response.status_mut() = StatusCode::BAD_REQUEST;
 
     response
 }
