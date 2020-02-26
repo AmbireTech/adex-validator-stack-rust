@@ -4,7 +4,7 @@ CREATE TABLE channels
     creator        VARCHAR(255)             NOT NULL,
     deposit_asset  VARCHAR(42)              NOT NULL,
     deposit_amount VARCHAR(255)             NOT NULL,
-    valid_until    TIMESTAMP WITH TIME ZONE NOT NULL,
+    valid_until    TIMESTAMP(2) WITH TIME ZONE NOT NULL,
     spec           JSONB                    NOT NULL,
 
     PRIMARY KEY (id)
@@ -18,7 +18,7 @@ CREATE TABLE validator_messages
     channel_id VARCHAR(66)              NOT NULL REFERENCES channels (id) ON DELETE RESTRICT,
     "from"     VARCHAR(255)             NOT NULL,
     msg        JSONB                    NOT NULL,
-    received   TIMESTAMP WITH TIME ZONE NOT NULL
+    received   TIMESTAMP(2) WITH TIME ZONE NOT NULL
 );
 
 CREATE INDEX idx_validator_messages_received ON validator_messages (received);
@@ -28,7 +28,7 @@ CREATE INDEX idx_validator_messages_msg_state_root ON validator_messages ((msg -
 CREATE TABLE event_aggregates
 (
     channel_id VARCHAR(66)              NOT NULL REFERENCES channels (id) ON DELETE RESTRICT,
-    created    TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    created    TIMESTAMP(2) WITH TIME ZONE NOT NULL DEFAULT NOW(),
     event_type VARCHAR(255)             NOT NULL,
     earner     VARCHAR(255),
     count      VARCHAR                   NOT NULL,
