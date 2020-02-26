@@ -130,10 +130,12 @@ mod list_channels {
             serde_json::Value::from_str(&format!(r#"[{{"id": "{}"}}]"#, validator_id))
                 .expect("Not a valid json")
         });
+        println!("{}", valid_until_ge);
         let (where_clauses, params) =
             channel_list_query_params(creator, validator.as_ref(), valid_until_ge);
         let total_count_params = (where_clauses.clone(), params.clone());
-
+        // println!("{}",  where_clauses.join(" AND "));
+        println!("{:?}", params );
         let channels = pool
             .run(move |connection| {
                 async move {

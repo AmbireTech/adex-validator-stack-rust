@@ -72,7 +72,9 @@ pub struct Pricing {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "UPPERCASE")]
 pub struct PricingBounds {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub impression: Option<Pricing>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub click: Option<Pricing>,
 }
 
@@ -86,7 +88,8 @@ pub struct ChannelSpec {
     pub max_per_impression: BigNum,
     /// Minimum payment offered per impression
     pub min_per_impression: BigNum,
-    // Event pricing bounds
+    /// Event pricing bounds
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pricing_bounds: Option<PricingBounds>,
     /// An array of TargetingTag (optional)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -95,6 +98,7 @@ pub struct ChannelSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub min_targeting_score: Option<f64>,
     /// EventSubmission object, applies to event submission (POST /channel/:id/events)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub event_submission: Option<EventSubmission>,
     /// A millisecond timestamp of when the campaign was created
     #[serde(
@@ -112,6 +116,7 @@ pub struct ChannelSpec {
     )]
     pub active_from: Option<DateTime<Utc>>,
     /// A random number to ensure the campaignSpec hash is unique
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nonce: Option<BigNum>,
     /// A millisecond timestamp of when the campaign should enter a withdraw period
     /// (no longer accept any events other than CHANNEL_CLOSE)
