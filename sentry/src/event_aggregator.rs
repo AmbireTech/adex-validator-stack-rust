@@ -1,4 +1,5 @@
 use crate::access::check_access;
+use crate::analytics_recorder;
 use crate::db::event_aggregate::insert_event_aggregate;
 use crate::db::get_channel_by_id;
 use crate::db::DbPool;
@@ -8,14 +9,20 @@ use crate::ResponseError;
 use crate::Session;
 use async_std::sync::RwLock;
 use chrono::Utc;
+use lazy_static::lazy_static;
 use primitives::adapter::Adapter;
 use primitives::sentry::{Event, EventAggregate};
 use primitives::{Channel, ChannelId};
 use slog::{error, Logger};
 use std::collections::HashMap;
+use std::env;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::delay_for;
+
+lazy_static! {
+    pub static ref ANALYTICS_RECORDER: Option<String> = env::var("ANALYTICS_RECORDER").ok();
+}
 
 #[derive(Debug)]
 struct Record {
@@ -66,6 +73,7 @@ impl EventAggregator {
         let recorder = self.recorder.clone();
         let aggr_throttle = app.config.aggr_throttle;
         let dbpool = app.pool.clone();
+        let redis = app.redis.clone();
         let logger = app.logger.clone();
 
         let mut channel_recorder = self.recorder.write().await;
@@ -103,7 +111,7 @@ impl EventAggregator {
                                 break;
                             }
 
-                            delay_for(Duration::from_secs(aggr_throttle as u64)).await;
+                            delay_for(Duration::from_millis(aggr_throttle as u64)).await;
                             store(&dbpool, &channel_id, &logger, recorder.clone()).await;
                         }
                     });
@@ -131,18 +139,22 @@ impl EventAggregator {
             .iter()
             .for_each(|ev| event_reducer::reduce(&record.channel, &mut record.aggregate, ev));
 
+        if ANALYTICS_RECORDER.is_some() {
+            tokio::spawn(analytics_recorder::record(
+                redis.clone(),
+                record.channel.clone(),
+                session.clone(),
+                events.to_owned().to_vec(),
+                app.logger.clone(),
+            ));
+        }
+
         // drop write access to RwLock
         // this is required to prevent a deadlock in store
         drop(channel_recorder);
 
         if aggr_throttle == 0 {
-            store(
-                &app.pool,
-                &channel_id,
-                &app.logger.clone(),
-                recorder.clone(),
-            )
-            .await;
+            store(&app.pool, &channel_id, &app.logger, recorder.clone()).await;
         }
 
         Ok(())

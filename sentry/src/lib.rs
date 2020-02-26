@@ -5,11 +5,12 @@ use crate::chain::chain;
 use crate::db::DbPool;
 use crate::event_aggregator::EventAggregator;
 use crate::middleware::auth;
-use crate::middleware::channel::channel_load;
+use crate::middleware::channel::{channel_load, get_channel_id};
 use crate::middleware::cors::{cors, Cors};
 use crate::routes::channel::channel_status;
 use crate::routes::event_aggregate::list_channel_event_aggregates;
 use crate::routes::validator_message::{extract_params, list_validator_messages};
+use chrono::Utc;
 use futures::future::{BoxFuture, FutureExt};
 use hyper::{Body, Method, Request, Response, StatusCode};
 use lazy_static::lazy_static;
@@ -17,7 +18,7 @@ use primitives::adapter::Adapter;
 use primitives::{Config, ValidatorId};
 use redis::aio::MultiplexedConnection;
 use regex::Regex;
-use routes::analytics::{advertiser_analytics, analytics, publisher_analytics};
+use routes::analytics::{advanced_analytics, advertiser_analytics, analytics, publisher_analytics};
 use routes::cfg::config;
 use routes::channel::{
     channel_list, create_channel, create_validator_messages, insert_events, last_approved,
@@ -40,6 +41,7 @@ pub mod routes {
 }
 
 pub mod access;
+pub mod analytics_recorder;
 mod chain;
 pub mod db;
 pub mod event_aggregator;
@@ -55,6 +57,7 @@ lazy_static! {
     static ref CHANNEL_EVENTS_AGGREGATES: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events-aggregates/?$").expect("The regex should be valid");
     static ref ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
     static ref ADVERTISER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-advertiser/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
+    static ref PUBLISHER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-publisher/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
     static ref CREATE_EVENTS_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events(/.*)?$").expect("The regex should be valid");
 
 }
@@ -139,6 +142,16 @@ impl<A: Adapter + 'static> Application<A> {
             ("/channel/list", &Method::GET) => channel_list(req, &self).await,
 
             ("/analytics", &Method::GET) => analytics(req, &self).await,
+            ("/analytics/advanced", &Method::GET) => {
+                let req = match chain(req, &self, vec![Box::new(auth_required_middleware)]).await {
+                    Ok(req) => req,
+                    Err(error) => {
+                        return map_response_error(error);
+                    }
+                };
+
+                advanced_analytics(req, &self).await
+            }
             ("/analytics/for-advertiser", &Method::GET) => {
                 let req = match chain(req, &self, vec![Box::new(auth_required_middleware)]).await {
                     Ok(req) => req,
@@ -186,7 +199,13 @@ async fn analytics_router<A: Adapter + 'static>(
                     .map_or("".to_string(), |m| m.as_str().to_string())]);
                 req.extensions_mut().insert(param);
 
-                let req = chain(req, app, vec![Box::new(channel_load)]).await?;
+                let req = chain(
+                    req,
+                    app,
+                    vec![Box::new(channel_load), Box::new(get_channel_id)],
+                )
+                .await?;
+
                 analytics(req, app).await
             } else if let Some(caps) = ADVERTISER_ANALYTICS_BY_CHANNEL_ID.captures(route) {
                 let param = RouteParams(vec![caps
@@ -194,8 +213,28 @@ async fn analytics_router<A: Adapter + 'static>(
                     .map_or("".to_string(), |m| m.as_str().to_string())]);
                 req.extensions_mut().insert(param);
 
-                let req = auth_required_middleware(req, app).await?;
+                let req = chain(
+                    req,
+                    app,
+                    vec![Box::new(auth_required_middleware), Box::new(get_channel_id)],
+                )
+                .await?;
+
                 advertiser_analytics(req, app).await
+            } else if let Some(caps) = PUBLISHER_ANALYTICS_BY_CHANNEL_ID.captures(route) {
+                let param = RouteParams(vec![caps
+                    .get(1)
+                    .map_or("".to_string(), |m| m.as_str().to_string())]);
+                req.extensions_mut().insert(param);
+
+                let req = chain(
+                    req,
+                    app,
+                    vec![Box::new(auth_required_middleware), Box::new(get_channel_id)],
+                )
+                .await?;
+
+                publisher_analytics(req, app).await
             } else {
                 Err(ResponseError::NotFound)
             }
@@ -377,10 +416,16 @@ pub fn success_response(response_body: String) -> Response<Body> {
     response
 }
 
+pub fn epoch() -> f64 {
+    Utc::now().timestamp() as f64 / 2_628_000_000.0
+}
+
 // @TODO: Make pub(crate)
 #[derive(Debug, Clone)]
 pub struct Session {
     pub era: i64,
     pub uid: ValidatorId,
     pub ip: Option<String>,
+    pub country: Option<String>,
+    pub referrer_header: Option<String>,
 }

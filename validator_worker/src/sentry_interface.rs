@@ -34,7 +34,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
         logger: Logger,
     ) -> Result<Self, ValidatorWorker> {
         let client = Client::builder()
-            .timeout(Duration::from_secs(config.fetch_timeout.into()))
+            .timeout(Duration::from_millis(config.fetch_timeout.into()))
             .build()
             .map_err(|e| ValidatorWorker::Failed(format!("building Client error: {}", e)))?;
 
@@ -199,13 +199,12 @@ pub async fn all_channels(
     if first_page.total_pages < 2 {
         Ok(first_page.channels)
     } else {
-        let mut all: Vec<ChannelListResponse> =
+        let all: Vec<ChannelListResponse> =
             try_join_all((1..first_page.total_pages).map(|i| fetch_page(url.clone(), i, &whoami)))
                 .await?;
 
-        all.push(first_page);
-        let result_all: Vec<Channel> = all
-            .into_iter()
+        let result_all: Vec<Channel> = std::iter::once(first_page)
+            .chain(all.into_iter())
             .flat_map(|ch| ch.channels.into_iter())
             .collect();
         Ok(result_all)

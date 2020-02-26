@@ -62,6 +62,8 @@ pub(crate) async fn for_request(
             era: adapter_session.era,
             uid: adapter_session.uid,
             ip: get_request_ip(&req),
+            country: None,
+            referrer_header: None,
         };
 
         req.extensions_mut().insert(session);
