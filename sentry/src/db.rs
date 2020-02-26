@@ -86,7 +86,7 @@ pub async fn setup_migrations(environment: &str) {
 
     if environment == "development" {
         // seeds database tables for testing
-        migrations.push(make_migration!("20190806011140_initial-tables/seed"))
+        migrations.push(make_migration!("20190806011140_initial-tables/seed"));
     }
 
     // Define Migrations
@@ -95,6 +95,18 @@ pub async fn setup_migrations(environment: &str) {
         .expect("Loading migrations failed");
 
     // Reload config, ping the database for applied migrations
+    let config = config.reload().expect("Should reload applied migrations");
+
+    if environment == "development" {
+        // delete all existing data to make tests reproducible
+        Migrator::with_config(&config)
+            .all(true)
+            .direction(Direction::Down)
+            .swallow_completion(true)
+            .apply()
+            .expect("Applying migrations failed");
+    }
+
     let config = config.reload().expect("Should reload applied migrations");
 
     Migrator::with_config(&config)

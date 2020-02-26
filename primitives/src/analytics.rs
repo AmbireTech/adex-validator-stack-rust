@@ -1,30 +1,42 @@
+use crate::ChannelId;
 use crate::DomainError;
 use serde::{Deserialize, Serialize};
 
 pub const ANALYTICS_QUERY_LIMIT: u32 = 200;
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnalyticsData {
+    pub time: f64,
+    pub value: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub channel_id: Option<ChannelId>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AnalyticsResponse {
-    time: u32,
-    value: String,
+    pub aggr: Vec<AnalyticsData>,
+    pub limit: u32,
 }
 
 #[cfg(feature = "postgres")]
 pub mod postgres {
-    use super::AnalyticsResponse;
+    use super::AnalyticsData;
     use tokio_postgres::Row;
 
-    impl From<&Row> for AnalyticsResponse {
+    impl From<&Row> for AnalyticsData {
         fn from(row: &Row) -> Self {
             Self {
                 time: row.get("time"),
                 value: row.get("value"),
+                channel_id: row.try_get("channel_id").ok(),
             }
         }
     }
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AnalyticsQuery {
     #[serde(default = "default_limit")]
     pub limit: u32,
@@ -34,6 +46,7 @@ pub struct AnalyticsQuery {
     pub metric: String,
     #[serde(default = "default_timeframe")]
     pub timeframe: String,
+    pub segment_by_channel: Option<String>,
 }
 
 impl AnalyticsQuery {

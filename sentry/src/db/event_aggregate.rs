@@ -5,10 +5,72 @@ use bb8_postgres::tokio_postgres::types::{ToSql, Type};
 use bb8_postgres::tokio_postgres::Error;
 use chrono::{DateTime, Utc};
 use futures::pin_mut;
-use primitives::sentry::EventAggregate;
+use primitives::sentry::{
+    ApproveStateValidatorMessage, EventAggregate, HeartbeatValidatorMessage,
+    NewStateValidatorMessage,
+};
 use primitives::BigNum;
-use primitives::{ChannelId, ValidatorId};
+use primitives::{Channel, ChannelId, ValidatorId};
 use std::ops::Add;
+
+pub async fn lastest_approve_state(
+    pool: &DbPool,
+    channel: &Channel,
+) -> Result<Option<ApproveStateValidatorMessage>, RunError<bb8_postgres::tokio_postgres::Error>> {
+    pool
+        .run(move |connection| {
+            async move {
+                match connection.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'ApproveState' ORDER BY received DESC LIMIT 1").await {
+                    Ok(select) => match connection.query(&select, &[&channel.id, &channel.spec.validators.follower().id]).await {
+                        Ok(rows) => Ok((rows.get(0).map(ApproveStateValidatorMessage::from), connection)),
+                        Err(e) => Err((e, connection)),
+                    },
+                    Err(e) => Err((e, connection)),
+                }
+            }
+        })
+        .await
+}
+
+pub async fn latest_new_state(
+    pool: &DbPool,
+    channel: &Channel,
+    state_root: &str,
+) -> Result<Option<NewStateValidatorMessage>, RunError<bb8_postgres::tokio_postgres::Error>> {
+    pool
+    .run(move |connection| {
+        async move {
+            match connection.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'NewState' AND msg->> 'stateRoot' = $3 ORDER BY received DESC LIMIT 1").await {
+                Ok(select) => match connection.query(&select, &[&channel.id, &channel.spec.validators.leader().id, &state_root]).await {
+                    Ok(rows) => Ok((rows.get(0).map(NewStateValidatorMessage::from), connection)),
+                    Err(e) => Err((e, connection)),
+                },
+                Err(e) => Err((e, connection)),
+            }
+        }
+    })
+    .await
+}
+
+pub async fn latest_heartbeats(
+    pool: &DbPool,
+    channel_id: &ChannelId,
+    validator_id: &ValidatorId,
+) -> Result<Vec<HeartbeatValidatorMessage>, RunError<bb8_postgres::tokio_postgres::Error>> {
+    pool
+    .run(move |connection| {
+        async move {
+            match connection.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'Heartbeat' ORDER BY received DESC LIMIT 2").await {
+                Ok(select) => match connection.query(&select, &[&channel_id, &validator_id]).await {
+                    Ok(rows) => Ok((rows.iter().map(HeartbeatValidatorMessage::from).collect(), connection)),
+                    Err(e) => Err((e, connection)),
+                },
+                Err(e) => Err((e, connection)),
+            }
+        }
+    })
+    .await
+}
 
 pub async fn list_event_aggregates(
     pool: &DbPool,
@@ -96,7 +158,6 @@ struct EventData {
     earner: Option<ValidatorId>,
     event_count: BigNum,
     event_payout: BigNum,
-    created: DateTime<Utc>,
 }
 
 pub async fn insert_event_aggregate(
@@ -104,8 +165,6 @@ pub async fn insert_event_aggregate(
     channel_id: &ChannelId,
     event: &EventAggregate,
 ) -> Result<bool, RunError<bb8_postgres::tokio_postgres::Error>> {
-    let created = Utc::now();
-
     let mut data: Vec<EventData> = Vec::new();
 
     for (event_type, aggr) in &event.events {
@@ -121,7 +180,6 @@ pub async fn insert_event_aggregate(
                     earner: Some(earner.clone()),
                     event_count: event_count.to_owned(),
                     event_payout: event_payout.clone(),
-                    created,
                 });
 
                 // total sum
@@ -135,7 +193,6 @@ pub async fn insert_event_aggregate(
                 earner: None,
                 event_count: total_event_counts,
                 event_payout: total_event_payouts,
-                created,
             });
         }
     }
@@ -149,12 +206,14 @@ pub async fn insert_event_aggregate(
                     Err(e) => return Err((e, connection))
                 };
 
+                let created = Utc::now(); // time discrepancy
+
                 let writer = BinaryCopyInWriter::new(sink, &[Type::VARCHAR, Type::TIMESTAMPTZ, Type::VARCHAR, Type::VARCHAR, Type::VARCHAR, Type::VARCHAR]);
                 pin_mut!(writer);
                 for item in data {
-                    if let Err(e) = writer.as_mut().write(&[&item.id, &item.created, &item.event_type, &item.event_count, &item.event_payout, &item.earner]).await {
-                            err = Some(e);
-                            break;
+                    if let Err(e) = writer.as_mut().write(&[&item.id, &created, &item.event_type, &item.event_count, &item.event_payout, &item.earner]).await {
+                        err = Some(e);
+                        break;
                     }
                 }
 
