@@ -69,6 +69,11 @@ pub async fn check_access(
         return Err(Error::ChannelIsInWithdrawPeriod);
     }
 
+    // Extra rulfes for normal (non-CLOSE) events
+    if forbidden_country(&session) || forbidden_referrer(&session) {
+        return Err(Error::ForbiddenReferrer)
+    }
+
     let default_rules = [
         Rule {
             uids: Some(vec![channel.creator.to_string()]),
@@ -169,10 +174,24 @@ async fn apply_rule(
 }
 
 
-fn forbidden_referrer(session: &Session) {
-    session
+fn forbidden_referrer(session: &Session) -> bool {
+    if let Some(hostname) = session
         .referrer_header
-        
+        .as_ref()
+        .map(|rf| rf.split('/').nth(2))
+        .flatten() 
+    {
+       return hostname == "localhost" || hostname == "127.0.0.1" || hostname.starts_with("localhost:") || hostname.starts_with("127.0.0.1:");
+    }
+
+    false
+}
+
+fn forbidden_country(session: &Session) -> bool {
+    if let Some(country) = session.country.as_ref() {
+        return country == "XX";
+    }
+    false
 }
 
 #[cfg(test)]
