@@ -149,7 +149,7 @@ fn run<A: Adapter + 'static>(
 async fn infinite<A: Adapter + 'static>(args: Args<A>, logger: &Logger) {
     loop {
         let arg = args.clone();
-        let delay_future = delay_for(Duration::from_secs(arg.config.wait_time as u64));
+        let delay_future = delay_for(Duration::from_millis(arg.config.wait_time as u64));
         let _result = join(iterate_channels(arg, logger), delay_future).await;
     }
 }
@@ -194,7 +194,7 @@ async fn validator_tick<A: Adapter + 'static>(
     let whoami = adapter.whoami().clone();
     // Cloning the `Logger` is cheap, see documentation for more info
     let sentry = SentryApi::init(adapter, &channel, &config, logger.clone())?;
-    let duration = Duration::from_secs(config.validator_tick_timeout as u64);
+    let duration = Duration::from_millis(config.validator_tick_timeout as u64);
 
     match channel.spec.validators.find(&whoami) {
         SpecValidator::Leader(_) => {
