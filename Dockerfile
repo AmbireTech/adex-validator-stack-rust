@@ -38,7 +38,7 @@ RUN apt update && apt-get install -y libssl-dev
 
 COPY --from=builder /usr/local/bin/validator_worker .
 
-ENTRYPOINT validator_worker -a ${ADAPTER:-ethereum} \
+CMD validator_worker -a ${ADAPTER:-ethereum} \
             ${KEYSTORE_FILE:+-k $KEYSTORE_FILE} \
             ${DUMMY_IDENTITY:+-i $DUMMY_IDENTITY} \
             ${SINGLE_TICK:+-t} \
