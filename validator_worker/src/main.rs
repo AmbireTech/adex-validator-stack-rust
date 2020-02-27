@@ -198,13 +198,17 @@ async fn validator_tick<A: Adapter + 'static>(
 
     match channel.spec.validators.find(&whoami) {
         SpecValidator::Leader(_) => {
-            if let Err(e) = timeout(duration, leader::tick(&sentry)).await {
-                return Err(ValidatorWorkerError::Failed(e.to_string()));
+            match timeout(duration, leader::tick(&sentry)).await {
+                Err(e) => return Err(ValidatorWorkerError::Failed(e.to_string())),
+                Ok(Err(e)) => return Err(ValidatorWorkerError::Failed(e.to_string())),
+                _ => ()
             }
         }
         SpecValidator::Follower(_) => {
-            if let Err(e) = timeout(duration, follower::tick(&sentry)).await {
-                return Err(ValidatorWorkerError::Failed(e.to_string()));
+            match timeout(duration, follower::tick(&sentry)).await {
+                Err(e) => return Err(ValidatorWorkerError::Failed(e.to_string())),
+                Ok(Err(e)) => return Err(ValidatorWorkerError::Failed(e.to_string())),
+                _ => ()
             }
         }
         SpecValidator::None => {
