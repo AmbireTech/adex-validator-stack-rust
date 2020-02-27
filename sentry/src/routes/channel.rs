@@ -45,10 +45,11 @@ pub async fn create_channel<A: Adapter>(
 ) -> Result<Response<Body>, ResponseError> {
     let body = hyper::body::to_bytes(req.into_body()).await?;
 
-    let channel = serde_json::from_slice::<Channel>(&body)?;
+    let channel = serde_json::from_slice::<Channel>(&body)
+        .map_err(|e| ResponseError::FailedValidation(e.to_string()))?;
 
     if let Err(e) = app.adapter.validate_channel(&channel).await {
-        return Err(ResponseError::BadRequest(e.to_string()));
+        return Err(ResponseError::FailedValidation(e.to_string()));
     }
     
     let error_response = ResponseError::BadRequest(

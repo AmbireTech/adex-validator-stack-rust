@@ -135,6 +135,7 @@ impl EventAggregator {
         if let Err(e) = has_access {
             let err = match e {
                 AccessError::OnlyCreatorCanCloseChannel | AccessError::ForbiddenReferrer => ResponseError::Forbidden(e.to_string()),
+                AccessError::RulesError(error) => ResponseError::TooManyRequests(error),
                 _ => ResponseError::BadRequest(e.to_string()),
             };
             return Err(err);

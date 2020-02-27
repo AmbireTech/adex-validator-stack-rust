@@ -8,7 +8,7 @@ pub async fn config<A: Adapter>(
     _: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
-    let config_str = serde_json::to_string(&app.config)?;
+    let config_str: String = serde_json::to_string(&app.config)?;
 
     Ok(Response::builder()
         .header(CONTENT_TYPE, "application/json")

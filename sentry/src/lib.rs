@@ -359,7 +359,8 @@ pub enum ResponseError {
     FailedValidation(String),
     Unauthorized,
     Forbidden(String),
-    Conflict(String)
+    Conflict(String),
+    TooManyRequests(String)
 }
 
 impl<T> From<T> for ResponseError
@@ -383,6 +384,7 @@ pub fn map_response_error(error: ResponseError) -> Response<Body> {
         ),
         ResponseError::Forbidden(e) => bad_response(e, StatusCode::FORBIDDEN),
         ResponseError::Conflict(e) => bad_response(e, StatusCode::CONFLICT),
+        ResponseError::TooManyRequests(e) => bad_response(e, StatusCode::TOO_MANY_REQUESTS),
         ResponseError::FailedValidation(e) => bad_validation_response(e)
     }
 }
