@@ -472,19 +472,19 @@ mod test {
 
         // Sign
         let expected_response =
-            "0xce654de0b3d14d63e1cb3181eee7a7a37ef4a06c9fabc204faf96f26357441b625b1be460fbe8f5278cc02aa88a5d0ac2f238e9e3b8e4893760d33bccf77e47f1b";
+            "0x625fd46f82c4cfd135ea6a8534e85dbf50beb157046dce59d2e97aacdf4e38381d1513c0e6f002b2f05c05458038b187754ff38cc0658dfc9ba854cccfb6e13e1b";
         let message = "2bdeafae53940669daa6f519373f686c";
         let response = eth_adapter.sign(message).expect("failed to sign message");
         assert_eq!(expected_response, response, "invalid signature");
 
         // Verify
         let signature =
-            "0xce654de0b3d14d63e1cb3181eee7a7a37ef4a06c9fabc204faf96f26357441b625b1be460fbe8f5278cc02aa88a5d0ac2f238e9e3b8e4893760d33bccf77e47f1b";
+            "0x9e07f12958ce7c5eb1362eb9461e4745dd9d74a42b921391393caea700bfbd6e1ad876a7d8f9202ef1fe6110dbfe87840c5676ca5c4fda9f3330694a1ac2a1fc1b";
         let verify = eth_adapter
             .verify(
-                &ValidatorId::try_from("2bDeAFAE53940669DaA6F519373f686c1f3d3393")
+                &ValidatorId::try_from("2892f6C41E0718eeeDd49D98D648C789668cA67d")
                     .expect("Failed to parse id"),
-                "2bdeafae53940669daa6f519373f686c",
+                "8bc45d8eb27f4c98cab35d17b0baecc2a263d6831ef0800f4c190cbfac6d20a3",
                 &signature,
             )
             .expect("Failed to verify signatures");
