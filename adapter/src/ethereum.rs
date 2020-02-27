@@ -472,12 +472,15 @@ mod test {
         let expected_response =
             "0x625fd46f82c4cfd135ea6a8534e85dbf50beb157046dce59d2e97aacdf4e38381d1513c0e6f002b2f05c05458038b187754ff38cc0658dfc9ba854cccfb6e13e1b";
         let message = "2bdeafae53940669daa6f519373f686c";
-        let response = eth_adapter.sign(message).expect("failed to sign message");
-        assert_eq!(expected_response, response, "invalid signature");
+        let signature = eth_adapter.sign(message).expect("failed to sign message");
+        assert_eq!(expected_response, signature, "invalid signature");
 
         // Verify
+<<<<<<< HEAD
         let signature =
             "0x9e07f12958ce7c5eb1362eb9461e4745dd9d74a42b921391393caea700bfbd6e1ad876a7d8f9202ef1fe6110dbfe87840c5676ca5c4fda9f3330694a1ac2a1fc1b";
+=======
+>>>>>>> 89abe43... fix: date check & ethereum sign
         let verify = eth_adapter
             .verify(
                 &ValidatorId::try_from("2892f6C41E0718eeeDd49D98D648C789668cA67d")

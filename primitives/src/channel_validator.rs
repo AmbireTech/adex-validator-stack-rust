@@ -24,7 +24,7 @@ pub trait ChannelValidator {
             ));
         }
 
-        if channel.valid_until > (Utc::now() + Duration::days(366)) {
+        if channel.valid_until > (Utc::now() + Duration::days(365)) {
             return Err(ChannelError::InvalidValidUntil(
                 "channel.validUntil should not be greater than one year".to_string(),
             ));
