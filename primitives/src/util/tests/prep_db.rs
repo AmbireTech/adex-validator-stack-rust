@@ -1,4 +1,5 @@
 use crate::{
+    channel::{Pricing, PricingBounds},
     BigNum, Channel, ChannelId, ChannelSpec, EventSubmission, SpecValidators, ValidatorDesc,
     ValidatorId,
 };
@@ -69,7 +70,7 @@ lazy_static! {
                 title: None,
                 validators: SpecValidators::new(DUMMY_VALIDATOR_LEADER.clone(), DUMMY_VALIDATOR_FOLLOWER.clone()),
                 max_per_impression: 10.into(),
-                min_per_impression: 10.into(),
+                min_per_impression: 1.into(),
                 targeting: vec![],
                 min_targeting_score: None,
                 event_submission: Some(EventSubmission { allow: vec![] }),
@@ -79,7 +80,7 @@ lazy_static! {
                 nonce: Some(nonce),
                 withdraw_period_start: Utc.timestamp_millis(4_073_414_400_000),
                 ad_units: vec![],
-                pricing_bounds: None,
+                pricing_bounds: Some(PricingBounds {impression: None, click: Some(Pricing { max: 0.into(), min: 0.into()})}),
             },
         }
     };

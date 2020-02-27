@@ -28,6 +28,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .arg(
             Arg::with_name("adapter")
+                .long("adapter")
                 .short("a")
                 .help("the adapter for authentication and signing")
                 .required(true)
@@ -37,18 +38,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .arg(
             Arg::with_name("keystoreFile")
+                .long("keystoreFile")
                 .short("k")
                 .help("path to the JSON Ethereum Keystore file")
                 .takes_value(true),
         )
         .arg(
             Arg::with_name("dummyIdentity")
+                .long("dummyIdentity")
                 .short("i")
                 .help("the identity to use with the dummy adapter")
                 .takes_value(true),
         )
         .arg(
             Arg::with_name("clustered")
+                .long("clustered")
                 .short("c")
                 .help("Run app in cluster mode with multiple workers"),
         )
