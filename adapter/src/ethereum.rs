@@ -117,7 +117,7 @@ impl Adapter for EthereumAdapter {
         if let Some(wallet) = &self.wallet {
             let state_root = hex::decode(state_root)
                 .map_err(|_| AdapterError::Signature("invalid state_root".to_string()))?;
-            let message = Message::from_slice(&hash_message(unsafe { std::str::from_utf8_unchecked(&state_root) }));
+            let message = Message::from_slice(&hash_message(&state_root));
             let wallet_sign = wallet
                 .sign(&self.keystore_pwd, &message)
                 .map_err(|_| map_error("failed to sign messages"))?;
@@ -141,7 +141,7 @@ impl Adapter for EthereumAdapter {
         let signature = Signature::from_electrum(&decoded_signature);
         let state_root = hex::decode(state_root)
             .map_err(|_| AdapterError::Signature("invalid state_root".to_string()))?;
-        let message = Message::from_slice(&hash_message(unsafe { std::str::from_utf8_unchecked(&state_root) }));
+        let message = Message::from_slice(&hash_message(&state_root));
 
         verify_address(&address, &signature, &message).or_else(|_| Ok(false))
     }
@@ -321,14 +321,13 @@ impl RelayerClient {
     }
 }
 
-fn hash_message(message: &str) -> [u8; 32] {
+fn hash_message(message: &[u8]) -> [u8; 32] {
     let eth = "\x19Ethereum Signed Message:\n";
     let message_length = message.len();
 
-    let encoded = format!("{}{}{}", eth, message_length, message);
-
     let mut result = Keccak::new_keccak256();
-    result.update(&encoded.as_bytes());
+    result.update(&format!("{}{}", eth, message_length).as_bytes());
+    result.update(&message);
 
     let mut res: [u8; 32] = [0; 32];
     result.finalize(&mut res);
@@ -381,7 +380,7 @@ pub fn ewt_sign(
     let message = Message::from_slice(&hash_message(&format!(
         "{}.{}",
         header_encoded, payload_encoded
-    )));
+    ).as_bytes()));
     let signature: Signature = signer
         .sign(password, &message)
         .map_err(|_| map_error("sign message"))?
@@ -404,7 +403,7 @@ pub fn ewt_verify(
     let message = Message::from_slice(&hash_message(&format!(
         "{}.{}",
         header_encoded, payload_encoded
-    )));
+    ).as_bytes()));
 
     let decoded_signature = base64::decode_config(&token, base64::URL_SAFE_NO_PAD)?;
     let signature = Signature::from_electrum(&decoded_signature);
