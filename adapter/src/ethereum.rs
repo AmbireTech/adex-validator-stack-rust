@@ -130,7 +130,10 @@ impl Adapter for EthereumAdapter {
     }
 
     fn verify(&self, signer: &ValidatorId, state_root: &str, sig: &str) -> AdapterResult<bool> {
-        let decoded_signature = hex::decode(sig)
+        if !sig.starts_with("0x") {
+            return Err(AdapterError::Signature("not 0x prefixed hex".to_string()));
+        }
+        let decoded_signature = hex::decode(&sig[2..])
             .map_err(|_| AdapterError::Signature("invalid signature".to_string()))?;
         let address = Address::from_slice(signer.inner());
         let signature = Signature::from_electrum(&decoded_signature);
@@ -473,7 +476,7 @@ mod test {
 
         // Verify
         let signature =
-            "ce654de0b3d14d63e1cb3181eee7a7a37ef4a06c9fabc204faf96f26357441b625b1be460fbe8f5278cc02aa88a5d0ac2f238e9e3b8e4893760d33bccf77e47f1b";
+            "0xce654de0b3d14d63e1cb3181eee7a7a37ef4a06c9fabc204faf96f26357441b625b1be460fbe8f5278cc02aa88a5d0ac2f238e9e3b8e4893760d33bccf77e47f1b";
         let verify = eth_adapter
             .verify(
                 &ValidatorId::try_from("2bDeAFAE53940669DaA6F519373f686c1f3d3393")
