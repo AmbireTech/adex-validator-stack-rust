@@ -377,10 +377,9 @@ pub fn ewt_sign(
 
     let payload_encoded =
         base64::encode_config(&serde_json::to_string(payload)?, base64::URL_SAFE_NO_PAD);
-    let message = Message::from_slice(&hash_message(&format!(
-        "{}.{}",
-        header_encoded, payload_encoded
-    ).as_bytes()));
+    let message = Message::from_slice(&hash_message(
+        &format!("{}.{}", header_encoded, payload_encoded).as_bytes(),
+    ));
     let signature: Signature = signer
         .sign(password, &message)
         .map_err(|_| map_error("sign message"))?
@@ -400,10 +399,9 @@ pub fn ewt_verify(
     payload_encoded: &str,
     token: &str,
 ) -> Result<VerifyPayload, Box<dyn Error>> {
-    let message = Message::from_slice(&hash_message(&format!(
-        "{}.{}",
-        header_encoded, payload_encoded
-    ).as_bytes()));
+    let message = Message::from_slice(&hash_message(
+        &format!("{}.{}", header_encoded, payload_encoded).as_bytes(),
+    ));
 
     let decoded_signature = base64::decode_config(&token, base64::URL_SAFE_NO_PAD)?;
     let signature = Signature::from_electrum(&decoded_signature);
