@@ -2,7 +2,6 @@ use crate::channel::{Channel, ChannelError, SpecValidator, SpecValidators};
 use crate::config::Config;
 use crate::ValidatorId;
 use chrono::{Utc};
-use chrono::offset::TimeZone;
 use std::cmp::PartialEq;
 use time::Duration;
 use crate::BigNum;

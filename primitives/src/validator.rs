@@ -1,6 +1,5 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize, Serializer, Deserializer};
-use serde_hex::{SerHex, StrictPfx};
 use std::fmt;
 use hex::FromHex;
 
