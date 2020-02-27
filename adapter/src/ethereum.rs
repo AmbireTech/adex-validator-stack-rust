@@ -115,7 +115,9 @@ impl Adapter for EthereumAdapter {
 
     fn sign(&self, state_root: &str) -> AdapterResult<String> {
         if let Some(wallet) = &self.wallet {
-            let message = Message::from_slice(&hash_message(state_root));
+            let state_root = hex::decode(state_root)
+                .map_err(|_| AdapterError::Signature("invalid state_root".to_string()))?;
+            let message = Message::from_slice(&hash_message(unsafe { std::str::from_utf8_unchecked(&state_root) }));
             let wallet_sign = wallet
                 .sign(&self.keystore_pwd, &message)
                 .map_err(|_| map_error("failed to sign messages"))?;
@@ -137,7 +139,9 @@ impl Adapter for EthereumAdapter {
             .map_err(|_| AdapterError::Signature("invalid signature".to_string()))?;
         let address = Address::from_slice(signer.inner());
         let signature = Signature::from_electrum(&decoded_signature);
-        let message = Message::from_slice(&hash_message(state_root));
+        let state_root = hex::decode(state_root)
+            .map_err(|_| AdapterError::Signature("invalid state_root".to_string()))?;
+        let message = Message::from_slice(&hash_message(unsafe { std::str::from_utf8_unchecked(&state_root) }));
 
         verify_address(&address, &signature, &message).or_else(|_| Ok(false))
     }
