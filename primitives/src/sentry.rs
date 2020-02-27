@@ -164,6 +164,7 @@ pub struct EventAggregateResponse {
 #[serde(rename_all = "camelCase")]
 pub struct ValidationErrorResponse {
     pub status_code: u64,
+    pub message: String,
     pub validation: Vec<String>
 }
 

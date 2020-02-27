@@ -1,6 +1,6 @@
 CREATE TABLE channels
 (
-    id             VARCHAR(66)              NOT NULL UNIQUE,
+    id             VARCHAR(66)              NOT NULL,
     creator        VARCHAR(255)             NOT NULL,
     deposit_asset  VARCHAR(42)              NOT NULL,
     deposit_amount VARCHAR(255)             NOT NULL,

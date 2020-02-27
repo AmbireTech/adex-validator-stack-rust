@@ -49,7 +49,7 @@ pub async fn create_channel<A: Adapter>(
         .map_err(|e| ResponseError::FailedValidation(e.to_string()))?;
 
     if let Err(e) = app.adapter.validate_channel(&channel).await {
-        return Err(ResponseError::FailedValidation(e.to_string()));
+        return Err(ResponseError::BadRequest(e.to_string()));
     }
     
     let error_response = ResponseError::BadRequest(

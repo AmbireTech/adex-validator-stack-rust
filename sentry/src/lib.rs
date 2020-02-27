@@ -415,6 +415,7 @@ pub fn bad_response(response_body: String, status_code: StatusCode) -> Response<
 pub fn bad_validation_response(response_body: String) -> Response<Body> {
     let error_response = ValidationErrorResponse {
         status_code: 400,
+        message: response_body.clone(),
         validation: vec![response_body]
     };
 
