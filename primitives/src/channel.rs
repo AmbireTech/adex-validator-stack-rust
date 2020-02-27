@@ -257,6 +257,7 @@ pub enum ChannelError {
     UnlistedAsset,
     MinimumDepositNotMet,
     MinimumValidatorFeeNotMet,
+    FeeConstraintViolated,
 }
 
 impl fmt::Display for ChannelError {
@@ -270,6 +271,7 @@ impl fmt::Display for ChannelError {
             ChannelError::UnlistedAsset => write!(f, "channel.depositAsset is not whitelisted"),
             ChannelError::MinimumDepositNotMet => write!(f, "channel.depositAmount is less than MINIMAL_DEPOSIT"),
             ChannelError::MinimumValidatorFeeNotMet => write!(f, "channel validator fee is less than MINIMAL_FEE"),
+            ChannelError::FeeConstraintViolated => write!(f, "total fees <= deposit: fee constraint violated" ),
         }
     }
 }

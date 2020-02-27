@@ -68,7 +68,7 @@ impl EventAggregator {
         &self,
         app: &'a Application<A>,
         channel_id: &ChannelId,
-        session: &Session,
+        session: Option<&Session>,
         events: &'a [Event],
     ) -> Result<(), ResponseError> {
         let recorder = self.recorder.clone();
@@ -126,7 +126,7 @@ impl EventAggregator {
 
         let has_access = check_access(
             &app.redis,
-            &session,
+            session,
             &app.config.ip_rate_limit,
             &record.channel,
             events,
@@ -136,6 +136,7 @@ impl EventAggregator {
             let err = match e {
                 AccessError::OnlyCreatorCanCloseChannel | AccessError::ForbiddenReferrer => ResponseError::Forbidden(e.to_string()),
                 AccessError::RulesError(error) => ResponseError::TooManyRequests(error),
+                AccessError::UnAuthenticated => ResponseError::Unauthorized,
                 _ => ResponseError::BadRequest(e.to_string()),
             };
             return Err(err);
@@ -145,11 +146,13 @@ impl EventAggregator {
             .iter()
             .for_each(|ev| event_reducer::reduce(&record.channel, &mut record.aggregate, ev));
 
-        if ANALYTICS_RECORDER.is_some() {
+        // only time we don't have session is during
+        // an unauthenticated close event
+        if ANALYTICS_RECORDER.is_some() && session.is_some() {
             tokio::spawn(analytics_recorder::record(
                 redis.clone(),
                 record.channel.clone(),
-                session.clone(),
+                session.expect("should have session").clone(),
                 events.to_owned().to_vec(),
                 app.logger.clone(),
             ));

@@ -336,10 +336,6 @@ async fn channels_router<A: Adapter + 'static>(
     } else if let (Some(caps), &Method::POST) =
         (CREATE_EVENTS_BY_CHANNEL_ID.captures(&path), method)
     {
-        if req.extensions().get::<Session>().is_none() {
-            return Err(ResponseError::Unauthorized);
-        }
-
         let param = RouteParams(vec![caps
             .get(1)
             .map_or("".to_string(), |m| m.as_str().to_string())]);

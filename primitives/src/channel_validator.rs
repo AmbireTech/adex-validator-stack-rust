@@ -5,6 +5,7 @@ use chrono::{Utc};
 use chrono::offset::TimeZone;
 use std::cmp::PartialEq;
 use time::Duration;
+use crate::BigNum;
 
 pub trait ChannelValidator {
     fn is_channel_valid(
@@ -48,6 +49,12 @@ pub trait ChannelValidator {
 
         if adapter_channel_validator.fee < config.minimal_fee {
             return Err(ChannelError::MinimumValidatorFeeNotMet);
+        }
+
+        let total_validator_fee: BigNum = channel.spec.validators.iter().map(|v| v.fee.clone()).fold(BigNum::from(0), |acc, x| acc + x);
+
+        if total_validator_fee >= channel.deposit_amount {
+            return Err(ChannelError::FeeConstraintViolated)
         }
 
         Ok(())

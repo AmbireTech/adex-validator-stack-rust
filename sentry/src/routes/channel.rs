@@ -195,7 +195,7 @@ pub async fn insert_events<A: Adapter + 'static>(
     let session = req
         .extensions()
         .get::<Session>()
-        .expect("request session")
+        .map(ToOwned::to_owned)
         .to_owned();
 
     let route_params = req
@@ -214,7 +214,7 @@ pub async fn insert_events<A: Adapter + 'static>(
         .ok_or_else(|| ResponseError::BadRequest("invalid request".to_string()))?;
 
     app.event_aggregator
-        .record(app, &channel_id, &session, &events)
+        .record(app, &channel_id, session.as_ref(), &events)
         .await?;
 
     Ok(Response::builder()
