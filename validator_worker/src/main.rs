@@ -31,6 +31,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .version("0.1")
         .arg(
             Arg::with_name("config")
+                .short("config")
                 .help("the config file for the validator worker")
                 .takes_value(true),
         )

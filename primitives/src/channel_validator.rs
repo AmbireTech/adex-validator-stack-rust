@@ -1,8 +1,10 @@
 use crate::channel::{Channel, ChannelError, SpecValidator, SpecValidators};
 use crate::config::Config;
 use crate::ValidatorId;
-use chrono::Utc;
+use chrono::{Utc};
+use chrono::offset::TimeZone;
 use std::cmp::PartialEq;
+use time::Duration;
 
 pub trait ChannelValidator {
     fn is_channel_valid(
@@ -17,7 +19,15 @@ pub trait ChannelValidator {
         };
 
         if channel.valid_until < Utc::now() {
-            return Err(ChannelError::PassedValidUntil);
+            return Err(ChannelError::InvalidValidUntil("channel.validUntil has passed".to_string()));
+        }
+        
+        if channel.valid_until > (Utc::now() + Duration::days(366)) {
+            return Err(ChannelError::InvalidValidUntil("channel.validUntil should not be greater than one year".to_string()));
+        }
+
+        if channel.spec.withdraw_period_start > channel.valid_until {
+            return Err(ChannelError::InvalidValidUntil("channel withdrawPeriodStart is invalid".to_string()));
         }
 
         if !all_validators_listed(&channel.spec.validators, &config.validators_whitelist) {

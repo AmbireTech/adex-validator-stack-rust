@@ -31,7 +31,7 @@ impl fmt::Display for AdapterError {
             AdapterError::Authorization(error) => write!(f, "Authorization error: {}", error),
             AdapterError::Configuration(error) => write!(f, "Configuration error: {}", error),
             AdapterError::Signature(error) => write!(f, "Signature error: {}", error),
-            AdapterError::InvalidChannel(error) => write!(f, "Invalid Channel error: {}", error),
+            AdapterError::InvalidChannel(error) => write!(f, "{}", error),
             AdapterError::Failed(error) => write!(f, "error: {}", error),
         }
     }

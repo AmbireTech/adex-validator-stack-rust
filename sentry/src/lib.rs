@@ -359,6 +359,7 @@ pub enum ResponseError {
     FailedValidation(String),
     Unauthorized,
     Forbidden(String),
+    Conflict(String)
 }
 
 impl<T> From<T> for ResponseError
@@ -381,6 +382,7 @@ pub fn map_response_error(error: ResponseError) -> Response<Body> {
             StatusCode::UNAUTHORIZED,
         ),
         ResponseError::Forbidden(e) => bad_response(e, StatusCode::FORBIDDEN),
+        ResponseError::Conflict(e) => bad_response(e, StatusCode::CONFLICT),
         ResponseError::FailedValidation(e) => bad_validation_response(e)
     }
 }
@@ -394,7 +396,7 @@ pub fn not_found() -> Response<Body> {
 
 pub fn bad_response(response_body: String, status_code: StatusCode) -> Response<Body> {
     let mut error_response = HashMap::new();
-    error_response.insert("error", response_body);
+    error_response.insert("message", response_body);
 
     let body = Body::from(serde_json::to_string(&error_response).expect("serialise err response"));
 

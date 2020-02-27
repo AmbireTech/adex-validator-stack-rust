@@ -16,6 +16,8 @@ use primitives::validator::MessageTypes;
 use primitives::{Channel, ChannelId};
 use slog::error;
 use std::collections::HashMap;
+use bb8_postgres::tokio_postgres::error;
+use bb8::RunError;
 
 pub async fn channel_status<A: Adapter>(
     req: Request<Body>,
@@ -48,17 +50,28 @@ pub async fn create_channel<A: Adapter>(
     if let Err(e) = app.adapter.validate_channel(&channel).await {
         return Err(ResponseError::BadRequest(e.to_string()));
     }
+    
+    let error_response = ResponseError::BadRequest(
+        "err occurred; please try again later".into(),
+    );
 
     match insert_channel(&app.pool, &channel).await {
-        Err(err) => {
-            error!(&app.logger, "{}", &err; "module" => "create_channel");
-            Err(ResponseError::BadRequest(
-                "err occurred; please try again later".into(),
-            ))
+        Err(error) => {
+            error!(&app.logger, "{}", &error; "module" => "create_channel");
+            match error {
+                RunError::User(e) => {
+                    if e.code() == Some(&error::SqlState::UNIQUE_VIOLATION) {
+                        Err(ResponseError::Conflict(
+                            "channel already exists".to_string()
+                        ))
+                    } else {
+                        Err(error_response)
+                    }
+                }
+                _ => Err(error_response)
+            }
         }
-        Ok(false) => Err(ResponseError::BadRequest(
-            "err occurred; please try again later".into(),
-        )),
+        Ok(false) => Err(error_response),
         _ => Ok(()),
     }?;
 

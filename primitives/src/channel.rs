@@ -237,7 +237,7 @@ pub enum ChannelError {
     /// which in terms means, that the adapter shouldn't handle this Channel
     AdapterNotIncluded,
     /// when `channel.valid_until` has passed (< now), the channel should be handled
-    PassedValidUntil,
+    InvalidValidUntil(String),
     UnlistedValidator,
     UnlistedCreator,
     UnlistedAsset,
@@ -247,7 +247,16 @@ pub enum ChannelError {
 
 impl fmt::Display for ChannelError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Channel error",)
+        match self {
+            ChannelError::InvalidArgument(error) => write!(f, "{}", error),
+            ChannelError::AdapterNotIncluded => write!(f, "channel is not validated by us"),
+            ChannelError::InvalidValidUntil(error) => write!(f, "{}", error),
+            ChannelError::UnlistedValidator => write!(f, "validators are not in the whitelist"),
+            ChannelError::UnlistedCreator => write!(f, "channel.creator is not whitelisted"),
+            ChannelError::UnlistedAsset => write!(f, "channel.depositAsset is not whitelisted"),
+            ChannelError::MinimumDepositNotMet => write!(f, "channel.depositAmount is less than MINIMAL_DEPOSIT"),
+            ChannelError::MinimumValidatorFeeNotMet => write!(f, "channel validator fee is less than MINIMAL_FEE"),
+        }
     }
 }
 
