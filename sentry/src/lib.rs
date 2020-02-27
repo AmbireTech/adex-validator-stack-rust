@@ -15,14 +15,15 @@ use futures::future::{BoxFuture, FutureExt};
 use hyper::{Body, Method, Request, Response, StatusCode};
 use lazy_static::lazy_static;
 use primitives::adapter::Adapter;
+use primitives::sentry::ValidationErrorResponse;
 use primitives::{Config, ValidatorId};
-use primitives::sentry::{ValidationErrorResponse};
 use redis::aio::MultiplexedConnection;
 use regex::Regex;
 use routes::analytics::{advanced_analytics, advertiser_analytics, analytics, publisher_analytics};
 use routes::cfg::config;
 use routes::channel::{
-    channel_list, create_channel, create_validator_messages, insert_events, last_approved, channel_validate
+    channel_list, channel_validate, create_channel, create_validator_messages, insert_events,
+    last_approved,
 };
 use slog::{error, Logger};
 use std::collections::HashMap;
@@ -356,7 +357,7 @@ pub enum ResponseError {
     Unauthorized,
     Forbidden(String),
     Conflict(String),
-    TooManyRequests(String)
+    TooManyRequests(String),
 }
 
 impl<T> From<T> for ResponseError
@@ -381,7 +382,7 @@ pub fn map_response_error(error: ResponseError) -> Response<Body> {
         ResponseError::Forbidden(e) => bad_response(e, StatusCode::FORBIDDEN),
         ResponseError::Conflict(e) => bad_response(e, StatusCode::CONFLICT),
         ResponseError::TooManyRequests(e) => bad_response(e, StatusCode::TOO_MANY_REQUESTS),
-        ResponseError::FailedValidation(e) => bad_validation_response(e)
+        ResponseError::FailedValidation(e) => bad_validation_response(e),
     }
 }
 
@@ -412,7 +413,7 @@ pub fn bad_validation_response(response_body: String) -> Response<Body> {
     let error_response = ValidationErrorResponse {
         status_code: 400,
         message: response_body.clone(),
-        validation: vec![response_body]
+        validation: vec![response_body],
     };
 
     let body = Body::from(serde_json::to_string(&error_response).expect("serialise err response"));

@@ -3,7 +3,7 @@ use std::fmt;
 
 use chrono::serde::{ts_milliseconds, ts_milliseconds_option, ts_seconds};
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 
 use crate::big_num::BigNum;
@@ -13,7 +13,13 @@ use std::ops::Deref;
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Copy, Clone, Hash)]
 #[serde(transparent)]
-pub struct ChannelId(#[serde(deserialize_with = "channel_id_from_str", serialize_with = "SerHex::<StrictPfx>::serialize")] [u8; 32]);
+pub struct ChannelId(
+    #[serde(
+        deserialize_with = "channel_id_from_str",
+        serialize_with = "SerHex::<StrictPfx>::serialize"
+    )]
+    [u8; 32],
+);
 
 fn channel_id_from_str<'de, D>(deserializer: D) -> Result<[u8; 32], D::Error>
 where
@@ -21,12 +27,11 @@ where
 {
     let channel_id = String::deserialize(deserializer)?;
     if channel_id.is_empty() || channel_id.len() != 66 {
-        return Err(serde::de::Error::custom("invalid channel id".to_string()))
+        return Err(serde::de::Error::custom("invalid channel id".to_string()));
     }
 
     <[u8; 32] as FromHex>::from_hex(&channel_id[2..]).map_err(serde::de::Error::custom)
 }
-
 
 impl Deref for ChannelId {
     type Target = [u8];
@@ -75,7 +80,6 @@ pub struct Channel {
     pub valid_until: DateTime<Utc>,
     pub spec: ChannelSpec,
 }
-
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Pricing {
@@ -269,9 +273,15 @@ impl fmt::Display for ChannelError {
             ChannelError::UnlistedValidator => write!(f, "validators are not in the whitelist"),
             ChannelError::UnlistedCreator => write!(f, "channel.creator is not whitelisted"),
             ChannelError::UnlistedAsset => write!(f, "channel.depositAsset is not whitelisted"),
-            ChannelError::MinimumDepositNotMet => write!(f, "channel.depositAmount is less than MINIMAL_DEPOSIT"),
-            ChannelError::MinimumValidatorFeeNotMet => write!(f, "channel validator fee is less than MINIMAL_FEE"),
-            ChannelError::FeeConstraintViolated => write!(f, "total fees <= deposit: fee constraint violated" ),
+            ChannelError::MinimumDepositNotMet => {
+                write!(f, "channel.depositAmount is less than MINIMAL_DEPOSIT")
+            }
+            ChannelError::MinimumValidatorFeeNotMet => {
+                write!(f, "channel validator fee is less than MINIMAL_FEE")
+            }
+            ChannelError::FeeConstraintViolated => {
+                write!(f, "total fees <= deposit: fee constraint violated")
+            }
         }
     }
 }

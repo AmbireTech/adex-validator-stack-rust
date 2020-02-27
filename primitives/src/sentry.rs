@@ -165,7 +165,7 @@ pub struct EventAggregateResponse {
 pub struct ValidationErrorResponse {
     pub status_code: u64,
     pub message: String,
-    pub validation: Vec<String>
+    pub validation: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize)]

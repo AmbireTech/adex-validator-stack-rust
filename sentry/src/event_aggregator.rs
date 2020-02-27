@@ -1,4 +1,5 @@
 use crate::access::check_access;
+use crate::access::Error as AccessError;
 use crate::analytics_recorder;
 use crate::db::event_aggregate::insert_event_aggregate;
 use crate::db::get_channel_by_id;
@@ -6,7 +7,6 @@ use crate::db::DbPool;
 use crate::event_reducer;
 use crate::Application;
 use crate::ResponseError;
-use crate::access::Error as AccessError;
 use crate::Session;
 use async_std::sync::RwLock;
 use chrono::Utc;
@@ -134,7 +134,9 @@ impl EventAggregator {
         .await;
         if let Err(e) = has_access {
             let err = match e {
-                AccessError::OnlyCreatorCanCloseChannel | AccessError::ForbiddenReferrer => ResponseError::Forbidden(e.to_string()),
+                AccessError::OnlyCreatorCanCloseChannel | AccessError::ForbiddenReferrer => {
+                    ResponseError::Forbidden(e.to_string())
+                }
                 AccessError::RulesError(error) => ResponseError::TooManyRequests(error),
                 AccessError::UnAuthenticated => ResponseError::Unauthorized,
                 _ => ResponseError::BadRequest(e.to_string()),

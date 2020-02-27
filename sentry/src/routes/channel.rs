@@ -6,6 +6,8 @@ use crate::Application;
 use crate::ResponseError;
 use crate::RouteParams;
 use crate::Session;
+use bb8::RunError;
+use bb8_postgres::tokio_postgres::error;
 use futures::future::try_join_all;
 use hex::FromHex;
 use hyper::{Body, Request, Response};
@@ -16,8 +18,6 @@ use primitives::validator::MessageTypes;
 use primitives::{Channel, ChannelId};
 use slog::error;
 use std::collections::HashMap;
-use bb8_postgres::tokio_postgres::error;
-use bb8::RunError;
 
 pub async fn channel_status<A: Adapter>(
     req: Request<Body>,
@@ -51,10 +51,8 @@ pub async fn create_channel<A: Adapter>(
     if let Err(e) = app.adapter.validate_channel(&channel).await {
         return Err(ResponseError::BadRequest(e.to_string()));
     }
-    
-    let error_response = ResponseError::BadRequest(
-        "err occurred; please try again later".into(),
-    );
+
+    let error_response = ResponseError::BadRequest("err occurred; please try again later".into());
 
     match insert_channel(&app.pool, &channel).await {
         Err(error) => {
@@ -63,13 +61,13 @@ pub async fn create_channel<A: Adapter>(
                 RunError::User(e) => {
                     if e.code() == Some(&error::SqlState::UNIQUE_VIOLATION) {
                         Err(ResponseError::Conflict(
-                            "channel already exists".to_string()
+                            "channel already exists".to_string(),
                         ))
                     } else {
                         Err(error_response)
                     }
                 }
-                _ => Err(error_response)
+                _ => Err(error_response),
             }
         }
         Ok(false) => Err(error_response),
@@ -106,14 +104,13 @@ pub async fn channel_list<A: Adapter>(
 
 pub async fn channel_validate<A: Adapter>(
     req: Request<Body>,
-    _: &Application<A>
+    _: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
     let body = hyper::body::to_bytes(req.into_body()).await?;
     let _channel = serde_json::from_slice::<Channel>(&body)
         .map_err(|e| ResponseError::FailedValidation(e.to_string()))?;
     let create_response = SuccessResponse { success: true };
     Ok(success_response(serde_json::to_string(&create_response)?))
-
 }
 
 pub async fn last_approved<A: Adapter>(

@@ -57,8 +57,12 @@ pub(crate) async fn for_request(
                 adapter_session
             }
         };
-    
-        let referrer = req.headers().get(REFERER).map(|hv| hv.to_str().ok().map(ToString::to_string)).flatten();
+
+        let referrer = req
+            .headers()
+            .get(REFERER)
+            .map(|hv| hv.to_str().ok().map(ToString::to_string))
+            .flatten();
 
         let session = Session {
             era: adapter_session.era,

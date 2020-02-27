@@ -63,8 +63,7 @@ pub async fn check_access(
 
     // We're only sending a CLOSE
     // That's allowed for the creator normally, and for everyone during the withdraw period
-    if has_close_event && session.uid == channel.creator
-    {
+    if has_close_event && session.uid == channel.creator {
         return Ok(());
     }
 
@@ -79,7 +78,7 @@ pub async fn check_access(
 
     // Extra rulfes for normal (non-CLOSE) events
     if forbidden_country(&session) || forbidden_referrer(&session) {
-        return Err(Error::ForbiddenReferrer)
+        return Err(Error::ForbiddenReferrer);
     }
 
     let default_rules = [
@@ -181,15 +180,17 @@ async fn apply_rule(
     }
 }
 
-
 fn forbidden_referrer(session: &Session) -> bool {
     if let Some(hostname) = session
         .referrer_header
         .as_ref()
         .map(|rf| rf.split('/').nth(2))
-        .flatten() 
+        .flatten()
     {
-       return hostname == "localhost" || hostname == "127.0.0.1" || hostname.starts_with("localhost:") || hostname.starts_with("127.0.0.1:");
+        return hostname == "localhost"
+            || hostname == "127.0.0.1"
+            || hostname.starts_with("localhost:")
+            || hostname.starts_with("127.0.0.1:");
     }
 
     false
@@ -272,12 +273,24 @@ mod test {
         let events = get_impression_events(2);
         let channel = get_channel(rule);
 
-        let response =
-            check_access(&redis, Some(session), &config.ip_rate_limit, &channel, &events).await;
+        let response = check_access(
+            &redis,
+            Some(session),
+            &config.ip_rate_limit,
+            &channel,
+            &events,
+        )
+        .await;
         assert_eq!(Ok(()), response);
 
-        let err_response =
-            check_access(&redis, Some(session), &config.ip_rate_limit, &channel, &events).await;
+        let err_response = check_access(
+            &redis,
+            Some(session),
+            &config.ip_rate_limit,
+            &channel,
+            &events,
+        )
+        .await;
         assert_eq!(
             Err(Error::RulesError(
                 "rateLimit: too many requests".to_string()

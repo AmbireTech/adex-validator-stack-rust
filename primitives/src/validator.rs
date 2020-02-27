@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize, Serializer, Deserializer};
-use std::fmt;
 use hex::FromHex;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::fmt;
 
 use crate::{BalancesMap, BigNum, DomainError, ToETHChecksum};
 use std::convert::TryFrom;
@@ -16,8 +16,13 @@ pub enum ValidatorError {
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[serde(transparent)]
-pub struct ValidatorId(#[serde(deserialize_with = "validator_id_from_str", serialize_with = "SerHex::<StrictPfx>::serialize")] [u8; 20]);
-
+pub struct ValidatorId(
+    #[serde(
+        deserialize_with = "validator_id_from_str",
+        serialize_with = "SerHex::<StrictPfx>::serialize"
+    )]
+    [u8; 20],
+);
 
 fn validator_id_from_str<'de, D>(deserializer: D) -> Result<[u8; 20], D::Error>
 where
@@ -25,7 +30,7 @@ where
 {
     let validator_id = String::deserialize(deserializer)?;
     if validator_id.is_empty() || validator_id.len() != 42 {
-        return Err(serde::de::Error::custom("invalid validator id".to_string()))
+        return Err(serde::de::Error::custom("invalid validator id".to_string()));
     }
 
     <[u8; 20] as FromHex>::from_hex(&validator_id[2..]).map_err(serde::de::Error::custom)
@@ -81,7 +86,9 @@ impl TryFrom<&str> for ValidatorId {
         };
 
         if hex_value.len() != 40 {
-            return Err(DomainError::InvalidArgument("Failed to deserialize validator id".to_string()));
+            return Err(DomainError::InvalidArgument(
+                "Failed to deserialize validator id".to_string(),
+            ));
         }
 
         let result = hex::decode(hex_value).map_err(|_| {
