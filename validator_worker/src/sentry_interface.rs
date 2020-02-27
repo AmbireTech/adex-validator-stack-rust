@@ -13,6 +13,8 @@ use primitives::{Channel, Config, ToETHChecksum, ValidatorDesc, ValidatorId};
 use reqwest::{Client, Response};
 use slog::{error, Logger};
 use std::collections::HashMap;
+use std::error::Error;
+use std::fmt;
 use std::time::Duration;
 
 #[derive(Debug, Clone)]
@@ -163,13 +165,41 @@ impl<T: Adapter + 'static> SentryApi<T> {
     }
 }
 
+#[derive(Debug)]
+enum PropagationError {
+    Request(reqwest::Error),
+    Unsuccessful,
+}
+
+impl fmt::Display for PropagationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use PropagationError::*;
+
+        match self {
+            Request(error) => write!(f, "Request error: {}", error),
+            Unsuccessful => write!(f, "Propagation returned unsuccessful response"),
+        }
+    }
+}
+
+impl Error for PropagationError {
+    fn cause(&self) -> Option<&dyn Error> {
+        use PropagationError::*;
+
+        match self {
+            Request(error) => Some(error),
+            Unsuccessful => None,
+        }
+    }
+}
+
 async fn propagate_to(
     channel_id: &str,
     auth_token: &str,
     client: &Client,
     validator: &ValidatorDesc,
     messages: &[&MessageTypes],
-) -> Result<(), reqwest::Error> {
+) -> Result<(), PropagationError> {
     let url = format!(
         "{}/channel/{}/validator-messages",
         validator.url, channel_id
@@ -177,7 +207,7 @@ async fn propagate_to(
     let mut body = HashMap::new();
     body.insert("messages", messages);
 
-    let _response: SuccessResponse = client
+    let response: SuccessResponse = client
         .post(&url)
         .bearer_auth(&auth_token)
         .json(&body)
@@ -186,7 +216,11 @@ async fn propagate_to(
         .json()
         .await?;
 
-    Ok(())
+    if !response.success {
+        Err(PropagationError::Unsuccessful)
+    } else {
+        Ok(())
+    }
 }
 
 pub async fn all_channels(
