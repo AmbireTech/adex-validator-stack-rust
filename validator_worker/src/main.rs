@@ -202,20 +202,28 @@ async fn validator_tick<A: Adapter + 'static>(
     let duration = Duration::from_millis(config.validator_tick_timeout as u64);
 
     match channel.spec.validators.find(&whoami) {
-        SpecValidator::Leader(_) => timeout(duration, leader::tick(&sentry))
-            .await
-            .map_err(|timeout_err| {
-                ValidatorWorkerError::Channel(channel.id, timeout_err.to_string())
-            })?
-            .map_err(|tick_err| ValidatorWorkerError::Channel(channel.id, tick_err.to_string()))
-            .map(|_| ()),
-        SpecValidator::Follower(_) => timeout(duration, follower::tick(&sentry))
-            .await
-            .map_err(|timeout_err| {
-                ValidatorWorkerError::Channel(channel.id, timeout_err.to_string())
-            })?
-            .map_err(|tick_err| ValidatorWorkerError::Channel(channel.id, tick_err.to_string()))
-            .map(|_| ()),
+        SpecValidator::Leader(_) => match timeout(duration, leader::tick(&sentry)).await {
+            Err(timeout_e) => Err(ValidatorWorkerError::Channel(
+                channel.id,
+                timeout_e.to_string(),
+            )),
+            Ok(Err(tick_e)) => Err(ValidatorWorkerError::Channel(
+                channel.id,
+                tick_e.to_string(),
+            )),
+            _ => Ok(()),
+        },
+        SpecValidator::Follower(_) => match timeout(duration, follower::tick(&sentry)).await {
+            Err(timeout_e) => Err(ValidatorWorkerError::Channel(
+                channel.id,
+                timeout_e.to_string(),
+            )),
+            Ok(Err(tick_e)) => Err(ValidatorWorkerError::Channel(
+                channel.id,
+                tick_e.to_string(),
+            )),
+            _ => Ok(()),
+        },
         SpecValidator::None => Err(ValidatorWorkerError::Channel(
             channel.id,
             "validatorTick: processing a channel which we are not validating".to_string(),
