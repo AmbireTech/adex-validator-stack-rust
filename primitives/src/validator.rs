@@ -30,7 +30,7 @@ where
 {
     let validator_id = String::deserialize(deserializer)?;
     if validator_id.is_empty() || validator_id.len() != 42 {
-        return Err(serde::de::Error::custom("invalid validator id".to_string()));
+        return Err(serde::de::Error::custom("invalid validator id length".to_string()));
     }
 
     <[u8; 20] as FromHex>::from_hex(&validator_id[2..]).map_err(serde::de::Error::custom)
@@ -87,7 +87,7 @@ impl TryFrom<&str> for ValidatorId {
 
         if hex_value.len() != 40 {
             return Err(DomainError::InvalidArgument(
-                "Failed to deserialize validator id".to_string(),
+                "invalid validator id length".to_string(),
             ));
         }
 

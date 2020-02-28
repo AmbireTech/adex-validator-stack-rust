@@ -181,26 +181,22 @@ async fn apply_rule(
 }
 
 fn forbidden_referrer(session: &Session) -> bool {
-    if let Some(hostname) = session
+    match session
         .referrer_header
         .as_ref()
         .map(|rf| rf.split('/').nth(2))
         .flatten()
     {
-        return hostname == "localhost"
-            || hostname == "127.0.0.1"
-            || hostname.starts_with("localhost:")
-            || hostname.starts_with("127.0.0.1:");
+        Some(hostname) => hostname == "localhost" || hostname == "127.0.0.1" || hostname.starts_with("localhost:") || hostname.starts_with("127.0.0.1:"),
+        None => false
     }
-
-    false
 }
 
 fn forbidden_country(session: &Session) -> bool {
-    if let Some(country) = session.country.as_ref() {
-        return country == "XX";
+    match session.country.as_ref() {
+        Some(country) => country == "XX",
+        None => false
     }
-    false
 }
 
 #[cfg(test)]
