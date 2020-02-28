@@ -34,7 +34,11 @@ ENV SINGLE_TICK=
 
 WORKDIR /usr/local/bin
 
-RUN apt update && apt-get install -y libssl-dev
+RUN apt update && apt-get install -y libssl-dev ca-certificates
+
+COPY docs/config/cloudflare_origin.crt /usr/local/share/ca-certificates/
+
+RUN update-ca-certificates
 
 COPY --from=builder /usr/local/bin/validator_worker .
 
