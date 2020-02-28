@@ -36,6 +36,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         )
         .arg(
             Arg::with_name("adapter")
+                .long("adapter")
                 .short("a")
                 .help("the adapter for authentication and signing")
                 .required(true)
@@ -45,18 +46,21 @@ fn main() -> Result<(), Box<dyn Error>> {
         )
         .arg(
             Arg::with_name("keystoreFile")
+                .long("keystoreFile")
                 .short("k")
                 .help("path to the JSON Ethereum Keystore file")
                 .takes_value(true),
         )
         .arg(
             Arg::with_name("dummyIdentity")
+                .long("dummyIdentity")
                 .short("i")
                 .help("the identity to use with the dummy adapter")
                 .takes_value(true),
         )
         .arg(
             Arg::with_name("sentryUrl")
+                .long("sentryUrl")
                 .short("u")
                 .help("the URL to the sentry used for listing channels")
                 .default_value("http://127.0.0.1:8005")
@@ -65,6 +69,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         )
         .arg(
             Arg::with_name("singleTick")
+                .long("singleTick")
                 .short("t")
                 .takes_value(false)
                 .help("runs the validator in single-tick mode and exit"),

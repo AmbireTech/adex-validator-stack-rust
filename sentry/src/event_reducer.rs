@@ -1,5 +1,6 @@
+use crate::analytics_recorder::get_payout;
 use primitives::sentry::{AggregateEvents, Event, EventAggregate};
-use primitives::{Channel, ValidatorId};
+use primitives::{BigNum, Channel, ValidatorId};
 
 // @TODO: Remove attribute once we use this function!
 #[allow(dead_code)]
@@ -7,10 +8,17 @@ pub(crate) fn reduce(channel: &Channel, initial_aggr: &mut EventAggregate, ev: &
     match ev {
         Event::Impression { publisher, .. } => {
             let impression = initial_aggr.events.get("IMPRESSION");
-
-            let merge = merge_impression_ev(impression, &publisher, &channel);
+            let payout = get_payout(&channel, &ev);
+            let merge = merge_impression_ev(impression, &publisher, &payout);
 
             initial_aggr.events.insert("IMPRESSION".to_owned(), merge);
+        }
+        Event::Click { publisher, .. } => {
+            let clicks = initial_aggr.events.get("CLICK");
+            let payout = get_payout(&channel, &ev);
+            let merge = merge_impression_ev(clicks, &publisher, &payout);
+
+            initial_aggr.events.insert("CLICK".to_owned(), merge);
         }
         Event::Close => {
             let creator = channel.creator.clone();
@@ -29,7 +37,7 @@ pub(crate) fn reduce(channel: &Channel, initial_aggr: &mut EventAggregate, ev: &
 fn merge_impression_ev(
     impression: Option<&AggregateEvents>,
     earner: &ValidatorId,
-    channel: &Channel,
+    payout: &BigNum,
 ) -> AggregateEvents {
     let mut impression = impression.map(Clone::clone).unwrap_or_default();
 
@@ -45,7 +53,7 @@ fn merge_impression_ev(
         .event_payouts
         .entry(earner.clone())
         .or_insert_with(|| 0.into());
-    *event_payouts += &channel.spec.min_per_impression;
+    *event_payouts += payout;
 
     impression
 }
@@ -73,6 +81,8 @@ mod test {
         let event = Event::Impression {
             publisher: IDS["publisher"].clone(),
             ad_unit: None,
+            ad_slot: None,
+            referrer: None,
         };
 
         for _ in 0..101 {
