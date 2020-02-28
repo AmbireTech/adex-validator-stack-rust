@@ -81,17 +81,13 @@ impl AsRef<[u8]> for ValidatorId {
 impl TryFrom<&str> for ValidatorId {
     type Error = DomainError;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let hex_value = if value.len() == 42 {
-            &value[2..]
-        } else {
-            value
-        };
-
-        if hex_value.len() != 40 {
-            return Err(DomainError::InvalidArgument(
+        let hex_value = match value {
+            value if value.len() == 42 => Ok(&value[2..]),
+            value if value.len() == 40 => Ok(value),
+            _ => Err(DomainError::InvalidArgument(
                 "invalid validator id length".to_string(),
-            ));
-        }
+            )),
+        }?;
 
         let result = hex::decode(hex_value).map_err(|_| {
             DomainError::InvalidArgument("Failed to deserialize validator id".to_string())
