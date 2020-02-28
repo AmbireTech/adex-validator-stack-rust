@@ -30,7 +30,9 @@ where
 {
     let validator_id = String::deserialize(deserializer)?;
     if validator_id.is_empty() || validator_id.len() != 42 {
-        return Err(serde::de::Error::custom("invalid validator id length".to_string()));
+        return Err(serde::de::Error::custom(
+            "invalid validator id length".to_string(),
+        ));
     }
 
     <[u8; 20] as FromHex>::from_hex(&validator_id[2..]).map_err(serde::de::Error::custom)

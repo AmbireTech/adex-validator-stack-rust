@@ -187,15 +187,20 @@ fn forbidden_referrer(session: &Session) -> bool {
         .map(|rf| rf.split('/').nth(2))
         .flatten()
     {
-        Some(hostname) => hostname == "localhost" || hostname == "127.0.0.1" || hostname.starts_with("localhost:") || hostname.starts_with("127.0.0.1:"),
-        None => false
+        Some(hostname) => {
+            hostname == "localhost"
+                || hostname == "127.0.0.1"
+                || hostname.starts_with("localhost:")
+                || hostname.starts_with("127.0.0.1:")
+        }
+        None => false,
     }
 }
 
 fn forbidden_country(session: &Session) -> bool {
     match session.country.as_ref() {
         Some(country) => country == "XX",
-        None => false
+        None => false,
     }
 }
 

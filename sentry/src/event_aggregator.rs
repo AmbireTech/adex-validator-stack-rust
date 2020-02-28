@@ -132,15 +132,13 @@ impl EventAggregator {
             events,
         )
         .await
-        .map_err(|e| {
-            match e {
-                AccessError::OnlyCreatorCanCloseChannel | AccessError::ForbiddenReferrer => {
-                    ResponseError::Forbidden(e.to_string())
-                }
-                AccessError::RulesError(error) => ResponseError::TooManyRequests(error),
-                AccessError::UnAuthenticated => ResponseError::Unauthorized,
-                _ => ResponseError::BadRequest(e.to_string()),
+        .map_err(|e| match e {
+            AccessError::OnlyCreatorCanCloseChannel | AccessError::ForbiddenReferrer => {
+                ResponseError::Forbidden(e.to_string())
             }
+            AccessError::RulesError(error) => ResponseError::TooManyRequests(error),
+            AccessError::UnAuthenticated => ResponseError::Unauthorized,
+            _ => ResponseError::BadRequest(e.to_string()),
         })?;
 
         events

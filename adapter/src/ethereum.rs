@@ -476,11 +476,8 @@ mod test {
         assert_eq!(expected_response, signature, "invalid signature");
 
         // Verify
-<<<<<<< HEAD
         let signature =
             "0x9e07f12958ce7c5eb1362eb9461e4745dd9d74a42b921391393caea700bfbd6e1ad876a7d8f9202ef1fe6110dbfe87840c5676ca5c4fda9f3330694a1ac2a1fc1b";
-=======
->>>>>>> 89abe43... fix: date check & ethereum sign
         let verify = eth_adapter
             .verify(
                 &ValidatorId::try_from("2892f6C41E0718eeeDd49D98D648C789668cA67d")
@@ -489,7 +486,6 @@ mod test {
                 &signature,
             )
             .expect("Failed to verify signatures");
-        
 
         let sig1 = "0x9fa5852041b9818021323aff8260624fd6998c52c95d9ad5036e0db6f2bf2b2d48a188ec1d638581ff56b0a2ecceca6d3880fc65030558bd8f68b154e7ebf80f1b";
         let msg = "1648231285e69677531ffe70719f67a07f3d4393b8425a5a1c84b0c72434c77b";
