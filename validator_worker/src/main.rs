@@ -7,7 +7,6 @@ use std::time::Duration;
 
 use clap::{App, Arg};
 use futures::future::{join, join_all};
-use slog::{error, info, Logger};
 use tokio::runtime::Runtime;
 use tokio::time::{delay_for, timeout};
 
@@ -16,6 +15,7 @@ use primitives::adapter::{Adapter, DummyAdapterOptions, KeystoreOptions};
 use primitives::config::{configuration, Config};
 use primitives::util::tests::prep_db::{AUTH, IDS};
 use primitives::{Channel, SpecValidator, ValidatorId};
+use slog::{error, info, Logger};
 use validator_worker::error::ValidatorWorker as ValidatorWorkerError;
 use validator_worker::{all_channels, follower, leader, SentryApi};
 
