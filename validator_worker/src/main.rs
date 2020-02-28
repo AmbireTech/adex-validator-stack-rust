@@ -6,7 +6,8 @@ use std::error::Error;
 use std::time::Duration;
 
 use clap::{App, Arg};
-use futures::future::{join, try_join_all};
+use futures::future::{join, join_all};
+use slog::{error, info, Logger};
 use tokio::runtime::Runtime;
 use tokio::time::{delay_for, timeout};
 
@@ -15,7 +16,6 @@ use primitives::adapter::{Adapter, DummyAdapterOptions, KeystoreOptions};
 use primitives::config::{configuration, Config};
 use primitives::util::tests::prep_db::{AUTH, IDS};
 use primitives::{Channel, SpecValidator, ValidatorId};
-use slog::{error, info, Logger};
 use validator_worker::error::ValidatorWorker as ValidatorWorkerError;
 use validator_worker::{all_channels, follower, leader, SentryApi};
 
@@ -165,25 +165,25 @@ async fn iterate_channels<A: Adapter + 'static>(args: Args<A>, logger: &Logger) 
     let channels = match result {
         Ok(channels) => channels,
         Err(e) => {
-            error!(logger, "Failed to get channels {}", &e; "main" => "iterate_channels");
+            error!(logger, "Failed to get channels - {}", &e; "main" => "iterate_channels");
             return;
         }
     };
 
     let channels_size = channels.len();
 
-    let tick = try_join_all(
+    let tick_results = join_all(
         channels
             .into_iter()
             .map(|channel| validator_tick(args.adapter.clone(), channel, &args.config, logger)),
     )
     .await;
 
-    info!(logger, "processed {} channels", channels_size);
-
-    if let Err(e) = tick {
-        error!(logger, "An occurred while processing channels {}", &e; "main" => "iterate_channels");
+    for channel_err in tick_results.into_iter().filter_map(Result::err) {
+        error!(logger, "Error processing channels - {}", channel_err; "main" => "iterate_channels");
     }
+
+    info!(logger, "processed {} channels", channels_size);
 
     if channels_size >= args.config.max_channels as usize {
         error!(logger, "WARNING: channel limit cfg.MAX_CHANNELS={} reached", &args.config.max_channels; "main" => "iterate_channels");
@@ -202,23 +202,25 @@ async fn validator_tick<A: Adapter + 'static>(
     let duration = Duration::from_millis(config.validator_tick_timeout as u64);
 
     match channel.spec.validators.find(&whoami) {
-        SpecValidator::Leader(_) => {
-            if let Err(e) = timeout(duration, leader::tick(&sentry)).await {
-                return Err(ValidatorWorkerError::Failed(e.to_string()));
-            }
-        }
-        SpecValidator::Follower(_) => {
-            if let Err(e) = timeout(duration, follower::tick(&sentry)).await {
-                return Err(ValidatorWorkerError::Failed(e.to_string()));
-            }
-        }
-        SpecValidator::None => {
-            return Err(ValidatorWorkerError::Failed(
-                "validatorTick: processing a channel where we are not validating".to_string(),
-            ))
-        }
-    };
-    Ok(())
+        SpecValidator::Leader(_) => timeout(duration, leader::tick(&sentry))
+            .await
+            .map_err(|timeout_err| {
+                ValidatorWorkerError::Channel(channel.id, timeout_err.to_string())
+            })?
+            .map_err(|tick_err| ValidatorWorkerError::Channel(channel.id, tick_err.to_string()))
+            .map(|_| ()),
+        SpecValidator::Follower(_) => timeout(duration, follower::tick(&sentry))
+            .await
+            .map_err(|timeout_err| {
+                ValidatorWorkerError::Channel(channel.id, timeout_err.to_string())
+            })?
+            .map_err(|tick_err| ValidatorWorkerError::Channel(channel.id, tick_err.to_string()))
+            .map(|_| ()),
+        SpecValidator::None => Err(ValidatorWorkerError::Channel(
+            channel.id,
+            "validatorTick: processing a channel which we are not validating".to_string(),
+        )),
+    }
 }
 
 fn logger() -> Logger {
