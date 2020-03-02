@@ -1,3 +1,4 @@
+use crate::channel::ChannelError;
 use crate::channel_validator::ChannelValidator;
 use crate::{Channel, DomainError, ValidatorId};
 use futures::future::BoxFuture;
@@ -6,40 +7,53 @@ use std::collections::HashMap;
 use std::convert::From;
 use std::error::Error;
 use std::fmt;
-use std::fmt::Debug;
 
-pub type AdapterResult<T> = Result<T, AdapterError>;
+pub type AdapterResult<T, AE> = Result<T, AdapterError<AE>>;
 
-#[derive(Debug, Eq, PartialEq)]
-pub enum AdapterError {
+pub trait AdapterErrorKind: fmt::Debug + fmt::Display {}
+
+#[derive(Debug)]
+pub enum AdapterError<AE: AdapterErrorKind> {
     Authentication(String),
-    EwtVerifyFailed(String),
     Authorization(String),
     Configuration(String),
     Signature(String),
-    InvalidChannel(String),
+    InvalidChannel(ChannelError),
     Failed(String),
+    /// Adapter specific errors
+    Adapter(AE),
+    Domain(DomainError),
+    /// If
+    LockedWallet,
 }
 
-impl Error for AdapterError {}
+impl<AE: AdapterErrorKind> Error for AdapterError<AE> {}
 
-impl fmt::Display for AdapterError {
+impl<AE: AdapterErrorKind> From<AE> for AdapterError<AE> {
+    fn from(adapter_err: AE) -> Self {
+        Self::Adapter(adapter_err)
+    }
+}
+
+impl<AE: AdapterErrorKind> fmt::Display for AdapterError<AE> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             AdapterError::Authentication(error) => write!(f, "Authentication error: {}", error),
-            AdapterError::EwtVerifyFailed(error) => write!(f, "Ewt verification error: {}", error),
             AdapterError::Authorization(error) => write!(f, "Authorization error: {}", error),
             AdapterError::Configuration(error) => write!(f, "Configuration error: {}", error),
             AdapterError::Signature(error) => write!(f, "Signature error: {}", error),
             AdapterError::InvalidChannel(error) => write!(f, "{}", error),
             AdapterError::Failed(error) => write!(f, "error: {}", error),
+            AdapterError::Adapter(error) => write!(f, "Adapter specific error: {}", error),
+            AdapterError::Domain(error) => write!(f, "Domain error: {}", error),
+            AdapterError::LockedWallet => write!(f, "You must `.unlock()` the wallet first"),
         }
     }
 }
 
-impl From<DomainError> for AdapterError {
-    fn from(err: DomainError) -> AdapterError {
-        AdapterError::Failed(err.to_string())
+impl<AE: AdapterErrorKind> From<DomainError> for AdapterError<AE> {
+    fn from(err: DomainError) -> AdapterError<AE> {
+        AdapterError::Domain(err)
     }
 }
 
@@ -61,15 +75,17 @@ pub struct Session {
     pub uid: ValidatorId,
 }
 
-pub trait Adapter: ChannelValidator + Send + Sync + Clone + Debug {
+pub trait Adapter: ChannelValidator + Send + Sync + Clone + fmt::Debug {
+    type AdapterError: AdapterErrorKind;
+
     /// Unlock adapter
-    fn unlock(&mut self) -> AdapterResult<()>;
+    fn unlock(&mut self) -> AdapterResult<(), Self::AdapterError>;
 
     /// Get Adapter whoami
     fn whoami(&self) -> &ValidatorId;
 
     /// Signs the provided state_root
-    fn sign(&self, state_root: &str) -> AdapterResult<String>;
+    fn sign(&self, state_root: &str) -> AdapterResult<String, Self::AdapterError>;
 
     /// Verify, based on the signature & state_root, that the signer is the same
     fn verify(
@@ -77,14 +93,20 @@ pub trait Adapter: ChannelValidator + Send + Sync + Clone + Debug {
         signer: &ValidatorId,
         state_root: &str,
         signature: &str,
-    ) -> AdapterResult<bool>;
+    ) -> AdapterResult<bool, Self::AdapterError>;
 
     /// Validate a channel
-    fn validate_channel<'a>(&'a self, channel: &'a Channel) -> BoxFuture<'a, AdapterResult<bool>>;
+    fn validate_channel<'a>(
+        &'a self,
+        channel: &'a Channel,
+    ) -> BoxFuture<'a, AdapterResult<bool, Self::AdapterError>>;
 
     /// Get user session from token
-    fn session_from_token<'a>(&'a self, token: &'a str) -> BoxFuture<'a, AdapterResult<Session>>;
+    fn session_from_token<'a>(
+        &'a self,
+        token: &'a str,
+    ) -> BoxFuture<'a, AdapterResult<Session, Self::AdapterError>>;
 
     /// Gets authentication for specific validator
-    fn get_auth(&self, validator_id: &ValidatorId) -> AdapterResult<String>;
+    fn get_auth(&self, validator_id: &ValidatorId) -> AdapterResult<String, Self::AdapterError>;
 }

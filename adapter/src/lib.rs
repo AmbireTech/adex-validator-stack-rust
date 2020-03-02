@@ -144,7 +144,7 @@ impl EthereumChannel {
         })
     }
 
-    pub fn hash(&self, contract_addr: &[u8; 20]) -> Result<[u8; 32], Box<dyn Error>> {
+    pub fn hash(&self, contract_addr: &[u8; 20]) -> [u8; 32] {
         let tokens = [
             Token::Address(Address::from_slice(contract_addr)),
             Token::Address(self.creator.to_owned()),
@@ -167,12 +167,7 @@ impl EthereumChannel {
         let mut res: [u8; 32] = [0; 32];
         result.finalize(&mut res);
 
-        Ok(res)
-    }
-
-    pub fn hash_hex(&self, contract_addr: &[u8; 20]) -> Result<String, Box<dyn Error>> {
-        let result = self.hash(contract_addr)?;
-        Ok(format!("0x{}", hex::encode(result)))
+        res
     }
 
     pub fn to_solidity_tuple(&self) -> Token {

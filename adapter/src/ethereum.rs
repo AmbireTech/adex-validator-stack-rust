@@ -1,5 +1,6 @@
 use crate::EthereumChannel;
 use chrono::Utc;
+use error::*;
 use ethabi::token::Token;
 use ethkey::Password;
 use ethstore::SafeAccount;
@@ -14,13 +15,12 @@ use primitives::{
     adapter::{Adapter, AdapterError, AdapterResult, KeystoreOptions, Session},
     channel_validator::ChannelValidator,
     config::Config,
-    Channel, ToETHChecksum, ValidatorId,
+    Channel, ChannelId, ToETHChecksum, ValidatorId,
 };
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::convert::TryFrom;
-use std::error::Error;
 use std::fs;
 use std::sync::Arc;
 use tiny_keccak::Keccak;
@@ -56,30 +56,27 @@ pub struct EthereumAdapter {
 impl ChannelValidator for EthereumAdapter {}
 
 impl EthereumAdapter {
-    pub fn init(opts: KeystoreOptions, config: &Config) -> AdapterResult<EthereumAdapter> {
+    pub fn init(opts: KeystoreOptions, config: &Config) -> AdapterResult<EthereumAdapter, Error> {
         let keystore_contents = fs::read_to_string(&opts.keystore_file)
-            .map_err(|_| map_error("Invalid keystore location provided"))?;
+            .map_err(|err| Error::Keystore(KeystoreError::ReadingFile(err)))?;
 
         let keystore_json: Value = serde_json::from_str(&keystore_contents)
-            .map_err(|_| map_error("Invalid keystore json provided"))?;
+            .map_err(|err| Error::Keystore(KeystoreError::Deserialization(err)))?;
 
-        let address = match keystore_json["address"].as_str() {
-            Some(addr) => eth_checksum::checksum(&addr),
-            None => {
-                return Err(AdapterError::Failed(
-                    "address missing in keystore json".to_string(),
-                ))
-            }
-        };
+        let address = keystore_json["address"]
+            .as_str()
+            .map(eth_checksum::checksum)
+            .ok_or_else(|| Error::Keystore(KeystoreError::AddressMissing))?;
 
-        let address = ValidatorId::try_from(&address)?;
+        let address = ValidatorId::try_from(&address)
+            .map_err(|err| Error::Keystore(KeystoreError::AddressInvalid(err)))?;
 
-        let (eloop, transport) = web3::transports::Http::new(&config.ethereum_network)
-            .map_err(|_| map_error("failed to init http transport"))?;
+        let (eloop, transport) =
+            web3::transports::Http::new(&config.ethereum_network).map_err(Error::Web3)?;
         let event_loop = Arc::new(eloop);
         let web3 = web3::Web3::new(transport);
-        let relayer = RelayerClient::new(&config.ethereum_adapter_relayer)
-            .map_err(|_| map_error("Client for Relayer couldn't be built"))?;
+        let relayer =
+            RelayerClient::new(&config.ethereum_adapter_relayer).map_err(Error::RelayerClient)?;
 
         Ok(Self {
             address,
@@ -95,14 +92,16 @@ impl EthereumAdapter {
 }
 
 impl Adapter for EthereumAdapter {
-    fn unlock(&mut self) -> AdapterResult<()> {
+    type AdapterError = Error;
+
+    fn unlock(&mut self) -> AdapterResult<(), Self::AdapterError> {
         let account = SafeAccount::from_file(
             serde_json::from_value(self.keystore_json.clone())
-                .map_err(|_| map_error("Invalid keystore json provided"))?,
+                .map_err(|err| Error::Keystore(KeystoreError::Deserialization(err)))?,
             None,
             &Some(self.keystore_pwd.clone()),
         )
-        .map_err(|_| map_error("Failed to create account"))?;
+        .map_err(Error::WalletUnlock)?;
 
         self.wallet = Some(account);
 
@@ -113,7 +112,7 @@ impl Adapter for EthereumAdapter {
         &self.address
     }
 
-    fn sign(&self, state_root: &str) -> AdapterResult<String> {
+    fn sign(&self, state_root: &str) -> AdapterResult<String, Self::AdapterError> {
         if let Some(wallet) = &self.wallet {
             let state_root = hex::decode(state_root)
                 .map_err(|_| AdapterError::Signature("invalid state_root".to_string()))?;
@@ -125,13 +124,16 @@ impl Adapter for EthereumAdapter {
 
             Ok(format!("0x{}", signature))
         } else {
-            Err(AdapterError::Configuration(
-                "Unlock the wallet before signing".to_string(),
-            ))
+            Err(AdapterError::LockedWallet)
         }
     }
 
-    fn verify(&self, signer: &ValidatorId, state_root: &str, sig: &str) -> AdapterResult<bool> {
+    fn verify(
+        &self,
+        signer: &ValidatorId,
+        state_root: &str,
+        sig: &str,
+    ) -> AdapterResult<bool, Self::AdapterError> {
         if !sig.starts_with("0x") {
             return Err(AdapterError::Signature("not 0x prefixed hex".to_string()));
         }
@@ -146,26 +148,26 @@ impl Adapter for EthereumAdapter {
         verify_address(&address, &signature, &message).or_else(|_| Ok(false))
     }
 
-    fn validate_channel<'a>(&'a self, channel: &'a Channel) -> BoxFuture<'a, AdapterResult<bool>> {
+    fn validate_channel<'a>(
+        &'a self,
+        channel: &'a Channel,
+    ) -> BoxFuture<'a, AdapterResult<bool, Self::AdapterError>> {
         async move {
             // check if channel is valid
-            if let Err(e) = EthereumAdapter::is_channel_valid(&self.config, self.whoami(), channel)
-            {
-                return Err(AdapterError::InvalidChannel(e.to_string()));
-            }
+            EthereumAdapter::is_channel_valid(&self.config, self.whoami(), channel)
+                .map_err(AdapterError::InvalidChannel)?;
 
-            let eth_channel = EthereumChannel::try_from(channel)
-                .map_err(|e| AdapterError::InvalidChannel(e.to_string()))?;
+            let eth_channel =
+                EthereumChannel::try_from(channel).map_err(AdapterError::InvalidChannel)?;
 
-            let channel_id = eth_channel
-                .hash_hex(&self.config.ethereum_core_address)
-                .map_err(|_| map_error("Failed to hash the channel id"))?;
+            let eth_channel_id =
+                ChannelId::from(eth_channel.hash(&self.config.ethereum_core_address));
 
-            let our_channel_id = format!("0x{}", hex::encode(channel.id));
-            if channel_id != our_channel_id {
-                return Err(AdapterError::Configuration(
-                    "channel.id is not valid".to_string(),
-                ));
+            if eth_channel_id != channel.id {
+                return Err(AdapterError::Adapter(Error::InvalidChannelId {
+                    expected: ChannelId::from(eth_channel_id),
+                    actual: channel.id,
+                }));
             }
 
             let contract_address: Address = self.config.ethereum_core_address.into();
@@ -186,19 +188,20 @@ impl Adapter for EthereumAdapter {
                 .map_err(|_| map_error("contract channel status query failed"))?;
 
             if channel_status != *CHANNEL_STATE_ACTIVE {
-                return Err(AdapterError::Configuration(
-                    "channel is not Active on the ethereum network".to_string(),
-                ));
+                Err(AdapterError::Adapter(Error::ChannelInactive(channel.id)))
+            } else {
+                Ok(true)
             }
-
-            Ok(true)
         }
         .boxed()
     }
 
     /// Creates a `Session` from a provided Token by calling the Contract.
     /// Does **not** cache the (`Token`, `Session`) pair.
-    fn session_from_token<'a>(&'a self, token: &'a str) -> BoxFuture<'a, AdapterResult<Session>> {
+    fn session_from_token<'a>(
+        &'a self,
+        token: &'a str,
+    ) -> BoxFuture<'a, AdapterResult<Session, Self::AdapterError>> {
         async move {
             if token.len() < 16 {
                 return Err(AdapterError::Failed("invalid token id".to_string()));
@@ -255,11 +258,11 @@ impl Adapter for EthereumAdapter {
         .boxed()
     }
 
-    fn get_auth(&self, validator: &ValidatorId) -> AdapterResult<String> {
+    fn get_auth(&self, validator: &ValidatorId) -> AdapterResult<String, Self::AdapterError> {
         let wallet = self
             .wallet
             .as_ref()
-            .ok_or_else(|| AdapterError::Configuration("unlock wallet".to_string()))?;
+            .ok_or_else(|| AdapterError::LockedWallet)?;
 
         let era = Utc::now().timestamp_millis() as f64 / 60000.0;
         let payload = Payload {
@@ -295,7 +298,7 @@ impl RelayerClient {
         &self,
         from: &ValidatorId,
         identity: &ValidatorId,
-    ) -> Result<bool, AdapterError> {
+    ) -> Result<bool, AdapterError<Error>> {
         use reqwest::Response;
         use std::collections::HashMap;
 
@@ -311,7 +314,7 @@ impl RelayerClient {
             .send()
             .and_then(|res: Response| res.json())
             .await
-            .map_err(|_| map_error("Fetching privileges failed"))?;
+            .map_err(Error::RelayerClient)?;
 
         let has_privileges = identities_owned
             .get(identity)
@@ -335,7 +338,7 @@ fn hash_message(message: &[u8]) -> [u8; 32] {
     res
 }
 
-fn map_error(err: &str) -> AdapterError {
+fn map_error(err: &str) -> AdapterError<Error> {
     AdapterError::Failed(err.to_string())
 }
 
@@ -366,7 +369,7 @@ pub fn ewt_sign(
     signer: &SafeAccount,
     password: &Password,
     payload: &Payload,
-) -> Result<String, Box<dyn Error>> {
+) -> Result<String, Box<dyn std::error::Error>> {
     let header = Header {
         header_type: "JWT".to_string(),
         alg: "ETH".to_string(),
@@ -398,7 +401,7 @@ pub fn ewt_verify(
     header_encoded: &str,
     payload_encoded: &str,
     token: &str,
-) -> Result<VerifyPayload, Box<dyn Error>> {
+) -> Result<VerifyPayload, Box<dyn std::error::Error>> {
     let message = Message::from_slice(&hash_message(
         &format!("{}.{}", header_encoded, payload_encoded).as_bytes(),
     ));
@@ -420,6 +423,83 @@ pub fn ewt_verify(
     };
 
     Ok(verified_payload)
+}
+
+mod error {
+    use primitives::adapter::AdapterErrorKind;
+    use primitives::ChannelId;
+    use std::fmt;
+
+    #[derive(Debug)]
+    pub enum KeystoreError {
+        /// `address` key is missing from the keystore file
+        AddressMissing,
+        /// The `address` key in the keystore file is not a valid `ValidatorId`
+        AddressInvalid(primitives::DomainError),
+        /// reading the keystore file failed
+        ReadingFile(std::io::Error),
+        /// Deserializing the keystore file failed
+        Deserialization(serde_json::Error),
+    }
+
+    impl std::error::Error for KeystoreError {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            use KeystoreError::*;
+            match self {
+                AddressMissing => None,
+                AddressInvalid(err) => Some(err),
+                ReadingFile(err) => Some(err),
+                Deserialization(err) => Some(err),
+            }
+        }
+    }
+
+    impl fmt::Display for KeystoreError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            use KeystoreError::*;
+
+            match self {
+                AddressMissing => write!(f, "\"address\" key missing in keystore file"),
+                AddressInvalid(err) => write!(f, "\"address\" is invalid: {}", err),
+                ReadingFile(err) => write!(f, "Reading the keystore file failed: {}", err),
+                Deserialization(err) => {
+                    write!(f, "Deserializing the keystore file failed: {}", err)
+                }
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    pub enum Error {
+        Keystore(KeystoreError),
+        WalletUnlock(ethstore::Error),
+        Web3(web3::Error),
+        RelayerClient(reqwest::Error),
+        /// When the ChannelId that we get from hashing the EthereumChannel with the contract address
+        /// does not align with the provided Channel
+        InvalidChannelId {
+            expected: ChannelId,
+            actual: ChannelId,
+        },
+        ChannelInactive(ChannelId),
+    }
+
+    impl AdapterErrorKind for Error {}
+
+    impl fmt::Display for Error {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            use Error::*;
+
+            match self {
+                Keystore(err) => write!(f, "Keystore error: {}", err),
+                WalletUnlock(err) => write!(f, "Wallet unlocking error: {}", err),
+                Web3(err) => write!(f, "Web3 error: {}", err),
+                RelayerClient(err) => write!(f, "Relayer client error: {}", err),
+                InvalidChannelId { expected, actual} => write!(f, "The hashed EthereumChannel.id ({}) is not the same as the Channel.id ({}) that was provided", expected, actual),
+                ChannelInactive(channel_id) => write!(f, "Channel ({}) is not Active on the ethereum network", channel_id)
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -499,7 +579,7 @@ mod test {
             )
             .expect("Failed to verify signatures");
 
-        assert_eq!(verify, true, "invalid signature verification");
+        assert!(verify, "invalid signature verification");
     }
 
     #[test]
@@ -686,7 +766,7 @@ mod test {
             .expect("open channel");
 
         let contract_addr = adex_contract.address().to_fixed_bytes();
-        let channel_id = eth_channel.hash(&contract_addr).expect("hash hex");
+        let channel_id = eth_channel.hash(&contract_addr);
         // set id to proper id
         valid_channel.id = ChannelId::from(channel_id);
 
@@ -699,6 +779,6 @@ mod test {
             .await
             .expect("failed to validate channel");
 
-        assert_eq!(result, true, "should validate valid channel correctly");
+        assert!(result, "should validate valid channel correctly");
     }
 }

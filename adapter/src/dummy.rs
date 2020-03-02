@@ -1,9 +1,12 @@
 use futures::future::{BoxFuture, FutureExt};
-use primitives::adapter::{Adapter, AdapterError, AdapterResult, DummyAdapterOptions, Session};
+use primitives::adapter::{
+    Adapter, AdapterError, AdapterErrorKind, AdapterResult, DummyAdapterOptions, Session,
+};
 use primitives::channel_validator::ChannelValidator;
 use primitives::config::Config;
 use primitives::{Channel, ToETHChecksum, ValidatorId};
 use std::collections::HashMap;
+use std::fmt;
 
 #[derive(Debug, Clone)]
 pub struct DummyAdapter {
@@ -30,8 +33,20 @@ impl DummyAdapter {
     }
 }
 
+#[derive(Debug)]
+pub struct Error {}
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Dummy Adapter error occurred!")
+    }
+}
+
+impl AdapterErrorKind for Error {}
+
 impl Adapter for DummyAdapter {
-    fn unlock(&mut self) -> AdapterResult<()> {
+    type AdapterError = Error;
+
+    fn unlock(&mut self) -> AdapterResult<(), Self::AdapterError> {
         Ok(())
     }
 
@@ -39,7 +54,7 @@ impl Adapter for DummyAdapter {
         &self.identity
     }
 
-    fn sign(&self, state_root: &str) -> AdapterResult<String> {
+    fn sign(&self, state_root: &str) -> AdapterResult<String, Self::AdapterError> {
         let signature = format!(
             "Dummy adapter signature for {} by {}",
             state_root,
@@ -53,7 +68,7 @@ impl Adapter for DummyAdapter {
         signer: &ValidatorId,
         _state_root: &str,
         signature: &str,
-    ) -> AdapterResult<bool> {
+    ) -> AdapterResult<bool, Self::AdapterError> {
         // select the `identity` and compare it to the signer
         // for empty string this will return array with 1 element - an empty string `[""]`
         let is_same = match signature.rsplit(' ').take(1).next() {
@@ -64,17 +79,22 @@ impl Adapter for DummyAdapter {
         Ok(is_same)
     }
 
-    fn validate_channel<'a>(&'a self, channel: &'a Channel) -> BoxFuture<'a, AdapterResult<bool>> {
+    fn validate_channel<'a>(
+        &'a self,
+        channel: &'a Channel,
+    ) -> BoxFuture<'a, AdapterResult<bool, Self::AdapterError>> {
         async move {
-            match DummyAdapter::is_channel_valid(&self.config, self.whoami(), channel) {
-                Ok(_) => Ok(true),
-                Err(e) => Err(AdapterError::InvalidChannel(e.to_string())),
-            }
+            DummyAdapter::is_channel_valid(&self.config, self.whoami(), channel)
+                .map(|_| true)
+                .map_err(AdapterError::InvalidChannel)
         }
         .boxed()
     }
 
-    fn session_from_token<'a>(&'a self, token: &'a str) -> BoxFuture<'a, AdapterResult<Session>> {
+    fn session_from_token<'a>(
+        &'a self,
+        token: &'a str,
+    ) -> BoxFuture<'a, AdapterResult<Session, Self::AdapterError>> {
         async move {
             let identity = self
                 .authorization_tokens
@@ -95,7 +115,7 @@ impl Adapter for DummyAdapter {
         .boxed()
     }
 
-    fn get_auth(&self, _validator: &ValidatorId) -> AdapterResult<String> {
+    fn get_auth(&self, _validator: &ValidatorId) -> AdapterResult<String, Self::AdapterError> {
         let who = self
             .session_tokens
             .iter()
