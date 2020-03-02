@@ -115,7 +115,9 @@ impl Adapter for EthereumAdapter {
 
     fn sign(&self, state_root: &str) -> AdapterResult<String> {
         if let Some(wallet) = &self.wallet {
-            let message = Message::from_slice(&hash_message(state_root));
+            let state_root = hex::decode(state_root)
+                .map_err(|_| AdapterError::Signature("invalid state_root".to_string()))?;
+            let message = Message::from_slice(&hash_message(&state_root));
             let wallet_sign = wallet
                 .sign(&self.keystore_pwd, &message)
                 .map_err(|_| map_error("failed to sign messages"))?;
@@ -130,11 +132,16 @@ impl Adapter for EthereumAdapter {
     }
 
     fn verify(&self, signer: &ValidatorId, state_root: &str, sig: &str) -> AdapterResult<bool> {
-        let decoded_signature = hex::decode(sig)
+        if !sig.starts_with("0x") {
+            return Err(AdapterError::Signature("not 0x prefixed hex".to_string()));
+        }
+        let decoded_signature = hex::decode(&sig[2..])
             .map_err(|_| AdapterError::Signature("invalid signature".to_string()))?;
         let address = Address::from_slice(signer.inner());
         let signature = Signature::from_electrum(&decoded_signature);
-        let message = Message::from_slice(&hash_message(state_root));
+        let state_root = hex::decode(state_root)
+            .map_err(|_| AdapterError::Signature("invalid state_root".to_string()))?;
+        let message = Message::from_slice(&hash_message(&state_root));
 
         verify_address(&address, &signature, &message).or_else(|_| Ok(false))
     }
@@ -314,14 +321,13 @@ impl RelayerClient {
     }
 }
 
-fn hash_message(message: &str) -> [u8; 32] {
+fn hash_message(message: &[u8]) -> [u8; 32] {
     let eth = "\x19Ethereum Signed Message:\n";
     let message_length = message.len();
 
-    let encoded = format!("{}{}{}", eth, message_length, message);
-
     let mut result = Keccak::new_keccak256();
-    result.update(&encoded.as_bytes());
+    result.update(&format!("{}{}", eth, message_length).as_bytes());
+    result.update(&message);
 
     let mut res: [u8; 32] = [0; 32];
     result.finalize(&mut res);
@@ -371,10 +377,9 @@ pub fn ewt_sign(
 
     let payload_encoded =
         base64::encode_config(&serde_json::to_string(payload)?, base64::URL_SAFE_NO_PAD);
-    let message = Message::from_slice(&hash_message(&format!(
-        "{}.{}",
-        header_encoded, payload_encoded
-    )));
+    let message = Message::from_slice(&hash_message(
+        &format!("{}.{}", header_encoded, payload_encoded).as_bytes(),
+    ));
     let signature: Signature = signer
         .sign(password, &message)
         .map_err(|_| map_error("sign message"))?
@@ -394,10 +399,9 @@ pub fn ewt_verify(
     payload_encoded: &str,
     token: &str,
 ) -> Result<VerifyPayload, Box<dyn Error>> {
-    let message = Message::from_slice(&hash_message(&format!(
-        "{}.{}",
-        header_encoded, payload_encoded
-    )));
+    let message = Message::from_slice(&hash_message(
+        &format!("{}.{}", header_encoded, payload_encoded).as_bytes(),
+    ));
 
     let decoded_signature = base64::decode_config(&token, base64::URL_SAFE_NO_PAD)?;
     let signature = Signature::from_electrum(&decoded_signature);
@@ -466,20 +470,32 @@ mod test {
 
         // Sign
         let expected_response =
-            "0xce654de0b3d14d63e1cb3181eee7a7a37ef4a06c9fabc204faf96f26357441b625b1be460fbe8f5278cc02aa88a5d0ac2f238e9e3b8e4893760d33bccf77e47f1b";
+            "0x625fd46f82c4cfd135ea6a8534e85dbf50beb157046dce59d2e97aacdf4e38381d1513c0e6f002b2f05c05458038b187754ff38cc0658dfc9ba854cccfb6e13e1b";
         let message = "2bdeafae53940669daa6f519373f686c";
-        let response = eth_adapter.sign(message).expect("failed to sign message");
-        assert_eq!(expected_response, response, "invalid signature");
+        let signature = eth_adapter.sign(message).expect("failed to sign message");
+        assert_eq!(expected_response, signature, "invalid signature");
 
         // Verify
         let signature =
-            "ce654de0b3d14d63e1cb3181eee7a7a37ef4a06c9fabc204faf96f26357441b625b1be460fbe8f5278cc02aa88a5d0ac2f238e9e3b8e4893760d33bccf77e47f1b";
+            "0x9e07f12958ce7c5eb1362eb9461e4745dd9d74a42b921391393caea700bfbd6e1ad876a7d8f9202ef1fe6110dbfe87840c5676ca5c4fda9f3330694a1ac2a1fc1b";
         let verify = eth_adapter
             .verify(
-                &ValidatorId::try_from("2bDeAFAE53940669DaA6F519373f686c1f3d3393")
+                &ValidatorId::try_from("2892f6C41E0718eeeDd49D98D648C789668cA67d")
                     .expect("Failed to parse id"),
-                "2bdeafae53940669daa6f519373f686c",
+                "8bc45d8eb27f4c98cab35d17b0baecc2a263d6831ef0800f4c190cbfac6d20a3",
                 &signature,
+            )
+            .expect("Failed to verify signatures");
+
+        let sig1 = "0x9fa5852041b9818021323aff8260624fd6998c52c95d9ad5036e0db6f2bf2b2d48a188ec1d638581ff56b0a2ecceca6d3880fc65030558bd8f68b154e7ebf80f1b";
+        let msg = "1648231285e69677531ffe70719f67a07f3d4393b8425a5a1c84b0c72434c77b";
+
+        let verify2 = eth_adapter
+            .verify(
+                &ValidatorId::try_from("ce07CbB7e054514D590a0262C93070D838bFBA2e")
+                    .expect("Failed to parse id"),
+                msg,
+                &sig1,
             )
             .expect("Failed to verify signatures");
 

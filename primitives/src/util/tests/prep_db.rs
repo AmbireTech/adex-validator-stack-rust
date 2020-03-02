@@ -1,4 +1,5 @@
 use crate::{
+    channel::{Pricing, PricingBounds},
     BigNum, Channel, ChannelId, ChannelSpec, EventSubmission, SpecValidators, ValidatorDesc,
     ValidatorId,
 };
@@ -35,7 +36,7 @@ lazy_static! {
         auth.insert("user".into(), "x8c9v1b2".into());
         auth.insert("publisher".into(), "testing".into());
         auth.insert("publisher2".into(), "testing2".into());
-        auth.insert("creator".into(), "0x033ed90e0fec3f3ea1c9b005c724d704501e0196".into());
+        auth.insert("creator".into(), "0x033Ed90e0FeC3F3ea1C9b005C724D704501e0196".into());
         auth.insert("tester".into(), "AUTH_awesomeTester".into());
 
         auth
@@ -69,7 +70,7 @@ lazy_static! {
                 title: None,
                 validators: SpecValidators::new(DUMMY_VALIDATOR_LEADER.clone(), DUMMY_VALIDATOR_FOLLOWER.clone()),
                 max_per_impression: 10.into(),
-                min_per_impression: 10.into(),
+                min_per_impression: 1.into(),
                 targeting: vec![],
                 min_targeting_score: None,
                 event_submission: Some(EventSubmission { allow: vec![] }),
@@ -79,7 +80,7 @@ lazy_static! {
                 nonce: Some(nonce),
                 withdraw_period_start: Utc.timestamp_millis(4_073_414_400_000),
                 ad_units: vec![],
-                pricing_bounds: None,
+                pricing_bounds: Some(PricingBounds {impression: None, click: Some(Pricing { max: 0.into(), min: 0.into()})}),
             },
         }
     };

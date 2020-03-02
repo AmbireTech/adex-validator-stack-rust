@@ -6,6 +6,8 @@ use crate::Application;
 use crate::ResponseError;
 use crate::RouteParams;
 use crate::Session;
+use bb8::RunError;
+use bb8_postgres::tokio_postgres::error;
 use futures::future::try_join_all;
 use hex::FromHex;
 use hyper::{Body, Request, Response};
@@ -43,22 +45,26 @@ pub async fn create_channel<A: Adapter>(
 ) -> Result<Response<Body>, ResponseError> {
     let body = hyper::body::to_bytes(req.into_body()).await?;
 
-    let channel = serde_json::from_slice::<Channel>(&body)?;
+    let channel = serde_json::from_slice::<Channel>(&body)
+        .map_err(|e| ResponseError::FailedValidation(e.to_string()))?;
 
     if let Err(e) = app.adapter.validate_channel(&channel).await {
         return Err(ResponseError::BadRequest(e.to_string()));
     }
 
+    let error_response = ResponseError::BadRequest("err occurred; please try again later".into());
+
     match insert_channel(&app.pool, &channel).await {
-        Err(err) => {
-            error!(&app.logger, "{}", &err; "module" => "create_channel");
-            Err(ResponseError::BadRequest(
-                "err occurred; please try again later".into(),
-            ))
+        Err(error) => {
+            error!(&app.logger, "{}", &error; "module" => "create_channel");
+            match error {
+                RunError::User(e) if e.code() == Some(&error::SqlState::UNIQUE_VIOLATION) => Err(
+                    ResponseError::Conflict("channel already exists".to_string()),
+                ),
+                _ => Err(error_response),
+            }
         }
-        Ok(false) => Err(ResponseError::BadRequest(
-            "err occurred; please try again later".into(),
-        )),
+        Ok(false) => Err(error_response),
         _ => Ok(()),
     }?;
 
@@ -88,6 +94,17 @@ pub async fn channel_list<A: Adapter>(
     .await?;
 
     Ok(success_response(serde_json::to_string(&list_response)?))
+}
+
+pub async fn channel_validate<A: Adapter>(
+    req: Request<Body>,
+    _: &Application<A>,
+) -> Result<Response<Body>, ResponseError> {
+    let body = hyper::body::to_bytes(req.into_body()).await?;
+    let _channel = serde_json::from_slice::<Channel>(&body)
+        .map_err(|e| ResponseError::FailedValidation(e.to_string()))?;
+    let create_response = SuccessResponse { success: true };
+    Ok(success_response(serde_json::to_string(&create_response)?))
 }
 
 pub async fn last_approved<A: Adapter>(
@@ -166,29 +183,25 @@ pub async fn insert_events<A: Adapter + 'static>(
     req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
-    let session = req
-        .extensions()
-        .get::<Session>()
-        .expect("request session")
-        .to_owned();
+    let (req_head, req_body) = req.into_parts();
+    let session = req_head.extensions.get::<Session>();
 
-    let route_params = req
-        .extensions()
+    let route_params = req_head
+        .extensions
         .get::<RouteParams>()
         .expect("request should have route params");
 
     let channel_id = ChannelId::from_hex(route_params.index(0))?;
 
-    let into_body = req.into_body();
-    let body = hyper::body::to_bytes(into_body).await?;
-    let request_body = serde_json::from_slice::<HashMap<String, Vec<Event>>>(&body)?;
+    let body_bytes = hyper::body::to_bytes(req_body).await?;
+    let request_body = serde_json::from_slice::<HashMap<String, Vec<Event>>>(&body_bytes)?;
 
     let events = request_body
         .get("events")
         .ok_or_else(|| ResponseError::BadRequest("invalid request".to_string()))?;
 
     app.event_aggregator
-        .record(app, &channel_id, &session, &events)
+        .record(app, &channel_id, session, &events)
         .await?;
 
     Ok(Response::builder()
