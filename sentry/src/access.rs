@@ -304,7 +304,7 @@ mod test {
     async fn ip_rate_limit() {
         let (config, redis) = setup().await;
 
-        let session = &Session {
+        let session = Session {
             era: 0,
             uid: IDS["follower"].clone(),
             ip: Default::default(),
@@ -323,7 +323,7 @@ mod test {
 
         let err_response = check_access(
             &redis,
-            Some(session),
+            Some(&session),
             &config.ip_rate_limit,
             &channel,
             &get_impression_events(2),
@@ -339,7 +339,7 @@ mod test {
 
         let response = check_access(
             &redis,
-            Some(session),
+            Some(&session),
             &config.ip_rate_limit,
             &channel,
             &get_impression_events(1),
