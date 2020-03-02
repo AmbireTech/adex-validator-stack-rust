@@ -15,13 +15,15 @@ use futures::future::{BoxFuture, FutureExt};
 use hyper::{Body, Method, Request, Response, StatusCode};
 use lazy_static::lazy_static;
 use primitives::adapter::Adapter;
+use primitives::sentry::ValidationErrorResponse;
 use primitives::{Config, ValidatorId};
 use redis::aio::MultiplexedConnection;
 use regex::Regex;
 use routes::analytics::{advanced_analytics, advertiser_analytics, analytics, publisher_analytics};
 use routes::cfg::config;
 use routes::channel::{
-    channel_list, create_channel, create_validator_messages, insert_events, last_approved,
+    channel_list, channel_validate, create_channel, create_validator_messages, insert_events,
+    last_approved,
 };
 use slog::{error, Logger};
 use std::collections::HashMap;
@@ -131,7 +133,7 @@ impl<A: Adapter + 'static> Application<A> {
             Ok(req) => req,
             Err(error) => {
                 error!(&self.logger, "{}", &error; "module" => "middleware-auth");
-                return map_response_error(ResponseError::BadRequest("invalid auth".into()));
+                return map_response_error(ResponseError::Unauthorized);
             }
         };
 
@@ -140,6 +142,7 @@ impl<A: Adapter + 'static> Application<A> {
             ("/cfg", &Method::GET) => config(req, &self).await,
             ("/channel", &Method::POST) => create_channel(req, &self).await,
             ("/channel/list", &Method::GET) => channel_list(req, &self).await,
+            ("/channel/validate", &Method::POST) => channel_validate(req, &self).await,
 
             ("/analytics", &Method::GET) => analytics(req, &self).await,
             ("/analytics/advanced", &Method::GET) => {
@@ -334,10 +337,6 @@ async fn channels_router<A: Adapter + 'static>(
     } else if let (Some(caps), &Method::POST) =
         (CREATE_EVENTS_BY_CHANNEL_ID.captures(&path), method)
     {
-        if req.extensions().get::<Session>().is_none() {
-            return Err(ResponseError::Unauthorized);
-        }
-
         let param = RouteParams(vec![caps
             .get(1)
             .map_or("".to_string(), |m| m.as_str().to_string())]);
@@ -354,7 +353,11 @@ async fn channels_router<A: Adapter + 'static>(
 pub enum ResponseError {
     NotFound,
     BadRequest(String),
+    FailedValidation(String),
     Unauthorized,
+    Forbidden(String),
+    Conflict(String),
+    TooManyRequests(String),
 }
 
 impl<T> From<T> for ResponseError
@@ -376,6 +379,10 @@ pub fn map_response_error(error: ResponseError) -> Response<Body> {
             "invalid authorization".to_string(),
             StatusCode::UNAUTHORIZED,
         ),
+        ResponseError::Forbidden(e) => bad_response(e, StatusCode::FORBIDDEN),
+        ResponseError::Conflict(e) => bad_response(e, StatusCode::CONFLICT),
+        ResponseError::TooManyRequests(e) => bad_response(e, StatusCode::TOO_MANY_REQUESTS),
+        ResponseError::FailedValidation(e) => bad_validation_response(e),
     }
 }
 
@@ -388,7 +395,7 @@ pub fn not_found() -> Response<Body> {
 
 pub fn bad_response(response_body: String, status_code: StatusCode) -> Response<Body> {
     let mut error_response = HashMap::new();
-    error_response.insert("error", response_body);
+    error_response.insert("message", response_body);
 
     let body = Body::from(serde_json::to_string(&error_response).expect("serialise err response"));
 
@@ -398,6 +405,25 @@ pub fn bad_response(response_body: String, status_code: StatusCode) -> Response<
         .insert("Content-type", "application/json".parse().unwrap());
 
     *response.status_mut() = status_code;
+
+    response
+}
+
+pub fn bad_validation_response(response_body: String) -> Response<Body> {
+    let error_response = ValidationErrorResponse {
+        status_code: 400,
+        message: response_body.clone(),
+        validation: vec![response_body],
+    };
+
+    let body = Body::from(serde_json::to_string(&error_response).expect("serialise err response"));
+
+    let mut response = Response::new(body);
+    response
+        .headers_mut()
+        .insert("Content-type", "application/json".parse().unwrap());
+
+    *response.status_mut() = StatusCode::BAD_REQUEST;
 
     response
 }

@@ -36,7 +36,7 @@ lazy_static! {
         auth.insert("user".into(), "x8c9v1b2".into());
         auth.insert("publisher".into(), "testing".into());
         auth.insert("publisher2".into(), "testing2".into());
-        auth.insert("creator".into(), "0x033ed90e0fec3f3ea1c9b005c724d704501e0196".into());
+        auth.insert("creator".into(), "0x033Ed90e0FeC3F3ea1C9b005C724D704501e0196".into());
         auth.insert("tester".into(), "AUTH_awesomeTester".into());
 
         auth

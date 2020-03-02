@@ -160,6 +160,14 @@ pub struct EventAggregateResponse {
     pub events: Vec<EventAggregate>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ValidationErrorResponse {
+    pub status_code: u64,
+    pub message: String,
+    pub validation: Vec<String>,
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AdvancedAnalyticsResponse {

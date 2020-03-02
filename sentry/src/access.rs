@@ -15,7 +15,9 @@ pub enum Error {
     OnlyCreatorCanCloseChannel,
     ChannelIsExpired,
     ChannelIsInWithdrawPeriod,
+    ForbiddenReferrer,
     RulesError(String),
+    UnAuthenticated,
 }
 
 impl error::Error for Error {}
@@ -24,9 +26,11 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::OnlyCreatorCanCloseChannel => write!(f, "only creator can create channel"),
-            Error::ChannelIsExpired => write!(f, "channel has expired"),
+            Error::ChannelIsExpired => write!(f, "channel is expired"),
             Error::ChannelIsInWithdrawPeriod => write!(f, "channel is in withdraw period"),
+            Error::ForbiddenReferrer => write!(f, "event submission restricted"),
             Error::RulesError(error) => write!(f, "{}", error),
+            Error::UnAuthenticated => write!(f, "unauthenticated"),
         }
     }
 }
@@ -34,7 +38,7 @@ impl fmt::Display for Error {
 // @TODO: Make pub(crate)
 pub async fn check_access(
     redis: &MultiplexedConnection,
-    session: &Session,
+    session: Option<&Session>,
     rate_limit: &RateLimit,
     channel: &Channel,
     events: &[Event],
@@ -43,18 +47,23 @@ pub async fn check_access(
         Event::Close => true,
         _ => false,
     };
+
+    let has_close_event = events.iter().all(is_close_event);
     let current_time = Utc::now();
     let is_in_withdraw_period = current_time > channel.spec.withdraw_period_start;
 
+    if has_close_event && is_in_withdraw_period {
+        return Ok(());
+    }
+
+    let session = session.ok_or_else(|| Error::UnAuthenticated)?;
     if current_time > channel.valid_until {
         return Err(Error::ChannelIsExpired);
     }
 
     // We're only sending a CLOSE
     // That's allowed for the creator normally, and for everyone during the withdraw period
-    if events.iter().all(is_close_event)
-        && (session.uid == channel.creator || is_in_withdraw_period)
-    {
+    if has_close_event && session.uid == channel.creator {
         return Ok(());
     }
 
@@ -65,6 +74,11 @@ pub async fn check_access(
 
     if is_in_withdraw_period {
         return Err(Error::ChannelIsInWithdrawPeriod);
+    }
+
+    // Extra rulfes for normal (non-CLOSE) events
+    if forbidden_country(&session) || forbidden_referrer(&session) {
+        return Err(Error::ForbiddenReferrer);
     }
 
     let default_rules = [
@@ -166,6 +180,30 @@ async fn apply_rule(
     }
 }
 
+fn forbidden_referrer(session: &Session) -> bool {
+    match session
+        .referrer_header
+        .as_ref()
+        .map(|rf| rf.split('/').nth(2))
+        .flatten()
+    {
+        Some(hostname) => {
+            hostname == "localhost"
+                || hostname == "127.0.0.1"
+                || hostname.starts_with("localhost:")
+                || hostname.starts_with("127.0.0.1:")
+        }
+        None => false,
+    }
+}
+
+fn forbidden_country(session: &Session) -> bool {
+    match session.country.as_ref() {
+        Some(country) => country == "XX",
+        None => false,
+    }
+}
+
 #[cfg(test)]
 mod test {
     use std::time::Duration;
@@ -236,12 +274,24 @@ mod test {
         let events = get_impression_events(2);
         let channel = get_channel(rule);
 
-        let response =
-            check_access(&redis, &session, &config.ip_rate_limit, &channel, &events).await;
+        let response = check_access(
+            &redis,
+            Some(&session),
+            &config.ip_rate_limit,
+            &channel,
+            &events,
+        )
+        .await;
         assert_eq!(Ok(()), response);
 
-        let err_response =
-            check_access(&redis, &session, &config.ip_rate_limit, &channel, &events).await;
+        let err_response = check_access(
+            &redis,
+            Some(&session),
+            &config.ip_rate_limit,
+            &channel,
+            &events,
+        )
+        .await;
         assert_eq!(
             Err(Error::RulesError(
                 "rateLimit: too many requests".to_string()
@@ -254,7 +304,7 @@ mod test {
     async fn ip_rate_limit() {
         let (config, redis) = setup().await;
 
-        let session = Session {
+        let session = &Session {
             era: 0,
             uid: IDS["follower"].clone(),
             ip: Default::default(),
@@ -273,7 +323,7 @@ mod test {
 
         let err_response = check_access(
             &redis,
-            &session,
+            Some(session),
             &config.ip_rate_limit,
             &channel,
             &get_impression_events(2),
@@ -289,7 +339,7 @@ mod test {
 
         let response = check_access(
             &redis,
-            &session,
+            Some(session),
             &config.ip_rate_limit,
             &channel,
             &get_impression_events(1),

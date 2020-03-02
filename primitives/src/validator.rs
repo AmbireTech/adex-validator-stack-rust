@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize, Serializer};
-use serde_hex::{SerHex, StrictPfx};
+use hex::FromHex;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 
 use crate::{BalancesMap, BigNum, DomainError, ToETHChecksum};
@@ -16,7 +16,27 @@ pub enum ValidatorError {
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[serde(transparent)]
-pub struct ValidatorId(#[serde(with = "SerHex::<StrictPfx>")] [u8; 20]);
+pub struct ValidatorId(
+    #[serde(
+        deserialize_with = "validator_id_from_str",
+        serialize_with = "SerHex::<StrictPfx>::serialize"
+    )]
+    [u8; 20],
+);
+
+fn validator_id_from_str<'de, D>(deserializer: D) -> Result<[u8; 20], D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let validator_id = String::deserialize(deserializer)?;
+    if validator_id.is_empty() || validator_id.len() != 42 {
+        return Err(serde::de::Error::custom(
+            "invalid validator id length".to_string(),
+        ));
+    }
+
+    <[u8; 20] as FromHex>::from_hex(&validator_id[2..]).map_err(serde::de::Error::custom)
+}
 
 impl ValidatorId {
     pub fn inner(&self) -> &[u8; 20] {
@@ -61,11 +81,13 @@ impl AsRef<[u8]> for ValidatorId {
 impl TryFrom<&str> for ValidatorId {
     type Error = DomainError;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let hex_value = if value.len() == 42 {
-            &value[2..]
-        } else {
-            value
-        };
+        let hex_value = match value {
+            value if value.len() == 42 => Ok(&value[2..]),
+            value if value.len() == 40 => Ok(value),
+            _ => Err(DomainError::InvalidArgument(
+                "invalid validator id length".to_string(),
+            )),
+        }?;
 
         let result = hex::decode(hex_value).map_err(|_| {
             DomainError::InvalidArgument("Failed to deserialize validator id".to_string())
@@ -101,6 +123,7 @@ impl fmt::Display for ValidatorId {
 #[serde(rename_all = "camelCase")]
 pub struct ValidatorDesc {
     pub id: ValidatorId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fee_addr: Option<ValidatorId>,
     pub url: String,
     pub fee: BigNum,
