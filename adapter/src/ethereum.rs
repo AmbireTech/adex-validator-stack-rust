@@ -119,7 +119,7 @@ impl Adapter for EthereumAdapter {
             let message = Message::from_slice(&hash_message(&state_root));
             let wallet_sign = wallet
                 .sign(&self.keystore_pwd, &message)
-                .map_err(|_| map_error("failed to sign messages"))?;
+                .map_err(|err| Error::SignMessage(EwtSigningError::SigningMessage(err)))?;
             let signature: Signature = wallet_sign.into_electrum().into();
 
             Ok(format!("0x{}", signature))
@@ -222,7 +222,7 @@ impl Adapter for EthereumAdapter {
                 };
 
             let verified = ewt_verify(header_encoded, payload_encoded, token_encoded)
-                .map_err(|e| map_error(&e.to_string()))?;
+                .map_err(|err| AdapterError::Adapter(Error::VerifyMessage(err)))?;
 
             if self.whoami().to_checksum() != verified.payload.id {
                 return Err(AdapterError::Configuration(
@@ -273,7 +273,7 @@ impl Adapter for EthereumAdapter {
         };
 
         ewt_sign(&wallet, &self.keystore_pwd, &payload)
-            .map_err(|_| map_error("Failed to sign token"))
+            .map_err(|err| AdapterError::Adapter(Error::SignMessage(err)))
     }
 }
 
@@ -369,28 +369,32 @@ pub fn ewt_sign(
     signer: &SafeAccount,
     password: &Password,
     payload: &Payload,
-) -> Result<String, Box<dyn std::error::Error>> {
+) -> Result<String, EwtSigningError> {
     let header = Header {
         header_type: "JWT".to_string(),
         alg: "ETH".to_string(),
     };
 
-    let header_encoded =
-        base64::encode_config(&serde_json::to_string(&header)?, base64::URL_SAFE_NO_PAD);
+    let header_encoded = base64::encode_config(
+        &serde_json::to_string(&header).map_err(EwtSigningError::HeaderSerialization)?,
+        base64::URL_SAFE_NO_PAD,
+    );
 
-    let payload_encoded =
-        base64::encode_config(&serde_json::to_string(payload)?, base64::URL_SAFE_NO_PAD);
+    let payload_encoded = base64::encode_config(
+        &serde_json::to_string(payload).map_err(EwtSigningError::PayloadSerialization)?,
+        base64::URL_SAFE_NO_PAD,
+    );
     let message = Message::from_slice(&hash_message(
         &format!("{}.{}", header_encoded, payload_encoded).as_bytes(),
     ));
     let signature: Signature = signer
         .sign(password, &message)
-        .map_err(|_| map_error("sign message"))?
+        .map_err(EwtSigningError::SigningMessage)?
         .into_electrum()
         .into();
 
     let token = base64::encode_config(
-        &hex::decode(format!("{}", signature))?,
+        &hex::decode(format!("{}", signature)).map_err(EwtSigningError::DecodingHexSignature)?,
         base64::URL_SAFE_NO_PAD,
     );
 
@@ -401,21 +405,25 @@ pub fn ewt_verify(
     header_encoded: &str,
     payload_encoded: &str,
     token: &str,
-) -> Result<VerifyPayload, Box<dyn std::error::Error>> {
+) -> Result<VerifyPayload, EwtVerifyError> {
     let message = Message::from_slice(&hash_message(
         &format!("{}.{}", header_encoded, payload_encoded).as_bytes(),
     ));
 
-    let decoded_signature = base64::decode_config(&token, base64::URL_SAFE_NO_PAD)?;
+    let decoded_signature = base64::decode_config(&token, base64::URL_SAFE_NO_PAD)
+        .map_err(EwtVerifyError::SignatureDecoding)?;
     let signature = Signature::from_electrum(&decoded_signature);
 
-    let address = public_to_address(&recover(&signature, &message)?);
+    let address =
+        public_to_address(&recover(&signature, &message).map_err(EwtVerifyError::AddressRecovery)?);
 
-    let payload_string = String::from_utf8(base64::decode_config(
-        &payload_encoded,
-        base64::URL_SAFE_NO_PAD,
-    )?)?;
-    let payload: Payload = serde_json::from_str(&payload_string)?;
+    let payload_string = String::from_utf8(
+        base64::decode_config(&payload_encoded, base64::URL_SAFE_NO_PAD)
+            .map_err(EwtVerifyError::PayloadDecoding)?,
+    )
+    .map_err(EwtVerifyError::PayloadUtf8)?;
+    let payload: Payload =
+        serde_json::from_str(&payload_string).map_err(EwtVerifyError::PayloadDeserialization)?;
 
     let verified_payload = VerifyPayload {
         from: ValidatorId::from(address.as_fixed_bytes()),
@@ -482,7 +490,12 @@ mod error {
             actual: ChannelId,
         },
         ChannelInactive(ChannelId),
+        /// Signing of the message failed
+        SignMessage(EwtSigningError),
+        VerifyMessage(EwtVerifyError),
     }
+
+    impl std::error::Error for Error {}
 
     impl AdapterErrorKind for Error {}
 
@@ -491,12 +504,58 @@ mod error {
             use Error::*;
 
             match self {
-                Keystore(err) => write!(f, "Keystore error: {}", err),
-                WalletUnlock(err) => write!(f, "Wallet unlocking error: {}", err),
-                Web3(err) => write!(f, "Web3 error: {}", err),
-                RelayerClient(err) => write!(f, "Relayer client error: {}", err),
+                Keystore(err) => write!(f, "Keystore error - {}", err),
+                WalletUnlock(err) => write!(f, "Wallet unlocking error - {}", err),
+                Web3(err) => write!(f, "Web3 error - {}", err),
+                RelayerClient(err) => write!(f, "Relayer client error - {}", err),
                 InvalidChannelId { expected, actual} => write!(f, "The hashed EthereumChannel.id ({}) is not the same as the Channel.id ({}) that was provided", expected, actual),
-                ChannelInactive(channel_id) => write!(f, "Channel ({}) is not Active on the ethereum network", channel_id)
+                ChannelInactive(channel_id) => write!(f, "Channel ({}) is not Active on the ethereum network", channel_id),
+                SignMessage(err) => write!(f, "Signing message - {}", err),
+                VerifyMessage(err) => write!(f, "Verifying message - {}", err),
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    pub enum EwtSigningError {
+        HeaderSerialization(serde_json::Error),
+        PayloadSerialization(serde_json::Error),
+        SigningMessage(ethstore::Error),
+        DecodingHexSignature(hex::FromHexError),
+    }
+
+    impl fmt::Display for EwtSigningError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            use EwtSigningError::*;
+
+            match self {
+                HeaderSerialization(err) => write!(f, "Header serialization - {}", err),
+                PayloadSerialization(err) => write!(f, "Payload serialization - {}", err),
+                SigningMessage(err) => write!(f, "{}", err),
+                DecodingHexSignature(err) => write!(f, "Decoding hex of Signature - {}", err),
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    pub enum EwtVerifyError {
+        AddressRecovery(parity_crypto::publickey::Error),
+        SignatureDecoding(base64::DecodeError),
+        PayloadDecoding(base64::DecodeError),
+        PayloadDeserialization(serde_json::Error),
+        PayloadUtf8(std::string::FromUtf8Error),
+    }
+
+    impl fmt::Display for EwtVerifyError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            use EwtVerifyError::*;
+
+            match self {
+                AddressRecovery(err) => write!(f, "Address recovery - {}", err),
+                SignatureDecoding(err) => write!(f, "Signature decoding - {}", err),
+                PayloadDecoding(err) => write!(f, "Payload decoding - {}", err),
+                PayloadDeserialization(err) => write!(f, "Payload deserialization - {}", err),
+                PayloadUtf8(err) => write!(f, "Payload is not a valid utf8 string - {}", err),
             }
         }
     }
