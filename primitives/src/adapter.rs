@@ -5,15 +5,14 @@ use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::From;
-use std::error::Error;
 use std::fmt;
 
-pub type AdapterResult<T, AE> = Result<T, AdapterError<AE>>;
+pub type AdapterResult<T, AE> = Result<T, Error<AE>>;
 
 pub trait AdapterErrorKind: fmt::Debug + fmt::Display {}
 
 #[derive(Debug)]
-pub enum AdapterError<AE: AdapterErrorKind> {
+pub enum Error<AE: AdapterErrorKind> {
     Authentication(String),
     Authorization(String),
     Configuration(String),
@@ -27,33 +26,33 @@ pub enum AdapterError<AE: AdapterErrorKind> {
     LockedWallet,
 }
 
-impl<AE: AdapterErrorKind> Error for AdapterError<AE> {}
+impl<AE: AdapterErrorKind> std::error::Error for Error<AE> {}
 
-impl<AE: AdapterErrorKind> From<AE> for AdapterError<AE> {
+impl<AE: AdapterErrorKind> From<AE> for Error<AE> {
     fn from(adapter_err: AE) -> Self {
         Self::Adapter(adapter_err)
     }
 }
 
-impl<AE: AdapterErrorKind> fmt::Display for AdapterError<AE> {
+impl<AE: AdapterErrorKind> fmt::Display for Error<AE> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            AdapterError::Authentication(error) => write!(f, "Authentication error: {}", error),
-            AdapterError::Authorization(error) => write!(f, "Authorization error: {}", error),
-            AdapterError::Configuration(error) => write!(f, "Configuration error: {}", error),
-            AdapterError::Signature(error) => write!(f, "Signature error: {}", error),
-            AdapterError::InvalidChannel(error) => write!(f, "{}", error),
-            AdapterError::Failed(error) => write!(f, "error: {}", error),
-            AdapterError::Adapter(error) => write!(f, "Adapter specific error: {}", error),
-            AdapterError::Domain(error) => write!(f, "Domain error: {}", error),
-            AdapterError::LockedWallet => write!(f, "You must `.unlock()` the wallet first"),
+            Error::Authentication(error) => write!(f, "Authentication error: {}", error),
+            Error::Authorization(error) => write!(f, "Authorization error: {}", error),
+            Error::Configuration(error) => write!(f, "Configuration error: {}", error),
+            Error::Signature(error) => write!(f, "Signature error: {}", error),
+            Error::InvalidChannel(error) => write!(f, "{}", error),
+            Error::Failed(error) => write!(f, "error: {}", error),
+            Error::Adapter(error) => write!(f, "Adapter specific error: {}", error),
+            Error::Domain(error) => write!(f, "Domain error: {}", error),
+            Error::LockedWallet => write!(f, "You must `.unlock()` the wallet first"),
         }
     }
 }
 
-impl<AE: AdapterErrorKind> From<DomainError> for AdapterError<AE> {
-    fn from(err: DomainError) -> AdapterError<AE> {
-        AdapterError::Domain(err)
+impl<AE: AdapterErrorKind> From<DomainError> for Error<AE> {
+    fn from(err: DomainError) -> Error<AE> {
+        Error::Domain(err)
     }
 }
 
@@ -76,7 +75,7 @@ pub struct Session {
 }
 
 pub trait Adapter: ChannelValidator + Send + Sync + Clone + fmt::Debug {
-    type AdapterError: AdapterErrorKind;
+    type AdapterError: AdapterErrorKind + 'static;
 
     /// Unlock adapter
     fn unlock(&mut self) -> AdapterResult<(), Self::AdapterError>;

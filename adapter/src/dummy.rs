@@ -1,6 +1,6 @@
 use futures::future::{BoxFuture, FutureExt};
 use primitives::adapter::{
-    Adapter, AdapterError, AdapterErrorKind, AdapterResult, DummyAdapterOptions, Session,
+    Adapter, AdapterErrorKind, AdapterResult, DummyAdapterOptions, Error as AdapterError, Session,
 };
 use primitives::channel_validator::ChannelValidator;
 use primitives::config::Config;

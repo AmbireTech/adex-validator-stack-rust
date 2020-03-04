@@ -12,7 +12,7 @@ use parity_crypto::publickey::{
     public_to_address, recover, verify_address, Address, Message, Signature,
 };
 use primitives::{
-    adapter::{Adapter, AdapterError, AdapterResult, KeystoreOptions, Session},
+    adapter::{Adapter, AdapterResult, Error as AdapterError, KeystoreOptions, Session},
     channel_validator::ChannelValidator,
     config::Config,
     Channel, ChannelId, ToETHChecksum, ValidatorId,
