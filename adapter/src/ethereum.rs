@@ -165,7 +165,7 @@ impl Adapter for EthereumAdapter {
 
             if eth_channel_id != channel.id {
                 return Err(AdapterError::Adapter(Error::InvalidChannelId {
-                    expected: ChannelId::from(eth_channel_id),
+                    expected: eth_channel_id,
                     actual: channel.id,
                 }));
             }
