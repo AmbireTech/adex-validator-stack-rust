@@ -15,14 +15,11 @@ pub trait AdapterErrorKind: fmt::Debug + fmt::Display {}
 pub enum Error<AE: AdapterErrorKind> {
     Authentication(String),
     Authorization(String),
-    Configuration(String),
-    Signature(String),
     InvalidChannel(ChannelError),
-    Failed(String),
     /// Adapter specific errors
     Adapter(AE),
     Domain(DomainError),
-    /// If
+    /// You need to `.unlock()` the wallet first
     LockedWallet,
 }
 
@@ -39,10 +36,7 @@ impl<AE: AdapterErrorKind> fmt::Display for Error<AE> {
         match self {
             Error::Authentication(error) => write!(f, "Authentication error: {}", error),
             Error::Authorization(error) => write!(f, "Authorization error: {}", error),
-            Error::Configuration(error) => write!(f, "Configuration error: {}", error),
-            Error::Signature(error) => write!(f, "Signature error: {}", error),
             Error::InvalidChannel(error) => write!(f, "{}", error),
-            Error::Failed(error) => write!(f, "error: {}", error),
             Error::Adapter(error) => write!(f, "Adapter specific error: {}", error),
             Error::Domain(error) => write!(f, "Domain error: {}", error),
             Error::LockedWallet => write!(f, "You must `.unlock()` the wallet first"),

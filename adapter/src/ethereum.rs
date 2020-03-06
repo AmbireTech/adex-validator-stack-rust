@@ -36,7 +36,6 @@ lazy_static! {
     static ref ADEXCORE_ABI: &'static [u8] =
         include_bytes!("../../lib/protocol-eth/abi/AdExCore.json");
     static ref CHANNEL_STATE_ACTIVE: U256 = 1.into();
-    static ref PRIVILEGE_LEVEL_NONE: u8 = 0;
 }
 
 #[derive(Debug, Clone)]
@@ -57,19 +56,18 @@ impl ChannelValidator for EthereumAdapter {}
 
 impl EthereumAdapter {
     pub fn init(opts: KeystoreOptions, config: &Config) -> AdapterResult<EthereumAdapter, Error> {
-        let keystore_contents = fs::read_to_string(&opts.keystore_file)
-            .map_err(|err| Error::Keystore(KeystoreError::ReadingFile(err)))?;
+        let keystore_contents =
+            fs::read_to_string(&opts.keystore_file).map_err(KeystoreError::ReadingFile)?;
 
-        let keystore_json: Value = serde_json::from_str(&keystore_contents)
-            .map_err(|err| Error::Keystore(KeystoreError::Deserialization(err)))?;
+        let keystore_json: Value =
+            serde_json::from_str(&keystore_contents).map_err(KeystoreError::Deserialization)?;
 
         let address = keystore_json["address"]
             .as_str()
             .map(eth_checksum::checksum)
-            .ok_or_else(|| Error::Keystore(KeystoreError::AddressMissing))?;
+            .ok_or_else(|| KeystoreError::AddressMissing)?;
 
-        let address = ValidatorId::try_from(&address)
-            .map_err(|err| Error::Keystore(KeystoreError::AddressInvalid(err)))?;
+        let address = ValidatorId::try_from(&address).map_err(KeystoreError::AddressInvalid)?;
 
         let (eloop, transport) =
             web3::transports::Http::new(&config.ethereum_network).map_err(Error::Web3)?;
@@ -97,7 +95,7 @@ impl Adapter for EthereumAdapter {
     fn unlock(&mut self) -> AdapterResult<(), Self::AdapterError> {
         let account = SafeAccount::from_file(
             serde_json::from_value(self.keystore_json.clone())
-                .map_err(|err| Error::Keystore(KeystoreError::Deserialization(err)))?,
+                .map_err(KeystoreError::Deserialization)?,
             None,
             &Some(self.keystore_pwd.clone()),
         )
@@ -114,12 +112,12 @@ impl Adapter for EthereumAdapter {
 
     fn sign(&self, state_root: &str) -> AdapterResult<String, Self::AdapterError> {
         if let Some(wallet) = &self.wallet {
-            let state_root = hex::decode(state_root)
-                .map_err(|_| AdapterError::Signature("invalid state_root".to_string()))?;
+            let state_root =
+                hex::decode(state_root).map_err(StateRootError::StateRootHexDecoding)?;
             let message = Message::from_slice(&hash_message(&state_root));
             let wallet_sign = wallet
                 .sign(&self.keystore_pwd, &message)
-                .map_err(|err| Error::SignMessage(EwtSigningError::SigningMessage(err)))?;
+                .map_err(EwtSigningError::SigningMessage)?;
             let signature: Signature = wallet_sign.into_electrum().into();
 
             Ok(format!("0x{}", signature))
@@ -135,17 +133,19 @@ impl Adapter for EthereumAdapter {
         sig: &str,
     ) -> AdapterResult<bool, Self::AdapterError> {
         if !sig.starts_with("0x") {
-            return Err(AdapterError::Signature("not 0x prefixed hex".to_string()));
+            return Err(StateRootError::SignatureNotPrefixed.into());
         }
-        let decoded_signature = hex::decode(&sig[2..])
-            .map_err(|_| AdapterError::Signature("invalid signature".to_string()))?;
+        let decoded_signature =
+            hex::decode(&sig[2..]).map_err(StateRootError::SignatureHexDecoding)?;
         let address = Address::from_slice(signer.inner());
         let signature = Signature::from_electrum(&decoded_signature);
-        let state_root = hex::decode(state_root)
-            .map_err(|_| AdapterError::Signature("invalid state_root".to_string()))?;
+        let state_root = hex::decode(state_root).map_err(StateRootError::StateRootHexDecoding)?;
         let message = Message::from_slice(&hash_message(&state_root));
 
-        verify_address(&address, &signature, &message).or_else(|_| Ok(false))
+        let verify_address = verify_address(&address, &signature, &message)
+            .map_err(StateRootError::PublicKeyRecovery)?;
+
+        Ok(verify_address)
     }
 
     fn validate_channel<'a>(
@@ -173,19 +173,19 @@ impl Adapter for EthereumAdapter {
             let contract_address: Address = self.config.ethereum_core_address.into();
 
             let contract = Contract::from_json(self.web3.eth(), contract_address, &ADEXCORE_ABI)
-                .map_err(|_| map_error("failed to init core contract"))?;
+                .map_err(Error::ContractInitialization)?;
 
             let channel_status: U256 = contract
                 .query(
                     "states",
-                    (Token::FixedBytes(channel.id.as_ref().to_vec()),),
+                    Token::FixedBytes(channel.id.as_ref().to_vec()),
                     None,
                     Options::default(),
                     None,
                 )
                 .compat()
                 .await
-                .map_err(|_| map_error("contract channel status query failed"))?;
+                .map_err(Error::ContractQuerying)?;
 
             if channel_status != *CHANNEL_STATE_ACTIVE {
                 Err(AdapterError::Adapter(Error::ChannelInactive(channel.id)))
@@ -204,7 +204,9 @@ impl Adapter for EthereumAdapter {
     ) -> BoxFuture<'a, AdapterResult<Session, Self::AdapterError>> {
         async move {
             if token.len() < 16 {
-                return Err(AdapterError::Failed("invalid token id".to_string()));
+                return Err(AdapterError::Authentication(
+                    "Invalid token id length".to_string(),
+                ));
             }
 
             let parts: Vec<&str> = token.split('.').collect();
@@ -214,7 +216,7 @@ impl Adapter for EthereumAdapter {
                         (header_encoded, payload_encoded, token_encoded)
                     }
                     _ => {
-                        return Err(AdapterError::Failed(format!(
+                        return Err(AdapterError::Authentication(format!(
                             "{} token string is incorrect",
                             token
                         )))
@@ -222,10 +224,10 @@ impl Adapter for EthereumAdapter {
                 };
 
             let verified = ewt_verify(header_encoded, payload_encoded, token_encoded)
-                .map_err(|err| AdapterError::Adapter(Error::VerifyMessage(err)))?;
+                .map_err(Error::VerifyMessage)?;
 
             if self.whoami().to_checksum() != verified.payload.id {
-                return Err(AdapterError::Configuration(
+                return Err(AdapterError::Authentication(
                     "token payload.id !== whoami(): token was not intended for us".to_string(),
                 ));
             }
@@ -338,10 +340,6 @@ fn hash_message(message: &[u8]) -> [u8; 32] {
     res
 }
 
-fn map_error(err: &str) -> AdapterError<Error> {
-    AdapterError::Failed(err.to_string())
-}
-
 // Ethereum Web Tokens
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Payload {
@@ -434,9 +432,87 @@ pub fn ewt_verify(
 }
 
 mod error {
-    use primitives::adapter::AdapterErrorKind;
+    use primitives::adapter::{AdapterErrorKind, Error as AdapterError};
     use primitives::ChannelId;
     use std::fmt;
+
+    #[derive(Debug)]
+    pub enum Error {
+        Keystore(KeystoreError),
+        WalletUnlock(ethstore::Error),
+        Web3(web3::Error),
+        RelayerClient(reqwest::Error),
+        /// When the ChannelId that we get from hashing the EthereumChannel with the contract address
+        /// does not align with the provided Channel
+        InvalidChannelId {
+            expected: ChannelId,
+            actual: ChannelId,
+        },
+        ChannelInactive(ChannelId),
+        /// Signing of the message failed
+        SignMessage(EwtSigningError),
+        VerifyMessage(EwtVerifyError),
+        ContractInitialization(ethabi::Error),
+        ContractQuerying(web3::contract::Error),
+        StateRoot(StateRootError),
+    }
+
+    impl std::error::Error for Error {}
+
+    impl AdapterErrorKind for Error {}
+
+    impl fmt::Display for Error {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            use Error::*;
+
+            match self {
+                Keystore(err) => write!(f, "Keystore error - {}", err),
+                WalletUnlock(err) => write!(f, "Wallet unlocking error - {}", err),
+                Web3(err) => write!(f, "Web3 error - {}", err),
+                RelayerClient(err) => write!(f, "Relayer client error - {}", err),
+                InvalidChannelId { expected, actual} => write!(f, "The hashed EthereumChannel.id ({}) is not the same as the Channel.id ({}) that was provided", expected, actual),
+                ChannelInactive(channel_id) => write!(f, "Channel ({}) is not Active on the ethereum network", channel_id),
+                SignMessage(err) => write!(f, "Signing message - {}", err),
+                VerifyMessage(err) => write!(f, "Verifying message - {}", err),
+                ContractInitialization(err) => write!(f, "Contract initialization - {}", err),
+                ContractQuerying(err) => write!(f, "Contract querying - {}", err),
+                StateRoot(err) => write!(f, "State root - {}", err)
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    pub enum StateRootError {
+        PublicKeyRecovery(parity_crypto::publickey::Error),
+        StateRootHexDecoding(hex::FromHexError),
+        SignatureHexDecoding(hex::FromHexError),
+        SignatureNotPrefixed,
+    }
+
+    impl fmt::Display for StateRootError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            use StateRootError::*;
+
+            match self {
+                PublicKeyRecovery(err) => {
+                    write!(f, "Recovering the public key from the signature - {}", err)
+                }
+                StateRootHexDecoding(err) => {
+                    write!(f, "Decoding the hex of the state root - {}", err)
+                }
+                SignatureHexDecoding(err) => {
+                    write!(f, "Decoding the hex of the signature - {}", err)
+                }
+                SignatureNotPrefixed => write!(f, "Signature is not prefixed with `0x`"),
+            }
+        }
+    }
+
+    impl From<StateRootError> for AdapterError<Error> {
+        fn from(err: StateRootError) -> Self {
+            AdapterError::Adapter(Error::StateRoot(err))
+        }
+    }
 
     #[derive(Debug)]
     pub enum KeystoreError {
@@ -468,51 +544,16 @@ mod error {
 
             match self {
                 AddressMissing => write!(f, "\"address\" key missing in keystore file"),
-                AddressInvalid(err) => write!(f, "\"address\" is invalid: {}", err),
-                ReadingFile(err) => write!(f, "Reading the keystore file failed: {}", err),
-                Deserialization(err) => {
-                    write!(f, "Deserializing the keystore file failed: {}", err)
-                }
+                AddressInvalid(err) => write!(f, "\"address\" is invalid - {}", err),
+                ReadingFile(err) => write!(f, "Reading keystore file - {}", err),
+                Deserialization(err) => write!(f, "Deserializing keystore file - {}", err),
             }
         }
     }
 
-    #[derive(Debug)]
-    pub enum Error {
-        Keystore(KeystoreError),
-        WalletUnlock(ethstore::Error),
-        Web3(web3::Error),
-        RelayerClient(reqwest::Error),
-        /// When the ChannelId that we get from hashing the EthereumChannel with the contract address
-        /// does not align with the provided Channel
-        InvalidChannelId {
-            expected: ChannelId,
-            actual: ChannelId,
-        },
-        ChannelInactive(ChannelId),
-        /// Signing of the message failed
-        SignMessage(EwtSigningError),
-        VerifyMessage(EwtVerifyError),
-    }
-
-    impl std::error::Error for Error {}
-
-    impl AdapterErrorKind for Error {}
-
-    impl fmt::Display for Error {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            use Error::*;
-
-            match self {
-                Keystore(err) => write!(f, "Keystore error - {}", err),
-                WalletUnlock(err) => write!(f, "Wallet unlocking error - {}", err),
-                Web3(err) => write!(f, "Web3 error - {}", err),
-                RelayerClient(err) => write!(f, "Relayer client error - {}", err),
-                InvalidChannelId { expected, actual} => write!(f, "The hashed EthereumChannel.id ({}) is not the same as the Channel.id ({}) that was provided", expected, actual),
-                ChannelInactive(channel_id) => write!(f, "Channel ({}) is not Active on the ethereum network", channel_id),
-                SignMessage(err) => write!(f, "Signing message - {}", err),
-                VerifyMessage(err) => write!(f, "Verifying message - {}", err),
-            }
+    impl From<KeystoreError> for AdapterError<Error> {
+        fn from(err: KeystoreError) -> Self {
+            AdapterError::Adapter(Error::Keystore(err))
         }
     }
 
@@ -531,9 +572,14 @@ mod error {
             match self {
                 HeaderSerialization(err) => write!(f, "Header serialization - {}", err),
                 PayloadSerialization(err) => write!(f, "Payload serialization - {}", err),
-                SigningMessage(err) => write!(f, "{}", err),
+                SigningMessage(err) => write!(f, "Signing message - {}", err),
                 DecodingHexSignature(err) => write!(f, "Decoding hex of Signature - {}", err),
             }
+        }
+    }
+    impl From<EwtSigningError> for AdapterError<Error> {
+        fn from(err: EwtSigningError) -> Self {
+            AdapterError::Adapter(Error::SignMessage(err))
         }
     }
 
@@ -638,7 +684,8 @@ mod test {
             )
             .expect("Failed to verify signatures");
 
-        assert!(verify, "invalid signature verification");
+        assert!(verify, "invalid signature 1 verification");
+        assert!(verify2, "invalid signature 2 verification");
     }
 
     #[test]
@@ -689,9 +736,7 @@ mod test {
             address: eth_adapter.whoami().to_checksum(),
         };
 
-        let token = ewt_sign(&wallet.unwrap(), &eth_adapter.keystore_pwd, &payload)
-            .map_err(|_| map_error("Failed to sign token"))
-            .unwrap();
+        let token = ewt_sign(&wallet.unwrap(), &eth_adapter.keystore_pwd, &payload).unwrap();
 
         let session: Session = eth_adapter.session_from_token(&token).await.unwrap();
 
