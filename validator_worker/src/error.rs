@@ -1,25 +1,47 @@
+use primitives::adapter::AdapterErrorKind;
 use primitives::ChannelId;
-use serde::{Deserialize, Serialize};
-use std::error::Error;
-use std::fmt::{Display, Formatter, Result};
+use std::fmt;
 
-#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
-pub enum ValidatorWorker {
-    Configuration(String),
-    Failed(String),
-    Channel(ChannelId, String),
+#[derive(Debug)]
+pub enum TickError {
+    TimedOut(tokio::time::Elapsed),
+    Tick(Box<dyn std::error::Error>),
 }
 
-impl Error for ValidatorWorker {}
-
-impl Display for ValidatorWorker {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+impl fmt::Display for TickError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ValidatorWorker::Configuration(err) => write!(f, "Configuration error: {}", err),
-            ValidatorWorker::Failed(err) => write!(f, "error: {}", err),
-            ValidatorWorker::Channel(channel_id, err) => {
-                write!(f, "Channel {}: {}", channel_id, err)
-            }
+            TickError::TimedOut(err) => write!(f, "Tick timed out - {}", err),
+            TickError::Tick(err) => write!(f, "Tick error - {}", err),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum Error<AE: AdapterErrorKind> {
+    SentryApi(crate::sentry_interface::Error<AE>),
+    LeaderTick(ChannelId, TickError),
+    FollowerTick(ChannelId, TickError),
+}
+
+impl<AE: AdapterErrorKind> std::error::Error for Error<AE> {}
+
+impl<AE: AdapterErrorKind> fmt::Display for Error<AE> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use Error::*;
+
+        match self {
+            SentryApi(err) => write!(f, "Sentry Api error - {}", err),
+            LeaderTick(channel_id, err) => write!(
+                f,
+                "Error for Leader tick of Channel ({}) - {}",
+                channel_id, err
+            ),
+            FollowerTick(channel_id, err) => write!(
+                f,
+                "Error for Follower tick of Channel ({}) - {}",
+                channel_id, err
+            ),
         }
     }
 }

@@ -16,7 +16,7 @@ use primitives::config::{configuration, Config};
 use primitives::util::tests::prep_db::{AUTH, IDS};
 use primitives::{Channel, SpecValidator, ValidatorId};
 use slog::{error, info, Logger};
-use validator_worker::error::ValidatorWorker as ValidatorWorkerError;
+use validator_worker::error::{Error as ValidatorWorkerError, TickError};
 use validator_worker::{all_channels, follower, leader, SentryApi};
 
 #[derive(Debug, Clone)]
@@ -195,39 +195,40 @@ async fn validator_tick<A: Adapter + 'static>(
     channel: Channel,
     config: &Config,
     logger: &Logger,
-) -> Result<(), ValidatorWorkerError> {
+) -> Result<(), ValidatorWorkerError<A::AdapterError>> {
     let whoami = adapter.whoami().clone();
     // Cloning the `Logger` is cheap, see documentation for more info
-    let sentry = SentryApi::init(adapter, &channel, &config, logger.clone())?;
+    let sentry = SentryApi::init(adapter, &channel, &config, logger.clone())
+        .map_err(ValidatorWorkerError::SentryApi)?;
     let duration = Duration::from_millis(config.validator_tick_timeout as u64);
 
     match channel.spec.validators.find(&whoami) {
         SpecValidator::Leader(_) => match timeout(duration, leader::tick(&sentry)).await {
-            Err(timeout_e) => Err(ValidatorWorkerError::Channel(
+            Err(timeout_e) => Err(ValidatorWorkerError::LeaderTick(
                 channel.id,
-                timeout_e.to_string(),
+                TickError::TimedOut(timeout_e),
             )),
-            Ok(Err(tick_e)) => Err(ValidatorWorkerError::Channel(
+            Ok(Err(tick_e)) => Err(ValidatorWorkerError::LeaderTick(
                 channel.id,
-                tick_e.to_string(),
+                TickError::Tick(tick_e),
             )),
             _ => Ok(()),
         },
         SpecValidator::Follower(_) => match timeout(duration, follower::tick(&sentry)).await {
-            Err(timeout_e) => Err(ValidatorWorkerError::Channel(
+            Err(timeout_e) => Err(ValidatorWorkerError::FollowerTick(
                 channel.id,
-                timeout_e.to_string(),
+                TickError::TimedOut(timeout_e),
             )),
-            Ok(Err(tick_e)) => Err(ValidatorWorkerError::Channel(
+            Ok(Err(tick_e)) => Err(ValidatorWorkerError::FollowerTick(
                 channel.id,
-                tick_e.to_string(),
+                TickError::Tick(tick_e),
             )),
             _ => Ok(()),
         },
-        SpecValidator::None => Err(ValidatorWorkerError::Channel(
-            channel.id,
-            "validatorTick: processing a channel which we are not validating".to_string(),
-        )),
+        // @TODO: Can we make this so that we don't have this check at all? maybe something with the SentryApi struct?
+        SpecValidator::None => {
+            unreachable!("SentryApi makes a check if validator is in Channel spec on `init()`")
+        }
     }
 }
 

@@ -1,19 +1,20 @@
-use crate::error::ValidatorWorker;
+use std::collections::HashMap;
+use std::fmt;
+use std::time::Duration;
+
 use chrono::{DateTime, Utc};
-use futures::future::try_join_all;
-use futures::future::TryFutureExt;
-use primitives::adapter::Adapter;
+use futures::future::{try_join_all, TryFutureExt};
+use reqwest::{Client, Response};
+use slog::{error, Logger};
+
+use primitives::adapter::{Adapter, AdapterErrorKind, Error as AdapterError};
 use primitives::channel::SpecValidator;
 use primitives::sentry::{
     ChannelListResponse, EventAggregateResponse, LastApprovedResponse, SuccessResponse,
     ValidatorMessageResponse,
 };
 use primitives::validator::MessageTypes;
-use primitives::{Channel, Config, ToETHChecksum, ValidatorDesc, ValidatorId};
-use reqwest::{Client, Response};
-use slog::{error, Logger};
-use std::collections::HashMap;
-use std::time::Duration;
+use primitives::{Channel, ChannelId, Config, ToETHChecksum, ValidatorDesc, ValidatorId};
 
 #[derive(Debug, Clone)]
 pub struct SentryApi<T: Adapter> {
@@ -26,17 +27,63 @@ pub struct SentryApi<T: Adapter> {
     pub propagate_to: Vec<(ValidatorDesc, String)>,
 }
 
-impl<T: Adapter + 'static> SentryApi<T> {
+#[derive(Debug)]
+pub enum Error<AE: AdapterErrorKind> {
+    BuildingClient(reqwest::Error),
+    Request(reqwest::Error),
+    ValidatorAuthentication(AdapterError<AE>),
+    MissingWhoamiInChannelValidators {
+        channel: ChannelId,
+        validators: Vec<ValidatorId>,
+        whoami: ValidatorId,
+    },
+}
+
+impl<AE: AdapterErrorKind> std::error::Error for Error<AE> {}
+
+impl<AE: AdapterErrorKind> fmt::Display for Error<AE> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use Error::*;
+
+        match self {
+            BuildingClient(err) => write!(f, "Building client - {}", err),
+            Request(err) => write!(f, "Making a request - {}", err),
+            ValidatorAuthentication(err) => {
+                write!(f, "Getting authentication for validator - {}", err)
+            }
+            MissingWhoamiInChannelValidators {
+                channel,
+                validators,
+                whoami,
+            } => {
+                let validator_ids = validators
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                write!(
+                    f,
+                    "We cannot find validator entry for whoami ({}) in channel {} with validators: {}",
+                    whoami,
+                    channel,
+                    validator_ids
+                )
+            }
+        }
+    }
+}
+
+impl<A: Adapter + 'static> SentryApi<A> {
     pub fn init(
-        adapter: T,
+        adapter: A,
         channel: &Channel,
         config: &Config,
         logger: Logger,
-    ) -> Result<Self, ValidatorWorker> {
+    ) -> Result<Self, Error<A::AdapterError>> {
         let client = Client::builder()
             .timeout(Duration::from_millis(config.fetch_timeout.into()))
             .build()
-            .map_err(|e| ValidatorWorker::Failed(format!("building Client error: {}", e)))?;
+            .map_err(Error::BuildingClient)?;
 
         // validate that we are to validate the channel
         match channel.spec.validators.find(adapter.whoami()) {
@@ -51,12 +98,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
                         adapter
                             .get_auth(&validator.id)
                             .map(|auth| (validator.to_owned(), auth))
-                            .map_err(|e| {
-                                ValidatorWorker::Failed(format!(
-                                    "Propagation error: get auth failed {}",
-                                    e
-                                ))
-                            })
+                            .map_err(Error::ValidatorAuthentication)
                     })
                     .collect::<Result<Vec<_>, _>>()?;
 
@@ -70,12 +112,20 @@ impl<T: Adapter + 'static> SentryApi<T> {
                     config: config.to_owned(),
                 })
             }
-            SpecValidator::None => Err(ValidatorWorker::Failed(
-                "We can not find validator entry for whoami".to_string(),
-            )),
+            SpecValidator::None => Err(Error::MissingWhoamiInChannelValidators {
+                channel: channel.id,
+                validators: channel
+                    .spec
+                    .validators
+                    .iter()
+                    .map(|v| v.id.clone())
+                    .collect(),
+                whoami: adapter.whoami().clone(),
+            }),
         }
     }
 
+    // @TODO: Remove logging & fix `try_join_all` @see: https://github.com/AdExNetwork/adex-validator-stack-rust/issues/278
     pub async fn propagate(&self, messages: &[&MessageTypes]) {
         let channel_id = format!("0x{}", hex::encode(&self.channel.id));
         if let Err(e) = try_join_all(self.propagate_to.iter().map(|(validator, auth_token)| {
@@ -83,7 +133,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
         }))
         .await
         {
-            error!(&self.logger, "Propagation error: {}", e; "module" => "sentry_interface", "in" => "SentryApi");
+            error!(&self.logger, "Propagation error - {}", e; "module" => "sentry_interface", "in" => "SentryApi");
         }
     }
 
@@ -91,7 +141,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
         &self,
         from: &ValidatorId,
         message_types: &[&str],
-    ) -> Result<Option<MessageTypes>, reqwest::Error> {
+    ) -> Result<Option<MessageTypes>, Error<A::AdapterError>> {
         let message_type = message_types.join("+");
         let url = format!(
             "{}/validator-messages/{}/{}?limit=1",
@@ -104,6 +154,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
             .get(&url)
             .send()
             .and_then(|res: Response| res.json::<ValidatorMessageResponse>())
+            .map_err(Error::Request)
             .await?;
 
         Ok(result.validator_messages.first().map(|m| m.msg.clone()))
@@ -112,20 +163,21 @@ impl<T: Adapter + 'static> SentryApi<T> {
     pub async fn get_our_latest_msg(
         &self,
         message_types: &[&str],
-    ) -> Result<Option<MessageTypes>, reqwest::Error> {
+    ) -> Result<Option<MessageTypes>, Error<A::AdapterError>> {
         self.get_latest_msg(self.adapter.whoami(), message_types)
             .await
     }
 
-    pub async fn get_last_approved(&self) -> Result<LastApprovedResponse, reqwest::Error> {
+    pub async fn get_last_approved(&self) -> Result<LastApprovedResponse, Error<A::AdapterError>> {
         self.client
             .get(&format!("{}/last-approved", self.validator_url))
             .send()
             .and_then(|res: Response| res.json::<LastApprovedResponse>())
+            .map_err(Error::Request)
             .await
     }
 
-    pub async fn get_last_msgs(&self) -> Result<LastApprovedResponse, reqwest::Error> {
+    pub async fn get_last_msgs(&self) -> Result<LastApprovedResponse, Error<A::AdapterError>> {
         self.client
             .get(&format!(
                 "{}/last-approved?withHeartbeat=true",
@@ -133,17 +185,18 @@ impl<T: Adapter + 'static> SentryApi<T> {
             ))
             .send()
             .and_then(|res: Response| res.json::<LastApprovedResponse>())
+            .map_err(Error::Request)
             .await
     }
 
     pub async fn get_event_aggregates(
         &self,
         after: DateTime<Utc>,
-    ) -> Result<EventAggregateResponse, Box<ValidatorWorker>> {
+    ) -> Result<EventAggregateResponse, Error<A::AdapterError>> {
         let auth_token = self
             .adapter
             .get_auth(self.adapter.whoami())
-            .map_err(|e| Box::new(ValidatorWorker::Failed(e.to_string())))?;
+            .map_err(Error::ValidatorAuthentication)?;
 
         let url = format!(
             "{}/events-aggregates?after={}",
@@ -155,10 +208,10 @@ impl<T: Adapter + 'static> SentryApi<T> {
             .get(&url)
             .bearer_auth(&auth_token)
             .send()
-            .map_err(|e| Box::new(ValidatorWorker::Failed(e.to_string())))
+            .map_err(Error::Request)
             .await?
             .json()
-            .map_err(|e| Box::new(ValidatorWorker::Failed(e.to_string())))
+            .map_err(Error::Request)
             .await
     }
 }
