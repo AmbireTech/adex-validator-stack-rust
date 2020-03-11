@@ -34,11 +34,11 @@ impl<AE: AdapterErrorKind> From<AE> for Error<AE> {
 impl<AE: AdapterErrorKind> fmt::Display for Error<AE> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::Authentication(error) => write!(f, "Authentication error: {}", error),
-            Error::Authorization(error) => write!(f, "Authorization error: {}", error),
+            Error::Authentication(error) => write!(f, "Authentication: {}", error),
+            Error::Authorization(error) => write!(f, "Authorization: {}", error),
             Error::InvalidChannel(error) => write!(f, "{}", error),
-            Error::Adapter(error) => write!(f, "Adapter specific error: {}", error),
-            Error::Domain(error) => write!(f, "Domain error: {}", error),
+            Error::Adapter(error) => write!(f, "Adapter specific: {}", error),
+            Error::Domain(error) => write!(f, "Domain: {}", error),
             Error::LockedWallet => write!(f, "You must `.unlock()` the wallet first"),
         }
     }
