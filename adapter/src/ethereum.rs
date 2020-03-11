@@ -112,8 +112,7 @@ impl Adapter for EthereumAdapter {
 
     fn sign(&self, state_root: &str) -> AdapterResult<String, Self::AdapterError> {
         if let Some(wallet) = &self.wallet {
-            let state_root =
-                hex::decode(state_root).map_err(StateRootError::StateRootHexDecoding)?;
+            let state_root = hex::decode(state_root).map_err(VerifyError::StateRootDecoding)?;
             let message = Message::from_slice(&hash_message(&state_root));
             let wallet_sign = wallet
                 .sign(&self.keystore_pwd, &message)
@@ -133,17 +132,16 @@ impl Adapter for EthereumAdapter {
         sig: &str,
     ) -> AdapterResult<bool, Self::AdapterError> {
         if !sig.starts_with("0x") {
-            return Err(StateRootError::SignatureNotPrefixed.into());
+            return Err(VerifyError::SignatureNotPrefixed.into());
         }
-        let decoded_signature =
-            hex::decode(&sig[2..]).map_err(StateRootError::SignatureHexDecoding)?;
+        let decoded_signature = hex::decode(&sig[2..]).map_err(VerifyError::SignatureDecoding)?;
         let address = Address::from_slice(signer.inner());
         let signature = Signature::from_electrum(&decoded_signature);
-        let state_root = hex::decode(state_root).map_err(StateRootError::StateRootHexDecoding)?;
+        let state_root = hex::decode(state_root).map_err(VerifyError::StateRootDecoding)?;
         let message = Message::from_slice(&hash_message(&state_root));
 
         let verify_address = verify_address(&address, &signature, &message)
-            .map_err(StateRootError::PublicKeyRecovery)?;
+            .map_err(VerifyError::PublicKeyRecovery)?;
 
         Ok(verify_address)
     }
@@ -454,7 +452,8 @@ mod error {
         VerifyMessage(EwtVerifyError),
         ContractInitialization(ethabi::Error),
         ContractQuerying(web3::contract::Error),
-        StateRoot(StateRootError),
+        /// Error occurred during verification of Signature and/or StateRoot and/or Address
+        VerifyAddress(VerifyError),
     }
 
     impl std::error::Error for Error {}
@@ -466,51 +465,49 @@ mod error {
             use Error::*;
 
             match self {
-                Keystore(err) => write!(f, "Keystore error - {}", err),
-                WalletUnlock(err) => write!(f, "Wallet unlocking error - {}", err),
-                Web3(err) => write!(f, "Web3 error - {}", err),
-                RelayerClient(err) => write!(f, "Relayer client error - {}", err),
+                Keystore(err) => write!(f, "Keystore: {}", err),
+                WalletUnlock(err) => write!(f, "Wallet unlocking: {}", err),
+                Web3(err) => write!(f, "Web3: {}", err),
+                RelayerClient(err) => write!(f, "Relayer client: {}", err),
                 InvalidChannelId { expected, actual} => write!(f, "The hashed EthereumChannel.id ({}) is not the same as the Channel.id ({}) that was provided", expected, actual),
                 ChannelInactive(channel_id) => write!(f, "Channel ({}) is not Active on the ethereum network", channel_id),
-                SignMessage(err) => write!(f, "Signing message - {}", err),
-                VerifyMessage(err) => write!(f, "Verifying message - {}", err),
-                ContractInitialization(err) => write!(f, "Contract initialization - {}", err),
-                ContractQuerying(err) => write!(f, "Contract querying - {}", err),
-                StateRoot(err) => write!(f, "State root - {}", err)
+                SignMessage(err) => write!(f, "Signing message: {}", err),
+                VerifyMessage(err) => write!(f, "Verifying message: {}", err),
+                ContractInitialization(err) => write!(f, "Contract initialization: {}", err),
+                ContractQuerying(err) => write!(f, "Contract querying: {}", err),
+                VerifyAddress(err) => write!(f, "Verifying address: {}", err)
             }
         }
     }
 
     #[derive(Debug)]
-    pub enum StateRootError {
+    /// Error returned on `eth_adapter.verify()` when the combination of
+    /// (signer, state_root, signature) **doesn't align**.
+    pub enum VerifyError {
         PublicKeyRecovery(parity_crypto::publickey::Error),
-        StateRootHexDecoding(hex::FromHexError),
-        SignatureHexDecoding(hex::FromHexError),
+        StateRootDecoding(hex::FromHexError),
+        SignatureDecoding(hex::FromHexError),
         SignatureNotPrefixed,
     }
 
-    impl fmt::Display for StateRootError {
+    impl fmt::Display for VerifyError {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            use StateRootError::*;
+            use VerifyError::*;
 
             match self {
                 PublicKeyRecovery(err) => {
-                    write!(f, "Recovering the public key from the signature - {}", err)
+                    write!(f, "Recovering the public key from the signature: {}", err)
                 }
-                StateRootHexDecoding(err) => {
-                    write!(f, "Decoding the hex of the state root - {}", err)
-                }
-                SignatureHexDecoding(err) => {
-                    write!(f, "Decoding the hex of the signature - {}", err)
-                }
+                StateRootDecoding(err) => write!(f, "Decoding the hex of the state root: {}", err),
+                SignatureDecoding(err) => write!(f, "Decoding the hex of the signature: {}", err),
                 SignatureNotPrefixed => write!(f, "Signature is not prefixed with `0x`"),
             }
         }
     }
 
-    impl From<StateRootError> for AdapterError<Error> {
-        fn from(err: StateRootError) -> Self {
-            AdapterError::Adapter(Error::StateRoot(err))
+    impl From<VerifyError> for AdapterError<Error> {
+        fn from(err: VerifyError) -> Self {
+            AdapterError::Adapter(Error::VerifyAddress(err))
         }
     }
 
@@ -544,9 +541,9 @@ mod error {
 
             match self {
                 AddressMissing => write!(f, "\"address\" key missing in keystore file"),
-                AddressInvalid(err) => write!(f, "\"address\" is invalid - {}", err),
-                ReadingFile(err) => write!(f, "Reading keystore file - {}", err),
-                Deserialization(err) => write!(f, "Deserializing keystore file - {}", err),
+                AddressInvalid(err) => write!(f, "\"address\" is invalid: {}", err),
+                ReadingFile(err) => write!(f, "Reading keystore file: {}", err),
+                Deserialization(err) => write!(f, "Deserializing keystore file: {}", err),
             }
         }
     }
@@ -570,10 +567,10 @@ mod error {
             use EwtSigningError::*;
 
             match self {
-                HeaderSerialization(err) => write!(f, "Header serialization - {}", err),
-                PayloadSerialization(err) => write!(f, "Payload serialization - {}", err),
-                SigningMessage(err) => write!(f, "Signing message - {}", err),
-                DecodingHexSignature(err) => write!(f, "Decoding hex of Signature - {}", err),
+                HeaderSerialization(err) => write!(f, "Header serialization: {}", err),
+                PayloadSerialization(err) => write!(f, "Payload serialization: {}", err),
+                SigningMessage(err) => write!(f, "Signing message: {}", err),
+                DecodingHexSignature(err) => write!(f, "Decoding hex of Signature: {}", err),
             }
         }
     }
@@ -597,11 +594,11 @@ mod error {
             use EwtVerifyError::*;
 
             match self {
-                AddressRecovery(err) => write!(f, "Address recovery - {}", err),
-                SignatureDecoding(err) => write!(f, "Signature decoding - {}", err),
-                PayloadDecoding(err) => write!(f, "Payload decoding - {}", err),
-                PayloadDeserialization(err) => write!(f, "Payload deserialization - {}", err),
-                PayloadUtf8(err) => write!(f, "Payload is not a valid utf8 string - {}", err),
+                AddressRecovery(err) => write!(f, "Address recovery: {}", err),
+                SignatureDecoding(err) => write!(f, "Signature decoding: {}", err),
+                PayloadDecoding(err) => write!(f, "Payload decoding: {}", err),
+                PayloadDeserialization(err) => write!(f, "Payload deserialization: {}", err),
+                PayloadUtf8(err) => write!(f, "Payload is not a valid utf8 string: {}", err),
             }
         }
     }
