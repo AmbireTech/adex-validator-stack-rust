@@ -125,6 +125,8 @@ impl Adapter for EthereumAdapter {
         }
     }
 
+    /// `state_root` is hex string which **should not** be `0x` prefixed
+    /// `sig` is hex string wihch **should be** `0x` prefixed
     fn verify(
         &self,
         signer: &ValidatorId,
