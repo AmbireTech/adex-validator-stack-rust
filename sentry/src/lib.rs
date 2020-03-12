@@ -252,8 +252,6 @@ async fn channels_router<A: Adapter + 'static>(
 ) -> Result<Response<Body>, ResponseError> {
     let (path, method) = (req.uri().path().to_owned(), req.method());
 
-    // example with
-    // @TODO remove later
     // regex matching for routes with params
     if let (Some(caps), &Method::GET) = (LAST_APPROVED_BY_CHANNEL_ID.captures(&path), method) {
         let param = RouteParams(vec![caps

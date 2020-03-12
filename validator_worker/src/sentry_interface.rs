@@ -3,9 +3,9 @@ use std::fmt;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
-use futures::future::{try_join_all, TryFutureExt};
+use futures::future::{join_all, try_join_all, TryFutureExt};
 use reqwest::{Client, Response};
-use slog::{error, Logger};
+use slog::Logger;
 
 use primitives::adapter::{Adapter, AdapterErrorKind, Error as AdapterError};
 use primitives::channel::SpecValidator;
@@ -15,6 +15,8 @@ use primitives::sentry::{
 };
 use primitives::validator::MessageTypes;
 use primitives::{Channel, ChannelId, Config, ToETHChecksum, ValidatorDesc, ValidatorId};
+
+pub type PropagationResult<AE> = Result<(), (ValidatorId, Error<AE>)>;
 
 #[derive(Debug, Clone)]
 pub struct SentryApi<T: Adapter> {
@@ -125,16 +127,21 @@ impl<A: Adapter + 'static> SentryApi<A> {
         }
     }
 
-    // @TODO: Remove logging & fix `try_join_all` @see: https://github.com/AdExNetwork/adex-validator-stack-rust/issues/278
-    pub async fn propagate(&self, messages: &[&MessageTypes]) {
-        let channel_id = format!("0x{}", hex::encode(&self.channel.id));
-        if let Err(e) = try_join_all(self.propagate_to.iter().map(|(validator, auth_token)| {
-            propagate_to(&channel_id, &auth_token, &self.client, &validator, messages)
+    pub async fn propagate(
+        &self,
+        messages: &[&MessageTypes],
+    ) -> Vec<PropagationResult<A::AdapterError>> {
+        join_all(self.propagate_to.iter().map(|(validator, auth_token)| {
+            propagate_to(
+                &self.channel.id,
+                &auth_token,
+                &self.client,
+                &validator,
+                messages,
+            )
+            .map_err(move |e| (validator.id.clone(), Error::Request(e)))
         }))
         .await
-        {
-            error!(&self.logger, "Propagation error - {}", e; "module" => "sentry_interface", "in" => "SentryApi");
-        }
     }
 
     pub async fn get_latest_msg(
@@ -217,7 +224,7 @@ impl<A: Adapter + 'static> SentryApi<A> {
 }
 
 async fn propagate_to(
-    channel_id: &str,
+    channel_id: &ChannelId,
     auth_token: &str,
     client: &Client,
     validator: &ValidatorDesc,

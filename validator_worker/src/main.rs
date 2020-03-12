@@ -202,6 +202,7 @@ async fn validator_tick<A: Adapter + 'static>(
         .map_err(ValidatorWorkerError::SentryApi)?;
     let duration = Duration::from_millis(config.validator_tick_timeout as u64);
 
+    // @TODO: Log results from `tick()` see: https://github.com/AdExNetwork/adex-validator-stack-rust/issues/280
     match channel.spec.validators.find(&whoami) {
         SpecValidator::Leader(_) => match timeout(duration, leader::tick(&sentry)).await {
             Err(timeout_e) => Err(ValidatorWorkerError::LeaderTick(
