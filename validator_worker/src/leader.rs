@@ -20,21 +20,29 @@ pub struct TickStatus<AE: AdapterErrorKind> {
     pub heartbeat: HeartbeatStatus<AE>,
     /// If None, then the conditions for handling a new state haven't been met
     pub new_state: NewStateResult<AE>,
+    pub producer_tick: producer::TickStatus<AE>,
 }
 
 pub async fn tick<A: Adapter + 'static>(
     iface: &SentryApi<A>,
 ) -> Result<TickStatus<A::AdapterError>, Box<dyn Error>> {
-    let (balances, new_accounting) = producer::tick(&iface).await?;
-
-    let new_state_sent = match new_accounting {
-        Some(accounting) => on_new_accounting(&iface, (&balances, &accounting)).await?,
-        None => NewStateResult::NotSent,
+    let producer_tick = producer::tick(&iface).await?;
+    let (balances, new_state) = match &producer_tick {
+        producer::TickStatus::AccountingSent {
+            balances,
+            new_accounting,
+            ..
+        } => {
+            let new_state = on_new_accounting(&iface, (balances, new_accounting)).await?;
+            (balances, new_state)
+        }
+        producer::TickStatus::AccountingNotSent(balances) => (balances, NewStateResult::NotSent),
     };
 
     Ok(TickStatus {
-        heartbeat: heartbeat(&iface, balances).await?,
-        new_state: new_state_sent,
+        heartbeat: heartbeat(&iface, &balances).await?,
+        new_state,
+        producer_tick,
     })
 }
 

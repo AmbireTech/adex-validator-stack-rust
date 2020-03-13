@@ -33,6 +33,7 @@ pub enum ApproveStateResult<AE: AdapterErrorKind> {
 pub struct TickStatus<AE: AdapterErrorKind> {
     pub heartbeat: HeartbeatStatus<AE>,
     pub approve_state: ApproveStateResult<AE>,
+    pub producer_tick: producer::TickStatus<AE>,
 }
 
 pub async fn tick<A: Adapter + 'static>(
@@ -60,7 +61,11 @@ pub async fn tick<A: Adapter + 'static>(
         _ => false,
     };
 
-    let (balances, _) = producer::tick(&iface).await?;
+    let producer_tick = producer::tick(&iface).await?;
+    let balances = match &producer_tick {
+        producer::TickStatus::AccountingSent { balances, .. } => balances,
+        producer::TickStatus::AccountingNotSent(balances) => balances,
+    };
     let approve_state_result = if let (Some(new_state), false) = (new_msg, latest_is_responded_to) {
         on_new_state(&iface, &balances, &new_state).await?
     } else {
@@ -70,6 +75,7 @@ pub async fn tick<A: Adapter + 'static>(
     Ok(TickStatus {
         heartbeat: heartbeat(&iface, balances).await?,
         approve_state: approve_state_result,
+        producer_tick,
     })
 }
 
