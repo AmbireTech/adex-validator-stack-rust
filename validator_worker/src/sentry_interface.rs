@@ -89,7 +89,7 @@ impl<A: Adapter + 'static> SentryApi<A> {
 
         // validate that we are to validate the channel
         match channel.spec.validators.find(adapter.whoami()) {
-            SpecValidator::Leader(v) | SpecValidator::Follower(v) => {
+            Some(SpecValidator::Leader(v)) | Some(SpecValidator::Follower(v)) => {
                 let channel_id = format!("0x{}", hex::encode(&channel.id));
                 let validator_url = format!("{}/channel/{}", v.url, channel_id);
                 let propagate_to = channel
@@ -114,7 +114,7 @@ impl<A: Adapter + 'static> SentryApi<A> {
                     config: config.to_owned(),
                 })
             }
-            SpecValidator::None => Err(Error::MissingWhoamiInChannelValidators {
+            None => Err(Error::MissingWhoamiInChannelValidators {
                 channel: channel.id,
                 validators: channel
                     .spec
