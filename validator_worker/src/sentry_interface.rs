@@ -8,7 +8,6 @@ use reqwest::{Client, Response};
 use slog::Logger;
 
 use primitives::adapter::{Adapter, AdapterErrorKind, Error as AdapterError};
-use primitives::channel::SpecValidator;
 use primitives::sentry::{
     ChannelListResponse, EventAggregateResponse, LastApprovedResponse, SuccessResponse,
     ValidatorMessageResponse,
@@ -16,7 +15,7 @@ use primitives::sentry::{
 use primitives::validator::MessageTypes;
 use primitives::{Channel, ChannelId, Config, ToETHChecksum, ValidatorDesc, ValidatorId};
 
-pub type PropagationResult<AE> = Result<(), (ValidatorId, Error<AE>)>;
+pub type PropagationResult<AE> = Result<ValidatorId, (ValidatorId, Error<AE>)>;
 
 #[derive(Debug, Clone)]
 pub struct SentryApi<T: Adapter> {
@@ -48,10 +47,10 @@ impl<AE: AdapterErrorKind> fmt::Display for Error<AE> {
         use Error::*;
 
         match self {
-            BuildingClient(err) => write!(f, "Building client - {}", err),
-            Request(err) => write!(f, "Making a request - {}", err),
+            BuildingClient(err) => write!(f, "Building client: {}", err),
+            Request(err) => write!(f, "Making a request: {}", err),
             ValidatorAuthentication(err) => {
-                write!(f, "Getting authentication for validator - {}", err)
+                write!(f, "Getting authentication for validator: {}", err)
             }
             MissingWhoamiInChannelValidators {
                 channel,
@@ -65,7 +64,7 @@ impl<AE: AdapterErrorKind> fmt::Display for Error<AE> {
                     .join(", ");
                 write!(
                     f,
-                    "We cannot find validator entry for whoami ({}) in channel {} with validators: {}",
+                    "We cannot find validator entry for whoami {:#?} in channel {:#?} with validators: {}",
                     whoami,
                     channel,
                     validator_ids
@@ -78,7 +77,7 @@ impl<AE: AdapterErrorKind> fmt::Display for Error<AE> {
 impl<A: Adapter + 'static> SentryApi<A> {
     pub fn init(
         adapter: A,
-        channel: &Channel,
+        channel: Channel,
         config: &Config,
         logger: Logger,
     ) -> Result<Self, Error<A::AdapterError>> {
@@ -89,9 +88,10 @@ impl<A: Adapter + 'static> SentryApi<A> {
 
         // validate that we are to validate the channel
         match channel.spec.validators.find(adapter.whoami()) {
-            Some(SpecValidator::Leader(v)) | Some(SpecValidator::Follower(v)) => {
-                let channel_id = format!("0x{}", hex::encode(&channel.id));
-                let validator_url = format!("{}/channel/{}", v.url, channel_id);
+            Some(ref spec_validator) => {
+                let validator = spec_validator.validator();
+                let validator_url = format!("{}/channel/{}", validator.url, channel.id);
+
                 let propagate_to = channel
                     .spec
                     .validators
@@ -110,7 +110,7 @@ impl<A: Adapter + 'static> SentryApi<A> {
                     client,
                     logger,
                     propagate_to,
-                    channel: channel.to_owned(),
+                    channel,
                     config: config.to_owned(),
                 })
             }
@@ -132,14 +132,13 @@ impl<A: Adapter + 'static> SentryApi<A> {
         messages: &[&MessageTypes],
     ) -> Vec<PropagationResult<A::AdapterError>> {
         join_all(self.propagate_to.iter().map(|(validator, auth_token)| {
-            propagate_to(
+            propagate_to::<A>(
                 &self.channel.id,
                 &auth_token,
                 &self.client,
                 &validator,
                 messages,
             )
-            .map_err(move |e| (validator.id.clone(), Error::Request(e)))
         }))
         .await
     }
@@ -223,13 +222,13 @@ impl<A: Adapter + 'static> SentryApi<A> {
     }
 }
 
-async fn propagate_to(
+async fn propagate_to<A: Adapter>(
     channel_id: &ChannelId,
     auth_token: &str,
     client: &Client,
     validator: &ValidatorDesc,
     messages: &[&MessageTypes],
-) -> Result<(), reqwest::Error> {
+) -> PropagationResult<A::AdapterError> {
     let url = format!(
         "{}/channel/{}/validator-messages",
         validator.url, channel_id
@@ -242,11 +241,13 @@ async fn propagate_to(
         .bearer_auth(&auth_token)
         .json(&body)
         .send()
-        .await?
+        .await
+        .map_err(|e| (validator.id.clone(), Error::Request(e)))?
         .json()
-        .await?;
+        .await
+        .map_err(|e| (validator.id.clone(), Error::Request(e)))?;
 
-    Ok(())
+    Ok(validator.id.clone())
 }
 
 pub async fn all_channels(

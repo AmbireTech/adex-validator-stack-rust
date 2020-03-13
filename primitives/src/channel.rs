@@ -157,9 +157,19 @@ pub struct ChannelSpec {
 /// A (leader, follower) tuple
 pub struct SpecValidators(ValidatorDesc, ValidatorDesc);
 
+#[derive(Debug)]
 pub enum SpecValidator<'a> {
     Leader(&'a ValidatorDesc),
     Follower(&'a ValidatorDesc),
+}
+
+impl<'a> SpecValidator<'a> {
+    pub fn validator(&self) -> &'a ValidatorDesc {
+        match self {
+            SpecValidator::Leader(validator) => validator,
+            SpecValidator::Follower(validator) => validator,
+        }
+    }
 }
 
 impl SpecValidators {

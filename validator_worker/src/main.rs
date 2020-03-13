@@ -161,7 +161,6 @@ async fn infinite<A: Adapter + 'static>(args: Args<A>, logger: &Logger) {
 }
 
 async fn iterate_channels<A: Adapter + 'static>(args: Args<A>, logger: &Logger) {
-    use futures::FutureExt;
     let result = all_channels(&args.sentry_url, args.adapter.whoami()).await;
 
     let channels = match result {
@@ -174,10 +173,11 @@ async fn iterate_channels<A: Adapter + 'static>(args: Args<A>, logger: &Logger) 
 
     let channels_size = channels.len();
 
-    let tick_results = join_all(channels.into_iter().map(|channel| {
-        validator_tick(args.adapter.clone(), channel, &args.config, logger)
-        // .map(|result| (channel.id.clone(), result))
-    }))
+    let tick_results = join_all(
+        channels
+            .into_iter()
+            .map(|channel| validator_tick(args.adapter.clone(), channel, &args.config, logger)),
+    )
     .await;
 
     for channel_err in tick_results.into_iter().filter_map(Result::err) {
@@ -198,8 +198,9 @@ async fn validator_tick<A: Adapter + 'static>(
     logger: &Logger,
 ) -> Result<(ChannelId, Box<dyn Debug>), ValidatorWorkerError<A::AdapterError>> {
     let whoami = adapter.whoami().clone();
+
     // Cloning the `Logger` is cheap, see documentation for more info
-    let sentry = SentryApi::init(adapter, &channel, &config, logger.clone())
+    let sentry = SentryApi::init(adapter, channel.clone(), &config, logger.clone())
         .map_err(ValidatorWorkerError::SentryApi)?;
     let duration = Duration::from_millis(config.validator_tick_timeout as u64);
 
