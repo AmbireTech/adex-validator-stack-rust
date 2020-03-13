@@ -12,6 +12,7 @@ use primitives::{BalancesMap, BigNum, Channel};
 
 use crate::sentry_interface::{PropagationResult, SentryApi};
 
+#[derive(Debug)]
 pub enum HeartbeatStatus<AE: AdapterErrorKind> {
     Sent(Vec<PropagationResult<AE>>),
     NotSent,

@@ -10,6 +10,7 @@ use crate::sentry_interface::{PropagationResult, SentryApi};
 use crate::{get_state_root_hash, producer};
 use chrono::Utc;
 
+#[derive(Debug)]
 pub enum InvalidNewState {
     RootHash,
     Signature,
@@ -17,6 +18,7 @@ pub enum InvalidNewState {
     Health,
 }
 
+#[derive(Debug)]
 pub enum ApproveStateResult<AE: AdapterErrorKind> {
     Sent(Vec<PropagationResult<AE>>),
     /// Conditions for handling the new state haven't been met
@@ -27,6 +29,7 @@ pub enum ApproveStateResult<AE: AdapterErrorKind> {
     },
 }
 
+#[derive(Debug)]
 pub struct TickStatus<AE: AdapterErrorKind> {
     pub heartbeat: HeartbeatStatus<AE>,
     pub approve_state: ApproveStateResult<AE>,
