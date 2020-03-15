@@ -341,7 +341,7 @@ fn hash_message(message: &[u8]) -> [u8; 32] {
 }
 
 // Ethereum Web Tokens
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Payload {
     pub id: String,
     pub era: i64,
@@ -350,7 +350,7 @@ pub struct Payload {
     pub identity: Option<ValidatorId>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VerifyPayload {
     pub from: ValidatorId,
     pub payload: Payload,
@@ -704,15 +704,22 @@ mod test {
         let expected = "eyJ0eXBlIjoiSldUIiwiYWxnIjoiRVRIIn0.eyJpZCI6ImF3ZXNvbWVWYWxpZGF0b3IiLCJlcmEiOjEwMDAwMCwiYWRkcmVzcyI6IjB4MmJEZUFGQUU1Mzk0MDY2OURhQTZGNTE5MzczZjY4NmMxZjNkMzM5MyJ9.gGw_sfnxirENdcX5KJQWaEt4FVRvfEjSLD4f3OiPrJIltRadeYP2zWy9T2GYcK5xxD96vnqAw4GebAW7rMlz4xw";
         assert_eq!(response, expected, "generated wrong ewt signature");
 
-        let expected_verification_response = r#"VerifyPayload { from: ValidatorId([43, 222, 175, 174, 83, 148, 6, 105, 218, 166, 245, 25, 55, 63, 104, 108, 31, 61, 51, 147]), payload: Payload { id: "awesomeValidator", era: 100000, address: "0x2bDeAFAE53940669DaA6F519373f686c1f3d3393", identity: None } }"#;
+        let expected_verification_response = VerifyPayload {
+            from: ValidatorId::try_from("0x2bdeafae53940669daa6f519373f686c1f3d3393").unwrap(),
+            payload: Payload {
+                id: "awesomeValidator".to_string(),
+                era: 100000,
+                address: "0x2bDeAFAE53940669DaA6F519373f686c1f3d3393".to_string(),
+                identity: None,
+            },
+        };
 
         let parts: Vec<&str> = expected.split('.').collect();
         let verification =
             ewt_verify(parts[0], parts[1], parts[2]).expect("Failed to verify ewt token");
 
         assert_eq!(
-            expected_verification_response,
-            format!("{:?}", verification),
+            expected_verification_response, verification,
             "generated wrong verification payload"
         );
     }
