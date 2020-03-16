@@ -216,7 +216,7 @@ async fn validator_tick<A: Adapter + 'static>(
             )),
             Ok(Ok(tick_status)) => {
                 info!(&logger, "Leader tick"; "status" => ?tick_status);
-                Ok((channel.id.clone(), Box::new(tick_status)))
+                Ok((channel.id, Box::new(tick_status)))
             }
         },
         Some(SpecValidator::Follower(_)) => {
@@ -231,7 +231,7 @@ async fn validator_tick<A: Adapter + 'static>(
                 )),
                 Ok(Ok(tick_status)) => {
                     info!(&logger, "Follower tick"; "status" => ?tick_status);
-                    Ok((channel.id.clone(), Box::new(tick_status)))
+                    Ok((channel.id, Box::new(tick_status)))
                 }
             }
         }
