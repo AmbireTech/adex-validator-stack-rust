@@ -1,5 +1,4 @@
 use std::convert::TryFrom;
-use std::error::Error;
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, Mul, Sub};
 use std::str::FromStr;
