@@ -705,7 +705,8 @@ mod test {
         assert_eq!(response, expected, "generated wrong ewt signature");
 
         let expected_verification_response = VerifyPayload {
-            from: ValidatorId::try_from("0x2bdeafae53940669daa6f519373f686c1f3d3393").unwrap(),
+            from: ValidatorId::try_from("0x2bdeafae53940669daa6f519373f686c1f3d3393")
+                .expect("Valid ValidatorId"),
             payload: Payload {
                 id: "awesomeValidator".to_string(),
                 era: 100000,
