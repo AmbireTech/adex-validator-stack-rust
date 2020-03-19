@@ -1,5 +1,4 @@
 use std::convert::TryFrom;
-use std::error::Error;
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, Mul, Sub};
 use std::str::FromStr;
@@ -195,7 +194,7 @@ impl TryFrom<&str> for BigNum {
 
     fn try_from(num: &str) -> Result<Self, Self::Error> {
         let big_uint = BigUint::from_str(&num)
-            .map_err(|err| super::DomainError::InvalidArgument(err.description().to_string()))?;
+            .map_err(|err| super::DomainError::InvalidArgument(err.to_string()))?;
 
         Ok(Self(big_uint))
     }
