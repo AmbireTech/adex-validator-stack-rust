@@ -25,7 +25,7 @@ time = "0.1.42"
 hex = "0.3.2"
 merkletree = "0.10.0"
 tiny-keccak = "1.5"
-eth_checksum = "0.1.1"
+rust-crypto = "0.2"
 # Numbers - BigNum, Numbers, Traits and Derives
 num-bigint = { version = "0.2", features = ["serde"] }
 num = "0.2.0"

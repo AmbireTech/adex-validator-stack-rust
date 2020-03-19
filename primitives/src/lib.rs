@@ -24,6 +24,7 @@ pub mod util {
     pub mod logging;
 }
 pub mod analytics;
+mod eth_checksum;
 pub mod validator;
 
 pub use self::ad_unit::AdUnit;
