@@ -195,7 +195,7 @@ impl TryFrom<&str> for BigNum {
 
     fn try_from(num: &str) -> Result<Self, Self::Error> {
         let big_uint = BigUint::from_str(&num)
-            .map_err(|err| super::DomainError::InvalidArgument(err.description().to_string()))?;
+            .map_err(|err| super::DomainError::InvalidArgument(err.to_string()))?;
 
         Ok(Self(big_uint))
     }
