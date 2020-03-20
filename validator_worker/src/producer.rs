@@ -2,17 +2,28 @@ use std::error::Error;
 
 use chrono::{TimeZone, Utc};
 
-use primitives::adapter::Adapter;
+use primitives::adapter::{Adapter, AdapterErrorKind};
 use primitives::validator::{Accounting, MessageTypes};
-use primitives::BalancesMap;
+use primitives::{BalancesMap, ChannelId};
 
 use crate::core::events::merge_aggrs;
-use crate::sentry_interface::SentryApi;
-use slog::info;
+use crate::sentry_interface::{PropagationResult, SentryApi};
 
-pub type Result = std::result::Result<(BalancesMap, Option<Accounting>), Box<dyn Error>>;
+#[derive(Debug)]
+pub enum TickStatus<AE: AdapterErrorKind> {
+    AccountingSent {
+        channel: ChannelId,
+        balances: BalancesMap,
+        new_accounting: Accounting,
+        accounting_propagation: Vec<PropagationResult<AE>>,
+        event_counts: usize,
+    },
+    AccountingNotSent(BalancesMap),
+}
 
-pub async fn tick<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result {
+pub async fn tick<A: Adapter + 'static>(
+    iface: &SentryApi<A>,
+) -> Result<TickStatus<A::AdapterError>, Box<dyn Error>> {
     let validator_msg_resp = iface.get_our_latest_msg(&["Accounting"]).await?;
 
     let accounting = match validator_msg_resp {
@@ -29,19 +40,18 @@ pub async fn tick<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result {
         .await?;
 
     if !aggrs.events.is_empty() {
-        info!(
-            iface.logger,
-            "channel {}: processing {} event aggregates",
-            iface.channel.id,
-            aggrs.events.len()
-        );
         let (balances, new_accounting) = merge_aggrs(&accounting, &aggrs.events, &iface.channel)?;
 
         let message_types = MessageTypes::Accounting(new_accounting.clone());
-        iface.propagate(&[&message_types]).await;
 
-        Ok((balances, Some(new_accounting)))
+        Ok(TickStatus::AccountingSent {
+            channel: iface.channel.id,
+            accounting_propagation: iface.propagate(&[&message_types]).await,
+            balances,
+            new_accounting,
+            event_counts: aggrs.events.len(),
+        })
     } else {
-        Ok((accounting.balances.clone(), None))
+        Ok(TickStatus::AccountingNotSent(accounting.balances.clone()))
     }
 }

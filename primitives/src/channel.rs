@@ -11,7 +11,7 @@ use crate::{AdUnit, EventSubmission, TargetingTag, ValidatorDesc, ValidatorId};
 use hex::{FromHex, FromHexError};
 use std::ops::Deref;
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Copy, Clone, Hash)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Copy, Clone, Hash)]
 #[serde(transparent)]
 pub struct ChannelId(
     #[serde(
@@ -20,6 +20,12 @@ pub struct ChannelId(
     )]
     [u8; 32],
 );
+
+impl fmt::Debug for ChannelId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ChannelId({})", self)
+    }
+}
 
 fn channel_id_from_str<'de, D>(deserializer: D) -> Result<[u8; 32], D::Error>
 where
@@ -151,22 +157,18 @@ pub struct ChannelSpec {
 /// A (leader, follower) tuple
 pub struct SpecValidators(ValidatorDesc, ValidatorDesc);
 
+#[derive(Debug)]
 pub enum SpecValidator<'a> {
     Leader(&'a ValidatorDesc),
     Follower(&'a ValidatorDesc),
-    None,
 }
 
 impl<'a> SpecValidator<'a> {
-    pub fn is_some(&self) -> bool {
-        match &self {
-            SpecValidator::None => false,
-            _ => true,
+    pub fn validator(&self) -> &'a ValidatorDesc {
+        match self {
+            SpecValidator::Leader(validator) => validator,
+            SpecValidator::Follower(validator) => validator,
         }
-    }
-
-    pub fn is_none(&self) -> bool {
-        !self.is_some()
     }
 }
 
@@ -183,13 +185,13 @@ impl SpecValidators {
         &self.1
     }
 
-    pub fn find(&self, validator_id: &ValidatorId) -> SpecValidator<'_> {
+    pub fn find(&self, validator_id: &ValidatorId) -> Option<SpecValidator<'_>> {
         if &self.leader().id == validator_id {
-            SpecValidator::Leader(&self.leader())
+            Some(SpecValidator::Leader(&self.leader()))
         } else if &self.follower().id == validator_id {
-            SpecValidator::Follower(&self.follower())
+            Some(SpecValidator::Follower(&self.follower()))
         } else {
-            SpecValidator::None
+            None
         }
     }
 
