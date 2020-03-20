@@ -36,7 +36,9 @@ lazy_static! {
 
 pub async fn redis_connection() -> Result<MultiplexedConnection, RedisError> {
     let client = redis::Client::open(REDIS_URL.as_str()).expect("Wrong redis connection url");
-    client.get_multiplexed_tokio_connection().await
+    let (connection, driver) = client.get_multiplexed_async_connection().await?;
+    tokio::spawn(driver);
+    Ok(connection)
 }
 
 pub async fn postgres_connection() -> Result<DbPool, bb8_postgres::tokio_postgres::Error> {
