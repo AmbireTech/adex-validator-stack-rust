@@ -60,8 +60,7 @@ lazy_static! {
     static ref ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
     static ref ADVERTISER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-advertiser/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
     static ref PUBLISHER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-publisher/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
-    static ref CREATE_EVENTS_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events(/.*)?$").expect("The regex should be valid");
-
+    static ref CREATE_EVENTS_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events/?$").expect("The regex should be valid");
 }
 
 fn auth_required_middleware<'a, A: Adapter>(
@@ -253,7 +252,16 @@ async fn channels_router<A: Adapter + 'static>(
     let (path, method) = (req.uri().path().to_owned(), req.method());
 
     // regex matching for routes with params
-    if let (Some(caps), &Method::GET) = (LAST_APPROVED_BY_CHANNEL_ID.captures(&path), method) {
+    if let (Some(caps), &Method::POST) = (CREATE_EVENTS_BY_CHANNEL_ID.captures(&path), method) {
+        let param = RouteParams(vec![caps
+            .get(1)
+            .map_or("".to_string(), |m| m.as_str().to_string())]);
+
+        req.extensions_mut().insert(param);
+
+        insert_events(req, app).await
+    } else if let (Some(caps), &Method::GET) = (LAST_APPROVED_BY_CHANNEL_ID.captures(&path), method)
+    {
         let param = RouteParams(vec![caps
             .get(1)
             .map_or("".to_string(), |m| m.as_str().to_string())]);
@@ -332,16 +340,6 @@ async fn channels_router<A: Adapter + 'static>(
         let req = chain(req, app, vec![Box::new(channel_load)]).await?;
 
         list_channel_event_aggregates(req, app).await
-    } else if let (Some(caps), &Method::POST) =
-        (CREATE_EVENTS_BY_CHANNEL_ID.captures(&path), method)
-    {
-        let param = RouteParams(vec![caps
-            .get(1)
-            .map_or("".to_string(), |m| m.as_str().to_string())]);
-
-        req.extensions_mut().insert(param);
-
-        insert_events(req, app).await
     } else {
         Err(ResponseError::NotFound)
     }
