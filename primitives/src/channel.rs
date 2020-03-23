@@ -383,5 +383,3 @@ pub mod postgres {
         to_sql_checked!();
     }
 }
-
-pub fn match_price() {}
