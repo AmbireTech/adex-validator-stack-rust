@@ -7,6 +7,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 
 use crate::big_num::BigNum;
+use crate::sentry::Event;
 use crate::{AdUnit, EventSubmission, TargetingTag, ValidatorDesc, ValidatorId};
 use hex::{FromHex, FromHexError};
 use std::ops::Deref;
@@ -145,6 +146,26 @@ pub struct ChannelSpec {
     /// An array of AdUnit (optional)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ad_units: Vec<AdUnit>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub price_multiplication_rules: Vec<PriceMultiplicationRules>,
+    pub price_dynamic_adjustment: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PriceMultiplicationRules {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    multiplier: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    amount: Option<BigNum>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    ev_type: Vec<Event>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    publisher: Vec<ValidatorId>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    os_type: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    country: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -362,3 +383,5 @@ pub mod postgres {
         to_sql_checked!();
     }
 }
+
+pub fn match_price() {}
