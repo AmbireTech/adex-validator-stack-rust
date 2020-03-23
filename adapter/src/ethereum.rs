@@ -486,20 +486,21 @@ mod test {
                 &signature,
             )
             .expect("Failed to verify signatures");
+        assert_eq!(verify, true, "invalid signature verification");
 
-        let sig1 = "0x9fa5852041b9818021323aff8260624fd6998c52c95d9ad5036e0db6f2bf2b2d48a188ec1d638581ff56b0a2ecceca6d3880fc65030558bd8f68b154e7ebf80f1b";
-        let msg = "1648231285e69677531ffe70719f67a07f3d4393b8425a5a1c84b0c72434c77b";
+        let signature2 = "0x9fa5852041b9818021323aff8260624fd6998c52c95d9ad5036e0db6f2bf2b2d48a188ec1d638581ff56b0a2ecceca6d3880fc65030558bd8f68b154e7ebf80f1b";
+        let message2 = "1648231285e69677531ffe70719f67a07f3d4393b8425a5a1c84b0c72434c77b";
 
         let verify2 = eth_adapter
             .verify(
                 &ValidatorId::try_from("ce07CbB7e054514D590a0262C93070D838bFBA2e")
                     .expect("Failed to parse id"),
-                msg,
-                &sig1,
+                message2,
+                &signature2,
             )
             .expect("Failed to verify signatures");
 
-        assert_eq!(verify, true, "invalid signature verification");
+        assert_eq!(verify2, true, "invalid signature verification");
     }
 
     #[test]
