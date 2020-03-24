@@ -158,14 +158,14 @@ pub struct PriceMultiplicationRules {
     multiplier: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     amount: Option<BigNum>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    ev_type: Vec<Event>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    publisher: Vec<ValidatorId>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    os_type: Vec<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    country: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    ev_type: Option<Vec<Event>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    publisher: Option<Vec<ValidatorId>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    os_type: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    country: Option<Vec<String>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
