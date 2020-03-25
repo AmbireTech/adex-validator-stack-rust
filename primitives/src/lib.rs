@@ -11,7 +11,7 @@ pub mod channel;
 pub mod channel_validator;
 pub mod config;
 pub mod event_submission;
-pub mod market_channel;
+pub mod market;
 pub mod merkle_tree;
 pub mod sentry;
 pub mod targeting_tag;
