@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use chrono::{DateTime, Utc};
 
-use crate::{BigNum, Channel, BalancesMap};
+use crate::{BalancesMap, BigNum, Channel};
 
 // Data structs specific to the market
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]

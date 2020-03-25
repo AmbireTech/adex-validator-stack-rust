@@ -2,7 +2,7 @@
 #![deny(clippy::all)]
 
 use adex_primitives::market::{Campaign, StatusType};
-use adex_primitives::{ChannelId, AdUnit, BigNum, SpecValidators, TargetingTag};
+use adex_primitives::{AdUnit, BigNum, ChannelId, SpecValidators, TargetingTag};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
