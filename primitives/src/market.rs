@@ -40,6 +40,7 @@ impl Status {
 #[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Campaign {
+    #[serde(flatten)]
     pub channel: Channel,
     pub status: Status,
 }
