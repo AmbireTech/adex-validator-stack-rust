@@ -8,15 +8,19 @@ use crate::{BalancesMap, BigNum, Channel};
 // Data structs specific to the market
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum StatusType {
-    Initializing,
-    Ready,
     Active,
+    Ready,
+    Pending,
+    Initializing,
+    Waiting,
     Offline,
     Disconnected,
     Unhealthy,
-    Withdraw,
+    Invalid,
     Expired,
+    /// also called "Closed"
     Exhausted,
+    Withdraw,
 }
 
 #[derive(Deserialize, Clone, Debug)]
