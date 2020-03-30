@@ -35,7 +35,7 @@ impl fmt::Display for StatusType {
 pub struct Status {
     #[serde(rename = "name")]
     pub status_type: StatusType,
-    pub usd_estimate: f32,
+    pub usd_estimate: Option<f32>,
     #[serde(rename = "lastApprovedBalances")]
     pub balances: BalancesMap,
     #[serde(with = "ts_milliseconds")]
