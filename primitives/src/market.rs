@@ -1,7 +1,8 @@
 use chrono::serde::ts_milliseconds;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use chrono::{DateTime, Utc};
+use std::fmt;
 
 use crate::{BalancesMap, BigNum, Channel};
 
@@ -21,6 +22,12 @@ pub enum StatusType {
     /// also called "Closed"
     Exhausted,
     Withdraw,
+}
+
+impl fmt::Display for StatusType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(self, f)
+    }
 }
 
 #[derive(Deserialize, Clone, Debug)]
