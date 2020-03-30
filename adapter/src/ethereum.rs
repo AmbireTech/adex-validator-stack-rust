@@ -856,6 +856,8 @@ mod test {
                 withdraw_period_start: Utc::now() + Duration::days(1),
                 ad_units: vec![],
                 pricing_bounds: None,
+                price_multiplication_rules: Default::default(),
+                price_dynamic_adjustment: false,
             },
         };
 
