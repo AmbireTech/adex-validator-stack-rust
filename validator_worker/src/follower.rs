@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::fmt;
 
 use primitives::adapter::{Adapter, AdapterErrorKind};
 use primitives::validator::{ApproveState, MessageTypes, NewState, RejectState};
@@ -18,13 +19,28 @@ pub enum InvalidNewState {
     Health,
 }
 
+impl fmt::Display for InvalidNewState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use InvalidNewState::*;
+
+        let string = match self {
+            RootHash => "InvalidRootHash",
+            Signature => "InvalidSignature",
+            Transition => "InvalidTransition",
+            Health => "TooLowHealth",
+        };
+
+        write!(f, "{}", string)
+    }
+}
+
 #[derive(Debug)]
 pub enum ApproveStateResult<AE: AdapterErrorKind> {
     Sent(Vec<PropagationResult<AE>>),
     /// Conditions for handling the new state haven't been met
     NotSent,
-    Err {
-        new_state: InvalidNewState,
+    RejectedState {
+        reason: InvalidNewState,
         reject_state_propagation: Vec<PropagationResult<AE>>,
     },
 }
@@ -63,8 +79,8 @@ pub async fn tick<A: Adapter + 'static>(
 
     let producer_tick = producer::tick(&iface).await?;
     let balances = match &producer_tick {
-        producer::TickStatus::AccountingSent { balances, .. } => balances,
-        producer::TickStatus::AccountingNotSent(balances) => balances,
+        producer::TickStatus::Sent { balances, .. } => balances,
+        producer::TickStatus::NoNewEventAggr(balances) => balances,
     };
     let approve_state_result = if let (Some(new_state), false) = (new_msg, latest_is_responded_to) {
         on_new_state(&iface, &balances, &new_state).await?
@@ -139,18 +155,9 @@ async fn on_error<'a, A: Adapter + 'static>(
     new_state: &'a NewState,
     status: InvalidNewState,
 ) -> ApproveStateResult<A::AdapterError> {
-    use InvalidNewState::*;
-    let reason = match &status {
-        RootHash => "InvalidRootHash",
-        Signature => "InvalidSignature",
-        Transition => "InvalidTransition",
-        Health => "TooLowHealth",
-    }
-    .to_string();
-
     let reject_state_propagation = iface
         .propagate(&[&MessageTypes::RejectState(RejectState {
-            reason,
+            reason: status.to_string(),
             state_root: new_state.state_root.clone(),
             signature: new_state.signature.clone(),
             balances: Some(new_state.balances.clone()),
@@ -159,8 +166,8 @@ async fn on_error<'a, A: Adapter + 'static>(
         })])
         .await;
 
-    ApproveStateResult::Err {
+    ApproveStateResult::RejectedState {
+        reason: status,
         reject_state_propagation,
-        new_state: status,
     }
 }

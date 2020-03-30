@@ -11,7 +11,7 @@ use crate::{get_state_root_hash, producer};
 #[derive(Debug)]
 pub enum NewStateResult<AE: AdapterErrorKind> {
     Sent(Vec<PropagationResult<AE>>),
-    /// Conditions for sending the new accounting haven't been met
+    /// Conditions for sending the new state haven't been met
     NotSent,
 }
 
@@ -28,7 +28,7 @@ pub async fn tick<A: Adapter + 'static>(
 ) -> Result<TickStatus<A::AdapterError>, Box<dyn Error>> {
     let producer_tick = producer::tick(&iface).await?;
     let (balances, new_state) = match &producer_tick {
-        producer::TickStatus::AccountingSent {
+        producer::TickStatus::Sent {
             balances,
             new_accounting,
             ..
@@ -36,7 +36,7 @@ pub async fn tick<A: Adapter + 'static>(
             let new_state = on_new_accounting(&iface, (balances, new_accounting)).await?;
             (balances, new_state)
         }
-        producer::TickStatus::AccountingNotSent(balances) => (balances, NewStateResult::NotSent),
+        producer::TickStatus::NoNewEventAggr(balances) => (balances, NewStateResult::NotSent),
     };
 
     Ok(TickStatus {
