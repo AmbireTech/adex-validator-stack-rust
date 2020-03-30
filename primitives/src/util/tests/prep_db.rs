@@ -81,6 +81,8 @@ lazy_static! {
                 withdraw_period_start: Utc.timestamp_millis(4_073_414_400_000),
                 ad_units: vec![],
                 pricing_bounds: Some(PricingBounds {impression: None, click: Some(Pricing { max: 0.into(), min: 0.into()})}),
+                price_multiplication_rules: Default::default(),
+                price_dynamic_adjustment: false,
             },
         }
     };
