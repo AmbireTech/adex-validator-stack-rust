@@ -12,7 +12,6 @@ use futures::future::try_join_all;
 use hex::FromHex;
 use hyper::{Body, Request, Response};
 use primitives::adapter::Adapter;
-use primitives::channel::SpecValidator;
 use primitives::sentry::{Event, LastApproved, LastApprovedResponse, SuccessResponse};
 use primitives::validator::MessageTypes;
 use primitives::{Channel, ChannelId};
@@ -235,7 +234,7 @@ pub async fn create_validator_messages<A: Adapter + 'static>(
         .ok_or_else(|| ResponseError::BadRequest("missing messages body".to_string()))?;
 
     match channel.spec.validators.find(&session.uid) {
-        SpecValidator::None => Err(ResponseError::Unauthorized),
+        None => Err(ResponseError::Unauthorized),
         _ => {
             try_join_all(messages.iter().map(|message| {
                 insert_validator_messages(&app.pool, &channel, &session.uid, &message)
