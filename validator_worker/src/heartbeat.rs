@@ -5,18 +5,14 @@ use chrono::{Duration, Utc};
 
 use adapter::get_signable_state_root;
 use byteorder::{BigEndian, ByteOrder};
-use primitives::adapter::{Adapter, AdapterErrorKind};
+use primitives::adapter::Adapter;
 use primitives::merkle_tree::MerkleTree;
 use primitives::validator::{Heartbeat, MessageTypes};
 use primitives::{BalancesMap, BigNum, Channel};
 
 use crate::sentry_interface::{PropagationResult, SentryApi};
 
-#[derive(Debug)]
-pub enum HeartbeatStatus<AE: AdapterErrorKind> {
-    Sent(Vec<PropagationResult<AE>>),
-    NotSent,
-}
+pub type HeartbeatStatus<A> = Option<Vec<PropagationResult<A>>>;
 
 async fn send_heartbeat<A: Adapter + 'static>(
     iface: &SentryApi<A>,
@@ -59,9 +55,9 @@ pub async fn heartbeat<A: Adapter + 'static>(
     });
 
     if should_send {
-        Ok(HeartbeatStatus::Sent(send_heartbeat(&iface).await?))
+        Ok(Some(send_heartbeat(&iface).await?))
     } else {
-        Ok(HeartbeatStatus::NotSent)
+        Ok(None)
     }
 }
 

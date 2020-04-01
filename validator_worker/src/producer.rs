@@ -13,7 +13,6 @@ use crate::sentry_interface::{PropagationResult, SentryApi};
 pub enum TickStatus<AE: AdapterErrorKind> {
     Sent {
         channel: ChannelId,
-        balances: BalancesMap,
         new_accounting: Accounting,
         accounting_propagation: Vec<PropagationResult<AE>>,
         event_counts: usize,
@@ -40,14 +39,13 @@ pub async fn tick<A: Adapter + 'static>(
         .await?;
 
     if !aggrs.events.is_empty() {
-        let (balances, new_accounting) = merge_aggrs(&accounting, &aggrs.events, &iface.channel)?;
+        let new_accounting = merge_aggrs(&accounting, &aggrs.events, &iface.channel)?;
 
         let message_types = MessageTypes::Accounting(new_accounting.clone());
 
         Ok(TickStatus::Sent {
             channel: iface.channel.id,
             accounting_propagation: iface.propagate(&[&message_types]).await,
-            balances,
             new_accounting,
             event_counts: aggrs.events.len(),
         })

@@ -11,7 +11,7 @@ pub enum TickError {
 impl fmt::Display for TickError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            TickError::TimedOut(err) => write!(f, "Tick timed out ({})", err),
+            TickError::TimedOut(err) => write!(f, "Tick TimedOut: ({})", err),
             TickError::Tick(err) => write!(f, "Tick: {}", err),
         }
     }
@@ -31,13 +31,9 @@ impl<AE: AdapterErrorKind> fmt::Display for Error<AE> {
         use Error::*;
 
         match self {
-            SentryApi(err) => write!(f, "Sentry Api: {}", err),
-            LeaderTick(channel_id, err) => {
-                write!(f, "Error for Leader tick of {:#?}: {}", channel_id, err)
-            }
-            FollowerTick(channel_id, err) => {
-                write!(f, "Error for Follower tick of {:#?}: {}", channel_id, err)
-            }
+            SentryApi(err) => write!(f, "SentryApi: {}", err),
+            LeaderTick(channel_id, err) => write!(f, "LeaderTick {:#?}: {}", channel_id, err),
+            FollowerTick(channel_id, err) => write!(f, "FollowerTick {:#?}: {}", channel_id, err),
         }
     }
 }

@@ -36,12 +36,12 @@ impl fmt::Display for InvalidNewState {
 
 #[derive(Debug)]
 pub enum ApproveStateResult<AE: AdapterErrorKind> {
-    Sent(Vec<PropagationResult<AE>>),
-    /// Conditions for handling the new state haven't been met
-    NotSent,
+    /// If None, Conditions for handling the new state haven't been met
+    Sent(Option<Vec<PropagationResult<AE>>>),
     RejectedState {
         reason: InvalidNewState,
-        reject_state_propagation: Vec<PropagationResult<AE>>,
+        state_root: String,
+        propagation: Vec<PropagationResult<AE>>,
     },
 }
 
@@ -79,13 +79,13 @@ pub async fn tick<A: Adapter + 'static>(
 
     let producer_tick = producer::tick(&iface).await?;
     let balances = match &producer_tick {
-        producer::TickStatus::Sent { balances, .. } => balances,
+        producer::TickStatus::Sent { new_accounting, .. } => &new_accounting.balances,
         producer::TickStatus::NoNewEventAggr(balances) => balances,
     };
     let approve_state_result = if let (Some(new_state), false) = (new_msg, latest_is_responded_to) {
         on_new_state(&iface, &balances, &new_state).await?
     } else {
-        ApproveStateResult::NotSent
+        ApproveStateResult::Sent(None)
     };
 
     Ok(TickStatus {
@@ -147,7 +147,7 @@ async fn on_new_state<'a, A: Adapter + 'static>(
         })])
         .await;
 
-    Ok(ApproveStateResult::Sent(propagation_result))
+    Ok(ApproveStateResult::Sent(Some(propagation_result)))
 }
 
 async fn on_error<'a, A: Adapter + 'static>(
@@ -155,7 +155,7 @@ async fn on_error<'a, A: Adapter + 'static>(
     new_state: &'a NewState,
     status: InvalidNewState,
 ) -> ApproveStateResult<A::AdapterError> {
-    let reject_state_propagation = iface
+    let propagation = iface
         .propagate(&[&MessageTypes::RejectState(RejectState {
             reason: status.to_string(),
             state_root: new_state.state_root.clone(),
@@ -168,6 +168,7 @@ async fn on_error<'a, A: Adapter + 'static>(
 
     ApproveStateResult::RejectedState {
         reason: status,
-        reject_state_propagation,
+        state_root: new_state.state_root.clone(),
+        propagation,
     }
 }

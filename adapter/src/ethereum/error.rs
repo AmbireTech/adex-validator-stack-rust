@@ -66,8 +66,8 @@ impl fmt::Display for VerifyError {
             PublicKeyRecovery(err) => {
                 write!(f, "Recovering the public key from the signature: {}", err)
             }
-            StateRootDecoding(err) => write!(f, "Decoding the hex of the state root: {}", err),
-            SignatureDecoding(err) => write!(f, "Decoding the hex of the signature: {}", err),
+            StateRootDecoding(err) => write!(f, "Decoding state root: {}", err),
+            SignatureDecoding(err) => write!(f, "Decoding signature: {}", err),
             SignatureNotPrefixed => write!(f, "Signature is not prefixed with `0x`"),
         }
     }
