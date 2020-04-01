@@ -1,19 +1,21 @@
-use crate::error::ValidatorWorker;
+use std::collections::HashMap;
+use std::fmt;
+use std::time::Duration;
+
 use chrono::{DateTime, Utc};
-use futures::future::try_join_all;
-use futures::future::TryFutureExt;
-use primitives::adapter::Adapter;
-use primitives::channel::SpecValidator;
+use futures::future::{join_all, try_join_all, TryFutureExt};
+use reqwest::{Client, Response};
+use slog::Logger;
+
+use primitives::adapter::{Adapter, AdapterErrorKind, Error as AdapterError};
 use primitives::sentry::{
     ChannelListResponse, EventAggregateResponse, LastApprovedResponse, SuccessResponse,
     ValidatorMessageResponse,
 };
 use primitives::validator::MessageTypes;
-use primitives::{Channel, Config, ToETHChecksum, ValidatorDesc, ValidatorId};
-use reqwest::{Client, Response};
-use slog::{error, Logger};
-use std::collections::HashMap;
-use std::time::Duration;
+use primitives::{Channel, ChannelId, Config, ToETHChecksum, ValidatorDesc, ValidatorId};
+
+pub type PropagationResult<AE> = Result<ValidatorId, (ValidatorId, Error<AE>)>;
 
 #[derive(Debug, Clone)]
 pub struct SentryApi<T: Adapter> {
@@ -26,23 +28,70 @@ pub struct SentryApi<T: Adapter> {
     pub propagate_to: Vec<(ValidatorDesc, String)>,
 }
 
-impl<T: Adapter + 'static> SentryApi<T> {
+#[derive(Debug)]
+pub enum Error<AE: AdapterErrorKind> {
+    BuildingClient(reqwest::Error),
+    Request(reqwest::Error),
+    ValidatorAuthentication(AdapterError<AE>),
+    MissingWhoamiInChannelValidators {
+        channel: ChannelId,
+        validators: Vec<ValidatorId>,
+        whoami: ValidatorId,
+    },
+}
+
+impl<AE: AdapterErrorKind> std::error::Error for Error<AE> {}
+
+impl<AE: AdapterErrorKind> fmt::Display for Error<AE> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use Error::*;
+
+        match self {
+            BuildingClient(err) => write!(f, "Building client: {}", err),
+            Request(err) => write!(f, "Making a request: {}", err),
+            ValidatorAuthentication(err) => {
+                write!(f, "Getting authentication for validator: {}", err)
+            }
+            MissingWhoamiInChannelValidators {
+                channel,
+                validators,
+                whoami,
+            } => {
+                let validator_ids = validators
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                write!(
+                    f,
+                    "We cannot find validator entry for whoami {:#?} in channel {:#?} with validators: {}",
+                    whoami,
+                    channel,
+                    validator_ids
+                )
+            }
+        }
+    }
+}
+
+impl<A: Adapter + 'static> SentryApi<A> {
     pub fn init(
-        adapter: T,
-        channel: &Channel,
+        adapter: A,
+        channel: Channel,
         config: &Config,
         logger: Logger,
-    ) -> Result<Self, ValidatorWorker> {
+    ) -> Result<Self, Error<A::AdapterError>> {
         let client = Client::builder()
             .timeout(Duration::from_millis(config.fetch_timeout.into()))
             .build()
-            .map_err(|e| ValidatorWorker::Failed(format!("building Client error: {}", e)))?;
+            .map_err(Error::BuildingClient)?;
 
         // validate that we are to validate the channel
         match channel.spec.validators.find(adapter.whoami()) {
-            SpecValidator::Leader(v) | SpecValidator::Follower(v) => {
-                let channel_id = format!("0x{}", hex::encode(&channel.id));
-                let validator_url = format!("{}/channel/{}", v.url, channel_id);
+            Some(ref spec_validator) => {
+                let validator = spec_validator.validator();
+                let validator_url = format!("{}/channel/{}", validator.url, channel.id);
+
                 let propagate_to = channel
                     .spec
                     .validators
@@ -51,12 +100,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
                         adapter
                             .get_auth(&validator.id)
                             .map(|auth| (validator.to_owned(), auth))
-                            .map_err(|e| {
-                                ValidatorWorker::Failed(format!(
-                                    "Propagation error: get auth failed {}",
-                                    e
-                                ))
-                            })
+                            .map_err(Error::ValidatorAuthentication)
                     })
                     .collect::<Result<Vec<_>, _>>()?;
 
@@ -66,32 +110,44 @@ impl<T: Adapter + 'static> SentryApi<T> {
                     client,
                     logger,
                     propagate_to,
-                    channel: channel.to_owned(),
+                    channel,
                     config: config.to_owned(),
                 })
             }
-            SpecValidator::None => Err(ValidatorWorker::Failed(
-                "We can not find validator entry for whoami".to_string(),
-            )),
+            None => Err(Error::MissingWhoamiInChannelValidators {
+                channel: channel.id,
+                validators: channel
+                    .spec
+                    .validators
+                    .iter()
+                    .map(|v| v.id.clone())
+                    .collect(),
+                whoami: adapter.whoami().clone(),
+            }),
         }
     }
 
-    pub async fn propagate(&self, messages: &[&MessageTypes]) {
-        let channel_id = format!("0x{}", hex::encode(&self.channel.id));
-        if let Err(e) = try_join_all(self.propagate_to.iter().map(|(validator, auth_token)| {
-            propagate_to(&channel_id, &auth_token, &self.client, &validator, messages)
+    pub async fn propagate(
+        &self,
+        messages: &[&MessageTypes],
+    ) -> Vec<PropagationResult<A::AdapterError>> {
+        join_all(self.propagate_to.iter().map(|(validator, auth_token)| {
+            propagate_to::<A>(
+                &self.channel.id,
+                &auth_token,
+                &self.client,
+                &validator,
+                messages,
+            )
         }))
         .await
-        {
-            error!(&self.logger, "Propagation error: {}", e; "module" => "sentry_interface", "in" => "SentryApi");
-        }
     }
 
     pub async fn get_latest_msg(
         &self,
         from: &ValidatorId,
         message_types: &[&str],
-    ) -> Result<Option<MessageTypes>, reqwest::Error> {
+    ) -> Result<Option<MessageTypes>, Error<A::AdapterError>> {
         let message_type = message_types.join("+");
         let url = format!(
             "{}/validator-messages/{}/{}?limit=1",
@@ -104,6 +160,7 @@ impl<T: Adapter + 'static> SentryApi<T> {
             .get(&url)
             .send()
             .and_then(|res: Response| res.json::<ValidatorMessageResponse>())
+            .map_err(Error::Request)
             .await?;
 
         Ok(result.validator_messages.first().map(|m| m.msg.clone()))
@@ -112,20 +169,21 @@ impl<T: Adapter + 'static> SentryApi<T> {
     pub async fn get_our_latest_msg(
         &self,
         message_types: &[&str],
-    ) -> Result<Option<MessageTypes>, reqwest::Error> {
+    ) -> Result<Option<MessageTypes>, Error<A::AdapterError>> {
         self.get_latest_msg(self.adapter.whoami(), message_types)
             .await
     }
 
-    pub async fn get_last_approved(&self) -> Result<LastApprovedResponse, reqwest::Error> {
+    pub async fn get_last_approved(&self) -> Result<LastApprovedResponse, Error<A::AdapterError>> {
         self.client
             .get(&format!("{}/last-approved", self.validator_url))
             .send()
             .and_then(|res: Response| res.json::<LastApprovedResponse>())
+            .map_err(Error::Request)
             .await
     }
 
-    pub async fn get_last_msgs(&self) -> Result<LastApprovedResponse, reqwest::Error> {
+    pub async fn get_last_msgs(&self) -> Result<LastApprovedResponse, Error<A::AdapterError>> {
         self.client
             .get(&format!(
                 "{}/last-approved?withHeartbeat=true",
@@ -133,17 +191,18 @@ impl<T: Adapter + 'static> SentryApi<T> {
             ))
             .send()
             .and_then(|res: Response| res.json::<LastApprovedResponse>())
+            .map_err(Error::Request)
             .await
     }
 
     pub async fn get_event_aggregates(
         &self,
         after: DateTime<Utc>,
-    ) -> Result<EventAggregateResponse, Box<ValidatorWorker>> {
+    ) -> Result<EventAggregateResponse, Error<A::AdapterError>> {
         let auth_token = self
             .adapter
             .get_auth(self.adapter.whoami())
-            .map_err(|e| Box::new(ValidatorWorker::Failed(e.to_string())))?;
+            .map_err(Error::ValidatorAuthentication)?;
 
         let url = format!(
             "{}/events-aggregates?after={}",
@@ -155,21 +214,21 @@ impl<T: Adapter + 'static> SentryApi<T> {
             .get(&url)
             .bearer_auth(&auth_token)
             .send()
-            .map_err(|e| Box::new(ValidatorWorker::Failed(e.to_string())))
+            .map_err(Error::Request)
             .await?
             .json()
-            .map_err(|e| Box::new(ValidatorWorker::Failed(e.to_string())))
+            .map_err(Error::Request)
             .await
     }
 }
 
-async fn propagate_to(
-    channel_id: &str,
+async fn propagate_to<A: Adapter>(
+    channel_id: &ChannelId,
     auth_token: &str,
     client: &Client,
     validator: &ValidatorDesc,
     messages: &[&MessageTypes],
-) -> Result<(), reqwest::Error> {
+) -> PropagationResult<A::AdapterError> {
     let url = format!(
         "{}/channel/{}/validator-messages",
         validator.url, channel_id
@@ -182,11 +241,13 @@ async fn propagate_to(
         .bearer_auth(&auth_token)
         .json(&body)
         .send()
-        .await?
+        .await
+        .map_err(|e| (validator.id.clone(), Error::Request(e)))?
         .json()
-        .await?;
+        .await
+        .map_err(|e| (validator.id.clone(), Error::Request(e)))?;
 
-    Ok(())
+    Ok(validator.id.clone())
 }
 
 pub async fn all_channels(
