@@ -13,7 +13,6 @@ use crate::sentry_interface::{PropagationResult, SentryApi};
 pub enum TickStatus<AE: AdapterErrorKind> {
     Sent {
         channel: ChannelId,
-        // balances: BalancesMap,
         new_accounting: Accounting,
         accounting_propagation: Vec<PropagationResult<AE>>,
         event_counts: usize,

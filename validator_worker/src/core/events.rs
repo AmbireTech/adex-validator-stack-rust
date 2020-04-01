@@ -35,7 +35,7 @@ pub(crate) fn merge_aggrs(
     let new_accounting = Accounting {
         last_event_aggregate,
         balances_before_fees,
-        balances
+        balances,
     };
 
     Ok(new_accounting)
@@ -115,9 +115,8 @@ mod test {
             balances: BalancesMap::default(),
         };
 
-        let new_accounting =
-            merge_aggrs(&acc, &[gen_ev_aggr(5, &IDS["publisher"])], &channel)
-                .expect("Something went wrong");
+        let new_accounting = merge_aggrs(&acc, &[gen_ev_aggr(5, &IDS["publisher"])], &channel)
+            .expect("Something went wrong");
 
         assert_eq!(
             new_accounting.balances_before_fees[&IDS["publisher"]],
@@ -165,9 +164,8 @@ mod test {
             balances: BalancesMap::default(),
         };
 
-        let new_accounting =
-            merge_aggrs(&acc, &[gen_ev_aggr(1_001, &IDS["publisher"])], &channel)
-                .expect("Something went wrong");
+        let new_accounting = merge_aggrs(&acc, &[gen_ev_aggr(1_001, &IDS["publisher"])], &channel)
+            .expect("Something went wrong");
 
         assert_eq!(
             new_accounting.balances_before_fees[&IDS["publisher"]],

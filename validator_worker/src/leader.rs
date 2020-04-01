@@ -8,13 +8,6 @@ use crate::sentry_interface::{PropagationResult, SentryApi};
 use crate::{get_state_root_hash, producer};
 
 #[derive(Debug)]
-pub enum NewStateResult<AE: AdapterErrorKind> {
-    Sent(Vec<PropagationResult<AE>>),
-    /// Conditions for sending the new state haven't been met
-    NotSent,
-}
-
-#[derive(Debug)]
 pub struct TickStatus<AE: AdapterErrorKind> {
     pub heartbeat: HeartbeatStatus<AE>,
     /// If None, then the conditions for handling a new state haven't been met
@@ -27,10 +20,7 @@ pub async fn tick<A: Adapter + 'static>(
 ) -> Result<TickStatus<A::AdapterError>, Box<dyn Error>> {
     let producer_tick = producer::tick(&iface).await?;
     let (balances, new_state) = match &producer_tick {
-        producer::TickStatus::Sent {
-            new_accounting,
-            ..
-        } => {
+        producer::TickStatus::Sent { new_accounting, .. } => {
             let new_state = on_new_accounting(&iface, new_accounting).await?;
             (&new_accounting.balances, Some(new_state))
         }
