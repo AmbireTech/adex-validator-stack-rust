@@ -536,7 +536,7 @@ mod test {
                 .expect("Valid ValidatorId"),
             payload: Payload {
                 id: "awesomeValidator".to_string(),
-                era: 100000,
+                era: 100_000,
                 address: "0x2bDeAFAE53940669DaA6F519373f686c1f3d3393".to_string(),
                 identity: None,
             },

@@ -10,7 +10,7 @@ pub(crate) fn merge_aggrs(
     accounting: &Accounting,
     aggregates: &[EventAggregate],
     channel: &Channel,
-) -> Result<(BalancesMap, Accounting), DomainError> {
+) -> Result<Accounting, DomainError> {
     let deposit = channel.deposit_amount.clone();
 
     let last_event_aggregate = [accounting.last_event_aggregate]
@@ -35,10 +35,10 @@ pub(crate) fn merge_aggrs(
     let new_accounting = Accounting {
         last_event_aggregate,
         balances_before_fees,
-        balances: balances.clone(),
+        balances
     };
 
-    Ok((balances, new_accounting))
+    Ok(new_accounting)
 }
 
 fn merge_payouts_into_balances<'a, T: Iterator<Item = &'a AggregateEvents>>(
@@ -115,11 +115,10 @@ mod test {
             balances: BalancesMap::default(),
         };
 
-        let (balances, new_accounting) =
+        let new_accounting =
             merge_aggrs(&acc, &[gen_ev_aggr(5, &IDS["publisher"])], &channel)
                 .expect("Something went wrong");
 
-        assert_eq!(balances, new_accounting.balances, "balances is the same");
         assert_eq!(
             new_accounting.balances_before_fees[&IDS["publisher"]],
             150.into(),
@@ -166,11 +165,10 @@ mod test {
             balances: BalancesMap::default(),
         };
 
-        let (balances, new_accounting) =
+        let new_accounting =
             merge_aggrs(&acc, &[gen_ev_aggr(1_001, &IDS["publisher"])], &channel)
                 .expect("Something went wrong");
 
-        assert_eq!(balances, new_accounting.balances, "balances is the same");
         assert_eq!(
             new_accounting.balances_before_fees[&IDS["publisher"]],
             9_800.into(),

@@ -79,7 +79,7 @@ pub async fn tick<A: Adapter + 'static>(
 
     let producer_tick = producer::tick(&iface).await?;
     let balances = match &producer_tick {
-        producer::TickStatus::Sent { balances, .. } => balances,
+        producer::TickStatus::Sent { new_accounting, .. } => &new_accounting.balances,
         producer::TickStatus::NoNewEventAggr(balances) => balances,
     };
     let approve_state_result = if let (Some(new_state), false) = (new_msg, latest_is_responded_to) {
