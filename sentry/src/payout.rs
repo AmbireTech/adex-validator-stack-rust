@@ -119,7 +119,7 @@ fn price_bounds(channel: &Channel, event: &Event) -> (BigNum, BigNum) {
 mod tests {
     use super::*;
     use primitives::channel::{Pricing, PricingBounds};
-    use primitives::util::tests::prep_db::{AUTH, DUMMY_CHANNEL, IDS};
+    use primitives::util::tests::prep_db::{DUMMY_CHANNEL, IDS};
 
     #[test]
     fn test_plain_events() {
@@ -334,6 +334,107 @@ mod tests {
         assert!(
             payout == BigNum::from(10),
             "fixedAmount (country, pulisher): should choose first fixedAmount rule"
+        );
+    }
+
+    #[test]
+    fn test_pick_fixed_amount_rule_over_multiplier_event() {
+        let mut channel: Channel = DUMMY_CHANNEL.clone();
+        channel.spec.pricing_bounds = Some(PricingBounds {
+            click: Some(Pricing {
+                min: BigNum::from(23),
+                max: BigNum::from(100),
+            }),
+            impression: None,
+        });
+        channel.spec.price_multiplication_rules = vec![
+            PriceMultiplicationRules {
+                multiplier: Some(1.2),
+                amount: None,
+                os_type: Some(vec!["android".to_string()]),
+                ev_type: Some(vec!["CLICK".to_string()]),
+                publisher: Some(vec![IDS["publisher"].clone()]),
+                country: Some(vec!["us".to_string()]),
+            },
+            PriceMultiplicationRules {
+                multiplier: None,
+                amount: Some(BigNum::from(12)),
+                os_type: None,
+                ev_type: Some(vec!["CLICK".to_string()]),
+                publisher: Some(vec![IDS["publisher"].clone()]),
+                country: Some(vec!["us".to_string()]),
+            },
+        ];
+
+        let session = Session {
+            ip: None,
+            country: Some("us".to_string()),
+            referrer_header: None,
+            os: None,
+        };
+
+        let event = Event::Click {
+            publisher: IDS["publisher"].clone(),
+            ad_slot: None,
+            ad_unit: None,
+            referrer: None,
+        };
+
+        let payout = get_payout(&channel, &event, &session);
+        assert!(
+            payout == BigNum::from(12),
+            "fixedAmount (country, osType, publisher): choose fixedAmount rule over multiplier if present"
+        );
+    }
+
+    #[test]
+    fn test_apply_all_mutliplier_rules() {
+        let mut channel: Channel = DUMMY_CHANNEL.clone();
+
+        channel.spec.pricing_bounds = Some(PricingBounds {
+            click: Some(Pricing {
+                min: BigNum::from(100),
+                max: BigNum::from(1000)
+            }),
+            impression: None,
+        });
+        channel.spec.price_multiplication_rules = vec![
+            PriceMultiplicationRules {
+                multiplier: Some(1.2),
+                amount: None,
+                os_type: Some(vec!["android".to_string()]),
+                ev_type: Some(vec!["CLICK".to_string()]),
+                publisher: Some(vec![IDS["publisher"].clone()]),
+                country: Some(vec!["us".to_string()]),
+            },
+            PriceMultiplicationRules {
+                multiplier: Some(1.2),
+                amount: None,
+                os_type: None,
+                ev_type: None,
+                publisher: None,
+                country: None,
+            },
+        ];
+
+        let session = Session {
+            ip: None,
+            country: Some("us".to_string()),
+            referrer_header: None,
+            os: None,
+        };
+
+        let event = Event::Click {
+            publisher: IDS["publisher"].clone(),
+            ad_slot: None,
+            ad_unit: None,
+            referrer: None,
+        };
+
+        let payout = get_payout(&channel, &event, &session);
+        assert!(
+            payout == BigNum::from(144),
+            "fixedAmount (country, osType, publisher): choose fixedAmount rule over multiplier if present"
         );
     }
 }
