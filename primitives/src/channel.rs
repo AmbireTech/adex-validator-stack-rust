@@ -165,7 +165,7 @@ pub struct PriceMultiplicationRules {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub amount: Option<BigNum>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub ev_type: Option<Vec<Event>>,
+    pub ev_type: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub publisher: Option<Vec<ValidatorId>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
