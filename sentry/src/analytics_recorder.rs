@@ -1,4 +1,5 @@
 use crate::epoch;
+use crate::payout::get_payout;
 use crate::Session;
 use primitives::sentry::Event;
 use primitives::sentry::{ChannelReport, PublisherReport};
@@ -6,7 +7,6 @@ use primitives::{BigNum, Channel};
 use redis::aio::MultiplexedConnection;
 use redis::pipe;
 use slog::{error, Logger};
-use crate::payout::get_payout;
 
 pub async fn record(
     mut conn: MultiplexedConnection,

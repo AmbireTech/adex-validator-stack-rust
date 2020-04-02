@@ -134,7 +134,7 @@ mod test {
             .expect("Handling the Request shouldn't have failed");
 
         assert!(
-            no_auth.extensions().get::<Session>().is_none(),
+            no_auth.extensions().get::<AuthSession>().is_none(),
             "There shouldn't be a Session in the extensions"
         );
 
@@ -147,7 +147,7 @@ mod test {
             .await
             .expect("Handling the Request shouldn't have failed");
         assert!(
-            incorrect_auth.extensions().get::<Session>().is_none(),
+            incorrect_auth.extensions().get::<AuthSession>().is_none(),
             "There shouldn't be a Session in the extensions"
         );
 
