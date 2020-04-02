@@ -59,7 +59,7 @@ mod test {
         let dummy_adapter = DummyAdapter::init(adapter_options, &config);
         let logger = Logger::root(Discard, o!());
 
-        SentryApi::init(dummy_adapter, &channel, &config, logger).expect("should succeed")
+        SentryApi::init(dummy_adapter, channel.clone(), &config, logger).expect("should succeed")
     }
 
     #[test]

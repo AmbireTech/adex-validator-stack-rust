@@ -14,7 +14,7 @@ pub enum ValidatorError {
     InvalidTransition,
 }
 
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[serde(transparent)]
 pub struct ValidatorId(
     #[serde(
@@ -23,6 +23,12 @@ pub struct ValidatorId(
     )]
     [u8; 20],
 );
+
+impl fmt::Debug for ValidatorId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ValidatorId({})", self.to_hex_prefix_string())
+    }
+}
 
 fn validator_id_from_str<'de, D>(deserializer: D) -> Result<[u8; 20], D::Error>
 where
