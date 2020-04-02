@@ -6,20 +6,7 @@ use primitives::{BigNum, Channel};
 use redis::aio::MultiplexedConnection;
 use redis::pipe;
 use slog::{error, Logger};
-
-pub fn get_payout(channel: &Channel, event: &Event) -> BigNum {
-    match event {
-        Event::Impression { .. } => channel.spec.min_per_impression.clone(),
-        Event::Click { .. } => channel
-            .spec
-            .pricing_bounds
-            .as_ref()
-            .and_then(|pricing_bound| pricing_bound.click.as_ref())
-            .map(|click| click.min.clone())
-            .unwrap_or_default(),
-        _ => Default::default(),
-    }
-}
+use crate::payout::get_payout;
 
 pub async fn record(
     mut conn: MultiplexedConnection,
@@ -47,7 +34,7 @@ pub async fn record(
                 referrer,
             } => {
                 let divisor = BigNum::from(10u64.pow(18));
-                let pay_amount = get_payout(&channel, event)
+                let pay_amount = get_payout(&channel, event, &session)
                     .div_floor(&divisor)
                     .to_f64()
                     .expect("should always have a payout");

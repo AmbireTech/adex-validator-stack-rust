@@ -6,7 +6,7 @@ use redis::aio::MultiplexedConnection;
 
 use primitives::adapter::{Adapter, Session as AdapterSession};
 
-use crate::Session;
+use crate::{AuthSession, Session};
 
 /// Check `Authorization` header for `Bearer` scheme with `Adapter::session_from_token`.
 /// If the `Adapter` fails to create an `AdapterSession`, `ResponseError::BadRequest` will be returned.
@@ -15,6 +15,21 @@ pub(crate) async fn for_request(
     adapter: &impl Adapter,
     redis: MultiplexedConnection,
 ) -> Result<Request<Body>, Box<dyn error::Error>> {
+    let referrer = req
+        .headers()
+        .get(REFERER)
+        .map(|hv| hv.to_str().ok().map(ToString::to_string))
+        .flatten();
+
+    let session = Session {
+        ip: get_request_ip(&req),
+        country: None,
+        referrer_header: referrer,
+        os: None,
+    };
+
+    req.extensions_mut().insert(session.clone());
+
     let authorization = req.headers().get(AUTHORIZATION);
 
     let prefix = "Bearer ";
@@ -58,21 +73,13 @@ pub(crate) async fn for_request(
             }
         };
 
-        let referrer = req
-            .headers()
-            .get(REFERER)
-            .map(|hv| hv.to_str().ok().map(ToString::to_string))
-            .flatten();
-
-        let session = Session {
+        let auth = AuthSession {
             era: adapter_session.era,
             uid: adapter_session.uid,
-            ip: get_request_ip(&req),
-            country: None,
-            referrer_header: referrer,
+            session,
         };
 
-        req.extensions_mut().insert(session);
+        req.extensions_mut().insert(auth);
     }
 
     Ok(req)
@@ -173,10 +180,10 @@ mod test {
             .expect("Valid requests should succeed");
         let session = altered_request
             .extensions()
-            .get::<Session>()
+            .get::<AuthSession>()
             .expect("There should be a Session set inside the request");
 
         assert_eq!(IDS["leader"], session.uid);
-        assert!(session.ip.is_none());
+        assert!(session.session.ip.is_none());
     }
 }

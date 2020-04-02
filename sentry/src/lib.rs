@@ -48,6 +48,7 @@ mod chain;
 pub mod db;
 pub mod event_aggregator;
 pub mod event_reducer;
+pub mod payout;
 
 lazy_static! {
     static ref CHANNEL_GET_BY_ID: Regex =
@@ -443,11 +444,33 @@ pub fn epoch() -> f64 {
 }
 
 // @TODO: Make pub(crate)
+// #[derive(Debug, Clone)]
+// pub struct Session {
+//     pub era: i64,
+//     pub uid: ValidatorId,
+//     pub ip: Option<String>,
+//     pub country: Option<String>,
+//     pub referrer_header: Option<String>,
+//     pub os: Option<String>,
+// }
+
 #[derive(Debug, Clone)]
 pub struct Session {
-    pub era: i64,
-    pub uid: ValidatorId,
     pub ip: Option<String>,
     pub country: Option<String>,
     pub referrer_header: Option<String>,
+    pub os: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AuthSession {
+    pub era: i64,
+    pub uid: ValidatorId,
+    pub session: Session,
+}
+
+impl AsRef<Session> for AuthSession {
+    fn as_ref(&self) -> &Session {
+        &self.session
+    }
 }

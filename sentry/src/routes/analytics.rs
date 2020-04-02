@@ -3,9 +3,9 @@ use crate::db::analytics::{
 };
 use crate::success_response;
 use crate::Application;
+use crate::AuthSession;
 use crate::ResponseError;
 use crate::RouteParams;
-use crate::Session;
 use hyper::{Body, Request, Response};
 use primitives::adapter::Adapter;
 use primitives::analytics::{AnalyticsQuery, AnalyticsResponse};
@@ -17,10 +17,10 @@ pub async fn publisher_analytics<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
-    let sess = req.extensions().get::<Session>();
+    let sess = req.extensions().get::<AuthSession>();
 
     let analytics_type = AnalyticsType::Publisher {
-        session: sess.cloned().ok_or(ResponseError::Unauthorized)?,
+        auth: sess.cloned().ok_or(ResponseError::Unauthorized)?,
     };
 
     process_analytics(req, app, analytics_type)
@@ -65,9 +65,9 @@ pub async fn advertiser_analytics<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
-    let sess = req.extensions().get::<Session>();
+    let sess = req.extensions().get::<AuthSession>();
     let analytics_type = AnalyticsType::Advertiser {
-        session: sess.ok_or(ResponseError::Unauthorized)?.to_owned(),
+        auth: sess.ok_or(ResponseError::Unauthorized)?.to_owned(),
     };
 
     process_analytics(req, app, analytics_type)
@@ -110,15 +110,18 @@ pub async fn advanced_analytics<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
-    let sess = req.extensions().get::<Session>().expect("auth is required");
-    let advertiser_channels = advertiser_channel_ids(&app.pool, &sess.uid).await?;
+    let auth = req
+        .extensions()
+        .get::<AuthSession>()
+        .expect("auth is required");
+    let advertiser_channels = advertiser_channel_ids(&app.pool, &auth.uid).await?;
 
     let query = serde_urlencoded::from_str::<AnalyticsQuery>(&req.uri().query().unwrap_or(""))?;
 
     let response = get_advanced_reports(
         &app.redis,
         &query.event_type,
-        &sess.uid,
+        &auth.uid,
         &advertiser_channels,
     )
     .await

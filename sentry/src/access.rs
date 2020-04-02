@@ -2,7 +2,7 @@ use chrono::Utc;
 use futures::future::try_join_all;
 use redis::aio::MultiplexedConnection;
 
-use crate::Session;
+use crate::{AuthSession, Session};
 use primitives::event_submission::{RateLimit, Rule};
 use primitives::sentry::Event;
 use primitives::Channel;
@@ -38,7 +38,8 @@ impl fmt::Display for Error {
 // @TODO: Make pub(crate)
 pub async fn check_access(
     redis: &MultiplexedConnection,
-    session: Option<&Session>,
+    auth_session: Option<&AuthSession>,
+    session: &Session,
     rate_limit: &RateLimit,
     channel: &Channel,
     events: &[Event],
@@ -56,19 +57,22 @@ pub async fn check_access(
         return Ok(());
     }
 
-    let session = session.ok_or_else(|| Error::UnAuthenticated)?;
     if current_time > channel.valid_until {
         return Err(Error::ChannelIsExpired);
     }
 
+    let (is_creator, auth_uid) = match auth_session.as_ref() {
+        Some(auth) => (auth.uid == channel.creator, auth.uid.to_string()),
+        None => (false, Default::default()),
+    };
     // We're only sending a CLOSE
     // That's allowed for the creator normally, and for everyone during the withdraw period
-    if has_close_event && session.uid == channel.creator {
+    if has_close_event && is_creator {
         return Ok(());
     }
 
     // Only the creator can send a CLOSE
-    if session.uid != channel.creator && events.iter().any(is_close_event) {
+    if is_creator && events.iter().any(is_close_event) {
         return Err(Error::OnlyCreatorCanCloseChannel);
     }
 
@@ -91,6 +95,7 @@ pub async fn check_access(
             rate_limit: Some(rate_limit.clone()),
         },
     ];
+
     // Enforce access limits
     let allow_rules = channel
         .spec
@@ -103,7 +108,7 @@ pub async fn check_access(
     let rules = allow_rules
         .iter()
         .filter(|r| match &r.uids {
-            Some(uids) => uids.iter().any(|uid| uid.eq(&session.uid.to_string())),
+            Some(uids) => uids.iter().any(|uid| uid.eq(&auth_uid)),
             None => true,
         })
         .collect::<Vec<_>>();
@@ -116,7 +121,7 @@ pub async fn check_access(
     let apply_all_rules = try_join_all(
         rules
             .iter()
-            .map(|rule| apply_rule(redis.clone(), &rule, &events, &channel, &session)),
+            .map(|rule| apply_rule(redis.clone(), &rule, &events, &channel, &auth_uid, &session)),
     );
 
     if let Err(rule_error) = apply_all_rules.await {
@@ -131,16 +136,13 @@ async fn apply_rule(
     rule: &Rule,
     events: &[Event],
     channel: &Channel,
+    uid: &str,
     session: &Session,
 ) -> Result<(), String> {
     match &rule.rate_limit {
         Some(rate_limit) => {
             let key = if &rate_limit.limit_type == "sid" {
-                Ok(format!(
-                    "adexRateLimit:{}:{}",
-                    hex::encode(channel.id),
-                    session.uid
-                ))
+                Ok(format!("adexRateLimit:{}:{}", hex::encode(channel.id), uid))
             } else if &rate_limit.limit_type == "ip" {
                 if events.len() != 1 {
                     Err("rateLimit: only allows 1 event".to_string())
@@ -257,11 +259,16 @@ mod test {
         let (config, redis) = setup().await;
 
         let session = Session {
-            era: 0,
-            uid: IDS["follower"].clone(),
             ip: Default::default(),
             referrer_header: None,
             country: None,
+            os: None,
+        };
+
+        let auth = AuthSession {
+            era: 0,
+            uid: IDS["follower"].clone(),
+            session: session.clone(),
         };
 
         let rule = Rule {
@@ -276,7 +283,8 @@ mod test {
 
         let response = check_access(
             &redis,
-            Some(&session),
+            Some(&auth),
+            &session,
             &config.ip_rate_limit,
             &channel,
             &events,
@@ -285,8 +293,9 @@ mod test {
         assert_eq!(Ok(()), response);
 
         let err_response = check_access(
-            &redis,
-            Some(&session),
+            &&redis,
+            Some(&auth),
+            &session,
             &config.ip_rate_limit,
             &channel,
             &events,
@@ -305,11 +314,16 @@ mod test {
         let (config, redis) = setup().await;
 
         let session = Session {
+            ip: Default::default(),
+            referrer_header: None,
+            country: None,
+            os: None,
+        };
+
+        let auth = AuthSession {
             era: 0,
             uid: IDS["follower"].clone(),
-            ip: Default::default(),
-            country: None,
-            referrer_header: None,
+            session: session.clone(),
         };
 
         let rule = Rule {
@@ -323,7 +337,8 @@ mod test {
 
         let err_response = check_access(
             &redis,
-            Some(&session),
+            Some(&auth),
+            &session,
             &config.ip_rate_limit,
             &channel,
             &get_impression_events(2),
@@ -339,7 +354,8 @@ mod test {
 
         let response = check_access(
             &redis,
-            Some(&session),
+            Some(&auth),
+            &session,
             &config.ip_rate_limit,
             &channel,
             &get_impression_events(1),

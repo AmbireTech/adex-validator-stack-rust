@@ -7,7 +7,7 @@ use crate::db::DbPool;
 use crate::event_reducer;
 use crate::Application;
 use crate::ResponseError;
-use crate::Session;
+use crate::{AuthSession, Session};
 use async_std::sync::RwLock;
 use chrono::Utc;
 use lazy_static::lazy_static;
@@ -68,7 +68,8 @@ impl EventAggregator {
         &self,
         app: &'a Application<A>,
         channel_id: &ChannelId,
-        session: Option<&Session>,
+        auth_session: Option<&AuthSession>,
+        session: &Session,
         events: &'a [Event],
     ) -> Result<(), ResponseError> {
         let recorder = self.recorder.clone();
@@ -126,6 +127,7 @@ impl EventAggregator {
 
         check_access(
             &app.redis,
+            auth_session,
             session,
             &app.config.ip_rate_limit,
             &record.channel,
@@ -141,13 +143,13 @@ impl EventAggregator {
             _ => ResponseError::BadRequest(e.to_string()),
         })?;
 
-        events
-            .iter()
-            .for_each(|ev| event_reducer::reduce(&record.channel, &mut record.aggregate, ev));
+        events.iter().for_each(|ev| {
+            event_reducer::reduce(&record.channel, &mut record.aggregate, ev, &session)
+        });
 
         // only time we don't have session is during
         // an unauthenticated close event
-        if let (true, Some(session)) = (ANALYTICS_RECORDER.is_some(), session) {
+        if ANALYTICS_RECORDER.is_some() {
             tokio::spawn(analytics_recorder::record(
                 redis.clone(),
                 record.channel.clone(),

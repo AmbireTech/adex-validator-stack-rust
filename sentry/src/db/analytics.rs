@@ -1,6 +1,6 @@
 use crate::db::DbPool;
 use crate::epoch;
-use crate::Session;
+use crate::AuthSession;
 use bb8::RunError;
 use bb8_postgres::tokio_postgres::types::ToSql;
 use chrono::Utc;
@@ -13,9 +13,9 @@ use std::collections::HashMap;
 use std::error::Error;
 
 pub enum AnalyticsType {
-    Advertiser { session: Session },
+    Advertiser { auth: AuthSession },
     Global,
-    Publisher { session: Session },
+    Publisher { auth: AuthSession },
 }
 
 pub async fn advertiser_channel_ids(
@@ -78,11 +78,11 @@ pub async fn get_analytics(
 
     let mut group_clause = "time".to_string();
     let mut select_clause = match analytics_type {
-        AnalyticsType::Advertiser { session } => {
+        AnalyticsType::Advertiser { auth } => {
             if channel_id.is_none() {
                 where_clauses.push(format!(
                     "channel_id IN (SELECT id FROM channels WHERE creator = '{}')",
-                    session.uid
+                    auth.uid
                 ));
             }
 
@@ -99,8 +99,8 @@ pub async fn get_analytics(
                 metric, interval
             )
         }
-        AnalyticsType::Publisher { session } => {
-            where_clauses.push(format!("earner = '{}'", session.uid));
+        AnalyticsType::Publisher { auth } => {
+            where_clauses.push(format!("earner = '{}'", auth.uid));
 
             format!(
                 "SUM({}::numeric)::varchar as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time", 
