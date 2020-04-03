@@ -1,11 +1,11 @@
 use crate::db::analytics::{
     advertiser_channel_ids, get_advanced_reports, get_analytics, AnalyticsType,
 };
-use crate::success_response;
 use crate::Application;
-use crate::AuthSession;
+use crate::Auth;
 use crate::ResponseError;
 use crate::RouteParams;
+use crate::{success_response, Session};
 use hyper::{Body, Request, Response};
 use primitives::adapter::Adapter;
 use primitives::analytics::{AnalyticsQuery, AnalyticsResponse};
@@ -17,11 +17,13 @@ pub async fn publisher_analytics<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
-    let sess = req.extensions().get::<AuthSession>();
+    let session = req
+        .extensions()
+        .get::<Session>()
+        .ok_or(ResponseError::Unauthorized)?;
+    let auth = session.auth.ok_or(ResponseError::Unauthorized)?;
 
-    let analytics_type = AnalyticsType::Publisher {
-        auth: sess.cloned().ok_or(ResponseError::Unauthorized)?,
-    };
+    let analytics_type = AnalyticsType::Publisher { auth };
 
     process_analytics(req, app, analytics_type)
         .await
@@ -65,7 +67,7 @@ pub async fn advertiser_analytics<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
-    let sess = req.extensions().get::<AuthSession>();
+    let sess = req.extensions().get::<Auth>();
     let analytics_type = AnalyticsType::Advertiser {
         auth: sess.ok_or(ResponseError::Unauthorized)?.to_owned(),
     };
@@ -110,10 +112,7 @@ pub async fn advanced_analytics<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
-    let auth = req
-        .extensions()
-        .get::<AuthSession>()
-        .expect("auth is required");
+    let auth = req.extensions().get::<Auth>().expect("auth is required");
     let advertiser_channels = advertiser_channel_ids(&app.pool, &auth.uid).await?;
 
     let query = serde_urlencoded::from_str::<AnalyticsQuery>(&req.uri().query().unwrap_or(""))?;

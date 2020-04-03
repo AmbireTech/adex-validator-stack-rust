@@ -446,6 +446,7 @@ pub fn epoch() -> f64 {
 // @TODO: Make pub(crate)
 #[derive(Debug, Clone)]
 pub struct Session {
+    pub auth: Option<Auth>,
     pub ip: Option<String>,
     pub country: Option<String>,
     pub referrer_header: Option<String>,
@@ -453,14 +454,7 @@ pub struct Session {
 }
 
 #[derive(Debug, Clone)]
-pub struct AuthSession {
+pub struct Auth {
     pub era: i64,
     pub uid: ValidatorId,
-    pub session: Session,
-}
-
-impl AsRef<Session> for AuthSession {
-    fn as_ref(&self) -> &Session {
-        &self.session
-    }
 }

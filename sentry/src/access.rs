@@ -2,7 +2,7 @@ use chrono::Utc;
 use futures::future::try_join_all;
 use redis::aio::MultiplexedConnection;
 
-use crate::{AuthSession, Session};
+use crate::Session;
 use primitives::event_submission::{RateLimit, Rule};
 use primitives::sentry::Event;
 use primitives::Channel;
@@ -38,7 +38,6 @@ impl fmt::Display for Error {
 // @TODO: Make pub(crate)
 pub async fn check_access(
     redis: &MultiplexedConnection,
-    auth_session: Option<&AuthSession>,
     session: &Session,
     rate_limit: &RateLimit,
     channel: &Channel,
@@ -61,7 +60,7 @@ pub async fn check_access(
         return Err(Error::ChannelIsExpired);
     }
 
-    let (is_creator, auth_uid) = match auth_session.as_ref() {
+    let (is_creator, auth_uid) = match &session.auth {
         Some(auth) => (auth.uid == channel.creator, auth.uid.to_string()),
         None => (false, Default::default()),
     };
@@ -258,17 +257,17 @@ mod test {
     async fn session_uid_rate_limit() {
         let (config, redis) = setup().await;
 
+        let auth = Auth {
+            era: 0,
+            uid: IDS["follower"].clone(),
+        };
+
         let session = Session {
+            auth: Some(auth),
             ip: Default::default(),
             referrer_header: None,
             country: None,
             os: None,
-        };
-
-        let auth = AuthSession {
-            era: 0,
-            uid: IDS["follower"].clone(),
-            session: session.clone(),
         };
 
         let rule = Rule {
@@ -281,26 +280,12 @@ mod test {
         let events = get_impression_events(2);
         let channel = get_channel(rule);
 
-        let response = check_access(
-            &redis,
-            Some(&auth),
-            &session,
-            &config.ip_rate_limit,
-            &channel,
-            &events,
-        )
-        .await;
+        let response =
+            check_access(&redis, &session, &config.ip_rate_limit, &channel, &events).await;
         assert_eq!(Ok(()), response);
 
-        let err_response = check_access(
-            &&redis,
-            Some(&auth),
-            &session,
-            &config.ip_rate_limit,
-            &channel,
-            &events,
-        )
-        .await;
+        let err_response =
+            check_access(&&redis, &session, &config.ip_rate_limit, &channel, &events).await;
         assert_eq!(
             Err(Error::RulesError(
                 "rateLimit: too many requests".to_string()
@@ -313,17 +298,17 @@ mod test {
     async fn ip_rate_limit() {
         let (config, redis) = setup().await;
 
+        let auth = Auth {
+            era: 0,
+            uid: IDS["follower"].clone(),
+        };
+
         let session = Session {
             ip: Default::default(),
             referrer_header: None,
             country: None,
             os: None,
-        };
-
-        let auth = AuthSession {
-            era: 0,
-            uid: IDS["follower"].clone(),
-            session: session.clone(),
+            auth: Some(auth),
         };
 
         let rule = Rule {
@@ -337,7 +322,6 @@ mod test {
 
         let err_response = check_access(
             &redis,
-            Some(&auth),
             &session,
             &config.ip_rate_limit,
             &channel,
@@ -354,7 +338,6 @@ mod test {
 
         let response = check_access(
             &redis,
-            Some(&auth),
             &session,
             &config.ip_rate_limit,
             &channel,

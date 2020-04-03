@@ -7,7 +7,7 @@ use crate::db::DbPool;
 use crate::event_reducer;
 use crate::Application;
 use crate::ResponseError;
-use crate::{AuthSession, Session};
+use crate::Session;
 use async_std::sync::RwLock;
 use chrono::Utc;
 use lazy_static::lazy_static;
@@ -68,7 +68,6 @@ impl EventAggregator {
         &self,
         app: &'a Application<A>,
         channel_id: &ChannelId,
-        auth_session: Option<&AuthSession>,
         session: &Session,
         events: &'a [Event],
     ) -> Result<(), ResponseError> {
@@ -127,7 +126,6 @@ impl EventAggregator {
 
         check_access(
             &app.redis,
-            auth_session,
             session,
             &app.config.ip_rate_limit,
             &record.channel,
