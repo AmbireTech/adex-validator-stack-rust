@@ -5,7 +5,7 @@ use crate::success_response;
 use crate::Application;
 use crate::ResponseError;
 use crate::RouteParams;
-use crate::{AuthSession, Session};
+use crate::{Auth, Session};
 use bb8::RunError;
 use bb8_postgres::tokio_postgres::error;
 use futures::future::try_join_all;
@@ -184,7 +184,7 @@ pub async fn insert_events<A: Adapter + 'static>(
 ) -> Result<Response<Body>, ResponseError> {
     let (req_head, req_body) = req.into_parts();
 
-    let auth_session = req_head.extensions.get::<AuthSession>();
+    let auth = req_head.extensions.get::<Auth>();
     let session = req_head
         .extensions
         .get::<Session>()
@@ -205,7 +205,7 @@ pub async fn insert_events<A: Adapter + 'static>(
         .ok_or_else(|| ResponseError::BadRequest("invalid request".to_string()))?;
 
     app.event_aggregator
-        .record(app, &channel_id, auth_session, session, &events)
+        .record(app, &channel_id, session, auth, &events)
         .await?;
 
     Ok(Response::builder()
@@ -220,7 +220,7 @@ pub async fn create_validator_messages<A: Adapter + 'static>(
 ) -> Result<Response<Body>, ResponseError> {
     let session = req
         .extensions()
-        .get::<AuthSession>()
+        .get::<Auth>()
         .expect("auth request session")
         .to_owned();
 

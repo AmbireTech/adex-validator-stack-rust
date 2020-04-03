@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 use primitives::{adapter::Adapter, sentry::EventAggregateResponse, Channel};
 
-use crate::{db::list_event_aggregates, success_response, Application, AuthSession, ResponseError};
+use crate::{db::list_event_aggregates, success_response, Application, Auth, ResponseError};
 
 #[derive(Deserialize)]
 pub struct EventAggregatesQuery {
@@ -23,7 +23,7 @@ pub async fn list_channel_event_aggregates<A: Adapter>(
 
     let auth = req
         .extensions()
-        .get::<AuthSession>()
+        .get::<Auth>()
         .ok_or_else(|| ResponseError::Unauthorized)?;
 
     let query =

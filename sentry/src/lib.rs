@@ -453,14 +453,7 @@ pub struct Session {
 }
 
 #[derive(Debug, Clone)]
-pub struct AuthSession {
+pub struct Auth {
     pub era: i64,
     pub uid: ValidatorId,
-    pub session: Session,
-}
-
-impl AsRef<Session> for AuthSession {
-    fn as_ref(&self) -> &Session {
-        &self.session
-    }
 }

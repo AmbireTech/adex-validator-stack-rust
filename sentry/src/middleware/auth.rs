@@ -6,7 +6,7 @@ use redis::aio::MultiplexedConnection;
 
 use primitives::adapter::{Adapter, Session as AdapterSession};
 
-use crate::{AuthSession, Session};
+use crate::{Auth, Session};
 
 /// Check `Authorization` header for `Bearer` scheme with `Adapter::session_from_token`.
 /// If the `Adapter` fails to create an `AdapterSession`, `ResponseError::BadRequest` will be returned.
@@ -27,8 +27,7 @@ pub(crate) async fn for_request(
         referrer_header: referrer,
         os: None,
     };
-
-    req.extensions_mut().insert(session.clone());
+    req.extensions_mut().insert(session);
 
     let authorization = req.headers().get(AUTHORIZATION);
 
@@ -73,10 +72,9 @@ pub(crate) async fn for_request(
             }
         };
 
-        let auth = AuthSession {
+        let auth = Auth {
             era: adapter_session.era,
             uid: adapter_session.uid,
-            session,
         };
 
         req.extensions_mut().insert(auth);
@@ -134,7 +132,7 @@ mod test {
             .expect("Handling the Request shouldn't have failed");
 
         assert!(
-            no_auth.extensions().get::<AuthSession>().is_none(),
+            no_auth.extensions().get::<Auth>().is_none(),
             "There shouldn't be a Session in the extensions"
         );
 
@@ -147,7 +145,7 @@ mod test {
             .await
             .expect("Handling the Request shouldn't have failed");
         assert!(
-            incorrect_auth.extensions().get::<AuthSession>().is_none(),
+            incorrect_auth.extensions().get::<Auth>().is_none(),
             "There shouldn't be a Session in the extensions"
         );
 
@@ -178,12 +176,18 @@ mod test {
         let altered_request = for_request(req, &dummy_adapter, redis)
             .await
             .expect("Valid requests should succeed");
-        let session = altered_request
+
+        let auth = altered_request
             .extensions()
-            .get::<AuthSession>()
+            .get::<Auth>()
             .expect("There should be a Session set inside the request");
 
-        assert_eq!(IDS["leader"], session.uid);
-        assert!(session.session.ip.is_none());
+        assert_eq!(IDS["leader"], auth.uid);
+
+        let session = altered_request
+            .extensions()
+            .get::<Session>()
+            .expect("There should be a Session set inside the request");
+        assert!(session.ip.is_none());
     }
 }

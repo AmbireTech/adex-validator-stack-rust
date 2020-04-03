@@ -1,6 +1,6 @@
 use crate::db::DbPool;
 use crate::epoch;
-use crate::AuthSession;
+use crate::Auth;
 use bb8::RunError;
 use bb8_postgres::tokio_postgres::types::ToSql;
 use chrono::Utc;
@@ -13,9 +13,9 @@ use std::collections::HashMap;
 use std::error::Error;
 
 pub enum AnalyticsType {
-    Advertiser { auth: AuthSession },
+    Advertiser { auth: Auth },
     Global,
-    Publisher { auth: AuthSession },
+    Publisher { auth: Auth },
 }
 
 pub async fn advertiser_channel_ids(

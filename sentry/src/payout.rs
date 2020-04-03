@@ -34,24 +34,19 @@ fn payout(
     min_price: BigNum,
     publisher: &ValidatorId,
 ) -> BigNum {
-    let matching_rules: Vec<&PriceMultiplicationRules> = rules
-        .iter()
-        .filter(|&rule| match_rule(rule, &event, &session, &publisher))
-        .collect();
-    let fixed_amount_rule = matching_rules
-        .iter()
-        .find(|&rule| rule.amount.is_some())
-        .map(|&rule| rule.amount.as_ref().expect("should have value"));
+    let fixed_amount_rule = rules.iter().find_map(|rule| {
+        match (match_rule(rule, &event, &session, &publisher), &rule.amount) {
+            (true, Some(amount)) => Some(amount.clone()),
+            _ => None,
+        }
+    });
 
     let price_by_rules = match fixed_amount_rule {
-        Some(amount) => amount.clone(),
+        Some(amount) => amount,
         None => {
             let exponent: f64 = 10.0;
-            let multiplier = rules
-                .iter()
-                .filter(|&rule| rule.multiplier.is_some())
-                .map(|rule| rule.multiplier.expect("should have value"))
-                .fold(1.0, |result, i| result * i);
+            // @TODO: Know-issue - `multiplier` and `value` can overflow, should return Error instead
+            let multiplier: f64 = rules.iter().filter_map(|rule| rule.multiplier).product();
             let value: u64 = (multiplier * exponent.powi(18)) as u64;
             let result = min_price * BigNum::from(value);
 
@@ -170,7 +165,6 @@ mod tests {
         cases.iter().for_each(|case| {
             let (event, expected_result, message) = case;
             let payout = get_payout(&channel, &event, &session);
-            // println!("payout {:?}", payout.to_f64());
             assert!(&payout == expected_result, message.clone());
         })
     }
@@ -224,8 +218,7 @@ mod tests {
             os: None,
         };
 
-        cases.iter().for_each(|case| {
-            let (event, expected_result, message) = case;
+        cases.iter().for_each(|(event, expected_result, message)| {
             let payout = get_payout(&channel, &event, &session);
             assert!(&payout == expected_result, message.clone());
         })
