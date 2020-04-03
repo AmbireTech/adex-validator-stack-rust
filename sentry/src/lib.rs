@@ -444,16 +444,6 @@ pub fn epoch() -> f64 {
 }
 
 // @TODO: Make pub(crate)
-// #[derive(Debug, Clone)]
-// pub struct Session {
-//     pub era: i64,
-//     pub uid: ValidatorId,
-//     pub ip: Option<String>,
-//     pub country: Option<String>,
-//     pub referrer_header: Option<String>,
-//     pub os: Option<String>,
-// }
-
 #[derive(Debug, Clone)]
 pub struct Session {
     pub ip: Option<String>,

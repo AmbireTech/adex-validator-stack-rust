@@ -42,19 +42,21 @@ fn payout(
         .iter()
         .find(|&rule| rule.amount.is_some())
         .map(|&rule| rule.amount.as_ref().expect("should have value"));
-    let price_by_rules = if let Some(amount) = fixed_amount_rule {
-        amount.clone()
-    } else {
-        let exponent: f64 = 10.0;
-        let multiplier = rules
-            .iter()
-            .filter(|&rule| rule.multiplier.is_some())
-            .map(|rule| rule.multiplier.expect("should have value"))
-            .fold(1.0, |result, i| result * i);
-        let value: u64 = (multiplier * exponent.powi(18)) as u64;
-        let result = min_price * BigNum::from(value);
 
-        result / BigNum::from(10u64.pow(18))
+    let price_by_rules = match fixed_amount_rule {
+        Some(amount) => amount.clone(),
+        None => {
+            let exponent: f64 = 10.0;
+            let multiplier = rules
+                .iter()
+                .filter(|&rule| rule.multiplier.is_some())
+                .map(|rule| rule.multiplier.expect("should have value"))
+                .fold(1.0, |result, i| result * i);
+            let value: u64 = (multiplier * exponent.powi(18)) as u64;
+            let result = min_price * BigNum::from(value);
+
+            result / BigNum::from(10u64.pow(18))
+        }
     };
 
     max_price.min(price_by_rules)
@@ -66,14 +68,12 @@ fn match_rule(
     session: &Session,
     uid: &ValidatorId,
 ) -> bool {
-    let ev_type = match &rule.ev_type {
-        Some(event_types) => event_types.contains(&ev_type.to_string()),
-        None => true,
-    };
-
-    let publisher = match &rule.publisher {
-        Some(publishers) => publishers.contains(&uid),
-        None => true,
+    let (ev_type, publisher) = match (&rule.ev_type, &rule.publisher) {
+        (Some(event_types), Some(publishers)) => (
+            event_types.contains(&ev_type.to_string()),
+            publishers.contains(&uid),
+        ),
+        _ => (true, true),
     };
 
     let os_type = match (&rule.os_type, &session.os) {
@@ -394,7 +394,7 @@ mod tests {
         channel.spec.pricing_bounds = Some(PricingBounds {
             click: Some(Pricing {
                 min: BigNum::from(100),
-                max: BigNum::from(1000)
+                max: BigNum::from(1000),
             }),
             impression: None,
         });
