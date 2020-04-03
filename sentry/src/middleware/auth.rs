@@ -176,12 +176,12 @@ mod test {
         let altered_request = for_request(req, &dummy_adapter, redis)
             .await
             .expect("Valid requests should succeed");
-        let session = altered_request
+        let auth = altered_request
             .extensions()
             .get::<Auth>()
             .expect("There should be a Session set inside the request");
 
-        assert_eq!(IDS["leader"], session.uid);
-        assert!(session.session.ip.is_none());
+        assert_eq!(IDS["leader"], auth.uid);
+        assert!(auth.session.ip.is_none());
     }
 }
