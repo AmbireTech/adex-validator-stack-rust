@@ -63,12 +63,14 @@ fn match_rule(
     session: &Session,
     uid: &ValidatorId,
 ) -> bool {
-    let (ev_type, publisher) = match (&rule.ev_type, &rule.publisher) {
-        (Some(event_types), Some(publishers)) => (
-            event_types.contains(&ev_type.to_string()),
-            publishers.contains(&uid),
-        ),
-        _ => (true, true),
+    let ev_type = match &rule.ev_type {
+        Some(event_types) => event_types.contains(&ev_type.to_string()),
+        _ => true,
+    };
+
+    let publisher = match &rule.publisher {
+        Some(publishers) => publishers.contains(&uid),
+        _ => true,
     };
 
     let os_type = match (&rule.os_type, &session.os) {
@@ -219,7 +221,9 @@ mod tests {
         };
 
         cases.iter().for_each(|(event, expected_result, message)| {
+            println!("payout {}", expected_result.to_string());
             let payout = get_payout(&channel, &event, &session);
+            println!("payout {}", payout.to_string());
             assert!(&payout == expected_result, message.clone());
         })
     }
