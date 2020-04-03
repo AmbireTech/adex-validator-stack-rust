@@ -434,7 +434,7 @@ mod tests {
         let payout = get_payout(&channel, &event, &session);
         assert!(
             payout == BigNum::from(144),
-            "fixedAmount (country, osType, publisher): choose fixedAmount rule over multiplier if present"
+            "fixedAmount (country, osType, publisher): apply all multiplier rules"
         );
     }
 }
