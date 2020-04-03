@@ -184,7 +184,7 @@ pub async fn insert_events<A: Adapter + 'static>(
 ) -> Result<Response<Body>, ResponseError> {
     let (req_head, req_body) = req.into_parts();
 
-    let auth_session = req_head.extensions.get::<Auth>();
+    let auth = req_head.extensions.get::<Auth>();
     let session = req_head
         .extensions
         .get::<Session>()
@@ -205,7 +205,7 @@ pub async fn insert_events<A: Adapter + 'static>(
         .ok_or_else(|| ResponseError::BadRequest("invalid request".to_string()))?;
 
     app.event_aggregator
-        .record(app, &channel_id, session, &events)
+        .record(app, &channel_id, session, auth, &events)
         .await?;
 
     Ok(Response::builder()

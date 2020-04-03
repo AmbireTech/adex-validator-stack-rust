@@ -21,6 +21,14 @@ pub(crate) async fn for_request(
         .map(|hv| hv.to_str().ok().map(ToString::to_string))
         .flatten();
 
+    let session = Session {
+        ip: get_request_ip(&req),
+        country: None,
+        referrer_header: referrer,
+        os: None,
+    };
+    req.extensions_mut().insert(session);
+
     let authorization = req.headers().get(AUTHORIZATION);
 
     let prefix = "Bearer ";
@@ -69,15 +77,7 @@ pub(crate) async fn for_request(
             uid: adapter_session.uid,
         };
 
-        let session = Session {
-            ip: get_request_ip(&req),
-            country: None,
-            referrer_header: referrer,
-            os: None,
-            auth: Some(auth),
-        };
-
-        req.extensions_mut().insert(session);
+        req.extensions_mut().insert(auth);
     }
 
     Ok(req)
@@ -176,12 +176,18 @@ mod test {
         let altered_request = for_request(req, &dummy_adapter, redis)
             .await
             .expect("Valid requests should succeed");
+
         let auth = altered_request
             .extensions()
             .get::<Auth>()
             .expect("There should be a Session set inside the request");
 
         assert_eq!(IDS["leader"], auth.uid);
-        assert!(auth.session.ip.is_none());
+
+        let session = altered_request
+            .extensions()
+            .get::<Session>()
+            .expect("There should be a Session set inside the request");
+        assert!(session.ip.is_none());
     }
 }

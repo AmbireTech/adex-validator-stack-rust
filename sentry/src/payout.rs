@@ -36,7 +36,7 @@ fn payout(
 ) -> BigNum {
     let fixed_amount_rule = rules.iter().find_map(|rule| {
         match (match_rule(rule, &event, &session, &publisher), &rule.amount) {
-            (true, Some(amount)) => rule.amount.clone(),
+            (true, Some(amount)) => Some(amount.clone()),
             _ => None,
         }
     });
@@ -45,7 +45,8 @@ fn payout(
         Some(amount) => amount,
         None => {
             let exponent: f64 = 10.0;
-            let multiplier = rules.iter().filter_map(|&rule| rule.multiplier).product();
+            // @TODO: Know-issue - `multiplier` and `value` can overflow, should return Error instead
+            let multiplier: f64 = rules.iter().filter_map(|rule| rule.multiplier).product();
             let value: u64 = (multiplier * exponent.powi(18)) as u64;
             let result = min_price * BigNum::from(value);
 
@@ -164,7 +165,6 @@ mod tests {
         cases.iter().for_each(|case| {
             let (event, expected_result, message) = case;
             let payout = get_payout(&channel, &event, &session);
-            // println!("payout {:?}", payout.to_f64());
             assert!(&payout == expected_result, message.clone());
         })
     }
@@ -218,8 +218,7 @@ mod tests {
             os: None,
         };
 
-        cases.iter().for_each(|case| {
-            let (event, expected_result, message) = case;
+        cases.iter().for_each(|(event, expected_result, message)| {
             let payout = get_payout(&channel, &event, &session);
             assert!(&payout == expected_result, message.clone());
         })

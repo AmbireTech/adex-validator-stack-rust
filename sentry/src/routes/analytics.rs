@@ -1,11 +1,11 @@
 use crate::db::analytics::{
     advertiser_channel_ids, get_advanced_reports, get_analytics, AnalyticsType,
 };
+use crate::success_response;
 use crate::Application;
 use crate::Auth;
 use crate::ResponseError;
 use crate::RouteParams;
-use crate::{success_response, Session};
 use hyper::{Body, Request, Response};
 use primitives::adapter::Adapter;
 use primitives::analytics::{AnalyticsQuery, AnalyticsResponse};
@@ -17,11 +17,11 @@ pub async fn publisher_analytics<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
-    let session = req
+    let auth = req
         .extensions()
-        .get::<Session>()
-        .ok_or(ResponseError::Unauthorized)?;
-    let auth = session.auth.ok_or(ResponseError::Unauthorized)?;
+        .get::<Auth>()
+        .ok_or(ResponseError::Unauthorized)?
+        .clone();
 
     let analytics_type = AnalyticsType::Publisher { auth };
 

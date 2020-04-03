@@ -1,6 +1,5 @@
 use crate::access::check_access;
 use crate::access::Error as AccessError;
-use crate::analytics_recorder;
 use crate::db::event_aggregate::insert_event_aggregate;
 use crate::db::get_channel_by_id;
 use crate::db::DbPool;
@@ -8,6 +7,7 @@ use crate::event_reducer;
 use crate::Application;
 use crate::ResponseError;
 use crate::Session;
+use crate::{analytics_recorder, Auth};
 use async_std::sync::RwLock;
 use chrono::Utc;
 use lazy_static::lazy_static;
@@ -69,6 +69,7 @@ impl EventAggregator {
         app: &'a Application<A>,
         channel_id: &ChannelId,
         session: &Session,
+        auth: Option<&Auth>,
         events: &'a [Event],
     ) -> Result<(), ResponseError> {
         let recorder = self.recorder.clone();
@@ -127,6 +128,7 @@ impl EventAggregator {
         check_access(
             &app.redis,
             session,
+            auth,
             &app.config.ip_rate_limit,
             &record.channel,
             events,

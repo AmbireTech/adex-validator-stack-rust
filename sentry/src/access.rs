@@ -2,7 +2,7 @@ use chrono::Utc;
 use futures::future::try_join_all;
 use redis::aio::MultiplexedConnection;
 
-use crate::Session;
+use crate::{Auth, Session};
 use primitives::event_submission::{RateLimit, Rule};
 use primitives::sentry::Event;
 use primitives::Channel;
@@ -39,6 +39,7 @@ impl fmt::Display for Error {
 pub async fn check_access(
     redis: &MultiplexedConnection,
     session: &Session,
+    auth: Option<&Auth>,
     rate_limit: &RateLimit,
     channel: &Channel,
     events: &[Event],
@@ -60,7 +61,7 @@ pub async fn check_access(
         return Err(Error::ChannelIsExpired);
     }
 
-    let (is_creator, auth_uid) = match &session.auth {
+    let (is_creator, auth_uid) = match auth {
         Some(auth) => (auth.uid == channel.creator, auth.uid.to_string()),
         None => (false, Default::default()),
     };
@@ -263,7 +264,6 @@ mod test {
         };
 
         let session = Session {
-            auth: Some(auth),
             ip: Default::default(),
             referrer_header: None,
             country: None,
@@ -280,12 +280,26 @@ mod test {
         let events = get_impression_events(2);
         let channel = get_channel(rule);
 
-        let response =
-            check_access(&redis, &session, &config.ip_rate_limit, &channel, &events).await;
+        let response = check_access(
+            &redis,
+            &session,
+            Some(&auth),
+            &config.ip_rate_limit,
+            &channel,
+            &events,
+        )
+        .await;
         assert_eq!(Ok(()), response);
 
-        let err_response =
-            check_access(&&redis, &session, &config.ip_rate_limit, &channel, &events).await;
+        let err_response = check_access(
+            &&redis,
+            &session,
+            Some(&auth),
+            &config.ip_rate_limit,
+            &channel,
+            &events,
+        )
+        .await;
         assert_eq!(
             Err(Error::RulesError(
                 "rateLimit: too many requests".to_string()
@@ -308,7 +322,6 @@ mod test {
             referrer_header: None,
             country: None,
             os: None,
-            auth: Some(auth),
         };
 
         let rule = Rule {
@@ -323,6 +336,7 @@ mod test {
         let err_response = check_access(
             &redis,
             &session,
+            Some(&auth),
             &config.ip_rate_limit,
             &channel,
             &get_impression_events(2),
@@ -339,6 +353,7 @@ mod test {
         let response = check_access(
             &redis,
             &session,
+            Some(&auth),
             &config.ip_rate_limit,
             &channel,
             &get_impression_events(1),
