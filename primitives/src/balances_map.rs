@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use crate::{BigNum, ValidatorId};
-use std::collections::btree_map::{Entry, Iter, IntoIter, Values};
+use std::collections::btree_map::{Entry, IntoIter, Iter, Values};
 
 use serde::{Deserialize, Serialize};
 use std::iter::FromIterator;
