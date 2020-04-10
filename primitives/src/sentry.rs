@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::hash::Hash;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LastApproved {
     /// NewState can be None if the channel is brand new
@@ -15,21 +15,21 @@ pub struct LastApproved {
     pub approve_state: Option<ApproveStateValidatorMessage>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct NewStateValidatorMessage {
     pub from: ValidatorId,
     pub received: DateTime<Utc>,
     pub msg: MessageTypes,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct ApproveStateValidatorMessage {
     pub from: ValidatorId,
     pub received: DateTime<Utc>,
     pub msg: MessageTypes,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct HeartbeatValidatorMessage {
     pub from: ValidatorId,
     pub received: DateTime<Utc>,
@@ -129,7 +129,7 @@ pub struct ChannelListResponse {
     pub total_pages: u64,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LastApprovedResponse {
     pub last_approved: Option<LastApproved>,
