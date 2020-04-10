@@ -14,8 +14,10 @@ pub trait ChannelValidator {
     ) -> Result<(), ChannelError> {
         let adapter_channel_validator = match channel.spec.validators.find(validator_identity) {
             // check if the channel validators include our adapter identity
-            SpecValidator::None => return Err(ChannelError::AdapterNotIncluded),
-            SpecValidator::Leader(validator) | SpecValidator::Follower(validator) => validator,
+            None => return Err(ChannelError::AdapterNotIncluded),
+            Some(SpecValidator::Leader(validator)) | Some(SpecValidator::Follower(validator)) => {
+                validator
+            }
         };
 
         if channel.valid_until < Utc::now() {

@@ -5,14 +5,13 @@ use crate::success_response;
 use crate::Application;
 use crate::ResponseError;
 use crate::RouteParams;
-use crate::Session;
+use crate::{Auth, Session};
 use bb8::RunError;
 use bb8_postgres::tokio_postgres::error;
 use futures::future::try_join_all;
 use hex::FromHex;
 use hyper::{Body, Request, Response};
 use primitives::adapter::Adapter;
-use primitives::channel::SpecValidator;
 use primitives::sentry::{Event, LastApproved, LastApprovedResponse, SuccessResponse};
 use primitives::validator::MessageTypes;
 use primitives::{Channel, ChannelId};
@@ -184,7 +183,12 @@ pub async fn insert_events<A: Adapter + 'static>(
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
     let (req_head, req_body) = req.into_parts();
-    let session = req_head.extensions.get::<Session>();
+
+    let auth = req_head.extensions.get::<Auth>();
+    let session = req_head
+        .extensions
+        .get::<Session>()
+        .expect("request should have session");
 
     let route_params = req_head
         .extensions
@@ -201,7 +205,7 @@ pub async fn insert_events<A: Adapter + 'static>(
         .ok_or_else(|| ResponseError::BadRequest("invalid request".to_string()))?;
 
     app.event_aggregator
-        .record(app, &channel_id, session, &events)
+        .record(app, &channel_id, session, auth, &events)
         .await?;
 
     Ok(Response::builder()
@@ -216,8 +220,8 @@ pub async fn create_validator_messages<A: Adapter + 'static>(
 ) -> Result<Response<Body>, ResponseError> {
     let session = req
         .extensions()
-        .get::<Session>()
-        .expect("request session")
+        .get::<Auth>()
+        .expect("auth request session")
         .to_owned();
 
     let channel = req
@@ -235,7 +239,7 @@ pub async fn create_validator_messages<A: Adapter + 'static>(
         .ok_or_else(|| ResponseError::BadRequest("missing messages body".to_string()))?;
 
     match channel.spec.validators.find(&session.uid) {
-        SpecValidator::None => Err(ResponseError::Unauthorized),
+        None => Err(ResponseError::Unauthorized),
         _ => {
             try_join_all(messages.iter().map(|message| {
                 insert_validator_messages(&app.pool, &channel, &session.uid, &message)

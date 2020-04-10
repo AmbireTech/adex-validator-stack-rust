@@ -48,6 +48,7 @@ mod chain;
 pub mod db;
 pub mod event_aggregator;
 pub mod event_reducer;
+pub mod payout;
 
 lazy_static! {
     static ref CHANNEL_GET_BY_ID: Regex =
@@ -250,8 +251,6 @@ async fn channels_router<A: Adapter + 'static>(
 ) -> Result<Response<Body>, ResponseError> {
     let (path, method) = (req.uri().path().to_owned(), req.method());
 
-    // example with
-    // @TODO remove later
     // regex matching for routes with params
     if let (Some(caps), &Method::POST) = (CREATE_EVENTS_BY_CHANNEL_ID.captures(&path), method) {
         let param = RouteParams(vec![caps
@@ -446,9 +445,14 @@ pub fn epoch() -> f64 {
 // @TODO: Make pub(crate)
 #[derive(Debug, Clone)]
 pub struct Session {
-    pub era: i64,
-    pub uid: ValidatorId,
     pub ip: Option<String>,
     pub country: Option<String>,
     pub referrer_header: Option<String>,
+    pub os: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Auth {
+    pub era: i64,
+    pub uid: ValidatorId,
 }
