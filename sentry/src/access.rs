@@ -72,7 +72,7 @@ pub async fn check_access(
     }
 
     // Only the creator can send a CLOSE
-    if is_creator && events.iter().any(is_close_event) {
+    if !is_creator && events.iter().any(is_close_event) {
         return Err(Error::OnlyCreatorCanCloseChannel);
     }
 
