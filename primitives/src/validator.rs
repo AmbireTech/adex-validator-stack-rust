@@ -137,7 +137,7 @@ pub struct ValidatorDesc {
 
 // Validator Message Types
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Accounting {
     #[serde(rename = "lastEvAggr")]
@@ -146,7 +146,7 @@ pub struct Accounting {
     pub balances: BalancesMap,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ApproveState {
     pub state_root: String,
@@ -154,7 +154,7 @@ pub struct ApproveState {
     pub is_healthy: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct NewState {
     pub state_root: String,
@@ -162,7 +162,7 @@ pub struct NewState {
     pub balances: BalancesMap,
 }
 
-#[derive(Default, Serialize, Deserialize, Debug, Clone)]
+#[derive(Default, Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct RejectState {
     pub reason: String,
@@ -172,7 +172,7 @@ pub struct RejectState {
     pub timestamp: Option<DateTime<Utc>>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Heartbeat {
     pub signature: String,
@@ -190,7 +190,7 @@ impl Heartbeat {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(tag = "type")]
 pub enum MessageTypes {
     ApproveState(ApproveState),

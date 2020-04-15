@@ -137,8 +137,7 @@ impl<A: Adapter + 'static> Application<A> {
             }
         };
 
-        let path = req.uri().path().to_string();
-        let mut response = match (path.as_ref(), req.method()) {
+        let mut response = match (req.uri().path(), req.method()) {
             ("/cfg", &Method::GET) => config(req, &self).await,
             ("/channel", &Method::POST) => create_channel(req, &self).await,
             ("/channel/list", &Method::GET) => channel_list(req, &self).await,
