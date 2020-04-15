@@ -13,7 +13,6 @@ health_threshold_promilles = 970
 health_unsignable_promilles = 770
 propagation_timeout = 3000
 
-list_timeout = 10000
 fetch_timeout = 10000
 validator_tick_timeout = 10000
 
