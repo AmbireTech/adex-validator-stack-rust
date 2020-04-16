@@ -177,7 +177,7 @@ pub async fn insert_event_aggregate(
                 data.push(EventData {
                     id: channel_id.to_owned(),
                     event_type: event_type.clone(),
-                    earner: Some(earner.clone()),
+                    earner: Some(*earner),
                     event_count: event_count.to_owned(),
                     event_payout: event_payout.clone(),
                 });
