@@ -32,7 +32,7 @@ pub async fn list_channel_event_aggregates<A: Adapter>(
     let from = if channel.spec.validators.find(&auth.uid).is_some() {
         None
     } else {
-        Some(auth.uid.clone())
+        Some(auth.uid)
     };
 
     let event_aggregates = list_event_aggregates(
