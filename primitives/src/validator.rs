@@ -14,7 +14,7 @@ pub enum ValidatorError {
     InvalidTransition,
 }
 
-#[derive(Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[serde(transparent)]
 pub struct ValidatorId(
     #[serde(
