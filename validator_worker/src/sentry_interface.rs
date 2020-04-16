@@ -116,12 +116,7 @@ impl<A: Adapter + 'static> SentryApi<A> {
             }
             None => Err(Error::MissingWhoamiInChannelValidators {
                 channel: channel.id,
-                validators: channel
-                    .spec
-                    .validators
-                    .iter()
-                    .map(|v| v.id)
-                    .collect(),
+                validators: channel.spec.validators.iter().map(|v| v.id).collect(),
                 whoami: *adapter.whoami(),
             }),
         }
