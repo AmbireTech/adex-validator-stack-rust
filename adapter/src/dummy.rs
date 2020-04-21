@@ -103,7 +103,7 @@ impl Adapter for DummyAdapter {
 
             match identity {
                 Some((id, _)) => Ok(Session {
-                    uid: self.session_tokens[id].clone(),
+                    uid: self.session_tokens[id],
                     era: 0,
                 }),
                 None => Err(AdapterError::Authentication(format!(

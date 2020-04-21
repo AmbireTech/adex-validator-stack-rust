@@ -27,10 +27,9 @@ pub(crate) fn reduce(
             initial_aggr.events.insert("CLICK".to_owned(), merge);
         }
         Event::Close => {
-            let creator = channel.creator.clone();
             let close_event = AggregateEvents {
-                event_counts: Some(vec![(creator.clone(), 1.into())].into_iter().collect()),
-                event_payouts: vec![(creator, channel.deposit_amount.clone())]
+                event_counts: Some(vec![(channel.creator, 1.into())].into_iter().collect()),
+                event_payouts: vec![(channel.creator, channel.deposit_amount.clone())]
                     .into_iter()
                     .collect(),
             };

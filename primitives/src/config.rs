@@ -29,7 +29,6 @@ pub struct Config {
     pub health_unsignable_promilles: u32,
     pub propagation_timeout: u32,
     pub fetch_timeout: u32,
-    pub list_timeout: u32,
     pub validator_tick_timeout: u32,
     pub ip_rate_limit: RateLimit,  // HashMap??
     pub sid_rate_limit: RateLimit, // HashMap ??
