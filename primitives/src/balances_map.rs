@@ -39,6 +39,10 @@ impl BalancesMap {
     pub fn insert(&mut self, key: ValidatorId, value: BigNum) -> Option<BigNum> {
         self.0.insert(key, value)
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
 }
 
 impl FromIterator<(ValidatorId, BigNum)> for BalancesMap {
