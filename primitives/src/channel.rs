@@ -153,6 +153,7 @@ pub struct ChannelSpec {
     pub ad_units: Vec<AdUnit>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub price_multiplication_rules: Vec<PriceMultiplicationRules>,
+    #[serde(default)]
     pub price_dynamic_adjustment: bool,
 }
 
