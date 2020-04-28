@@ -296,8 +296,12 @@ fn get_unit_html(
 #[cfg(test)]
 mod test {
     use super::*;
+    use adex_primitives::ValidatorId;
+    use std::convert::TryFrom;
 
     fn get_ad_unit(media_mime: &str) -> AdUnit {
+        let owner = ValidatorId::try_from("0xce07CbB7e054514D590a0262C93070D838bFBA2e")
+            .expect("Should be valid ValidatorId string");
         AdUnit {
             ipfs: "".to_string(),
             ad_type: "".to_string(),
@@ -307,7 +311,7 @@ mod test {
             targeting: vec![],
             min_targeting_score: None,
             tags: vec![],
-            owner: "".to_string(),
+            owner,
             created: Utc::now(),
             title: None,
             description: None,
