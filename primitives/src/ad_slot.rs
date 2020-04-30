@@ -33,6 +33,7 @@ pub struct AdSlot {
     /// Advertised URL
     pub target_url: String,
     /// Array of TargetingTag
+    #[serde(default)]
     pub targeting: Vec<TargetingTag>,
     // HashMap<DepositAsset, BigNum> for the minimum payment accepted per impression
     #[serde(default)]
@@ -44,6 +45,7 @@ pub struct AdSlot {
     #[serde(default)]
     pub auto_tags: Vec<TargetingTag>,
     /// Valid ipfs hash for Ad Unit object. It will be used as fallback data (optional)
+    #[serde(default)]
     pub fallback_unit: Option<String>,
     /// User address from the session
     pub owner: ValidatorId,
@@ -51,8 +53,10 @@ pub struct AdSlot {
     #[serde(with = "ts_milliseconds")]
     pub created: DateTime<Utc>,
     /// the name of the unit used in platform UI
+    #[serde(default)]
     pub title: Option<String>,
     /// arbitrary text used in platform UI
+    #[serde(default)]
     pub description: Option<String>,
     #[serde(default)]
     pub webiste: Option<String>,
