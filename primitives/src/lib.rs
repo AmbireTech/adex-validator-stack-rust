@@ -3,7 +3,8 @@
 use std::error;
 use std::fmt;
 
-pub mod ad_unit;
+mod ad_slot;
+mod ad_unit;
 pub mod adapter;
 pub mod balances_map;
 pub mod big_num;
@@ -28,6 +29,7 @@ pub mod analytics;
 mod eth_checksum;
 pub mod validator;
 
+pub use self::ad_slot::AdSlot;
 pub use self::ad_unit::AdUnit;
 pub use self::balances_map::BalancesMap;
 pub use self::big_num::BigNum;
