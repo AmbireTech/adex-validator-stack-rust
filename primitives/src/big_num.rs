@@ -197,6 +197,14 @@ impl TryFrom<&str> for BigNum {
     }
 }
 
+impl FromStr for BigNum {
+    type Err = super::DomainError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        BigNum::try_from(s)
+    }
+}
+
 impl ToString for BigNum {
     fn to_string(&self) -> String {
         self.0.to_str_radix(10)

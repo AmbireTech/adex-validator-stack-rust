@@ -2,11 +2,13 @@ use crate::BigNum;
 use serde::{Deserialize, Serialize};
 use serde_json::{value::Value as SerdeValue, Number};
 use std::convert::TryFrom;
-use std::fmt;
+use std::{fmt, str::FromStr};
 
 pub type Map = serde_json::value::Map<String, SerdeValue>;
 
-#[derive(Debug)]
+use super::{Input, Output, TryGet};
+
+#[derive(Debug, Eq, PartialEq)]
 pub enum Error {
     TypeError,
     UnknownVariable,
@@ -29,7 +31,7 @@ pub enum Rule {
 }
 
 impl Rule {
-    pub fn eval(&self, input: &Map, output: &mut Map) -> Result<Option<Value>, Error> {
+    pub fn eval(&self, input: &Input, output: &mut Output) -> Result<Option<Value>, Error> {
         eval(input, output, self)
     }
 }
@@ -51,6 +53,34 @@ impl Value {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(from = "BigNum")]
+/// Bn (BigNum) function.
+/// This struct is also used to parse the Input correctly for [`TryGet`](primitives::targeting::TryGet).
+///
+/// This type will be:
+/// - Deserialized from a normal `BigNum`
+///
+/// ```json
+/// { "some_big_num_field": "1000" }
+/// ```
+///
+/// - Serialized to:
+///
+/// ```json
+/// { "FUNC": { "bn": "1000" } }
+/// ```
+pub struct Bn {
+    #[serde(rename = "bn")]
+    pub big_num: BigNum,
+}
+
+impl From<BigNum> for Bn {
+    fn from(big_num: BigNum) -> Self {
+        Self { big_num }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum Function {
     If(Box<Rule>, Box<Rule>),
@@ -58,8 +88,9 @@ pub enum Function {
     Intersects(Box<Rule>, Box<Rule>),
     Get(String),
     // TODO: set
-
     // TODO: Add: div, mul, mod, add, sub, max, min
+    /// Bn (BigNum) function.
+    Bn(Bn),
 }
 
 impl From<Function> for Rule {
@@ -99,7 +130,16 @@ impl TryFrom<SerdeValue> for Value {
         match serde_value {
             SerdeValue::Bool(bool) => Ok(Self::Bool(bool)),
             SerdeValue::Number(number) => Ok(Self::Number(number)),
-            SerdeValue::String(string) => Ok(Self::String(string)),
+            SerdeValue::String(string) => {
+                // we need to try and parse the String as a BigNum
+                // if it fails, then it's just a String
+                let big_num = BigNum::from_str(&string);
+
+                match big_num {
+                    Ok(big_num) => Ok(Value::BigNum(big_num)),
+                    Err(_) => Ok(Value::String(string)),
+                }
+            }
             SerdeValue::Array(serde_array) => {
                 let array = serde_array
                     .into_iter()
@@ -137,7 +177,7 @@ impl Value {
 ///     - Array
 /// - Mutates output
 /// - Throws an error
-fn eval(input: &Map, output: &mut Map, rule: &Rule) -> Result<Option<Value>, Error> {
+fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>, Error> {
     let function = match rule {
         Rule::Value(value) => return Ok(Some(value.clone())),
         Rule::Function(function) => function,
@@ -179,11 +219,8 @@ fn eval(input: &Map, output: &mut Map, rule: &Rule) -> Result<Option<Value>, Err
 
             Some(Value::Bool(a.iter().any(|x| b.contains(x))))
         }
-        Function::Get(key) => {
-            let input_value = input.get(key).ok_or(Error::UnknownVariable)?;
-
-            Some(Value::try_from(input_value.clone())?)
-        }
+        Function::Get(key) => Some(input.try_get(key)?),
+        Function::Bn(bn) => Some(Value::BigNum(bn.big_num.clone())),
     };
 
     Ok(value)
@@ -192,6 +229,7 @@ fn eval(input: &Map, output: &mut Map, rule: &Rule) -> Result<Option<Value>, Err
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::targeting::AdSlot;
 
     #[test]
     fn deserialzes_intersects_rule() {
@@ -231,16 +269,18 @@ mod test {
     /// ```
     #[test]
     fn test_intersects_eval() {
-        let input: Map = vec![(
-            "adSlot.categories".to_string(),
-            SerdeValue::Array(vec![
-                SerdeValue::String("Bitcoin".to_string()),
-                SerdeValue::String("Ethereum".to_string()),
-            ]),
-        )]
-        .into_iter()
-        .collect();
-        let mut output = Map::new();
+        let mut input = Input::default();
+        input.ad_slot = Some(AdSlot {
+            categories: vec!["Bitcoin".to_string(), "Ethereum".to_string()],
+            hostname: Default::default(),
+            alexa_rank: 0.0,
+        });
+
+        let mut output = Output {
+            show: true,
+            boost: 1.0,
+            price: Default::default(),
+        };
 
         let categories = vec![Value::new_string("News"), Value::new_string("Bitcoin")];
 
@@ -256,15 +296,12 @@ mod test {
             result.expect("Sould return Non-NULL result!")
         );
 
-        let input: Map = vec![(
-            "adSlot.categories".to_string(),
-            SerdeValue::Array(vec![
-                SerdeValue::String("Advertisement".to_string()),
-                SerdeValue::String("Programming".to_string()),
-            ]),
-        )]
-        .into_iter()
-        .collect();
+        let mut input = Input::default();
+        input.ad_slot = Some(AdSlot {
+            categories: vec!["Advertisement".to_string(), "Programming".to_string()],
+            hostname: Default::default(),
+            alexa_rank: 0.0,
+        });
 
         let result = rules.eval(&input, &mut output).expect("Should eval rules");
 

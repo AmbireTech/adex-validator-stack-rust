@@ -6,37 +6,16 @@ pub use eval::*;
 
 mod eval;
 
-pub trait TryGet {
-    const PATTERN: &'static str;
-
-    fn try_get(&self, key: &str) -> Result<Value, Error>;
-}
-
-impl<T: Serialize> TryGet for T {
+pub trait TryGet: Serialize {
     const PATTERN: &'static str = ".";
 
     fn try_get(&self, key: &str) -> Result<Value, Error> {
-        let mut splitn = key.splitn(2, '.');
-
-        let (field, remaining_key) = (splitn.next(), splitn.next());
         let serde_value = serde_json::json!(self);
+        let pointer = format!("/{pointer}", pointer = key.replace(Self::PATTERN, "/"));
 
-        // filter empty string
-        let field = field.filter(|s| !s.is_empty());
-        let remaining_key = remaining_key.filter(|s| !s.is_empty());
-
-        // TODO: Check what type of error we should return in each case
-        match (field, remaining_key, serde_value) {
-            (Some(field), remaining_key, serde_json::Value::Object(map)) => {
-                match map.get(field) {
-                    Some(serde_value) => serde_value.try_get(remaining_key.unwrap_or_default()),
-                    None => Err(Error::TypeError),
-                }
-            },
-            (None, None, serde_value) => Value::try_from(serde_value.clone()),
-            // if we have any other field or remaining_key, it's iligal:
-            // i.e. `first.second` for values that are not map
-            _ => Err(Error::UnknownVariable),
+        match serde_value.pointer(&pointer) {
+            Some(serde_value) => Value::try_from(serde_value.clone()),
+            None => Err(Error::UnknownVariable),
         }
     }
 }
@@ -88,7 +67,6 @@ pub struct Global {
     pub user_agent_browser_family: String,
 }
 
-
 #[derive(Debug, Serialize, Deserialize)]
 #[cfg_attr(test, derive(Default))]
 #[serde(rename_all = "camelCase")]
@@ -98,6 +76,12 @@ pub struct AdSlot {
     pub alexa_rank: f64,
 }
 
+impl TryGet for Input {}
+impl TryGet for Global {}
+impl TryGet for AdView {}
+impl TryGet for AdSlot {}
+
+#[derive(Debug)]
 pub struct Output {
     /// Whether to show the ad
     /// Default: true
@@ -120,14 +104,38 @@ mod test {
     #[test]
     fn test_try_get_of_input() {
         let mut input = Input::default();
+        input.global.ad_slot_id = "ad_slot_id Value".to_string();
+        input.global.campaign_budget = BigNum::from(50);
         input.ad_view = Some(AdView {
-            seconds_since_show: 10, has_custom_preferences: false
+            seconds_since_show: 10,
+            has_custom_preferences: false,
         });
 
-        let result = input.try_get("adView.secondsSinceShow").expect("Should get the adView field");
+        let ad_view_seconds_since_show = input
+            .try_get("adView.secondsSinceShow")
+            .expect("Should get the ad_view.seconds_since_show field");
 
-        let expected = serde_json::from_str::<serde_json::Number>("10").expect("Should create number");
+        let expected_number =
+            serde_json::from_str::<serde_json::Number>("10").expect("Should create number");
 
-        assert_eq!(Value::Number(expected), result)
+        assert_eq!(Value::Number(expected_number), ad_view_seconds_since_show);
+
+        let ad_slot_id = input
+            .try_get("adSlotId")
+            .expect("Should get the global.ad_slot_id field");
+
+        assert_eq!(Value::String("ad_slot_id Value".to_string()), ad_slot_id);
+
+        let get_unknown = input
+            .try_get("unknownField")
+            .expect_err("Should return Error");
+
+        assert_eq!(Error::UnknownVariable, get_unknown);
+
+        let global_campaign_budget = input
+            .try_get("campaignBudget")
+            .expect("Should get the global.campaign_budget field");
+
+        assert_eq!(Value::BigNum(BigNum::from(50)), global_campaign_budget);
     }
 }
