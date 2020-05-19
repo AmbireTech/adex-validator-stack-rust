@@ -35,6 +35,73 @@ pub struct Input {
     pub ad_slot: Option<AdSlot>,
 }
 
+impl Input {
+    fn try_get(&self, key: &str) -> Result<Value, Error> {
+        match key {
+            "adView.secondsSinceShow" => self
+                .ad_view
+                .as_ref()
+                .map(|ad_view| Value::Number(ad_view.seconds_since_show.into()))
+                .ok_or(Error::UnknownVariable),
+            "adView.hasCustomPreferences" => self
+                .ad_view
+                .as_ref()
+                .map(|ad_view| Value::Bool(ad_view.has_custom_preferences))
+                .ok_or(Error::UnknownVariable),
+            "adSlotId" => Ok(Value::String(self.global.ad_slot_id.clone())),
+            "adUnitId" => Ok(Value::String(self.global.ad_unit_id.clone())),
+            "adUnitType" => Ok(Value::String(self.global.ad_unit_type.clone())),
+            "publisherId" => Ok(Value::String(self.global.publisher_id.clone())),
+            "advertiserId" => Ok(Value::String(self.global.advertiser_id.clone())),
+            "country" => Ok(Value::String(self.global.country.clone())),
+            "eventType" => Ok(Value::String(self.global.event_type.clone())),
+            "campaignId" => Ok(Value::String(self.global.campiagn_id.clone())),
+            "campaignTotalSpent" => Ok(Value::String(self.global.campaign_total_spent.clone())),
+            "campaignSecondsActive" => {
+                Ok(Value::Number(self.global.campaign_seconds_active.into()))
+            }
+            "campaignSecondsDuration" => {
+                Ok(Value::Number(self.global.campaign_seconds_duration.into()))
+            }
+            "campaignBudget" => Ok(Value::BigNum(self.global.campaign_budget.clone())),
+            "eventMinPrice" => Ok(Value::BigNum(self.global.event_min_price.clone())),
+            "eventMaxPrice" => Ok(Value::BigNum(self.global.event_max_price.clone())),
+            "publisherEarnedFromCampaign" => Ok(Value::BigNum(
+                self.global.publisher_earned_from_campaign.clone(),
+            )),
+            "secondsSinceEpoch" => Ok(Value::Number(self.global.seconds_since_epoch.into())),
+            "userAgentOS" => Ok(Value::String(self.global.user_agent_os.clone())),
+            "userAgentBrowserFamily" => Ok(Value::String(self.global.user_agent_browser_family.clone())),
+            "adSlot.categories" => self
+                .ad_slot
+                .as_ref()
+                .map(|ad_slot| {
+                    let array = ad_slot
+                        .categories
+                        .iter()
+                        .map(|string| Value::String(string.clone()))
+                        .collect();
+                    Value::Array(array)
+                })
+                .ok_or(Error::UnknownVariable),
+            "adSlot.hostname" => self
+                .ad_slot
+                .as_ref()
+                .map(|ad_slot| Value::String(ad_slot.hostname.clone()))
+                .ok_or(Error::UnknownVariable),
+            "adSlot.alexaRank" => {
+                let ad_slot = self.ad_slot.as_ref().ok_or(Error::UnknownVariable)?;
+
+                match serde_json::Number::from_f64(ad_slot.alexa_rank) {
+                        Some(number) => Ok(Value::Number(number)),
+                        None => Err(Error::TypeError)
+                }
+            }
+            _unknown_field => Err(Error::UnknownVariable),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[cfg_attr(test, derive(Default))]
 #[serde(rename_all = "camelCase")]
@@ -54,6 +121,7 @@ pub struct Global {
     pub advertiser_id: String,
     pub country: String,
     pub event_type: String,
+    pub campiagn_id: String,
     pub campaign_total_spent: String,
     pub campaign_seconds_active: u64,
     pub campaign_seconds_duration: u64,
@@ -75,11 +143,6 @@ pub struct AdSlot {
     pub hostname: String,
     pub alexa_rank: f64,
 }
-
-impl TryGet for Input {}
-impl TryGet for Global {}
-impl TryGet for AdView {}
-impl TryGet for AdSlot {}
 
 #[derive(Debug)]
 pub struct Output {
@@ -115,8 +178,7 @@ mod test {
             .try_get("adView.secondsSinceShow")
             .expect("Should get the ad_view.seconds_since_show field");
 
-        let expected_number =
-            serde_json::from_str::<serde_json::Number>("10").expect("Should create number");
+        let expected_number = serde_json::Number::from(10);
 
         assert_eq!(Value::Number(expected_number), ad_view_seconds_since_show);
 

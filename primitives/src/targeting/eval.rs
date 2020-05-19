@@ -53,44 +53,15 @@ impl Value {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-#[serde(from = "BigNum")]
-/// Bn (BigNum) function.
-/// This struct is also used to parse the Input correctly for [`TryGet`](primitives::targeting::TryGet).
-///
-/// This type will be:
-/// - Deserialized from a normal `BigNum`
-///
-/// ```json
-/// { "some_big_num_field": "1000" }
-/// ```
-///
-/// - Serialized to:
-///
-/// ```json
-/// { "FUNC": { "bn": "1000" } }
-/// ```
-pub struct Bn {
-    #[serde(rename = "bn")]
-    pub big_num: BigNum,
-}
-
-impl From<BigNum> for Bn {
-    fn from(big_num: BigNum) -> Self {
-        Self { big_num }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+// TODO: https://github.com/AdExNetwork/adex-validator-stack-rust/issues/296
 pub enum Function {
     If(Box<Rule>, Box<Rule>),
     And(Box<Rule>, Box<Rule>),
     Intersects(Box<Rule>, Box<Rule>),
     Get(String),
-    // TODO: set
-    // TODO: Add: div, mul, mod, add, sub, max, min
-    /// Bn (BigNum) function.
-    Bn(Bn),
+    /// Bn(Value) function.
+    Bn(Value),
 }
 
 impl From<Function> for Rule {
@@ -130,16 +101,7 @@ impl TryFrom<SerdeValue> for Value {
         match serde_value {
             SerdeValue::Bool(bool) => Ok(Self::Bool(bool)),
             SerdeValue::Number(number) => Ok(Self::Number(number)),
-            SerdeValue::String(string) => {
-                // we need to try and parse the String as a BigNum
-                // if it fails, then it's just a String
-                let big_num = BigNum::from_str(&string);
-
-                match big_num {
-                    Ok(big_num) => Ok(Value::BigNum(big_num)),
-                    Err(_) => Ok(Value::String(string)),
-                }
-            }
+            SerdeValue::String(string) => Ok(Value::String(string)),
             SerdeValue::Array(serde_array) => {
                 let array = serde_array
                     .into_iter()
@@ -220,7 +182,26 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
             Some(Value::Bool(a.iter().any(|x| b.contains(x))))
         }
         Function::Get(key) => Some(input.try_get(key)?),
-        Function::Bn(bn) => Some(Value::BigNum(bn.big_num.clone())),
+        Function::Bn(value) => {
+            let big_num = match value {
+                Value::String(string) => {
+                    let big_num =
+                        BigNum::from_str(string.as_str()).map_err(|_| Error::TypeError)?;
+
+                    Value::BigNum(big_num)
+                }
+                Value::BigNum(big_num) => Value::BigNum(big_num.clone()),
+                Value::Number(number) => {
+                    let big_num =
+                        BigNum::from_str(&number.to_string()).map_err(|_| Error::TypeError)?;
+
+                    Value::BigNum(big_num)
+                }
+                _ => return Err(Error::TypeError),
+            };
+
+            Some(big_num)
+        }
     };
 
     Ok(value)
