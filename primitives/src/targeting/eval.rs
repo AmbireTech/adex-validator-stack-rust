@@ -49,6 +49,10 @@ impl Value {
     pub fn new_string(string: &str) -> Self {
         Self::String(string.to_string())
     }
+
+    pub fn new_number(number: impl Into<Number>) -> Self {
+        Self::Number(number.into())
+    }
 }
 
 impl TryFrom<SerdeValue> for Value {
@@ -114,6 +118,10 @@ impl Function {
 
     pub fn new_get(key: &str) -> Self {
         Self::Get(key.to_string())
+    }
+
+    pub fn new_bn(value: impl Into<Value>) -> Self {
+        Self::Bn(value.into())
     }
 }
 
@@ -337,6 +345,30 @@ mod test {
     }
 
     #[test]
+    fn test_and_eval() {
+        let input = Input::default();
+        let mut output = Output {
+            show: true,
+            boost: 1.0,
+            price: Default::default(),
+        };
+
+        let cases = [
+            (true, true, true),
+            (false, false, false),
+            (false, true, false),
+            (true, false, false),
+        ];
+
+        for (lhs, rhs, expected) in cases.iter() {
+            let rule = Rule::Function(Function::new_and(Value::Bool(*lhs), Value::Bool(*rhs)));
+            let expected = Some(Value::Bool(*expected));
+
+            assert_eq!(Ok(expected), rule.eval(&input, &mut output));
+        }
+    }
+
+    #[test]
     fn test_if_eval() {
         let input = Input::default();
         let mut output = Output {
@@ -354,6 +386,57 @@ mod test {
         let rule = Rule::Function(Function::new_if(Value::Bool(false), then));
 
         assert_eq!(Ok(None), rule.eval(&input, &mut output));
+    }
 
+    #[test]
+    fn test_bn_eval_from_actual_number_value_string_bignum_or_number() {
+        let input = Input::default();
+        let mut output = Output {
+            show: true,
+            boost: 1.0,
+            price: Default::default(),
+        };
+
+        let cases = vec![
+            (Value::new_string("1000"), Value::BigNum(1000.into())),
+            (Value::new_number(5000), Value::BigNum(5000.into())),
+            (Value::BigNum(2.into()), Value::BigNum(2.into())),
+            // rounded floats should work!
+            (
+                Value::Number(Number::from_f64(2.0).expect("should create float number")),
+                Value::BigNum(2.into()),
+            ),
+        ];
+
+        for (from, expected) in cases.into_iter() {
+            let rule = Rule::Function(Function::new_bn(from));
+
+            assert_eq!(Ok(Some(expected)), rule.eval(&input, &mut output));
+        }
+    }
+
+    #[test]
+    fn test_bn_eval_from_actual_incorrect_value() {
+        let input = Input::default();
+        let mut output = Output {
+            show: true,
+            boost: 1.0,
+            price: Default::default(),
+        };
+
+        let error_cases = vec![
+            Value::new_string("text"),
+            // BigNums can only be possitive
+            Value::new_number(-100),
+            Value::Bool(true),
+            Value::Array(vec![Value::Bool(false)]),
+            Value::Number(Number::from_f64(2.5).expect("should create float number")),
+        ];
+
+        for error_case in error_cases.into_iter() {
+            let rule = Rule::Function(Function::new_bn(error_case));
+
+            assert_eq!(Err(Error::TypeError), rule.eval(&input, &mut output));
+        }
     }
 }
