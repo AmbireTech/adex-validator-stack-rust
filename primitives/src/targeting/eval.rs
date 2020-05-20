@@ -58,8 +58,8 @@ impl TryFrom<SerdeValue> for Value {
         match serde_value {
             SerdeValue::Bool(bool) => Ok(Self::Bool(bool)),
             SerdeValue::Number(number) => Ok(Self::Number(number)),
-            // String can be either a String or a BigNum
-            // but we handle this case by using Type casting with the Function::Bn
+            // It's impossible to have a BigNumber literal in the rules, since they're JSON based (conform to serde_json::value::Value)
+            // However it is possible to obtain a BigNumber by invoking the Function::Bn
             SerdeValue::String(string) => Ok(Value::String(string)),
             SerdeValue::Array(serde_array) => {
                 let array = serde_array
