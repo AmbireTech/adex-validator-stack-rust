@@ -1,7 +1,7 @@
 use crate::BigNum;
 use serde::{Deserialize, Serialize};
 use serde_json::{value::Value as SerdeValue, Number};
-use std::{convert::TryFrom, fmt, str::FromStr};
+use std::{convert::TryFrom, fmt, ops::Div, str::FromStr};
 
 pub type Map = serde_json::value::Map<String, SerdeValue>;
 
@@ -49,6 +49,10 @@ impl Value {
     pub fn new_string(string: &str) -> Self {
         Self::String(string.to_string())
     }
+
+    pub fn new_number(number: impl Into<Number>) -> Self {
+        Self::Number(number.into())
+    }
 }
 
 impl TryFrom<SerdeValue> for Value {
@@ -77,6 +81,8 @@ impl TryFrom<SerdeValue> for Value {
 #[serde(rename_all = "camelCase")]
 // TODO: https://github.com/AdExNetwork/adex-validator-stack-rust/issues/296
 pub enum Function {
+    /// Math `div`
+    Div(Box<Rule>, Box<Rule>),
     If(Box<Rule>, Box<Rule>),
     And(Box<Rule>, Box<Rule>),
     Intersects(Box<Rule>, Box<Rule>),
@@ -98,8 +104,8 @@ impl From<Value> for Rule {
 }
 
 impl Function {
-    pub fn new_if(lhs: impl Into<Rule>, rhs: impl Into<Rule>) -> Self {
-        Self::If(Box::new(lhs.into()), Box::new(rhs.into()))
+    pub fn new_if(condition: impl Into<Rule>, then: impl Into<Rule>) -> Self {
+        Self::If(Box::new(condition.into()), Box::new(then.into()))
     }
 
     pub fn new_and(lhs: impl Into<Rule>, rhs: impl Into<Rule>) -> Self {
@@ -112,6 +118,10 @@ impl Function {
 
     pub fn new_get(key: &str) -> Self {
         Self::Get(key.to_string())
+    }
+
+    pub fn new_bn(value: impl Into<Value>) -> Self {
+        Self::Bn(value.into())
     }
 }
 
@@ -126,6 +136,24 @@ impl Value {
     pub fn try_array(self) -> Result<Vec<Value>, Error> {
         match self {
             Self::Array(array) => Ok(array),
+            _ => Err(Error::TypeError),
+        }
+    }
+
+    pub fn try_bignum(self) -> Result<BigNum, Error> {
+        BigNum::try_from(self)
+    }
+}
+
+impl TryFrom<Value> for BigNum {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::String(string) => BigNum::from_str(&string).map_err(|_| Error::TypeError),
+            Value::BigNum(big_num) => Ok(big_num),
+            Value::Number(number) => {
+                BigNum::from_str(&number.to_string()).map_err(|_| Error::TypeError)
+            }
             _ => Err(Error::TypeError),
         }
     }
@@ -149,16 +177,53 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
 
     // basic operators
     let value = match function {
+        Function::Div(first_rule, second_rule) => {
+            let value = match first_rule.eval(input, output)?.ok_or(Error::TypeError)? {
+                Value::Number(first_number) => {
+                    match second_rule.eval(input, output)?.ok_or(Error::TypeError)? {
+                        Value::Number(second_number) => {
+                            if let Some(num) = first_number.as_f64() {
+                                let divided =
+                                    num.div(second_number.as_f64().ok_or(Error::TypeError)?);
+
+                                Value::Number(Number::from_f64(divided).ok_or(Error::TypeError)?)
+                            } else if let Some(num) = first_number.as_i64() {
+                                let rhs = second_number.as_i64().ok_or(Error::TypeError)?;
+                                let divided = num.checked_div(rhs).ok_or(Error::TypeError)?;
+
+                                Value::Number(divided.into())
+                            } else if let Some(num) = first_number.as_u64() {
+                                let rhs = second_number.as_u64().ok_or(Error::TypeError)?;
+                                let divided = num.checked_div(rhs).ok_or(Error::TypeError)?;
+
+                                Value::Number(divided.into())
+                            } else {
+                                return Err(Error::TypeError);
+                            }
+                        }
+                        _ => return Err(Error::TypeError),
+                    }
+                }
+                Value::BigNum(first_bignum) => {
+                    let second_bignum = second_rule
+                        .eval(input, output)?
+                        .ok_or(Error::TypeError)?
+                        .try_bignum()?;
+
+                    Value::BigNum(first_bignum.div(second_bignum))
+                }
+                _ => return Err(Error::TypeError),
+            };
+
+            Some(value)
+        }
         Function::If(first_rule, second_rule) => {
             let eval_if = eval(input, output, first_rule)?
                 .ok_or(Error::TypeError)?
                 .try_bool()?;
 
             if eval_if {
-                let bool = eval(input, output, second_rule)?
-                    .ok_or(Error::TypeError)?
-                    .try_bool()?;
-                Some(Value::Bool(bool))
+                eval(input, output, second_rule)?
             } else {
                 None
             }
@@ -185,24 +250,9 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
         }
         Function::Get(key) => Some(input.try_get(key)?),
         Function::Bn(value) => {
-            let big_num = match value {
-                Value::String(string) => {
-                    let big_num =
-                        BigNum::from_str(string.as_str()).map_err(|_| Error::TypeError)?;
+            let big_num = value.clone().try_bignum()?;
 
-                    Value::BigNum(big_num)
-                }
-                Value::BigNum(big_num) => Value::BigNum(big_num.clone()),
-                Value::Number(number) => {
-                    let big_num =
-                        BigNum::from_str(&number.to_string()).map_err(|_| Error::TypeError)?;
-
-                    Value::BigNum(big_num)
-                }
-                _ => return Err(Error::TypeError),
-            };
-
-            Some(big_num)
+            Some(Value::BigNum(big_num))
         }
     };
 
@@ -292,5 +342,101 @@ mod test {
             Value::Bool(false),
             result.expect("Sould return Non-NULL result!")
         );
+    }
+
+    #[test]
+    fn test_and_eval() {
+        let input = Input::default();
+        let mut output = Output {
+            show: true,
+            boost: 1.0,
+            price: Default::default(),
+        };
+
+        let cases = [
+            (true, true, true),
+            (false, false, false),
+            (false, true, false),
+            (true, false, false),
+        ];
+
+        for (lhs, rhs, expected) in cases.iter() {
+            let rule = Rule::Function(Function::new_and(Value::Bool(*lhs), Value::Bool(*rhs)));
+            let expected = Some(Value::Bool(*expected));
+
+            assert_eq!(Ok(expected), rule.eval(&input, &mut output));
+        }
+    }
+
+    #[test]
+    fn test_if_eval() {
+        let input = Input::default();
+        let mut output = Output {
+            show: true,
+            boost: 1.0,
+            price: Default::default(),
+        };
+
+        let then = Value::String("yes".to_string());
+
+        let rule = Rule::Function(Function::new_if(Value::Bool(true), then.clone()));
+
+        assert_eq!(Ok(Some(then.clone())), rule.eval(&input, &mut output));
+
+        let rule = Rule::Function(Function::new_if(Value::Bool(false), then));
+
+        assert_eq!(Ok(None), rule.eval(&input, &mut output));
+    }
+
+    #[test]
+    fn test_bn_eval_from_actual_number_value_string_bignum_or_number() {
+        let input = Input::default();
+        let mut output = Output {
+            show: true,
+            boost: 1.0,
+            price: Default::default(),
+        };
+
+        let cases = vec![
+            (Value::new_string("1000"), Value::BigNum(1000.into())),
+            (Value::new_number(5000), Value::BigNum(5000.into())),
+            (Value::BigNum(2.into()), Value::BigNum(2.into())),
+            // rounded floats should work!
+            (
+                Value::Number(Number::from_f64(2.0).expect("should create float number")),
+                Value::BigNum(2.into()),
+            ),
+        ];
+
+        for (from, expected) in cases.into_iter() {
+            let rule = Rule::Function(Function::new_bn(from));
+
+            assert_eq!(Ok(Some(expected)), rule.eval(&input, &mut output));
+        }
+    }
+
+    #[test]
+    fn test_bn_eval_from_actual_incorrect_value() {
+        let input = Input::default();
+        let mut output = Output {
+            show: true,
+            boost: 1.0,
+            price: Default::default(),
+        };
+
+        let error_cases = vec![
+            Value::new_string("text"),
+            // BigNums can only be possitive
+            Value::new_number(-100),
+            Value::Bool(true),
+            Value::Array(vec![Value::Bool(false)]),
+            Value::Number(Number::from_f64(2.5).expect("should create float number")),
+        ];
+
+        for error_case in error_cases.into_iter() {
+            let rule = Rule::Function(Function::new_bn(error_case));
+
+            assert_eq!(Err(Error::TypeError), rule.eval(&input, &mut output));
+        }
     }
 }
