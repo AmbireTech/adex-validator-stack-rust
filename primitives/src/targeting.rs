@@ -1,23 +1,18 @@
 use crate::BigNum;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub use eval::*;
 
 mod eval;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 #[cfg_attr(test, derive(Default))]
-#[serde(rename_all = "camelCase")]
 pub struct Input {
     /// AdView scope, accessible only on the AdView
-    #[serde(default)]
     pub ad_view: Option<AdView>,
     /// Global scope, accessible everywhere
-    #[serde(flatten)]
     pub global: Global,
     /// adSlot scope, accessible on Supermarket and AdView
-    #[serde(default)]
     pub ad_slot: Option<AdSlot>,
 }
 
@@ -90,17 +85,15 @@ impl Input {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 #[cfg_attr(test, derive(Default))]
-#[serde(rename_all = "camelCase")]
 pub struct AdView {
     pub seconds_since_show: u64,
     pub has_custom_preferences: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 #[cfg_attr(test, derive(Default))]
-#[serde(rename_all = "camelCase")]
 pub struct Global {
     pub ad_slot_id: String,
     pub ad_unit_id: String,
@@ -118,14 +111,12 @@ pub struct Global {
     pub event_max_price: BigNum,
     pub publisher_earned_from_campaign: BigNum,
     pub seconds_since_epoch: u64,
-    #[serde(rename = "userAgentOS")]
     pub user_agent_os: String,
     pub user_agent_browser_family: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 #[cfg_attr(test, derive(Default))]
-#[serde(rename_all = "camelCase")]
 pub struct AdSlot {
     pub categories: Vec<String>,
     pub hostname: String,
