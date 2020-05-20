@@ -1,24 +1,10 @@
 use crate::BigNum;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, convert::TryFrom};
+use std::collections::HashMap;
 
 pub use eval::*;
 
 mod eval;
-
-pub trait TryGet: Serialize {
-    const PATTERN: &'static str = ".";
-
-    fn try_get(&self, key: &str) -> Result<Value, Error> {
-        let serde_value = serde_json::json!(self);
-        let pointer = format!("/{pointer}", pointer = key.replace(Self::PATTERN, "/"));
-
-        match serde_value.pointer(&pointer) {
-            Some(serde_value) => Value::try_from(serde_value.clone()),
-            None => Err(Error::UnknownVariable),
-        }
-    }
-}
 
 #[derive(Debug, Serialize, Deserialize)]
 #[cfg_attr(test, derive(Default))]
@@ -71,7 +57,9 @@ impl Input {
             )),
             "secondsSinceEpoch" => Ok(Value::Number(self.global.seconds_since_epoch.into())),
             "userAgentOS" => Ok(Value::String(self.global.user_agent_os.clone())),
-            "userAgentBrowserFamily" => Ok(Value::String(self.global.user_agent_browser_family.clone())),
+            "userAgentBrowserFamily" => {
+                Ok(Value::String(self.global.user_agent_browser_family.clone()))
+            }
             "adSlot.categories" => self
                 .ad_slot
                 .as_ref()
@@ -93,8 +81,8 @@ impl Input {
                 let ad_slot = self.ad_slot.as_ref().ok_or(Error::UnknownVariable)?;
 
                 match serde_json::Number::from_f64(ad_slot.alexa_rank) {
-                        Some(number) => Ok(Value::Number(number)),
-                        None => Err(Error::TypeError)
+                    Some(number) => Ok(Value::Number(number)),
+                    None => Err(Error::TypeError),
                 }
             }
             _unknown_field => Err(Error::UnknownVariable),

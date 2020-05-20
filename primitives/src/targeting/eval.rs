@@ -1,12 +1,11 @@
 use crate::BigNum;
 use serde::{Deserialize, Serialize};
 use serde_json::{value::Value as SerdeValue, Number};
-use std::convert::TryFrom;
-use std::{fmt, str::FromStr};
+use std::{convert::TryFrom, fmt, str::FromStr};
 
 pub type Map = serde_json::value::Map<String, SerdeValue>;
 
-use super::{Input, Output, TryGet};
+use super::{Input, Output};
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum Error {
@@ -52,6 +51,28 @@ impl Value {
     }
 }
 
+impl TryFrom<SerdeValue> for Value {
+    type Error = Error;
+
+    fn try_from(serde_value: SerdeValue) -> Result<Self, Self::Error> {
+        match serde_value {
+            SerdeValue::Bool(bool) => Ok(Self::Bool(bool)),
+            SerdeValue::Number(number) => Ok(Self::Number(number)),
+            // String can be either a String or a BigNum
+            // but we handle this case by using Type casting with the Function::Bn
+            SerdeValue::String(string) => Ok(Value::String(string)),
+            SerdeValue::Array(serde_array) => {
+                let array = serde_array
+                    .into_iter()
+                    .map(Value::try_from)
+                    .collect::<Result<_, _>>()?;
+                Ok(Self::Array(array))
+            }
+            SerdeValue::Object(_) | SerdeValue::Null => Err(Error::TypeError),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 // TODO: https://github.com/AdExNetwork/adex-validator-stack-rust/issues/296
@@ -94,26 +115,6 @@ impl Function {
     }
 }
 
-impl TryFrom<SerdeValue> for Value {
-    type Error = Error;
-
-    fn try_from(serde_value: SerdeValue) -> Result<Self, Self::Error> {
-        match serde_value {
-            SerdeValue::Bool(bool) => Ok(Self::Bool(bool)),
-            SerdeValue::Number(number) => Ok(Self::Number(number)),
-            SerdeValue::String(string) => Ok(Value::String(string)),
-            SerdeValue::Array(serde_array) => {
-                let array = serde_array
-                    .into_iter()
-                    .map(Value::try_from)
-                    .collect::<Result<_, _>>()?;
-                Ok(Self::Array(array))
-            }
-            SerdeValue::Object(_) | SerdeValue::Null => Err(Error::TypeError),
-        }
-    }
-}
-
 impl Value {
     pub fn try_bool(self) -> Result<bool, Error> {
         match self {
@@ -137,6 +138,7 @@ impl Value {
 ///     - Number
 ///     - String
 ///     - Array
+///     - BigNum
 /// - Mutates output
 /// - Throws an error
 fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>, Error> {
