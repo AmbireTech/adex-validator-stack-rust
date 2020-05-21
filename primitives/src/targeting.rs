@@ -198,4 +198,29 @@ mod test {
 
         assert_eq!(Value::BigNum(BigNum::from(50)), global_campaign_budget);
     }
+
+    #[test]
+    fn test_output_from_channel() {
+        use crate::channel::{Pricing, PricingBounds};
+        use crate::util::tests::prep_db::DUMMY_CHANNEL;
+
+        let mut channel = DUMMY_CHANNEL.clone();
+        channel.spec.pricing_bounds = Some(PricingBounds {
+            impression: Some(Pricing {
+                min: 1_000.into(),
+                max: 2_000.into(),
+            }),
+            click: Some(Pricing {
+                min: 3_000.into(),
+                max: 4_000.into(),
+            }),
+        });
+
+        let output = Output::from(&channel);
+
+        assert_eq!(true, output.show);
+        assert_eq!(1.0, output.boost);
+        assert_eq!(Some(&BigNum::from(1_000)), output.price.get("IMPRESSION"));
+        assert_eq!(Some(&BigNum::from(3_000)), output.price.get("CLICK"));
+    }
 }

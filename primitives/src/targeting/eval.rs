@@ -123,6 +123,10 @@ impl Function {
         Self::Get(key.to_string())
     }
 
+    pub fn new_set(key: &str, eval: impl Into<Rule>) -> Self {
+        Self::Set(key.to_string(), Box::new(eval.into()))
+    }
+
     pub fn new_bn(value: impl Into<Value>) -> Self {
         Self::Bn(value.into())
     }
@@ -491,5 +495,35 @@ mod test {
 
             assert_eq!(Err(Error::TypeError), rule.eval(&input, &mut output));
         }
+    }
+
+    #[test]
+    fn test_set_eval() {
+        use crate::channel::{Pricing, PricingBounds};
+        use crate::util::tests::prep_db::DUMMY_CHANNEL;
+
+        let mut channel = DUMMY_CHANNEL.clone();
+        channel.spec.pricing_bounds = Some(PricingBounds {
+            impression: Some(Pricing {
+                min: 1_000.into(),
+                max: 2_000.into(),
+            }),
+            click: Some(Pricing {
+                min: 3_000.into(),
+                max: 4_000.into(),
+            }),
+        });
+
+        let input = Input::default();
+        let mut output = Output::from(&channel);
+
+        assert_eq!(Some(&BigNum::from(1_000)), output.price.get("IMPRESSION"));
+
+        let set_to = Value::BigNum(BigNum::from(20));
+        let rule = Rule::Function(Function::new_set("price.IMPRESSION", set_to));
+
+        assert_eq!(Ok(None), rule.eval(&input, &mut output));
+
+        assert_eq!(Some(&BigNum::from(20)), output.price.get("IMPRESSION"));
     }
 }
