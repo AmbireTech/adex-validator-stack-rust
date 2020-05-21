@@ -1,4 +1,4 @@
-use crate::BigNum;
+use crate::{BigNum, Channel};
 use std::collections::HashMap;
 
 pub use eval::*;
@@ -137,6 +137,25 @@ pub struct Output {
     /// The default is the min of the bound of event type:
     /// Default: pricingBounds.IMPRESSION.min
     pub price: HashMap<String, BigNum>,
+}
+
+impl From<&Channel> for Output {
+    fn from(channel: &Channel) -> Self {
+        let price = match &channel.spec.pricing_bounds {
+            Some(pricing_bounds) => pricing_bounds
+                .to_vec()
+                .into_iter()
+                .map(|(key, price)| (key.to_string(), price.min))
+                .collect(),
+            _ => Default::default(),
+        };
+
+        Self {
+            show: true,
+            boost: 1.0,
+            price,
+        }
+    }
 }
 
 #[cfg(test)]
