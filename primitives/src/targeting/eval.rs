@@ -87,6 +87,9 @@ pub enum Function {
     And(Box<Rule>, Box<Rule>),
     Intersects(Box<Rule>, Box<Rule>),
     Get(String),
+    /// Output variables can be set any number of times by different rules, except `show`
+    /// if `show` is at any point set to `false`, we stop executing rules and don't show the ad.
+    Set(String, Box<Rule>),
     /// Bn(Value) function.
     Bn(Value),
 }
@@ -142,6 +145,13 @@ impl Value {
 
     pub fn try_bignum(self) -> Result<BigNum, Error> {
         BigNum::try_from(self)
+    }
+
+    pub fn try_number(self) -> Result<Number, Error> {
+        match self {
+            Value::Number(number) => Ok(number),
+            _ => Err(Error::TypeError),
+        }
     }
 }
 
@@ -247,6 +257,49 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
                 .try_array()?;
 
             Some(Value::Bool(a.iter().any(|x| b.contains(x))))
+        }
+        Function::Set(key, rule) => {
+            // Output variables can be set any number of times by different rules, except `show`
+            // if `show` is at any point set to `false`, we stop executing rules and don't show the ad.
+            match key.as_str() {
+                "boost" => {
+                    let boost_num = rule
+                        .eval(input, output)?
+                        .ok_or(Error::TypeError)?
+                        .try_number()?;
+
+                    output.boost = boost_num.as_f64().ok_or(Error::TypeError)?;
+                }
+                "show" => {
+                    let show_value = rule
+                        .eval(input, output)?
+                        .ok_or(Error::TypeError)?
+                        .try_bool()?;
+
+                    output.show = show_value;
+                }
+                "price.IMPRESSION" => {
+                    let price = rule
+                        .eval(input, output)?
+                        .ok_or(Error::TypeError)?
+                        .try_bignum()?;
+
+                    // we do not care about any other old value
+                    output.price.insert("IMPRESSION".to_string(), price);
+                }
+                "price.CLICK" => {
+                    let price = rule
+                        .eval(input, output)?
+                        .ok_or(Error::TypeError)?
+                        .try_bignum()?;
+
+                    // we do not care about any other old value
+                    output.price.insert("CLICK".to_string(), price);
+                }
+                _ => return Err(Error::UnknownVariable),
+            }
+
+            return Ok(None);
         }
         Function::Get(key) => Some(input.try_get(key)?),
         Function::Bn(value) => {
