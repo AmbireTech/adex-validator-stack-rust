@@ -17,10 +17,12 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::TypeError => write!(f, "TypeError: Wrong type"),
-            Error::UnknownVariable => write!(f, "UnknownVariable: Unknown varialbe passed"),
+            Error::UnknownVariable => write!(f, "UnknownVariable: Unknown variable passed"),
         }
     }
 }
+
+impl std::error::Error for Error {}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(untagged)]
@@ -322,16 +324,10 @@ mod test {
     use crate::targeting::AdSlot;
 
     #[test]
-    fn deserialzes_intersects_rule() {
+    fn deserialize_intersects_with_get_rule() {
         let json = r#"{"intersects": [{ "get": "adSlot.categories" }, ["News", "Bitcoin"]]}"#;
 
         let parsed_rule = serde_json::from_str::<Rule>(json).expect("Should deserialize");
-
-        let mut expected_map = Map::new();
-        expected_map.insert(
-            "get".to_string(),
-            SerdeValue::String("adSlot.categories".to_string()),
-        );
 
         let expected = Rule::Function(Function::new_intersects(
             Rule::Function(Function::new_get("adSlot.categories")),
@@ -383,7 +379,7 @@ mod test {
 
         assert_eq!(
             Value::Bool(true),
-            result.expect("Sould return Non-NULL result!")
+            result.expect("Should return Non-NULL result!")
         );
 
         let mut input = Input::default();
@@ -397,7 +393,7 @@ mod test {
 
         assert_eq!(
             Value::Bool(false),
-            result.expect("Sould return Non-NULL result!")
+            result.expect("Should return Non-NULL result!")
         );
     }
 
@@ -456,12 +452,12 @@ mod test {
 
         let cases = vec![
             (Value::new_string("1000"), Value::BigNum(1000.into())),
-            (Value::new_number(5000), Value::BigNum(5000.into())),
-            (Value::BigNum(2.into()), Value::BigNum(2.into())),
+            (Value::new_number(2_000), Value::BigNum(2_000.into())),
+            (Value::BigNum(3.into()), Value::BigNum(3.into())),
             // rounded floats should work!
             (
-                Value::Number(Number::from_f64(2.0).expect("should create float number")),
-                Value::BigNum(2.into()),
+                Value::Number(Number::from_f64(40.0).expect("should create float number")),
+                Value::BigNum(40.into()),
             ),
         ];
 
@@ -483,7 +479,7 @@ mod test {
 
         let error_cases = vec![
             Value::new_string("text"),
-            // BigNums can only be possitive
+            // BigNums can only be positive
             Value::new_number(-100),
             Value::Bool(true),
             Value::Array(vec![Value::Bool(false)]),
