@@ -306,42 +306,43 @@ enum MathOperator {
     Division
 }
 
-fn math_operator(lhs: Number, rhs: Number, ops: MathOperator) -> Result<Number, Error> {
-    match (lhs.as_u64(), rhs.as_u64()) {
-        (Some(lhs), Some(rhs)) => {
-            match ops {
-                MathOperator::Division => {
-                    let divided = lhs.checked_div(rhs).ok_or(Error::TypeError)?;
-
-                    Ok(divided.into())
-                }
+fn handle_u64(lhs: u64, rhs: u64, ops: MathOperator) -> Result<Number, Error> {
+        match ops {
+            MathOperator::Division => {
+                let divided = lhs.checked_div(rhs).ok_or(Error::TypeError)?;
+                Ok(divided.into())
             }
         }
+}
+
+fn handle_i64(lhs: i64, rhs: i64, ops: MathOperator) -> Result<Number, Error> {
+    match ops {
+        MathOperator::Division => {
+            let divided = lhs.checked_div(rhs).ok_or(Error::TypeError)?;
+            Ok(divided.into())
+        }
+    }
+}
+
+fn handle_f64(lhs: f64, rhs: f64, ops:MathOperator) -> Result<Number, Error> {
+        match ops {
+            MathOperator::Division => {
+                let divided = lhs.div(rhs);
+                Ok(Number::from_f64(divided).ok_or(Error::TypeError)?)
+            }
+        }
+}
+
+fn math_operator(lhs: Number, rhs: Number, ops: MathOperator) -> Result<Number, Error> {
+    match (lhs.as_u64(), rhs.as_u64()) {
+        (Some(lhs), Some(rhs)) => handle_u64(lhs, rhs, ops),
         _ => {
-            // i64s
             match (lhs.as_i64(), rhs.as_i64()) {
-                (Some(lhs), Some(rhs)) => {
-                    match ops {
-                        MathOperator::Division => {
-                            let divided = lhs.checked_div(rhs).ok_or(Error::TypeError)?;
-
-                            Ok(divided.into())
-                        }
-                    }
-                }
+                (Some(lhs), Some(rhs)) => handle_i64(lhs, rhs, ops),
                 _ => {
-                    // f64s
                     match (lhs.as_f64(), rhs.as_f64()) {
-                        (Some(lhs), Some(rhs)) => {
-                            match ops {
-                                MathOperator::Division => {
-                                    let divided = lhs.div(rhs);
-
-                                    Ok(Number::from_f64(divided).ok_or(Error::TypeError)?)
-                                }
-                            }
-                        }
-                        _ => return Err(Error::TypeError)
+                        (Some(lhs), Some(rhs)) => handle_f64(lhs, rhs, ops),
+                        _ => Err(Error::TypeError)
                     }
                 }
             }
