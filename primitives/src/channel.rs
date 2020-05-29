@@ -102,6 +102,22 @@ pub struct PricingBounds {
     pub click: Option<Pricing>,
 }
 
+impl PricingBounds {
+    pub fn to_vec(&self) -> Vec<(&str, Pricing)> {
+        let mut vec = Vec::new();
+
+        if let Some(pricing) = self.impression.as_ref() {
+            vec.push(("IMPRESSION", pricing.clone()));
+        }
+
+        if let Some(pricing) = self.click.as_ref() {
+            vec.push(("CLICK", pricing.clone()))
+        }
+
+        vec
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ChannelSpec {
