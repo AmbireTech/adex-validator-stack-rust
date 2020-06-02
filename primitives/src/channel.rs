@@ -75,7 +75,7 @@ impl fmt::Display for ChannelId {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Channel {
     pub id: ChannelId,
@@ -87,13 +87,13 @@ pub struct Channel {
     pub spec: ChannelSpec,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct Pricing {
     pub max: BigNum,
     pub min: BigNum,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 #[serde(rename_all = "UPPERCASE")]
 pub struct PricingBounds {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -118,7 +118,7 @@ impl PricingBounds {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ChannelSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -173,7 +173,7 @@ pub struct ChannelSpec {
     pub price_dynamic_adjustment: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PriceMultiplicationRules {
     #[serde(default, skip_serializing_if = "Option::is_none")]

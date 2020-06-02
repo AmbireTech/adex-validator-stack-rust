@@ -16,7 +16,7 @@ serde_millis = "0.1.1"
 # Configuration
 toml = "0.5"
 # Logging
-slog = { version = "^2.5.2" , features = ["max_level_trace"] }
+slog = { version = "^2.5.2", features = ["max_level_trace"] }
 slog-term = "^2.4.2"
 slog-async = "^2.3.0"
 # Domain

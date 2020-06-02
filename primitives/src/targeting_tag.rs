@@ -2,13 +2,13 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::error::Error;
 use std::ops::Mul;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct TargetingTag {
     pub tag: String,
     pub score: Score,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 #[serde(transparent)]
 pub struct Score(#[serde(deserialize_with = "score_deserialize")] f64);
 

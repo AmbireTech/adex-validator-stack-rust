@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{TargetingTag, ValidatorId};
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AdUnit {
     /// valid ipfs hash of spec props below
