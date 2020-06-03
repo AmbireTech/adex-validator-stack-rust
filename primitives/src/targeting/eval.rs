@@ -194,39 +194,23 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
     // basic operators
     let value = match function {
         Function::Div(first_rule, second_rule) => {
-            let value = match first_rule.eval(input, output)?.ok_or(Error::TypeError)? {
-                Value::Number(first_number) => {
-                    match second_rule.eval(input, output)?.ok_or(Error::TypeError)? {
-                        Value::Number(second_number) => {
-                            if let Some(num) = first_number.as_f64() {
-                                let divided =
-                                    num.div(second_number.as_f64().ok_or(Error::TypeError)?);
+            let first_eval = first_rule.eval(input, output)?.ok_or(Error::TypeError)?;
+            let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
 
-                                Value::Number(Number::from_f64(divided).ok_or(Error::TypeError)?)
-                            } else if let Some(num) = first_number.as_i64() {
-                                let rhs = second_number.as_i64().ok_or(Error::TypeError)?;
-                                let divided = num.checked_div(rhs).ok_or(Error::TypeError)?;
 
-                                Value::Number(divided.into())
-                            } else if let Some(num) = first_number.as_u64() {
-                                let rhs = second_number.as_u64().ok_or(Error::TypeError)?;
-                                let divided = num.checked_div(rhs).ok_or(Error::TypeError)?;
+            let value = match (first_eval, second_eval) {
+                (Value::BigNum(bignum), second_value) => {
+                    let second_bignum = BigNum::try_from(second_value)?;
 
-                                Value::Number(divided.into())
-                            } else {
-                                return Err(Error::TypeError);
-                            }
-                        }
-                        _ => return Err(Error::TypeError),
-                    }
+                    Value::BigNum(bignum.div(second_bignum))
+                },
+                (lhs_value, Value::BigNum(rhs_bignum)) => {
+                    let lhs_bignum = BigNum::try_from(lhs_value)?;
+
+                    Value::BigNum(lhs_bignum.div(rhs_bignum))
                 }
-                Value::BigNum(first_bignum) => {
-                    let second_bignum = second_rule
-                        .eval(input, output)?
-                        .ok_or(Error::TypeError)?
-                        .try_bignum()?;
-
-                    Value::BigNum(first_bignum.div(second_bignum))
+                (Value::Number(lhs), Value::Number(rhs)) => {
+                    Value::Number(math_operator(lhs, rhs, MathOperator::Division)?)
                 }
                 _ => return Err(Error::TypeError),
             };
@@ -316,6 +300,54 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
     };
 
     Ok(value)
+}
+
+enum MathOperator {
+    Division
+}
+
+fn handle_u64(lhs: u64, rhs: u64, ops: MathOperator) -> Result<Number, Error> {
+        match ops {
+            MathOperator::Division => {
+                let divided = lhs.checked_div(rhs).ok_or(Error::TypeError)?;
+                Ok(divided.into())
+            }
+        }
+}
+
+fn handle_i64(lhs: i64, rhs: i64, ops: MathOperator) -> Result<Number, Error> {
+    match ops {
+        MathOperator::Division => {
+            let divided = lhs.checked_div(rhs).ok_or(Error::TypeError)?;
+            Ok(divided.into())
+        }
+    }
+}
+
+fn handle_f64(lhs: f64, rhs: f64, ops:MathOperator) -> Result<Number, Error> {
+        match ops {
+            MathOperator::Division => {
+                let divided = lhs.div(rhs);
+                Ok(Number::from_f64(divided).ok_or(Error::TypeError)?)
+            }
+        }
+}
+
+fn math_operator(lhs: Number, rhs: Number, ops: MathOperator) -> Result<Number, Error> {
+    match (lhs.as_u64(), rhs.as_u64()) {
+        (Some(lhs), Some(rhs)) => handle_u64(lhs, rhs, ops),
+        _ => {
+            match (lhs.as_i64(), rhs.as_i64()) {
+                (Some(lhs), Some(rhs)) => handle_i64(lhs, rhs, ops),
+                _ => {
+                    match (lhs.as_f64(), rhs.as_f64()) {
+                        (Some(lhs), Some(rhs)) => handle_f64(lhs, rhs, ops),
+                        _ => Err(Error::TypeError)
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
