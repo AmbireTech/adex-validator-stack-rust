@@ -213,14 +213,11 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
             .ok_or(Error::TypeError)?;
             let product_rule = Rule::Value(product);
             let boxed_rule = Box::new(product_rule);
-            let value = eval(
+            eval(
                 input,
                 output,
                 &Rule::Function(Function::Div(boxed_rule, third_rule.clone())),
             )?
-            .ok_or(Error::TypeError)?;
-
-            Some(value)
         }
         Function::Div(first_rule, second_rule) => {
             let first_eval = first_rule.eval(input, output)?.ok_or(Error::TypeError)?;
