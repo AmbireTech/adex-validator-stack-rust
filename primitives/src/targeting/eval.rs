@@ -208,17 +208,17 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
             let product = eval(
                 input,
                 output,
-                &Rule::Function(Function::Mul(*first_rule, *second_rule)),
+                &Rule::Function(Function::Mul(first_rule.clone(), second_rule.clone())),
             )?
-            .ok_or(Error::TypeError);
-            let value = match product {
-                Ok(product) => {
-                    let product_rule = Rule::Value(product);
-                    let boxed_rule = Box::new(product_rule);
-                    eval(input, output, &Rule::Function(Function::Div(boxed_rule, *third_rule)))
-                },
-                _ => return Err(Error::TypeError),
-            };
+            .ok_or(Error::TypeError)?;
+            let product_rule = Rule::Value(product);
+            let boxed_rule = Box::new(product_rule);
+            let value = eval(
+                input,
+                output,
+                &Rule::Function(Function::Div(boxed_rule, third_rule.clone())),
+            )?
+            .ok_or(Error::TypeError)?;
 
             Some(value)
         }
