@@ -97,7 +97,27 @@ pub enum Function {
     Max(Box<Rule>, Box<Rule>),
     Min(Box<Rule>, Box<Rule>),
     If(Box<Rule>, Box<Rule>),
+    IfNot(Box<Rule>, Box<Rule>),
+    IfElse(Box<Rule>, Box<Rule>, Box<Rule>),
     And(Box<Rule>, Box<Rule>),
+    Or(Box<Rule>, Box<Rule>),
+    Xor(Box<Rule>, Box<Rule>),
+    Not(Box<Rule>),
+    Lt(Box<Rule>, Box<Rule>),
+    Lte(Box<Rule>, Box<Rule>),
+    Gt(Box<Rule>, Box<Rule>),
+    Gte(Box<Rule>, Box<Rule>),
+    Equals(Box<Rule>, Box<Rule>),
+    NotEquals(Box<Rule>, Box<Rule>),
+    In(Box<Rule>, Box<Rule>),
+    NotIn(Box<Rule>, Box<Rule>),
+    At(Box<Rule>, Box<Rule>),
+    // Note: this is inclusive of the start and end value
+    Between(Box<Rule>, Box<Rule>, Box<Rule>),
+    Split(Box<Rule>, Box<Rule>),
+    StartsWith(Box<Rule>, Box<Rule>),
+    EndsWith(Box<Rule>, Box<Rule>),
+    OnlyShowIf(Box<Rule>),
     Intersects(Box<Rule>, Box<Rule>),
     Get(String),
     /// Output variables can be set any number of times by different rules, except `show`
@@ -124,12 +144,80 @@ impl Function {
         Self::If(Box::new(condition.into()), Box::new(then.into()))
     }
 
+    pub fn new_if_not(condition: impl Into<Rule>, then: impl Into<Rule>) -> Self {
+        Self::IfNot(Box::new(condition.into()), Box::new(then.into()))
+    }
+
+    pub fn new_if_else(
+        condition: impl Into<Rule>,
+        then: impl Into<Rule>,
+        otherwise: impl Into<Rule>,
+    ) -> Self {
+        Self::IfElse(
+            Box::new(condition.into()),
+            Box::new(then.into()),
+            Box::new(otherwise.into()),
+        )
+    }
+
     pub fn new_and(lhs: impl Into<Rule>, rhs: impl Into<Rule>) -> Self {
         Self::And(Box::new(lhs.into()), Box::new(rhs.into()))
     }
 
+    pub fn new_or(lhs: impl Into<Rule>, rhs: impl Into<Rule>) -> Self {
+        Self::Or(Box::new(lhs.into()), Box::new(rhs.into()))
+    }
+
+    pub fn new_xor(lhs: impl Into<Rule>, rhs: impl Into<Rule>) -> Self {
+        Self::Xor(Box::new(lhs.into()), Box::new(rhs.into()))
+    }
+
+    pub fn new_not(statement: impl Into<Rule>) -> Self {
+        Self::Not(Box::new(statement.into()))
+    }
+
     pub fn new_intersects(lhs: impl Into<Rule>, rhs: impl Into<Rule>) -> Self {
         Self::Intersects(Box::new(lhs.into()), Box::new(rhs.into()))
+    }
+
+    pub fn new_in(lhs: impl Into<Rule>, rhs: impl Into<Rule>) -> Self {
+        Self::In(Box::new(lhs.into()), Box::new(rhs.into()))
+    }
+
+    pub fn new_not_in(lhs: impl Into<Rule>, rhs: impl Into<Rule>) -> Self {
+        Self::NotIn(Box::new(lhs.into()), Box::new(rhs.into()))
+    }
+
+    pub fn new_between(
+        value: impl Into<Rule>,
+        start: impl Into<Rule>,
+        end: impl Into<Rule>,
+    ) -> Self {
+        Self::Between(
+            Box::new(value.into()),
+            Box::new(start.into()),
+            Box::new(end.into()),
+        )
+    }
+
+    pub fn new_split(string: impl Into<Rule>, separator: impl Into<Rule>) -> Self {
+        Self::Split(Box::new(string.into()), Box::new(separator.into()))
+    }
+
+    pub fn new_starts_with(string: impl Into<Rule>, start: impl Into<Rule>) -> Self {
+        Self::StartsWith(Box::new(string.into()), Box::new(start.into()))
+    }
+
+    pub fn new_ends_with(string: impl Into<Rule>, end: impl Into<Rule>) -> Self {
+        Self::EndsWith(Box::new(string.into()), Box::new(end.into()))
+    }
+
+    pub fn new_at(array: impl Into<Rule>, position: impl Into<Rule>) -> Self {
+        Self::At(Box::new(array.into()), Box::new(position.into()))
+    }
+
+    pub fn new_only_show_if(condition: impl Into<Rule>) -> Self {
+        Self::OnlyShowIf(Box::new(condition.into()))
     }
 
     pub fn new_get(key: &str) -> Self {
@@ -149,6 +237,13 @@ impl Value {
     pub fn try_bool(self) -> Result<bool, Error> {
         match self {
             Self::Bool(b) => Ok(b),
+            _ => Err(Error::TypeError),
+        }
+    }
+
+    pub fn try_string(self) -> Result<String, Error> {
+        match self {
+            Self::String(s) => Ok(s),
             _ => Err(Error::TypeError),
         }
     }
@@ -391,6 +486,28 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
                 None
             }
         }
+        Function::IfNot(first_rule, second_rule) => {
+            let eval_if = eval(input, output, first_rule)?
+                .ok_or(Error::TypeError)?
+                .try_bool()?;
+
+            if !eval_if {
+                eval(input, output, second_rule)?
+            } else {
+                None
+            }
+        }
+        Function::IfElse(first_rule, second_rule, third_rule) => {
+            let eval_if = eval(input, output, first_rule)?
+                .ok_or(Error::TypeError)?
+                .try_bool()?;
+
+            if eval_if {
+                eval(input, output, second_rule)?
+            } else {
+                eval(input, output, third_rule)?
+            }
+        }
         Function::And(first_rule, second_rule) => {
             let a = eval(input, output, first_rule)?
                 .ok_or(Error::TypeError)?
@@ -400,6 +517,81 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
                 .try_bool()?;
 
             Some(Value::Bool(a && b))
+        }
+        Function::Or(first_rule, second_rule) => {
+            let a = eval(input, output, first_rule)?
+                .ok_or(Error::TypeError)?
+                .try_bool()?;
+            let b = eval(input, output, second_rule)?
+                .ok_or(Error::TypeError)?
+                .try_bool()?;
+
+            Some(Value::Bool(a || b))
+        }
+        Function::Xor(first_rule, second_rule) => {
+            let a = eval(input, output, first_rule)?
+                .ok_or(Error::TypeError)?
+                .try_bool()?;
+            let b = eval(input, output, second_rule)?
+                .ok_or(Error::TypeError)?
+                .try_bool()?;
+
+            Some(Value::Bool((a && !b) || (!a && b)))
+        }
+        Function::Not(first_rule) => {
+            let a = eval(input, output, first_rule)?
+                .ok_or(Error::TypeError)?
+                .try_bool()?;
+
+            Some(Value::Bool(!a))
+        }
+        Function::Lt(first_rule, second_rule) => {
+            let first_eval = first_rule.eval(input, output)?.ok_or(Error::TypeError)?;
+            let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
+
+            let lhs = BigNum::try_from(first_eval)?;
+            let rhs = BigNum::try_from(second_eval)?;
+            Some(Value::Bool(lhs.lt(&rhs)))
+        }
+        Function::Lte(first_rule, second_rule) => {
+            let first_eval = first_rule.eval(input, output)?.ok_or(Error::TypeError)?;
+            let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
+
+            let lhs = BigNum::try_from(first_eval)?;
+            let rhs = BigNum::try_from(second_eval)?;
+            Some(Value::Bool(lhs.le(&rhs)))
+        }
+        Function::Gt(first_rule, second_rule) => {
+            let first_eval = first_rule.eval(input, output)?.ok_or(Error::TypeError)?;
+            let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
+
+            let lhs = BigNum::try_from(first_eval)?;
+            let rhs = BigNum::try_from(second_eval)?;
+            Some(Value::Bool(lhs.gt(&rhs)))
+        }
+        Function::Gte(first_rule, second_rule) => {
+            let first_eval = first_rule.eval(input, output)?.ok_or(Error::TypeError)?;
+            let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
+
+            let lhs = BigNum::try_from(first_eval)?;
+            let rhs = BigNum::try_from(second_eval)?;
+            Some(Value::Bool(lhs.ge(&rhs)))
+        }
+        Function::Equals(first_rule, second_rule) => {
+            let first_eval = first_rule.eval(input, output)?.ok_or(Error::TypeError)?;
+            let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
+
+            let lhs = BigNum::try_from(first_eval)?;
+            let rhs = BigNum::try_from(second_eval)?;
+            Some(Value::Bool(lhs.eq(&rhs)))
+        }
+        Function::NotEquals(first_rule, second_rule) => {
+            let first_eval = first_rule.eval(input, output)?.ok_or(Error::TypeError)?;
+            let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
+
+            let lhs = BigNum::try_from(first_eval)?;
+            let rhs = BigNum::try_from(second_eval)?;
+            Some(Value::Bool(lhs.ne(&rhs)))
         }
         Function::Intersects(first_rule, second_rule) => {
             let a = eval(input, output, first_rule)?
@@ -411,6 +603,94 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
 
             Some(Value::Bool(a.iter().any(|x| b.contains(x))))
         }
+        Function::In(first_rule, second_rule) => {
+            let a = eval(input, output, first_rule)?.ok_or(Error::TypeError)?;
+            let b = eval(input, output, second_rule)?
+                .ok_or(Error::TypeError)?
+                .try_array()?;
+
+            Some(Value::Bool(b.contains(&a)))
+        }
+        Function::NotIn(first_rule, second_rule) => {
+            let a = eval(input, output, first_rule)?.ok_or(Error::TypeError)?;
+            let b = eval(input, output, second_rule)?
+                .ok_or(Error::TypeError)?
+                .try_array()?;
+
+            Some(Value::Bool(!b.contains(&a)))
+        }
+        Function::Between(first_rule, second_rule, third_rule) => {
+            let first_eval = first_rule.eval(input, output)?.ok_or(Error::TypeError)?;
+            let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
+            let third_eval = third_rule.eval(input, output)?.ok_or(Error::TypeError)?;
+
+            let value = BigNum::try_from(first_eval)?;
+            let start = BigNum::try_from(second_eval)?;
+            let end = BigNum::try_from(third_eval)?;
+
+            Some(Value::Bool(value.ge(&start) && value.le(&end)))
+        }
+        Function::At(first_rule, second_rule) => {
+            let first_eval = first_rule
+                .eval(input, output)?
+                .ok_or(Error::TypeError)?
+                .try_array()?;
+            let second_eval = second_rule
+                .eval(input, output)?
+                .ok_or(Error::TypeError)?
+                .try_number()?
+                .as_u64()
+                .ok_or(Error::TypeError)?;
+            let index = second_eval as usize;
+            let value = &first_eval[index];
+            Some(value.clone())
+        }
+        Function::Split(first_rule, second_rule) => {
+            let first_eval = first_rule
+                .eval(input, output)?
+                .ok_or(Error::TypeError)?
+                .try_string()?;
+            let second_eval = second_rule
+                .eval(input, output)?
+                .ok_or(Error::TypeError)?
+                .try_string()?;
+
+            let after_split: Vec<&str> = first_eval.split(&second_eval).collect();
+            let mapped_to_value = after_split
+                .into_iter()
+                .map(|x| Value::new_string(x))
+                .collect();
+            Some(Value::Array(mapped_to_value))
+        }
+        Function::StartsWith(first_rule, second_rule) => {
+            let first_eval = first_rule
+                .eval(input, output)?
+                .ok_or(Error::TypeError)?
+                .try_string()?;
+            let second_eval = second_rule
+                .eval(input, output)?
+                .ok_or(Error::TypeError)?
+                .try_string()?;
+
+            Some(Value::Bool(first_eval.starts_with(&second_eval)))
+        }
+        Function::EndsWith(first_rule, second_rule) => {
+            let first_eval = first_rule
+                .eval(input, output)?
+                .ok_or(Error::TypeError)?
+                .try_string()?;
+            let second_eval = second_rule
+                .eval(input, output)?
+                .ok_or(Error::TypeError)?
+                .try_string()?;
+
+            Some(Value::Bool(first_eval.ends_with(&second_eval)))
+        }
+        Function::OnlyShowIf(first_rule) => eval(
+            input,
+            output,
+            &Rule::Function(Function::Set(String::from("show"), first_rule.clone())),
+        )?,
         Function::Set(key, rule) => {
             // Output variables can be set any number of times by different rules, except `show`
             // if `show` is at any point set to `false`, we stop executing rules and don't show the ad.
