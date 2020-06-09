@@ -1,7 +1,12 @@
 use crate::BigNum;
 use serde::{Deserialize, Serialize};
 use serde_json::{value::Value as SerdeValue, Number};
-use std::{convert::TryFrom, fmt, ops::Div, str::FromStr};
+use std::{
+    convert::TryFrom,
+    fmt,
+    ops::{Add, Div, Mul, Rem, Sub},
+    str::FromStr,
+};
 
 pub type Map = serde_json::value::Map<String, SerdeValue>;
 
@@ -83,8 +88,14 @@ impl TryFrom<SerdeValue> for Value {
 #[serde(rename_all = "camelCase")]
 // TODO: https://github.com/AdExNetwork/adex-validator-stack-rust/issues/296
 pub enum Function {
-    /// Math `div`
+    MulDiv(Box<Rule>, Box<Rule>, Box<Rule>),
     Div(Box<Rule>, Box<Rule>),
+    Mul(Box<Rule>, Box<Rule>),
+    Mod(Box<Rule>, Box<Rule>),
+    Add(Box<Rule>, Box<Rule>),
+    Sub(Box<Rule>, Box<Rule>),
+    Max(Box<Rule>, Box<Rule>),
+    Min(Box<Rule>, Box<Rule>),
     If(Box<Rule>, Box<Rule>),
     And(Box<Rule>, Box<Rule>),
     Intersects(Box<Rule>, Box<Rule>),
@@ -193,17 +204,31 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
 
     // basic operators
     let value = match function {
+        Function::MulDiv(first_rule, second_rule, third_rule) => {
+            let product = eval(
+                input,
+                output,
+                &Rule::Function(Function::Mul(first_rule.clone(), second_rule.clone())),
+            )?
+            .ok_or(Error::TypeError)?;
+            let product_rule = Rule::Value(product);
+            let boxed_rule = Box::new(product_rule);
+            eval(
+                input,
+                output,
+                &Rule::Function(Function::Div(boxed_rule, third_rule.clone())),
+            )?
+        }
         Function::Div(first_rule, second_rule) => {
             let first_eval = first_rule.eval(input, output)?.ok_or(Error::TypeError)?;
             let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
-
 
             let value = match (first_eval, second_eval) {
                 (Value::BigNum(bignum), second_value) => {
                     let second_bignum = BigNum::try_from(second_value)?;
 
                     Value::BigNum(bignum.div(second_bignum))
-                },
+                }
                 (lhs_value, Value::BigNum(rhs_bignum)) => {
                     let lhs_bignum = BigNum::try_from(lhs_value)?;
 
@@ -211,6 +236,144 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
                 }
                 (Value::Number(lhs), Value::Number(rhs)) => {
                     Value::Number(math_operator(lhs, rhs, MathOperator::Division)?)
+                }
+                _ => return Err(Error::TypeError),
+            };
+
+            Some(value)
+        }
+        Function::Mul(first_rule, second_rule) => {
+            let first_eval = first_rule.eval(input, output)?.ok_or(Error::TypeError)?;
+            let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
+
+            let value = match (first_eval, second_eval) {
+                (Value::BigNum(bignum), rhs_value) => {
+                    let rhs_bignum = BigNum::try_from(rhs_value)?;
+
+                    Value::BigNum(bignum.mul(rhs_bignum))
+                }
+                (lhs_value, Value::BigNum(rhs_bignum)) => {
+                    let lhs_bignum = BigNum::try_from(lhs_value)?;
+
+                    Value::BigNum(lhs_bignum.mul(rhs_bignum))
+                }
+                (Value::Number(lhs), Value::Number(rhs)) => {
+                    Value::Number(math_operator(lhs, rhs, MathOperator::Multiplication)?)
+                }
+                _ => return Err(Error::TypeError),
+            };
+
+            Some(value)
+        }
+        Function::Mod(first_rule, second_rule) => {
+            let first_eval = first_rule.eval(input, output)?.ok_or(Error::TypeError)?;
+            let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
+
+            let value = match (first_eval, second_eval) {
+                (Value::BigNum(bignum), rhs_value) => {
+                    let rhs_bignum = BigNum::try_from(rhs_value)?;
+
+                    Value::BigNum(bignum.rem(rhs_bignum))
+                }
+                (lhs_value, Value::BigNum(rhs_bignum)) => {
+                    let lhs_bignum = BigNum::try_from(lhs_value)?;
+
+                    Value::BigNum(lhs_bignum.rem(rhs_bignum))
+                }
+                (Value::Number(lhs), Value::Number(rhs)) => {
+                    Value::Number(math_operator(lhs, rhs, MathOperator::Modulus)?)
+                }
+                _ => return Err(Error::TypeError),
+            };
+
+            Some(value)
+        }
+        Function::Add(first_rule, second_rule) => {
+            let first_eval = first_rule.eval(input, output)?.ok_or(Error::TypeError)?;
+            let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
+
+            let value = match (first_eval, second_eval) {
+                (Value::BigNum(bignum), rhs_value) => {
+                    let rhs_bignum = BigNum::try_from(rhs_value)?;
+
+                    Value::BigNum(bignum.add(rhs_bignum))
+                }
+                (lhs_value, Value::BigNum(rhs_bignum)) => {
+                    let lhs_bignum = BigNum::try_from(lhs_value)?;
+
+                    Value::BigNum(lhs_bignum.add(rhs_bignum))
+                }
+                (Value::Number(lhs), Value::Number(rhs)) => {
+                    Value::Number(math_operator(lhs, rhs, MathOperator::Addition)?)
+                }
+                _ => return Err(Error::TypeError),
+            };
+
+            Some(value)
+        }
+        Function::Sub(first_rule, second_rule) => {
+            let first_eval = first_rule.eval(input, output)?.ok_or(Error::TypeError)?;
+            let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
+
+            let value = match (first_eval, second_eval) {
+                (Value::BigNum(bignum), rhs_value) => {
+                    let rhs_bignum = BigNum::try_from(rhs_value)?;
+
+                    Value::BigNum(bignum.sub(rhs_bignum))
+                }
+                (lhs_value, Value::BigNum(rhs_bignum)) => {
+                    let lhs_bignum = BigNum::try_from(lhs_value)?;
+
+                    Value::BigNum(lhs_bignum.sub(rhs_bignum))
+                }
+                (Value::Number(lhs), Value::Number(rhs)) => {
+                    Value::Number(math_operator(lhs, rhs, MathOperator::Subtraction)?)
+                }
+                _ => return Err(Error::TypeError),
+            };
+
+            Some(value)
+        }
+        Function::Max(first_rule, second_rule) => {
+            let first_eval = first_rule.eval(input, output)?.ok_or(Error::TypeError)?;
+            let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
+
+            let value = match (first_eval, second_eval) {
+                (Value::BigNum(bignum), rhs_value) => {
+                    let rhs_bignum = BigNum::try_from(rhs_value)?;
+
+                    Value::BigNum(bignum.max(rhs_bignum))
+                }
+                (lhs_value, Value::BigNum(rhs_bignum)) => {
+                    let lhs_bignum = BigNum::try_from(lhs_value)?;
+
+                    Value::BigNum(lhs_bignum.max(rhs_bignum))
+                }
+                (Value::Number(lhs), Value::Number(rhs)) => {
+                    Value::Number(math_operator(lhs, rhs, MathOperator::Max)?)
+                }
+                _ => return Err(Error::TypeError),
+            };
+
+            Some(value)
+        }
+        Function::Min(first_rule, second_rule) => {
+            let first_eval = first_rule.eval(input, output)?.ok_or(Error::TypeError)?;
+            let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
+
+            let value = match (first_eval, second_eval) {
+                (Value::BigNum(bignum), rhs_value) => {
+                    let rhs_bignum = BigNum::try_from(rhs_value)?;
+
+                    Value::BigNum(bignum.min(rhs_bignum))
+                }
+                (lhs_value, Value::BigNum(rhs_bignum)) => {
+                    let lhs_bignum = BigNum::try_from(lhs_value)?;
+
+                    Value::BigNum(lhs_bignum.min(rhs_bignum))
+                }
+                (Value::Number(lhs), Value::Number(rhs)) => {
+                    Value::Number(math_operator(lhs, rhs, MathOperator::Min)?)
                 }
                 _ => return Err(Error::TypeError),
             };
@@ -303,16 +466,46 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
 }
 
 enum MathOperator {
-    Division
+    Division,
+    Multiplication,
+    Modulus,
+    Addition,
+    Subtraction,
+    Max,
+    Min,
 }
 
 fn handle_u64(lhs: u64, rhs: u64, ops: MathOperator) -> Result<Number, Error> {
-        match ops {
-            MathOperator::Division => {
-                let divided = lhs.checked_div(rhs).ok_or(Error::TypeError)?;
-                Ok(divided.into())
-            }
+    match ops {
+        MathOperator::Division => {
+            let divided = lhs.checked_div(rhs).ok_or(Error::TypeError)?;
+            Ok(divided.into())
         }
+        MathOperator::Multiplication => {
+            let multiplied = lhs.checked_mul(rhs).ok_or(Error::TypeError)?;
+            Ok(multiplied.into())
+        }
+        MathOperator::Modulus => {
+            let modulus = lhs.checked_rem(rhs).ok_or(Error::TypeError)?;
+            Ok(modulus.into())
+        }
+        MathOperator::Addition => {
+            let added = lhs.checked_add(rhs).ok_or(Error::TypeError)?;
+            Ok(added.into())
+        }
+        MathOperator::Subtraction => {
+            let subtracted = lhs.checked_sub(rhs).ok_or(Error::TypeError)?;
+            Ok(subtracted.into())
+        }
+        MathOperator::Max => {
+            let max = lhs.max(rhs);
+            Ok(max.into())
+        }
+        MathOperator::Min => {
+            let min = lhs.min(rhs);
+            Ok(min.into())
+        }
+    }
 }
 
 fn handle_i64(lhs: i64, rhs: i64, ops: MathOperator) -> Result<Number, Error> {
@@ -321,32 +514,76 @@ fn handle_i64(lhs: i64, rhs: i64, ops: MathOperator) -> Result<Number, Error> {
             let divided = lhs.checked_div(rhs).ok_or(Error::TypeError)?;
             Ok(divided.into())
         }
+        MathOperator::Multiplication => {
+            let multiplied = lhs.checked_mul(rhs).ok_or(Error::TypeError)?;
+            Ok(multiplied.into())
+        }
+        MathOperator::Modulus => {
+            let modulus = lhs.checked_rem(rhs).ok_or(Error::TypeError)?;
+            Ok(modulus.into())
+        }
+        MathOperator::Addition => {
+            let added = lhs.checked_add(rhs).ok_or(Error::TypeError)?;
+            Ok(added.into())
+        }
+        MathOperator::Subtraction => {
+            let subtracted = lhs.checked_sub(rhs).ok_or(Error::TypeError)?;
+            Ok(subtracted.into())
+        }
+        MathOperator::Max => {
+            let max = lhs.max(rhs);
+            Ok(max.into())
+        }
+        MathOperator::Min => {
+            let min = lhs.min(rhs);
+            Ok(min.into())
+        }
     }
 }
 
-fn handle_f64(lhs: f64, rhs: f64, ops:MathOperator) -> Result<Number, Error> {
-        match ops {
-            MathOperator::Division => {
-                let divided = lhs.div(rhs);
-                Ok(Number::from_f64(divided).ok_or(Error::TypeError)?)
-            }
+fn handle_f64(lhs: f64, rhs: f64, ops: MathOperator) -> Result<Number, Error> {
+    match ops {
+        MathOperator::Division => {
+            let divided = lhs.div(rhs);
+            Ok(Number::from_f64(divided).ok_or(Error::TypeError)?)
         }
+        MathOperator::Multiplication => {
+            let multiplied = lhs.mul(rhs);
+            Ok(Number::from_f64(multiplied).ok_or(Error::TypeError)?)
+        }
+        MathOperator::Modulus => {
+            let modulus = lhs.rem(rhs);
+            Ok(Number::from_f64(modulus).ok_or(Error::TypeError)?)
+        }
+        MathOperator::Addition => {
+            let added = lhs.add(rhs);
+            Ok(Number::from_f64(added).ok_or(Error::TypeError)?)
+        }
+        MathOperator::Subtraction => {
+            let subtracted = lhs.sub(rhs);
+            Ok(Number::from_f64(subtracted).ok_or(Error::TypeError)?)
+        }
+        MathOperator::Max => {
+            let max = lhs.max(rhs);
+            Ok(Number::from_f64(max).ok_or(Error::TypeError)?)
+        }
+        MathOperator::Min => {
+            let min = lhs.min(rhs);
+            Ok(Number::from_f64(min).ok_or(Error::TypeError)?)
+        }
+    }
 }
 
 fn math_operator(lhs: Number, rhs: Number, ops: MathOperator) -> Result<Number, Error> {
     match (lhs.as_u64(), rhs.as_u64()) {
         (Some(lhs), Some(rhs)) => handle_u64(lhs, rhs, ops),
-        _ => {
-            match (lhs.as_i64(), rhs.as_i64()) {
-                (Some(lhs), Some(rhs)) => handle_i64(lhs, rhs, ops),
-                _ => {
-                    match (lhs.as_f64(), rhs.as_f64()) {
-                        (Some(lhs), Some(rhs)) => handle_f64(lhs, rhs, ops),
-                        _ => Err(Error::TypeError)
-                    }
-                }
-            }
-        }
+        _ => match (lhs.as_i64(), rhs.as_i64()) {
+            (Some(lhs), Some(rhs)) => handle_i64(lhs, rhs, ops),
+            _ => match (lhs.as_f64(), rhs.as_f64()) {
+                (Some(lhs), Some(rhs)) => handle_f64(lhs, rhs, ops),
+                _ => Err(Error::TypeError),
+            },
+        },
     }
 }
 
