@@ -36,7 +36,7 @@ impl Input {
             "advertiserId" => Ok(Value::String(self.global.advertiser_id.clone())),
             "country" => Ok(Value::String(self.global.country.clone())),
             "eventType" => Ok(Value::String(self.global.event_type.clone())),
-            "campaignId" => Ok(Value::String(self.global.campiagn_id.clone())),
+            "campaignId" => Ok(Value::String(self.global.campaign_id.clone())),
             "campaignTotalSpent" => Ok(Value::String(self.global.campaign_total_spent.clone())),
             "campaignSecondsActive" => {
                 Ok(Value::Number(self.global.campaign_seconds_active.into()))
@@ -102,7 +102,7 @@ pub struct Global {
     pub advertiser_id: String,
     pub country: String,
     pub event_type: String,
-    pub campiagn_id: String,
+    pub campaign_id: String,
     pub campaign_total_spent: String,
     pub campaign_seconds_active: u64,
     pub campaign_seconds_duration: u64,

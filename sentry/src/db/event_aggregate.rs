@@ -13,7 +13,7 @@ use primitives::BigNum;
 use primitives::{Channel, ChannelId, ValidatorId};
 use std::ops::Add;
 
-pub async fn lastest_approve_state(
+pub async fn latest_approve_state(
     pool: &DbPool,
     channel: &Channel,
 ) -> Result<Option<ApproveStateValidatorMessage>, RunError<bb8_postgres::tokio_postgres::Error>> {
@@ -108,7 +108,7 @@ pub async fn list_event_aggregates(
                 let statement = format!(
                     "
                         WITH aggregates AS (
-                            SELECT 
+                            SELECT
                                 channel_id,
                                 created,
                                 event_type,
@@ -124,7 +124,7 @@ pub async fn list_event_aggregates(
                                         jsonb_build_object(
                                             earner, payout
                                         )
-                                    )    
+                                    )
                                 )
                                 as data
                             FROM event_aggregates WHERE {} GROUP BY channel_id, event_type, created ORDER BY created DESC LIMIT {}
