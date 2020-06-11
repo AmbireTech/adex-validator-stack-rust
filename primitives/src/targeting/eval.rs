@@ -802,11 +802,18 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
 
             Some(Value::Bool(first_eval.ends_with(&second_eval)))
         }
-        Function::OnlyShowIf(first_rule) => eval(
-            input,
-            output,
-            &Rule::Function(Function::Set(String::from("show"), first_rule.clone())),
-        )?,
+        Function::OnlyShowIf(first_rule) => {
+            let first_eval = first_rule
+                .eval(input, output)?
+                .ok_or(Error::TypeError)?
+                .try_bool()?;
+            let new_rule = Box::new(Rule::Value(Value::Bool(first_eval)));
+            eval(
+                input,
+                output,
+                &Rule::Function(Function::Set(String::from("show"), new_rule)),
+            )?
+        }
         Function::Do(first_rule) => eval(input, output, first_rule)?,
         Function::Set(key, rule) => {
             // Output variables can be set any number of times by different rules, except `show`
