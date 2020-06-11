@@ -656,17 +656,13 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
                 (Value::Number(lhs), Value::Number(rhs)) => {
                     Value::Bool(compare_numbers(lhs, rhs, ComparisonOperator::Equals)?)
                 }
-                (Value::Bool(lhs), Value::Bool(rhs)) => {
-                    Value::Bool(lhs == rhs)
-                }
-                (Value::String(lhs), Value::String(rhs)) => {
-                    Value::Bool(lhs == rhs)
-                }
+                (Value::Bool(lhs), Value::Bool(rhs)) => Value::Bool(lhs == rhs),
+                (Value::String(lhs), Value::String(rhs)) => Value::Bool(lhs == rhs),
                 (Value::Array(lhs), Value::Array(rhs)) => {
                     if lhs.len() != rhs.len() {
                         Value::Bool(false)
                     } else {
-                        let are_same = lhs.iter().zip(rhs.iter()).all(|(a,b)| a == b);
+                        let are_same = lhs.iter().zip(rhs.iter()).all(|(a, b)| a == b);
                         Value::Bool(are_same)
                     }
                 }
@@ -693,17 +689,13 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
                 (Value::Number(lhs), Value::Number(rhs)) => {
                     Value::Bool(compare_numbers(lhs, rhs, ComparisonOperator::NotEquals)?)
                 }
-                (Value::Bool(lhs), Value::Bool(rhs)) => {
-                    Value::Bool(lhs != rhs)
-                }
-                (Value::String(lhs), Value::String(rhs)) => {
-                    Value::Bool(lhs != rhs)
-                }
+                (Value::Bool(lhs), Value::Bool(rhs)) => Value::Bool(lhs != rhs),
+                (Value::String(lhs), Value::String(rhs)) => Value::Bool(lhs != rhs),
                 (Value::Array(lhs), Value::Array(rhs)) => {
                     if lhs.len() != rhs.len() {
                         Value::Bool(true)
                     } else {
-                        let are_same = lhs.iter().zip(rhs.iter()).all(|(a,b)| a == b);
+                        let are_same = lhs.iter().zip(rhs.iter()).all(|(a, b)| a == b);
                         Value::Bool(!are_same)
                     }
                 }
@@ -815,9 +807,7 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
             output,
             &Rule::Function(Function::Set(String::from("show"), first_rule.clone())),
         )?,
-        Function::Do(first_rule) => {
-            eval(input, output, first_rule)?
-        }
+        Function::Do(first_rule) => eval(input, output, first_rule)?,
         Function::Set(key, rule) => {
             // Output variables can be set any number of times by different rules, except `show`
             // if `show` is at any point set to `false`, we stop executing rules and don't show the ad.
