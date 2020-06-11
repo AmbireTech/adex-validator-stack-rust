@@ -112,13 +112,14 @@ pub enum Function {
     In(Box<Rule>, Box<Rule>),
     NotIn(Box<Rule>, Box<Rule>),
     At(Box<Rule>, Box<Rule>),
-    // Note: this is inclusive of the start and end value
+    /// Note: this is inclusive of the start and end value
     Between(Box<Rule>, Box<Rule>, Box<Rule>),
     Split(Box<Rule>, Box<Rule>),
     StartsWith(Box<Rule>, Box<Rule>),
     EndsWith(Box<Rule>, Box<Rule>),
     OnlyShowIf(Box<Rule>),
     Intersects(Box<Rule>, Box<Rule>),
+    Do(Box<Rule>),
     Get(String),
     /// Output variables can be set any number of times by different rules, except `show`
     /// if `show` is at any point set to `false`, we stop executing rules and don't show the ad.
@@ -549,49 +550,167 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
             let first_eval = first_rule.eval(input, output)?.ok_or(Error::TypeError)?;
             let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
 
-            let lhs = BigNum::try_from(first_eval)?;
-            let rhs = BigNum::try_from(second_eval)?;
-            Some(Value::Bool(lhs.lt(&rhs)))
+            let value = match (first_eval, second_eval) {
+                (Value::BigNum(bignum), rhs_value) => {
+                    let rhs_bignum = BigNum::try_from(rhs_value)?;
+
+                    Value::Bool(bignum.lt(&rhs_bignum))
+                }
+                (lhs_value, Value::BigNum(rhs_bignum)) => {
+                    let lhs_bignum = BigNum::try_from(lhs_value)?;
+
+                    Value::Bool(lhs_bignum.lt(&rhs_bignum))
+                }
+                (Value::Number(lhs), Value::Number(rhs)) => {
+                    Value::Bool(compare_numbers(lhs, rhs, ComparisonOperator::Lt)?)
+                }
+                _ => return Err(Error::TypeError),
+            };
+
+            Some(value)
         }
         Function::Lte(first_rule, second_rule) => {
             let first_eval = first_rule.eval(input, output)?.ok_or(Error::TypeError)?;
             let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
 
-            let lhs = BigNum::try_from(first_eval)?;
-            let rhs = BigNum::try_from(second_eval)?;
-            Some(Value::Bool(lhs.le(&rhs)))
+            let value = match (first_eval, second_eval) {
+                (Value::BigNum(bignum), rhs_value) => {
+                    let rhs_bignum = BigNum::try_from(rhs_value)?;
+
+                    Value::Bool(bignum.le(&rhs_bignum))
+                }
+                (lhs_value, Value::BigNum(rhs_bignum)) => {
+                    let lhs_bignum = BigNum::try_from(lhs_value)?;
+
+                    Value::Bool(lhs_bignum.le(&rhs_bignum))
+                }
+                (Value::Number(lhs), Value::Number(rhs)) => {
+                    Value::Bool(compare_numbers(lhs, rhs, ComparisonOperator::Lte)?)
+                }
+                _ => return Err(Error::TypeError),
+            };
+
+            Some(value)
         }
         Function::Gt(first_rule, second_rule) => {
             let first_eval = first_rule.eval(input, output)?.ok_or(Error::TypeError)?;
             let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
 
-            let lhs = BigNum::try_from(first_eval)?;
-            let rhs = BigNum::try_from(second_eval)?;
-            Some(Value::Bool(lhs.gt(&rhs)))
+            let value = match (first_eval, second_eval) {
+                (Value::BigNum(bignum), rhs_value) => {
+                    let rhs_bignum = BigNum::try_from(rhs_value)?;
+
+                    Value::Bool(bignum.gt(&rhs_bignum))
+                }
+                (lhs_value, Value::BigNum(rhs_bignum)) => {
+                    let lhs_bignum = BigNum::try_from(lhs_value)?;
+
+                    Value::Bool(lhs_bignum.gt(&rhs_bignum))
+                }
+                (Value::Number(lhs), Value::Number(rhs)) => {
+                    Value::Bool(compare_numbers(lhs, rhs, ComparisonOperator::Gt)?)
+                }
+                _ => return Err(Error::TypeError),
+            };
+
+            Some(value)
         }
         Function::Gte(first_rule, second_rule) => {
             let first_eval = first_rule.eval(input, output)?.ok_or(Error::TypeError)?;
             let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
 
-            let lhs = BigNum::try_from(first_eval)?;
-            let rhs = BigNum::try_from(second_eval)?;
-            Some(Value::Bool(lhs.ge(&rhs)))
+            let value = match (first_eval, second_eval) {
+                (Value::BigNum(bignum), rhs_value) => {
+                    let rhs_bignum = BigNum::try_from(rhs_value)?;
+
+                    Value::Bool(bignum.ge(&rhs_bignum))
+                }
+                (lhs_value, Value::BigNum(rhs_bignum)) => {
+                    let lhs_bignum = BigNum::try_from(lhs_value)?;
+
+                    Value::Bool(lhs_bignum.ge(&rhs_bignum))
+                }
+                (Value::Number(lhs), Value::Number(rhs)) => {
+                    Value::Bool(compare_numbers(lhs, rhs, ComparisonOperator::Gte)?)
+                }
+                _ => return Err(Error::TypeError),
+            };
+
+            Some(value)
         }
         Function::Equals(first_rule, second_rule) => {
             let first_eval = first_rule.eval(input, output)?.ok_or(Error::TypeError)?;
             let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
 
-            let lhs = BigNum::try_from(first_eval)?;
-            let rhs = BigNum::try_from(second_eval)?;
-            Some(Value::Bool(lhs.eq(&rhs)))
+            let value = match (first_eval, second_eval) {
+                (Value::BigNum(bignum), rhs_value) => {
+                    let rhs_bignum = BigNum::try_from(rhs_value)?;
+
+                    Value::Bool(bignum.eq(&rhs_bignum))
+                }
+                (lhs_value, Value::BigNum(rhs_bignum)) => {
+                    let lhs_bignum = BigNum::try_from(lhs_value)?;
+
+                    Value::Bool(lhs_bignum.eq(&rhs_bignum))
+                }
+                (Value::Number(lhs), Value::Number(rhs)) => {
+                    Value::Bool(compare_numbers(lhs, rhs, ComparisonOperator::Equals)?)
+                }
+                (Value::Bool(lhs), Value::Bool(rhs)) => {
+                    Value::Bool(lhs == rhs)
+                }
+                (Value::String(lhs), Value::String(rhs)) => {
+                    Value::Bool(lhs == rhs)
+                }
+                (Value::Array(lhs), Value::Array(rhs)) => {
+                    if lhs.len() != rhs.len() {
+                        Value::Bool(false)
+                    } else {
+                        let are_same = lhs.iter().zip(rhs.iter()).all(|(a,b)| a == b);
+                        Value::Bool(are_same)
+                    }
+                }
+                _ => return Err(Error::TypeError),
+            };
+
+            Some(value)
         }
         Function::NotEquals(first_rule, second_rule) => {
             let first_eval = first_rule.eval(input, output)?.ok_or(Error::TypeError)?;
             let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
 
-            let lhs = BigNum::try_from(first_eval)?;
-            let rhs = BigNum::try_from(second_eval)?;
-            Some(Value::Bool(lhs.ne(&rhs)))
+            let value = match (first_eval, second_eval) {
+                (Value::BigNum(bignum), rhs_value) => {
+                    let rhs_bignum = BigNum::try_from(rhs_value)?;
+
+                    Value::Bool(bignum.ne(&rhs_bignum))
+                }
+                (lhs_value, Value::BigNum(rhs_bignum)) => {
+                    let lhs_bignum = BigNum::try_from(lhs_value)?;
+
+                    Value::Bool(lhs_bignum.ne(&rhs_bignum))
+                }
+                (Value::Number(lhs), Value::Number(rhs)) => {
+                    Value::Bool(compare_numbers(lhs, rhs, ComparisonOperator::NotEquals)?)
+                }
+                (Value::Bool(lhs), Value::Bool(rhs)) => {
+                    Value::Bool(lhs != rhs)
+                }
+                (Value::String(lhs), Value::String(rhs)) => {
+                    Value::Bool(lhs != rhs)
+                }
+                (Value::Array(lhs), Value::Array(rhs)) => {
+                    if lhs.len() != rhs.len() {
+                        Value::Bool(true)
+                    } else {
+                        let are_same = lhs.iter().zip(rhs.iter()).all(|(a,b)| a == b);
+                        Value::Bool(!are_same)
+                    }
+                }
+                _ => return Err(Error::TypeError),
+            };
+
+            Some(value)
         }
         Function::Intersects(first_rule, second_rule) => {
             let a = eval(input, output, first_rule)?
@@ -631,7 +750,7 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
             Some(Value::Bool(value.ge(&start) && value.le(&end)))
         }
         Function::At(first_rule, second_rule) => {
-            let first_eval = first_rule
+            let mut first_eval = first_rule
                 .eval(input, output)?
                 .ok_or(Error::TypeError)?
                 .try_array()?;
@@ -641,9 +760,14 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
                 .try_number()?
                 .as_u64()
                 .ok_or(Error::TypeError)?;
-            let index = second_eval as usize;
-            let value = &first_eval[index];
-            Some(value.clone())
+            let index = usize::try_from(second_eval).unwrap();
+            let value = if first_eval.get(index).is_none() {
+                None
+            } else {
+                Some(first_eval.swap_remove(index))
+            };
+            let value = value.ok_or(Error::TypeError)?;
+            Some(value)
         }
         Function::Split(first_rule, second_rule) => {
             let first_eval = first_rule
@@ -691,6 +815,9 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
             output,
             &Rule::Function(Function::Set(String::from("show"), first_rule.clone())),
         )?,
+        Function::Do(first_rule) => {
+            eval(input, output, first_rule)?
+        }
         Function::Set(key, rule) => {
             // Output variables can be set any number of times by different rules, except `show`
             // if `show` is at any point set to `false`, we stop executing rules and don't show the ad.
@@ -753,6 +880,61 @@ enum MathOperator {
     Subtraction,
     Max,
     Min,
+}
+
+enum ComparisonOperator {
+    Gt,
+    Gte,
+    Lt,
+    Lte,
+    Equals,
+    NotEquals,
+}
+
+fn compare_numbers(lhs: Number, rhs: Number, ops: ComparisonOperator) -> Result<bool, Error> {
+    match (lhs.as_u64(), rhs.as_u64()) {
+        (Some(lhs), Some(rhs)) => handle_comparisons(lhs, rhs, ops),
+        _ => match (lhs.as_i64(), rhs.as_i64()) {
+            (Some(lhs), Some(rhs)) => handle_comparisons(lhs, rhs, ops),
+            _ => match (lhs.as_f64(), rhs.as_f64()) {
+                (Some(lhs), Some(rhs)) => handle_comparisons(lhs, rhs, ops),
+                _ => Err(Error::TypeError),
+            },
+        },
+    }
+}
+
+fn handle_comparisons<T: PartialOrd>(
+    lhs: T,
+    rhs: T,
+    ops: ComparisonOperator,
+) -> Result<bool, Error> {
+    match ops {
+        ComparisonOperator::Lt => {
+            let is_lt = lhs < rhs;
+            Ok(is_lt)
+        }
+        ComparisonOperator::Lte => {
+            let is_lte = lhs <= rhs;
+            Ok(is_lte)
+        }
+        ComparisonOperator::Gt => {
+            let is_gt = lhs > rhs;
+            Ok(is_gt)
+        }
+        ComparisonOperator::Gte => {
+            let is_gte = lhs >= rhs;
+            Ok(is_gte)
+        }
+        ComparisonOperator::Equals => {
+            let is_equal = lhs == rhs;
+            Ok(is_equal)
+        }
+        ComparisonOperator::NotEquals => {
+            let is_not_equal = lhs != rhs;
+            Ok(is_not_equal)
+        }
+    }
 }
 
 fn handle_u64(lhs: u64, rhs: u64, ops: MathOperator) -> Result<Number, Error> {
