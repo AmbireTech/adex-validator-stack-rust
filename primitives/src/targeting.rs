@@ -34,7 +34,12 @@ impl Input {
             "adUnitId" => Ok(Value::String(self.global.ad_unit_id.clone())),
             "publisherId" => Ok(Value::String(self.global.publisher_id.clone())),
             "advertiserId" => Ok(Value::String(self.global.advertiser_id.clone())),
-            "country" => self.global.country.clone().map(Value::String).ok_or(Error::UnknownVariable),
+            "country" => self
+                .global
+                .country
+                .clone()
+                .map(Value::String)
+                .ok_or(Error::UnknownVariable),
             "eventType" => Ok(Value::String(self.global.event_type.clone())),
             "campaignId" => Ok(Value::String(self.global.campaign_id.clone())),
             "campaignTotalSpent" => Ok(Value::String(self.global.campaign_total_spent.clone())),
@@ -51,10 +56,18 @@ impl Input {
                 self.global.publisher_earned_from_campaign.clone(),
             )),
             "secondsSinceEpoch" => Ok(Value::Number(self.global.seconds_since_epoch.into())),
-            "userAgentOS" => self.global.user_agent_os.clone().map(Value::String).ok_or(Error::UnknownVariable),
-            "userAgentBrowserFamily" => {
-                self.global.user_agent_browser_family.clone().map(Value::String).ok_or(Error::UnknownVariable)
-            }
+            "userAgentOS" => self
+                .global
+                .user_agent_os
+                .clone()
+                .map(Value::String)
+                .ok_or(Error::UnknownVariable),
+            "userAgentBrowserFamily" => self
+                .global
+                .user_agent_browser_family
+                .clone()
+                .map(Value::String)
+                .ok_or(Error::UnknownVariable),
             "adSlot.categories" => self
                 .ad_slot
                 .as_ref()
@@ -70,9 +83,10 @@ impl Input {
             "adSlot.hostname" => self
                 .ad_slot
                 .as_ref()
-                .map(|ad_slot| Value::String(ad_slot.hostname.clone()))
+                .map(|ad_slot| Value::String(ad_slot.hostname.clone().unwrap_or_default()))
                 .ok_or(Error::UnknownVariable),
             "adSlot.alexaRank" => {
+                // @TODO: Decide how to handle Alexa rank values
                 let ad_slot = self.ad_slot.as_ref().ok_or(Error::UnknownVariable)?;
                 let alexa_rank = ad_slot.alexa_rank.ok_or(Error::UnknownVariable)?;
 
@@ -123,7 +137,7 @@ pub struct Global {
 #[cfg_attr(test, derive(Default))]
 pub struct AdSlot {
     pub categories: Vec<String>,
-    pub hostname: String,
+    pub hostname: Option<String>,
     pub alexa_rank: Option<f64>,
 }
 
@@ -202,7 +216,10 @@ mod test {
 
         assert_eq!(Value::BigNum(BigNum::from(50)), global_campaign_budget);
 
-        assert_eq!(Err(Error::UnknownVariable), input.try_get("adSlot.alexaRank"));
+        assert_eq!(
+            Err(Error::UnknownVariable),
+            input.try_get("adSlot.alexaRank")
+        );
         let mut ad_slot = AdSlot::default();
         ad_slot.alexa_rank = Some(20.0);
         input.ad_slot = Some(ad_slot);
