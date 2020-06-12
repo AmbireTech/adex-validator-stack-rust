@@ -119,7 +119,7 @@ pub enum Function {
     /// Is first value included in an array (second value)
     In(Box<Rule>, Box<Rule>),
     /// Is first value NOT included in an array (second value)
-    NotIn(Box<Rule>, Box<Rule>),
+    Nin(Box<Rule>, Box<Rule>),
     /// Gets the element at a certain position (second value) of an array (first value)
     At(Box<Rule>, Box<Rule>),
     /// Note: this is inclusive of the start and end value
@@ -196,8 +196,8 @@ impl Function {
         Self::In(Box::new(lhs.into()), Box::new(rhs.into()))
     }
 
-    pub fn new_not_in(lhs: impl Into<Rule>, rhs: impl Into<Rule>) -> Self {
-        Self::NotIn(Box::new(lhs.into()), Box::new(rhs.into()))
+    pub fn new_nin(lhs: impl Into<Rule>, rhs: impl Into<Rule>) -> Self {
+        Self::Nin(Box::new(lhs.into()), Box::new(rhs.into()))
     }
 
     pub fn new_between(
@@ -710,7 +710,7 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
 
             Some(Value::Bool(b.contains(&a)))
         }
-        Function::NotIn(first_rule, second_rule) => {
+        Function::Nin(first_rule, second_rule) => {
             let is_in = eval(
                 input,
                 output,
