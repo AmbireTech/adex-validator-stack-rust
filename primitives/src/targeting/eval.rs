@@ -88,6 +88,7 @@ impl TryFrom<SerdeValue> for Value {
 #[serde(rename_all = "camelCase")]
 // TODO: https://github.com/AdExNetwork/adex-validator-stack-rust/issues/296
 pub enum Function {
+    /// Multiplies first two values and then divides product by third value
     MulDiv(Box<Rule>, Box<Rule>, Box<Rule>),
     Div(Box<Rule>, Box<Rule>),
     Mul(Box<Rule>, Box<Rule>),
@@ -103,14 +104,23 @@ pub enum Function {
     Or(Box<Rule>, Box<Rule>),
     Xor(Box<Rule>, Box<Rule>),
     Not(Box<Rule>),
+    /// Is the first value Lesser than second value
     Lt(Box<Rule>, Box<Rule>),
+    /// Is the first value Lesser than or equal to the second value
     Lte(Box<Rule>, Box<Rule>),
+    /// Is the first value Greater than second value
     Gt(Box<Rule>, Box<Rule>),
+    /// Is the first value Greater than or equal to the second value
     Gte(Box<Rule>, Box<Rule>),
-    Equals(Box<Rule>, Box<Rule>),
-    NotEquals(Box<Rule>, Box<Rule>),
+    /// Are values equal
+    Eq(Box<Rule>, Box<Rule>),
+    /// Are values NOT equal
+    Neq(Box<Rule>, Box<Rule>),
+    /// Is first value included in an array (second value)
     In(Box<Rule>, Box<Rule>),
+    /// Is first value NOT included in an array (second value)
     NotIn(Box<Rule>, Box<Rule>),
+    /// Gets the element at a certain position (second value) of an array (first value)
     At(Box<Rule>, Box<Rule>),
     /// Note: this is inclusive of the start and end value
     Between(Box<Rule>, Box<Rule>, Box<Rule>),
@@ -119,6 +129,7 @@ pub enum Function {
     EndsWith(Box<Rule>, Box<Rule>),
     OnlyShowIf(Box<Rule>),
     Intersects(Box<Rule>, Box<Rule>),
+    /// Evaluates rule
     Do(Box<Rule>),
     Get(String),
     /// Output variables can be set any number of times by different rules, except `show`
@@ -537,7 +548,7 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
                 .ok_or(Error::TypeError)?
                 .try_bool()?;
 
-            Some(Value::Bool((a && !b) || (!a && b)))
+            Some(Value::Bool(a ^ b))
         }
         Function::Not(first_rule) => {
             let a = eval(input, output, first_rule)?
@@ -638,7 +649,7 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
 
             Some(value)
         }
-        Function::Equals(first_rule, second_rule) => {
+        Function::Eq(first_rule, second_rule) => {
             let first_eval = first_rule.eval(input, output)?.ok_or(Error::TypeError)?;
             let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
 
@@ -654,7 +665,7 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
                     Value::Bool(lhs_bignum.eq(&rhs_bignum))
                 }
                 (Value::Number(lhs), Value::Number(rhs)) => {
-                    Value::Bool(compare_numbers(lhs, rhs, ComparisonOperator::Equals)?)
+                    Value::Bool(compare_numbers(lhs, rhs, ComparisonOperator::Eq)?)
                 }
                 (Value::Bool(lhs), Value::Bool(rhs)) => Value::Bool(lhs == rhs),
                 (Value::String(lhs), Value::String(rhs)) => Value::Bool(lhs == rhs),
@@ -671,38 +682,15 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
 
             Some(value)
         }
-        Function::NotEquals(first_rule, second_rule) => {
-            let first_eval = first_rule.eval(input, output)?.ok_or(Error::TypeError)?;
-            let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
-
-            let value = match (first_eval, second_eval) {
-                (Value::BigNum(bignum), rhs_value) => {
-                    let rhs_bignum = BigNum::try_from(rhs_value)?;
-
-                    Value::Bool(bignum.ne(&rhs_bignum))
-                }
-                (lhs_value, Value::BigNum(rhs_bignum)) => {
-                    let lhs_bignum = BigNum::try_from(lhs_value)?;
-
-                    Value::Bool(lhs_bignum.ne(&rhs_bignum))
-                }
-                (Value::Number(lhs), Value::Number(rhs)) => {
-                    Value::Bool(compare_numbers(lhs, rhs, ComparisonOperator::NotEquals)?)
-                }
-                (Value::Bool(lhs), Value::Bool(rhs)) => Value::Bool(lhs != rhs),
-                (Value::String(lhs), Value::String(rhs)) => Value::Bool(lhs != rhs),
-                (Value::Array(lhs), Value::Array(rhs)) => {
-                    if lhs.len() != rhs.len() {
-                        Value::Bool(true)
-                    } else {
-                        let are_same = lhs.iter().zip(rhs.iter()).all(|(a, b)| a == b);
-                        Value::Bool(!are_same)
-                    }
-                }
-                _ => return Err(Error::TypeError),
-            };
-
-            Some(value)
+        Function::Neq(first_rule, second_rule) => {
+            let is_equal = eval(
+                input,
+                output,
+                &Rule::Function(Function::Eq(first_rule.clone(), second_rule.clone())),
+            )?
+            .ok_or(Error::TypeError)?
+            .try_bool()?;
+            Some(Value::Bool(!is_equal))
         }
         Function::Intersects(first_rule, second_rule) => {
             let a = eval(input, output, first_rule)?
@@ -723,23 +711,31 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
             Some(Value::Bool(b.contains(&a)))
         }
         Function::NotIn(first_rule, second_rule) => {
-            let a = eval(input, output, first_rule)?.ok_or(Error::TypeError)?;
-            let b = eval(input, output, second_rule)?
-                .ok_or(Error::TypeError)?
-                .try_array()?;
-
-            Some(Value::Bool(!b.contains(&a)))
+            let is_in = eval(
+                input,
+                output,
+                &Rule::Function(Function::In(first_rule.clone(), second_rule.clone())),
+            )?
+            .ok_or(Error::TypeError)?
+            .try_bool()?;
+            Some(Value::Bool(!is_in))
         }
         Function::Between(first_rule, second_rule, third_rule) => {
-            let first_eval = first_rule.eval(input, output)?.ok_or(Error::TypeError)?;
-            let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
-            let third_eval = third_rule.eval(input, output)?.ok_or(Error::TypeError)?;
-
-            let value = BigNum::try_from(first_eval)?;
-            let start = BigNum::try_from(second_eval)?;
-            let end = BigNum::try_from(third_eval)?;
-
-            Some(Value::Bool(value.ge(&start) && value.le(&end)))
+            let is_gte_start = eval(
+                input,
+                output,
+                &Rule::Function(Function::Gte(first_rule.clone(), second_rule.clone())),
+            )?
+            .ok_or(Error::TypeError)?
+            .try_bool()?;
+            let is_lte_end = eval(
+                input,
+                output,
+                &Rule::Function(Function::Lte(first_rule.clone(), third_rule.clone())),
+            )?
+            .ok_or(Error::TypeError)?
+            .try_bool()?;
+            Some(Value::Bool(is_gte_start && is_lte_end))
         }
         Function::At(first_rule, second_rule) => {
             let mut first_eval = first_rule
@@ -752,14 +748,12 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
                 .try_number()?
                 .as_u64()
                 .ok_or(Error::TypeError)?;
-            let index = usize::try_from(second_eval).unwrap();
-            let value = if first_eval.get(index).is_none() {
-                None
+            let index = usize::try_from(second_eval).map_err(|_| Error::TypeError)?;
+            if first_eval.get(index).is_none() {
+                return Err(Error::TypeError);
             } else {
                 Some(first_eval.swap_remove(index))
-            };
-            let value = value.ok_or(Error::TypeError)?;
-            Some(value)
+            }
         }
         Function::Split(first_rule, second_rule) => {
             let first_eval = first_rule
@@ -771,12 +765,11 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
                 .ok_or(Error::TypeError)?
                 .try_string()?;
 
-            let after_split: Vec<&str> = first_eval.split(&second_eval).collect();
-            let mapped_to_value = after_split
-                .into_iter()
-                .map(|x| Value::new_string(x))
+            let after_split = first_eval
+                .split(&second_eval)
+                .map(Value::new_string)
                 .collect();
-            Some(Value::Array(mapped_to_value))
+            Some(Value::Array(after_split))
         }
         Function::StartsWith(first_rule, second_rule) => {
             let first_eval = first_rule
@@ -880,57 +873,38 @@ enum MathOperator {
 }
 
 enum ComparisonOperator {
+    /// First value is greater than second value
     Gt,
+    /// First value is greater than or equal to second value
     Gte,
+    /// First value is lesser than second value
     Lt,
+    /// First value is lesser than or equal to second value
     Lte,
-    Equals,
-    NotEquals,
+    /// Values are equal
+    Eq,
 }
 
 fn compare_numbers(lhs: Number, rhs: Number, ops: ComparisonOperator) -> Result<bool, Error> {
     match (lhs.as_u64(), rhs.as_u64()) {
-        (Some(lhs), Some(rhs)) => handle_comparisons(lhs, rhs, ops),
+        (Some(lhs), Some(rhs)) => Ok(handle_comparisons(lhs, rhs, ops)),
         _ => match (lhs.as_i64(), rhs.as_i64()) {
-            (Some(lhs), Some(rhs)) => handle_comparisons(lhs, rhs, ops),
+            (Some(lhs), Some(rhs)) => Ok(handle_comparisons(lhs, rhs, ops)),
             _ => match (lhs.as_f64(), rhs.as_f64()) {
-                (Some(lhs), Some(rhs)) => handle_comparisons(lhs, rhs, ops),
+                (Some(lhs), Some(rhs)) => Ok(handle_comparisons(lhs, rhs, ops)),
                 _ => Err(Error::TypeError),
             },
         },
     }
 }
 
-fn handle_comparisons<T: PartialOrd>(
-    lhs: T,
-    rhs: T,
-    ops: ComparisonOperator,
-) -> Result<bool, Error> {
+fn handle_comparisons<T: PartialOrd>(lhs: T, rhs: T, ops: ComparisonOperator) -> bool {
     match ops {
-        ComparisonOperator::Lt => {
-            let is_lt = lhs < rhs;
-            Ok(is_lt)
-        }
-        ComparisonOperator::Lte => {
-            let is_lte = lhs <= rhs;
-            Ok(is_lte)
-        }
-        ComparisonOperator::Gt => {
-            let is_gt = lhs > rhs;
-            Ok(is_gt)
-        }
-        ComparisonOperator::Gte => {
-            let is_gte = lhs >= rhs;
-            Ok(is_gte)
-        }
-        ComparisonOperator::Equals => {
-            let is_equal = lhs == rhs;
-            Ok(is_equal)
-        }
-        ComparisonOperator::NotEquals => {
-            let is_not_equal = lhs != rhs;
-            Ok(is_not_equal)
-        }
+        ComparisonOperator::Lt => lhs.lt(&rhs),
+        ComparisonOperator::Lte => lhs.le(&rhs),
+        ComparisonOperator::Gt => lhs.gt(&rhs),
+        ComparisonOperator::Gte => lhs.ge(&rhs),
+        ComparisonOperator::Eq => lhs.eq(&rhs),
     }
 }
 
