@@ -18,6 +18,28 @@ pub enum Error {
     UnknownVariable,
 }
 
+trait Eval {
+    fn eval(self, input: &Input, output: &mut Output) -> Result<Option<Value>, Error>;
+}
+
+impl Eval for Value {
+    fn eval(self, input: &Input, output: &mut Output) -> Result<Option<Value>, Error> {
+        eval(input, output, &Rule::Value(self))
+    }
+}
+
+impl Eval for Function {
+    fn eval(self, input: &Input, output: &mut Output) -> Result<Option<Value>, Error> {
+        eval(input, output, &Rule::Function(self))
+    }
+}
+
+impl Eval for &Rule {
+    fn eval(self, input: &Input, output: &mut Output) -> Result<Option<Value>, Error> {
+        eval(input, output, self)
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -312,19 +334,12 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
     // basic operators
     let value = match function {
         Function::MulDiv(first_rule, second_rule, third_rule) => {
-            let product = eval(
-                input,
-                output,
-                &Rule::Function(Function::Mul(first_rule.clone(), second_rule.clone())),
-            )?
-            .ok_or(Error::TypeError)?;
+            let product = Function::Mul(first_rule.clone(), second_rule.clone())
+                .eval(input, output)?
+                .ok_or(Error::TypeError)?;
             let product_rule = Rule::Value(product);
             let boxed_rule = Box::new(product_rule);
-            eval(
-                input,
-                output,
-                &Rule::Function(Function::Div(boxed_rule, third_rule.clone())),
-            )?
+            Function::Div(boxed_rule, third_rule.clone()).eval(input, output)?
         }
         Function::Div(first_rule, second_rule) => {
             let first_eval = first_rule.eval(input, output)?.ok_or(Error::TypeError)?;
@@ -683,13 +698,10 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
             Some(value)
         }
         Function::Neq(first_rule, second_rule) => {
-            let is_equal = eval(
-                input,
-                output,
-                &Rule::Function(Function::Eq(first_rule.clone(), second_rule.clone())),
-            )?
-            .ok_or(Error::TypeError)?
-            .try_bool()?;
+            let is_equal = Function::Eq(first_rule.clone(), second_rule.clone())
+                .eval(input, output)?
+                .ok_or(Error::TypeError)?
+                .try_bool()?;
             Some(Value::Bool(!is_equal))
         }
         Function::Intersects(first_rule, second_rule) => {
@@ -711,30 +723,22 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
             Some(Value::Bool(b.contains(&a)))
         }
         Function::Nin(first_rule, second_rule) => {
-            let is_in = eval(
-                input,
-                output,
-                &Rule::Function(Function::In(first_rule.clone(), second_rule.clone())),
-            )?
-            .ok_or(Error::TypeError)?
-            .try_bool()?;
+            let is_in = Function::In(first_rule.clone(), second_rule.clone())
+                .eval(input, output)?
+                .ok_or(Error::TypeError)?
+                .try_bool()?;
             Some(Value::Bool(!is_in))
         }
         Function::Between(first_rule, second_rule, third_rule) => {
-            let is_gte_start = eval(
-                input,
-                output,
-                &Rule::Function(Function::Gte(first_rule.clone(), second_rule.clone())),
-            )?
-            .ok_or(Error::TypeError)?
-            .try_bool()?;
-            let is_lte_end = eval(
-                input,
-                output,
-                &Rule::Function(Function::Lte(first_rule.clone(), third_rule.clone())),
-            )?
-            .ok_or(Error::TypeError)?
-            .try_bool()?;
+            let is_gte_start = Function::Gte(first_rule.clone(), second_rule.clone())
+                .eval(input, output)?
+                .ok_or(Error::TypeError)?
+                .try_bool()?;
+
+            let is_lte_end = Function::Lte(first_rule.clone(), third_rule.clone())
+                .eval(input, output)?
+                .ok_or(Error::TypeError)?
+                .try_bool()?;
             Some(Value::Bool(is_gte_start && is_lte_end))
         }
         Function::At(first_rule, second_rule) => {
@@ -801,11 +805,7 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
                 .ok_or(Error::TypeError)?
                 .try_bool()?;
             let new_rule = Box::new(Rule::Value(Value::Bool(first_eval)));
-            eval(
-                input,
-                output,
-                &Rule::Function(Function::Set(String::from("show"), new_rule)),
-            )?
+            Function::Set(String::from("show"), new_rule).eval(input, output)?
         }
         Function::Do(first_rule) => eval(input, output, first_rule)?,
         Function::Set(key, rule) => {
