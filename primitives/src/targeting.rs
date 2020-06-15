@@ -83,7 +83,7 @@ impl Input {
             "adSlot.hostname" => self
                 .ad_slot
                 .as_ref()
-                .map(|ad_slot| Value::String(ad_slot.hostname.clone().unwrap_or_default()))
+                .map(|ad_slot| Value::String(ad_slot.hostname.clone()))
                 .ok_or(Error::UnknownVariable),
             "adSlot.alexaRank" => {
                 // @TODO: Decide how to handle Alexa rank values
@@ -137,7 +137,7 @@ pub struct Global {
 #[cfg_attr(test, derive(Default))]
 pub struct AdSlot {
     pub categories: Vec<String>,
-    pub hostname: Option<String>,
+    pub hostname: String,
     pub alexa_rank: Option<f64>,
 }
 
