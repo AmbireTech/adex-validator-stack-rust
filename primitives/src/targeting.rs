@@ -86,7 +86,6 @@ impl Input {
                 .map(|ad_slot| Value::String(ad_slot.hostname.clone()))
                 .ok_or(Error::UnknownVariable),
             "adSlot.alexaRank" => {
-                // @TODO: Decide how to handle Alexa rank values
                 let ad_slot = self.ad_slot.as_ref().ok_or(Error::UnknownVariable)?;
                 let alexa_rank = ad_slot.alexa_rank.ok_or(Error::UnknownVariable)?;
 
