@@ -30,13 +30,18 @@ impl Input {
                 .map(|ad_view| Value::Bool(ad_view.has_custom_preferences))
                 .ok_or(Error::UnknownVariable),
             "adSlotId" => Ok(Value::String(self.global.ad_slot_id.clone())),
+            "adSlotType" => Ok(Value::String(self.global.ad_slot_type.clone())),
             "adUnitId" => Ok(Value::String(self.global.ad_unit_id.clone())),
-            "adUnitType" => Ok(Value::String(self.global.ad_unit_type.clone())),
             "publisherId" => Ok(Value::String(self.global.publisher_id.clone())),
             "advertiserId" => Ok(Value::String(self.global.advertiser_id.clone())),
-            "country" => Ok(Value::String(self.global.country.clone())),
+            "country" => self
+                .global
+                .country
+                .clone()
+                .map(Value::String)
+                .ok_or(Error::UnknownVariable),
             "eventType" => Ok(Value::String(self.global.event_type.clone())),
-            "campaignId" => Ok(Value::String(self.global.campiagn_id.clone())),
+            "campaignId" => Ok(Value::String(self.global.campaign_id.clone())),
             "campaignTotalSpent" => Ok(Value::String(self.global.campaign_total_spent.clone())),
             "campaignSecondsActive" => {
                 Ok(Value::Number(self.global.campaign_seconds_active.into()))
@@ -51,10 +56,18 @@ impl Input {
                 self.global.publisher_earned_from_campaign.clone(),
             )),
             "secondsSinceEpoch" => Ok(Value::Number(self.global.seconds_since_epoch.into())),
-            "userAgentOS" => Ok(Value::String(self.global.user_agent_os.clone())),
-            "userAgentBrowserFamily" => {
-                Ok(Value::String(self.global.user_agent_browser_family.clone()))
-            }
+            "userAgentOS" => self
+                .global
+                .user_agent_os
+                .clone()
+                .map(Value::String)
+                .ok_or(Error::UnknownVariable),
+            "userAgentBrowserFamily" => self
+                .global
+                .user_agent_browser_family
+                .clone()
+                .map(Value::String)
+                .ok_or(Error::UnknownVariable),
             "adSlot.categories" => self
                 .ad_slot
                 .as_ref()
@@ -70,12 +83,14 @@ impl Input {
             "adSlot.hostname" => self
                 .ad_slot
                 .as_ref()
-                .map(|ad_slot| Value::String(ad_slot.hostname.clone()))
+                .map(|ad_slot| Value::String(ad_slot.hostname.clone().unwrap_or_default()))
                 .ok_or(Error::UnknownVariable),
             "adSlot.alexaRank" => {
+                // @TODO: Decide how to handle Alexa rank values
                 let ad_slot = self.ad_slot.as_ref().ok_or(Error::UnknownVariable)?;
+                let alexa_rank = ad_slot.alexa_rank.ok_or(Error::UnknownVariable)?;
 
-                match serde_json::Number::from_f64(ad_slot.alexa_rank) {
+                match serde_json::Number::from_f64(alexa_rank) {
                     Some(number) => Ok(Value::Number(number)),
                     None => Err(Error::TypeError),
                 }
@@ -95,14 +110,20 @@ pub struct AdView {
 #[derive(Debug, Clone)]
 #[cfg_attr(test, derive(Default))]
 pub struct Global {
+    /// Global scope, accessible everywhere
     pub ad_slot_id: String,
-    pub ad_unit_id: String,
-    pub ad_unit_type: String,
+    pub ad_slot_type: String,
     pub publisher_id: String,
-    pub advertiser_id: String,
-    pub country: String,
+    pub country: Option<String>,
     pub event_type: String,
-    pub campiagn_id: String,
+    pub seconds_since_epoch: u64,
+    pub user_agent_os: Option<String>,
+    pub user_agent_browser_family: Option<String>,
+    /// Global scope, accessible everywhere, campaign-dependant
+    pub ad_unit_id: String,
+    // adUnitCategories
+    pub advertiser_id: String,
+    pub campaign_id: String,
     pub campaign_total_spent: String,
     pub campaign_seconds_active: u64,
     pub campaign_seconds_duration: u64,
@@ -110,17 +131,14 @@ pub struct Global {
     pub event_min_price: BigNum,
     pub event_max_price: BigNum,
     pub publisher_earned_from_campaign: BigNum,
-    pub seconds_since_epoch: u64,
-    pub user_agent_os: String,
-    pub user_agent_browser_family: String,
 }
 
 #[derive(Debug, Clone)]
 #[cfg_attr(test, derive(Default))]
 pub struct AdSlot {
     pub categories: Vec<String>,
-    pub hostname: String,
-    pub alexa_rank: f64,
+    pub hostname: Option<String>,
+    pub alexa_rank: Option<f64>,
 }
 
 #[derive(Debug)]
@@ -197,6 +215,15 @@ mod test {
             .expect("Should get the global.campaign_budget field");
 
         assert_eq!(Value::BigNum(BigNum::from(50)), global_campaign_budget);
+
+        assert_eq!(
+            Err(Error::UnknownVariable),
+            input.try_get("adSlot.alexaRank")
+        );
+        let mut ad_slot = AdSlot::default();
+        ad_slot.alexa_rank = Some(20.0);
+        input.ad_slot = Some(ad_slot);
+        assert!(input.try_get("adSlot.alexaRank").is_ok());
     }
 
     #[test]
