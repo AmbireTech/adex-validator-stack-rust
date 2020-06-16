@@ -2,9 +2,9 @@ use crate::{BalancesMap, Channel};
 
 #[derive(Debug, Clone)]
 pub struct Campaign {
-    channel: Channel,
-    status: Status,
-    balances: BalancesMap,
+    pub channel: Channel,
+    pub status: Status,
+    pub balances: BalancesMap,
 }
 
 impl Campaign {
