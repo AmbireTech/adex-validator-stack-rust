@@ -141,14 +141,10 @@ pub struct ChannelSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub event_submission: Option<EventSubmission>,
     /// A millisecond timestamp of when the campaign was created
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "ts_milliseconds_option"
-    )]
-    pub created: Option<DateTime<Utc>>,
+    #[serde(with = "ts_milliseconds")]
+    pub created: DateTime<Utc>,
     /// A millisecond timestamp representing the time you want this campaign to become active (optional)
-    /// Used by the AdViewManager
+    /// Used by the AdViewManager & Targeting AIP#31
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
