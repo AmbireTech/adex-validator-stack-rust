@@ -17,6 +17,8 @@ pub mod merkle_tree;
 pub mod sentry;
 pub mod targeting;
 pub mod targeting_tag;
+pub mod supermarket;
+
 pub mod util {
     pub mod tests {
         pub mod prep_db;
