@@ -116,6 +116,14 @@ impl PricingBounds {
 
         vec
     }
+
+    pub fn get(&self, event_type: &str) -> Option<&Pricing> {
+        match event_type {
+            "IMPRESSION" => self.impression.as_ref(),
+            "CLICK" => self.click.as_ref(),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
