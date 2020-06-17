@@ -677,7 +677,7 @@ mod test {
                 targeting: vec![],
                 min_targeting_score: None,
                 event_submission: Some(EventSubmission { allow: vec![] }),
-                created: Some(Utc::now()),
+                created: Utc::now(),
                 active_from: None,
                 nonce: None,
                 withdraw_period_start: Utc::now() + Duration::days(1),

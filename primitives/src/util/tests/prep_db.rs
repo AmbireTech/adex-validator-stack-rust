@@ -75,7 +75,7 @@ lazy_static! {
                 min_targeting_score: None,
                 event_submission: Some(EventSubmission { allow: vec![] }),
                 // July 29, 2019 7:00:00 AM
-                created: Some(Utc.timestamp(1_564_383_600, 0)),
+                created: Utc.timestamp(1_564_383_600, 0),
                 active_from: None,
                 nonce: Some(nonce),
                 withdraw_period_start: Utc.timestamp_millis(4_073_414_400_000),
