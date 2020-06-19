@@ -12,6 +12,10 @@ pub type Map = serde_json::value::Map<String, SerdeValue>;
 
 use super::{Input, Output};
 
+#[cfg(test)]
+#[path = "eval_test.rs"]
+mod test;
+
 #[derive(Debug, Eq, PartialEq)]
 pub enum Error {
     TypeError,
@@ -174,6 +178,50 @@ impl From<Value> for Rule {
 }
 
 impl Function {
+    pub fn new_muldiv(
+        value: impl Into<Rule>,
+        multiplier: impl Into<Rule>,
+        divisor: impl Into<Rule>,
+    ) -> Self {
+        Self::MulDiv(
+            Box::new(value.into()),
+            Box::new(multiplier.into()),
+            Box::new(divisor.into()),
+        )
+    }
+    pub fn new_div(lhs: impl Into<Rule>, rhs: impl Into<Rule>) -> Self {
+        Self::Div(Box::new(lhs.into()), Box::new(rhs.into()))
+    }
+    pub fn new_mul(lhs: impl Into<Rule>, rhs: impl Into<Rule>) -> Self {
+        Self::Mul(Box::new(lhs.into()), Box::new(rhs.into()))
+    }
+    pub fn new_add(lhs: impl Into<Rule>, rhs: impl Into<Rule>) -> Self {
+        Self::Add(Box::new(lhs.into()), Box::new(rhs.into()))
+    }
+    pub fn new_sub(lhs: impl Into<Rule>, rhs: impl Into<Rule>) -> Self {
+        Self::Sub(Box::new(lhs.into()), Box::new(rhs.into()))
+    }
+    pub fn new_mod(lhs: impl Into<Rule>, rhs: impl Into<Rule>) -> Self {
+        Self::Mod(Box::new(lhs.into()), Box::new(rhs.into()))
+    }
+    pub fn new_min(lhs: impl Into<Rule>, rhs: impl Into<Rule>) -> Self {
+        Self::Min(Box::new(lhs.into()), Box::new(rhs.into()))
+    }
+    pub fn new_max(lhs: impl Into<Rule>, rhs: impl Into<Rule>) -> Self {
+        Self::Max(Box::new(lhs.into()), Box::new(rhs.into()))
+    }
+    pub fn new_lt(lhs: impl Into<Rule>, rhs: impl Into<Rule>) -> Self {
+        Self::Lt(Box::new(lhs.into()), Box::new(rhs.into()))
+    }
+    pub fn new_lte(lhs: impl Into<Rule>, rhs: impl Into<Rule>) -> Self {
+        Self::Lte(Box::new(lhs.into()), Box::new(rhs.into()))
+    }
+    pub fn new_gt(lhs: impl Into<Rule>, rhs: impl Into<Rule>) -> Self {
+        Self::Gt(Box::new(lhs.into()), Box::new(rhs.into()))
+    }
+    pub fn new_gte(lhs: impl Into<Rule>, rhs: impl Into<Rule>) -> Self {
+        Self::Gte(Box::new(lhs.into()), Box::new(rhs.into()))
+    }
     pub fn new_if(condition: impl Into<Rule>, then: impl Into<Rule>) -> Self {
         Self::If(Box::new(condition.into()), Box::new(then.into()))
     }
@@ -234,6 +282,14 @@ impl Function {
         )
     }
 
+    pub fn new_eq(lhs: impl Into<Rule>, rhs: impl Into<Rule>) -> Self {
+        Self::Eq(Box::new(lhs.into()), Box::new(rhs.into()))
+    }
+
+    pub fn new_neq(lhs: impl Into<Rule>, rhs: impl Into<Rule>) -> Self {
+        Self::Neq(Box::new(lhs.into()), Box::new(rhs.into()))
+    }
+
     pub fn new_split(string: impl Into<Rule>, separator: impl Into<Rule>) -> Self {
         Self::Split(Box::new(string.into()), Box::new(separator.into()))
     }
@@ -252,6 +308,10 @@ impl Function {
 
     pub fn new_only_show_if(condition: impl Into<Rule>) -> Self {
         Self::OnlyShowIf(Box::new(condition.into()))
+    }
+
+    pub fn new_do(rule: impl Into<Rule>) -> Self {
+        Self::Do(Box::new(rule.into()))
     }
 
     pub fn new_get(key: &str) -> Self {
@@ -1017,211 +1077,5 @@ fn math_operator(lhs: Number, rhs: Number, ops: MathOperator) -> Result<Number, 
                 _ => Err(Error::TypeError),
             },
         },
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use crate::targeting::AdSlot;
-
-    #[test]
-    fn deserialize_intersects_with_get_rule() {
-        let json = r#"{"intersects": [{ "get": "adSlot.categories" }, ["News", "Bitcoin"]]}"#;
-
-        let parsed_rule = serde_json::from_str::<Rule>(json).expect("Should deserialize");
-
-        let expected = Rule::Function(Function::new_intersects(
-            Rule::Function(Function::new_get("adSlot.categories")),
-            Rule::Value(Value::Array(vec![
-                Value::new_string("News"),
-                Value::new_string("Bitcoin"),
-            ])),
-        ));
-
-        assert_eq!(expected, parsed_rule)
-    }
-
-    /// ```json
-    /// {
-    ///   "intersects": [
-    ///     {
-    ///       "get": "adSlot.categories"
-    ///     },
-    ///     [
-    ///       "News",
-    ///       "Bitcoin"
-    ///     ]
-    ///   ]
-    /// }
-    /// ```
-    #[test]
-    fn test_intersects_eval() {
-        let mut input = Input::default();
-        input.ad_slot = Some(AdSlot {
-            categories: vec!["Bitcoin".to_string(), "Ethereum".to_string()],
-            hostname: Default::default(),
-            alexa_rank: 0.0,
-        });
-
-        let mut output = Output {
-            show: true,
-            boost: 1.0,
-            price: Default::default(),
-        };
-
-        let categories = vec![Value::new_string("News"), Value::new_string("Bitcoin")];
-
-        let rules = Rule::Function(Function::new_intersects(
-            Function::new_get("adSlot.categories"),
-            Value::Array(categories),
-        ));
-
-        let result = rules.eval(&input, &mut output).expect("Should eval rules");
-
-        assert_eq!(
-            Value::Bool(true),
-            result.expect("Should return Non-NULL result!")
-        );
-
-        let mut input = Input::default();
-        input.ad_slot = Some(AdSlot {
-            categories: vec!["Advertisement".to_string(), "Programming".to_string()],
-            hostname: Default::default(),
-            alexa_rank: 0.0,
-        });
-
-        let result = rules.eval(&input, &mut output).expect("Should eval rules");
-
-        assert_eq!(
-            Value::Bool(false),
-            result.expect("Should return Non-NULL result!")
-        );
-    }
-
-    #[test]
-    fn test_and_eval() {
-        let input = Input::default();
-        let mut output = Output {
-            show: true,
-            boost: 1.0,
-            price: Default::default(),
-        };
-
-        let cases = [
-            (true, true, true),
-            (false, false, false),
-            (false, true, false),
-            (true, false, false),
-        ];
-
-        for (lhs, rhs, expected) in cases.iter() {
-            let rule = Rule::Function(Function::new_and(Value::Bool(*lhs), Value::Bool(*rhs)));
-            let expected = Some(Value::Bool(*expected));
-
-            assert_eq!(Ok(expected), rule.eval(&input, &mut output));
-        }
-    }
-
-    #[test]
-    fn test_if_eval() {
-        let input = Input::default();
-        let mut output = Output {
-            show: true,
-            boost: 1.0,
-            price: Default::default(),
-        };
-
-        let then = Value::String("yes".to_string());
-
-        let rule = Rule::Function(Function::new_if(Value::Bool(true), then.clone()));
-
-        assert_eq!(Ok(Some(then.clone())), rule.eval(&input, &mut output));
-
-        let rule = Rule::Function(Function::new_if(Value::Bool(false), then));
-
-        assert_eq!(Ok(None), rule.eval(&input, &mut output));
-    }
-
-    #[test]
-    fn test_bn_eval_from_actual_number_value_string_bignum_or_number() {
-        let input = Input::default();
-        let mut output = Output {
-            show: true,
-            boost: 1.0,
-            price: Default::default(),
-        };
-
-        let cases = vec![
-            (Value::new_string("1000"), Value::BigNum(1000.into())),
-            (Value::new_number(2_000), Value::BigNum(2_000.into())),
-            (Value::BigNum(3.into()), Value::BigNum(3.into())),
-            // rounded floats should work!
-            (
-                Value::Number(Number::from_f64(40.0).expect("should create float number")),
-                Value::BigNum(40.into()),
-            ),
-        ];
-
-        for (from, expected) in cases.into_iter() {
-            let rule = Rule::Function(Function::new_bn(from));
-
-            assert_eq!(Ok(Some(expected)), rule.eval(&input, &mut output));
-        }
-    }
-
-    #[test]
-    fn test_bn_eval_from_actual_incorrect_value() {
-        let input = Input::default();
-        let mut output = Output {
-            show: true,
-            boost: 1.0,
-            price: Default::default(),
-        };
-
-        let error_cases = vec![
-            Value::new_string("text"),
-            // BigNums can only be positive
-            Value::new_number(-100),
-            Value::Bool(true),
-            Value::Array(vec![Value::Bool(false)]),
-            Value::Number(Number::from_f64(2.5).expect("should create float number")),
-        ];
-
-        for error_case in error_cases.into_iter() {
-            let rule = Rule::Function(Function::new_bn(error_case));
-
-            assert_eq!(Err(Error::TypeError), rule.eval(&input, &mut output));
-        }
-    }
-
-    #[test]
-    fn test_set_eval() {
-        use crate::channel::{Pricing, PricingBounds};
-        use crate::util::tests::prep_db::DUMMY_CHANNEL;
-
-        let mut channel = DUMMY_CHANNEL.clone();
-        channel.spec.pricing_bounds = Some(PricingBounds {
-            impression: Some(Pricing {
-                min: 1_000.into(),
-                max: 2_000.into(),
-            }),
-            click: Some(Pricing {
-                min: 3_000.into(),
-                max: 4_000.into(),
-            }),
-        });
-
-        let input = Input::default();
-        let mut output = Output::from(&channel);
-
-        assert_eq!(Some(&BigNum::from(1_000)), output.price.get("IMPRESSION"));
-
-        let set_to = Value::BigNum(BigNum::from(20));
-        let rule = Rule::Function(Function::new_set("price.IMPRESSION", set_to));
-
-        assert_eq!(Ok(None), rule.eval(&input, &mut output));
-
-        assert_eq!(Some(&BigNum::from(20)), output.price.get("IMPRESSION"));
     }
 }
