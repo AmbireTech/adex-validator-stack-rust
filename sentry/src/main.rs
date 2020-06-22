@@ -127,7 +127,7 @@ async fn run<A: Adapter + 'static>(app: Application<A>, port: u16) {
     let logger = app.logger.clone();
     info!(&logger, "Listening on port {}!", port);
 
-    let make_service = make_service_fn(move |_| {
+    let make_service = make_service_fn(|_| {
         let server = app.clone();
         async move {
             Ok::<_, Error>(service_fn(move |req| {

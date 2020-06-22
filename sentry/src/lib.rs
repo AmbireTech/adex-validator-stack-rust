@@ -48,6 +48,7 @@ mod chain;
 pub mod db;
 pub mod event_aggregator;
 pub mod event_reducer;
+pub mod payout;
 
 lazy_static! {
     static ref CHANNEL_GET_BY_ID: Regex =
@@ -136,8 +137,7 @@ impl<A: Adapter + 'static> Application<A> {
             }
         };
 
-        let path = req.uri().path().to_string();
-        let mut response = match (path.as_ref(), req.method()) {
+        let mut response = match (req.uri().path(), req.method()) {
             ("/cfg", &Method::GET) => config(req, &self).await,
             ("/channel", &Method::POST) => create_channel(req, &self).await,
             ("/channel/list", &Method::GET) => channel_list(req, &self).await,
@@ -445,9 +445,14 @@ pub fn epoch() -> f64 {
 // @TODO: Make pub(crate)
 #[derive(Debug, Clone)]
 pub struct Session {
-    pub era: i64,
-    pub uid: ValidatorId,
     pub ip: Option<String>,
     pub country: Option<String>,
     pub referrer_header: Option<String>,
+    pub os: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Auth {
+    pub era: i64,
+    pub uid: ValidatorId,
 }

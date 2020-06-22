@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use crate::{BigNum, ValidatorId};
-use std::collections::btree_map::{Entry, Iter, Values};
+use std::collections::btree_map::{Entry, IntoIter, Iter, Values};
 
 use serde::{Deserialize, Serialize};
 use std::iter::FromIterator;
@@ -39,6 +39,10 @@ impl BalancesMap {
     pub fn insert(&mut self, key: ValidatorId, value: BigNum) -> Option<BigNum> {
         self.0.insert(key, value)
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
 }
 
 impl FromIterator<(ValidatorId, BigNum)> for BalancesMap {
@@ -47,6 +51,15 @@ impl FromIterator<(ValidatorId, BigNum)> for BalancesMap {
         let btree_map: BTreeMap<ValidatorId, BigNum> = iter.into_iter().collect();
 
         BalancesMap(btree_map)
+    }
+}
+
+impl IntoIterator for BalancesMap {
+    type Item = (ValidatorId, BigNum);
+    type IntoIter = IntoIter<ValidatorId, BigNum>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
     }
 }
 

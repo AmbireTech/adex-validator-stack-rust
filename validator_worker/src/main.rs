@@ -197,7 +197,7 @@ async fn validator_tick<A: Adapter + 'static>(
     config: &Config,
     logger: &Logger,
 ) -> Result<(ChannelId, Box<dyn Debug>), ValidatorWorkerError<A::AdapterError>> {
-    let whoami = adapter.whoami().clone();
+    let whoami = *adapter.whoami();
 
     // Cloning the `Logger` is cheap, see documentation for more info
     let sentry = SentryApi::init(adapter, channel.clone(), &config, logger.clone())

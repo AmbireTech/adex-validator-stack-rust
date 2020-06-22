@@ -1,30 +1,35 @@
-use crate::analytics_recorder::get_payout;
+use crate::payout::get_payout;
+use crate::Session;
 use primitives::sentry::{AggregateEvents, Event, EventAggregate};
 use primitives::{BigNum, Channel, ValidatorId};
 
 // @TODO: Remove attribute once we use this function!
 #[allow(dead_code)]
-pub(crate) fn reduce(channel: &Channel, initial_aggr: &mut EventAggregate, ev: &Event) {
+pub(crate) fn reduce(
+    channel: &Channel,
+    initial_aggr: &mut EventAggregate,
+    ev: &Event,
+    session: &Session,
+) {
     match ev {
         Event::Impression { publisher, .. } => {
             let impression = initial_aggr.events.get("IMPRESSION");
-            let payout = get_payout(&channel, &ev);
+            let payout = get_payout(&channel, &ev, session);
             let merge = merge_impression_ev(impression, &publisher, &payout);
 
             initial_aggr.events.insert("IMPRESSION".to_owned(), merge);
         }
         Event::Click { publisher, .. } => {
             let clicks = initial_aggr.events.get("CLICK");
-            let payout = get_payout(&channel, &ev);
+            let payout = get_payout(&channel, &ev, session);
             let merge = merge_impression_ev(clicks, &publisher, &payout);
 
             initial_aggr.events.insert("CLICK".to_owned(), merge);
         }
         Event::Close => {
-            let creator = channel.creator.clone();
             let close_event = AggregateEvents {
-                event_counts: Some(vec![(creator.clone(), 1.into())].into_iter().collect()),
-                event_payouts: vec![(creator, channel.deposit_amount.clone())]
+                event_counts: Some(vec![(channel.creator, 1.into())].into_iter().collect()),
+                event_payouts: vec![(channel.creator, channel.deposit_amount.clone())]
                     .into_iter()
                     .collect(),
             };
@@ -85,8 +90,15 @@ mod test {
             referrer: None,
         };
 
+        let session = Session {
+            ip: Default::default(),
+            country: None,
+            referrer_header: None,
+            os: None,
+        };
+
         for _ in 0..101 {
-            reduce(&channel, &mut event_aggr, &event);
+            reduce(&channel, &mut event_aggr, &event, &session);
         }
 
         assert_eq!(event_aggr.channel_id, channel.id);

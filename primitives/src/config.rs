@@ -4,7 +4,6 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 use std::fs;
-use toml;
 
 lazy_static! {
     static ref DEVELOPMENT_CONFIG: Config =
@@ -29,7 +28,6 @@ pub struct Config {
     pub health_unsignable_promilles: u32,
     pub propagation_timeout: u32,
     pub fetch_timeout: u32,
-    pub list_timeout: u32,
     pub validator_tick_timeout: u32,
     pub ip_rate_limit: RateLimit,  // HashMap??
     pub sid_rate_limit: RateLimit, // HashMap ??

@@ -116,13 +116,8 @@ impl<A: Adapter + 'static> SentryApi<A> {
             }
             None => Err(Error::MissingWhoamiInChannelValidators {
                 channel: channel.id,
-                validators: channel
-                    .spec
-                    .validators
-                    .iter()
-                    .map(|v| v.id.clone())
-                    .collect(),
-                whoami: adapter.whoami().clone(),
+                validators: channel.spec.validators.iter().map(|v| v.id).collect(),
+                whoami: *adapter.whoami(),
             }),
         }
     }
@@ -242,12 +237,12 @@ async fn propagate_to<A: Adapter>(
         .json(&body)
         .send()
         .await
-        .map_err(|e| (validator.id.clone(), Error::Request(e)))?
+        .map_err(|e| (validator.id, Error::Request(e)))?
         .json()
         .await
-        .map_err(|e| (validator.id.clone(), Error::Request(e)))?;
+        .map_err(|e| (validator.id, Error::Request(e)))?;
 
-    Ok(validator.id.clone())
+    Ok(validator.id)
 }
 
 pub async fn all_channels(

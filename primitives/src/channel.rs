@@ -7,7 +7,6 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 
 use crate::big_num::BigNum;
-use crate::sentry::Event;
 use crate::{AdUnit, EventSubmission, TargetingTag, ValidatorDesc, ValidatorId};
 use hex::{FromHex, FromHexError};
 use std::ops::Deref;
@@ -103,6 +102,22 @@ pub struct PricingBounds {
     pub click: Option<Pricing>,
 }
 
+impl PricingBounds {
+    pub fn to_vec(&self) -> Vec<(&str, Pricing)> {
+        let mut vec = Vec::new();
+
+        if let Some(pricing) = self.impression.as_ref() {
+            vec.push(("IMPRESSION", pricing.clone()));
+        }
+
+        if let Some(pricing) = self.click.as_ref() {
+            vec.push(("CLICK", pricing.clone()))
+        }
+
+        vec
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ChannelSpec {
@@ -154,6 +169,7 @@ pub struct ChannelSpec {
     pub ad_units: Vec<AdUnit>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub price_multiplication_rules: Vec<PriceMultiplicationRules>,
+    #[serde(default)]
     pub price_dynamic_adjustment: bool,
 }
 
@@ -161,17 +177,17 @@ pub struct ChannelSpec {
 #[serde(rename_all = "camelCase")]
 pub struct PriceMultiplicationRules {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    multiplier: Option<f64>,
+    pub multiplier: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    amount: Option<BigNum>,
+    pub amount: Option<BigNum>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    ev_type: Option<Vec<Event>>,
+    pub ev_type: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    publisher: Option<Vec<ValidatorId>>,
+    pub publisher: Option<Vec<ValidatorId>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    os_type: Option<Vec<String>>,
+    pub os_type: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    country: Option<Vec<String>>,
+    pub country: Option<Vec<String>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
