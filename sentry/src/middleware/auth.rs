@@ -107,7 +107,7 @@ mod test {
 
     async fn setup() -> (DummyAdapter, MultiplexedConnection) {
         let adapter_options = DummyAdapterOptions {
-            dummy_identity: IDS["leader"].clone(),
+            dummy_identity: IDS["leader"],
             dummy_auth: IDS.clone(),
             dummy_auth_tokens: AUTH.clone(),
         };
