@@ -132,7 +132,7 @@ mod tests {
         let cases: Vec<(Event, BigNum, String)> = vec![
             (
                 Event::Impression {
-                    publisher: IDS["publisher"].clone(),
+                    publisher: IDS["publisher"],
                     ad_slot: None,
                     ad_unit: None,
                     referrer: None,
@@ -142,7 +142,7 @@ mod tests {
             ),
             (
                 Event::Click {
-                    publisher: IDS["publisher"].clone(),
+                    publisher: IDS["publisher"],
                     ad_slot: None,
                     ad_unit: None,
                     referrer: None,
@@ -193,7 +193,7 @@ mod tests {
         let cases: Vec<(Event, BigNum, String)> = vec![
             (
                 Event::Impression {
-                    publisher: IDS["publisher"].clone(),
+                    publisher: IDS["publisher"],
                     ad_slot: None,
                     ad_unit: None,
                     referrer: None,
@@ -203,7 +203,7 @@ mod tests {
             ),
             (
                 Event::Click {
-                    publisher: IDS["publisher"].clone(),
+                    publisher: IDS["publisher"],
                     ad_slot: None,
                     ad_unit: None,
                     referrer: None,
@@ -250,7 +250,7 @@ mod tests {
         let cases: Vec<(Event, BigNum, String)> = vec![
             (
                 Event::Impression {
-                    publisher: IDS["publisher"].clone(),
+                    publisher: IDS["publisher"],
                     ad_slot: None,
                     ad_unit: None,
                     referrer: None,
@@ -260,7 +260,7 @@ mod tests {
             ),
             (
                 Event::Click {
-                    publisher: IDS["publisher"].clone(),
+                    publisher: IDS["publisher"],
                     ad_slot: None,
                     ad_unit: None,
                     referrer: None,
@@ -308,7 +308,7 @@ mod tests {
                 amount: Some(BigNum::from(12)),
                 os_type: None,
                 ev_type: Some(vec!["CLICK".to_string()]),
-                publisher: Some(vec![IDS["publisher"].clone()]),
+                publisher: Some(vec![IDS["publisher"]]),
                 country: Some(vec!["us".to_string()]),
             },
         ];
@@ -321,7 +321,7 @@ mod tests {
         };
 
         let event = Event::Click {
-            publisher: IDS["publisher"].clone(),
+            publisher: IDS["publisher"],
             ad_slot: None,
             ad_unit: None,
             referrer: None,
@@ -350,7 +350,7 @@ mod tests {
                 amount: None,
                 os_type: Some(vec!["android".to_string()]),
                 ev_type: Some(vec!["CLICK".to_string()]),
-                publisher: Some(vec![IDS["publisher"].clone()]),
+                publisher: Some(vec![IDS["publisher"]]),
                 country: Some(vec!["us".to_string()]),
             },
             PriceMultiplicationRules {
@@ -358,7 +358,7 @@ mod tests {
                 amount: Some(BigNum::from(12)),
                 os_type: None,
                 ev_type: Some(vec!["CLICK".to_string()]),
-                publisher: Some(vec![IDS["publisher"].clone()]),
+                publisher: Some(vec![IDS["publisher"]]),
                 country: Some(vec!["us".to_string()]),
             },
         ];
@@ -371,7 +371,7 @@ mod tests {
         };
 
         let event = Event::Click {
-            publisher: IDS["publisher"].clone(),
+            publisher: IDS["publisher"],
             ad_slot: None,
             ad_unit: None,
             referrer: None,
@@ -401,7 +401,7 @@ mod tests {
                 amount: None,
                 os_type: Some(vec!["android".to_string()]),
                 ev_type: Some(vec!["CLICK".to_string()]),
-                publisher: Some(vec![IDS["publisher"].clone()]),
+                publisher: Some(vec![IDS["publisher"]]),
                 country: Some(vec!["us".to_string()]),
             },
             PriceMultiplicationRules {

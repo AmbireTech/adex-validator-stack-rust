@@ -246,7 +246,7 @@ mod test {
     fn get_impression_events(count: i8) -> Vec<Event> {
         (0..count)
             .map(|_| Event::Impression {
-                publisher: IDS["publisher2"].clone(),
+                publisher: IDS["publisher2"],
                 ad_unit: None,
                 ad_slot: None,
                 referrer: None,
@@ -260,7 +260,7 @@ mod test {
 
         let auth = Auth {
             era: 0,
-            uid: IDS["follower"].clone(),
+            uid: IDS["follower"],
         };
 
         let session = Session {
@@ -314,7 +314,7 @@ mod test {
 
         let auth = Auth {
             era: 0,
-            uid: IDS["follower"].clone(),
+            uid: IDS["follower"],
         };
 
         let session = Session {
