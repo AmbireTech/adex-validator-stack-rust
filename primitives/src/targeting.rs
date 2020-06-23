@@ -184,10 +184,10 @@ pub struct Global {
     pub user_agent_os: Option<String>,
     pub user_agent_browser_family: Option<String>,
     /// Global scope, accessible everywhere, campaign-dependant
-    ad_unit: Option<AdUnit>,
-    channel: Channel,
-    status: Option<Status>,
-    balances: Option<BalancesMap>,
+    pub ad_unit: Option<AdUnit>,
+    pub channel: Channel,
+    pub status: Option<Status>,
+    pub balances: Option<BalancesMap>,
 }
 
 #[derive(Debug, Clone)]
