@@ -218,29 +218,29 @@ mod math_functions {
 
         let cases = vec![
             (
-                Value::BigNum(3000.into()),
-                Value::BigNum(1000.into()),
+                Value::BigNum(100.into()),
                 Value::BigNum(3.into()),
+                Value::BigNum(33.into()),
             ),
             (
-                Value::new_number(3000),
-                Value::BigNum(1000.into()),
+                Value::new_number(100),
                 Value::BigNum(3.into()),
+                Value::BigNum(33.into()),
             ),
             (
-                Value::BigNum(3000.into()),
-                Value::new_number(1000),
-                Value::BigNum(3.into()),
-            ),
-            (
-                Value::Number(Number::from_f64(3000.0).expect("should create float number")),
-                Value::Number(Number::from_f64(1000.0).expect("should create float number")),
-                Value::Number(Number::from_f64(3.0).expect("should create float number")),
-            ),
-            (
-                Value::new_number(3000),
-                Value::new_number(1000),
+                Value::BigNum(100.into()),
                 Value::new_number(3),
+                Value::BigNum(33.into()),
+            ),
+            (
+                Value::Number(Number::from_f64(100.0).expect("should create float number")),
+                Value::Number(Number::from_f64(3.0).expect("should create float number")),
+                Value::Number(Number::from_f64(33.333333333333336).expect("should create float number")),
+            ),
+            (
+                Value::new_number(10),
+                Value::new_number(3),
+                Value::new_number(10 / 3),
             ),
         ];
 
@@ -331,7 +331,7 @@ mod math_functions {
         ];
 
         for (lhs, rhs, expected) in cases.into_iter() {
-            let rule = Rule::Function(Function::new_mod(lhs, rhs));
+            let rule = Function::new_mod(lhs, rhs);
 
             assert_eq!(Ok(Some(expected)), rule.eval(&input, &mut output));
         }
@@ -853,11 +853,11 @@ mod control_flow_and_logic {
             price: Default::default(),
         };
 
-        let cases = [(true, false), (false, true)];
+        let cases = vec![(true, false), (false, true)];
 
-        for (value, expected) in cases.iter() {
-            let rule = Rule::Function(Function::new_not(Value::Bool(*value)));
-            let expected = Some(Value::Bool(*expected));
+        for (value, expected) in cases.into_iter() {
+            let rule = Rule::Function(Function::new_not(Value::Bool(value)));
+            let expected = Some(Value::Bool(expected));
 
             assert_eq!(Ok(expected), rule.eval(&input, &mut output));
         }
@@ -1018,7 +1018,7 @@ mod control_flow_and_logic {
             Value::BigNum(100.into()),
         ));
         let rule_do = Rule::Function(Function::new_do(rule));
-        assert_eq!(Ok(Some(result.clone())), rule_do.eval(&input, &mut output));
+        assert_eq!(Ok(Some(result)), rule_do.eval(&input, &mut output));
     }
 }
 
@@ -1034,7 +1034,7 @@ mod string_and_array {
             price: Default::default(),
         };
 
-        let cases = [
+        let cases = vec![
             (
                 Value::BigNum(1.into()),
                 Value::Array(vec![
@@ -1055,12 +1055,12 @@ mod string_and_array {
             ),
         ];
 
-        for (value, arr, expected) in cases.iter() {
+        for (value, arr, expected) in cases.into_iter() {
             let rule = Rule::Function(Function::new_in(
                 Rule::Value(value.clone()),
                 Rule::Value(arr.clone()),
             ));
-            let expected = Some(Value::Bool(*expected));
+            let expected = Some(Value::Bool(expected));
 
             assert_eq!(Ok(expected), rule.eval(&input, &mut output));
         }
