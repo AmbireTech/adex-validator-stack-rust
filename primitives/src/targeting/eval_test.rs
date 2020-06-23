@@ -874,6 +874,8 @@ mod control_flow_and_logic {
         let cases = [
             (Value::BigNum(1.into()), Value::BigNum(1.into()), true),
             (Value::BigNum(1.into()), Value::BigNum(2.into()), false),
+            (Value::Number(Number::from_f64(3.33).expect("should create float")), Value::Number(Number::from_f64(3.33).expect("should create float")), true),
+            (Value::Number(Number::from_f64(3.33).expect("should create float")), Value::Number(Number::from_f64(3.3).expect("should create float")), false),
             (Value::Bool(true), Value::Bool(true), true),
             (Value::Bool(true), Value::Bool(false), false),
             (
