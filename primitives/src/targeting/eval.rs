@@ -880,8 +880,8 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
             let new_rule = Box::new(Rule::Value(Value::Bool(first_eval)));
             Function::Set(String::from("show"), new_rule).eval(input, output)?
         }
-        Function::GetPriceInUsd(second_rule) => {
-            let amount = second_rule.eval(input, output)?.ok_or(Error::TypeError)?.try_bignum()?;
+        Function::GetPriceInUsd(first_rule) => {
+            let amount = first_rule.eval(input, output)?.ok_or(Error::TypeError)?.try_bignum()?;
             let deposit_asset = Function::Get("deposit_asset".to_string()).eval(input, output)?.ok_or(Error::TypeError)?.try_string()?;
 
             let divisor = get_deposit_asset_divisor(&deposit_asset)?;
