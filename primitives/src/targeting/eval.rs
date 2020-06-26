@@ -22,6 +22,14 @@ pub enum Error {
     UnknownVariable,
 }
 
+fn get_deposit_asset_divisor(address: &String) -> Result<BigNum, Error> {
+    match address.as_str() {
+        "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359" => Ok(BigNum::from(10u64.pow(18))),
+        "0xdac17f958d2ee523a2206206994597c13d831ec7" => Ok(BigNum::from(10u64.pow(6))),
+        _ => Err(Error::TypeError)
+    }
+}
+
 trait Eval {
     fn eval(self, input: &Input, output: &mut Output) -> Result<Option<Value>, Error>;
 }
@@ -154,6 +162,7 @@ pub enum Function {
     StartsWith(Box<Rule>, Box<Rule>),
     EndsWith(Box<Rule>, Box<Rule>),
     OnlyShowIf(Box<Rule>),
+    GetPriceInUsd(Box<Rule>),
     Intersects(Box<Rule>, Box<Rule>),
     /// Evaluates rule
     Do(Box<Rule>),
@@ -324,6 +333,10 @@ impl Function {
 
     pub fn new_bn(value: impl Into<Value>) -> Self {
         Self::Bn(value.into())
+    }
+
+    pub fn new_get_price_in_usd(amount: impl Into<Rule>) -> Self {
+        Self::GetPriceInUsd(Box::new(amount.into()))
     }
 }
 
@@ -866,6 +879,13 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
                 .try_bool()?;
             let new_rule = Box::new(Rule::Value(Value::Bool(first_eval)));
             Function::Set(String::from("show"), new_rule).eval(input, output)?
+        }
+        Function::GetPriceInUsd(second_rule) => {
+            let amount = second_rule.eval(input, output)?.ok_or(Error::TypeError)?.try_bignum()?;
+            let deposit_asset = Function::Get("deposit_asset".to_string()).eval(input, output)?.ok_or(Error::TypeError)?.try_string()?;
+
+            let divisor = get_deposit_asset_divisor(&deposit_asset)?;
+            Some(Value::BigNum(amount.div(divisor)))
         }
         Function::Do(first_rule) => eval(input, output, first_rule)?,
         Function::Set(key, rule) => {

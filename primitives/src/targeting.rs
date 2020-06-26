@@ -36,7 +36,7 @@ impl Input {
             "advertiserId" => Ok(Value::String(self.global.advertiser_id.clone())),
             "country" => Ok(Value::String(self.global.country.clone())),
             "eventType" => Ok(Value::String(self.global.event_type.clone())),
-            "campaignId" => Ok(Value::String(self.global.campiagn_id.clone())),
+            "campaignId" => Ok(Value::String(self.global.campaign_id.clone())),
             "campaignTotalSpent" => Ok(Value::String(self.global.campaign_total_spent.clone())),
             "campaignSecondsActive" => {
                 Ok(Value::Number(self.global.campaign_seconds_active.into()))
@@ -45,6 +45,7 @@ impl Input {
                 Ok(Value::Number(self.global.campaign_seconds_duration.into()))
             }
             "campaignBudget" => Ok(Value::BigNum(self.global.campaign_budget.clone())),
+            "depositAsset" => Ok(Value::String(self.global.deposit_asset.clone())),
             "eventMinPrice" => Ok(Value::BigNum(self.global.event_min_price.clone())),
             "eventMaxPrice" => Ok(Value::BigNum(self.global.event_max_price.clone())),
             "publisherEarnedFromCampaign" => Ok(Value::BigNum(
@@ -102,11 +103,12 @@ pub struct Global {
     pub advertiser_id: String,
     pub country: String,
     pub event_type: String,
-    pub campiagn_id: String,
+    pub campaign_id: String,
     pub campaign_total_spent: String,
     pub campaign_seconds_active: u64,
     pub campaign_seconds_duration: u64,
     pub campaign_budget: BigNum,
+    pub deposit_asset: String,
     pub event_min_price: BigNum,
     pub event_max_price: BigNum,
     pub publisher_earned_from_campaign: BigNum,
