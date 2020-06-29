@@ -359,8 +359,8 @@ pub mod postgres {
                 deposit_asset: row.get("deposit_asset"),
                 deposit_amount: row.get("deposit_amount"),
                 valid_until: row.get("valid_until"),
-                spec: row.get::<_, Json<ChannelSpec>>("spec").0,
                 targeting_rules: row.get::<_, Json<Vec<Rule>>>("targeting_rules").0,
+                spec: row.get::<_, Json<ChannelSpec>>("spec").0,
             }
         }
     }
