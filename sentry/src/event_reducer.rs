@@ -84,7 +84,7 @@ mod test {
         };
 
         let event = Event::Impression {
-            publisher: IDS["publisher"].clone(),
+            publisher: IDS["publisher"],
             ad_unit: None,
             ad_slot: None,
             referrer: None,
