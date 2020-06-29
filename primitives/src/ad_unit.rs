@@ -2,7 +2,7 @@ use chrono::serde::{ts_milliseconds, ts_milliseconds_option};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::{TargetingTag, ValidatorId};
+use crate::ValidatorId;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -25,14 +25,8 @@ pub struct AdUnit {
     pub media_mime: String,
     /// Advertised URL
     pub target_url: String,
-    /// Array of TargetingTag
-    pub targeting: Vec<TargetingTag>,
     /// Number; minimum targeting score (optional)
     pub min_targeting_score: Option<f64>,
-    /// Array of TargetingTag (optional)
-    /// meant for discovery between publishers/advertisers
-    #[serde(default)]
-    pub tags: Vec<TargetingTag>,
     /// user address from the session
     pub owner: ValidatorId,
     /// number, UTC timestamp in milliseconds, used as nonce for escaping duplicated spec ipfs hashes

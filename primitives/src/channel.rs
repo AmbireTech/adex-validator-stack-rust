@@ -136,18 +136,14 @@ pub struct ChannelSpec {
     pub title: Option<String>,
     pub validators: SpecValidators,
     /// Maximum payment per impression
+    /// **OBSOLETE**, only used if `pricingBounds` is missing an `IMPRESSION` entry
     pub max_per_impression: BigNum,
     /// Minimum payment offered per impression
+    /// **OBSOLETE**, only used if `pricingBounds` is missing an `IMPRESSION` entry
     pub min_per_impression: BigNum,
     /// Event pricing bounds
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pricing_bounds: Option<PricingBounds>,
-    /// An array of TargetingTag (optional)
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub targeting: Vec<TargetingTag>,
-    /// Minimum targeting score (optional)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub min_targeting_score: Option<f64>,
     /// EventSubmission object, applies to event submission (POST /channel/:id/events)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub event_submission: Option<EventSubmission>,
@@ -176,27 +172,6 @@ pub struct ChannelSpec {
     pub ad_units: Vec<AdUnit>,
     #[serde(default)]
     pub targeting_rules: Vec<Rule>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub price_multiplication_rules: Vec<PriceMultiplicationRules>,
-    #[serde(default)]
-    pub price_dynamic_adjustment: bool,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct PriceMultiplicationRules {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub multiplier: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub amount: Option<BigNum>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub ev_type: Option<Vec<String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub publisher: Option<Vec<ValidatorId>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub os_type: Option<Vec<String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub country: Option<Vec<String>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
