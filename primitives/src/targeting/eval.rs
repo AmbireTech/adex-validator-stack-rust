@@ -587,6 +587,26 @@ fn math_operator(lhs: Number, rhs: Number, ops: MathOperator) -> Result<Number, 
     }
 }
 
+#[cfg(feature = "postgres")]
+pub mod postgres {
+    use bytes::BytesMut;
+    use postgres_types::{accepts, to_sql_checked, IsNull, Json, ToSql, Type};
+    use std::error::Error;
+    use super::*;
+
+    impl ToSql for Rule {
+        fn to_sql(
+            &self,
+            ty: &Type,
+            w: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+            Json(self).to_sql(ty, w)
+        }
+
+        accepts!(JSONB);
+        to_sql_checked!();
+    }
+}
 #[cfg(test)]
 mod test {
     use super::*;
