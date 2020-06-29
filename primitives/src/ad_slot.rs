@@ -1,4 +1,4 @@
-use crate::{BigNum, ValidatorId, targeting::Rule};
+use crate::{targeting::Rule, BigNum, ValidatorId};
 use chrono::serde::{ts_milliseconds, ts_milliseconds_option};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
