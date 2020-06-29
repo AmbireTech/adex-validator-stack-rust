@@ -1,15 +1,16 @@
 use std::error::Error;
 use std::fmt;
+use std::ops::Deref;
 
 use chrono::serde::{ts_milliseconds, ts_milliseconds_option, ts_seconds};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 
-use crate::big_num::BigNum;
-use crate::{AdUnit, EventSubmission, TargetingTag, ValidatorDesc, ValidatorId};
+use crate::{
+    targeting::Rule, AdUnit, BigNum, EventSubmission, TargetingTag, ValidatorDesc, ValidatorId,
+};
 use hex::{FromHex, FromHexError};
-use std::ops::Deref;
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Copy, Clone, Hash)]
 #[serde(transparent)]
@@ -84,6 +85,8 @@ pub struct Channel {
     pub deposit_amount: BigNum,
     #[serde(with = "ts_seconds")]
     pub valid_until: DateTime<Utc>,
+    #[serde(default)]
+    pub targeting_rules: Vec<Rule>,
     pub spec: ChannelSpec,
 }
 
@@ -171,6 +174,8 @@ pub struct ChannelSpec {
     /// An array of AdUnit (optional)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ad_units: Vec<AdUnit>,
+    #[serde(default)]
+    pub targeting_rules: Vec<Rule>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub price_multiplication_rules: Vec<PriceMultiplicationRules>,
     #[serde(default)]
@@ -339,6 +344,7 @@ impl Error for ChannelError {
 pub mod postgres {
     use super::ChannelId;
     use super::{Channel, ChannelSpec};
+    use crate::targeting::Rule;
     use bytes::BytesMut;
     use hex::FromHex;
     use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
@@ -353,6 +359,7 @@ pub mod postgres {
                 deposit_asset: row.get("deposit_asset"),
                 deposit_amount: row.get("deposit_amount"),
                 valid_until: row.get("valid_until"),
+                targeting_rules: row.get::<_, Json<Vec<Rule>>>("targeting_rules").0,
                 spec: row.get::<_, Json<ChannelSpec>>("spec").0,
             }
         }
