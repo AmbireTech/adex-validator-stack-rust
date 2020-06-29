@@ -15,8 +15,10 @@ pub mod event_submission;
 pub mod market;
 pub mod merkle_tree;
 pub mod sentry;
+pub mod supermarket;
 pub mod targeting;
 pub mod targeting_tag;
+
 pub mod util {
     pub mod tests {
         pub mod prep_db;

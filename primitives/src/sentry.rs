@@ -217,21 +217,16 @@ impl fmt::Display for ChannelReport {
 
 pub mod channel_list {
     use crate::ValidatorId;
-    use chrono::serde::ts_seconds::deserialize as ts_seconds;
-    use chrono::{DateTime, Utc};
-    use serde::Deserialize;
+    use chrono::{serde::ts_seconds, DateTime, Utc};
+    use serde::{Deserialize, Serialize};
 
-    #[derive(Debug, Deserialize)]
+    #[derive(Debug, Serialize, Deserialize)]
     pub struct ChannelListQuery {
         #[serde(default = "default_page")]
         pub page: u64,
         /// filters the list on `valid_until >= valid_until_ge`
         /// It should be the same timestamp format as the `Channel.valid_until`: **seconds**
-        #[serde(
-            deserialize_with = "ts_seconds",
-            default = "Utc::now",
-            rename = "validUntil"
-        )]
+        #[serde(with = "ts_seconds", default = "Utc::now", rename = "validUntil")]
         pub valid_until_ge: DateTime<Utc>,
         pub creator: Option<String>,
         /// filters the channels containing a specific validator if provided
