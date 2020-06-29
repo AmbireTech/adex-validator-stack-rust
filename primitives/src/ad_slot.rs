@@ -59,7 +59,7 @@ pub struct AdSlot {
     #[serde(default)]
     pub description: Option<String>,
     #[serde(default)]
-    pub webiste: Option<String>,
+    pub website: Option<String>,
     /// user can change it - used for filtering in platform UI
     #[serde(default)]
     pub archived: bool,

@@ -882,7 +882,7 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
         }
         Function::GetPriceInUsd(first_rule) => {
             let amount = first_rule.eval(input, output)?.ok_or(Error::TypeError)?.try_bignum()?;
-            let deposit_asset = Function::Get("deposit_asset".to_string()).eval(input, output)?.ok_or(Error::TypeError)?.try_string()?;
+            let deposit_asset = &input.global.channel.deposit_asset;
 
             let divisor = get_deposit_asset_divisor(&deposit_asset)?;
             Some(Value::BigNum(amount.div(divisor)))
@@ -1097,5 +1097,26 @@ fn math_operator(lhs: Number, rhs: Number, ops: MathOperator) -> Result<Number, 
                 _ => Err(Error::TypeError),
             },
         },
+    }
+}
+
+#[cfg(feature = "postgres")]
+pub mod postgres {
+    use super::*;
+    use bytes::BytesMut;
+    use postgres_types::{accepts, to_sql_checked, IsNull, Json, ToSql, Type};
+    use std::error::Error;
+
+    impl ToSql for Rule {
+        fn to_sql(
+            &self,
+            ty: &Type,
+            w: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+            Json(self).to_sql(ty, w)
+        }
+
+        accepts!(JSONB);
+        to_sql_checked!();
     }
 }

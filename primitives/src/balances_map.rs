@@ -32,6 +32,10 @@ impl BalancesMap {
         self.0.get(key)
     }
 
+    pub fn contains_key(&self, key: &ValidatorId) -> bool {
+        self.0.contains_key(key)
+    }
+
     pub fn entry(&mut self, key: ValidatorId) -> Entry<'_, ValidatorId, BigNum> {
         self.0.entry(key)
     }
