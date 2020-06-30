@@ -35,13 +35,6 @@ impl Input {
                 .map(|ad_view| Value::Bool(ad_view.has_custom_preferences))
                 .ok_or(Error::UnknownVariable),
             "adSlotId" => Ok(Value::String(self.global.ad_slot_id.clone())),
-            // "adUnitType" => Ok(Value::String(self.global.ad_unit_type.clone())),
-            // "publisherId" => Ok(Value::String(self.global.publisher_id.clone())),
-            // "advertiserId" => Ok(Value::String(self.global.advertiser_id.clone())),
-            // "country" => Ok(Value::String(self.global.country.clone())),
-            // "eventType" => Ok(Value::String(self.global.event_type.clone())),
-            // "campaignId" => Ok(Value::String(self.global.campaign_id.clone())),
-            // "campaignTotalSpent" => Ok(Value::String(self.global.campaign_total_spent.clone())),
             "adSlotType" => Ok(Value::String(self.global.ad_slot_type.clone())),
             "publisherId" => Ok(Value::String(self.global.publisher_id.to_checksum())),
             "secondsSinceEpoch" => Ok(Value::Number(self.global.seconds_since_epoch.into())),
@@ -99,17 +92,6 @@ impl Input {
 
                 Ok(Value::Number(seconds.into()))
             }
-            // "campaignBudget" => Ok(Value::BigNum(self.global.campaign_budget.clone())),
-            // "depositAsset" => Ok(Value::String(self.global.deposit_asset.clone())),
-            // "eventMinPrice" => Ok(Value::BigNum(self.global.event_min_price.clone())),
-            // "eventMaxPrice" => Ok(Value::BigNum(self.global.event_max_price.clone())),
-            // "publisherEarnedFromCampaign" => Ok(Value::BigNum(
-            //     self.global.publisher_earned_from_campaign.clone(),
-            // )),
-            // "secondsSinceEpoch" => Ok(Value::Number(self.global.seconds_since_epoch.into())),
-            // "userAgentOS" => Ok(Value::String(self.global.user_agent_os.clone())),
-            // "userAgentBrowserFamily" => {
-            //     Ok(Value::String(self.global.user_agent_browser_family.clone()))
             "campaignBudget" => Ok(Value::BigNum(self.global.channel.deposit_amount.clone())),
             "eventMinPrice" => {
                 let min = get_pricing_bounds(&self.global.channel, &self.global.event_type).min;
@@ -198,18 +180,6 @@ pub struct Global {
     pub publisher_id: ValidatorId,
     pub country: Option<String>,
     pub event_type: String,
-// <<<<<<< HEAD
-//     pub campaign_id: String,
-//     pub campaign_total_spent: String,
-//     pub campaign_seconds_active: u64,
-//     pub campaign_seconds_duration: u64,
-//     pub campaign_budget: BigNum,
-//     pub deposit_asset: String,
-//     pub event_min_price: BigNum,
-//     pub event_max_price: BigNum,
-//     pub publisher_earned_from_campaign: BigNum,
-// =======
-// >>>>>>> 1af13803ab7d990dc29f65a848c4fb8bc22a3368
     pub seconds_since_epoch: u64,
     pub user_agent_os: Option<String>,
     pub user_agent_browser_family: Option<String>,

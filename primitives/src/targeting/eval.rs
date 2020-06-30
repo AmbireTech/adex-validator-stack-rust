@@ -24,8 +24,8 @@ pub enum Error {
 
 fn get_deposit_asset_divisor(address: &String) -> Result<BigNum, Error> {
     match address.as_str() {
-        "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359" => Ok(BigNum::from(10u64.pow(18))),
-        "0xdac17f958d2ee523a2206206994597c13d831ec7" => Ok(BigNum::from(10u64.pow(6))),
+        "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359" => Ok(BigNum::from(10u64.pow(18))), // DAI
+        "0xdac17f958d2ee523a2206206994597c13d831ec7" => Ok(BigNum::from(10u64.pow(6))), // Tether
         _ => Err(Error::TypeError)
     }
 }
