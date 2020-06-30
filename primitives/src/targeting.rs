@@ -137,7 +137,7 @@ impl Input {
                     Some(number) => Ok(Value::Number(number)),
                     None => Err(Error::TypeError),
                 }
-            },
+            }
             _unknown_field => Err(Error::UnknownVariable),
         }
     }

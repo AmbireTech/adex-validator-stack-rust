@@ -25,8 +25,8 @@ pub enum Error {
 fn get_deposit_asset_divisor(address: &String) -> Result<BigNum, Error> {
     match address.as_str() {
         "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359" => Ok(BigNum::from(10u64.pow(18))), // DAI
-        "0xdac17f958d2ee523a2206206994597c13d831ec7" => Ok(BigNum::from(10u64.pow(6))), // Tether
-        _ => Err(Error::TypeError)
+        "0xdac17f958d2ee523a2206206994597c13d831ec7" => Ok(BigNum::from(10u64.pow(6))),  // Tether
+        _ => Err(Error::TypeError),
     }
 }
 
@@ -881,7 +881,10 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
             Function::Set(String::from("show"), new_rule).eval(input, output)?
         }
         Function::GetPriceInUsd(first_rule) => {
-            let amount = first_rule.eval(input, output)?.ok_or(Error::TypeError)?.try_bignum()?;
+            let amount = first_rule
+                .eval(input, output)?
+                .ok_or(Error::TypeError)?
+                .try_bignum()?;
             let deposit_asset = &input.global.channel.deposit_asset;
 
             let divisor = get_deposit_asset_divisor(&deposit_asset)?;
