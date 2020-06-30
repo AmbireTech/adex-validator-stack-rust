@@ -1,4 +1,4 @@
-use crate::{BigNum, TargetingTag, ValidatorId};
+use crate::{BigNum, TargetingTag, ValidatorId, targeting::Rule};
 use chrono::serde::{ts_milliseconds, ts_milliseconds_option};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -44,6 +44,9 @@ pub struct AdSlot {
     pub tags: Vec<TargetingTag>,
     #[serde(default)]
     pub auto_tags: Vec<TargetingTag>,
+    /// Targeting rules
+    #[serde(default)]
+    pub rules: Vec<Rule>,
     /// Valid ipfs hash for Ad Unit object. It will be used as fallback data (optional)
     #[serde(default)]
     pub fallback_unit: Option<String>,
