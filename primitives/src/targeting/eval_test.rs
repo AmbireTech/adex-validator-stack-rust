@@ -1295,4 +1295,40 @@ mod string_and_array {
             assert_eq!(Ok(expected), rule.eval(&input, &mut output));
         }
     }
+
+    #[test]
+    fn test_get_dai_price_in_usd_eval() {
+        let mut input = get_default_input();
+        input.global.channel.deposit_asset = "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359".to_string();
+        let mut output = Output {
+            show: true,
+            boost: 1.0,
+            price: Default::default(),
+        };
+
+        let amount_dai = BigNum::from_str("100000000000000000000").expect("Should create BigNum"); // 100 DAI
+        let amount_usd = Some(Value::BigNum(BigNum::from(100)));
+        let rule = Rule::Function(Function::new_get_price_in_usd(
+            Rule::Value(Value::BigNum(amount_dai)),
+        ));
+        assert_eq!(Ok(amount_usd), rule.eval(&input, &mut output));
+    }
+
+    #[test]
+    fn test_get_tether_price_in_usd_eval() {
+        let mut input = get_default_input();
+        input.global.channel.deposit_asset = "0xdac17f958d2ee523a2206206994597c13d831ec7".to_string();
+        let mut output = Output {
+            show: true,
+            boost: 1.0,
+            price: Default::default(),
+        };
+
+        let amount_tether = BigNum::from_str("100000000").expect("Should create BigNum"); // 100 Tether
+        let amount_usd = Some(Value::BigNum(BigNum::from(100)));
+        let rule = Rule::Function(Function::new_get_price_in_usd(
+            Rule::Value(Value::BigNum(amount_tether)),
+        ));
+        assert_eq!(Ok(amount_usd), rule.eval(&input, &mut output));
+    }
 }
