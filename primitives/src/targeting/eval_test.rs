@@ -1316,9 +1316,11 @@ mod string_and_array {
         };
         for (key, value) in &*DEPOSIT_ASSETS_MAP {
             input.global.channel.deposit_asset = key.to_string();
-            let amount_crypto =  BigNum::from(100).mul(value);
+            let amount_crypto = BigNum::from(100).mul(value);
             let amount_usd = Some(Value::BigNum(BigNum::from(100)));
-            let rule = Rule::Function(Function::new_get_price_in_usd(Rule::Value(Value::BigNum(amount_crypto))));
+            let rule = Rule::Function(Function::new_get_price_in_usd(Rule::Value(Value::BigNum(
+                amount_crypto,
+            ))));
             assert_eq!(Ok(amount_usd), rule.eval(&input, &mut output));
         }
         let amount_dai = BigNum::from_str("100000000000000000000").expect("Should create BigNum"); // 100 DAI

@@ -1,14 +1,14 @@
 use crate::BigNum;
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_json::{value::Value as SerdeValue, Number};
 use std::{
+    collections::HashMap,
     convert::TryFrom,
     fmt,
     ops::{Add, Div, Mul, Rem, Sub},
     str::FromStr,
-    collections::HashMap,
 };
-use lazy_static::lazy_static;
 
 pub type Map = serde_json::value::Map<String, SerdeValue>;
 
