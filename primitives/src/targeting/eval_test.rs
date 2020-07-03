@@ -287,7 +287,7 @@ mod math_functions {
                 Value::Number(Number::from_f64(100.0).expect("should create float number")),
                 Value::Number(Number::from_f64(3.0).expect("should create float number")),
                 Value::Number(
-                    Number::from_f64(33.333333333333336).expect("should create float number"),
+                    Number::from_f64(33.333_333_333_333_336).expect("should create float number"),
                 ),
             ),
             (
@@ -1088,7 +1088,6 @@ mod control_flow_and_logic {
 
 mod string_and_array {
     use super::*;
-
     #[test]
     fn test_in_eval() {
         let input = get_default_input();
@@ -1309,37 +1308,23 @@ mod string_and_array {
     #[test]
     fn test_get_dai_price_in_usd_eval() {
         let mut input = get_default_input();
-        input.global.channel.deposit_asset =
-            "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359".to_string();
+
         let mut output = Output {
             show: true,
             boost: 1.0,
             price: Default::default(),
         };
-
+        for (key, value) in &*DEPOSIT_ASSETS_MAP {
+            input.global.channel.deposit_asset = key.to_string();
+            let amount_crypto =  BigNum::from(100).mul(value);
+            let amount_usd = Some(Value::BigNum(BigNum::from(100)));
+            let rule = Rule::Function(Function::new_get_price_in_usd(Rule::Value(Value::BigNum(amount_crypto))));
+            assert_eq!(Ok(amount_usd), rule.eval(&input, &mut output));
+        }
         let amount_dai = BigNum::from_str("100000000000000000000").expect("Should create BigNum"); // 100 DAI
         let amount_usd = Some(Value::BigNum(BigNum::from(100)));
         let rule = Rule::Function(Function::new_get_price_in_usd(Rule::Value(Value::BigNum(
             amount_dai,
-        ))));
-        assert_eq!(Ok(amount_usd), rule.eval(&input, &mut output));
-    }
-
-    #[test]
-    fn test_get_tether_price_in_usd_eval() {
-        let mut input = get_default_input();
-        input.global.channel.deposit_asset =
-            "0xdac17f958d2ee523a2206206994597c13d831ec7".to_string();
-        let mut output = Output {
-            show: true,
-            boost: 1.0,
-            price: Default::default(),
-        };
-
-        let amount_tether = BigNum::from_str("100000000").expect("Should create BigNum"); // 100 Tether
-        let amount_usd = Some(Value::BigNum(BigNum::from(100)));
-        let rule = Rule::Function(Function::new_get_price_in_usd(Rule::Value(Value::BigNum(
-            amount_tether,
         ))));
         assert_eq!(Ok(amount_usd), rule.eval(&input, &mut output));
     }

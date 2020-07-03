@@ -6,7 +6,9 @@ use std::{
     fmt,
     ops::{Add, Div, Mul, Rem, Sub},
     str::FromStr,
+    collections::HashMap,
 };
+use lazy_static::lazy_static;
 
 pub type Map = serde_json::value::Map<String, SerdeValue>;
 
@@ -21,13 +23,19 @@ pub enum Error {
     TypeError,
     UnknownVariable,
 }
+pub const DAI_ADDR: &str = "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359";
+pub const USDT_ADDR: &str = "0xdac17f958d2ee523a2206206994597c13d831ec7";
+pub const USDC_ADDR: &str = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
 
-fn get_deposit_asset_divisor(address: &String) -> Result<BigNum, Error> {
-    match address.as_str() {
-        "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359" => Ok(BigNum::from(10u64.pow(18))), // DAI
-        "0xdac17f958d2ee523a2206206994597c13d831ec7" => Ok(BigNum::from(10u64.pow(6))),  // Tether
-        _ => Err(Error::TypeError),
-    }
+lazy_static! {
+    pub static ref DEPOSIT_ASSETS_MAP: HashMap<String, BigNum> = {
+        let mut assets = HashMap::new();
+        assets.insert(DAI_ADDR.into(), BigNum::from(10u64.pow(18)));
+        assets.insert(USDT_ADDR.into(), BigNum::from(10u64.pow(6)));
+        assets.insert(USDC_ADDR.into(), BigNum::from(10u64.pow(18)));
+
+        assets
+    };
 }
 
 trait Eval {
@@ -887,7 +895,7 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
                 .try_bignum()?;
             let deposit_asset = &input.global.channel.deposit_asset;
 
-            let divisor = get_deposit_asset_divisor(&deposit_asset)?;
+            let divisor = DEPOSIT_ASSETS_MAP.get(deposit_asset).unwrap();
             Some(Value::BigNum(amount.div(divisor)))
         }
         Function::Do(first_rule) => eval(input, output, first_rule)?,
