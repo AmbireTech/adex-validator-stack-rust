@@ -1306,7 +1306,7 @@ mod string_and_array {
     }
 
     #[test]
-    fn test_get_dai_price_in_usd_eval() {
+    fn test_get_price_in_usd_eval() {
         let mut input = get_default_input();
 
         let mut output = Output {
@@ -1323,11 +1323,5 @@ mod string_and_array {
             ))));
             assert_eq!(Ok(amount_usd), rule.eval(&input, &mut output));
         }
-        let amount_dai = BigNum::from_str("100000000000000000000").expect("Should create BigNum"); // 100 DAI
-        let amount_usd = Some(Value::BigNum(BigNum::from(100)));
-        let rule = Rule::Function(Function::new_get_price_in_usd(Rule::Value(Value::BigNum(
-            amount_dai,
-        ))));
-        assert_eq!(Ok(amount_usd), rule.eval(&input, &mut output));
     }
 }
