@@ -1,13 +1,18 @@
-use merkletree::hash::Algorithm;
-use merkletree::merkle;
-use merkletree::merkle::VecStore;
-use merkletree::proof::Proof;
+use merkletree::{hash::Algorithm, merkle, merkle::VecStore, proof::Proof};
 use std::hash::Hasher;
 use std::iter::FromIterator;
 use tiny_keccak::Keccak;
+use thiserror::Error;
+use std::fmt;
 
 #[derive(Clone)]
 struct KeccakAlgorithm(Keccak);
+
+impl fmt::Debug for KeccakAlgorithm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Keccak256 Algorithm")
+    }
+}
 
 impl KeccakAlgorithm {
     pub fn new() -> KeccakAlgorithm {
@@ -72,31 +77,41 @@ impl Algorithm<MerkleItem> for KeccakAlgorithm {
 type ExternalMerkleTree =
     merkletree::merkle::MerkleTree<MerkleItem, KeccakAlgorithm, VecStore<MerkleItem>>;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 enum Tree {
     SingleItem(MerkleItem),
     MerkleTree(ExternalMerkleTree),
 }
 
+#[derive(Debug, Error, Eq, PartialEq)]
+pub enum Error {
+    #[error("No leaves were provided")]
+    ZeroLeaves,
+}
+
+#[derive(Debug)]
 pub struct MerkleTree {
     tree: Tree,
     root: MerkleItem,
 }
 
 impl MerkleTree {
-    pub fn new(data: &[MerkleItem]) -> MerkleTree {
+    pub fn new(data: &[MerkleItem]) -> Result<MerkleTree, Error> {
         let mut leaves: Vec<MerkleItem> = data.to_owned();
+        // sort the MerkleTree leaves
+        leaves.sort();
+        // remove duplicates **before** we check the leaves length
+        leaves.dedup_by(|a, b| a == b);
 
-        let tree: Tree = if leaves.len() == 1 {
-            Tree::SingleItem(leaves[0].to_owned())
-        } else {
-            // sort the merkle tree leaves
-            leaves.sort();
-            // remove duplicates
-            leaves.dedup_by(|a, b| a == b);
+        let tree = match leaves.len() {
+            0 => return Err(Error::ZeroLeaves),
+            // should never `panic!`, we have a single leaf after all
+            1 => Tree::SingleItem(leaves.remove(0)),
+            _ => {
+                let merkletree = merkle::MerkleTree::from_iter(leaves);
 
-            let merkletree = merkle::MerkleTree::from_iter(leaves);
-            Tree::MerkleTree(merkletree)
+                Tree::MerkleTree(merkletree)
+            }
         };
 
         let root: MerkleItem = match &tree {
@@ -104,7 +119,7 @@ impl MerkleTree {
             Tree::MerkleTree(merkletree) => merkletree.root(),
         };
 
-        MerkleTree { tree, root }
+        Ok(MerkleTree { tree, root })
     }
 
     pub fn root(&self) -> MerkleItem {
@@ -135,6 +150,12 @@ mod test {
     use hex::FromHex;
 
     #[test]
+    fn it_returns_error_on_zero_leaves() {
+        let error = MerkleTree::new(&[]).expect_err("ZeroLeaves error expected");
+        assert_eq!(Error::ZeroLeaves, error);
+    }
+
+    #[test]
     fn it_generates_correct_merkle_tree_that_correlates_with_js_impl() {
         let h1 = <[u8; 32]>::from_hex(
             "71b1b2ad4db89eea341553b718f51f4f0aac03c6a596c4c0e1697f7b9d9da337",
@@ -145,7 +166,7 @@ mod test {
         )
         .unwrap();
 
-        let top = MerkleTree::new(&[h1, h2]);
+        let top = MerkleTree::new(&[h1, h2]).expect("Should create MerkleTree");
 
         let root = hex::encode(&top.root());
 
@@ -172,7 +193,7 @@ mod test {
         .unwrap();
 
         // duplicate leaves
-        let top = MerkleTree::new(&[h1, h2, h2]);
+        let top = MerkleTree::new(&[h1, h2, h2]).expect("Should create MerkleTree");
 
         let root = hex::encode(&top.root());
 
@@ -204,7 +225,7 @@ mod test {
         .unwrap();
 
         // odd leaves
-        let top = MerkleTree::new(&[h1, h2, h3]);
+        let top = MerkleTree::new(&[h1, h2, h3]).expect("Should create MerkleTree");
 
         let root = hex::encode(&top.root());
 
