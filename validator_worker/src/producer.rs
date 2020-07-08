@@ -28,20 +28,30 @@ pub async fn tick<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result {
         .get_event_aggregates(accounting.last_event_aggregate)
         .await?;
 
-    if !aggrs.events.is_empty() {
+    if aggrs.events.is_empty() {
+        return Ok((accounting.balances, None));
+    }
+
+    let (balances, new_accounting) = merge_aggrs(&accounting, &aggrs.events, &iface.channel)?;
+
+    if new_accounting.balances.is_empty() {
         info!(
             iface.logger,
-            "channel {}: processing {} event aggregates",
+            "channel {}: empty Accounting balances, skipping propagation", iface.channel.id
+        );
+
+        Ok((balances, None))
+    } else {
+        info!(
+            iface.logger,
+            "channel {}: processed {} event aggregates",
             iface.channel.id,
             aggrs.events.len()
         );
-        let (balances, new_accounting) = merge_aggrs(&accounting, &aggrs.events, &iface.channel)?;
 
         let message_types = MessageTypes::Accounting(new_accounting.clone());
         iface.propagate(&[&message_types]).await;
 
         Ok((balances, Some(new_accounting)))
-    } else {
-        Ok((accounting.balances.clone(), None))
     }
 }
