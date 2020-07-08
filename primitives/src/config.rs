@@ -4,7 +4,6 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 use std::fs;
-use toml;
 
 lazy_static! {
     static ref DEVELOPMENT_CONFIG: Config =
