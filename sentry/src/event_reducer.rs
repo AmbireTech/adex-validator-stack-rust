@@ -2,8 +2,6 @@ use crate::analytics_recorder::get_payout;
 use primitives::sentry::{AggregateEvents, Event, EventAggregate};
 use primitives::{BigNum, Channel, ValidatorId};
 
-// @TODO: Remove attribute once we use this function!
-#[allow(dead_code)]
 pub(crate) fn reduce(channel: &Channel, initial_aggr: &mut EventAggregate, ev: &Event) {
     match ev {
         Event::Impression { publisher, .. } => {

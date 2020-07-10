@@ -1,9 +1,9 @@
 use merkletree::{hash::Algorithm, merkle, merkle::VecStore, proof::Proof};
+use std::fmt;
 use std::hash::Hasher;
 use std::iter::FromIterator;
-use tiny_keccak::Keccak;
 use thiserror::Error;
-use std::fmt;
+use tiny_keccak::Keccak;
 
 #[derive(Clone)]
 struct KeccakAlgorithm(Keccak);
