@@ -39,7 +39,7 @@ pub fn get_balances_after_fees_tree(
         let adjusted_balance = value * &ratio;
 
         total += &adjusted_balance;
-        balances_after_fees.insert(key.clone(), adjusted_balance);
+        balances_after_fees.insert(*key, adjusted_balance);
     }
 
     let rounding_error = if deposit_amount == total_distributed {
