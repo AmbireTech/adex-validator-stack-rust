@@ -20,6 +20,7 @@ slog = { version = "^2.5.2" , features = ["max_level_trace"] }
 slog-term = "^2.4.2"
 slog-async = "^2.3.0"
 # Domain
+thiserror = "^1.0"
 chrono = { version = "0.4", features = ["serde"] }
 time = "0.1.42"
 hex = "0.3.2"

@@ -58,7 +58,7 @@ async fn store(db: &DbPool, channel_id: &ChannelId, logger: &Logger, recorder: R
                 aggregate: new_aggr(&channel_id),
             };
             channel_recorder.insert(channel_id.to_owned(), record);
-        };
+        }
     }
 }
 

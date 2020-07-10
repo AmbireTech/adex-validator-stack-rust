@@ -18,7 +18,7 @@ async fn send_heartbeat<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result<()
         .expect("The timestamp should be able to be converted to u64");
     BigEndian::write_uint(&mut timestamp_buf[26..], milliseconds, 6);
 
-    let merkle_tree = MerkleTree::new(&[timestamp_buf]);
+    let merkle_tree = MerkleTree::new(&[timestamp_buf])?;
 
     let state_root_raw = get_signable_state_root(&iface.channel.id, &merkle_tree.root())?;
     let state_root = hex::encode(state_root_raw);
