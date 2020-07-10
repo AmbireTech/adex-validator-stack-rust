@@ -1,7 +1,10 @@
 use std::error::Error;
 
 use primitives::adapter::{Adapter, AdapterErrorKind};
-use primitives::validator::{Accounting, MessageTypes, NewState};
+use primitives::{
+    validator::{Accounting, MessageTypes, NewState},
+    BalancesMap,
+};
 
 use crate::heartbeat::{heartbeat, HeartbeatStatus};
 use crate::sentry_interface::{PropagationResult, SentryApi};
@@ -19,12 +22,14 @@ pub async fn tick<A: Adapter + 'static>(
     iface: &SentryApi<A>,
 ) -> Result<TickStatus<A::AdapterError>, Box<dyn Error>> {
     let producer_tick = producer::tick(&iface).await?;
+    let empty_balances = BalancesMap::default();
     let (balances, new_state) = match &producer_tick {
         producer::TickStatus::Sent { new_accounting, .. } => {
             let new_state = on_new_accounting(&iface, new_accounting).await?;
             (&new_accounting.balances, Some(new_state))
         }
         producer::TickStatus::NoNewEventAggr(balances) => (balances, None),
+        producer::TickStatus::EmptyBalances => (&empty_balances, None),
     };
 
     Ok(TickStatus {

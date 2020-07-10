@@ -8,6 +8,7 @@ use primitives::{BalancesMap, ChannelId};
 
 use crate::core::events::merge_aggrs;
 use crate::sentry_interface::{PropagationResult, SentryApi};
+use slog::info;
 
 #[derive(Debug)]
 pub enum TickStatus<AE: AdapterErrorKind> {
@@ -18,6 +19,7 @@ pub enum TickStatus<AE: AdapterErrorKind> {
         event_counts: usize,
     },
     NoNewEventAggr(BalancesMap),
+    EmptyBalances,
 }
 
 pub async fn tick<A: Adapter + 'static>(
@@ -38,8 +40,26 @@ pub async fn tick<A: Adapter + 'static>(
         .get_event_aggregates(accounting.last_event_aggregate)
         .await?;
 
-    if !aggrs.events.is_empty() {
-        let new_accounting = merge_aggrs(&accounting, &aggrs.events, &iface.channel)?;
+    if aggrs.events.is_empty() {
+        return Ok(TickStatus::NoNewEventAggr(accounting.balances));
+    }
+
+    let new_accounting = merge_aggrs(&accounting, &aggrs.events, &iface.channel)?;
+
+    if new_accounting.balances.is_empty() {
+        info!(
+            iface.logger,
+            "channel {}: empty Accounting balances, skipping propagation", iface.channel.id
+        );
+
+        Ok(TickStatus::EmptyBalances)
+    } else {
+        info!(
+            iface.logger,
+            "channel {}: processed {} event aggregates",
+            iface.channel.id,
+            aggrs.events.len()
+        );
 
         let message_types = MessageTypes::Accounting(new_accounting.clone());
 
@@ -49,7 +69,5 @@ pub async fn tick<A: Adapter + 'static>(
             new_accounting,
             event_counts: aggrs.events.len(),
         })
-    } else {
-        Ok(TickStatus::NoNewEventAggr(accounting.balances.clone()))
     }
 }

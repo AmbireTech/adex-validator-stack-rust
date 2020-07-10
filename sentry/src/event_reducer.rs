@@ -3,8 +3,6 @@ use crate::Session;
 use primitives::sentry::{AggregateEvents, Event, EventAggregate};
 use primitives::{BigNum, Channel, ValidatorId};
 
-// @TODO: Remove attribute once we use this function!
-#[allow(dead_code)]
 pub(crate) fn reduce(
     channel: &Channel,
     initial_aggr: &mut EventAggregate,
