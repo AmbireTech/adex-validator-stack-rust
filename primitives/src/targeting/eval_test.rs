@@ -1317,7 +1317,7 @@ mod string_and_array {
         for (key, value) in &*DEPOSIT_ASSETS_MAP {
             input.global.channel.deposit_asset = key.to_string();
             let amount_crypto = BigNum::from(100).mul(value);
-            let amount_usd = Some(Value::BigNum(BigNum::from(100)));
+            let amount_usd = Some(Value::Number(Number::from_f64(100.0).expect("should create a float")));
             let rule = Rule::Function(Function::new_get_price_in_usd(Rule::Value(Value::BigNum(
                 amount_crypto,
             ))));
