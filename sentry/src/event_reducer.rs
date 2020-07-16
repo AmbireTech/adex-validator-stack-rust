@@ -47,14 +47,14 @@ fn merge_impression_ev(
     let event_count = impression
         .event_counts
         .get_or_insert_with(Default::default)
-        .entry(earner.clone())
+        .entry(*earner)
         .or_insert_with(|| 0.into());
 
     *event_count += &1.into();
 
     let event_payouts = impression
         .event_payouts
-        .entry(earner.clone())
+        .entry(*earner)
         .or_insert_with(|| 0.into());
     *event_payouts += payout;
 
