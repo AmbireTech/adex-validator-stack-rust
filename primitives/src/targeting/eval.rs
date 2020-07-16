@@ -895,11 +895,10 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
                 .try_bignum()?;
             let deposit_asset = &input.global.channel.deposit_asset;
 
-            let divisor = match DEPOSIT_ASSETS_MAP.get(deposit_asset) {
-                Some(d) => Ok(d),
-                None => Err(Error::TypeError),
-            };
-            Some(Value::BigNum(amount.div(divisor?)))
+            let divisor = DEPOSIT_ASSETS_MAP.get(deposit_asset).ok_or(Error::TypeError)?;
+            let amount_in_usd = amount.div(divisor).to_f64().ok_or(Error::TypeError)?;
+            let amount_as_number = Number::from_f64(amount_in_usd).ok_or(Error::TypeError)?;
+            Some(Value::Number(amount_as_number))
         }
         Function::Do(first_rule) => eval(input, output, first_rule)?,
         Function::Set(key, rule) => {
