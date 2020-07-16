@@ -48,7 +48,7 @@ pub async fn postgres_connection() -> Result<DbPool, bb8_postgres::tokio_postgre
         .user(POSTGRES_USER.as_str())
         .password(POSTGRES_PASSWORD.as_str())
         .host(POSTGRES_HOST.as_str())
-        .port(POSTGRES_PORT.clone());
+        .port(*POSTGRES_PORT);
     if let Some(db) = POSTGRES_DB.clone() {
         config.dbname(&db);
     }
@@ -64,7 +64,7 @@ pub async fn setup_migrations(environment: &str) {
         .database_user(POSTGRES_USER.as_str())
         .database_password(POSTGRES_PASSWORD.as_str())
         .database_host(POSTGRES_HOST.as_str())
-        .database_port(POSTGRES_PORT.clone())
+        .database_port(*POSTGRES_PORT)
         .database_name(&POSTGRES_DB.as_ref().unwrap_or(&POSTGRES_USER))
         .build()
         .expect("Should build migration settings");
