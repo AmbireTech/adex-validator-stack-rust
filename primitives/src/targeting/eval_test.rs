@@ -253,6 +253,28 @@ mod dsl_test {
 
         assert_eq!(Some(&BigNum::from(20)), output.price.get("IMPRESSION"));
     }
+
+    #[test]
+    fn test_get_eval() {
+        let input = get_default_input();
+        let mut output = Output {
+            show: true,
+            boost: 42.0,
+            price: Default::default(),
+        };
+
+        let input_country = Function::Get("country".to_string())
+            .eval(&input, &mut output)
+            .expect("Should get input.global.country");
+        assert_eq!(Some(Value::String("bg".to_string())), input_country);
+
+        let output_boost = Function::Get("boost".to_string())
+            .eval(&input, &mut output)
+            .expect("Should get output.boost");
+        let expected_output_boost = Number::from_f64(42.0).expect("should create Number");
+
+        assert_eq!(Some(Value::Number(expected_output_boost)), output_boost);
+    }
 }
 
 mod math_functions {
@@ -1320,7 +1342,9 @@ mod string_and_array {
         for (key, value) in &*DEPOSIT_ASSETS_MAP {
             input.global.channel.deposit_asset = key.to_string();
             let amount_crypto = BigNum::from(100).mul(value);
-            let amount_usd = Some(Value::Number(Number::from_f64(100.0).expect("should create a float")));
+            let amount_usd = Some(Value::Number(
+                Number::from_f64(100.0).expect("should create a float"),
+            ));
             let rule = Rule::Function(Function::new_get_price_in_usd(Rule::Value(Value::BigNum(
                 amount_crypto,
             ))));
