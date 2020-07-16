@@ -944,7 +944,11 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
 
             return Ok(None);
         }
-        Function::Get(key) => Some(input.try_get(key)?),
+        Function::Get(key) => match input.try_get(key) {
+            Ok(value) => Some(value),
+            Err(Error::UnknownVariable) => Some(output.try_get(key)?),
+            Err(e) => return Err(e),
+        },
         Function::Bn(value) => {
             let big_num = value.clone().try_bignum()?;
 

@@ -1063,9 +1063,12 @@ mod control_flow_and_logic {
             boost: 1.0,
             price: Default::default(),
         };
-        Rule::Function(Function::new_only_show_if(Value::Bool(true))).eval(&input, &mut output);
+        let result = Function::new_only_show_if(Value::Bool(true)).eval(&input, &mut output);
+        assert_eq!(Ok(None), result);
         assert!(output.show);
-        Rule::Function(Function::new_only_show_if(Value::Bool(false))).eval(&input, &mut output);
+
+        let result = Function::new_only_show_if(Value::Bool(false)).eval(&input, &mut output);
+        assert_eq!(Ok(None), result);
         assert!(!output.show);
     }
     #[test]
