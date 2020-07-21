@@ -56,7 +56,7 @@ pub struct AdSlot {
     #[serde(default)]
     pub archived: bool,
     /// UTC timestamp in milliseconds, changed every time modifiable property is changed
-    #[serde(deserialize_with = "from_timestamp_option")]
+    // #[serde(deserialize_with = "from_timestamp_option")]
     pub modified: Option<DateTime<Utc>>,
 }
 
