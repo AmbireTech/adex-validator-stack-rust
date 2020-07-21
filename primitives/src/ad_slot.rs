@@ -42,7 +42,7 @@ pub struct AdSlot {
     /// User address from the session
     pub owner: ValidatorId,
     /// UTC timestamp in milliseconds, used as nonce for escaping duplicated spec ipfs hashes
-    #[serde(deserialize_with = "from_timestamp")]
+    // #[serde(deserialize_with = "from_timestamp")]
     pub created: DateTime<Utc>,
     /// the name of the unit used in platform UI
     #[serde(default)]
@@ -60,13 +60,13 @@ pub struct AdSlot {
     pub modified: Option<DateTime<Utc>>,
 }
 
-fn from_timestamp(time: &String) -> DateTime<Utc> {
-    DateTime::parse_from_str(time, "%Y-%m-%dT%H:%M:%S.%f").unwrap()
-}
+// fn from_timestamp(time: &String) -> DateTime<Utc> {
+//     DateTime::parse_from_str(time, "%Y-%m-%dT%H:%M:%S.%f").unwrap()
+// }
 
-fn from_timestamp_option(time: &String) -> Option<DateTime<Utc>> {
-    match DateTime::parse_from_str(time, "%Y-%m-%dT%H:%M:%S.%f") {
-        Ok(t) => Some(t),
-        Err(_) => None,
-    }
-}
+// fn from_timestamp_option(time: &String) -> Option<DateTime<Utc>> {
+//     match DateTime::parse_from_str(time, "%Y-%m-%dT%H:%M:%S.%f") {
+//         Ok(t) => Some(t),
+//         Err(_) => None,
+//     }
+// }
