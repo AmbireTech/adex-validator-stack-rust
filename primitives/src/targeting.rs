@@ -6,6 +6,7 @@ use chrono::Utc;
 use std::collections::HashMap;
 
 pub use eval::*;
+use serde_json::Number;
 
 mod eval;
 
@@ -24,6 +25,7 @@ impl Input {
         let spec = &self.global.channel.spec;
 
         match key {
+            // AdView scope, accessible only on the AdView
             "adView.secondsSinceCampaignImpression" => self
                 .ad_view
                 .as_ref()
@@ -34,9 +36,22 @@ impl Input {
                 .as_ref()
                 .map(|ad_view| Value::Bool(ad_view.has_custom_preferences))
                 .ok_or(Error::UnknownVariable),
+            "adView.navigatorLanguage" => self
+                .ad_view
+                .as_ref()
+                .map(|ad_view| Value::String(ad_view.navigator_language.clone()))
+                .ok_or(Error::UnknownVariable),
+            // Global scope, accessible everywhere
             "adSlotId" => Ok(Value::String(self.global.ad_slot_id.clone())),
             "adSlotType" => Ok(Value::String(self.global.ad_slot_type.clone())),
             "publisherId" => Ok(Value::String(self.global.publisher_id.to_checksum())),
+            "country" => self
+                .global
+                .country
+                .clone()
+                .ok_or(Error::UnknownVariable)
+                .map(Value::String),
+            "eventType" => Ok(Value::String(self.global.event_type.clone())),
             "secondsSinceEpoch" => Ok(Value::Number(self.global.seconds_since_epoch.into())),
             "userAgentOS" => self
                 .global
@@ -50,7 +65,7 @@ impl Input {
                 .clone()
                 .map(Value::String)
                 .ok_or(Error::UnknownVariable),
-
+            // Global scope, accessible everywhere, campaign-dependant
             "adUnitId" => {
                 let ipfs = self
                     .global
@@ -112,6 +127,7 @@ impl Input {
 
                 Ok(Value::BigNum(earned))
             }
+            // adSlot scope, accessible on Supermarket and AdView
             "adSlot.categories" => self
                 .ad_slot
                 .as_ref()
@@ -211,6 +227,26 @@ pub struct Output {
     /// The default is the min of the bound of event type:
     /// Default: pricingBounds.IMPRESSION.min
     pub price: HashMap<String, BigNum>,
+}
+
+impl Output {
+    fn try_get(&self, key: &str) -> Result<Value, Error> {
+        match key {
+            "show" => Ok(Value::Bool(self.show)),
+            "boost" => {
+                let boost = Number::from_f64(self.boost).ok_or(Error::TypeError)?;
+                Ok(Value::Number(boost))
+            }
+            price_key if price_key.starts_with("price.") => {
+                let price = self
+                    .price
+                    .get(price_key.trim_start_matches("price."))
+                    .ok_or(Error::UnknownVariable)?;
+                Ok(Value::BigNum(price.clone()))
+            }
+            _ => Err(Error::UnknownVariable),
+        }
+    }
 }
 
 impl From<&Channel> for Output {
@@ -323,6 +359,26 @@ mod test {
         };
         input.ad_slot = Some(ad_slot);
         assert!(input.try_get("adSlot.alexaRank").is_ok());
+    }
+
+    #[test]
+    fn test_try_get_of_output() {
+        let output = Output {
+            show: false,
+            boost: 5.5,
+            price: vec![("one".to_string(), 100.into())].into_iter().collect(),
+        };
+
+        assert_eq!(Ok(Value::Bool(false)), output.try_get("show"));
+        assert_eq!(
+            Ok(Value::Number(
+                Number::from_f64(5.5).expect("Should make a number")
+            )),
+            output.try_get("boost")
+        );
+        assert_eq!(Ok(Value::BigNum(100.into())), output.try_get("price.one"));
+        assert_eq!(Err(Error::UnknownVariable), output.try_get("price.unknown"));
+        assert_eq!(Err(Error::UnknownVariable), output.try_get("unknown"));
     }
 
     #[test]
