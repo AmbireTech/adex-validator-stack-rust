@@ -8,7 +8,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 
 use crate::{
-    targeting::Rule, AdUnit, BigNum, EventSubmission, TargetingTag, ValidatorDesc, ValidatorId,
+    targeting::Rule, AdUnit, BigNum, EventSubmission, ValidatorDesc, ValidatorId,
 };
 use hex::{FromHex, FromHexError};
 
