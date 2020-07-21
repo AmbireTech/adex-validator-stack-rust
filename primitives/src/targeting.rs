@@ -143,7 +143,7 @@ impl Input {
     }
 }
 
-fn get_pricing_bounds(channel: &Channel, event_type: &str) -> Pricing {
+pub fn get_pricing_bounds(channel: &Channel, event_type: &str) -> Pricing {
     channel
         .spec
         .pricing_bounds
