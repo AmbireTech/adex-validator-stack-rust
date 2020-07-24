@@ -42,11 +42,11 @@ pub enum Finalized {
 
 pub mod units_for_slot {
     pub mod response {
+        use crate::{targeting::Rule, BigNum, ChannelId, ChannelSpec, SpecValidators, ValidatorId};
         use chrono::{
             serde::{ts_milliseconds, ts_milliseconds_option},
             DateTime, Utc,
         };
-        use crate::{targeting::Rule, BigNum, ChannelId, SpecValidators, ValidatorId, ChannelSpec};
         use serde::Serialize;
 
         #[derive(Debug, Serialize)]

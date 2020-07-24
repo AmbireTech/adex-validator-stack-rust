@@ -1,4 +1,4 @@
-use crate::{BigNum, TargetingTag, ValidatorId, targeting::Rule};
+use crate::{targeting::Rule, BigNum, TargetingTag, ValidatorId};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
