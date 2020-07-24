@@ -7,9 +7,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 
-use crate::{
-    targeting::Rule, AdUnit, BigNum, EventSubmission, ValidatorDesc, ValidatorId,
-};
+use crate::{targeting::Rule, AdUnit, BigNum, EventSubmission, ValidatorDesc, ValidatorId};
 use hex::{FromHex, FromHexError};
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Copy, Clone, Hash)]

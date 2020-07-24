@@ -8,21 +8,28 @@ pub(crate) fn reduce(
     initial_aggr: &mut EventAggregate,
     ev: &Event,
     session: &Session,
-) {
+) -> Result<(), Box<dyn std::error::Error>> {
+    let event_type = ev.to_string();
     match ev {
         Event::Impression { publisher, .. } => {
-            let impression = initial_aggr.events.get("IMPRESSION");
-            let payout = get_payout(&channel, &ev, session);
-            let merge = merge_impression_ev(impression, &publisher, &payout);
+            let impression = initial_aggr.events.get(&event_type);
+            let payout = get_payout(&channel, &ev, session)?;
+            let merge = merge_impression_ev(
+                impression,
+                payout.unwrap_or_else(|| (*publisher, Default::default())),
+            );
 
-            initial_aggr.events.insert("IMPRESSION".to_owned(), merge);
+            initial_aggr.events.insert(event_type, merge);
         }
         Event::Click { publisher, .. } => {
-            let clicks = initial_aggr.events.get("CLICK");
-            let payout = get_payout(&channel, &ev, session);
-            let merge = merge_impression_ev(clicks, &publisher, &payout);
+            let clicks = initial_aggr.events.get(&event_type);
+            let payout = get_payout(&channel, &ev, session)?;
+            let merge = merge_impression_ev(
+                clicks,
+                payout.unwrap_or_else(|| (*publisher, Default::default())),
+            );
 
-            initial_aggr.events.insert("CLICK".to_owned(), merge);
+            initial_aggr.events.insert(event_type, merge);
         }
         Event::Close => {
             let close_event = AggregateEvents {
@@ -31,32 +38,33 @@ pub(crate) fn reduce(
                     .into_iter()
                     .collect(),
             };
-            initial_aggr.events.insert("CLOSE".to_owned(), close_event);
+            initial_aggr.events.insert(event_type, close_event);
         }
         _ => {}
     };
+
+    Ok(())
 }
 
 fn merge_impression_ev(
     impression: Option<&AggregateEvents>,
-    earner: &ValidatorId,
-    payout: &BigNum,
+    payout: (ValidatorId, BigNum),
 ) -> AggregateEvents {
     let mut impression = impression.map(Clone::clone).unwrap_or_default();
 
     let event_count = impression
         .event_counts
         .get_or_insert_with(Default::default)
-        .entry(*earner)
+        .entry(payout.0)
         .or_insert_with(|| 0.into());
 
     *event_count += &1.into();
 
     let event_payouts = impression
         .event_payouts
-        .entry(*earner)
+        .entry(payout.0)
         .or_insert_with(|| 0.into());
-    *event_payouts += payout;
+    *event_payouts += &payout.1;
 
     impression
 }

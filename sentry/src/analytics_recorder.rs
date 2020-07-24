@@ -34,7 +34,11 @@ pub async fn record(
                 referrer,
             } => {
                 let divisor = BigNum::from(10u64.pow(18));
+                // @Todo: Check this!
                 let pay_amount = get_payout(&channel, event, &session)
+                    .expect("should have payout")
+                    .map(|(_, payout)| payout)
+                    .unwrap_or_default()
                     .div_floor(&divisor)
                     .to_f64()
                     .expect("should always have a payout");
