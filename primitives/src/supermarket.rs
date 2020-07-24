@@ -39,7 +39,6 @@ pub enum Finalized {
     Exhausted,
     Withdraw,
 }
-
 pub mod units_for_slot {
     pub mod response {
         use crate::{targeting::Rule, BigNum, ChannelId, ChannelSpec, SpecValidators, ValidatorId};
@@ -47,16 +46,26 @@ pub mod units_for_slot {
             serde::{ts_milliseconds, ts_milliseconds_option},
             DateTime, Utc,
         };
-        use serde::Serialize;
+        use serde::{Deserialize, Serialize};
+        use url::Url;
 
-        #[derive(Debug, Serialize)]
+        #[derive(Debug, Serialize, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Response {
+            pub targeting_input_base: Vec<Rule>,
+            pub accepted_referrers: Vec<Url>,
+            pub fallback_unit: AdUnit,
+            pub campaigns: Vec<Campaign>,
+        }
+
+        #[derive(Debug, Serialize, Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct UnitsWithPrice {
             pub unit: AdUnit,
             pub price: BigNum,
         }
 
-        #[derive(Debug, Serialize)]
+        #[derive(Debug, Serialize, Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct Campaign {
             #[serde(flatten)]
@@ -65,7 +74,7 @@ pub mod units_for_slot {
             pub units_with_price: Vec<UnitsWithPrice>,
         }
 
-        #[derive(Debug, Serialize)]
+        #[derive(Debug, Serialize, Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct Channel {
             pub id: ChannelId,
@@ -87,7 +96,7 @@ pub mod units_for_slot {
             }
         }
 
-        #[derive(Debug, Serialize)]
+        #[derive(Debug, Serialize, Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct Spec {
             #[serde(with = "ts_milliseconds")]
@@ -114,7 +123,7 @@ pub mod units_for_slot {
             }
         }
 
-        #[derive(Debug, Serialize)]
+        #[derive(Debug, Serialize, Deserialize, Clone)]
         #[serde(rename_all = "camelCase")]
         pub struct AdUnit {
             /// Same as `ipfs`
@@ -124,13 +133,13 @@ pub mod units_for_slot {
             pub target_url: String,
         }
 
-        impl From<crate::AdUnit> for AdUnit {
-            fn from(ad_unit: crate::AdUnit) -> Self {
+        impl From<&crate::AdUnit> for AdUnit {
+            fn from(ad_unit: &crate::AdUnit) -> Self {
                 Self {
-                    id: ad_unit.ipfs,
-                    media_url: ad_unit.media_url,
-                    media_mime: ad_unit.media_mime,
-                    target_url: ad_unit.target_url,
+                    id: ad_unit.ipfs.clone(),
+                    media_url: ad_unit.media_url.clone(),
+                    media_mime: ad_unit.media_mime.clone(),
+                    target_url: ad_unit.target_url.clone(),
                 }
             }
         }
