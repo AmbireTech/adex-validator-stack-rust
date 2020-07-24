@@ -31,6 +31,7 @@ name = "adview-manager"
 version = "0.1.0"
 dependencies = [
  "chrono 0.4.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-bigint 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "primitives 0.1.0",
  "serde 1.0.105 (registry+https://github.com/rust-lang/crates.io-index)",

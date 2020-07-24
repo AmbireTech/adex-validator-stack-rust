@@ -39,6 +39,7 @@ pub enum Finalized {
     Exhausted,
     Withdraw,
 }
+
 pub mod units_for_slot {
     pub mod response {
         use crate::{targeting::Rule, BigNum, ChannelId, ChannelSpec, SpecValidators, ValidatorId};
