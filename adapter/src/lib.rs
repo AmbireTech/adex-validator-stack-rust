@@ -225,12 +225,12 @@ mod test {
             .expect("The timestamp should be able to be converted to u64");
         BigEndian::write_uint(&mut timestamp_buf[26..], n, 6);
 
-        let merkle_tree = MerkleTree::new(&[timestamp_buf]);
+        let merkle_tree = MerkleTree::new(&[timestamp_buf]).expect("Should instantiate");
 
         let channel_id = "061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088";
 
         let state_root = get_signable_state_root(
-            &hex::decode(&channel_id).expect("fialed"),
+            &hex::decode(&channel_id).expect("failed"),
             &merkle_tree.root(),
         )
         .expect("Should get state_root");
