@@ -99,7 +99,6 @@ pub struct Application<A: Adapter> {
     pub pool: DbPool,
     pub config: Config,
     pub event_aggregator: EventAggregator,
-    __secret: (),
 }
 
 impl<A: Adapter + 'static> Application<A> {
@@ -117,7 +116,6 @@ impl<A: Adapter + 'static> Application<A> {
             redis,
             pool,
             event_aggregator: Default::default(),
-            __secret: (),
         }
     }
 
