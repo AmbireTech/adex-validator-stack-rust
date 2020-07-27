@@ -53,7 +53,8 @@ pub mod units_for_slot {
         #[derive(Debug, Serialize, Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct Response {
-            pub targeting_input_base: Vec<Rule>,
+            // TODO: This should be Input, however, we only need the fields and not the Global: Channel, Status & BalancesMap
+            pub targeting_input_base: (),
             pub accepted_referrers: Vec<Url>,
             pub fallback_unit: AdUnit,
             pub campaigns: Vec<Campaign>,
