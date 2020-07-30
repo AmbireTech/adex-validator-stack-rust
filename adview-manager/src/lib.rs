@@ -3,7 +3,7 @@
 
 use adex_primitives::{
     supermarket::units_for_slot::response::{AdUnit, Campaign, Response},
-    targeting::{AdView, Input},
+    targeting::{AdView, InputSource},
     BigNum, ChannelId, SpecValidators,
 };
 use chrono::{DateTime, Utc};
@@ -268,7 +268,7 @@ impl Manager {
         Self { options, history }
     }
 
-    pub fn get_targeting_input(&self, mut input: Input, channel_id: ChannelId) -> Input {
+    pub fn get_targeting_input(&self, mut input: InputSource, channel_id: ChannelId) -> InputSource {
         let seconds_since_campaign_impression = self
             .history
             .iter()

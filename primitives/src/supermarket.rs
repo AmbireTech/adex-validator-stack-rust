@@ -42,7 +42,7 @@ pub enum Finalized {
 
 pub mod units_for_slot {
     pub mod response {
-        use crate::{targeting::Rule, BigNum, ChannelId, ChannelSpec, SpecValidators, ValidatorId};
+        use crate::{targeting::{Input, Rule, InputMap}, BigNum, ChannelId, ChannelSpec, SpecValidators, ValidatorId};
         use chrono::{
             serde::{ts_milliseconds, ts_milliseconds_option},
             DateTime, Utc,
@@ -53,8 +53,7 @@ pub mod units_for_slot {
         #[derive(Debug, Serialize, Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct Response {
-            // TODO: This should be Input, however, we only need the fields and not the Global: Channel, Status & BalancesMap
-            pub targeting_input_base: (),
+            pub targeting_input_base: InputMap,
             pub accepted_referrers: Vec<Url>,
             pub fallback_unit: AdUnit,
             pub campaigns: Vec<Campaign>,

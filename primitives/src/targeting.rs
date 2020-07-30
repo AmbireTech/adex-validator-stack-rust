@@ -7,11 +7,40 @@ use std::collections::HashMap;
 
 pub use eval::*;
 use serde_json::Number;
+use serde::{Serialize};
 
 mod eval;
 
-#[derive(Debug, Clone)]
-pub struct Input {
+pub type InputMap = HashMap<String, Value>;
+
+#[derive(Debug)]
+pub enum Input {
+    Map {
+        inner: InputMap,
+        deposit_asset: String,
+    },
+    InputSource(InputSource),
+}
+
+impl Input {
+    pub fn get(&self, key: &str) -> Result<Value, Error> {
+        match self {
+            Input::Map{inner, ..} => inner.get(key).ok_or(Error::UnknownVariable).map(Clone::clone),
+            Input::InputSource(input) => input.try_get(key)
+        }
+    }
+
+    pub fn deposit_asset(&self) -> Value {
+        match self {
+            Input::Map{deposit_asset, ..} => Value::new_string(deposit_asset),
+            Input::InputSource(input) => Value::new_string(&input.global.channel.deposit_asset)
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(into = "InputMap")]
+pub struct InputSource {
     /// AdView scope, accessible only on the AdView
     pub ad_view: Option<AdView>,
     /// Global scope, accessible everywhere
@@ -20,7 +49,57 @@ pub struct Input {
     pub ad_slot: Option<AdSlot>,
 }
 
-impl Input {
+impl From<Input> for InputMap {
+    fn from(input: Input) -> Self {
+        let mut map = Self::new();
+
+        let fields = [
+            // AdView scope, accessible only on the AdView
+            "adView.secondsSinceCampaignImpression",
+            "adView.hasCustomPreferences",
+            "adView.navigatorLanguage",
+            // Global scope, accessible everywhere
+            "adSlotId",
+            "adSlotType",
+            "publisherId",
+            "country",
+            "eventType",
+            "secondsSinceEpoch",
+            "userAgentOS",
+            "userAgentBrowserFamily",
+            // Global scope, accessible everywhere, campaign-dependant
+            "adUnitId",
+            "advertiserId",
+            "campaignId",
+            "campaignTotalSpent",
+            "campaignSecondsActive",
+            "campaignSecondsDuration",
+            "campaignBudget",
+            "eventMinPrice",
+            "eventMaxPrice",
+            "publisherEarnedFromCampaign",
+            // adSlot scope, accessible on Supermarket and AdView
+            "adSlot.categories",
+            "adSlot.hostname",
+            "adSlot.alexaRank",
+        ];
+
+        for field in fields.iter() {
+            match input.try_get(field) {
+                Ok(value) => {
+                    // we don't care if there is an old value, there shouldn't be one!
+                    map.insert(field.to_string(), value);
+                },
+                // if there is an Error, it will be `UnknownVariable` and we just skip it
+                Err(_) => {},
+            }
+        }
+
+        map
+    }
+}
+
+impl InputSource {
     fn try_get(&self, key: &str) -> Result<Value, Error> {
         let spec = &self.global.channel.spec;
 
@@ -107,6 +186,7 @@ impl Input {
 
                 Ok(Value::Number(seconds.into()))
             }
+            "depositAsset" => Ok(Value::new_string(&self.global.channel.deposit_asset)),
             "campaignBudget" => Ok(Value::BigNum(self.global.channel.deposit_amount.clone())),
             "eventMinPrice" => {
                 let min = get_pricing_bounds(&self.global.channel, &self.global.event_type).min;
