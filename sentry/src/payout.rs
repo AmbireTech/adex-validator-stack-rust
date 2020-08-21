@@ -2,7 +2,7 @@ use crate::Session;
 use chrono::Utc;
 use primitives::{
     sentry::Event,
-    targeting::{get_pricing_bounds, Error, Error as EvalError, Global, Input, Output, Rule},
+    targeting::{get_pricing_bounds, Error, Error as EvalError, Input, Output, Rule, input},
     BigNum, Channel, ValidatorId,
 };
 use std::{
@@ -28,15 +28,6 @@ pub fn get_payout(channel: &Channel, event: &Event, session: &Session) -> Result
             ad_slot,
             ..
         } => {
-            /*
-            const targetingRules = channel.targetingRules || channel.spec.targetingRules || []
-                const eventType = ev.type.toUpperCase()
-                const [minPrice, maxPrice] = getPricingBounds(channel, eventType)
-                if (targetingRules.length === 0) return [balancesKey, minPrice]
-
-                const adUnit =
-                    Array.isArray(channel.spec.adUnits) && channel.spec.adUnits.find(u => u.ipfs === ev.adUnit)
-                const targetingInputBase = {*/
             let targeting_rules = if !channel.targeting_rules.is_empty() {
                 channel.targeting_rules.clone()
             } else {
@@ -52,9 +43,9 @@ pub fn get_payout(channel: &Channel, event: &Event, session: &Session) -> Result
                     .as_ref()
                     .and_then(|ipfs| channel.spec.ad_units.iter().find(|u| &u.ipfs == ipfs));
 
-                let input = Input {
+                let source = input::Source {
                     ad_view: None,
-                    global: Global {
+                    global: input::Global {
                         // TODO: Check this one!
                         ad_slot_id: ad_slot.clone().unwrap_or_default(),
                         // TODO: Check this one!
@@ -70,13 +61,13 @@ pub fn get_payout(channel: &Channel, event: &Event, session: &Session) -> Result
                         user_agent_browser_family: None,
                         // TODO: Check this one!
                         ad_unit: ad_unit.cloned(),
-                        channel: channel.clone(),
-                        status: None,
+                        channel: Some(channel.clone()),
                         balances: None,
                     },
                     // TODO: Check this one as well!
-                    ad_slot: None,
-                };
+                        ad_slot: None,
+                    };
+                let input = input::Input::Source(Box::new(source));
 
                 let mut output = Output {
                     show: true,

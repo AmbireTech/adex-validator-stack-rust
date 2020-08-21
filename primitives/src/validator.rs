@@ -3,7 +3,7 @@ use hex::FromHex;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 
-use crate::{BalancesMap, BigNum, DomainError, ToETHChecksum};
+use crate::{targeting::Value, BalancesMap, BigNum, DomainError, ToETHChecksum};
 use std::convert::TryFrom;
 
 #[derive(Debug)]
@@ -114,6 +114,7 @@ impl TryFrom<&str> for ValidatorId {
 
 impl TryFrom<&String> for ValidatorId {
     type Error = DomainError;
+
     fn try_from(value: &String) -> Result<Self, Self::Error> {
         ValidatorId::try_from(value.as_str())
     }
@@ -122,6 +123,18 @@ impl TryFrom<&String> for ValidatorId {
 impl fmt::Display for ValidatorId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.to_checksum())
+    }
+}
+
+impl TryFrom<Value> for ValidatorId {
+    type Error = DomainError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        let string = value.try_string().map_err(|err| {
+            DomainError::InvalidArgument(format!("Value is not a string: {}", err))
+        })?;
+
+        Self::try_from(&string)
     }
 }
 

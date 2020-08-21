@@ -2,17 +2,21 @@
 #![deny(clippy::all)]
 
 use adex_primitives::{
-    supermarket::units_for_slot::response::{AdUnit, Campaign, Response},
-    targeting::{AdView, InputSource},
+    supermarket::units_for_slot,
+    supermarket::units_for_slot::response::{AdUnit, Campaign},
+    targeting::{self, input, Value},
     BigNum, ChannelId, SpecValidators,
 };
+use async_std::{sync::RwLock, task::block_on};
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
+use rand::Rng;
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
-
-pub type TargetingScore = f64;
-pub type MinTargetingScore = TargetingScore;
+use std::{collections::VecDeque, convert::TryFrom, sync::Arc};
+use thiserror::Error;
+use units_for_slot::response::UnitsWithPrice;
+use url::Url;
 
 const IPFS_GATEWAY: &str = "https://ipfs.moonicorn.network/ipfs/";
 
@@ -58,10 +62,11 @@ impl Options {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct HistoryEntry {
     time: DateTime<Utc>,
     unit_id: String,
-    channel_id: ChannelId,
+    campaign_id: ChannelId,
     slot_id: String,
 }
 
@@ -150,8 +155,9 @@ fn is_video(ad_unit: &AdUnit) -> bool {
 // 	// takes around ~700ms for 100k iterations, yields very decent distribution (e.g. 724ms 50070, 728ms 49936)
 // 	return new BN(unit.id, 32).mul(seed).add(new BN(12345)).mod(new BN(0x80000000))
 // }
-fn randomized_sort_pos(_ad_unit: AdUnit, _seed: BigNum) -> BigNum {
-    todo!("Implement the randomized_sort_pos() function!")
+fn randomized_sort_pos(_ad_unit: &AdUnit, _seed: BigNum) -> BigNum {
+    // todo!("Implement the randomized_sort_pos() function!")
+    BigNum::from(10)
 }
 
 fn get_unit_html(
@@ -235,6 +241,7 @@ pub fn get_unit_html_with_events(
 
         format!("{}{}", fetch_opts, validators)
     };
+
     let get_timeout_code = |event_type: &str| -> String {
         format!(
             "setTimeout(function() {{ {code} }}, {timeout})",
@@ -258,23 +265,46 @@ pub fn get_unit_html_with_events(
     )
 }
 
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("Request to the Market failed: status {status} at url {url}")]
+    Market { status: StatusCode, url: String },
+    #[error(transparent)]
+    Request(#[from] reqwest::Error),
+}
+
 pub struct Manager {
     options: Options,
-    history: Vec<HistoryEntry>,
+    /// Contains the Entries from Old to New
+    /// It always trims to HISTORY_LIMIT, removing the oldest (firstly inserted) elements from the History
+    history: Arc<RwLock<VecDeque<HistoryEntry>>>,
+    client: reqwest::Client,
 }
 
 impl Manager {
-    pub fn new(options: Options, history: Vec<HistoryEntry>) -> Self {
-        Self { options, history }
+    pub fn new(options: Options, history: VecDeque<HistoryEntry>) -> Result<Self, Error> {
+        let client = reqwest::Client::builder().build()?;
+
+        Ok(Self {
+            options,
+            history: Arc::new(RwLock::new(history)),
+            client,
+        })
     }
 
-    pub fn get_targeting_input(&self, mut input: InputSource, channel_id: ChannelId) -> InputSource {
+    pub async fn get_targeting_input(
+        &self,
+        mut input: input::Input,
+        channel_id: ChannelId,
+    ) -> input::Input {
         let seconds_since_campaign_impression = self
             .history
+            .read()
+            .await
             .iter()
             .rev()
             .find_map(|h| {
-                if h.channel_id == channel_id {
+                if h.campaign_id == channel_id {
                     let last_impression: chrono::Duration = Utc::now() - h.time;
 
                     u64::try_from(last_impression.num_seconds()).ok()
@@ -284,7 +314,7 @@ impl Manager {
             })
             .unwrap_or(u64::MAX);
 
-        input.ad_view = Some(AdView {
+        input.set_ad_view(input::AdView {
             seconds_since_campaign_impression,
             has_custom_preferences: false,
             // TODO: Check this empty default!
@@ -294,9 +324,9 @@ impl Manager {
         input
     }
 
-    pub fn get_sticky_ad_unit(
+    pub async fn get_sticky_ad_unit(
         &self,
-        campaigns: Vec<Campaign>,
+        campaigns: &[Campaign],
         hostname: &str,
     ) -> Option<StickyAdUnit> {
         if self.options.disabled_sticky {
@@ -306,12 +336,15 @@ impl Manager {
         let stickiness_threshold = Utc::now() - *IMPRESSION_STICKINESS_TIME;
         let sticky_entry = self
             .history
+            .read()
+            .await
             .iter()
-            .find(|h| h.time > stickiness_threshold && h.slot_id == self.options.market_slot)?;
+            .find(|h| h.time > stickiness_threshold && h.slot_id == self.options.market_slot)
+            .cloned()?;
 
         let stick_campaign = campaigns
             .iter()
-            .find(|c| c.channel.id == sticky_entry.channel_id)?;
+            .find(|c| c.channel.id == sticky_entry.campaign_id)?;
 
         let unit = stick_campaign
             .units_with_price
@@ -342,106 +375,215 @@ impl Manager {
         })
     }
 
-    // private isCampaignSticky(campaign: any): boolean {
-    // 	if (this.options.disableSticky) return false
-    // 	const stickinessThreshold = Date.now() - IMPRESSION_STICKINESS_TIME
-    // 	return !!this.history.find(entry => entry.time > stickinessThreshold && entry.campaignId === campaign.id)
-    // }
-    fn is_campaign_sticky(channel_id: ChannelId) -> bool {
-        // let stickiness_threshold = Utc::now() - *IMPRESSION_STICKINESS_TIME;
-        todo!()
+    async fn is_campaign_sticky(&self, campaign_id: ChannelId) -> bool {
+        if self.options.disabled_sticky {
+            false
+        } else {
+            let stickiness_threshold = Utc::now() - *IMPRESSION_STICKINESS_TIME;
+
+            self.history
+                .read()
+                .await
+                .iter()
+                .any(|h| h.time > stickiness_threshold && h.campaign_id == campaign_id)
+        }
     }
 
-    // async getMarketDemandResp(): Promise<any> {
-    // 	const marketURL = this.options.marketURL
-    // 	const depositAsset = this.options.whitelistedTokens.map(tokenAddr => `&depositAsset=${tokenAddr}`).join('')
-    // 	// @NOTE not the same as the WAF generator script in the Market (which uses `.slice(2, 12)`)
-    // 	const pubPrefix = this.options.publisherAddr.slice(2, 10)
-    // 	const url = `${marketURL}/units-for-slot/${this.options.marketSlot}?pubPrefix=${pubPrefix}${depositAsset}`
-    // 	const r = await this.fetch(url)
-    // 	if (r.status !== 200) throw new Error(`market returned status code ${r.status} at ${url}`)
-    // 	return r.json()
-    // }
-    pub async fn get_market_demand_resp() {
-        todo!()
+    pub async fn get_market_demand_resp(
+        &self,
+    ) -> Result<units_for_slot::response::Response, Error> {
+        let pub_prefix: String = self
+            .options
+            .publisher_addr
+            .chars()
+            .skip(2)
+            .take(10)
+            .collect();
+
+        let deposit_asset = self
+            .options
+            .whitelisted_tokens
+            .iter()
+            .map(|token| format!("depositAsset={}", token))
+            .collect::<Vec<_>>()
+            .join("&");
+
+        let url = format!(
+            "{}/units-for-slot/{}?pubPrefix={}&{}",
+            self.options.market_url, self.options.market_slot, pub_prefix, deposit_asset
+        );
+
+        let market_response = self.client.get(&url).send().await?;
+
+        if market_response.status() != StatusCode::OK {
+            Err(Error::Market {
+                status: market_response.status(),
+                url,
+            })
+        } else {
+            let units_for_slot_response = market_response.json().await?;
+
+            Ok(units_for_slot_response)
+        }
     }
 
-    // async getNextAdUnit(): Promise<any> {
-    // 	const { campaigns, targetingInputBase, acceptedReferrers, fallbackUnit } = await this.getMarketDemandResp()
-    // 	const hostname = targetingInputBase['adSlot.hostname']
+    pub async fn get_next_ad_unit(&self) -> Result<Option<NextAdUnit>, Error> {
+        let units_for_slot = self.get_market_demand_resp().await?;
+        let campaigns = &units_for_slot.campaigns;
+        let fallback_unit = units_for_slot.fallback_unit;
+        let targeting_input = input::Getter {
+            base: units_for_slot.targeting_input_base,
+            ad_unit: None,
+            channel: None,
+            last_approved: None,
+            deposit_asset: None,
+        };
 
-    // 	// Stickiness is when we keep showing an ad unit for a slot for some time in order to achieve fair impression value
-    // 	// see https://github.com/AdExNetwork/adex-adview-manager/issues/65
-    // 	const stickyResult = this.getStickyAdUnit(campaigns, hostname)
-    // 	if (stickyResult) return { ...stickyResult, acceptedReferrers }
+        let hostname = targeting_input
+            .try_get("adSlot.hostname")
+            .and_then(Value::try_string)
+            .unwrap_or_default();
 
-    // 	// If two or more units result in the same price, apply random selection between them: this is why we need the seed
-    // 	const seed = new BN(Math.random() * (0x80000000 - 1))
+        // Stickiness is when we keep showing an ad unit for a slot for some time in order to achieve fair impression value
+        // see https://github.com/AdExNetwork/adex-adview-manager/issues/65
+        let sticky_result = self.get_sticky_ad_unit(campaigns, &hostname).await;
+        if let Some(sticky) = sticky_result {
+            return Ok(Some(NextAdUnit {
+                unit: sticky.unit,
+                price: sticky.price,
+                accepted_referrers: units_for_slot.accepted_referrers,
+                html: sticky.html,
+            }));
+        }
 
-    // 	// Apply targeting, now with adView.* variables, and sort the resulting ad units
-    // 	const unitsWithPrice = campaigns
-    // 		.map(campaign => {
-    // 			if (this.isCampaignSticky(campaign)) return []
+        // If two or more units result in the same price, apply random selection between them: this is why we need the seed
+        let mut rng = rand::thread_rng();
 
-    // 			const campaignInputBase = this.getTargetingInput(targetingInputBase, campaign)
-    // 			const campaignInput = targetingInputGetter.bind(null, campaignInputBase, campaign)
-    // 			const onTypeErr = (e, rule) => console.error(`WARNING: rule for ${campaign.id} failing with:`, rule, e)
-    // 			return campaign.unitsWithPrice.filter(({ unit, price }) => {
-    // 				const input = campaignInput.bind(null, unit)
-    // 				const output = {
-    // 					show: true,
-    // 					'price.IMPRESSION': new BN(price),
-    // 				}
-    // 				// NOTE: not using the price from the output on purpose
-    // 				// we trust what the server gives us since otherwise we may end up changing the price based on
-    // 				// adView-specific variables, which won't be consistent with the validator's price
-    // 				return evaluateMultiple(input, output, campaign.targetingRules, onTypeErr).show
-    // 			}).map(x => ({ ...x, campaignId: campaign.id }))
-    // 		})
-    // 		.reduce((a, b) => a.concat(b), [])
-    // 		.filter(x => !(this.options.disableVideo && isVideo(x.unit)))
-    // 		.sort((b, a) =>
-    // 			new BN(a.price).cmp(new BN(b.price))
-    // 				|| randomizedSortPos(a.unit, seed).cmp(randomizedSortPos(b.unit, seed))
-    // 		)
+        let random: f64 = rng.gen::<f64>() * (0x80000000_u64 as f64 - 1.0);
+        let seed = BigNum::from(random as u64);
 
-    // 	// Update history
-    // 	const auctionWinner = unitsWithPrice[0]
-    // 	if (auctionWinner) {
-    // 		this.history.push({
-    // 			time: Date.now(),
-    // 			slotId: this.options.marketSlot,
-    // 			unitId: auctionWinner.unit.id,
-    // 			campaignId: auctionWinner.campaignId,
-    // 		})
-    // 		this.history = this.history.slice(-HISTORY_LIMIT)
-    // 	}
+        // Apply targeting, now with adView.* variables, and sort the resulting ad units
+        let mut units_with_price: Vec<(UnitsWithPrice, ChannelId)> = campaigns
+            .iter()
+            .map(|campaign| {
+                // since we are in a Iterator.map(), we can't use async, so we block
+                if block_on(self.is_campaign_sticky(campaign.channel.id)) {
+                    return vec![];
+                }
+                let mut campaign_input = targeting_input.clone();
+                let campaign_id = campaign.channel.id;
+                campaign_input.channel = Some(campaign.channel.clone());
 
-    // 	// Return the results, with a fallback unit if there is one
-    // 	if (auctionWinner) {
-    // 		const { unit, price, campaignId } = auctionWinner
-    // 		const { validators } = campaigns.find(x => x.id === campaignId).spec
-    // 		return {
-    // 			unit,
-    // 			price,
-    // 			acceptedReferrers,
-    // 			html: getUnitHTMLWithEvents(this.options, { unit, hostname, campaignId, validators })
-    // 		}
-    // 	} else if (fallbackUnit) {
-    // 		const unit = fallbackUnit
-    // 		return {
-    // 			unit,
-    // 			price: '0',
-    // 			acceptedReferrers,
-    // 			html: getUnitHTML(this.options, { unit, hostname })
-    // 		}
-    // 	} else {
-    // 		return null
-    // 	}
-    // }
-    pub async fn get_next_ad_unit() -> Option<Response> {
-        todo!()
+                campaign
+                    .units_with_price
+                    .iter()
+                    .filter(|unit_with_price| {
+                        campaign_input.ad_unit = Some(unit_with_price.unit.clone());
+
+                        let mut output = targeting::Output {
+                            show: true,
+                            boost: 1.0,
+                            price: vec![("IMPRESSION".to_string(), unit_with_price.price.clone())]
+                                .into_iter()
+                                .collect(),
+                        };
+
+                        // TODO: Logging for `eval_multiple`
+                        targeting::eval_multiple(
+                            &campaign.targeting_rules,
+                            &input::Input::Getter(campaign_input.clone()),
+                            &mut output,
+                        );
+
+                        output.show
+                    })
+                    .map(|uwp| (uwp.clone(), campaign_id))
+                    .collect()
+            })
+            .flatten()
+            .filter(|x| !(self.options.disabled_video && is_video(&x.0.unit)))
+            .collect();
+
+        units_with_price.sort_by(|b, a| {
+            (&a.0.price).cmp(&b.0.price)
+            // TODO:
+            // || randomized_sort_pos(&a.0.unit, seed).cmp(randomized_sort_pos(&b.0.unit, seed))
+        });
+
+        // Update history
+        let auction_winner = units_with_price.get(0);
+
+        if let Some((unit_with_price, campaign_id)) = auction_winner {
+            let history = self.history.read().await.clone();
+
+            let new_entry = HistoryEntry {
+                time: Utc::now(),
+                unit_id: unit_with_price.unit.id.clone(),
+                campaign_id: *campaign_id,
+                slot_id: self.options.market_slot.clone(),
+            };
+
+            *self.history.write().await = history
+                .into_iter()
+                .chain(std::iter::once(new_entry))
+                // Reverse the iterator since we want to remove the oldest history entries
+                .rev()
+                .take(HISTORY_LIMIT as usize)
+                .collect::<VecDeque<HistoryEntry>>()
+                // Keeps the same order, as the one we've started with! Old => New
+                .into_iter()
+                .rev()
+                .collect();
+        }
+
+        // Return the results, with a fallback unit if there is one
+        if let Some((unit_with_price, campaign_id)) = auction_winner {
+            let validators = campaigns
+                .iter()
+                .find_map(|campaign| {
+                    if &campaign.channel.id == campaign_id {
+                        Some(&campaign.channel.spec.validators)
+                    } else {
+                        None
+                    }
+                })
+                // TODO: Check what should happen here
+                .unwrap();
+
+            let html = get_unit_html_with_events(
+                &self.options,
+                &unit_with_price.unit,
+                &hostname,
+                *campaign_id,
+                validators,
+                false,
+            );
+
+            Ok(Some(NextAdUnit {
+                unit: unit_with_price.unit.clone(),
+                price: unit_with_price.price.clone(),
+                accepted_referrers: units_for_slot.accepted_referrers,
+                html,
+            }))
+        } else if let Some(fallback_unit) = fallback_unit {
+            let html = get_unit_html(&self.options.size(), &fallback_unit, &hostname, "", "");
+            Ok(Some(NextAdUnit {
+                unit: fallback_unit,
+                price: 0.into(),
+                accepted_referrers: units_for_slot.accepted_referrers,
+                html,
+            }))
+        } else {
+            Ok(None)
+        }
     }
+}
+
+pub struct NextAdUnit {
+    pub unit: AdUnit,
+    pub price: BigNum,
+    pub accepted_referrers: Vec<Url>,
+    pub html: String,
 }
 
 pub struct StickyAdUnit {

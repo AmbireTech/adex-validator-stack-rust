@@ -10,8 +10,6 @@ use std::{
     str::FromStr,
 };
 
-pub type Map = serde_json::value::Map<String, SerdeValue>;
-
 use super::{Input, Output};
 
 #[cfg(test)]
@@ -893,7 +891,10 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
                 .eval(input, output)?
                 .ok_or(Error::TypeError)?
                 .try_bignum()?;
-            let deposit_asset = input.deposit_asset()?.try_string()?;
+
+            // if there is no way to get the deposit_asset, then fail with UnknownVariable
+            // since we can't calculate the price in USD
+            let deposit_asset = input.deposit_asset().ok_or(Error::UnknownVariable)?;
 
             let divisor = DEPOSIT_ASSETS_MAP
                 .get(&deposit_asset)
@@ -959,6 +960,25 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
     };
 
     Ok(value)
+}
+
+/// Stops (i.e. it short-circuits) evaluating `Rule`s when `Output.show` becomes `false`
+pub fn eval_multiple(
+    rules: &[Rule],
+    input: &Input,
+    output: &mut Output,
+) -> Vec<Result<Option<Value>, Error>> {
+    let mut results = vec![];
+
+    for rule in rules {
+        results.push(rule.eval(input, output));
+
+        if !output.show {
+            break;
+        }
+    }
+
+    results
 }
 
 enum MathOperator {

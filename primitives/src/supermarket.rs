@@ -42,7 +42,10 @@ pub enum Finalized {
 
 pub mod units_for_slot {
     pub mod response {
-        use crate::{targeting::{Input, Rule, InputMap}, BigNum, ChannelId, ChannelSpec, SpecValidators, ValidatorId};
+        use crate::{
+            targeting::{Map, Rule},
+            BigNum, ChannelId, ChannelSpec, SpecValidators, ValidatorId,
+        };
         use chrono::{
             serde::{ts_milliseconds, ts_milliseconds_option},
             DateTime, Utc,
@@ -53,20 +56,20 @@ pub mod units_for_slot {
         #[derive(Debug, Serialize, Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct Response {
-            pub targeting_input_base: InputMap,
+            pub targeting_input_base: Map,
             pub accepted_referrers: Vec<Url>,
-            pub fallback_unit: AdUnit,
+            pub fallback_unit: Option<AdUnit>,
             pub campaigns: Vec<Campaign>,
         }
 
-        #[derive(Debug, Serialize, Deserialize)]
+        #[derive(Debug, Clone, Serialize, Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct UnitsWithPrice {
             pub unit: AdUnit,
             pub price: BigNum,
         }
 
-        #[derive(Debug, Serialize, Deserialize)]
+        #[derive(Debug, Clone, Serialize, Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct Campaign {
             #[serde(flatten)]
@@ -75,7 +78,7 @@ pub mod units_for_slot {
             pub units_with_price: Vec<UnitsWithPrice>,
         }
 
-        #[derive(Debug, Serialize, Deserialize)]
+        #[derive(Debug, Clone, Serialize, Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct Channel {
             pub id: ChannelId,
@@ -97,7 +100,7 @@ pub mod units_for_slot {
             }
         }
 
-        #[derive(Debug, Serialize, Deserialize)]
+        #[derive(Debug, Clone, Serialize, Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct Spec {
             #[serde(with = "ts_milliseconds")]
