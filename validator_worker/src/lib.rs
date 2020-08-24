@@ -33,7 +33,7 @@ pub(crate) fn get_state_root_hash<A: Adapter + 'static>(
         .map(|(acc, amount)| get_balance_leaf(acc, amount))
         .collect::<Result<_, _>>()?;
 
-    let tree = MerkleTree::new(&elems);
+    let tree = MerkleTree::new(&elems)?;
     // keccak256(channelId, balanceRoot
     get_signable_state_root(&iface.channel.id, &tree.root())
 }

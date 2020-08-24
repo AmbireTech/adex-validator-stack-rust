@@ -1,12 +1,16 @@
-use crate::{BigNum, Channel};
+use crate::{
+    channel::Pricing, supermarket::Status, AdUnit, BalancesMap, BigNum, Channel, ToETHChecksum,
+    ValidatorId,
+};
+use chrono::Utc;
 use std::collections::HashMap;
 
 pub use eval::*;
+use serde_json::Number;
 
 mod eval;
 
 #[derive(Debug, Clone)]
-#[cfg_attr(test, derive(Default))]
 pub struct Input {
     /// AdView scope, accessible only on the AdView
     pub ad_view: Option<AdView>,
@@ -18,43 +22,36 @@ pub struct Input {
 
 impl Input {
     fn try_get(&self, key: &str) -> Result<Value, Error> {
+        let spec = &self.global.channel.spec;
+
         match key {
-            "adView.secondsSinceShow" => self
+            // AdView scope, accessible only on the AdView
+            "adView.secondsSinceCampaignImpression" => self
                 .ad_view
                 .as_ref()
-                .map(|ad_view| Value::Number(ad_view.seconds_since_show.into()))
+                .map(|ad_view| Value::Number(ad_view.seconds_since_campaign_impression.into()))
                 .ok_or(Error::UnknownVariable),
             "adView.hasCustomPreferences" => self
                 .ad_view
                 .as_ref()
                 .map(|ad_view| Value::Bool(ad_view.has_custom_preferences))
                 .ok_or(Error::UnknownVariable),
+            "adView.navigatorLanguage" => self
+                .ad_view
+                .as_ref()
+                .map(|ad_view| Value::String(ad_view.navigator_language.clone()))
+                .ok_or(Error::UnknownVariable),
+            // Global scope, accessible everywhere
             "adSlotId" => Ok(Value::String(self.global.ad_slot_id.clone())),
             "adSlotType" => Ok(Value::String(self.global.ad_slot_type.clone())),
-            "adUnitId" => Ok(Value::String(self.global.ad_unit_id.clone())),
-            "publisherId" => Ok(Value::String(self.global.publisher_id.clone())),
-            "advertiserId" => Ok(Value::String(self.global.advertiser_id.clone())),
+            "publisherId" => Ok(Value::String(self.global.publisher_id.to_checksum())),
             "country" => self
                 .global
                 .country
                 .clone()
-                .map(Value::String)
-                .ok_or(Error::UnknownVariable),
+                .ok_or(Error::UnknownVariable)
+                .map(Value::String),
             "eventType" => Ok(Value::String(self.global.event_type.clone())),
-            "campaignId" => Ok(Value::String(self.global.campaign_id.clone())),
-            "campaignTotalSpent" => Ok(Value::String(self.global.campaign_total_spent.clone())),
-            "campaignSecondsActive" => {
-                Ok(Value::Number(self.global.campaign_seconds_active.into()))
-            }
-            "campaignSecondsDuration" => {
-                Ok(Value::Number(self.global.campaign_seconds_duration.into()))
-            }
-            "campaignBudget" => Ok(Value::BigNum(self.global.campaign_budget.clone())),
-            "eventMinPrice" => Ok(Value::BigNum(self.global.event_min_price.clone())),
-            "eventMaxPrice" => Ok(Value::BigNum(self.global.event_max_price.clone())),
-            "publisherEarnedFromCampaign" => Ok(Value::BigNum(
-                self.global.publisher_earned_from_campaign.clone(),
-            )),
             "secondsSinceEpoch" => Ok(Value::Number(self.global.seconds_since_epoch.into())),
             "userAgentOS" => self
                 .global
@@ -68,6 +65,69 @@ impl Input {
                 .clone()
                 .map(Value::String)
                 .ok_or(Error::UnknownVariable),
+            // Global scope, accessible everywhere, campaign-dependant
+            "adUnitId" => {
+                let ipfs = self
+                    .global
+                    .ad_unit
+                    .as_ref()
+                    .map(|ad_unit| ad_unit.ipfs.clone());
+                Ok(Value::String(ipfs.unwrap_or_default()))
+            }
+            "advertiserId" => {
+                let creator = self.global.channel.creator.to_hex_prefix_string();
+
+                Ok(Value::String(creator))
+            }
+            "campaignId" => Ok(Value::String(self.global.channel.id.to_string())),
+            "campaignTotalSpent" => Ok(Value::BigNum(
+                self.global
+                    .balances
+                    .as_ref()
+                    .map(|b| b.values().sum())
+                    .unwrap_or_default(),
+            )),
+            "campaignSecondsActive" => {
+                let duration = Utc::now() - spec.active_from.unwrap_or(spec.created);
+
+                let seconds = duration
+                    .to_std()
+                    .map(|duration| duration.as_secs())
+                    .unwrap_or(0);
+
+                Ok(Value::Number(seconds.into()))
+            }
+            "campaignSecondsDuration" => {
+                let duration =
+                    spec.withdraw_period_start - spec.active_from.unwrap_or(spec.created);
+                let seconds = duration
+                    .to_std()
+                    .map(|std_duration| std_duration.as_secs())
+                    .unwrap_or(0);
+
+                Ok(Value::Number(seconds.into()))
+            }
+            "campaignBudget" => Ok(Value::BigNum(self.global.channel.deposit_amount.clone())),
+            "eventMinPrice" => {
+                let min = get_pricing_bounds(&self.global.channel, &self.global.event_type).min;
+                Ok(Value::BigNum(min))
+            }
+            "eventMaxPrice" => {
+                let max = get_pricing_bounds(&self.global.channel, &self.global.event_type).max;
+                Ok(Value::BigNum(max))
+            }
+            "publisherEarnedFromCampaign" => {
+                let earned = self
+                    .global
+                    .balances
+                    .as_ref()
+                    .and_then(|balances| balances.get(&self.global.publisher_id))
+                    .cloned()
+                    .unwrap_or_default();
+
+                Ok(Value::BigNum(earned))
+            }
+            // adSlot scope, accessible on Supermarket and AdView
             "adSlot.categories" => self
                 .ad_slot
                 .as_ref()
@@ -83,10 +143,9 @@ impl Input {
             "adSlot.hostname" => self
                 .ad_slot
                 .as_ref()
-                .map(|ad_slot| Value::String(ad_slot.hostname.clone().unwrap_or_default()))
+                .map(|ad_slot| Value::String(ad_slot.hostname.clone()))
                 .ok_or(Error::UnknownVariable),
             "adSlot.alexaRank" => {
-                // @TODO: Decide how to handle Alexa rank values
                 let ad_slot = self.ad_slot.as_ref().ok_or(Error::UnknownVariable)?;
                 let alexa_rank = ad_slot.alexa_rank.ok_or(Error::UnknownVariable)?;
 
@@ -100,44 +159,57 @@ impl Input {
     }
 }
 
-#[derive(Debug, Clone)]
-#[cfg_attr(test, derive(Default))]
-pub struct AdView {
-    pub seconds_since_show: u64,
-    pub has_custom_preferences: bool,
+pub fn get_pricing_bounds(channel: &Channel, event_type: &str) -> Pricing {
+    channel
+        .spec
+        .pricing_bounds
+        .as_ref()
+        .and_then(|pricing_bounds| pricing_bounds.get(event_type))
+        .cloned()
+        .unwrap_or_else(|| {
+            if event_type == "IMPRESSION" {
+                Pricing {
+                    min: channel.spec.min_per_impression.clone().max(1.into()),
+                    max: channel.spec.max_per_impression.clone().max(1.into()),
+                }
+            } else {
+                Pricing {
+                    min: 0.into(),
+                    max: 0.into(),
+                }
+            }
+        })
 }
 
 #[derive(Debug, Clone)]
-#[cfg_attr(test, derive(Default))]
+pub struct AdView {
+    pub seconds_since_campaign_impression: u64,
+    pub has_custom_preferences: bool,
+    pub navigator_language: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct Global {
     /// Global scope, accessible everywhere
     pub ad_slot_id: String,
     pub ad_slot_type: String,
-    pub publisher_id: String,
+    pub publisher_id: ValidatorId,
     pub country: Option<String>,
     pub event_type: String,
     pub seconds_since_epoch: u64,
     pub user_agent_os: Option<String>,
     pub user_agent_browser_family: Option<String>,
     /// Global scope, accessible everywhere, campaign-dependant
-    pub ad_unit_id: String,
-    // adUnitCategories
-    pub advertiser_id: String,
-    pub campaign_id: String,
-    pub campaign_total_spent: String,
-    pub campaign_seconds_active: u64,
-    pub campaign_seconds_duration: u64,
-    pub campaign_budget: BigNum,
-    pub event_min_price: BigNum,
-    pub event_max_price: BigNum,
-    pub publisher_earned_from_campaign: BigNum,
+    pub ad_unit: Option<AdUnit>,
+    pub channel: Channel,
+    pub status: Option<Status>,
+    pub balances: Option<BalancesMap>,
 }
 
 #[derive(Debug, Clone)]
-#[cfg_attr(test, derive(Default))]
 pub struct AdSlot {
     pub categories: Vec<String>,
-    pub hostname: Option<String>,
+    pub hostname: String,
     pub alexa_rank: Option<f64>,
 }
 
@@ -155,6 +227,26 @@ pub struct Output {
     /// The default is the min of the bound of event type:
     /// Default: pricingBounds.IMPRESSION.min
     pub price: HashMap<String, BigNum>,
+}
+
+impl Output {
+    fn try_get(&self, key: &str) -> Result<Value, Error> {
+        match key {
+            "show" => Ok(Value::Bool(self.show)),
+            "boost" => {
+                let boost = Number::from_f64(self.boost).ok_or(Error::TypeError)?;
+                Ok(Value::Number(boost))
+            }
+            price_key if price_key.starts_with("price.") => {
+                let price = self
+                    .price
+                    .get(price_key.trim_start_matches("price."))
+                    .ok_or(Error::UnknownVariable)?;
+                Ok(Value::BigNum(price.clone()))
+            }
+            _ => Err(Error::UnknownVariable),
+        }
+    }
 }
 
 impl From<&Channel> for Output {
@@ -179,20 +271,57 @@ impl From<&Channel> for Output {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::{
+        supermarket::Status,
+        util::tests::prep_db::{DUMMY_CHANNEL, IDS},
+    };
+    use chrono::Utc;
 
     #[test]
     fn test_try_get_of_input() {
-        let mut input = Input::default();
-        input.global.ad_slot_id = "ad_slot_id Value".to_string();
-        input.global.campaign_budget = BigNum::from(50);
-        input.ad_view = Some(AdView {
-            seconds_since_show: 10,
-            has_custom_preferences: false,
-        });
+        let ad_unit = AdUnit {
+            ipfs: "Hash".to_string(),
+            ad_type: "legacy_300x250".to_string(),
+            media_url: "media_url".to_string(),
+            media_mime: "media_mime".to_string(),
+            target_url: "target_url".to_string(),
+            targeting: vec![],
+            min_targeting_score: None,
+            tags: vec![],
+            owner: IDS["creator"],
+            created: Utc::now(),
+            title: None,
+            description: None,
+            archived: false,
+            modified: None,
+        };
+        let input_balances = BalancesMap::default();
+        let mut input = Input {
+            ad_view: Some(AdView {
+                seconds_since_campaign_impression: 10,
+                has_custom_preferences: false,
+                navigator_language: "bg".to_string(),
+            }),
+            global: Global {
+                ad_slot_id: "ad_slot_id Value".to_string(),
+                ad_slot_type: "ad_slot_type Value".to_string(),
+                publisher_id: IDS["leader"],
+                country: Some("bg".to_string()),
+                event_type: "IMPRESSION".to_string(),
+                seconds_since_epoch: 500,
+                user_agent_os: Some("os".to_string()),
+                user_agent_browser_family: Some("family".to_string()),
+                ad_unit: Some(ad_unit),
+                channel: DUMMY_CHANNEL.clone(),
+                status: Some(Status::Initializing),
+                balances: Some(input_balances),
+            },
+            ad_slot: None,
+        };
 
         let ad_view_seconds_since_show = input
-            .try_get("adView.secondsSinceShow")
-            .expect("Should get the ad_view.seconds_since_show field");
+            .try_get("adView.secondsSinceCampaignImpression")
+            .expect("Should get the ad_view.seconds_since_campaign_impression field");
 
         let expected_number = serde_json::Number::from(10);
 
@@ -214,16 +343,42 @@ mod test {
             .try_get("campaignBudget")
             .expect("Should get the global.campaign_budget field");
 
-        assert_eq!(Value::BigNum(BigNum::from(50)), global_campaign_budget);
+        assert_eq!(
+            Value::BigNum(DUMMY_CHANNEL.deposit_amount.clone()),
+            global_campaign_budget
+        );
 
         assert_eq!(
             Err(Error::UnknownVariable),
             input.try_get("adSlot.alexaRank")
         );
-        let mut ad_slot = AdSlot::default();
-        ad_slot.alexa_rank = Some(20.0);
+        let ad_slot = AdSlot {
+            categories: vec![],
+            hostname: "".to_string(),
+            alexa_rank: Some(20.0),
+        };
         input.ad_slot = Some(ad_slot);
         assert!(input.try_get("adSlot.alexaRank").is_ok());
+    }
+
+    #[test]
+    fn test_try_get_of_output() {
+        let output = Output {
+            show: false,
+            boost: 5.5,
+            price: vec![("one".to_string(), 100.into())].into_iter().collect(),
+        };
+
+        assert_eq!(Ok(Value::Bool(false)), output.try_get("show"));
+        assert_eq!(
+            Ok(Value::Number(
+                Number::from_f64(5.5).expect("Should make a number")
+            )),
+            output.try_get("boost")
+        );
+        assert_eq!(Ok(Value::BigNum(100.into())), output.try_get("price.one"));
+        assert_eq!(Err(Error::UnknownVariable), output.try_get("price.unknown"));
+        assert_eq!(Err(Error::UnknownVariable), output.try_get("unknown"));
     }
 
     #[test]

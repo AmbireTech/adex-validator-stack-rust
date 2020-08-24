@@ -78,9 +78,11 @@ pub async fn tick<A: Adapter + 'static>(
     };
 
     let producer_tick = producer::tick(&iface).await?;
+    let empty_balances = BalancesMap::default();
     let balances = match &producer_tick {
         producer::TickStatus::Sent { new_accounting, .. } => &new_accounting.balances,
         producer::TickStatus::NoNewEventAggr(balances) => balances,
+        producer::TickStatus::EmptyBalances => &empty_balances,
     };
     let approve_state_result = if let (Some(new_state), false) = (new_msg, latest_is_responded_to) {
         on_new_state(&iface, &balances, &new_state).await?
@@ -89,7 +91,7 @@ pub async fn tick<A: Adapter + 'static>(
     };
 
     Ok(TickStatus {
-        heartbeat: heartbeat(&iface, balances).await?,
+        heartbeat: heartbeat(&iface, &balances).await?,
         approve_state: approve_state_result,
         producer_tick,
     })
