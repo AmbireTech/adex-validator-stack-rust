@@ -13,7 +13,7 @@ use lazy_static::lazy_static;
 use rand::Rng;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
-use std::{collections::VecDeque, convert::TryFrom, sync::Arc};
+use std::{cmp::Ordering, collections::VecDeque, convert::TryFrom, sync::Arc};
 use thiserror::Error;
 use units_for_slot::response::UnitsWithPrice;
 use url::Url;
@@ -504,10 +504,10 @@ impl Manager {
             .filter(|x| !(self.options.disabled_video && is_video(&x.0.unit)))
             .collect();
 
-        units_with_price.sort_by(|b, a| {
-            (&a.0.price).cmp(&b.0.price)
-            // TODO:
-            // || randomized_sort_pos(&a.0.unit, seed).cmp(randomized_sort_pos(&b.0.unit, seed))
+        units_with_price.sort_by(|b, a| match (&a.0.price).cmp(&b.0.price) {
+            Ordering::Equal => randomized_sort_pos(&a.0.unit, seed.clone())
+                .cmp(&randomized_sort_pos(&b.0.unit, seed.clone())),
+            ordering => ordering,
         });
 
         // Update history
