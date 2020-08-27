@@ -2,7 +2,7 @@ use crate::Session;
 use chrono::Utc;
 use primitives::{
     sentry::Event,
-    targeting::{get_pricing_bounds, Error, Error as EvalError, Input, Output, Rule, input},
+    targeting::{get_pricing_bounds, input, Error, Error as EvalError, Input, Output, Rule},
     BigNum, Channel, ValidatorId,
 };
 use std::{
@@ -65,8 +65,8 @@ pub fn get_payout(channel: &Channel, event: &Event, session: &Session) -> Result
                         balances: None,
                     },
                     // TODO: Check this one as well!
-                        ad_slot: None,
-                    };
+                    ad_slot: None,
+                };
                 let input = input::Input::Source(Box::new(source));
 
                 let mut output = Output {

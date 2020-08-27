@@ -103,8 +103,9 @@ mod test {
             os: None,
         };
 
-        for _ in 0..101 {
-            reduce(&channel, &mut event_aggr, &event, &session);
+        for i in 0..101 {
+            reduce(&channel, &mut event_aggr, &event, &session)
+                .expect(&format!("Should be able to reduce event #{}", i));
         }
 
         assert_eq!(event_aggr.channel_id, channel.id);
