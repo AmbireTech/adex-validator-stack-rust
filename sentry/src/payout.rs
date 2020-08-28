@@ -2,7 +2,7 @@ use crate::Session;
 use chrono::Utc;
 use primitives::{
     sentry::Event,
-    targeting::{get_pricing_bounds, input, Error, Error as EvalError, Input, Output, Rule},
+    targeting::{get_pricing_bounds, input, Error, Error as EvalError, Input, Output, Rule, eval_multiple},
     BigNum, Channel, ValidatorId,
 };
 use std::{
@@ -77,7 +77,7 @@ pub fn get_payout(channel: &Channel, event: &Event, session: &Session) -> Result
                         .collect(),
                 };
 
-                eval_multiple(&targeting_rules, &input, &mut output);
+                eval_and_log(&targeting_rules, &input, &mut output);
 
                 if output.show {
                     let price = match output.price.get(&event_type) {
@@ -97,13 +97,15 @@ pub fn get_payout(channel: &Channel, event: &Event, session: &Session) -> Result
     }
 }
 
-// @TODO: Logging & move to Targeting when ready
-fn eval_multiple(rules: &[Rule], input: &Input, output: &mut Output) {
-    for rule in rules {
-        match rule.eval(input, output) {
+fn eval_and_log(/* logger: &Logger, channel_id: ChannelId,  */rules: &[Rule], input: &Input, output: &mut Output) {
+    for result in eval_multiple(rules, input, output) {
+        match result {
             Ok(_) => {}
             Err(EvalError::UnknownVariable) => {}
-            Err(EvalError::TypeError) => todo!("OnTypeErr logging"),
+            Err(EvalError::TypeError) => {
+                todo!();
+                // error!(logger, "`WARNING: rule for {:?} failing", channel_id; "rule" => rule, "err" => ?result)
+            }
         }
 
         if !output.show {
@@ -112,9 +114,105 @@ fn eval_multiple(rules: &[Rule], input: &Input, output: &mut Output) {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use primitives::channel::{Pricing, PricingBounds};
-//     use primitives::util::tests::prep_db::{DUMMY_CHANNEL, IDS};
-// }
+#[cfg(test)]
+mod test {
+    use super::*;
+    use primitives::channel::{Pricing, PricingBounds};
+    use primitives::util::tests::prep_db::{DUMMY_CHANNEL, IDS};
+
+    #[test]
+    fn get_event_payouts_pricing_bounds_impression_event() {
+        let mut channel = DUMMY_CHANNEL.clone();
+        channel.deposit_amount = 100.into();
+        channel.spec.min_per_impression = 8.into();
+        channel.spec.max_per_impression = 64.into();
+        channel.spec.pricing_bounds = Some(PricingBounds {
+            impression: None,
+            click: Some(Pricing {
+                min: 23.into(),
+                max: 100.into(),
+            }),
+        });
+
+        let event = Event::Impression {
+            publisher: IDS["leader"],
+            ad_unit: None,
+            ad_slot: None,
+            referrer: None,
+        };
+
+        let session = Session {
+            ip: None,
+            country: None,
+            referrer_header: None,
+            os: None,
+        };
+
+        let payout = get_payout(&channel, &event, &session).expect("Should be OK");
+
+        let expected_option = Some((IDS["leader"], 8.into()));
+        assert_eq!(expected_option, payout, "pricingBounds: impression event");
+    }
+
+    #[test]
+    fn get_event_payouts_pricing_bounds_click_event() {
+        let mut channel = DUMMY_CHANNEL.clone();
+        channel.deposit_amount = 100.into();
+        channel.spec.min_per_impression = 8.into();
+        channel.spec.max_per_impression = 64.into();
+        channel.spec.pricing_bounds = Some(PricingBounds {
+            impression: None,
+            click: Some(Pricing {
+                min: 23.into(),
+                max: 100.into(),
+            }),
+        });
+
+        let event = Event::Click {
+            publisher: IDS["leader"],
+            ad_unit: None,
+            ad_slot: None,
+            referrer: None,
+        };
+
+        let session = Session {
+            ip: None,
+            country: None,
+            referrer_header: None,
+            os: None,
+        };
+
+        let payout = get_payout(&channel, &event, &session).expect("Should be OK");
+
+        let expected_option = Some((IDS["leader"], 23.into()));
+        assert_eq!(expected_option, payout, "pricingBounds: click event");
+    }
+
+    #[test]
+    fn get_event_payouts_pricing_bounds_close_event() {
+        let mut channel = DUMMY_CHANNEL.clone();
+        channel.deposit_amount = 100.into();
+        channel.spec.min_per_impression = 8.into();
+        channel.spec.max_per_impression = 64.into();
+        channel.spec.pricing_bounds = Some(PricingBounds {
+            impression: None,
+            click: Some(Pricing {
+                min: 23.into(),
+                max: 100.into(),
+            }),
+        });
+
+        let event = Event::Close;
+
+        let session = Session {
+            ip: None,
+            country: None,
+            referrer_header: None,
+            os: None,
+        };
+
+        let payout = get_payout(&channel, &event, &session).expect("Should be OK");
+
+        assert_eq!(None, payout, "pricingBounds: click event");
+    }
+}
