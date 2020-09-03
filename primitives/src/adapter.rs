@@ -17,6 +17,7 @@ pub enum Error<AE: AdapterErrorKind> {
     Authorization(String),
     InvalidChannel(ChannelError),
     /// Adapter specific errors
+    // Since we don't know the size of the Adapter Error we use a Box to limit the size of this enum
     Adapter(Box<AE>),
     Domain(DomainError),
     /// You need to `.unlock()` the wallet first
@@ -69,7 +70,7 @@ pub struct Session {
 }
 
 #[async_trait]
-pub trait Adapter: ChannelValidator + Send + Sync + fmt::Debug {
+pub trait Adapter: ChannelValidator + Send + Sync + fmt::Debug + Clone {
     type AdapterError: AdapterErrorKind + 'static;
 
     /// Unlock adapter
