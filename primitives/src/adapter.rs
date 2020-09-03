@@ -1,7 +1,7 @@
 use crate::channel::ChannelError;
 use crate::channel_validator::ChannelValidator;
 use crate::{Channel, DomainError, ValidatorId};
-use futures::future::BoxFuture;
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::From;
@@ -17,7 +17,7 @@ pub enum Error<AE: AdapterErrorKind> {
     Authorization(String),
     InvalidChannel(ChannelError),
     /// Adapter specific errors
-    Adapter(AE),
+    Adapter(Box<AE>),
     Domain(DomainError),
     /// You need to `.unlock()` the wallet first
     LockedWallet,
@@ -27,7 +27,7 @@ impl<AE: AdapterErrorKind> std::error::Error for Error<AE> {}
 
 impl<AE: AdapterErrorKind> From<AE> for Error<AE> {
     fn from(adapter_err: AE) -> Self {
-        Self::Adapter(adapter_err)
+        Self::Adapter(Box::new(adapter_err))
     }
 }
 
@@ -37,7 +37,7 @@ impl<AE: AdapterErrorKind> fmt::Display for Error<AE> {
             Error::Authentication(error) => write!(f, "Authentication: {}", error),
             Error::Authorization(error) => write!(f, "Authorization: {}", error),
             Error::InvalidChannel(error) => write!(f, "{}", error),
-            Error::Adapter(error) => write!(f, "Adapter: {}", error),
+            Error::Adapter(error) => write!(f, "Adapter: {}", *error),
             Error::Domain(error) => write!(f, "Domain: {}", error),
             Error::LockedWallet => write!(f, "You must `.unlock()` the wallet first"),
         }
@@ -68,7 +68,8 @@ pub struct Session {
     pub uid: ValidatorId,
 }
 
-pub trait Adapter: ChannelValidator + Send + Sync + Clone + fmt::Debug {
+#[async_trait]
+pub trait Adapter: ChannelValidator + Send + Sync + fmt::Debug {
     type AdapterError: AdapterErrorKind + 'static;
 
     /// Unlock adapter
@@ -89,16 +90,16 @@ pub trait Adapter: ChannelValidator + Send + Sync + Clone + fmt::Debug {
     ) -> AdapterResult<bool, Self::AdapterError>;
 
     /// Validate a channel
-    fn validate_channel<'a>(
+    async fn validate_channel<'a>(
         &'a self,
         channel: &'a Channel,
-    ) -> BoxFuture<'a, AdapterResult<bool, Self::AdapterError>>;
+    ) -> AdapterResult<bool, Self::AdapterError>;
 
     /// Get user session from token
-    fn session_from_token<'a>(
+    async fn session_from_token<'a>(
         &'a self,
         token: &'a str,
-    ) -> BoxFuture<'a, AdapterResult<Session, Self::AdapterError>>;
+    ) -> AdapterResult<Session, Self::AdapterError>;
 
     /// Gets authentication for specific validator
     fn get_auth(&self, validator_id: &ValidatorId) -> AdapterResult<String, Self::AdapterError>;
