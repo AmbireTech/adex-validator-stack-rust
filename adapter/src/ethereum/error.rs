@@ -75,7 +75,7 @@ impl fmt::Display for VerifyError {
 
 impl From<VerifyError> for AdapterError<Error> {
     fn from(err: VerifyError) -> Self {
-        AdapterError::Adapter(Error::VerifyAddress(err))
+        AdapterError::Adapter(Error::VerifyAddress(err).into())
     }
 }
 
@@ -118,7 +118,7 @@ impl fmt::Display for KeystoreError {
 
 impl From<KeystoreError> for AdapterError<Error> {
     fn from(err: KeystoreError) -> Self {
-        AdapterError::Adapter(Error::Keystore(err))
+        AdapterError::Adapter(Error::Keystore(err).into())
     }
 }
 
@@ -144,7 +144,7 @@ impl fmt::Display for EwtSigningError {
 }
 impl From<EwtSigningError> for AdapterError<Error> {
     fn from(err: EwtSigningError) -> Self {
-        AdapterError::Adapter(Error::SignMessage(err))
+        AdapterError::Adapter(Error::SignMessage(err).into())
     }
 }
 

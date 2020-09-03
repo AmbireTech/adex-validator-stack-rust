@@ -1,10 +1,13 @@
-use futures::future::{BoxFuture, FutureExt};
-use primitives::adapter::{
-    Adapter, AdapterErrorKind, AdapterResult, DummyAdapterOptions, Error as AdapterError, Session,
+use async_trait::async_trait;
+use primitives::{
+    adapter::{
+        Adapter, AdapterErrorKind, AdapterResult, DummyAdapterOptions, Error as AdapterError,
+        Session,
+    },
+    channel_validator::ChannelValidator,
+    config::Config,
+    Channel, ToETHChecksum, ValidatorId,
 };
-use primitives::channel_validator::ChannelValidator;
-use primitives::config::Config;
-use primitives::{Channel, ToETHChecksum, ValidatorId};
 use std::collections::HashMap;
 use std::fmt;
 
@@ -43,6 +46,7 @@ impl fmt::Display for Error {
 
 impl AdapterErrorKind for Error {}
 
+#[async_trait]
 impl Adapter for DummyAdapter {
     type AdapterError = Error;
 
@@ -79,40 +83,34 @@ impl Adapter for DummyAdapter {
         Ok(is_same)
     }
 
-    fn validate_channel<'a>(
+    async fn validate_channel<'a>(
         &'a self,
         channel: &'a Channel,
-    ) -> BoxFuture<'a, AdapterResult<bool, Self::AdapterError>> {
-        async move {
-            DummyAdapter::is_channel_valid(&self.config, self.whoami(), channel)
-                .map(|_| true)
-                .map_err(AdapterError::InvalidChannel)
-        }
-        .boxed()
+    ) -> AdapterResult<bool, Self::AdapterError> {
+        DummyAdapter::is_channel_valid(&self.config, self.whoami(), channel)
+            .map(|_| true)
+            .map_err(AdapterError::InvalidChannel)
     }
 
-    fn session_from_token<'a>(
+    async fn session_from_token<'a>(
         &'a self,
         token: &'a str,
-    ) -> BoxFuture<'a, AdapterResult<Session, Self::AdapterError>> {
-        async move {
-            let identity = self
-                .authorization_tokens
-                .iter()
-                .find(|(_, id)| *id == token);
+    ) -> AdapterResult<Session, Self::AdapterError> {
+        let identity = self
+            .authorization_tokens
+            .iter()
+            .find(|(_, id)| *id == token);
 
-            match identity {
-                Some((id, _)) => Ok(Session {
-                    uid: self.session_tokens[id],
-                    era: 0,
-                }),
-                None => Err(AdapterError::Authentication(format!(
-                    "no session token for this auth: {}",
-                    token
-                ))),
-            }
+        match identity {
+            Some((id, _)) => Ok(Session {
+                uid: self.session_tokens[id],
+                era: 0,
+            }),
+            None => Err(AdapterError::Authentication(format!(
+                "no session token for this auth: {}",
+                token
+            ))),
         }
-        .boxed()
     }
 
     fn get_auth(&self, _validator: &ValidatorId) -> AdapterResult<String, Self::AdapterError> {

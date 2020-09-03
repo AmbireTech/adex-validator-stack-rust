@@ -29,6 +29,7 @@ base64 = "0.10.1"
 lazy_static = "1.4.0"
 # Futures
 futures = { version = "0.3.1", features = ["compat"] }
+async-trait = "0.1.40"
 
 [dev-dependencies]
 byteorder = "1.3"
