@@ -967,11 +967,11 @@ pub fn eval_multiple(
     rules: &[Rule],
     input: &Input,
     output: &mut Output,
-) -> Vec<Result<Option<Value>, Error>> {
+) -> Vec<Result<Option<Value>, (Error, Rule)>> {
     let mut results = vec![];
 
     for rule in rules {
-        results.push(rule.eval(input, output));
+        results.push(rule.eval(input, output).map_err(|err| (err, rule.clone())));
 
         if !output.show {
             break;
@@ -979,6 +979,29 @@ pub fn eval_multiple(
     }
 
     results
+}
+
+pub fn eval_with_callback<F: Fn(Error, Rule)>(
+    rules: &[Rule],
+    input: &Input,
+    output: &mut Output,
+    on_type_error: Option<F>,
+) {
+    for result in eval_multiple(rules, input, output) {
+        match (result, on_type_error.as_ref()) {
+            (Ok(_), _) => {}
+            (Err((Error::UnknownVariable, _)), _) => {}
+            (Err((Error::TypeError, rule)), Some(on_type_error)) => {
+                on_type_error(Error::TypeError, rule)
+            }
+            // skip any other case, including Error::TypeError if there is no passed function
+            _ => {}
+        }
+
+        if !output.show {
+            return;
+        }
+    }
 }
 
 enum MathOperator {

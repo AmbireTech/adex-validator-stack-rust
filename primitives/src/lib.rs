@@ -21,8 +21,16 @@ pub mod targeting_tag;
 
 pub mod util {
     pub mod tests {
+        use slog::{o, Discard, Drain, Logger};
+
         pub mod prep_db;
         pub mod time;
+
+        pub fn discard_logger() -> Logger {
+            let drain = Discard.fuse();
+
+            Logger::root(drain, o!())
+        }
     }
 
     pub mod logging;

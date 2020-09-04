@@ -13,6 +13,7 @@ use lazy_static::lazy_static;
 use rand::Rng;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
+use slog::{error, Logger};
 use std::{cmp::Ordering, collections::VecDeque, convert::TryFrom, sync::Arc};
 use thiserror::Error;
 use units_for_slot::response::UnitsWithPrice;
@@ -279,16 +280,22 @@ pub struct Manager {
     /// It always trims to HISTORY_LIMIT, removing the oldest (firstly inserted) elements from the History
     history: Arc<RwLock<VecDeque<HistoryEntry>>>,
     client: reqwest::Client,
+    logger: Logger,
 }
 
 impl Manager {
-    pub fn new(options: Options, history: VecDeque<HistoryEntry>) -> Result<Self, Error> {
+    pub fn new(
+        options: Options,
+        history: VecDeque<HistoryEntry>,
+        logger: Logger,
+    ) -> Result<Self, Error> {
         let client = reqwest::Client::builder().build()?;
 
         Ok(Self {
             options,
             history: Arc::new(RwLock::new(history)),
             client,
+            logger,
         })
     }
 
@@ -488,11 +495,13 @@ impl Manager {
                                 .collect(),
                         };
 
-                        // TODO: Logging for `eval_multiple`
-                        targeting::eval_multiple(
+                        let on_type_error = |error, rule| error!(&self.logger, "Rule evaluation error for {:?}", campaign_id; "error" => ?error, "rule" => ?rule);
+
+                        targeting::eval_with_callback(
                             &campaign.targeting_rules,
                             &input::Input::Getter(campaign_input.clone()),
                             &mut output,
+                            Some(on_type_error)
                         );
 
                         output.show

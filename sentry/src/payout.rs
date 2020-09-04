@@ -2,9 +2,10 @@ use crate::Session;
 use chrono::Utc;
 use primitives::{
     sentry::Event,
-    targeting::{get_pricing_bounds, input, Error, Error as EvalError, Input, Output, Rule, eval_multiple},
+    targeting::{eval_with_callback, get_pricing_bounds, input, Error, Output},
     BigNum, Channel, ValidatorId,
 };
+use slog::{error, Logger};
 use std::{
     cmp::{max, min},
     convert::TryFrom,
@@ -12,7 +13,7 @@ use std::{
 
 type Result = std::result::Result<Option<(ValidatorId, BigNum)>, Error>;
 
-pub fn get_payout(channel: &Channel, event: &Event, session: &Session) -> Result {
+pub fn get_payout(logger: &Logger, channel: &Channel, event: &Event, session: &Session) -> Result {
     let event_type = event.to_string();
 
     match event {
@@ -77,7 +78,9 @@ pub fn get_payout(channel: &Channel, event: &Event, session: &Session) -> Result
                         .collect(),
                 };
 
-                eval_and_log(&targeting_rules, &input, &mut output);
+                let on_type_error = |error, rule| error!(logger, "Rule evaluation error for {:?}", channel.id; "error" => ?error, "rule" => ?rule);
+
+                eval_with_callback(&targeting_rules, &input, &mut output, Some(on_type_error));
 
                 if output.show {
                     let price = match output.price.get(&event_type) {
@@ -97,31 +100,19 @@ pub fn get_payout(channel: &Channel, event: &Event, session: &Session) -> Result
     }
 }
 
-fn eval_and_log(/* logger: &Logger, channel_id: ChannelId,  */rules: &[Rule], input: &Input, output: &mut Output) {
-    for result in eval_multiple(rules, input, output) {
-        match result {
-            Ok(_) => {}
-            Err(EvalError::UnknownVariable) => {}
-            Err(EvalError::TypeError) => {
-                todo!();
-                // error!(logger, "`WARNING: rule for {:?} failing", channel_id; "rule" => rule, "err" => ?result)
-            }
-        }
-
-        if !output.show {
-            return;
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
     use primitives::channel::{Pricing, PricingBounds};
-    use primitives::util::tests::prep_db::{DUMMY_CHANNEL, IDS};
+    use primitives::util::tests::{
+        discard_logger,
+        prep_db::{DUMMY_CHANNEL, IDS},
+    };
 
     #[test]
     fn get_event_payouts_pricing_bounds_impression_event() {
+        let logger = discard_logger();
+
         let mut channel = DUMMY_CHANNEL.clone();
         channel.deposit_amount = 100.into();
         channel.spec.min_per_impression = 8.into();
@@ -148,7 +139,7 @@ mod test {
             os: None,
         };
 
-        let payout = get_payout(&channel, &event, &session).expect("Should be OK");
+        let payout = get_payout(&logger, &channel, &event, &session).expect("Should be OK");
 
         let expected_option = Some((IDS["leader"], 8.into()));
         assert_eq!(expected_option, payout, "pricingBounds: impression event");
@@ -156,6 +147,7 @@ mod test {
 
     #[test]
     fn get_event_payouts_pricing_bounds_click_event() {
+        let logger = discard_logger();
         let mut channel = DUMMY_CHANNEL.clone();
         channel.deposit_amount = 100.into();
         channel.spec.min_per_impression = 8.into();
@@ -182,7 +174,7 @@ mod test {
             os: None,
         };
 
-        let payout = get_payout(&channel, &event, &session).expect("Should be OK");
+        let payout = get_payout(&logger, &channel, &event, &session).expect("Should be OK");
 
         let expected_option = Some((IDS["leader"], 23.into()));
         assert_eq!(expected_option, payout, "pricingBounds: click event");
@@ -190,6 +182,7 @@ mod test {
 
     #[test]
     fn get_event_payouts_pricing_bounds_close_event() {
+        let logger = discard_logger();
         let mut channel = DUMMY_CHANNEL.clone();
         channel.deposit_amount = 100.into();
         channel.spec.min_per_impression = 8.into();
@@ -211,7 +204,7 @@ mod test {
             os: None,
         };
 
-        let payout = get_payout(&channel, &event, &session).expect("Should be OK");
+        let payout = get_payout(&logger, &channel, &event, &session).expect("Should be OK");
 
         assert_eq!(None, payout, "pricingBounds: click event");
     }

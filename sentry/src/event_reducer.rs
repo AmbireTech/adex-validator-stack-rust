@@ -1,9 +1,12 @@
-use crate::payout::get_payout;
-use crate::Session;
-use primitives::sentry::{AggregateEvents, Event, EventAggregate};
-use primitives::{BigNum, Channel, ValidatorId};
+use crate::{payout::get_payout, Session};
+use primitives::{
+    sentry::{AggregateEvents, Event, EventAggregate},
+    BigNum, Channel, ValidatorId,
+};
+use slog::Logger;
 
 pub(crate) fn reduce(
+    logger: &Logger,
     channel: &Channel,
     initial_aggr: &mut EventAggregate,
     ev: &Event,
@@ -13,8 +16,8 @@ pub(crate) fn reduce(
     match ev {
         Event::Impression { publisher, .. } => {
             let impression = initial_aggr.events.get(&event_type);
-            let payout = get_payout(&channel, &ev, session)?;
-            let merge = merge_impression_ev(
+            let payout = get_payout(logger, &channel, &ev, session)?;
+            let merge = merge_payable_event(
                 impression,
                 payout.unwrap_or_else(|| (*publisher, Default::default())),
             );
@@ -23,8 +26,8 @@ pub(crate) fn reduce(
         }
         Event::Click { publisher, .. } => {
             let clicks = initial_aggr.events.get(&event_type);
-            let payout = get_payout(&channel, &ev, session)?;
-            let merge = merge_impression_ev(
+            let payout = get_payout(logger, &channel, &ev, session)?;
+            let merge = merge_payable_event(
                 clicks,
                 payout.unwrap_or_else(|| (*publisher, Default::default())),
             );
@@ -46,13 +49,14 @@ pub(crate) fn reduce(
     Ok(())
 }
 
-fn merge_impression_ev(
-    impression: Option<&AggregateEvents>,
+/// payable_event is either an IMPRESSION or a CLICK
+fn merge_payable_event(
+    payable_event: Option<&AggregateEvents>,
     payout: (ValidatorId, BigNum),
 ) -> AggregateEvents {
-    let mut impression = impression.map(Clone::clone).unwrap_or_default();
+    let mut payable_event = payable_event.cloned().unwrap_or_default();
 
-    let event_count = impression
+    let event_count = payable_event
         .event_counts
         .get_or_insert_with(Default::default)
         .entry(payout.0)
@@ -60,24 +64,28 @@ fn merge_impression_ev(
 
     *event_count += &1.into();
 
-    let event_payouts = impression
+    let event_payouts = payable_event
         .event_payouts
         .entry(payout.0)
         .or_insert_with(|| 0.into());
     *event_payouts += &payout.1;
 
-    impression
+    payable_event
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
     use chrono::Utc;
-    use primitives::util::tests::prep_db::{DUMMY_CHANNEL, IDS};
+    use primitives::util::tests::{
+        discard_logger,
+        prep_db::{DUMMY_CHANNEL, IDS},
+    };
     use primitives::BigNum;
 
     #[test]
     fn test_reduce() {
+        let logger = discard_logger();
         let mut channel: Channel = DUMMY_CHANNEL.clone();
         channel.deposit_amount = 100.into();
         // make immutable again
@@ -104,7 +112,7 @@ mod test {
         };
 
         for i in 0..101 {
-            reduce(&channel, &mut event_aggr, &event, &session)
+            reduce(&logger, &channel, &mut event_aggr, &event, &session)
                 .expect(&format!("Should be able to reduce event #{}", i));
         }
 
