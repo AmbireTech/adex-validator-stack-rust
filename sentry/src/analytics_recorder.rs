@@ -34,14 +34,18 @@ pub async fn record(
                 referrer,
             } => {
                 let divisor = BigNum::from(10u64.pow(18));
-                // @Todo: Check this!
-                let pay_amount = get_payout(&logger, &channel, event, &session)
-                    .expect("should have payout")
-                    .map(|(_, payout)| payout)
-                    .unwrap_or_default()
-                    .div_floor(&divisor)
-                    .to_f64()
-                    .expect("should always have a payout");
+
+                let pay_amount = match get_payout(&channel, event, &session) {
+                    Ok(Some((_, payout))) => payout.div_floor(&divisor)
+                        .to_f64()
+                        .expect("Should always have a payout in f64 after division"),
+                    // This should never happen, as the conditions we are checking for in the .filter are the same as getPayout's
+                    Ok(None) => return,
+                    Err(err) => {
+                        error!(&logger, "Getting the payout failed: {}", &err; "module" => "analytics-recorder", "err" => ?err);
+                        return
+                    },
+                };
 
                 if let Some(ad_unit) = ad_unit {
                     db.zincr(
