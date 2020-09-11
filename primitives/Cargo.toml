@@ -24,6 +24,8 @@ thiserror = "^1.0"
 chrono = { version = "0.4", features = ["serde"] }
 time = "0.1.42"
 hex = "0.3.2"
+# CID & multihash / multibase
+cid = "0.5"
 merkletree = "0.10.0"
 tiny-keccak = "1.5"
 rust-crypto = "0.2"
