@@ -12,6 +12,7 @@ pub mod channel;
 pub mod channel_validator;
 pub mod config;
 pub mod event_submission;
+pub mod ipfs;
 pub mod market;
 pub mod merkle_tree;
 pub mod sentry;
@@ -38,6 +39,7 @@ pub use self::big_num::BigNum;
 pub use self::channel::{Channel, ChannelId, ChannelSpec, SpecValidator, SpecValidators};
 pub use self::config::Config;
 pub use self::event_submission::EventSubmission;
+pub use self::ipfs::IPFS;
 pub use self::targeting_tag::TargetingTag;
 pub use self::validator::{ValidatorDesc, ValidatorId};
 
