@@ -35,7 +35,7 @@ pub async fn record(
             } => {
                 let divisor = BigNum::from(10u64.pow(18));
 
-                let pay_amount = match get_payout(&channel, event, &session) {
+                let pay_amount = match get_payout(&logger, &channel, event, &session) {
                     Ok(Some((_, payout))) => payout.div_floor(&divisor)
                         .to_f64()
                         .expect("Should always have a payout in f64 after division"),
