@@ -8,7 +8,7 @@ version = "0.1.0"
 # Domain
 adex_primitives = {path = "../primitives", package = "primitives"}
 chrono = "0.4"
-num-bigint = {version = "0.3", features = ["serde"]}
+num-integer = "0.1"
 # (De)Serialization & Http requests
 serde = {version = "^1.0", features = ['derive']}
 serde_json = "^1.0"

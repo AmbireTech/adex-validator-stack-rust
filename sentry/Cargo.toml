@@ -12,7 +12,7 @@ async-std = "1.4.0"
 primitives = { path = "../primitives", features = ["postgres"] }
 adapter = { version = "0.1", path = "../adapter" }
 chrono = { version = "0.4", features = ["serde"] }
-hex = "0.3.2"
+hex = "0.4"
 # CLI
 clap = "2.33.0"
 # Server
