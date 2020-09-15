@@ -5,16 +5,23 @@ use adex_primitives::{
     supermarket::units_for_slot,
     supermarket::units_for_slot::response::{AdUnit, Campaign},
     targeting::{self, input, Value},
-    BigNum, ChannelId, SpecValidators,
+    BigNum, ChannelId, SpecValidators, IPFS,
 };
 use async_std::{sync::RwLock, task::block_on};
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
+use num_integer::Integer;
 use rand::Rng;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use slog::{error, Logger};
-use std::{cmp::Ordering, collections::VecDeque, convert::TryFrom, sync::Arc};
+use std::{
+    cmp::Ordering,
+    collections::VecDeque,
+    convert::TryFrom,
+    ops::{Add, Mul},
+    sync::Arc,
+};
 use thiserror::Error;
 use units_for_slot::response::UnitsWithPrice;
 use url::Url;
@@ -44,7 +51,7 @@ pub struct Options {
     // Defaulted via defaultOpts
     #[serde(rename = "marketURL")]
     pub market_url: String,
-    pub market_slot: String,
+    pub market_slot: IPFS,
     pub publisher_addr: String,
     // All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared
     pub whitelisted_tokens: Vec<String>,
@@ -66,9 +73,9 @@ impl Options {
 #[derive(Debug, Clone)]
 pub struct HistoryEntry {
     time: DateTime<Utc>,
-    unit_id: String,
+    unit_id: IPFS,
     campaign_id: ChannelId,
-    slot_id: String,
+    slot_id: IPFS,
 }
 
 #[derive(Serialize)]
@@ -77,8 +84,8 @@ struct Event {
     #[serde(rename = "type")]
     event_type: String,
     publisher: String,
-    ad_unit: String,
-    ad_slot: String,
+    ad_unit: IPFS,
+    ad_slot: IPFS,
     #[serde(rename = "ref")]
     referrer: String,
 }
@@ -149,16 +156,15 @@ fn is_video(ad_unit: &AdUnit) -> bool {
     ad_unit.media_mime.split('/').next() == Some("video")
 }
 
-// @TODO: IMPL
-// function randomizedSortPos(unit: Unit, seed: BN): BN {
-// 	// using base32 is technically wrong (IDs are in base 58), but it works well enough for this purpose
-// 	// kind of a LCG PRNG but without the state; using GCC's constraints as seen on stack overflow
-// 	// takes around ~700ms for 100k iterations, yields very decent distribution (e.g. 724ms 50070, 728ms 49936)
-// 	return new BN(unit.id, 32).mul(seed).add(new BN(12345)).mod(new BN(0x80000000))
-// }
-fn randomized_sort_pos(_ad_unit: &AdUnit, _seed: BigNum) -> BigNum {
-    // todo!("Implement the randomized_sort_pos() function!")
-    BigNum::from(10)
+/// Does not copy the JS impl, instead it generates the BigNum from the IPFS CID bytes instead
+fn randomized_sort_pos(ad_unit: &AdUnit, seed: BigNum) -> BigNum {
+    let bytes = ad_unit.id.0.to_bytes();
+
+    let unit_id = BigNum::from_bytes_be(&bytes);
+
+    let x: BigNum = unit_id.mul(seed).add(BigNum::from(12345));
+
+    x.mod_floor(&BigNum::from(0x80000000))
 }
 
 fn get_unit_html(
@@ -605,10 +611,11 @@ pub struct StickyAdUnit {
 #[cfg(test)]
 mod test {
     use super::*;
+    use adex_primitives::util::tests::prep_db::DUMMY_IPFS;
 
     fn get_ad_unit(media_mime: &str) -> AdUnit {
         AdUnit {
-            id: "".to_string(),
+            id: DUMMY_IPFS[0].clone(),
             media_url: "".to_string(),
             media_mime: media_mime.to_string(),
             target_url: "".to_string(),
@@ -632,5 +639,25 @@ mod test {
 
         // Non-IPFS case
         assert_eq!("http://123".to_string(), normalize_url("http://123"));
+    }
+
+    mod randomized_sort_pos {
+
+        use super::*;
+
+        #[test]
+        fn test_randomized_position() {
+            let ad_unit = AdUnit {
+                id: DUMMY_IPFS[0].clone(),
+                media_url: "ipfs://QmWWQSuPMS6aXCbZKpEjPHPUZN2NjB3YrhJTHsV4X3vb2t".to_string(),
+                media_mime: "image/jpeg".to_string(),
+                target_url: "https://google.com".to_string(),
+            };
+
+            let result = randomized_sort_pos(&ad_unit, 5.into());
+
+            // The seed is responsible for generating different results since the AdUnit IPFS can be the same
+            assert_eq!(BigNum::from(177_349_401), result);
+        }
     }
 }
