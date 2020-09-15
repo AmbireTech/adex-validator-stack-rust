@@ -42,7 +42,7 @@ pub fn get_payout(logger: &Logger, channel: &Channel, event: &Event, session: &S
             } else {
                 let ad_unit = ad_unit
                     .as_ref()
-                    .and_then(|ipfs| channel.spec.ad_units.iter().find(|u| &u.ipfs == ipfs));
+                    .and_then(|ipfs| channel.spec.ad_units.iter().find(|u| &u.ipfs.to_string() == ipfs));
 
                 let source = input::Source {
                     ad_view: None,

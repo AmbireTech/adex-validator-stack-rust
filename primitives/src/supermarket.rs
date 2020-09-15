@@ -42,9 +42,10 @@ pub enum Finalized {
 
 pub mod units_for_slot {
     pub mod response {
+
         use crate::{
             targeting::{Map, Rule},
-            BigNum, ChannelId, ChannelSpec, SpecValidators, ValidatorId,
+            BigNum, ChannelId, ChannelSpec, SpecValidators, ValidatorId, IPFS,
         };
         use chrono::{
             serde::{ts_milliseconds, ts_milliseconds_option},
@@ -131,7 +132,7 @@ pub mod units_for_slot {
         #[serde(rename_all = "camelCase")]
         pub struct AdUnit {
             /// Same as `ipfs`
-            pub id: String,
+            pub id: IPFS,
             pub media_url: String,
             pub media_mime: String,
             pub target_url: String,

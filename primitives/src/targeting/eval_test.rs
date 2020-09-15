@@ -1,14 +1,14 @@
 use super::*;
 use crate::{
     targeting::input,
-    util::tests::prep_db::{DUMMY_CHANNEL, IDS},
+    util::tests::prep_db::{DUMMY_CHANNEL, IDS, DUMMY_IPFS},
     AdUnit, BalancesMap,
 };
 use chrono::Utc;
 
 fn get_default_input() -> input::Source {
     let ad_unit = AdUnit {
-        ipfs: "Hash".to_string(),
+        ipfs: DUMMY_IPFS[0].clone(),
         ad_type: "legacy_300x250".to_string(),
         media_url: "media_url".to_string(),
         media_mime: "media_mime".to_string(),

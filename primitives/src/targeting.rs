@@ -43,7 +43,7 @@ pub mod input {
             match key {
                 "adUnitId" => {
                     let ipfs = self.ad_unit.as_ref().map(|ad_unit| ad_unit.id.clone());
-                    Ok(Value::String(ipfs.unwrap_or_default()))
+                    Ok(Value::String(ipfs.map(|ipfs| ipfs.to_string()).unwrap_or_default()))
                 }
 
                 "advertiserId" if channel.is_some() => {
@@ -336,8 +336,9 @@ pub mod input {
                         .global
                         .ad_unit
                         .as_ref()
-                        .map(|ad_unit| ad_unit.ipfs.clone());
-                    Ok(Value::String(ipfs.unwrap_or_default()))
+                        .map(|ad_unit| ad_unit.ipfs.to_string());
+
+                        Ok(Value::String(ipfs.unwrap_or_default()))
                 }
                 "advertiserId" => self
                     .global
@@ -461,13 +462,13 @@ pub mod input {
     #[cfg(test)]
     mod test {
         use super::*;
-        use crate::util::tests::prep_db::{DUMMY_CHANNEL, IDS};
+        use crate::util::tests::prep_db::{DUMMY_CHANNEL, IDS, DUMMY_IPFS};
         use chrono::Utc;
 
         #[test]
         fn test_try_get_of_input() {
             let ad_unit = AdUnit {
-                ipfs: "Hash".to_string(),
+                ipfs: DUMMY_IPFS[0].clone(),
                 ad_type: "legacy_300x250".to_string(),
                 media_url: "media_url".to_string(),
                 media_mime: "media_mime".to_string(),

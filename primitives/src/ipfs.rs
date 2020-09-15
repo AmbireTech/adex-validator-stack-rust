@@ -5,6 +5,8 @@ use thiserror::Error;
 
 const URL_PREFIX: &str = "ipfs://";
 
+pub use cid::{Cid, Error};
+
 #[derive(Clone, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(try_from = "String", into = "String")]
 pub struct IPFS(pub cid::Cid);
@@ -39,6 +41,14 @@ impl TryFrom<String> for IPFS {
     type Error = cid::Error;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::try_from(value.as_str())
+    }
+}
+
+impl TryFrom<&String> for IPFS {
+    type Error = cid::Error;
+
+    fn try_from(value: &String) -> Result<Self, Self::Error> {
         Self::try_from(value.as_str())
     }
 }
@@ -202,6 +212,9 @@ mod test {
         for &ipfs_str in TESTS_IPFS_V1.iter() {
             check(ipfs_str, cid::Version::V1)
         }
+
+        // v0 != v1
+        assert_ne!(IPFS::try_from(TESTS_IPFS_V0[0]), IPFS::try_from(TESTS_IPFS_V1[0]))
     }
 
     #[test]
