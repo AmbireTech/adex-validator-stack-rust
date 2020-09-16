@@ -204,7 +204,6 @@ mod test {
             )
         };
 
-
         for &ipfs_str in TESTS_IPFS_V0.iter() {
             check(ipfs_str, cid::Version::V0)
         }
@@ -214,7 +213,10 @@ mod test {
         }
 
         // v0 != v1
-        assert_ne!(IPFS::try_from(TESTS_IPFS_V0[0]), IPFS::try_from(TESTS_IPFS_V1[0]))
+        assert_ne!(
+            IPFS::try_from(TESTS_IPFS_V0[0]),
+            IPFS::try_from(TESTS_IPFS_V1[0])
+        )
     }
 
     #[test]
