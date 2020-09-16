@@ -40,9 +40,13 @@ pub fn get_payout(logger: &Logger, channel: &Channel, event: &Event, session: &S
             if targeting_rules.is_empty() {
                 Ok(Some((*publisher, pricing.min)))
             } else {
-                let ad_unit = ad_unit
-                    .as_ref()
-                    .and_then(|ipfs| channel.spec.ad_units.iter().find(|u| &u.ipfs.to_string() == ipfs));
+                let ad_unit = ad_unit.as_ref().and_then(|ipfs| {
+                    channel
+                        .spec
+                        .ad_units
+                        .iter()
+                        .find(|u| &u.ipfs.to_string() == ipfs)
+                });
 
                 let source = input::Source {
                     ad_view: None,

@@ -1,7 +1,7 @@
 use super::*;
 use crate::{
     targeting::input,
-    util::tests::prep_db::{DUMMY_CHANNEL, IDS, DUMMY_IPFS},
+    util::tests::prep_db::{DUMMY_CHANNEL, DUMMY_IPFS, IDS},
     AdUnit, BalancesMap,
 };
 use chrono::Utc;

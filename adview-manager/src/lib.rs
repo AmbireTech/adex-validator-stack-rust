@@ -5,7 +5,7 @@ use adex_primitives::{
     supermarket::units_for_slot,
     supermarket::units_for_slot::response::{AdUnit, Campaign},
     targeting::{self, input, Value},
-    BigNum, ChannelId, SpecValidators, IPFS,
+    BigNum, ChannelId, SpecValidators, ValidatorId, IPFS,
 };
 use async_std::{sync::RwLock, task::block_on};
 use chrono::{DateTime, Utc};
@@ -42,17 +42,13 @@ lazy_static! {
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-// const defaultOpts = {
-// 	marketURL: 'https://market.moonicorn.network',
-// 	whitelistedTokens: ['0x6B175474E89094C44Da98b954EedeAC495271d0F'],
-// 	disableVideo: false,
-// }
+// TODO: Add Default Ops somehow?
 pub struct Options {
     // Defaulted via defaultOpts
     #[serde(rename = "marketURL")]
-    pub market_url: String,
+    pub market_url: Url,
     pub market_slot: IPFS,
-    pub publisher_addr: String,
+    pub publisher_addr: ValidatorId,
     // All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared
     pub whitelisted_tokens: Vec<String>,
     pub width: Option<u64>,
@@ -83,7 +79,7 @@ pub struct HistoryEntry {
 struct Event {
     #[serde(rename = "type")]
     event_type: String,
-    publisher: String,
+    publisher: ValidatorId,
     ad_unit: IPFS,
     ad_slot: IPFS,
     #[serde(rename = "ref")]
@@ -156,7 +152,7 @@ fn is_video(ad_unit: &AdUnit) -> bool {
     ad_unit.media_mime.split('/').next() == Some("video")
 }
 
-/// Does not copy the JS impl, instead it generates the BigNum from the IPFS CID bytes instead
+/// Does not copy the JS impl, instead it generates the BigNum from the IPFS CID bytes
 fn randomized_sort_pos(ad_unit: &AdUnit, seed: BigNum) -> BigNum {
     let bytes = ad_unit.id.0.to_bytes();
 
@@ -220,7 +216,7 @@ pub fn get_unit_html_with_events(
     let get_body = |event_type: &str| EventBody {
         events: vec![Event {
             event_type: event_type.to_string(),
-            publisher: options.publisher_addr.clone(),
+            publisher: options.publisher_addr,
             ad_unit: ad_unit.id.clone(),
             ad_slot: options.market_slot.clone(),
             referrer: "document.referrer".to_string(),
@@ -405,13 +401,7 @@ impl Manager {
     pub async fn get_market_demand_resp(
         &self,
     ) -> Result<units_for_slot::response::Response, Error> {
-        let pub_prefix: String = self
-            .options
-            .publisher_addr
-            .chars()
-            .skip(2)
-            .take(10)
-            .collect();
+        let pub_prefix: String = self.options.publisher_addr.to_hex_non_prefix_string();
 
         let deposit_asset = self
             .options
@@ -421,8 +411,10 @@ impl Manager {
             .collect::<Vec<_>>()
             .join("&");
 
+
+        // Url adds a trailing `/`
         let url = format!(
-            "{}/units-for-slot/{}?pubPrefix={}&{}",
+            "{}units-for-slot/{}?pubPrefix={}&{}",
             self.options.market_url, self.options.market_slot, pub_prefix, deposit_asset
         );
 
@@ -562,7 +554,7 @@ impl Manager {
                         None
                     }
                 })
-                // TODO: Check what should happen here
+                // TODO: Check what should happen here if we don't find the Validator
                 .unwrap();
 
             let html = get_unit_html_with_events(
