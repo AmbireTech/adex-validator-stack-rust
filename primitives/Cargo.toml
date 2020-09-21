@@ -20,12 +20,16 @@ slog = { version = "^2.5.2" , features = ["max_level_trace"] }
 slog-term = "^2.4.2"
 slog-async = "^2.3.0"
 # Domain
+thiserror = "^1.0"
 chrono = { version = "0.4", features = ["serde"] }
 time = "0.1.42"
 hex = "0.3.2"
+# CID & multihash / multibase
+cid = "0.5"
 merkletree = "0.10.0"
 tiny-keccak = "1.5"
-eth_checksum = "0.1.1"
+rust-crypto = "0.2"
+url = { version = "2.1", features = ["serde"]}
 # Numbers - BigNum, Numbers, Traits and Derives
 num-bigint = { version = "0.2", features = ["serde"] }
 num = "0.2.0"
@@ -40,5 +44,6 @@ bytes = { version = "0.5", optional = true }
 tokio-postgres = { version = "0.5.1", optional = true, features = ["with-chrono-0_4", "with-serde_json-1"] }
 # Futures
 futures = "0.3.1"
+async-trait = "0.1.40"
 # Other
 lazy_static = "1.4.0"

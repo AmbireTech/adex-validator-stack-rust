@@ -36,7 +36,9 @@ lazy_static! {
 
 pub async fn redis_connection() -> Result<MultiplexedConnection, RedisError> {
     let client = redis::Client::open(REDIS_URL.as_str()).expect("Wrong redis connection url");
-    client.get_multiplexed_tokio_connection().await
+    let (connection, driver) = client.get_multiplexed_async_connection().await?;
+    tokio::spawn(driver);
+    Ok(connection)
 }
 
 pub async fn postgres_connection() -> Result<DbPool, bb8_postgres::tokio_postgres::Error> {
@@ -46,7 +48,7 @@ pub async fn postgres_connection() -> Result<DbPool, bb8_postgres::tokio_postgre
         .user(POSTGRES_USER.as_str())
         .password(POSTGRES_PASSWORD.as_str())
         .host(POSTGRES_HOST.as_str())
-        .port(POSTGRES_PORT.clone());
+        .port(*POSTGRES_PORT);
     if let Some(db) = POSTGRES_DB.clone() {
         config.dbname(&db);
     }
@@ -62,7 +64,7 @@ pub async fn setup_migrations(environment: &str) {
         .database_user(POSTGRES_USER.as_str())
         .database_password(POSTGRES_PASSWORD.as_str())
         .database_host(POSTGRES_HOST.as_str())
-        .database_port(POSTGRES_PORT.clone())
+        .database_port(*POSTGRES_PORT)
         .database_name(&POSTGRES_DB.as_ref().unwrap_or(&POSTGRES_USER))
         .build()
         .expect("Should build migration settings");
@@ -82,7 +84,10 @@ pub async fn setup_migrations(environment: &str) {
         };
     }
 
-    let mut migrations = vec![make_migration!("20190806011140_initial-tables")];
+    let mut migrations = vec![
+        make_migration!("20190806011140_initial-tables"),
+        make_migration!("20200625092729_channel-targeting-rules"),
+    ];
 
     if environment == "development" {
         // seeds database tables for testing

@@ -1,5 +1,5 @@
 use std::convert::TryFrom;
-use std::error::Error;
+use std::fmt;
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, Mul, Sub};
 use std::str::FromStr;
@@ -65,19 +65,7 @@ impl From<BigNum> for PrecisionU64 {
 }
 
 #[derive(
-    Serialize,
-    Deserialize,
-    Debug,
-    Clone,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    NumOps,
-    One,
-    Zero,
-    Num,
-    Default,
+    Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, NumOps, One, Zero, Num, Default,
 )]
 pub struct BigNum(
     #[serde(
@@ -110,6 +98,14 @@ impl BigNum {
 
     pub fn to_str_radix(&self, radix: u32) -> String {
         self.0.to_str_radix(radix)
+    }
+}
+
+impl fmt::Debug for BigNum {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let radix = 10;
+        let value = self.to_str_radix(radix);
+        write!(f, "BigNum(radix: {}; {})", radix, value)
     }
 }
 
@@ -250,9 +246,17 @@ impl TryFrom<&str> for BigNum {
 
     fn try_from(num: &str) -> Result<Self, Self::Error> {
         let big_uint = BigUint::from_str(&num)
-            .map_err(|err| super::DomainError::InvalidArgument(err.description().to_string()))?;
+            .map_err(|err| super::DomainError::InvalidArgument(err.to_string()))?;
 
         Ok(Self(big_uint))
+    }
+}
+
+impl FromStr for BigNum {
+    type Err = super::DomainError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        BigNum::try_from(s)
     }
 }
 

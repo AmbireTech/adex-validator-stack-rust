@@ -48,6 +48,7 @@ mod chain;
 pub mod db;
 pub mod event_aggregator;
 pub mod event_reducer;
+pub mod payout;
 
 lazy_static! {
     static ref CHANNEL_GET_BY_ID: Regex =
@@ -60,8 +61,7 @@ lazy_static! {
     static ref ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
     static ref ADVERTISER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-advertiser/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
     static ref PUBLISHER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-publisher/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
-    static ref CREATE_EVENTS_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events(/.*)?$").expect("The regex should be valid");
-
+    static ref CREATE_EVENTS_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events/?$").expect("The regex should be valid");
 }
 
 fn auth_required_middleware<'a, A: Adapter>(
@@ -99,7 +99,6 @@ pub struct Application<A: Adapter> {
     pub pool: DbPool,
     pub config: Config,
     pub event_aggregator: EventAggregator,
-    __secret: (),
 }
 
 impl<A: Adapter + 'static> Application<A> {
@@ -117,7 +116,6 @@ impl<A: Adapter + 'static> Application<A> {
             redis,
             pool,
             event_aggregator: Default::default(),
-            __secret: (),
         }
     }
 
@@ -137,8 +135,7 @@ impl<A: Adapter + 'static> Application<A> {
             }
         };
 
-        let path = req.uri().path().to_string();
-        let mut response = match (path.as_ref(), req.method()) {
+        let mut response = match (req.uri().path(), req.method()) {
             ("/cfg", &Method::GET) => config(req, &self).await,
             ("/channel", &Method::POST) => create_channel(req, &self).await,
             ("/channel/list", &Method::GET) => channel_list(req, &self).await,
@@ -252,10 +249,17 @@ async fn channels_router<A: Adapter + 'static>(
 ) -> Result<Response<Body>, ResponseError> {
     let (path, method) = (req.uri().path().to_owned(), req.method());
 
-    // example with
-    // @TODO remove later
     // regex matching for routes with params
-    if let (Some(caps), &Method::GET) = (LAST_APPROVED_BY_CHANNEL_ID.captures(&path), method) {
+    if let (Some(caps), &Method::POST) = (CREATE_EVENTS_BY_CHANNEL_ID.captures(&path), method) {
+        let param = RouteParams(vec![caps
+            .get(1)
+            .map_or("".to_string(), |m| m.as_str().to_string())]);
+
+        req.extensions_mut().insert(param);
+
+        insert_events(req, app).await
+    } else if let (Some(caps), &Method::GET) = (LAST_APPROVED_BY_CHANNEL_ID.captures(&path), method)
+    {
         let param = RouteParams(vec![caps
             .get(1)
             .map_or("".to_string(), |m| m.as_str().to_string())]);
@@ -334,16 +338,6 @@ async fn channels_router<A: Adapter + 'static>(
         let req = chain(req, app, vec![Box::new(channel_load)]).await?;
 
         list_channel_event_aggregates(req, app).await
-    } else if let (Some(caps), &Method::POST) =
-        (CREATE_EVENTS_BY_CHANNEL_ID.captures(&path), method)
-    {
-        let param = RouteParams(vec![caps
-            .get(1)
-            .map_or("".to_string(), |m| m.as_str().to_string())]);
-
-        req.extensions_mut().insert(param);
-
-        insert_events(req, app).await
     } else {
         Err(ResponseError::NotFound)
     }
@@ -449,9 +443,14 @@ pub fn epoch() -> f64 {
 // @TODO: Make pub(crate)
 #[derive(Debug, Clone)]
 pub struct Session {
-    pub era: i64,
-    pub uid: ValidatorId,
     pub ip: Option<String>,
     pub country: Option<String>,
     pub referrer_header: Option<String>,
+    pub os: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Auth {
+    pub era: i64,
+    pub uid: ValidatorId,
 }

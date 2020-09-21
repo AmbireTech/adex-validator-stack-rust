@@ -14,9 +14,10 @@ use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
 use primitives::adapter::{Adapter, DummyAdapterOptions, KeystoreOptions};
 use primitives::config::{configuration, Config};
 use primitives::util::tests::prep_db::{AUTH, IDS};
-use primitives::{Channel, SpecValidator, ValidatorId};
+use primitives::{Channel, ChannelId, SpecValidator, ValidatorId};
 use slog::{error, info, Logger};
-use validator_worker::error::ValidatorWorker as ValidatorWorkerError;
+use std::fmt::Debug;
+use validator_worker::error::{Error as ValidatorWorkerError, TickError};
 use validator_worker::{all_channels, follower, leader, SentryApi};
 
 #[derive(Debug, Clone)]
@@ -165,7 +166,7 @@ async fn iterate_channels<A: Adapter + 'static>(args: Args<A>, logger: &Logger) 
     let channels = match result {
         Ok(channels) => channels,
         Err(e) => {
-            error!(logger, "Failed to get channels - {}", &e; "main" => "iterate_channels");
+            error!(logger, "Failed to get channels"; "error" => ?e, "main" => "iterate_channels");
             return;
         }
     };
@@ -180,10 +181,10 @@ async fn iterate_channels<A: Adapter + 'static>(args: Args<A>, logger: &Logger) 
     .await;
 
     for channel_err in tick_results.into_iter().filter_map(Result::err) {
-        error!(logger, "Error processing channels - {}", channel_err; "main" => "iterate_channels");
+        error!(logger, "Error processing channel"; "channel_error" => ?channel_err, "main" => "iterate_channels");
     }
 
-    info!(logger, "processed {} channels", channels_size);
+    info!(logger, "Processed {} channels", channels_size);
 
     if channels_size >= args.config.max_channels as usize {
         error!(logger, "WARNING: channel limit cfg.MAX_CHANNELS={} reached", &args.config.max_channels; "main" => "iterate_channels");
@@ -195,39 +196,47 @@ async fn validator_tick<A: Adapter + 'static>(
     channel: Channel,
     config: &Config,
     logger: &Logger,
-) -> Result<(), ValidatorWorkerError> {
-    let whoami = adapter.whoami().clone();
+) -> Result<(ChannelId, Box<dyn Debug>), ValidatorWorkerError<A::AdapterError>> {
+    let whoami = *adapter.whoami();
+
     // Cloning the `Logger` is cheap, see documentation for more info
-    let sentry = SentryApi::init(adapter, &channel, &config, logger.clone())?;
+    let sentry = SentryApi::init(adapter, channel.clone(), &config, logger.clone())
+        .map_err(ValidatorWorkerError::SentryApi)?;
     let duration = Duration::from_millis(config.validator_tick_timeout as u64);
 
     match channel.spec.validators.find(&whoami) {
-        SpecValidator::Leader(_) => match timeout(duration, leader::tick(&sentry)).await {
-            Err(timeout_e) => Err(ValidatorWorkerError::Channel(
+        Some(SpecValidator::Leader(_)) => match timeout(duration, leader::tick(&sentry)).await {
+            Err(timeout_e) => Err(ValidatorWorkerError::LeaderTick(
                 channel.id,
-                timeout_e.to_string(),
+                TickError::TimedOut(timeout_e),
             )),
-            Ok(Err(tick_e)) => Err(ValidatorWorkerError::Channel(
+            Ok(Err(tick_e)) => Err(ValidatorWorkerError::LeaderTick(
                 channel.id,
-                tick_e.to_string(),
+                TickError::Tick(tick_e),
             )),
-            _ => Ok(()),
+            Ok(Ok(tick_status)) => {
+                info!(&logger, "Leader tick"; "status" => ?tick_status);
+                Ok((channel.id, Box::new(tick_status)))
+            }
         },
-        SpecValidator::Follower(_) => match timeout(duration, follower::tick(&sentry)).await {
-            Err(timeout_e) => Err(ValidatorWorkerError::Channel(
-                channel.id,
-                timeout_e.to_string(),
-            )),
-            Ok(Err(tick_e)) => Err(ValidatorWorkerError::Channel(
-                channel.id,
-                tick_e.to_string(),
-            )),
-            _ => Ok(()),
-        },
-        SpecValidator::None => Err(ValidatorWorkerError::Channel(
-            channel.id,
-            "validatorTick: processing a channel which we are not validating".to_string(),
-        )),
+        Some(SpecValidator::Follower(_)) => {
+            match timeout(duration, follower::tick(&sentry)).await {
+                Err(timeout_e) => Err(ValidatorWorkerError::FollowerTick(
+                    channel.id,
+                    TickError::TimedOut(timeout_e),
+                )),
+                Ok(Err(tick_e)) => Err(ValidatorWorkerError::FollowerTick(
+                    channel.id,
+                    TickError::Tick(tick_e),
+                )),
+                Ok(Ok(tick_status)) => {
+                    info!(&logger, "Follower tick"; "status" => ?tick_status);
+                    Ok((channel.id, Box::new(tick_status)))
+                }
+            }
+        }
+        // @TODO: Can we make this so that we don't have this check at all? maybe something with the SentryApi struct?
+        None => unreachable!("SentryApi makes a check if validator is in Channel spec on `init()`"),
     }
 }
 

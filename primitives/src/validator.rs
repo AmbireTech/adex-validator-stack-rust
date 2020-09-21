@@ -14,7 +14,7 @@ pub enum ValidatorError {
     InvalidTransition,
 }
 
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[serde(transparent)]
 pub struct ValidatorId(
     #[serde(
@@ -23,6 +23,12 @@ pub struct ValidatorId(
     )]
     [u8; 20],
 );
+
+impl fmt::Debug for ValidatorId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ValidatorId({})", self.to_hex_prefix_string())
+    }
+}
 
 fn validator_id_from_str<'de, D>(deserializer: D) -> Result<[u8; 20], D::Error>
 where
@@ -131,7 +137,7 @@ pub struct ValidatorDesc {
 
 // Validator Message Types
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Accounting {
     #[serde(rename = "lastEvAggr")]
@@ -140,7 +146,7 @@ pub struct Accounting {
     pub balances: BalancesMap,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ApproveState {
     pub state_root: String,
@@ -148,7 +154,7 @@ pub struct ApproveState {
     pub is_healthy: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct NewState {
     pub state_root: String,
@@ -156,7 +162,7 @@ pub struct NewState {
     pub balances: BalancesMap,
 }
 
-#[derive(Default, Serialize, Deserialize, Debug, Clone)]
+#[derive(Default, Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct RejectState {
     pub reason: String,
@@ -166,7 +172,7 @@ pub struct RejectState {
     pub timestamp: Option<DateTime<Utc>>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Heartbeat {
     pub signature: String,
@@ -184,7 +190,7 @@ impl Heartbeat {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(tag = "type")]
 pub enum MessageTypes {
     ApproveState(ApproveState),

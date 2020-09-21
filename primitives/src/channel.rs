@@ -1,17 +1,18 @@
 use std::error::Error;
 use std::fmt;
+use std::ops::Deref;
 
 use chrono::serde::{ts_milliseconds, ts_milliseconds_option, ts_seconds};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 
-use crate::big_num::BigNum;
-use crate::{AdUnit, EventSubmission, TargetingTag, ValidatorDesc, ValidatorId};
+use crate::{
+    targeting::Rule, AdUnit, BigNum, EventSubmission, TargetingTag, ValidatorDesc, ValidatorId,
+};
 use hex::{FromHex, FromHexError};
-use std::ops::Deref;
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Copy, Clone, Hash)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Copy, Clone, Hash)]
 #[serde(transparent)]
 pub struct ChannelId(
     #[serde(
@@ -20,6 +21,12 @@ pub struct ChannelId(
     )]
     [u8; 32],
 );
+
+impl fmt::Debug for ChannelId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ChannelId({})", self)
+    }
+}
 
 fn channel_id_from_str<'de, D>(deserializer: D) -> Result<[u8; 32], D::Error>
 where
@@ -78,6 +85,8 @@ pub struct Channel {
     pub deposit_amount: BigNum,
     #[serde(with = "ts_seconds")]
     pub valid_until: DateTime<Utc>,
+    #[serde(default)]
+    pub targeting_rules: Vec<Rule>,
     pub spec: ChannelSpec,
 }
 
@@ -94,6 +103,30 @@ pub struct PricingBounds {
     pub impression: Option<Pricing>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub click: Option<Pricing>,
+}
+
+impl PricingBounds {
+    pub fn to_vec(&self) -> Vec<(&str, Pricing)> {
+        let mut vec = Vec::new();
+
+        if let Some(pricing) = self.impression.as_ref() {
+            vec.push(("IMPRESSION", pricing.clone()));
+        }
+
+        if let Some(pricing) = self.click.as_ref() {
+            vec.push(("CLICK", pricing.clone()))
+        }
+
+        vec
+    }
+
+    pub fn get(&self, event_type: &str) -> Option<&Pricing> {
+        match event_type {
+            "IMPRESSION" => self.impression.as_ref(),
+            "CLICK" => self.click.as_ref(),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -119,14 +152,10 @@ pub struct ChannelSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub event_submission: Option<EventSubmission>,
     /// A millisecond timestamp of when the campaign was created
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "ts_milliseconds_option"
-    )]
-    pub created: Option<DateTime<Utc>>,
+    #[serde(with = "ts_milliseconds")]
+    pub created: DateTime<Utc>,
     /// A millisecond timestamp representing the time you want this campaign to become active (optional)
-    /// Used by the AdViewManager
+    /// Used by the AdViewManager & Targeting AIP#31
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
@@ -145,28 +174,47 @@ pub struct ChannelSpec {
     /// An array of AdUnit (optional)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ad_units: Vec<AdUnit>,
+    #[serde(default)]
+    pub targeting_rules: Vec<Rule>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub price_multiplication_rules: Vec<PriceMultiplicationRules>,
+    #[serde(default)]
+    pub price_dynamic_adjustment: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PriceMultiplicationRules {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub multiplier: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub amount: Option<BigNum>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ev_type: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publisher: Option<Vec<ValidatorId>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub os_type: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub country: Option<Vec<String>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 /// A (leader, follower) tuple
 pub struct SpecValidators(ValidatorDesc, ValidatorDesc);
 
+#[derive(Debug)]
 pub enum SpecValidator<'a> {
     Leader(&'a ValidatorDesc),
     Follower(&'a ValidatorDesc),
-    None,
 }
 
 impl<'a> SpecValidator<'a> {
-    pub fn is_some(&self) -> bool {
-        match &self {
-            SpecValidator::None => false,
-            _ => true,
+    pub fn validator(&self) -> &'a ValidatorDesc {
+        match self {
+            SpecValidator::Leader(validator) => validator,
+            SpecValidator::Follower(validator) => validator,
         }
-    }
-
-    pub fn is_none(&self) -> bool {
-        !self.is_some()
     }
 }
 
@@ -183,13 +231,13 @@ impl SpecValidators {
         &self.1
     }
 
-    pub fn find(&self, validator_id: &ValidatorId) -> SpecValidator<'_> {
+    pub fn find(&self, validator_id: &ValidatorId) -> Option<SpecValidator<'_>> {
         if &self.leader().id == validator_id {
-            SpecValidator::Leader(&self.leader())
+            Some(SpecValidator::Leader(&self.leader()))
         } else if &self.follower().id == validator_id {
-            SpecValidator::Follower(&self.follower())
+            Some(SpecValidator::Follower(&self.follower()))
         } else {
-            SpecValidator::None
+            None
         }
     }
 
@@ -296,6 +344,7 @@ impl Error for ChannelError {
 pub mod postgres {
     use super::ChannelId;
     use super::{Channel, ChannelSpec};
+    use crate::targeting::Rule;
     use bytes::BytesMut;
     use hex::FromHex;
     use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
@@ -310,6 +359,7 @@ pub mod postgres {
                 deposit_asset: row.get("deposit_asset"),
                 deposit_amount: row.get("deposit_amount"),
                 valid_until: row.get("valid_until"),
+                targeting_rules: row.get::<_, Json<Vec<Rule>>>("targeting_rules").0,
                 spec: row.get::<_, Json<ChannelSpec>>("spec").0,
             }
         }

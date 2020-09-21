@@ -1,21 +1,20 @@
-use self::channel_list::{ChannelListQuery, LastApprovedQuery};
-use crate::db::event_aggregate::{lastest_approve_state, latest_heartbeats, latest_new_state};
+use crate::db::event_aggregate::{latest_approve_state, latest_heartbeats, latest_new_state};
 use crate::db::{get_channel_by_id, insert_channel, insert_validator_messages, list_channels};
-use crate::success_response;
-use crate::Application;
-use crate::ResponseError;
-use crate::RouteParams;
-use crate::Session;
+use crate::{success_response, Application, Auth, ResponseError, RouteParams, Session};
 use bb8::RunError;
 use bb8_postgres::tokio_postgres::error;
 use futures::future::try_join_all;
 use hex::FromHex;
 use hyper::{Body, Request, Response};
-use primitives::adapter::Adapter;
-use primitives::channel::SpecValidator;
-use primitives::sentry::{Event, LastApproved, LastApprovedResponse, SuccessResponse};
-use primitives::validator::MessageTypes;
-use primitives::{Channel, ChannelId};
+use primitives::{
+    adapter::Adapter,
+    sentry::{
+        channel_list::{ChannelListQuery, LastApprovedQuery},
+        Event, LastApproved, LastApprovedResponse, SuccessResponse,
+    },
+    validator::MessageTypes,
+    Channel, ChannelId,
+};
 use slog::error;
 use std::collections::HashMap;
 
@@ -131,7 +130,7 @@ pub async fn last_approved<A: Adapter>(
         )
         .expect("should build response");
 
-    let approve_state = match lastest_approve_state(&app.pool, &channel).await? {
+    let approve_state = match latest_approve_state(&app.pool, &channel).await? {
         Some(approve_state) => approve_state,
         None => return Ok(default_response),
     };
@@ -140,7 +139,7 @@ pub async fn last_approved<A: Adapter>(
         MessageTypes::ApproveState(approve_state) => approve_state.state_root,
         _ => {
             error!(&app.logger, "{}", "failed to retrieve approved"; "module" => "last_approved");
-            return Err(ResponseError::BadRequest("an error occured".to_string()));
+            return Err(ResponseError::BadRequest("an error occurred".to_string()));
         }
     };
 
@@ -184,7 +183,12 @@ pub async fn insert_events<A: Adapter + 'static>(
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
     let (req_head, req_body) = req.into_parts();
-    let session = req_head.extensions.get::<Session>();
+
+    let auth = req_head.extensions.get::<Auth>();
+    let session = req_head
+        .extensions
+        .get::<Session>()
+        .expect("request should have session");
 
     let route_params = req_head
         .extensions
@@ -201,7 +205,7 @@ pub async fn insert_events<A: Adapter + 'static>(
         .ok_or_else(|| ResponseError::BadRequest("invalid request".to_string()))?;
 
     app.event_aggregator
-        .record(app, &channel_id, session, &events)
+        .record(app, &channel_id, session, auth, &events)
         .await?;
 
     Ok(Response::builder()
@@ -216,8 +220,8 @@ pub async fn create_validator_messages<A: Adapter + 'static>(
 ) -> Result<Response<Body>, ResponseError> {
     let session = req
         .extensions()
-        .get::<Session>()
-        .expect("request session")
+        .get::<Auth>()
+        .expect("auth request session")
         .to_owned();
 
     let channel = req
@@ -235,7 +239,7 @@ pub async fn create_validator_messages<A: Adapter + 'static>(
         .ok_or_else(|| ResponseError::BadRequest("missing messages body".to_string()))?;
 
     match channel.spec.validators.find(&session.uid) {
-        SpecValidator::None => Err(ResponseError::Unauthorized),
+        None => Err(ResponseError::Unauthorized),
         _ => {
             try_join_all(messages.iter().map(|message| {
                 insert_validator_messages(&app.pool, &channel, &session.uid, &message)
@@ -246,39 +250,5 @@ pub async fn create_validator_messages<A: Adapter + 'static>(
                 success: true,
             })?))
         }
-    }
-}
-
-mod channel_list {
-    use chrono::serde::ts_seconds::deserialize as ts_seconds;
-    use chrono::{DateTime, Utc};
-    use primitives::ValidatorId;
-    use serde::Deserialize;
-
-    #[derive(Debug, Deserialize)]
-    pub(super) struct ChannelListQuery {
-        #[serde(default = "default_page")]
-        pub page: u64,
-        /// filters the list on `valid_until >= valid_until_ge`
-        /// It should be the same timestamp format as the `Channel.valid_until`: **seconds**
-        #[serde(
-            deserialize_with = "ts_seconds",
-            default = "Utc::now",
-            rename = "validUntil"
-        )]
-        pub valid_until_ge: DateTime<Utc>,
-        pub creator: Option<String>,
-        /// filters the channels containing a specific validator if provided
-        pub validator: Option<ValidatorId>,
-    }
-
-    #[derive(Debug, Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    pub(super) struct LastApprovedQuery {
-        pub with_heartbeat: Option<String>,
-    }
-
-    fn default_page() -> u64 {
-        0
     }
 }

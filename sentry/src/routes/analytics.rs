@@ -1,15 +1,13 @@
-use crate::db::analytics::{
-    advertiser_channel_ids, get_advanced_reports, get_analytics, AnalyticsType,
+use crate::{
+    db::analytics::{advertiser_channel_ids, get_advanced_reports, get_analytics, AnalyticsType},
+    success_response, Application, Auth, ResponseError, RouteParams,
 };
-use crate::success_response;
-use crate::Application;
-use crate::ResponseError;
-use crate::RouteParams;
-use crate::Session;
 use hyper::{Body, Request, Response};
-use primitives::adapter::Adapter;
-use primitives::analytics::{AnalyticsQuery, AnalyticsResponse};
-use primitives::ChannelId;
+use primitives::{
+    adapter::Adapter,
+    analytics::{AnalyticsQuery, AnalyticsResponse},
+    ChannelId,
+};
 use redis::aio::MultiplexedConnection;
 use slog::{error, Logger};
 
@@ -17,11 +15,13 @@ pub async fn publisher_analytics<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
-    let sess = req.extensions().get::<Session>();
+    let auth = req
+        .extensions()
+        .get::<Auth>()
+        .ok_or(ResponseError::Unauthorized)?
+        .clone();
 
-    let analytics_type = AnalyticsType::Publisher {
-        session: sess.cloned().ok_or(ResponseError::Unauthorized)?,
-    };
+    let analytics_type = AnalyticsType::Publisher { auth };
 
     process_analytics(req, app, analytics_type)
         .await
@@ -65,9 +65,9 @@ pub async fn advertiser_analytics<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
-    let sess = req.extensions().get::<Session>();
+    let sess = req.extensions().get::<Auth>();
     let analytics_type = AnalyticsType::Advertiser {
-        session: sess.ok_or(ResponseError::Unauthorized)?.to_owned(),
+        auth: sess.ok_or(ResponseError::Unauthorized)?.to_owned(),
     };
 
     process_analytics(req, app, analytics_type)
@@ -110,15 +110,15 @@ pub async fn advanced_analytics<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
-    let sess = req.extensions().get::<Session>().expect("auth is required");
-    let advertiser_channels = advertiser_channel_ids(&app.pool, &sess.uid).await?;
+    let auth = req.extensions().get::<Auth>().expect("auth is required");
+    let advertiser_channels = advertiser_channel_ids(&app.pool, &auth.uid).await?;
 
     let query = serde_urlencoded::from_str::<AnalyticsQuery>(&req.uri().query().unwrap_or(""))?;
 
     let response = get_advanced_reports(
         &app.redis,
         &query.event_type,
-        &sess.uid,
+        &auth.uid,
         &advertiser_channels,
     )
     .await

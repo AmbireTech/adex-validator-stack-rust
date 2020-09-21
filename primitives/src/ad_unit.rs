@@ -1,8 +1,7 @@
-use chrono::serde::{ts_milliseconds, ts_milliseconds_option};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::TargetingTag;
+use crate::{TargetingTag, ValidatorId};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -34,9 +33,8 @@ pub struct AdUnit {
     #[serde(default)]
     pub tags: Vec<TargetingTag>,
     /// user address from the session
-    pub owner: String,
+    pub owner: ValidatorId,
     /// number, UTC timestamp in milliseconds, used as nonce for escaping duplicated spec ipfs hashes
-    #[serde(with = "ts_milliseconds")]
     pub created: DateTime<Utc>,
     /// the name of the unit used in platform UI
     pub title: Option<String>,
@@ -46,6 +44,5 @@ pub struct AdUnit {
     #[serde(default)]
     pub archived: bool,
     /// UTC timestamp in milliseconds, changed every time modifiable property is changed
-    #[serde(default, with = "ts_milliseconds_option")]
     pub modified: Option<DateTime<Utc>>,
 }

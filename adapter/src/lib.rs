@@ -144,7 +144,7 @@ impl EthereumChannel {
         })
     }
 
-    pub fn hash(&self, contract_addr: &[u8; 20]) -> Result<[u8; 32], Box<dyn Error>> {
+    pub fn hash(&self, contract_addr: &[u8; 20]) -> [u8; 32] {
         let tokens = [
             Token::Address(Address::from_slice(contract_addr)),
             Token::Address(self.creator.to_owned()),
@@ -167,12 +167,7 @@ impl EthereumChannel {
         let mut res: [u8; 32] = [0; 32];
         result.finalize(&mut res);
 
-        Ok(res)
-    }
-
-    pub fn hash_hex(&self, contract_addr: &[u8; 20]) -> Result<String, Box<dyn Error>> {
-        let result = self.hash(contract_addr)?;
-        Ok(format!("0x{}", hex::encode(result)))
+        res
     }
 
     pub fn to_solidity_tuple(&self) -> Token {
@@ -230,12 +225,12 @@ mod test {
             .expect("The timestamp should be able to be converted to u64");
         BigEndian::write_uint(&mut timestamp_buf[26..], n, 6);
 
-        let merkle_tree = MerkleTree::new(&[timestamp_buf]);
+        let merkle_tree = MerkleTree::new(&[timestamp_buf]).expect("Should instantiate");
 
         let channel_id = "061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088";
 
         let state_root = get_signable_state_root(
-            &hex::decode(&channel_id).expect("fialed"),
+            &hex::decode(&channel_id).expect("failed"),
             &merkle_tree.root(),
         )
         .expect("Should get state_root");

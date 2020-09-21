@@ -6,7 +6,7 @@ use redis::aio::MultiplexedConnection;
 
 use primitives::adapter::{Adapter, Session as AdapterSession};
 
-use crate::Session;
+use crate::{Auth, Session};
 
 /// Check `Authorization` header for `Bearer` scheme with `Adapter::session_from_token`.
 /// If the `Adapter` fails to create an `AdapterSession`, `ResponseError::BadRequest` will be returned.
@@ -15,6 +15,20 @@ pub(crate) async fn for_request(
     adapter: &impl Adapter,
     redis: MultiplexedConnection,
 ) -> Result<Request<Body>, Box<dyn error::Error>> {
+    let referrer = req
+        .headers()
+        .get(REFERER)
+        .map(|hv| hv.to_str().ok().map(ToString::to_string))
+        .flatten();
+
+    let session = Session {
+        ip: get_request_ip(&req),
+        country: None,
+        referrer_header: referrer,
+        os: None,
+    };
+    req.extensions_mut().insert(session);
+
     let authorization = req.headers().get(AUTHORIZATION);
 
     let prefix = "Bearer ";
@@ -58,21 +72,12 @@ pub(crate) async fn for_request(
             }
         };
 
-        let referrer = req
-            .headers()
-            .get(REFERER)
-            .map(|hv| hv.to_str().ok().map(ToString::to_string))
-            .flatten();
-
-        let session = Session {
+        let auth = Auth {
             era: adapter_session.era,
             uid: adapter_session.uid,
-            ip: get_request_ip(&req),
-            country: None,
-            referrer_header: referrer,
         };
 
-        req.extensions_mut().insert(session);
+        req.extensions_mut().insert(auth);
     }
 
     Ok(req)
@@ -83,7 +88,7 @@ fn get_request_ip(req: &Request<Body>) -> Option<String> {
         .get("true-client-ip")
         .or_else(|| req.headers().get("x-forwarded-for"))
         .and_then(|hv| hv.to_str().map(ToString::to_string).ok())
-        .map(|token| token.split(',').nth(0).map(ToString::to_string))
+        .map(|token| token.split(',').next().map(ToString::to_string))
         .flatten()
 }
 
@@ -102,7 +107,7 @@ mod test {
 
     async fn setup() -> (DummyAdapter, MultiplexedConnection) {
         let adapter_options = DummyAdapterOptions {
-            dummy_identity: IDS["leader"].clone(),
+            dummy_identity: IDS["leader"],
             dummy_auth: IDS.clone(),
             dummy_auth_tokens: AUTH.clone(),
         };
@@ -127,7 +132,7 @@ mod test {
             .expect("Handling the Request shouldn't have failed");
 
         assert!(
-            no_auth.extensions().get::<Session>().is_none(),
+            no_auth.extensions().get::<Auth>().is_none(),
             "There shouldn't be a Session in the extensions"
         );
 
@@ -140,7 +145,7 @@ mod test {
             .await
             .expect("Handling the Request shouldn't have failed");
         assert!(
-            incorrect_auth.extensions().get::<Session>().is_none(),
+            incorrect_auth.extensions().get::<Auth>().is_none(),
             "There shouldn't be a Session in the extensions"
         );
 
@@ -171,12 +176,18 @@ mod test {
         let altered_request = for_request(req, &dummy_adapter, redis)
             .await
             .expect("Valid requests should succeed");
+
+        let auth = altered_request
+            .extensions()
+            .get::<Auth>()
+            .expect("There should be a Session set inside the request");
+
+        assert_eq!(IDS["leader"], auth.uid);
+
         let session = altered_request
             .extensions()
             .get::<Session>()
             .expect("There should be a Session set inside the request");
-
-        assert_eq!(IDS["leader"], session.uid);
         assert!(session.ip.is_none());
     }
 }
