@@ -4,17 +4,20 @@ use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, Mul, Sub};
 use std::str::FromStr;
 
+use lazy_static::lazy_static;
 use num::rational::Ratio;
 use num::{BigUint, CheckedSub, Integer};
 use num_derive::{Num, NumOps, One, Zero};
 use num_traits::Pow;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-/// DAI has precision of 18 decimals
-/// For CPM we have 3 decimals precision, but that's for 1000 (3 decimals more)
-/// This in terms means we need 18 - (3 + 3) = 12 decimals precision
-pub const GLOBAL_MULTIPLIER: Multiplier = Multiplier(12);
+lazy_static! {
+    /// DAI has precision of 18 decimals
+    /// For CPM we have 3 decimals precision, but that's for 1000 (3 decimals more)
+    /// This in terms means we need 18 - (3 + 3) = 12 decimals precision
+    pub static ref GLOBAL_MULTIPLIER: Multiplier = Multiplier(10_u64.pow(12));
 
+}
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 /// Multiplier - Pow of 10 (10**n)
 pub struct Multiplier(u64);
@@ -48,16 +51,14 @@ pub struct PrecisionU64(u64);
 
 impl Into<BigNum> for PrecisionU64 {
     fn into(self) -> BigNum {
-        BigNum(GLOBAL_MULTIPLIER * self)
+        BigNum(*GLOBAL_MULTIPLIER * self)
     }
 }
 
 impl From<BigNum> for PrecisionU64 {
     fn from(bignum: BigNum) -> Self {
-        let precision = bignum
-            .div_floor(&GLOBAL_MULTIPLIER.into())
-            .to_u64()
-            .unwrap_or(0);
+        let multiplier = BigNum::from(GLOBAL_MULTIPLIER.0);
+        let precision = bignum.div_floor(&multiplier).to_u64().unwrap_or(0);
 
         Self(precision)
     }
