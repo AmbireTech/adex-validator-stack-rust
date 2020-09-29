@@ -1,4 +1,4 @@
-use num_traits::CheckedSub;
+use num::traits::CheckedSub;
 
 use primitives::sentry::{AggregateEvents, EventAggregate};
 use primitives::validator::Accounting;

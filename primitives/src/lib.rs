@@ -15,6 +15,7 @@ pub mod event_submission;
 pub mod ipfs;
 pub mod market;
 pub mod merkle_tree;
+pub mod multiplier;
 pub mod sentry;
 pub mod supermarket;
 pub mod targeting;
@@ -40,6 +41,7 @@ pub use self::channel::{Channel, ChannelId, ChannelSpec, SpecValidator, SpecVali
 pub use self::config::Config;
 pub use self::event_submission::EventSubmission;
 pub use self::ipfs::IPFS;
+pub use self::multiplier::{Multiplier, MultiplierNum};
 pub use self::targeting_tag::TargetingTag;
 pub use self::validator::{ValidatorDesc, ValidatorId};
 

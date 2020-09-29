@@ -1,5 +1,4 @@
-use num::rational::Ratio;
-use num_traits::CheckedSub;
+use num::{rational::Ratio, traits::CheckedSub};
 use primitives::{BalancesMap, BigNum, Channel, DomainError, ValidatorDesc};
 
 pub fn get_balances_after_fees_tree(

@@ -4,76 +4,34 @@ use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, Mul, Sub};
 use std::str::FromStr;
 
-use lazy_static::lazy_static;
-use num::rational::Ratio;
-use num::{BigUint, CheckedSub, Integer};
+use num::{rational::Ratio, traits::Pow, BigUint, CheckedSub, Integer};
 use num_derive::{Num, NumOps, One, Zero};
-use num_traits::Pow;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-lazy_static! {
-    /// DAI has precision of 18 decimals
-    /// For CPM we have 3 decimals precision, but that's for 1000 (3 decimals more)
-    /// This in terms means we need 18 - (3 + 3) = 12 decimals precision
-    pub static ref GLOBAL_MULTIPLIER: Multiplier = Multiplier(10_u64.pow(12));
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, NumOps, One, Zero, Num, Default)]
+pub struct BigNum(BigUint);
 
-}
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-/// Multiplier - Pow of 10 (10**n)
-pub struct Multiplier(u64);
-
-impl Mul<PrecisionU64> for Multiplier {
-    type Output = BigUint;
-
-    fn mul(self, rhs: PrecisionU64) -> Self::Output {
-        let real_multiplier = BigUint::from(10u8).pow(BigUint::from(GLOBAL_MULTIPLIER.0));
-
-        real_multiplier * rhs.0
+impl Serialize for BigNum {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.0.to_str_radix(10))
     }
 }
 
-impl Into<BigNum> for Multiplier {
-    fn into(self) -> BigNum {
-        BigNum(self.into())
+impl<'de> Deserialize<'de> for BigNum {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let num = String::deserialize(deserializer)?;
+        match BigUint::from_str(&num) {
+            Ok(biguint) => Ok(Self(biguint)),
+            Err(err) => Err(serde::de::Error::custom(err)),
+        }
     }
 }
-
-impl Into<BigUint> for Multiplier {
-    fn into(self) -> BigUint {
-        BigUint::from(10u8).pow(BigUint::from(self.0))
-    }
-}
-
-///
-// @TODO: (De)serialize
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PrecisionU64(u64);
-
-impl Into<BigNum> for PrecisionU64 {
-    fn into(self) -> BigNum {
-        BigNum(*GLOBAL_MULTIPLIER * self)
-    }
-}
-
-impl From<BigNum> for PrecisionU64 {
-    fn from(bignum: BigNum) -> Self {
-        let multiplier = BigNum::from(GLOBAL_MULTIPLIER.0);
-        let precision = bignum.div_floor(&multiplier).to_u64().unwrap_or(0);
-
-        Self(precision)
-    }
-}
-
-#[derive(
-    Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, NumOps, One, Zero, Num, Default,
-)]
-pub struct BigNum(
-    #[serde(
-        deserialize_with = "biguint_from_str",
-        serialize_with = "biguint_to_str"
-    )]
-    BigUint,
-);
 
 impl BigNum {
     pub fn new(num: BigUint) -> Result<Self, super::DomainError> {
@@ -98,6 +56,10 @@ impl BigNum {
 
     pub fn to_str_radix(&self, radix: u32) -> String {
         self.0.to_str_radix(radix)
+    }
+
+    pub fn pow(&self, exponent: u32) -> Self {
+        Self((&self.0).pow(exponent))
     }
 }
 
@@ -209,6 +171,14 @@ impl Mul<&BigNum> for BigNum {
     }
 }
 
+impl<'a, 'b> Pow<&'a BigNum> for &'b BigNum {
+    type Output = BigNum;
+
+    fn pow(self, rhs: &BigNum) -> Self::Output {
+        BigNum(<&BigUint as Pow<&BigUint>>::pow(&self.0, &rhs.0))
+    }
+}
+
 impl<'a> Sum<&'a BigNum> for BigNum {
     fn sum<I: Iterator<Item = &'a BigNum>>(iter: I) -> Self {
         let sum_uint = iter.map(|big_num| &big_num.0).sum();
@@ -278,21 +248,6 @@ impl From<BigUint> for BigNum {
     }
 }
 
-fn biguint_from_str<'de, D>(deserializer: D) -> Result<BigUint, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let num = String::deserialize(deserializer)?;
-    Ok(BigUint::from_str(&num).map_err(serde::de::Error::custom)?)
-}
-
-fn biguint_to_str<S>(num: &BigUint, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    serializer.serialize_str(&num.to_str_radix(10))
-}
-
 #[cfg(feature = "postgres")]
 pub mod postgres {
     use super::BigNum;
@@ -353,25 +308,5 @@ mod test {
 
         let expected: BigNum = 11.into();
         assert_eq!(expected, &big_num * &ratio);
-    }
-
-    #[test]
-    fn precision_u64_to_bignum() {
-        let precision = PrecisionU64(5);
-        let bignum = precision.into();
-
-        assert_eq!(BigNum::from(5_000_000_000_000), bignum)
-    }
-
-    #[test]
-    fn bignum_to_precision_u64() {
-        // less than the multiplier 12
-        let zero_bignum = BigNum::from(900_000_000_000);
-        // it should floor to 0
-        assert_eq!(PrecisionU64(0), PrecisionU64::from(zero_bignum));
-
-        let bignum = BigNum::from(5_000_000_000_000);
-
-        assert_eq!(PrecisionU64(5), PrecisionU64::from(bignum))
     }
 }
