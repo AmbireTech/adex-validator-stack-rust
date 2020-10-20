@@ -83,7 +83,7 @@ impl Rule {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(try_from = "SerdeValue")]
+#[serde(try_from = "SerdeValue", into = "SerdeValue")]
 pub enum Value {
     Bool(bool),
     Number(Number),
@@ -120,6 +120,18 @@ impl TryFrom<SerdeValue> for Value {
                 Ok(Self::Array(array))
             }
             SerdeValue::Object(_) | SerdeValue::Null => Err(Error::TypeError),
+        }
+    }
+}
+
+impl Into<SerdeValue> for Value {
+    fn into(self) -> SerdeValue {
+        match self {
+            Value::Bool(bool) => SerdeValue::Bool(bool),
+            Value::Number(number) => SerdeValue::Number(number),
+            Value::String(string) => SerdeValue::String(string),
+            Value::Array(array) => SerdeValue::Array(array.into_iter().map(|value| value.into()).collect()),
+            Value::BigNum(bignum) => SerdeValue::String(bignum.to_string())
         }
     }
 }
