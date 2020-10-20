@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{ValidatorId, IPFS};
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AdUnit {
     /// valid ipfs hash of spec props below

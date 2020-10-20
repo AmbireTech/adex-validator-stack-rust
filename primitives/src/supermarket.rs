@@ -1,6 +1,6 @@
 use crate::{BalancesMap, Channel};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Campaign {
     pub channel: Channel,
     pub status: Status,
@@ -128,7 +128,7 @@ pub mod units_for_slot {
             }
         }
 
-        #[derive(Debug, Serialize, Deserialize, Clone)]
+        #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
         #[serde(rename_all = "camelCase")]
         pub struct AdUnit {
             /// Same as `ipfs`

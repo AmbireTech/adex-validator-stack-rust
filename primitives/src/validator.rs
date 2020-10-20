@@ -138,7 +138,7 @@ impl TryFrom<Value> for ValidatorId {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ValidatorDesc {
     pub id: ValidatorId,
