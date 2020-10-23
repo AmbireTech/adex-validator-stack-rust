@@ -54,7 +54,7 @@ pub mod units_for_slot {
         use serde::{Deserialize, Serialize};
         use url::Url;
 
-        #[derive(Debug, Serialize, Deserialize)]
+        #[derive(Debug, Serialize, Deserialize, PartialEq)]
         #[serde(rename_all = "camelCase")]
         pub struct Response {
             pub targeting_input_base: Map,
@@ -63,14 +63,14 @@ pub mod units_for_slot {
             pub campaigns: Vec<Campaign>,
         }
 
-        #[derive(Debug, Clone, Serialize, Deserialize)]
+        #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
         #[serde(rename_all = "camelCase")]
         pub struct UnitsWithPrice {
             pub unit: AdUnit,
             pub price: BigNum,
         }
 
-        #[derive(Debug, Clone, Serialize, Deserialize)]
+        #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
         #[serde(rename_all = "camelCase")]
         pub struct Campaign {
             #[serde(flatten)]
@@ -79,7 +79,7 @@ pub mod units_for_slot {
             pub units_with_price: Vec<UnitsWithPrice>,
         }
 
-        #[derive(Debug, Clone, Serialize, Deserialize)]
+        #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
         #[serde(rename_all = "camelCase")]
         pub struct Channel {
             pub id: ChannelId,
@@ -101,7 +101,7 @@ pub mod units_for_slot {
             }
         }
 
-        #[derive(Debug, Clone, Serialize, Deserialize)]
+        #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
         #[serde(rename_all = "camelCase")]
         pub struct Spec {
             #[serde(with = "ts_milliseconds")]
