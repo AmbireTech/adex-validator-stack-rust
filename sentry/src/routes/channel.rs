@@ -89,6 +89,7 @@ pub async fn channel_list<A: Adapter>(
         &query.creator,
         &query.validator,
         &query.valid_until_ge,
+        query.page,
     )
     .await?;
 
