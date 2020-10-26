@@ -125,7 +125,6 @@ mod list_channels {
         creator: &Option<String>,
         validator: &Option<ValidatorId>,
         valid_until_ge: &DateTime<Utc>,
-        page: u64,
     ) -> Result<ChannelListResponse, RunError<bb8_postgres::tokio_postgres::Error>> {
         let validator = validator.as_ref().map(|validator_id| {
             serde_json::Value::from_str(&format!(r#"[{{"id": "{}"}}]"#, validator_id))
@@ -170,7 +169,7 @@ mod list_channels {
         Ok(ChannelListResponse {
             total_pages,
             total: total_pages,
-            page,
+            page: skip / limit as u64,
             channels,
         })
     }
