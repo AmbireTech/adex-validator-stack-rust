@@ -10,7 +10,7 @@ use primitives::{
     adapter::Adapter,
     sentry::{
         channel_list::{ChannelListQuery, LastApprovedQuery},
-        Event, LastApproved, LastApprovedResponse, SuccessResponse,
+        Event, LastApproved, LastApprovedResponse, SuccessResponse, LastApprovedResponseNoHeartbeats,
     },
     validator::MessageTypes,
     Channel, ChannelId,
@@ -151,28 +151,34 @@ pub async fn last_approved<A: Adapter>(
     let query = serde_urlencoded::from_str::<LastApprovedQuery>(&req.uri().query().unwrap_or(""))?;
     let validators = channel.spec.validators;
     let channel_id = channel.id;
-    let heartbeats = if query.with_heartbeat.is_some() {
+    let response_body = if query.with_heartbeat.is_some() {
         let result = try_join_all(
             validators
                 .iter()
                 .map(|validator| latest_heartbeats(&app.pool, &channel_id, &validator.id)),
         )
         .await?;
-        Some(result.into_iter().flatten().collect::<Vec<_>>())
+        let heartbeats = Some(result.into_iter().flatten().collect::<Vec<_>>());
+        serde_json::to_string(&LastApprovedResponse {
+            last_approved: Some(LastApproved {
+                new_state,
+                approve_state: Some(approve_state),
+            }),
+            heartbeats,
+        })?
     } else {
-        None
+        serde_json::to_string(&LastApprovedResponseNoHeartbeats {
+            last_approved: Some(LastApproved {
+                new_state,
+                approve_state: Some(approve_state),
+            })
+        })?
     };
 
     Ok(Response::builder()
         .header("Content-type", "application/json")
         .body(
-            serde_json::to_string(&LastApprovedResponse {
-                last_approved: Some(LastApproved {
-                    new_state,
-                    approve_state: Some(approve_state),
-                }),
-                heartbeats,
-            })?
+            response_body
             .into(),
         )
         .unwrap())

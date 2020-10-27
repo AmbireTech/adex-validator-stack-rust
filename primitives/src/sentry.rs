@@ -136,6 +136,12 @@ pub struct LastApprovedResponse {
     pub heartbeats: Option<Vec<HeartbeatValidatorMessage>>,
 }
 
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LastApprovedResponseNoHeartbeats {
+    pub last_approved: Option<LastApproved>,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SuccessResponse {
     pub success: bool,
