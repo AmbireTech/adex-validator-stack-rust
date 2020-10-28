@@ -168,6 +168,8 @@ mod list_channels {
 
         Ok(ChannelListResponse {
             total_pages,
+            total: total_pages,
+            page: skip / limit as u64,
             channels,
         })
     }
