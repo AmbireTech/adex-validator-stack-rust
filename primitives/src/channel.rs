@@ -79,9 +79,11 @@ impl FromStr for ChannelId {
     type Err = FromHexError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        assert_eq!(s.len(), 66);
-        assert_eq!(&s[0..2], "0x");
-        Self::from_hex(&s[2..])
+        if s.len() != 66 || &s[0..2] != "0x" {
+            Err(FromHexError::InvalidStringLength)
+        } else {
+            Self::from_hex(&s[2..])
+        }
     }
 }
 
