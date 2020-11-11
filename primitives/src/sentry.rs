@@ -127,6 +127,8 @@ pub struct AggregateEvents {
 pub struct ChannelListResponse {
     pub channels: Vec<Channel>,
     pub total_pages: u64,
+    pub total: u64,
+    pub page: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
