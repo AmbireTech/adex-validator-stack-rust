@@ -10,8 +10,6 @@ use std::{
     str::FromStr,
 };
 
-pub type Map = serde_json::value::Map<String, SerdeValue>;
-
 use super::{Input, Output};
 
 #[cfg(test)]
@@ -85,7 +83,7 @@ impl Rule {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(try_from = "SerdeValue")]
+#[serde(try_from = "SerdeValue", into = "SerdeValue")]
 pub enum Value {
     Bool(bool),
     Number(Number),
@@ -122,6 +120,18 @@ impl TryFrom<SerdeValue> for Value {
                 Ok(Self::Array(array))
             }
             SerdeValue::Object(_) | SerdeValue::Null => Err(Error::TypeError),
+        }
+    }
+}
+
+impl Into<SerdeValue> for Value {
+    fn into(self) -> SerdeValue {
+        match self {
+            Value::Bool(bool) => SerdeValue::Bool(bool),
+            Value::Number(number) => SerdeValue::Number(number),
+            Value::String(string) => SerdeValue::String(string),
+            Value::Array(array) => SerdeValue::Array(array.into_iter().map(|value| value.into()).collect()),
+            Value::BigNum(bignum) => SerdeValue::String(bignum.to_string())
         }
     }
 }
@@ -893,10 +903,13 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
                 .eval(input, output)?
                 .ok_or(Error::TypeError)?
                 .try_bignum()?;
-            let deposit_asset = &input.global.channel.deposit_asset;
+
+            // if there is no way to get the deposit_asset, then fail with UnknownVariable
+            // since we can't calculate the price in USD
+            let deposit_asset = input.deposit_asset().ok_or(Error::UnknownVariable)?;
 
             let divisor = DEPOSIT_ASSETS_MAP
-                .get(deposit_asset)
+                .get(&deposit_asset)
                 .ok_or(Error::TypeError)?;
             let amount_in_usd = amount.div(divisor).to_f64().ok_or(Error::TypeError)?;
             let amount_as_number = Number::from_f64(amount_in_usd).ok_or(Error::TypeError)?;
@@ -959,6 +972,48 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
     };
 
     Ok(value)
+}
+
+/// Stops (i.e. it short-circuits) evaluating `Rule`s when `Output.show` becomes `false`
+pub fn eval_multiple(
+    rules: &[Rule],
+    input: &Input,
+    output: &mut Output,
+) -> Vec<Result<Option<Value>, (Error, Rule)>> {
+    let mut results = vec![];
+
+    for rule in rules {
+        results.push(rule.eval(input, output).map_err(|err| (err, rule.clone())));
+
+        if !output.show {
+            break;
+        }
+    }
+
+    results
+}
+
+pub fn eval_with_callback<F: Fn(Error, Rule)>(
+    rules: &[Rule],
+    input: &Input,
+    output: &mut Output,
+    on_type_error: Option<F>,
+) {
+    for result in eval_multiple(rules, input, output) {
+        match (result, on_type_error.as_ref()) {
+            (Ok(_), _) => {}
+            (Err((Error::UnknownVariable, _)), _) => {}
+            (Err((Error::TypeError, rule)), Some(on_type_error)) => {
+                on_type_error(Error::TypeError, rule)
+            }
+            // skip any other case, including Error::TypeError if there is no passed function
+            _ => {}
+        }
+
+        if !output.show {
+            return;
+        }
+    }
 }
 
 enum MathOperator {

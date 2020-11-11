@@ -1,161 +1,140 @@
 use crate::Session;
-use primitives::channel::PriceMultiplicationRules;
-use primitives::sentry::Event;
-use primitives::ValidatorId;
-use primitives::{BigNum, Channel};
+use chrono::Utc;
+use primitives::{
+    sentry::Event,
+    targeting::{eval_with_callback, get_pricing_bounds, input, Error, Output},
+    BigNum, Channel, ValidatorId,
+};
+use slog::{error, Logger};
+use std::{
+    cmp::{max, min},
+    convert::TryFrom,
+};
 
-pub fn get_payout(channel: &Channel, event: &Event, session: &Session) -> BigNum {
+type Result = std::result::Result<Option<(ValidatorId, BigNum)>, Error>;
+
+pub fn get_payout(logger: &Logger, channel: &Channel, event: &Event, session: &Session) -> Result {
+    let event_type = event.to_string();
+
     match event {
-        Event::Impression { publisher, .. } | Event::Click { publisher, .. } => {
-            let (min, max) = price_bounds(&channel, &event);
-
-            if !channel.spec.price_multiplication_rules.is_empty() {
-                payout(
-                    &channel.spec.price_multiplication_rules,
-                    &event,
-                    &session,
-                    max,
-                    min,
-                    &publisher,
-                )
+        Event::Impression {
+            publisher,
+            ad_unit,
+            ad_slot,
+            ..
+        }
+        | Event::Click {
+            publisher,
+            ad_unit,
+            ad_slot,
+            ..
+        } => {
+            let targeting_rules = if !channel.targeting_rules.is_empty() {
+                channel.targeting_rules.clone()
             } else {
-                min
+                channel.spec.targeting_rules.clone()
+            };
+
+            let pricing = get_pricing_bounds(&channel, &event_type);
+
+            if targeting_rules.is_empty() {
+                Ok(Some((*publisher, pricing.min)))
+            } else {
+                let ad_unit = ad_unit.as_ref().and_then(|ipfs| {
+                    channel
+                        .spec
+                        .ad_units
+                        .iter()
+                        .find(|u| &u.ipfs.to_string() == ipfs)
+                });
+
+                let source = input::Source {
+                    ad_view: None,
+                    global: input::Global {
+                        // TODO: Check this one!
+                        ad_slot_id: ad_slot.clone().unwrap_or_default(),
+                        // TODO: Check this one!
+                        ad_slot_type: ad_unit.map(|u| u.ad_type.clone()).unwrap_or_default(),
+                        publisher_id: *publisher,
+                        country: session.country.clone(),
+                        event_type: event_type.clone(),
+                        // **seconds** means calling `timestamp()`
+                        seconds_since_epoch: u64::try_from(Utc::now().timestamp()).expect(
+                            "The timestamp (i64) should not overflow or underflow the u64!",
+                        ),
+                        user_agent_os: session.os.clone(),
+                        user_agent_browser_family: None,
+                        // TODO: Check this one!
+                        ad_unit: ad_unit.cloned(),
+                        channel: Some(channel.clone()),
+                        balances: None,
+                    },
+                    // TODO: Check this one as well!
+                    ad_slot: None,
+                };
+                let input = input::Input::Source(Box::new(source));
+
+                let mut output = Output {
+                    show: true,
+                    boost: 1.0,
+                    price: vec![(event_type.clone(), pricing.min.clone())]
+                        .into_iter()
+                        .collect(),
+                };
+
+                let on_type_error = |error, rule| error!(logger, "Rule evaluation error for {:?}", channel.id; "error" => ?error, "rule" => ?rule);
+
+                eval_with_callback(&targeting_rules, &input, &mut output, Some(on_type_error));
+
+                if output.show {
+                    let price = match output.price.get(&event_type) {
+                        Some(output_price) => {
+                            max(pricing.min, min(pricing.max, output_price.clone()))
+                        }
+                        None => max(pricing.min, pricing.max),
+                    };
+
+                    Ok(Some((*publisher, price)))
+                } else {
+                    Ok(None)
+                }
             }
         }
-        _ => Default::default(),
-    }
-}
-
-fn payout(
-    rules: &[PriceMultiplicationRules],
-    event: &Event,
-    session: &Session,
-    max_price: BigNum,
-    min_price: BigNum,
-    publisher: &ValidatorId,
-) -> BigNum {
-    let fixed_amount_rule = rules.iter().find_map(|rule| {
-        match (match_rule(rule, &event, &session, &publisher), &rule.amount) {
-            (true, Some(amount)) => Some(amount.clone()),
-            _ => None,
-        }
-    });
-
-    let price_by_rules = match fixed_amount_rule {
-        Some(amount) => amount,
-        None => {
-            let exponent: f64 = 10.0;
-            // @TODO: Know-issue - `multiplier` and `value` can overflow, should return Error instead
-            let multiplier: f64 = rules.iter().filter_map(|rule| rule.multiplier).product();
-            let value: u64 = (multiplier * exponent.powi(18)) as u64;
-            let result = min_price * BigNum::from(value);
-
-            result / BigNum::from(10u64.pow(18))
-        }
-    };
-
-    max_price.min(price_by_rules)
-}
-
-fn match_rule(
-    rule: &PriceMultiplicationRules,
-    ev_type: &Event,
-    session: &Session,
-    uid: &ValidatorId,
-) -> bool {
-    let ev_type = match &rule.ev_type {
-        Some(event_types) => event_types.contains(&ev_type.to_string()),
-        _ => true,
-    };
-
-    let publisher = match &rule.publisher {
-        Some(publishers) => publishers.contains(&uid),
-        _ => true,
-    };
-
-    let os_type = match (&rule.os_type, &session.os) {
-        (Some(oses), Some(os)) => oses.contains(&os),
-        (Some(_), None) => false,
-        _ => true,
-    };
-
-    let country = match (&rule.country, &session.country) {
-        (Some(countries), Some(country)) => countries.contains(&country),
-        (Some(_), None) => false,
-        _ => true,
-    };
-
-    ev_type && publisher && os_type && country
-}
-
-fn price_bounds(channel: &Channel, event: &Event) -> (BigNum, BigNum) {
-    let pricing_bounds = channel.spec.pricing_bounds.as_ref();
-    match (event, pricing_bounds) {
-        (Event::Impression { .. }, Some(pricing_bounds)) => {
-            match pricing_bounds.impression.as_ref() {
-                Some(pricing) => (pricing.min.clone(), pricing.max.clone()),
-                _ => (
-                    channel.spec.min_per_impression.clone(),
-                    channel.spec.max_per_impression.clone(),
-                ),
-            }
-        }
-        (Event::Impression { .. }, None) => (
-            channel.spec.min_per_impression.clone(),
-            channel.spec.max_per_impression.clone(),
-        ),
-        (Event::Click { .. }, Some(pricing_bounds)) => match pricing_bounds.click.as_ref() {
-            Some(pricing) => (pricing.min.clone(), pricing.max.clone()),
-            _ => (Default::default(), Default::default()),
-        },
-        _ => (Default::default(), Default::default()),
+        _ => Ok(None),
     }
 }
 
 #[cfg(test)]
-mod tests {
+mod test {
     use super::*;
     use primitives::channel::{Pricing, PricingBounds};
-    use primitives::util::tests::prep_db::{DUMMY_CHANNEL, IDS};
+    use primitives::util::tests::{
+        discard_logger,
+        prep_db::{DUMMY_CHANNEL, IDS},
+    };
 
     #[test]
-    fn test_plain_events() {
-        let mut channel: Channel = DUMMY_CHANNEL.clone();
+    fn get_event_payouts_pricing_bounds_impression_event() {
+        let logger = discard_logger();
+
+        let mut channel = DUMMY_CHANNEL.clone();
+        channel.deposit_amount = 100.into();
+        channel.spec.min_per_impression = 8.into();
+        channel.spec.max_per_impression = 64.into();
         channel.spec.pricing_bounds = Some(PricingBounds {
-            click: Some(Pricing {
-                min: BigNum::from(23),
-                max: BigNum::from(100),
-            }),
             impression: None,
+            click: Some(Pricing {
+                min: 23.into(),
+                max: 100.into(),
+            }),
         });
 
-        let cases: Vec<(Event, BigNum, String)> = vec![
-            (
-                Event::Impression {
-                    publisher: IDS["publisher"],
-                    ad_slot: None,
-                    ad_unit: None,
-                    referrer: None,
-                },
-                BigNum::from(1),
-                "pricingBounds: impression event".to_string(),
-            ),
-            (
-                Event::Click {
-                    publisher: IDS["publisher"],
-                    ad_slot: None,
-                    ad_unit: None,
-                    referrer: None,
-                },
-                BigNum::from(23),
-                "pricingBounds: click event".to_string(),
-            ),
-            (
-                Event::Close {},
-                BigNum::from(0),
-                "pricingBounds: close event".to_string(),
-            ),
-        ];
+        let event = Event::Impression {
+            publisher: IDS["leader"],
+            ad_unit: None,
+            ad_slot: None,
+            referrer: None,
+        };
 
         let session = Session {
             ip: None,
@@ -164,274 +143,73 @@ mod tests {
             os: None,
         };
 
-        cases.iter().for_each(|case| {
-            let (event, expected_result, message) = case;
-            let payout = get_payout(&channel, &event, &session);
-            assert!(&payout == expected_result, message.clone());
-        })
+        let payout = get_payout(&logger, &channel, &event, &session).expect("Should be OK");
+
+        let expected_option = Some((IDS["leader"], 8.into()));
+        assert_eq!(expected_option, payout, "pricingBounds: impression event");
     }
 
     #[test]
-    fn test_fixed_amount_price_rule_event() {
-        let mut channel: Channel = DUMMY_CHANNEL.clone();
+    fn get_event_payouts_pricing_bounds_click_event() {
+        let logger = discard_logger();
+        let mut channel = DUMMY_CHANNEL.clone();
+        channel.deposit_amount = 100.into();
+        channel.spec.min_per_impression = 8.into();
+        channel.spec.max_per_impression = 64.into();
         channel.spec.pricing_bounds = Some(PricingBounds {
-            click: Some(Pricing {
-                min: BigNum::from(23),
-                max: BigNum::from(100),
-            }),
             impression: None,
+            click: Some(Pricing {
+                min: 23.into(),
+                max: 100.into(),
+            }),
         });
-        channel.spec.price_multiplication_rules = vec![PriceMultiplicationRules {
-            multiplier: None,
-            amount: Some(BigNum::from(10)),
-            os_type: None,
-            ev_type: Some(vec!["CLICK".to_string()]),
-            publisher: None,
-            country: Some(vec!["us".to_string()]),
-        }];
 
-        let cases: Vec<(Event, BigNum, String)> = vec![
-            (
-                Event::Impression {
-                    publisher: IDS["publisher"],
-                    ad_slot: None,
-                    ad_unit: None,
-                    referrer: None,
-                },
-                BigNum::from(1),
-                "fixedAmount: impression".to_string(),
-            ),
-            (
-                Event::Click {
-                    publisher: IDS["publisher"],
-                    ad_slot: None,
-                    ad_unit: None,
-                    referrer: None,
-                },
-                BigNum::from(10),
-                "fixedAmount (country, publisher): click".to_string(),
-            ),
-        ];
+        let event = Event::Click {
+            publisher: IDS["leader"],
+            ad_unit: None,
+            ad_slot: None,
+            referrer: None,
+        };
 
         let session = Session {
             ip: None,
-            country: Some("us".to_string()),
-            referrer_header: None,
-            os: None,
-        };
-
-        cases.iter().for_each(|(event, expected_result, message)| {
-            println!("payout {}", expected_result.to_string());
-            let payout = get_payout(&channel, &event, &session);
-            println!("payout {}", payout.to_string());
-            assert!(&payout == expected_result, message.clone());
-        })
-    }
-
-    #[test]
-    fn test_fixed_amount_exceed_rule_event() {
-        let mut channel: Channel = DUMMY_CHANNEL.clone();
-        channel.spec.pricing_bounds = Some(PricingBounds {
-            click: Some(Pricing {
-                min: BigNum::from(23),
-                max: BigNum::from(100),
-            }),
-            impression: None,
-        });
-        channel.spec.price_multiplication_rules = vec![PriceMultiplicationRules {
-            multiplier: None,
-            amount: Some(BigNum::from(1000)),
-            os_type: None,
-            ev_type: None,
-            publisher: None,
             country: None,
-        }];
-
-        let cases: Vec<(Event, BigNum, String)> = vec![
-            (
-                Event::Impression {
-                    publisher: IDS["publisher"],
-                    ad_slot: None,
-                    ad_unit: None,
-                    referrer: None,
-                },
-                BigNum::from(10),
-                "fixedAmount (all): price should not exceed maxPerImpressionPrice".to_string(),
-            ),
-            (
-                Event::Click {
-                    publisher: IDS["publisher"],
-                    ad_slot: None,
-                    ad_unit: None,
-                    referrer: None,
-                },
-                BigNum::from(100),
-                "fixedAmount (all): price should not exceed event pricingBound max".to_string(),
-            ),
-        ];
-
-        let session = Session {
-            ip: None,
-            country: Some("us".to_string()),
             referrer_header: None,
             os: None,
         };
 
-        cases.iter().for_each(|case| {
-            let (event, expected_result, message) = case;
-            let payout = get_payout(&channel, &event, &session);
-            assert!(&payout == expected_result, message.clone());
-        })
+        let payout = get_payout(&logger, &channel, &event, &session).expect("Should be OK");
+
+        let expected_option = Some((IDS["leader"], 23.into()));
+        assert_eq!(expected_option, payout, "pricingBounds: click event");
     }
 
     #[test]
-    fn test_pick_first_fixed_amount_rule_event() {
-        let mut channel: Channel = DUMMY_CHANNEL.clone();
+    fn get_event_payouts_pricing_bounds_close_event() {
+        let logger = discard_logger();
+        let mut channel = DUMMY_CHANNEL.clone();
+        channel.deposit_amount = 100.into();
+        channel.spec.min_per_impression = 8.into();
+        channel.spec.max_per_impression = 64.into();
         channel.spec.pricing_bounds = Some(PricingBounds {
-            click: Some(Pricing {
-                min: BigNum::from(23),
-                max: BigNum::from(100),
-            }),
             impression: None,
+            click: Some(Pricing {
+                min: 23.into(),
+                max: 100.into(),
+            }),
         });
-        channel.spec.price_multiplication_rules = vec![
-            PriceMultiplicationRules {
-                multiplier: None,
-                amount: Some(BigNum::from(10)),
-                os_type: None,
-                ev_type: Some(vec!["CLICK".to_string()]),
-                publisher: None,
-                country: Some(vec!["us".to_string()]),
-            },
-            PriceMultiplicationRules {
-                multiplier: None,
-                amount: Some(BigNum::from(12)),
-                os_type: None,
-                ev_type: Some(vec!["CLICK".to_string()]),
-                publisher: Some(vec![IDS["publisher"]]),
-                country: Some(vec!["us".to_string()]),
-            },
-        ];
+
+        let event = Event::Close;
 
         let session = Session {
             ip: None,
-            country: Some("us".to_string()),
+            country: None,
             referrer_header: None,
             os: None,
         };
 
-        let event = Event::Click {
-            publisher: IDS["publisher"],
-            ad_slot: None,
-            ad_unit: None,
-            referrer: None,
-        };
+        let payout = get_payout(&logger, &channel, &event, &session).expect("Should be OK");
 
-        let payout = get_payout(&channel, &event, &session);
-        assert!(
-            payout == BigNum::from(10),
-            "fixedAmount (country, pulisher): should choose first fixedAmount rule"
-        );
-    }
-
-    #[test]
-    fn test_pick_fixed_amount_rule_over_multiplier_event() {
-        let mut channel: Channel = DUMMY_CHANNEL.clone();
-        channel.spec.pricing_bounds = Some(PricingBounds {
-            click: Some(Pricing {
-                min: BigNum::from(23),
-                max: BigNum::from(100),
-            }),
-            impression: None,
-        });
-        channel.spec.price_multiplication_rules = vec![
-            PriceMultiplicationRules {
-                multiplier: Some(1.2),
-                amount: None,
-                os_type: Some(vec!["android".to_string()]),
-                ev_type: Some(vec!["CLICK".to_string()]),
-                publisher: Some(vec![IDS["publisher"]]),
-                country: Some(vec!["us".to_string()]),
-            },
-            PriceMultiplicationRules {
-                multiplier: None,
-                amount: Some(BigNum::from(12)),
-                os_type: None,
-                ev_type: Some(vec!["CLICK".to_string()]),
-                publisher: Some(vec![IDS["publisher"]]),
-                country: Some(vec!["us".to_string()]),
-            },
-        ];
-
-        let session = Session {
-            ip: None,
-            country: Some("us".to_string()),
-            referrer_header: None,
-            os: None,
-        };
-
-        let event = Event::Click {
-            publisher: IDS["publisher"],
-            ad_slot: None,
-            ad_unit: None,
-            referrer: None,
-        };
-
-        let payout = get_payout(&channel, &event, &session);
-        assert!(
-            payout == BigNum::from(12),
-            "fixedAmount (country, osType, publisher): choose fixedAmount rule over multiplier if present"
-        );
-    }
-
-    #[test]
-    fn test_apply_all_mutliplier_rules() {
-        let mut channel: Channel = DUMMY_CHANNEL.clone();
-
-        channel.spec.pricing_bounds = Some(PricingBounds {
-            click: Some(Pricing {
-                min: BigNum::from(100),
-                max: BigNum::from(1000),
-            }),
-            impression: None,
-        });
-        channel.spec.price_multiplication_rules = vec![
-            PriceMultiplicationRules {
-                multiplier: Some(1.2),
-                amount: None,
-                os_type: Some(vec!["android".to_string()]),
-                ev_type: Some(vec!["CLICK".to_string()]),
-                publisher: Some(vec![IDS["publisher"]]),
-                country: Some(vec!["us".to_string()]),
-            },
-            PriceMultiplicationRules {
-                multiplier: Some(1.2),
-                amount: None,
-                os_type: None,
-                ev_type: None,
-                publisher: None,
-                country: None,
-            },
-        ];
-
-        let session = Session {
-            ip: None,
-            country: Some("us".to_string()),
-            referrer_header: None,
-            os: None,
-        };
-
-        let event = Event::Click {
-            publisher: IDS["publisher"].clone(),
-            ad_slot: None,
-            ad_unit: None,
-            referrer: None,
-        };
-
-        let payout = get_payout(&channel, &event, &session);
-        assert!(
-            payout == BigNum::from(144),
-            "fixedAmount (country, osType, publisher): apply all multiplier rules"
-        );
+        assert_eq!(None, payout, "pricingBounds: click event");
     }
 }

@@ -673,9 +673,7 @@ mod test {
                 validators: SpecValidators::new(leader_validator_desc, follower_validator_desc),
                 max_per_impression: 10.into(),
                 min_per_impression: 10.into(),
-                targeting: vec![],
                 targeting_rules: vec![],
-                min_targeting_score: None,
                 event_submission: Some(EventSubmission { allow: vec![] }),
                 created: Utc::now(),
                 active_from: None,
@@ -683,8 +681,6 @@ mod test {
                 withdraw_period_start: Utc::now() + Duration::days(1),
                 ad_units: vec![],
                 pricing_bounds: None,
-                price_multiplication_rules: Default::default(),
-                price_dynamic_adjustment: false,
             },
         };
 

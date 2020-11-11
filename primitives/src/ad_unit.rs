@@ -1,13 +1,13 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::{TargetingTag, ValidatorId};
+use crate::{ValidatorId, IPFS};
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AdUnit {
     /// valid ipfs hash of spec props below
-    pub ipfs: String,
+    pub ipfs: IPFS,
     /// the type of the ad unit
     /// currently, possible values are:
     /// legacy_300x250, legacy_250x250, legacy_240x400, legacy_336x280,
@@ -24,14 +24,8 @@ pub struct AdUnit {
     pub media_mime: String,
     /// Advertised URL
     pub target_url: String,
-    /// Array of TargetingTag
-    pub targeting: Vec<TargetingTag>,
     /// Number; minimum targeting score (optional)
     pub min_targeting_score: Option<f64>,
-    /// Array of TargetingTag (optional)
-    /// meant for discovery between publishers/advertisers
-    #[serde(default)]
-    pub tags: Vec<TargetingTag>,
     /// user address from the session
     pub owner: ValidatorId,
     /// number, UTC timestamp in milliseconds, used as nonce for escaping duplicated spec ipfs hashes

@@ -5,6 +5,8 @@ use thiserror::Error;
 
 const URL_PREFIX: &str = "ipfs://";
 
+pub use cid::{Cid, Error};
+
 #[derive(Clone, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(try_from = "String", into = "String")]
 pub struct IPFS(pub cid::Cid);
@@ -39,6 +41,14 @@ impl TryFrom<String> for IPFS {
     type Error = cid::Error;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::try_from(value.as_str())
+    }
+}
+
+impl TryFrom<&String> for IPFS {
+    type Error = cid::Error;
+
+    fn try_from(value: &String) -> Result<Self, Self::Error> {
         Self::try_from(value.as_str())
     }
 }
@@ -163,18 +173,25 @@ impl fmt::Debug for Url {
 mod test {
     use super::*;
 
-    static TESTS_IPFS_V1: [&str; 4] = [
+    // CID V0
+    static TESTS_IPFS_V0: [&str; 4] = [
         "QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR",
         "Qmasg8FrbuSQpjFu3kRnZF9beg8rEBFrqgi1uXDRwCbX5f",
         "QmQnu8zrHsuVvnTJsEgDHYA8c1MmRL7YLiMD8uzDUJKcNq",
         "QmYYBULc9QDEaDr8HAXvVWHDmFfL2GvyumYRr1g4ERBC96",
     ];
 
+    // CID V1
+    static TESTS_IPFS_V1: [&str; 1] = [
+        // V1 of the V0 ipfs: `QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR`
+        "bafybeif2h3mynaf3ylgdbs6arf6mczqycargt5cqm3rmel3wpjarlswway",
+    ];
+
     #[test]
     fn ipfs_from_string_and_serialize_deserialize() {
-        for &ipfs_str in TESTS_IPFS_V1.iter() {
+        let check = |ipfs_str: &str, version: cid::Version| {
             let ipfs = IPFS::try_from(ipfs_str).expect("should be ok");
-            assert_eq!(ipfs.0.version(), cid::Version::V0);
+            assert_eq!(ipfs.0.version(), version);
             assert_eq!(ipfs.0.to_string(), ipfs_str);
 
             let expected_json = format!("\"{}\"", ipfs);
@@ -185,7 +202,21 @@ mod test {
                 ipfs,
                 serde_json::from_str(&actual_json).expect("Should Deserialize")
             )
+        };
+
+        for &ipfs_str in TESTS_IPFS_V0.iter() {
+            check(ipfs_str, cid::Version::V0)
         }
+
+        for &ipfs_str in TESTS_IPFS_V1.iter() {
+            check(ipfs_str, cid::Version::V1)
+        }
+
+        // v0 != v1
+        assert_ne!(
+            IPFS::try_from(TESTS_IPFS_V0[0]),
+            IPFS::try_from(TESTS_IPFS_V1[0])
+        )
     }
 
     #[test]
@@ -216,15 +247,20 @@ mod test {
         }
 
         // Invalid cases
-        // CID V1 - Invalid scheme - valid IPFS
+        // CID V0 - Invalid scheme - valid IPFS
         assert_eq!(
             Err(UrlError::NoPrefix),
             "https://QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR".parse::<Url>()
         );
-        // CID V1 - Invalid scheme - valid IPFS
+        // CID V0 - Invalid scheme - valid IPFS
         assert_eq!(
             Err(UrlError::IPFS(cid::Error::ParsingError)),
             "ipfs://NotValid".parse::<Url>()
+        );
+        // CID V1 - Invalid scheme - valid IPFS
+        assert_eq!(
+            Err(UrlError::NoPrefix),
+            "https://bafybeif2h3mynaf3ylgdbs6arf6mczqycargt5cqm3rmel3wpjarlswway".parse::<Url>()
         );
     }
 }

@@ -1,7 +1,7 @@
 use crate::{
     channel::{Pricing, PricingBounds},
     BigNum, Channel, ChannelId, ChannelSpec, EventSubmission, SpecValidators, ValidatorDesc,
-    ValidatorId,
+    ValidatorId, IPFS,
 };
 use chrono::{TimeZone, Utc};
 use fake::faker::{Faker, Number};
@@ -73,8 +73,6 @@ lazy_static! {
                 max_per_impression: 10.into(),
                 min_per_impression: 1.into(),
                 targeting_rules: vec![],
-                targeting: vec![],
-                min_targeting_score: None,
                 event_submission: Some(EventSubmission { allow: vec![] }),
                 // July 29, 2019 7:00:00 AM
                 created: Utc.timestamp(1_564_383_600, 0),
@@ -83,9 +81,18 @@ lazy_static! {
                 withdraw_period_start: Utc.timestamp_millis(4_073_414_400_000),
                 ad_units: vec![],
                 pricing_bounds: Some(PricingBounds {impression: None, click: Some(Pricing { max: 0.into(), min: 0.into()})}),
-                price_multiplication_rules: Default::default(),
-                price_dynamic_adjustment: false,
             },
         }
     };
+
+    // CID V0
+    pub static ref DUMMY_IPFS: [IPFS; 5] = [
+        IPFS::try_from("QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR").expect("Valid IPFS V0"),
+        IPFS::try_from("Qmasg8FrbuSQpjFu3kRnZF9beg8rEBFrqgi1uXDRwCbX5f").expect("Valid IPFS V0"),
+        IPFS::try_from("QmQnu8zrHsuVvnTJsEgDHYA8c1MmRL7YLiMD8uzDUJKcNq").expect("Valid IPFS V0"),
+        IPFS::try_from("QmYYBULc9QDEaDr8HAXvVWHDmFfL2GvyumYRr1g4ERBC96").expect("Valid IPFS V0"),
+        // V1 of the V0 ipfs: `QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR`
+        IPFS::try_from("bafybeif2h3mynaf3ylgdbs6arf6mczqycargt5cqm3rmel3wpjarlswway").expect("Valid IPFS V1"),
+    ];
+
 }

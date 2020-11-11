@@ -1,6 +1,6 @@
 use crate::{BalancesMap, Channel};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Campaign {
     pub channel: Channel,
     pub status: Status,
@@ -39,9 +39,14 @@ pub enum Finalized {
     Exhausted,
     Withdraw,
 }
+
 pub mod units_for_slot {
     pub mod response {
-        use crate::{targeting::Rule, BigNum, ChannelId, ChannelSpec, SpecValidators, ValidatorId};
+
+        use crate::{
+            targeting::{Map, Rule},
+            BigNum, ChannelId, ChannelSpec, SpecValidators, ValidatorId, IPFS,
+        };
         use chrono::{
             serde::{ts_milliseconds, ts_milliseconds_option},
             DateTime, Utc,
@@ -49,24 +54,23 @@ pub mod units_for_slot {
         use serde::{Deserialize, Serialize};
         use url::Url;
 
-        #[derive(Debug, Serialize, Deserialize)]
+        #[derive(Debug, Serialize, Deserialize, PartialEq)]
         #[serde(rename_all = "camelCase")]
         pub struct Response {
-            // TODO: This should be Input, however, we only need the fields and not the Global: Channel, Status & BalancesMap
-            pub targeting_input_base: (),
+            pub targeting_input_base: Map,
             pub accepted_referrers: Vec<Url>,
-            pub fallback_unit: AdUnit,
+            pub fallback_unit: Option<AdUnit>,
             pub campaigns: Vec<Campaign>,
         }
 
-        #[derive(Debug, Serialize, Deserialize)]
+        #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
         #[serde(rename_all = "camelCase")]
         pub struct UnitsWithPrice {
             pub unit: AdUnit,
             pub price: BigNum,
         }
 
-        #[derive(Debug, Serialize, Deserialize)]
+        #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
         #[serde(rename_all = "camelCase")]
         pub struct Campaign {
             #[serde(flatten)]
@@ -75,7 +79,7 @@ pub mod units_for_slot {
             pub units_with_price: Vec<UnitsWithPrice>,
         }
 
-        #[derive(Debug, Serialize, Deserialize)]
+        #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
         #[serde(rename_all = "camelCase")]
         pub struct Channel {
             pub id: ChannelId,
@@ -97,7 +101,7 @@ pub mod units_for_slot {
             }
         }
 
-        #[derive(Debug, Serialize, Deserialize)]
+        #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
         #[serde(rename_all = "camelCase")]
         pub struct Spec {
             #[serde(with = "ts_milliseconds")]
@@ -124,11 +128,11 @@ pub mod units_for_slot {
             }
         }
 
-        #[derive(Debug, Serialize, Deserialize, Clone)]
+        #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
         #[serde(rename_all = "camelCase")]
         pub struct AdUnit {
             /// Same as `ipfs`
-            pub id: String,
+            pub id: IPFS,
             pub media_url: String,
             pub media_mime: String,
             pub target_url: String,
