@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::fmt;
 use std::ops::Deref;
+use std::str::FromStr;
 
 use chrono::serde::{ts_milliseconds, ts_milliseconds_option, ts_seconds};
 use chrono::{DateTime, Utc};
@@ -71,6 +72,16 @@ impl FromHex for ChannelId {
 impl fmt::Display for ChannelId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "0x{}", hex::encode(self.0))
+    }
+}
+
+impl FromStr for ChannelId {
+    type Err = FromHexError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        assert_eq!(s.len(), 66);
+        assert_eq!(&s[0..2], "0x");
+        Self::from_hex(&s[2..])
     }
 }
 
