@@ -130,8 +130,10 @@ impl Into<SerdeValue> for Value {
             Value::Bool(bool) => SerdeValue::Bool(bool),
             Value::Number(number) => SerdeValue::Number(number),
             Value::String(string) => SerdeValue::String(string),
-            Value::Array(array) => SerdeValue::Array(array.into_iter().map(|value| value.into()).collect()),
-            Value::BigNum(bignum) => SerdeValue::String(bignum.to_string())
+            Value::Array(array) => {
+                SerdeValue::Array(array.into_iter().map(|value| value.into()).collect())
+            }
+            Value::BigNum(bignum) => SerdeValue::String(bignum.to_string()),
         }
     }
 }
