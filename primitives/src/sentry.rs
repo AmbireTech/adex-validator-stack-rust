@@ -133,13 +133,10 @@ pub struct ChannelListResponse {
 #[serde(rename_all = "camelCase")]
 pub struct LastApprovedResponse {
     pub last_approved: Option<LastApproved>,
+    /// None -> withHeartbeat=true wasn't passed
+    /// Some(vec![]) (empty vec) or Some(heartbeats) - withHeartbeats=true was passed
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub heartbeats: Option<Vec<HeartbeatValidatorMessage>>,
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct LastApprovedResponseNoHeartbeats {
-    pub last_approved: Option<LastApproved>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

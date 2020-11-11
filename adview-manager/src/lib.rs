@@ -411,7 +411,6 @@ impl Manager {
             .collect::<Vec<_>>()
             .join("&");
 
-
         // Url adds a trailing `/`
         let url = format!(
             "{}units-for-slot/{}?pubPrefix={}&{}",
