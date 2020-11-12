@@ -32,15 +32,15 @@ where
     D: Deserializer<'de>,
 {
     let channel_id = String::deserialize(deserializer)?;
-    let channel_id = validate_channel_id(channel_id).map_err(serde::de::Error::custom)?;
+    let channel_id = validate_channel_id(&channel_id).map_err(serde::de::Error::custom)?;
     <[u8; 32] as FromHex>::from_hex(channel_id).map_err(serde::de::Error::custom)
 }
 
-fn validate_channel_id(s: String) -> Result<String, FromHexError> {
+fn validate_channel_id(s: &str) -> Result<&str, FromHexError> {
     if s.is_empty() || s.len() != 66 || &s[0..2] != "0x" {
         Err(FromHexError::InvalidStringLength)
     } else {
-        Ok(s[2..].into())
+        Ok(&s[2..])
     }
 }
 
@@ -84,7 +84,7 @@ impl FromStr for ChannelId {
     type Err = FromHexError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        ChannelId::from_hex(validate_channel_id(s.into())?)
+        ChannelId::from_hex(validate_channel_id(s)?)
     }
 }
 
