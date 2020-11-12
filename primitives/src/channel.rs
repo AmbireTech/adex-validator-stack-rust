@@ -15,7 +15,7 @@ use hex::{FromHex, FromHexError};
 #[serde(transparent)]
 pub struct ChannelId(
     #[serde(
-        deserialize_with = "channel_id_from_str",
+        deserialize_with = "deserialize_channel_id",
         serialize_with = "SerHex::<StrictPfx>::serialize"
     )]
     [u8; 32],
@@ -27,16 +27,21 @@ impl fmt::Debug for ChannelId {
     }
 }
 
-fn channel_id_from_str<'de, D>(deserializer: D) -> Result<[u8; 32], D::Error>
+fn deserialize_channel_id<'de, D>(deserializer: D) -> Result<[u8; 32], D::Error>
 where
     D: Deserializer<'de>,
 {
     let channel_id = String::deserialize(deserializer)?;
-    if channel_id.is_empty() || channel_id.len() != 66 {
-        return Err(serde::de::Error::custom("invalid channel id".to_string()));
-    }
+    let channel_id = validate_channel_id(channel_id).map_err(serde::de::Error::custom)?;
+    <[u8; 32] as FromHex>::from_hex(channel_id).map_err(serde::de::Error::custom)
+}
 
-    <[u8; 32] as FromHex>::from_hex(&channel_id[2..]).map_err(serde::de::Error::custom)
+fn validate_channel_id(s: String) -> Result<String, FromHexError> {
+    if s.is_empty() || s.len() != 66 || &s[0..2] != "0x" {
+        Err(FromHexError::InvalidStringLength)
+    } else {
+        Ok(s[2..].into())
+    }
 }
 
 impl Deref for ChannelId {
@@ -79,11 +84,7 @@ impl FromStr for ChannelId {
     type Err = FromHexError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.len() != 66 || &s[0..2] != "0x" {
-            Err(FromHexError::InvalidStringLength)
-        } else {
-            Self::from_hex(&s[2..])
-        }
+        ChannelId::from_hex(validate_channel_id(s.into())?)
     }
 }
 
