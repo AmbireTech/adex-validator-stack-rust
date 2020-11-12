@@ -13,6 +13,8 @@ serde = { version = "^1.0", features = ['derive'] }
 serde_json = "1.0"
 serde-hex = "0.1.0"
 serde_millis = "0.1.1"
+# Used prefixes on field for targeting::Input
+serde_with = "1.5"
 # Configuration
 toml = "0.5"
 # Logging
@@ -23,6 +25,8 @@ slog-async = "^2.3.0"
 thiserror = "^1.0"
 chrono = { version = "0.4", features = ["serde"] }
 time = "0.1.42"
+# Macro for easier derive of Display & FromStr
+parse-display = "^0.3"
 # CID & multihash / multibase
 cid = "0.5"
 hex = "0.4"
@@ -47,3 +51,6 @@ futures = "0.3"
 async-trait = "0.1.40"
 # Other
 lazy_static = "1.4.0"
+
+[dev-dependencies]
+pretty_assertions = "^0.6"

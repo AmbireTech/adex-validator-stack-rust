@@ -2,6 +2,7 @@ use crate::Session;
 use chrono::Utc;
 use primitives::{
     sentry::Event,
+    targeting::Input,
     targeting::{eval_with_callback, get_pricing_bounds, input, Error, Output},
     BigNum, Channel, ValidatorId,
 };
@@ -48,7 +49,7 @@ pub fn get_payout(logger: &Logger, channel: &Channel, event: &Event, session: &S
                         .find(|u| &u.ipfs.to_string() == ipfs)
                 });
 
-                let source = input::Source {
+                let input = Input {
                     ad_view: None,
                     global: input::Global {
                         // TODO: Check this one!
@@ -64,15 +65,15 @@ pub fn get_payout(logger: &Logger, channel: &Channel, event: &Event, session: &S
                         ),
                         user_agent_os: session.os.clone(),
                         user_agent_browser_family: None,
-                        // TODO: Check this one!
-                        ad_unit: ad_unit.cloned(),
-                        channel: Some(channel.clone()),
-                        balances: None,
                     },
+                    // TODO: Check this one!
+                    ad_unit_id: ad_unit.map(|unit| &unit.ipfs).cloned(),
+                    channel: None,
+                    balances: None,
                     // TODO: Check this one as well!
                     ad_slot: None,
-                };
-                let input = input::Input::Source(Box::new(source));
+                }
+                .with_channel(channel.clone());
 
                 let mut output = Output {
                     show: true,

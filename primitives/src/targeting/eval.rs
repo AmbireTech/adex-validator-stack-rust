@@ -10,7 +10,10 @@ use std::{
     str::FromStr,
 };
 
-use super::{Input, Output};
+use super::{
+    input::{channel::Getter as ChannelGetter, Get},
+    Input, Output,
+};
 
 #[cfg(test)]
 #[path = "eval_test.rs"]
@@ -83,7 +86,7 @@ impl Rule {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(try_from = "SerdeValue", into = "SerdeValue")]
+#[serde(untagged, try_from = "SerdeValue", /* into = "SerdeValue" */)]
 pub enum Value {
     Bool(bool),
     Number(Number),
@@ -130,8 +133,10 @@ impl Into<SerdeValue> for Value {
             Value::Bool(bool) => SerdeValue::Bool(bool),
             Value::Number(number) => SerdeValue::Number(number),
             Value::String(string) => SerdeValue::String(string),
-            Value::Array(array) => SerdeValue::Array(array.into_iter().map(|value| value.into()).collect()),
-            Value::BigNum(bignum) => SerdeValue::String(bignum.to_string())
+            Value::Array(array) => {
+                SerdeValue::Array(array.into_iter().map(|value| value.into()).collect())
+            }
+            Value::BigNum(bignum) => SerdeValue::String(bignum.to_string()),
         }
     }
 }
@@ -906,7 +911,17 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
 
             // if there is no way to get the deposit_asset, then fail with UnknownVariable
             // since we can't calculate the price in USD
-            let deposit_asset = input.deposit_asset().ok_or(Error::UnknownVariable)?;
+            let deposit_asset = match &input.channel {
+                Some(Get::Getter(ChannelGetter::Full(full_channel))) => {
+                    Ok(full_channel.channel.deposit_asset.clone())
+                }
+                Some(Get::Getter(ChannelGetter::Market(channel))) => {
+                    Ok(channel.deposit_asset.clone())
+                }
+                // In case of a Values - we don't have the deposit_asset on hand so we fail in that case
+                // In case of None we also fail
+                _ => Err(Error::UnknownVariable),
+            }?;
 
             let divisor = DEPOSIT_ASSETS_MAP
                 .get(&deposit_asset)
