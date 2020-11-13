@@ -37,10 +37,13 @@ where
 }
 
 fn validate_channel_id(s: &str) -> Result<&str, FromHexError> {
-    if s.is_empty() || s.len() != 66 || &s[0..2] != "0x" {
-        Err(FromHexError::InvalidStringLength)
-    } else {
-        Ok(&s[2..])
+    match (s.get(0..2), s.get(2..)) {
+        (Some(prefix), Some(hex)) => if s.len() != 66 || prefix != "0x" {
+            Err(FromHexError::InvalidStringLength)
+        } else {
+            Ok(hex)
+        },
+        _ => Err(FromHexError::InvalidStringLength)
     }
 }
 
