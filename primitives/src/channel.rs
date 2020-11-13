@@ -32,18 +32,19 @@ where
     D: Deserializer<'de>,
 {
     let channel_id = String::deserialize(deserializer)?;
-    let channel_id = validate_channel_id(&channel_id).map_err(serde::de::Error::custom)?;
-    <[u8; 32] as FromHex>::from_hex(channel_id).map_err(serde::de::Error::custom)
+    validate_channel_id(&channel_id).map_err(serde::de::Error::custom)
 }
 
-fn validate_channel_id(s: &str) -> Result<&str, FromHexError> {
+fn validate_channel_id(s: &str) -> Result<[u8; 32], FromHexError> {
     match (s.get(0..2), s.get(2..)) {
-        (Some(prefix), Some(hex)) => if hex.len() != 64 || prefix != "0x" {
-            Err(FromHexError::InvalidStringLength)
-        } else {
-            Ok(hex)
-        },
-        _ => Err(FromHexError::InvalidStringLength)
+        (Some(prefix), Some(hex)) => {
+            if hex.len() != 64 || prefix != "0x" {
+                Err(FromHexError::InvalidStringLength)
+            } else {
+                Ok(<[u8; 32] as FromHex>::from_hex(s)?)
+            }
+        }
+        _ => Err(FromHexError::InvalidStringLength),
     }
 }
 
