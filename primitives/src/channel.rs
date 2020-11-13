@@ -38,7 +38,7 @@ where
 
 fn validate_channel_id(s: &str) -> Result<&str, FromHexError> {
     match (s.get(0..2), s.get(2..)) {
-        (Some(prefix), Some(hex)) => if s.len() != 66 || prefix != "0x" {
+        (Some(prefix), Some(hex)) => if hex.len() != 64 || prefix != "0x" {
             Err(FromHexError::InvalidStringLength)
         } else {
             Ok(hex)
