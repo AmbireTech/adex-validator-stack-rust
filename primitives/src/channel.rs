@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::fmt;
 use std::ops::Deref;
+use std::str::FromStr;
 
 use chrono::serde::{ts_milliseconds, ts_milliseconds_option, ts_seconds};
 use chrono::{DateTime, Utc};
@@ -14,7 +15,7 @@ use hex::{FromHex, FromHexError};
 #[serde(transparent)]
 pub struct ChannelId(
     #[serde(
-        deserialize_with = "channel_id_from_str",
+        deserialize_with = "deserialize_channel_id",
         serialize_with = "SerHex::<StrictPfx>::serialize"
     )]
     [u8; 32],
@@ -26,16 +27,25 @@ impl fmt::Debug for ChannelId {
     }
 }
 
-fn channel_id_from_str<'de, D>(deserializer: D) -> Result<[u8; 32], D::Error>
+fn deserialize_channel_id<'de, D>(deserializer: D) -> Result<[u8; 32], D::Error>
 where
     D: Deserializer<'de>,
 {
     let channel_id = String::deserialize(deserializer)?;
-    if channel_id.is_empty() || channel_id.len() != 66 {
-        return Err(serde::de::Error::custom("invalid channel id".to_string()));
-    }
+    validate_channel_id(&channel_id).map_err(serde::de::Error::custom)
+}
 
-    <[u8; 32] as FromHex>::from_hex(&channel_id[2..]).map_err(serde::de::Error::custom)
+fn validate_channel_id(s: &str) -> Result<[u8; 32], FromHexError> {
+    match (s.get(0..2), s.get(2..)) {
+        (Some(prefix), Some(hex)) => {
+            if hex.len() != 64 || prefix != "0x" {
+                Err(FromHexError::InvalidStringLength)
+            } else {
+                Ok(<[u8; 32] as FromHex>::from_hex(s)?)
+            }
+        }
+        _ => Err(FromHexError::InvalidStringLength),
+    }
 }
 
 impl Deref for ChannelId {
@@ -71,6 +81,14 @@ impl FromHex for ChannelId {
 impl fmt::Display for ChannelId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "0x{}", hex::encode(self.0))
+    }
+}
+
+impl FromStr for ChannelId {
+    type Err = FromHexError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        ChannelId::from_hex(validate_channel_id(s)?)
     }
 }
 
