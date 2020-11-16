@@ -36,16 +36,10 @@ where
 }
 
 fn validate_channel_id(s: &str) -> Result<[u8; 32], FromHexError> {
-    match (s.get(0..2), s.get(2..)) {
-        (Some(prefix), Some(hex)) => {
-            if hex.len() != 64 || prefix != "0x" {
-                Err(FromHexError::InvalidStringLength)
-            } else {
-                Ok(<[u8; 32] as FromHex>::from_hex(s)?)
-            }
-        }
-        _ => Err(FromHexError::InvalidStringLength),
-    }
+    // strip `0x` prefix
+    let hex = s.strip_prefix("0x").unwrap_or(s);
+    // FromHex will make sure to check the length and match it to 32 bytes
+    <[u8; 32] as FromHex>::from_hex(hex)
 }
 
 impl Deref for ChannelId {
@@ -88,7 +82,7 @@ impl FromStr for ChannelId {
     type Err = FromHexError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        ChannelId::from_hex(validate_channel_id(s)?)
+        validate_channel_id(s).map(ChannelId)
     }
 }
 
@@ -328,6 +322,44 @@ impl fmt::Display for ChannelError {
 impl Error for ChannelError {
     fn cause(&self) -> Option<&dyn Error> {
         None
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_channel_id_() {
+        let hex_string = "061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088";
+        let prefixed_string = format!("0x{}", hex_string);
+
+        let expected_id = ChannelId([
+            0x06, 0x1d, 0x5e, 0x2a, 0x67, 0xd0, 0xa9, 0xa1, 0x0f, 0x1c, 0x73, 0x2b, 0xca, 0x12,
+            0xa6, 0x76, 0xd8, 0x3f, 0x79, 0x66, 0x3a, 0x39, 0x6f, 0x7d, 0x87, 0xb3, 0xe3, 0x0b,
+            0x9b, 0x41, 0x10, 0x88,
+        ]);
+
+        assert_eq!(ChannelId::from_str(hex_string).unwrap(), expected_id);
+        assert_eq!(ChannelId::from_str(&prefixed_string).unwrap(), expected_id);
+        assert_eq!(ChannelId::from_hex(hex_string).unwrap(), expected_id);
+
+        let hex_value = serde_json::Value::String(hex_string.to_string());
+        let prefixed_value = serde_json::Value::String(prefixed_string.clone());
+
+        // Deserialization from JSON
+        let de_hex_json = serde_json::from_value::<ChannelId>(hex_value.clone())
+            .expect("Should deserialize");
+        let de_prefixed_json =
+            serde_json::from_value::<ChannelId>(prefixed_value.clone()).expect("Should deserialize");
+
+        assert_eq!(de_hex_json, expected_id);
+        assert_eq!(de_prefixed_json, expected_id);
+
+        // Serialization to JSON
+        let actual_serialized = serde_json::to_value(expected_id).expect("Should Serialize");
+        // we don't expect any capitalization
+        assert_eq!(actual_serialized, serde_json::Value::String(prefixed_string))
     }
 }
 
