@@ -136,7 +136,7 @@ pub struct ChannelListResponse {
 pub struct LastApprovedResponse {
     pub last_approved: Option<LastApproved>,
     /// None -> withHeartbeat=true wasn't passed
-    /// Some(vec![]) (empty vec) or Some(heartbeats) - withHeartbeats=true was passed
+    /// Some(vec![]) (empty vec) or Some(heartbeats) - withHeartbeat=true was passed
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub heartbeats: Option<Vec<HeartbeatValidatorMessage>>,
 }
