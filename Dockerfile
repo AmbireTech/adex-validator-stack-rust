@@ -1,6 +1,6 @@
-FROM rust:1.40 as builder
+FROM rust:1.45.2 as builder
 
-MAINTAINER dev@adex.network
+LABEL maintaner="dev@adex.network"
 
 WORKDIR /usr/src/app
 
