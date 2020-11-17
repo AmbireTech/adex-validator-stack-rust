@@ -5,16 +5,15 @@
 use std::error::Error;
 
 use chrono::{DateTime, Utc};
-use ethabi::encode;
-use ethabi::token::Token;
 use hex::FromHex;
-use primitives::channel::ChannelError;
-use primitives::BigNum;
-use primitives::{Channel, ValidatorId};
+use primitives::{channel::ChannelError, BigNum, Channel, ValidatorId};
 use sha2::{Digest, Sha256};
 use std::convert::TryFrom;
 use tiny_keccak::Keccak;
-use web3::types::{Address, U256};
+use web3::{
+    ethabi::{encode, token::Token},
+    types::{Address, U256},
+};
 
 pub use self::dummy::DummyAdapter;
 pub use self::ethereum::EthereumAdapter;
