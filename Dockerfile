@@ -12,7 +12,9 @@ WORKDIR /usr/local/bin
 
 RUN cp $CARGO_HOME/bin/validator_worker .
 
-FROM ubuntu:18.04
+FROM ubuntu:20.04
+
+RUN apt update && apt-get install -y libssl-dev ca-certificates
 
 # `ethereum` or `dummy`
 ENV ADAPTER=
@@ -33,8 +35,6 @@ ENV SENTRY_URL=
 ENV SINGLE_TICK=
 
 WORKDIR /usr/local/bin
-
-RUN apt update && apt-get install -y libssl-dev ca-certificates
 
 COPY docs/config/cloudflare_origin.crt /usr/local/share/ca-certificates/
 

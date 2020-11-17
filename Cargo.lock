@@ -4015,7 +4015,7 @@ dependencies = [
 [[package]]
 name = "web3"
 version = "0.14.0"
-source = "git+https://github.com/elpiel/rust-web3?branch=export-ethabi#f96ed7ebca60aae6a0b1f8d5359fb146ab9ab453"
+source = "git+https://github.com/tomusdrw/rust-web3#ac198beb2118f1eec045255fc274d06d24f8fb61"
 dependencies = [
  "arrayvec 0.5.2",
  "async-native-tls",
