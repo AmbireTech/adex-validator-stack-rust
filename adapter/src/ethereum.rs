@@ -1,12 +1,11 @@
 use crate::EthereumChannel;
+use async_trait::async_trait;
 use chrono::Utc;
 use error::*;
 use ethabi::token::Token;
 use ethkey::Password;
 use ethstore::SafeAccount;
-use futures::compat::Future01CompatExt;
-use futures::future::{BoxFuture, FutureExt};
-use futures::TryFutureExt;
+use futures::{compat::Future01CompatExt, TryFutureExt};
 use lazy_static::lazy_static;
 use parity_crypto::publickey::{
     public_to_address, recover, verify_address, Address, Message, Signature,
@@ -91,6 +90,7 @@ impl EthereumAdapter {
     }
 }
 
+#[async_trait]
 impl Adapter for EthereumAdapter {
     type AdapterError = Error;
 
@@ -150,116 +150,114 @@ impl Adapter for EthereumAdapter {
         Ok(verify_address)
     }
 
-    fn validate_channel<'a>(
+    async fn validate_channel<'a>(
         &'a self,
         channel: &'a Channel,
-    ) -> BoxFuture<'a, AdapterResult<bool, Self::AdapterError>> {
-        async move {
-            // check if channel is valid
-            EthereumAdapter::is_channel_valid(&self.config, self.whoami(), channel)
-                .map_err(AdapterError::InvalidChannel)?;
+    ) -> AdapterResult<bool, Self::AdapterError> {
+        // check if channel is valid
+        EthereumAdapter::is_channel_valid(&self.config, self.whoami(), channel)
+            .map_err(AdapterError::InvalidChannel)?;
 
-            let eth_channel =
-                EthereumChannel::try_from(channel).map_err(AdapterError::InvalidChannel)?;
+        let eth_channel =
+            EthereumChannel::try_from(channel).map_err(AdapterError::InvalidChannel)?;
 
-            let eth_channel_id =
-                ChannelId::from(eth_channel.hash(&self.config.ethereum_core_address));
+        let eth_channel_id = ChannelId::from(eth_channel.hash(&self.config.ethereum_core_address));
 
-            if eth_channel_id != channel.id {
-                return Err(AdapterError::Adapter(Error::InvalidChannelId {
+        if eth_channel_id != channel.id {
+            return Err(AdapterError::Adapter(
+                Error::InvalidChannelId {
                     expected: eth_channel_id,
                     actual: channel.id,
-                }));
-            }
-
-            let contract_address: Address = self.config.ethereum_core_address.into();
-
-            let contract = Contract::from_json(self.web3.eth(), contract_address, &ADEXCORE_ABI)
-                .map_err(Error::ContractInitialization)?;
-
-            let channel_status: U256 = contract
-                .query(
-                    "states",
-                    Token::FixedBytes(channel.id.as_ref().to_vec()),
-                    None,
-                    Options::default(),
-                    None,
-                )
-                .compat()
-                .await
-                .map_err(Error::ContractQuerying)?;
-
-            if channel_status != *CHANNEL_STATE_ACTIVE {
-                Err(AdapterError::Adapter(Error::ChannelInactive(channel.id)))
-            } else {
-                Ok(true)
-            }
+                }
+                .into(),
+            ));
         }
-        .boxed()
+
+        let contract_address: Address = self.config.ethereum_core_address.into();
+
+        let contract = Contract::from_json(self.web3.eth(), contract_address, &ADEXCORE_ABI)
+            .map_err(Error::ContractInitialization)?;
+
+        let channel_status: U256 = contract
+            .query(
+                "states",
+                Token::FixedBytes(channel.id.as_ref().to_vec()),
+                None,
+                Options::default(),
+                None,
+            )
+            .compat()
+            .await
+            .map_err(Error::ContractQuerying)?;
+
+        if channel_status != *CHANNEL_STATE_ACTIVE {
+            Err(AdapterError::Adapter(
+                Error::ChannelInactive(channel.id).into(),
+            ))
+        } else {
+            Ok(true)
+        }
     }
 
     /// Creates a `Session` from a provided Token by calling the Contract.
     /// Does **not** cache the (`Token`, `Session`) pair.
-    fn session_from_token<'a>(
+    async fn session_from_token<'a>(
         &'a self,
         token: &'a str,
-    ) -> BoxFuture<'a, AdapterResult<Session, Self::AdapterError>> {
-        async move {
-            if token.len() < 16 {
-                return Err(AdapterError::Authentication(
-                    "Invalid token id length".to_string(),
-                ));
-            }
+    ) -> AdapterResult<Session, Self::AdapterError> {
+        if token.len() < 16 {
+            return Err(AdapterError::Authentication(
+                "Invalid token id length".to_string(),
+            ));
+        }
 
-            let parts: Vec<&str> = token.split('.').collect();
-            let (header_encoded, payload_encoded, token_encoded) =
-                match (parts.get(0), parts.get(1), parts.get(2)) {
-                    (Some(header_encoded), Some(payload_encoded), Some(token_encoded)) => {
-                        (header_encoded, payload_encoded, token_encoded)
-                    }
-                    _ => {
-                        return Err(AdapterError::Authentication(format!(
-                            "{} token string is incorrect",
-                            token
-                        )))
-                    }
-                };
-
-            let verified = ewt_verify(header_encoded, payload_encoded, token_encoded)
-                .map_err(Error::VerifyMessage)?;
-
-            if self.whoami().to_checksum() != verified.payload.id {
-                return Err(AdapterError::Authentication(
-                    "token payload.id !== whoami(): token was not intended for us".to_string(),
-                ));
-            }
-
-            let sess = match &verified.payload.identity {
-                Some(identity) => {
-                    if self
-                        .relayer
-                        .has_privileges(&verified.from, identity)
-                        .await?
-                    {
-                        Session {
-                            era: verified.payload.era,
-                            uid: identity.to_owned(),
-                        }
-                    } else {
-                        return Err(AdapterError::Authorization(
-                            "insufficient privilege".to_string(),
-                        ));
-                    }
+        let parts: Vec<&str> = token.split('.').collect();
+        let (header_encoded, payload_encoded, token_encoded) =
+            match (parts.get(0), parts.get(1), parts.get(2)) {
+                (Some(header_encoded), Some(payload_encoded), Some(token_encoded)) => {
+                    (header_encoded, payload_encoded, token_encoded)
                 }
-                None => Session {
-                    era: verified.payload.era,
-                    uid: verified.from,
-                },
+                _ => {
+                    return Err(AdapterError::Authentication(format!(
+                        "{} token string is incorrect",
+                        token
+                    )))
+                }
             };
 
-            Ok(sess)
+        let verified = ewt_verify(header_encoded, payload_encoded, token_encoded)
+            .map_err(Error::VerifyMessage)?;
+
+        if self.whoami().to_checksum() != verified.payload.id {
+            return Err(AdapterError::Authentication(
+                "token payload.id !== whoami(): token was not intended for us".to_string(),
+            ));
         }
-        .boxed()
+
+        let sess = match &verified.payload.identity {
+            Some(identity) => {
+                if self
+                    .relayer
+                    .has_privileges(&verified.from, identity)
+                    .await?
+                {
+                    Session {
+                        era: verified.payload.era,
+                        uid: identity.to_owned(),
+                    }
+                } else {
+                    return Err(AdapterError::Authorization(
+                        "insufficient privilege".to_string(),
+                    ));
+                }
+            }
+            None => Session {
+                era: verified.payload.era,
+                uid: verified.from,
+            },
+        };
+
+        Ok(sess)
     }
 
     fn get_auth(&self, validator: &ValidatorId) -> AdapterResult<String, Self::AdapterError> {
@@ -277,7 +275,7 @@ impl Adapter for EthereumAdapter {
         };
 
         ewt_sign(&wallet, &self.keystore_pwd, &payload)
-            .map_err(|err| AdapterError::Adapter(Error::SignMessage(err)))
+            .map_err(|err| AdapterError::Adapter(Error::SignMessage(err).into()))
     }
 }
 
@@ -675,9 +673,7 @@ mod test {
                 validators: SpecValidators::new(leader_validator_desc, follower_validator_desc),
                 max_per_impression: 10.into(),
                 min_per_impression: 10.into(),
-                targeting: vec![],
                 targeting_rules: vec![],
-                min_targeting_score: None,
                 event_submission: Some(EventSubmission { allow: vec![] }),
                 created: Utc::now(),
                 active_from: None,
@@ -685,8 +681,6 @@ mod test {
                 withdraw_period_start: Utc::now() + Duration::days(1),
                 ad_units: vec![],
                 pricing_bounds: None,
-                price_multiplication_rules: Default::default(),
-                price_dynamic_adjustment: false,
             },
         };
 

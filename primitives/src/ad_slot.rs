@@ -1,4 +1,4 @@
-use crate::{targeting::Rule, BigNum, TargetingTag, ValidatorId};
+use crate::{targeting::Rule, BigNum, ValidatorId};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -21,19 +21,9 @@ pub struct AdSlot {
     /// see IAB ad unit guidelines and iab_flex_{adUnitName} (see IAB's new ad portfolio and PDF)
     #[serde(rename = "type")]
     pub ad_type: String,
-    /// Array of TargetingTag
-    #[serde(default)]
-    pub targeting: Vec<TargetingTag>,
     // HashMap<DepositAsset, BigNum> for the minimum payment accepted per impression
     #[serde(default)]
     pub min_per_impression: Option<HashMap<String, BigNum>>,
-    /// Array of TargetingTag
-    /// meant for discovery between publishers/advertisers
-    #[serde(default)]
-    pub tags: Vec<TargetingTag>,
-    #[serde(default)]
-    pub auto_tags: Vec<TargetingTag>,
-    /// Targeting rules
     #[serde(default)]
     pub rules: Vec<Rule>,
     /// Valid ipfs hash for Ad Unit object. It will be used as fallback data (optional)

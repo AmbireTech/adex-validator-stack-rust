@@ -44,6 +44,10 @@ impl BigNum {
     pub fn to_str_radix(&self, radix: u32) -> String {
         self.0.to_str_radix(radix)
     }
+
+    pub fn from_bytes_be(buf: &[u8]) -> Self {
+        Self(BigUint::from_bytes_be(buf))
+    }
 }
 
 impl fmt::Debug for BigNum {

@@ -1,15 +1,13 @@
-use crate::db::analytics::{
-    advertiser_channel_ids, get_advanced_reports, get_analytics, AnalyticsType,
+use crate::{
+    db::analytics::{advertiser_channel_ids, get_advanced_reports, get_analytics, AnalyticsType},
+    success_response, Application, Auth, ResponseError, RouteParams,
 };
-use crate::success_response;
-use crate::Application;
-use crate::Auth;
-use crate::ResponseError;
-use crate::RouteParams;
 use hyper::{Body, Request, Response};
-use primitives::adapter::Adapter;
-use primitives::analytics::{AnalyticsQuery, AnalyticsResponse};
-use primitives::ChannelId;
+use primitives::{
+    adapter::Adapter,
+    analytics::{AnalyticsQuery, AnalyticsResponse},
+    ChannelId,
+};
 use redis::aio::MultiplexedConnection;
 use slog::{error, Logger};
 

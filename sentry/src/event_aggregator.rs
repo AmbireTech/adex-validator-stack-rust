@@ -144,7 +144,16 @@ impl EventAggregator {
         })?;
 
         events.iter().for_each(|ev| {
-            event_reducer::reduce(&record.channel, &mut record.aggregate, ev, &session)
+            match event_reducer::reduce(
+                &app.logger,
+                &record.channel,
+                &mut record.aggregate,
+                ev,
+                &session,
+            ) {
+                Ok(_) => {}
+                Err(err) => error!(&app.logger, "Event Reducer failed"; "error" => ?err ),
+            }
         });
 
         // only time we don't have session is during

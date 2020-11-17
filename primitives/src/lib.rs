@@ -12,6 +12,7 @@ pub mod channel;
 pub mod channel_validator;
 pub mod config;
 pub mod event_submission;
+pub mod ipfs;
 pub mod market;
 pub mod merkle_tree;
 pub mod sentry;
@@ -21,8 +22,16 @@ pub mod targeting_tag;
 
 pub mod util {
     pub mod tests {
+        use slog::{o, Discard, Drain, Logger};
+
         pub mod prep_db;
         pub mod time;
+
+        pub fn discard_logger() -> Logger {
+            let drain = Discard.fuse();
+
+            Logger::root(drain, o!())
+        }
     }
 
     pub mod logging;
@@ -38,6 +47,7 @@ pub use self::big_num::BigNum;
 pub use self::channel::{Channel, ChannelId, ChannelSpec, SpecValidator, SpecValidators};
 pub use self::config::Config;
 pub use self::event_submission::EventSubmission;
+pub use self::ipfs::IPFS;
 pub use self::targeting_tag::TargetingTag;
 pub use self::validator::{ValidatorDesc, ValidatorId};
 

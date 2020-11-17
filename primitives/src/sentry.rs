@@ -127,12 +127,17 @@ pub struct AggregateEvents {
 pub struct ChannelListResponse {
     pub channels: Vec<Channel>,
     pub total_pages: u64,
+    pub total: u64,
+    pub page: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LastApprovedResponse {
     pub last_approved: Option<LastApproved>,
+    /// None -> withHeartbeat=true wasn't passed
+    /// Some(vec![]) (empty vec) or Some(heartbeats) - withHeartbeat=true was passed
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub heartbeats: Option<Vec<HeartbeatValidatorMessage>>,
 }
 
