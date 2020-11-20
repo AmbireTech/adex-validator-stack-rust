@@ -24,7 +24,7 @@ pub fn channel_load<'a, A: Adapter + 'static>(
             .map_err(|_| ResponseError::BadRequest("Wrong Channel Id".to_string()))?;
         let channel = get_channel_by_id(&app.pool, &channel_id)
             .await?
-            .ok_or_else(|| ResponseError::NotFound)?;
+            .ok_or(ResponseError::NotFound)?;
 
         req.extensions_mut().insert(channel);
 
@@ -58,7 +58,7 @@ pub fn channel_if_active<'a, A: Adapter + 'static>(
 
         let channel = get_channel_by_id_and_validator(&app.pool, &channel_id, &validator_id)
             .await?
-            .ok_or_else(|| ResponseError::NotFound)?;
+            .ok_or(ResponseError::NotFound)?;
 
         req.extensions_mut().insert(channel);
 

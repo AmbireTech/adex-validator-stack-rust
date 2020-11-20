@@ -36,18 +36,12 @@ pub(crate) async fn for_request(
     let token = authorization
         .and_then(|hv| {
             hv.to_str()
-                .map(|token_str| {
-                    if token_str.starts_with(prefix) {
-                        Some(token_str[prefix.len()..].to_string())
-                    } else {
-                        None
-                    }
-                })
+                .map(|token_str| token_str.strip_prefix(prefix))
                 .transpose()
         })
         .transpose()?;
 
-    if let Some(ref token) = token {
+    if let Some(token) = token {
         let adapter_session = match redis::cmd("GET")
             .arg(token)
             .query_async::<_, Option<String>>(&mut redis.clone())

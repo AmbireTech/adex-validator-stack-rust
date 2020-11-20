@@ -99,7 +99,7 @@ impl MerkleTree {
     pub fn new(data: &[MerkleItem]) -> Result<MerkleTree, Error> {
         let mut leaves: Vec<MerkleItem> = data.to_owned();
         // sort the MerkleTree leaves
-        leaves.sort();
+        leaves.sort_unstable();
         // remove duplicates **before** we check the leaves length
         leaves.dedup_by(|a, b| a == b);
 

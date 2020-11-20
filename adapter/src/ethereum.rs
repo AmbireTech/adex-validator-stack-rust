@@ -62,7 +62,7 @@ impl EthereumAdapter {
         let address = keystore_json["address"]
             .as_str()
             .map(eth_checksum::checksum)
-            .ok_or_else(|| KeystoreError::AddressMissing)?;
+            .ok_or(KeystoreError::AddressMissing)?;
 
         let address = ValidatorId::try_from(&address).map_err(KeystoreError::AddressInvalid)?;
 
@@ -256,10 +256,7 @@ impl Adapter for EthereumAdapter {
     }
 
     fn get_auth(&self, validator: &ValidatorId) -> AdapterResult<String, Self::AdapterError> {
-        let wallet = self
-            .wallet
-            .as_ref()
-            .ok_or_else(|| AdapterError::LockedWallet)?;
+        let wallet = self.wallet.as_ref().ok_or(AdapterError::LockedWallet)?;
 
         let era = Utc::now().timestamp_millis() as f64 / 60000.0;
         let payload = Payload {
