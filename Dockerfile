@@ -7,7 +7,9 @@ WORKDIR /usr/src/app
 
 COPY . .
 
-RUN cargo install --path validator_worker --all-features
+# We intall the validator_worker binary with all features in Release mode
+# Inlcude the full backtrace for easier debugging
+RUN RUST_BACKTRACE=full cargo install --path validator_worker --all-features
 
 WORKDIR /usr/local/bin
 
