@@ -1,3 +1,4 @@
+# Builder
 FROM rust:1.45.2 as builder
 
 LABEL maintainer="dev@adex.network"
