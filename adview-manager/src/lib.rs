@@ -471,13 +471,12 @@ impl Manager {
 
                 let campaign_id = campaign.channel.id;
 
-                let campaign_input = targeting_input.clone().with_market_channel(campaign.channel.clone());
+                let mut unit_input = targeting_input.clone().with_market_channel(campaign.channel.clone());
 
                 campaign
                     .units_with_price
                     .iter()
                     .filter(|unit_with_price| {
-                        let mut unit_input = campaign_input.clone();
                         unit_input.ad_unit_id = Some(unit_with_price.unit.id.clone());
 
                         let mut output = targeting::Output {
