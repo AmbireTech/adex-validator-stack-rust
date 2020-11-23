@@ -8,7 +8,7 @@ Components:
 
 * [Sentry](#sentry)
 * [Validator worker](#validator-worker)
-* Adapter
+* Adapter - Ethereum & Dummy (for testing) Adapters
 * AdView manager
 
 ## Local & Testing setup
@@ -32,10 +32,10 @@ We need two services to be able to run `Sentry`: `Postgres` and `Redis`.
 
 ### Running Postgres
 
-`docker run --rm --name adex-validator-postgres -e POSTGRES_PASSWORD=docker -d -p 5432:5432 -v $HOME/docker/volumes/postgres:/var/lib/postgresql/data postgres`
+`docker run --rm --name adex-validator-postgres -e POSTGRES_PASSWORD=postgres -d -p 5432:5432 -v $HOME/docker/volumes/postgres:/var/lib/postgresql/data postgres`
 
 - `$HOME/docker/volumes/postgres` - your local storage for postgres (persist the data when we remove the container)
-- `POSTGRES_PASSWORD=docker` - the password of `postgres` user
+- `POSTGRES_PASSWORD=postgres` - the password of `postgres` user
 
 ### Running Redis
 
@@ -73,7 +73,7 @@ The password for the Keystore file can be set using the [environment variable `K
         ./docs/config/dev.toml
     ```
 
-#### Using the `Dummy Adapter`:
+#### Using the `Dummy Adapter`
 
 **Dummy** identities:
 
@@ -94,9 +94,9 @@ The password for the Keystore file can be set using the [environment variable `K
         ./docs/config/dev.toml
 ```
 
-For full list, check out (primitives/src/util/tests/prep_db.rs#L29-L43)[./primitives/src/util/tests/prep_db.rs#L29-L43]
+For full list, check out [primitives/src/util/tests/prep_db.rs#L29-L43](./primitives/src/util/tests/prep_db.rs#L29-L43)
 
-#### Environment variables:
+#### Environment variables
 
 - `ENV` - `production` or `development`; *default*: `development` - passing this env. variable will use the default configuration paths - [`docs/config/dev.toml`](./docs/config/dev.toml) (for `development`) or [`docs/config/prod.toml`](./docs/config/prod.toml) (for `production`). Otherwise you can pass your own configuration file path to the binary (check `cargo run -p sentry --help` for more information). In `development` it will make sure Sentry to seed the database.
 - `PORT` - *default*: `8005` - The local port that Sentry API will be accessible at
@@ -124,7 +124,7 @@ For a full list of all available CLI options on the Validator worker run `--help
 cargo run -p validator_worker -- --help
 ```
 
-#### Using the `Ethereum Adapter`:
+#### Using the `Ethereum Adapter`
 TODO: Update Keystore file and Keystore password for Leader/Follower as they are using the same at the moment.
 
 The password for the Keystore file can be set using the environment variable `KEYSTORE_PWD`.
@@ -152,7 +152,7 @@ The password for the Keystore file can be set using the environment variable `KE
         ./docs/config/dev.toml
     ```
 
-#### Using the `Dummy Adapter`:
+#### Using the `Dummy Adapter`
 - Leader: `ce07CbB7e054514D590a0262C93070D838bFBA2e`
 
     Assuming you have [Sentry API running](#running-sentry-rest-api) for the **Leader** on port `8005`:
@@ -177,7 +177,7 @@ The password for the Keystore file can be set using the environment variable `KE
         ./docs/config/dev.toml
     ```
 
-#### Environment variables:
+#### Environment variables
 
 - `ENV`: `production` or `development` ( *default* ) - passing this env. variable will use the default configuration paths - [`docs/config/dev.toml`](./docs/config/dev.toml) (for `development`) or [`docs/config/prod.toml`](./docs/config/prod.toml) (for `production`). Otherwise you can pass your own configuration file path to the binary (check `cargo run -p sentry --help` for more information). In `development` it will make sure Sentry to seed the database.
 - `PORT` - The local port that Sentry API will accessible at
