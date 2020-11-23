@@ -1045,7 +1045,7 @@ dependencies = [
 [[package]]
 name = "ethkey"
 version = "0.3.0"
-source = "git+https://github.com/elpiel/openethereum?branch=remove-dir-depenedency-for-ethstore#deefe701df39af2415be38746a783bbe257b8155"
+source = "git+https://github.com/elpiel/openethereum?branch=remove-dir-depenedency-for-ethstore#36e21b58e5fc8a69c62e7d819e57e38bbe9a2eb3"
 dependencies = [
  "edit-distance",
  "eth-secp256k1",
@@ -1066,7 +1066,7 @@ dependencies = [
 [[package]]
 name = "ethstore"
 version = "0.2.1"
-source = "git+https://github.com/elpiel/openethereum?branch=remove-dir-depenedency-for-ethstore#deefe701df39af2415be38746a783bbe257b8155"
+source = "git+https://github.com/elpiel/openethereum?branch=remove-dir-depenedency-for-ethstore#36e21b58e5fc8a69c62e7d819e57e38bbe9a2eb3"
 dependencies = [
  "ethereum-types 0.4.2",
  "ethkey",
@@ -1085,7 +1085,6 @@ dependencies = [
  "smallvec 0.6.13",
  "tempdir",
  "time",
- "tiny-keccak 1.5.0",
 ]
 
 [[package]]
@@ -1803,7 +1802,7 @@ dependencies = [
 [[package]]
 name = "memzero"
 version = "0.1.0"
-source = "git+https://github.com/elpiel/openethereum?branch=remove-dir-depenedency-for-ethstore#deefe701df39af2415be38746a783bbe257b8155"
+source = "git+https://github.com/elpiel/openethereum?branch=remove-dir-depenedency-for-ethstore#36e21b58e5fc8a69c62e7d819e57e38bbe9a2eb3"
 
 [[package]]
 name = "merkletree"
