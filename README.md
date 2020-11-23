@@ -49,43 +49,72 @@ For a full list of all available CLI options on Sentry run `--help`:
 cargo run -p sentry -- --help
 ```
 
+Starting the Sentry API in will always run migrations, this will make sure the database is always up to date with the latest migrations, before starting and exposing the web server.
+
+In `development` ( [`ENV` environment variable](#environment-variables) ) it will seed the database as well.
+
 #### Using the `Ethereum Adapter`
 
-The password for the Keystore file can be set using the environment variable `KEYSTORE_PWD`.
+The password for the Keystore file can be set using the [environment variable `KEYSTORE_PWD`](#adapter).
 
 - Leader
     ```bash
-    POSTGRES_DB="sentry_leader" PORT=8006 cargo run -p sentry -- --adapter ethereum --keystoreFile ./adapter/resources/keystore.json ./docs/config/dev.toml
+    POSTGRES_DB="sentry_leader" PORT=8006 cargo run -p sentry -- \
+        --adapter ethereum \
+        --keystoreFile ./adapter/resources/keystore.json \
+        ./docs/config/dev.toml
     ```
 
 - Follower
     ```bash
-    POSTGRES_DB="sentry_follower" PORT=8006 cargo run -p sentry -- --adapter ethereum --keystoreFile ./adapter/resources/keystore.json ./docs/config/dev.toml
+    POSTGRES_DB="sentry_follower" PORT=8006 cargo run -p sentry -- \
+        --adapter ethereum \
+        --keystoreFile ./adapter/resources/keystore.json
+        ./docs/config/dev.toml
     ```
 
 #### Using the `Dummy Adapter`:
 
-Dummy identities:
+**Dummy** identities:
 
 - Leader: `ce07CbB7e054514D590a0262C93070D838bFBA2e`
 
 ```bash
-POSTGRES_DB="sentry_leader" PORT=8005 cargo run -p sentry -- --adapter dummy --dummyIdentity ce07CbB7e054514D590a0262C93070D838bFBA2e ./docs/config/dev.toml
+    POSTGRES_DB="sentry_leader" PORT=8005 cargo run -p sentry -- \
+        --adapter dummy \
+        --dummyIdentity ce07CbB7e054514D590a0262C93070D838bFBA2e \
+        ./docs/config/dev.toml
 ```
 - Follower: `c91763d7f14ac5c5ddfbcd012e0d2a61ab9bded3`
 
 ```bash
-POSTGRES_DB="sentry_follower" PORT=8006 cargo run -p sentry -- --adapter dummy --dummyIdentity c91763d7f14ac5c5ddfbcd012e0d2a61ab9bded3 ./docs/config/dev.toml
+    POSTGRES_DB="sentry_follower" PORT=8006 cargo run -p sentry -- \
+        --adapter dummy \
+        --dummyIdentity c91763d7f14ac5c5ddfbcd012e0d2a61ab9bded3 \
+        ./docs/config/dev.toml
 ```
 
 For full list, check out (primitives/src/util/tests/prep_db.rs#L29-L43)[./primitives/src/util/tests/prep_db.rs#L29-L43]
 
 #### Environment variables:
 
-- `ENV`: `production` or `development` - pass this env. variable if you want to use the default configuration paths - [`docs/config/dev.toml`](./docs/config/dev.toml) (for development) or [`docs/config/prod.toml`](./docs/config/prod.toml) (for production)
-- `PORT`
-- `KEYSTORE_PWD`
-- `POSTGRES_DB`
+- `ENV` - `production` or `development`; *default*: `development` - passing this env. variable will use the default configuration paths - [`docs/config/dev.toml`](./docs/config/dev.toml) (for `development`) or [`docs/config/prod.toml`](./docs/config/prod.toml) (for `production`). Otherwise you can pass your own configuration file path to the binary (check `cargo run -p sentry --help` for more information). In `development` it will make sure Sentry to seed the database.
+- `PORT` - *default*: `8005` - The local port that Sentry API will be accessible at
+- `ANALYTICS_RECORDER` - accepts any non-zero value - whether or not to start the `Analytics recorder` that will track analytics stats for payout events (`IMPRESSION` & `CLICK`)
+##### Adapter
+- `KEYSTORE_PWD` - Password for the `Keystore file`, only available when using `Ethereum Adapter` (`--adapter ethereum`)
+
+##### Redis
+- `REDIS_URL` - *default*: `redis://127.0.0.1:6379`
+
+##### Postgres
+- `POSTGRES_HOST` - *default*: `localhost`
+- `POSTGRES_USER` - *default*: `postgres`
+- `POSTGRES_PASSWORD` - *default*: `postgres`
+- `POSTGRES_DB` - *default*: `user` name - Database name in Postgres to be used for this instance
+- `POSTGRES_PORT` - *default*: `5432`
+
+#####
 
 ### Running the Validator Worker
 
@@ -104,7 +133,11 @@ The password for the Keystore file can be set using the environment variable `KE
     Assuming you have [Sentry API running](#running-sentry-rest-api) for the **Leader** on port `8005`:
 
     ```bash
-    cargo run -p validator_worker --adapter ethereum --keystoreFile ./adapter/resources/keystore.json --sentryUrl http://127.0.0.1:8005 ./docs/config/dev.toml
+    cargo run -p validator_worker
+        --adapter ethereum
+        --keystoreFile ./adapter/resources/keystore.json
+        --sentryUrl http://127.0.0.1:8005
+        ./docs/config/dev.toml
     ```
 
 - Follower
@@ -112,7 +145,11 @@ The password for the Keystore file can be set using the environment variable `KE
     Assuming you have [Sentry API running](#running-sentry-rest-api) for the **Follower** on port `8006`:
 
     ```bash
-    cargo run -p validator_worker --adapter ethereum --keystoreFile ./adapter/resources/keystore.json --sentryUrl http://127.0.0.1:8006 ./docs/config/dev.toml
+    cargo run -p validator_worker
+        --adapter ethereum
+        --keystoreFile ./adapter/resources/keystore.json
+        --sentryUrl http://127.0.0.1:8006
+        ./docs/config/dev.toml
     ```
 
 #### Using the `Dummy Adapter`:
@@ -121,7 +158,11 @@ The password for the Keystore file can be set using the environment variable `KE
     Assuming you have [Sentry API running](#running-sentry-rest-api) for the **Leader** on port `8005`:
 
     ```bash
-    cargo run -p validator_worker --adapter dummy --dummyIdentity ce07CbB7e054514D590a0262C93070D838bFBA2e --sentryUrl http://127.0.0.1:8005 ./docs/config/dev.toml
+    cargo run -p validator_worker
+        --adapter dummy
+        --dummyIdentity ce07CbB7e054514D590a0262C93070D838bFBA2e
+        --sentryUrl http://127.0.0.1:8005
+        ./docs/config/dev.toml
     ```
 
 - Follower: `c91763d7f14ac5c5ddfbcd012e0d2a61ab9bded3`
@@ -129,8 +170,20 @@ The password for the Keystore file can be set using the environment variable `KE
     Assuming you have [Sentry API running](#running-sentry-rest-api) for the **Follower** on port `8006`:
 
     ```bash
-    cargo run -p validator_worker --adapter dummy --dummyIdentity c91763d7f14ac5c5ddfbcd012e0d2a61ab9bded3 --sentryUrl http://127.0.0.1:8006 ./docs/config/dev.toml
+    cargo run -p validator_worker
+        --adapter dummy
+        --dummyIdentity c91763d7f14ac5c5ddfbcd012e0d2a61ab9bded3
+        --sentryUrl http://127.0.0.1:8006
+        ./docs/config/dev.toml
     ```
+
+#### Environment variables:
+
+- `ENV`: `production` or `development` ( *default* ) - passing this env. variable will use the default configuration paths - [`docs/config/dev.toml`](./docs/config/dev.toml) (for `development`) or [`docs/config/prod.toml`](./docs/config/prod.toml) (for `production`). Otherwise you can pass your own configuration file path to the binary (check `cargo run -p sentry --help` for more information). In `development` it will make sure Sentry to seed the database.
+- `PORT` - The local port that Sentry API will accessible at
+
+##### Adapter
+- `KEYSTORE_PWD` - Password for the `Keystore file`, only available when using `Ethereum Adapter` (`--adapter ethereum`)
 
 ## Development environment
 

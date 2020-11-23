@@ -1,7 +1,7 @@
 #![deny(clippy::all)]
 #![deny(rust_2018_idioms)]
 
-use clap::{App, Arg};
+use clap::{crate_version, App, Arg};
 
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
 use hyper::service::{make_service_fn, service_fn};
@@ -20,7 +20,7 @@ const DEFAULT_PORT: u16 = 8005;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = App::new("Sentry")
-        .version("0.1")
+        .version(crate_version!())
         .arg(
             Arg::with_name("config")
                 .help("the config file for the validator worker")
