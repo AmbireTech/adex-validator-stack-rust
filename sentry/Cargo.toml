@@ -8,6 +8,7 @@ edition = "2018"
 # Futures
 futures = "0.3.1"
 async-std = "1.4.0"
+async-trait = "^0.1"
 # Primitives
 primitives = { path = "../primitives", features = ["postgres"] }
 adapter = { version = "0.1", path = "../adapter" }

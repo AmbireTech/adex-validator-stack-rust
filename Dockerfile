@@ -1,5 +1,5 @@
 # Builder
-FROM rust:1.45.2 as builder
+FROM rust:1.48.0 as builder
 
 LABEL maintainer="dev@adex.network"
 

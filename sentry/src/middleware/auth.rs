@@ -1,16 +1,55 @@
 use std::error;
 
+use async_trait::async_trait;
 use hyper::header::{AUTHORIZATION, REFERER};
 use hyper::{Body, Request};
 use redis::aio::MultiplexedConnection;
 
 use primitives::adapter::{Adapter, Session as AdapterSession};
 
-use crate::{Auth, Session};
+use crate::{middleware::Middleware, Application, Auth, ResponseError, Session};
+
+#[derive(Debug)]
+pub struct Authenticate;
+
+#[async_trait]
+impl<A: Adapter + 'static> Middleware<A> for Authenticate {
+    async fn call<'a>(
+        &self,
+        request: Request<Body>,
+        application: &'a Application<A>,
+    ) -> Result<Request<Body>, ResponseError> {
+        for_request(request, &application.adapter, application.redis.clone())
+            .await
+            .map_err(|error| {
+                slog::error!(&application.logger, "{}", &error; "module" => "middleware-auth");
+
+                ResponseError::Unauthorized
+            })
+    }
+}
+
+#[derive(Debug)]
+pub struct AuthRequired;
+
+#[async_trait]
+impl<A: Adapter + 'static> Middleware<A> for AuthRequired {
+    async fn call<'a>(
+        &self,
+        request: Request<Body>,
+        _application: &'a Application<A>,
+    ) -> Result<Request<Body>, ResponseError> {
+        if request.extensions().get::<Session>().is_some() {
+            Ok(request)
+        } else {
+            Err(ResponseError::Unauthorized)
+        }
+    }
+}
 
 /// Check `Authorization` header for `Bearer` scheme with `Adapter::session_from_token`.
 /// If the `Adapter` fails to create an `AdapterSession`, `ResponseError::BadRequest` will be returned.
-pub(crate) async fn for_request(
+async fn for_request(
     mut req: Request<Body>,
     adapter: &impl Adapter,
     redis: MultiplexedConnection,
