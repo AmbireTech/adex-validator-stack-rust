@@ -1,3 +1,5 @@
+use chrono::{TimeZone, Utc};
+
 use super::*;
 use crate::{
     targeting::input,
@@ -20,7 +22,7 @@ fn get_default_input() -> Input {
             publisher_id: IDS["leader"],
             country: Some("bg".to_string()),
             event_type: "IMPRESSION".to_string(),
-            seconds_since_epoch: 500,
+            seconds_since_epoch: Utc.ymd(2020, 11, 06).and_hms(12, 0, 0),
             user_agent_os: Some("os".to_string()),
             user_agent_browser_family: Some("family".to_string()),
         },

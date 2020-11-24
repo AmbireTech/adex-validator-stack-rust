@@ -1,5 +1,6 @@
 use super::{Error, Value};
 use crate::{ToETHChecksum, ValidatorId, IPFS};
+use chrono::{serde::ts_seconds, DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use field::{Field, GetField};
@@ -148,7 +149,8 @@ pub struct Global {
     pub publisher_id: ValidatorId,
     pub country: Option<String>,
     pub event_type: String,
-    pub seconds_since_epoch: u64,
+    #[serde(with = "ts_seconds")]
+    pub seconds_since_epoch: DateTime<Utc>,
     #[serde(rename = "userAgentOS")]
     pub user_agent_os: Option<String>,
     pub user_agent_browser_family: Option<String>,
@@ -166,7 +168,8 @@ impl GetField for Global {
             field::Global::Country => self.country.clone().map(Value::String),
             field::Global::EventType => Some(Value::String(self.event_type.clone())),
             field::Global::SecondsSinceEpoch => {
-                Some(Value::Number(self.seconds_since_epoch.into()))
+                // no need to convert to u64, this value should always be positive
+                Some(Value::new_number(self.seconds_since_epoch.timestamp()))
             }
             field::Global::UserAgentOS => self.user_agent_os.clone().map(Value::String),
             field::Global::UserAgentBrowserFamily => {
@@ -480,7 +483,7 @@ mod test {
                 publisher_id: IDS["publisher"],
                 country: Some("BG".into()),
                 event_type: "IMPRESSION".into(),
-                seconds_since_epoch: actual_date.timestamp() as u64,
+                seconds_since_epoch: actual_date,
                 user_agent_os: Some("Ubuntu".into()),
                 user_agent_browser_family: Some("Firefox".into()),
             },

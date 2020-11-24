@@ -7,10 +7,7 @@ use primitives::{
     BigNum, Channel, ValidatorId,
 };
 use slog::{error, Logger};
-use std::{
-    cmp::{max, min},
-    convert::TryFrom,
-};
+use std::cmp::{max, min};
 
 type Result = std::result::Result<Option<(ValidatorId, BigNum)>, Error>;
 
@@ -59,10 +56,7 @@ pub fn get_payout(logger: &Logger, channel: &Channel, event: &Event, session: &S
                         publisher_id: *publisher,
                         country: session.country.clone(),
                         event_type: event_type.clone(),
-                        // **seconds** means calling `timestamp()`
-                        seconds_since_epoch: u64::try_from(Utc::now().timestamp()).expect(
-                            "The timestamp (i64) should not overflow or underflow the u64!",
-                        ),
+                        seconds_since_epoch: Utc::now(),
                         user_agent_os: session.os.clone(),
                         user_agent_browser_family: None,
                     },
