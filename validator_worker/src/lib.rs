@@ -35,7 +35,7 @@ pub(crate) fn get_state_root_hash<A: Adapter + 'static>(
 
     let tree = MerkleTree::new(&elems)?;
     // keccak256(channelId, balanceRoot
-    get_signable_state_root(&iface.channel.id, &tree.root())
+    get_signable_state_root(iface.channel.id.as_ref(), &tree.root())
 }
 
 #[cfg(test)]

@@ -43,9 +43,9 @@ fn validate_channel_id(s: &str) -> Result<[u8; 32], FromHexError> {
 }
 
 impl Deref for ChannelId {
-    type Target = [u8];
+    type Target = [u8; 32];
 
-    fn deref(&self) -> &[u8] {
+    fn deref(&self) -> &[u8; 32] {
         &self.0
     }
 }
@@ -348,10 +348,10 @@ mod test {
         let prefixed_value = serde_json::Value::String(prefixed_string.clone());
 
         // Deserialization from JSON
-        let de_hex_json = serde_json::from_value::<ChannelId>(hex_value.clone())
+        let de_hex_json =
+            serde_json::from_value::<ChannelId>(hex_value.clone()).expect("Should deserialize");
+        let de_prefixed_json = serde_json::from_value::<ChannelId>(prefixed_value.clone())
             .expect("Should deserialize");
-        let de_prefixed_json =
-            serde_json::from_value::<ChannelId>(prefixed_value.clone()).expect("Should deserialize");
 
         assert_eq!(de_hex_json, expected_id);
         assert_eq!(de_prefixed_json, expected_id);
@@ -359,7 +359,10 @@ mod test {
         // Serialization to JSON
         let actual_serialized = serde_json::to_value(expected_id).expect("Should Serialize");
         // we don't expect any capitalization
-        assert_eq!(actual_serialized, serde_json::Value::String(prefixed_string))
+        assert_eq!(
+            actual_serialized,
+            serde_json::Value::String(prefixed_string)
+        )
     }
 }
 
