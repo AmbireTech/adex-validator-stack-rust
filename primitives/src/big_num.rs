@@ -259,10 +259,7 @@ pub mod postgres {
         }
 
         fn accepts(ty: &Type) -> bool {
-            match *ty {
-                Type::TEXT | Type::VARCHAR => true,
-                _ => false,
-            }
+            matches!(*ty, Type::TEXT | Type::VARCHAR)
         }
     }
 
@@ -276,10 +273,7 @@ pub mod postgres {
         }
 
         fn accepts(ty: &Type) -> bool {
-            match *ty {
-                Type::TEXT | Type::VARCHAR => true,
-                _ => false,
-            }
+            matches!(*ty, Type::TEXT | Type::VARCHAR)
         }
 
         fn to_sql_checked(

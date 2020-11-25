@@ -5,7 +5,7 @@ use std::convert::TryFrom;
 use std::error::Error;
 use std::time::Duration;
 
-use clap::{App, Arg};
+use clap::{crate_version, App, Arg};
 use futures::future::{join, join_all};
 use tokio::runtime::Runtime;
 use tokio::time::{delay_for, timeout};
@@ -29,7 +29,7 @@ struct Args<A: Adapter> {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let cli = App::new("Validator worker")
-        .version("0.1")
+        .version(crate_version!())
         .arg(
             Arg::with_name("config")
                 .help("the config file for the validator worker")

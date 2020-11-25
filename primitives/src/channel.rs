@@ -43,9 +43,9 @@ fn validate_channel_id(s: &str) -> Result<[u8; 32], FromHexError> {
 }
 
 impl Deref for ChannelId {
-    type Target = [u8];
+    type Target = [u8; 32];
 
-    fn deref(&self) -> &[u8] {
+    fn deref(&self) -> &[u8; 32] {
         &self.0
     }
 }

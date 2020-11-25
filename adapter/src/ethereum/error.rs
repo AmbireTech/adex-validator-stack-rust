@@ -18,7 +18,7 @@ pub enum Error {
     /// Signing of the message failed
     SignMessage(EwtSigningError),
     VerifyMessage(EwtVerifyError),
-    ContractInitialization(ethabi::Error),
+    ContractInitialization(web3::ethabi::Error),
     ContractQuerying(web3::contract::Error),
     /// Error occurred during verification of Signature and/or StateRoot and/or Address
     VerifyAddress(VerifyError),
@@ -52,7 +52,7 @@ impl fmt::Display for Error {
 /// Error returned on `eth_adapter.verify()` when the combination of
 /// (signer, state_root, signature) **doesn't align**.
 pub enum VerifyError {
-    PublicKeyRecovery(parity_crypto::publickey::Error),
+    PublicKeyRecovery(ethstore::ethkey::Error),
     StateRootDecoding(hex::FromHexError),
     SignatureDecoding(hex::FromHexError),
     SignatureNotPrefixed,
@@ -150,7 +150,7 @@ impl From<EwtSigningError> for AdapterError<Error> {
 
 #[derive(Debug)]
 pub enum EwtVerifyError {
-    AddressRecovery(parity_crypto::publickey::Error),
+    AddressRecovery(ethstore::ethkey::Error),
     SignatureDecoding(base64::DecodeError),
     PayloadDecoding(base64::DecodeError),
     PayloadDeserialization(serde_json::Error),

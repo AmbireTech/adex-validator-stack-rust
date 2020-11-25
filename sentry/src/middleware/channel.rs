@@ -1,4 +1,7 @@
-use crate::db::{get_channel_by_id, get_channel_by_id_and_validator};
+use crate::{
+    db::{get_channel_by_id, get_channel_by_id_and_validator},
+    middleware::Middleware,
+};
 use crate::{Application, ResponseError, RouteParams};
 use futures::future::{BoxFuture, FutureExt};
 use hex::FromHex;
@@ -7,8 +10,24 @@ use primitives::adapter::Adapter;
 use primitives::{ChannelId, ValidatorId};
 use std::convert::TryFrom;
 
+use async_trait::async_trait;
+
+#[derive(Debug)]
+pub struct ChannelLoad;
+
+#[async_trait]
+impl<A: Adapter + 'static> Middleware<A> for ChannelLoad {
+    async fn call<'a>(
+        &self,
+        request: Request<Body>,
+        application: &'a Application<A>,
+    ) -> Result<Request<Body>, ResponseError> {
+        channel_load(request, application).await
+    }
+}
+
 /// channel_load & channel_if_exist
-pub fn channel_load<'a, A: Adapter + 'static>(
+fn channel_load<'a, A: Adapter + 'static>(
     mut req: Request<Body>,
     app: &'a Application<A>,
 ) -> BoxFuture<'a, Result<Request<Body>, ResponseError>> {
@@ -24,7 +43,7 @@ pub fn channel_load<'a, A: Adapter + 'static>(
             .map_err(|_| ResponseError::BadRequest("Wrong Channel Id".to_string()))?;
         let channel = get_channel_by_id(&app.pool, &channel_id)
             .await?
-            .ok_or_else(|| ResponseError::NotFound)?;
+            .ok_or(ResponseError::NotFound)?;
 
         req.extensions_mut().insert(channel);
 
@@ -33,7 +52,21 @@ pub fn channel_load<'a, A: Adapter + 'static>(
     .boxed()
 }
 
-pub fn channel_if_active<'a, A: Adapter + 'static>(
+#[derive(Debug)]
+pub struct ChannelIfActive;
+
+#[async_trait]
+impl<A: Adapter + 'static> Middleware<A> for ChannelIfActive {
+    async fn call<'a>(
+        &self,
+        request: Request<Body>,
+        application: &'a Application<A>,
+    ) -> Result<Request<Body>, ResponseError> {
+        channel_if_active(request, application).await
+    }
+}
+
+fn channel_if_active<'a, A: Adapter + 'static>(
     mut req: Request<Body>,
     app: &'a Application<A>,
 ) -> BoxFuture<'a, Result<Request<Body>, ResponseError>> {
@@ -58,7 +91,7 @@ pub fn channel_if_active<'a, A: Adapter + 'static>(
 
         let channel = get_channel_by_id_and_validator(&app.pool, &channel_id, &validator_id)
             .await?
-            .ok_or_else(|| ResponseError::NotFound)?;
+            .ok_or(ResponseError::NotFound)?;
 
         req.extensions_mut().insert(channel);
 
@@ -67,7 +100,21 @@ pub fn channel_if_active<'a, A: Adapter + 'static>(
     .boxed()
 }
 
-pub fn get_channel_id<'a, A: Adapter + 'static>(
+#[derive(Debug)]
+pub struct GetChannelId;
+
+#[async_trait]
+impl<A: Adapter + 'static> Middleware<A> for GetChannelId {
+    async fn call<'a>(
+        &self,
+        request: Request<Body>,
+        application: &'a Application<A>,
+    ) -> Result<Request<Body>, ResponseError> {
+        get_channel_id(request, application).await
+    }
+}
+
+fn get_channel_id<'a, A: Adapter + 'static>(
     mut req: Request<Body>,
     _: &'a Application<A>,
 ) -> BoxFuture<'a, Result<Request<Body>, ResponseError>> {
