@@ -1,29 +1,16 @@
+use chrono::{TimeZone, Utc};
+
 use super::*;
 use crate::{
     targeting::input,
     util::tests::prep_db::{DUMMY_CHANNEL, DUMMY_IPFS, IDS},
-    AdUnit, BalancesMap,
+    BalancesMap,
 };
-use chrono::Utc;
 
-fn get_default_input() -> input::Source {
-    let ad_unit = AdUnit {
-        ipfs: DUMMY_IPFS[0].clone(),
-        ad_type: "legacy_300x250".to_string(),
-        media_url: "media_url".to_string(),
-        media_mime: "media_mime".to_string(),
-        target_url: "target_url".to_string(),
-        min_targeting_score: None,
-        owner: IDS["creator"],
-        created: Utc::now(),
-        title: None,
-        description: None,
-        archived: false,
-        modified: None,
-    };
+fn get_default_input() -> Input {
     let input_balances = BalancesMap::default();
 
-    input::Source {
+    let init_input = Input {
         ad_view: Some(input::AdView {
             seconds_since_campaign_impression: 10,
             has_custom_preferences: false,
@@ -35,15 +22,20 @@ fn get_default_input() -> input::Source {
             publisher_id: IDS["leader"],
             country: Some("bg".to_string()),
             event_type: "IMPRESSION".to_string(),
-            seconds_since_epoch: 500,
+            seconds_since_epoch: Utc.ymd(2020, 11, 06).and_hms(12, 0, 0),
             user_agent_os: Some("os".to_string()),
             user_agent_browser_family: Some("family".to_string()),
-            ad_unit: Some(ad_unit),
-            channel: Some(DUMMY_CHANNEL.clone()),
-            balances: Some(input_balances),
         },
+        channel: None,
+        balances: None,
+        ad_unit_id: Some(DUMMY_IPFS[0].clone()),
         ad_slot: None,
-    }
+    };
+
+    // Set the Channel, Balances and AdUnit for the Input
+    init_input
+        .with_channel(DUMMY_CHANNEL.clone())
+        .with_balances(input_balances)
 }
 
 mod dsl_test {
@@ -81,13 +73,12 @@ mod dsl_test {
     /// ```
     #[test]
     fn test_intersects_eval() {
-        let mut source = get_default_input();
-        source.ad_slot = Some(input::AdSlot {
+        let mut input = get_default_input();
+        input.ad_slot = Some(input::AdSlot {
             categories: vec!["Bitcoin".to_string(), "Ethereum".to_string()],
             hostname: Default::default(),
             alexa_rank: Some(0.0),
         });
-        let input = input::Input::Source(Box::new(source));
 
         let mut output = Output {
             show: true,
@@ -109,13 +100,12 @@ mod dsl_test {
             result.expect("Should return Non-NULL result!")
         );
 
-        let mut source = get_default_input();
-        source.ad_slot = Some(input::AdSlot {
+        let mut input = get_default_input();
+        input.ad_slot = Some(input::AdSlot {
             categories: vec!["Advertisement".to_string(), "Programming".to_string()],
             hostname: Default::default(),
             alexa_rank: Some(0.0),
         });
-        let input = input::Input::Source(Box::new(source));
 
         let result = rules.eval(&input, &mut output).expect("Should eval rules");
 
@@ -127,7 +117,7 @@ mod dsl_test {
 
     #[test]
     fn test_and_eval() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -151,7 +141,7 @@ mod dsl_test {
 
     #[test]
     fn test_if_eval() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
 
         let mut output = Output {
             show: true,
@@ -172,7 +162,7 @@ mod dsl_test {
 
     #[test]
     fn test_bn_eval_from_actual_number_value_string_bignum_or_number() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -199,7 +189,7 @@ mod dsl_test {
 
     #[test]
     fn test_bn_eval_from_actual_incorrect_value() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -239,7 +229,7 @@ mod dsl_test {
             }),
         });
 
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output::from(&channel);
 
         assert_eq!(Some(&BigNum::from(1_000)), output.price.get("IMPRESSION"));
@@ -254,7 +244,7 @@ mod dsl_test {
 
     #[test]
     fn test_get_eval() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 42.0,
@@ -280,7 +270,7 @@ mod math_functions {
 
     #[test]
     fn test_div_eval() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -325,7 +315,7 @@ mod math_functions {
     }
     #[test]
     fn test_mul_eval() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -368,7 +358,7 @@ mod math_functions {
     }
     #[test]
     fn test_mod_eval() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -411,7 +401,7 @@ mod math_functions {
     }
     #[test]
     fn test_add_eval() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -454,7 +444,7 @@ mod math_functions {
     }
     #[test]
     fn test_sub_eval() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -497,7 +487,7 @@ mod math_functions {
     }
     #[test]
     fn test_min_eval() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -540,7 +530,7 @@ mod math_functions {
     }
     #[test]
     fn test_max_eval() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -583,7 +573,7 @@ mod math_functions {
     }
     #[test]
     fn test_lt_eval() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -626,7 +616,7 @@ mod math_functions {
     }
     #[test]
     fn test_lte_eval() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -669,7 +659,7 @@ mod math_functions {
     }
     #[test]
     fn test_gt_eval() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -712,7 +702,7 @@ mod math_functions {
     }
     #[test]
     fn test_gte_eval() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -755,7 +745,7 @@ mod math_functions {
     }
     #[test]
     fn test_between_eval() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -803,7 +793,7 @@ mod math_functions {
     }
     #[test]
     fn test_muldiv_eval() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -827,7 +817,7 @@ mod control_flow_and_logic {
 
     #[test]
     fn test_if_not_eval() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -846,7 +836,7 @@ mod control_flow_and_logic {
     }
     #[test]
     fn test_if_else() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -874,7 +864,7 @@ mod control_flow_and_logic {
     }
     #[test]
     fn test_or_eval() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -897,7 +887,7 @@ mod control_flow_and_logic {
     }
     #[test]
     fn test_xor_eval() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -920,7 +910,7 @@ mod control_flow_and_logic {
     }
     #[test]
     fn test_not_eval() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -938,7 +928,7 @@ mod control_flow_and_logic {
     }
     #[test]
     fn test_eq_eval() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -1019,7 +1009,7 @@ mod control_flow_and_logic {
     }
     #[test]
     fn test_neq_eval() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -1077,7 +1067,7 @@ mod control_flow_and_logic {
     }
     #[test]
     fn test_only_show_if_eval() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -1093,7 +1083,7 @@ mod control_flow_and_logic {
     }
     #[test]
     fn test_do_eval() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -1113,7 +1103,7 @@ mod string_and_array {
     use super::*;
     #[test]
     fn test_in_eval() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -1153,7 +1143,7 @@ mod string_and_array {
     }
     #[test]
     fn test_nin_eval() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -1193,7 +1183,7 @@ mod string_and_array {
     }
     #[test]
     fn test_at_eval() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -1216,7 +1206,7 @@ mod string_and_array {
     }
     #[test]
     fn test_split_eval() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -1252,7 +1242,7 @@ mod string_and_array {
     }
     #[test]
     fn test_starts_with_eval() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -1293,7 +1283,7 @@ mod string_and_array {
     }
     #[test]
     fn test_ends_with_eval() {
-        let input = input::Input::Source(Box::new(get_default_input()));
+        let input = get_default_input();
         let mut output = Output {
             show: true,
             boost: 1.0,
@@ -1330,23 +1320,15 @@ mod string_and_array {
 
     #[test]
     fn test_get_price_in_usd_eval() {
-        let source = get_default_input();
-
         let mut output = Output {
             show: true,
             boost: 1.0,
             price: Default::default(),
         };
         for (key, value) in &*DEPOSIT_ASSETS_MAP {
-            let mut source = source.clone();
-            source
-                .global
-                .channel
-                .as_mut()
-                .expect("Should have Channel set for this test!")
-                .deposit_asset = key.to_string();
-
-            let input = input::Input::Source(Box::new(source));
+            let mut asset_channel = DUMMY_CHANNEL.clone();
+            asset_channel.deposit_asset = key.to_string();
+            let input = get_default_input().with_channel(asset_channel);
 
             let amount_crypto = BigNum::from(100).mul(value);
             let amount_usd = Some(Value::Number(
