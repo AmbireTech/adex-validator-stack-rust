@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
-# launch test rpc instance
-testrpc_port=8545
+# launch ganache test rpc instance
+ganache_port=8545
 
-testrpc_running() {
-  nc -z localhost "$testrpc_port"
+ganache_running() {
+  nc -z localhost "$ganache_port"
 }
 
-start_testrpc(){
+start_ganache(){
     local accounts=(
         --account="0x2bdd21761a483f71054e14f5b827213567971c676928d9a1808cbfa4b7501200,9000000000000000000000000000"
         --account="0x2bdd21761a483f71054e14f5b827213567971c676928d9a1808cbfa4b7501201,9000000000000000000000000000"
@@ -20,15 +20,16 @@ start_testrpc(){
         --account="0x2bdd21761a483f71054e14f5b827213567971c676928d9a1808cbfa4b7501208,9000000000000000000000000000"
         --account="0x2bdd21761a483f71054e14f5b827213567971c676928d9a1808cbfa4b7501209,9000000000000000000000000000"
     )
-    ../node_modules/.bin/ganache-cli --port $testrpc_port --gasLimit 0xfffffffffffff "${accounts[@]}" > /dev/null &
-    testrpc_pid=$!
+    ../node_modules/.bin/ganache-cli --port $ganache_port --gasLimit 0xfffffffffffff "${accounts[@]}" > /dev/null &
+    ganache_pid=$!
+    echo "Started ganache-cli on localhost:${ganache_port} with pid: ${ganache_pid}"
 }
 
-if testrpc_running; then
-  echo "Using existing testrpc instance"
+if ganache_running; then
+  echo "Using existing ganache instance"
 else
-  echo "Starting our own testrpc instance"
-  start_testrpc
+  echo "Starting our own ganache instance"
+  start_ganache
   # the ganache-cli need time to start up
-  sleep 5
+  sleep 15
 fi

@@ -1,0 +1,32 @@
+on: [push, pull_request]
+
+name: Continuous Integration
+
+jobs:
+  ci-flow:
+    name: Runs `cargo make ci-flow` - Tests, clippy & rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - uses: zhulik/redis-action@1.1.0
+      - uses: harmon758/postgresql-action@v1
+        with:
+          # the used database will also be `postgres`
+          postgresql user: postgres
+          postgresql password: postgres
+      - uses: actions-rs/toolchain@v1
+        with:
+          # No need to add `toolchain`, it will use `rust-toolchain` file instead
+          profile: default
+          override: true
+          components: clippy, rustfmt
+      - uses: actions/setup-node@v1
+        with:
+          node-version: '12'
+      - run: npm install
+      - uses: davidB/rust-cargo-make@v1
+      - name: Run `cargo make ci-flow`
+        run: |
+          cargo make ci-flow
