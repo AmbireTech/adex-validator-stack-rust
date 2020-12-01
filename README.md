@@ -20,6 +20,8 @@ Requirements:
   Check the [`rust-toolchain`](./rust-toolchain) file for specific version of rust.
   - [`cargo-make`](https://github.com/sagiegurari/cargo-make)
 - Docker
+- Node 14 (LTS) & npm
+    Used for running a local Ethereum node with `ganache-cli` for automated tests in the `Ethereum Adapter` ([adapter/src/ethereum.rs](./adapter/src/ethereum.rs), also check [scripts/ethereum.sh](./scripts/ethereum.sh))
 
 #### Linux
 

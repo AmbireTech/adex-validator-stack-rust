@@ -1,5 +1,23 @@
-[tasks.pre-test]
+[tasks.dev-test-flow]
+description = "Development testing flow will first format the code, and than run cargo build and test"
+category = "Development"
+dependencies = [
+  "format-flow",
+  "format-toml-conditioned-flow",
+  "pre-build",
+  "build",
+  "post-build",
+  "ganache-start",
+  "test-flow",
+  "ganache-stop",
+]
+
+[tasks.ganache-start]
+# condition = { env_false = ["IS_DOCKER_GANACHE_RUNNING"]}
+# if [ "$(docker start adex-ganache-cli 2>/dev/null)" -eq "adex-ganache-cli"]; docker run --rm --name adex-ganache-cli --detach --publish 8545:8545 --volume ${CARGO_MAKE_WORKING_DIRECTORY}/../scripts:/scripts --entrypoint /scripts/ganache-cli.sh trufflesuite/ganache-cli:latest fi
+script = { file = "scripts/start-docker.sh" }
+
+[tasks.ganache-stop]
 script = [
-    "npm install",
-    "../scripts/ethereum.sh"
+    "docker stop adex-ganache-cli"
 ]

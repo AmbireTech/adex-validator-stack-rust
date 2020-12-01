@@ -6,6 +6,14 @@ jobs:
   ci-flow:
     name: Runs `cargo make ci-flow` - Tests, clippy & rustfmt
     runs-on: ubuntu-latest
+    services:
+      ganache-cli:
+        image: docker://trufflesuite/ganache-cli:latest
+        ports:
+          - 8545:8545
+        volumes:
+          - ${GITHUB_WORKSPACE}/adapter/scripts:/scripts
+        options: --entrypoint /scripts/ganache-cli.sh
     steps:
       - uses: actions/checkout@v2
         with:
@@ -22,11 +30,10 @@ jobs:
           profile: default
           override: true
           components: clippy, rustfmt
-      - uses: actions/setup-node@v1
-        with:
-          node-version: '12'
-      - run: npm install
       - uses: davidB/rust-cargo-make@v1
       - name: Run `cargo make ci-flow`
+      # Running cargo make doesn't successfully start `ganache`
         run: |
           cargo make ci-flow
+      # todo: Build binary on git tag
+      # todo: Make a github Draft release
