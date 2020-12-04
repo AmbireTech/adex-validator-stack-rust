@@ -20,6 +20,7 @@ pub mod supermarket;
 pub mod targeting;
 
 pub mod util {
+    pub mod api;
     pub mod tests {
         use slog::{o, Discard, Drain, Logger};
 
