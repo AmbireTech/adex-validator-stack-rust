@@ -3,7 +3,7 @@ use std::{convert::TryFrom, fmt, str::FromStr};
 use parse_display::Display;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use url::Url as Url;
+use url::Url;
 
 // `url::Url::scheme()` returns lower-cased ASCII string without `:`
 const SCHEMES: [&str; 2] = ["http", "https"];
@@ -35,10 +35,9 @@ pub enum Error {
 /// - `Query`, e.g. `?query_param=value`, `?query_param`, `?query=value&....`, etc.
 ///
 /// [`url::Url`]: url::Url
-#[derive(Clone, Display, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Hash, Display, Ord, PartialOrd, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(try_from = "Url", into = "Url")]
 pub struct ApiUrl(Url);
-
 
 impl ApiUrl {
     pub fn parse(input: &str) -> Result<Self, Error> {
@@ -73,7 +72,7 @@ impl TryFrom<Url> for ApiUrl {
             return Err(Error::ShouldBeABase);
         }
 
-        if let Some(_) = url.fragment() {
+        if url.fragment().is_some() {
             return Err(Error::HasFragment);
         }
 
@@ -81,7 +80,7 @@ impl TryFrom<Url> for ApiUrl {
             return Err(Error::InvalidScheme(url.scheme().to_string()));
         }
 
-        if let Some(_) = url.query() {
+        if url.query().is_some() {
             return Err(Error::HasQuery);
         }
 
@@ -170,7 +169,8 @@ mod test {
             // HTTPS, authority, domain, port and path
             (
                 "https://username:password@jerry.adex.network:3335/leader",
-                ApiUrl::from_str("https://username:password@jerry.adex.network:3335/leader").unwrap(),
+                ApiUrl::from_str("https://username:password@jerry.adex.network:3335/leader")
+                    .unwrap(),
             ),
         ];
 
@@ -208,20 +208,27 @@ mod test {
         }
     }
 
-
     #[test]
     fn api_endpoint() {
         let api_url = ApiUrl::parse("http://127.0.0.1/leader").expect("It is a valid API URL");
 
-        let expected = url::Url::parse("http://127.0.0.1/leader/endpoint?query=query value").expect("it is a valid Url");
+        let expected = url::Url::parse("http://127.0.0.1/leader/endpoint?query=query value")
+            .expect("it is a valid Url");
         let expected_url_encoded = "http://127.0.0.1/leader/endpoint?query=query%20value";
 
-        let actual = api_url.join("endpoint?query=query value").expect("Should join endpoint");
-        let actual_should_strip_suffix = api_url.join("/endpoint?query=query value").expect("Should join endpoint and strip `/` suffix and preserve the original ApiUrl");
+        let actual = api_url
+            .join("endpoint?query=query value")
+            .expect("Should join endpoint");
+        let actual_should_strip_suffix = api_url
+            .join("/endpoint?query=query value")
+            .expect("Should join endpoint and strip `/` suffix and preserve the original ApiUrl");
         assert_eq!(&expected, &actual);
         assert_eq!(&expected, &actual_should_strip_suffix);
-        
+
         assert_eq!(expected_url_encoded, &actual.to_string());
-        assert_eq!(expected_url_encoded, &actual_should_strip_suffix.to_string());
+        assert_eq!(
+            expected_url_encoded,
+            &actual_should_strip_suffix.to_string()
+        );
     }
 }
