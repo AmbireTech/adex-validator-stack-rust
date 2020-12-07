@@ -13,6 +13,7 @@ use std::fmt;
 #[derive(Debug, PartialEq, Eq)]
 pub enum Error {
     OnlyCreatorCanCloseChannel,
+    OnlyCreatorCanUpdateTargetingRules,
     ChannelIsExpired,
     ChannelIsInWithdrawPeriod,
     ForbiddenReferrer,
@@ -25,7 +26,8 @@ impl error::Error for Error {}
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::OnlyCreatorCanCloseChannel => write!(f, "only creator can create channel"),
+            Error::OnlyCreatorCanCloseChannel => write!(f, "only creator can close channel"),
+            Error::OnlyCreatorCanUpdateTargetingRules => write!(f, "only creator can update targeting rules"),
             Error::ChannelIsExpired => write!(f, "channel is expired"),
             Error::ChannelIsInWithdrawPeriod => write!(f, "channel is in withdraw period"),
             Error::ForbiddenReferrer => write!(f, "event submission restricted"),
@@ -45,8 +47,10 @@ pub async fn check_access(
     events: &[Event],
 ) -> Result<(), Error> {
     let is_close_event = |e: &Event| matches!(e, Event::Close);
+    let is_update_targeting_event = |e: &Event| matches!(e, Event::UpdateTargeting { .. });
 
     let has_close_event = events.iter().all(is_close_event);
+    let has_update_targeting_event = events.iter().all(is_update_targeting_event);
     let current_time = Utc::now();
     let is_in_withdraw_period = current_time > channel.spec.withdraw_period_start;
 
@@ -68,9 +72,18 @@ pub async fn check_access(
         return Ok(());
     }
 
+    if has_update_targeting_event && is_creator {
+        return Ok(());
+    }
+
     // Only the creator can send a CLOSE
     if !is_creator && events.iter().any(is_close_event) {
         return Err(Error::OnlyCreatorCanCloseChannel);
+    }
+
+    // Only the creator can send a UPDATE_TARGETING
+    if !is_creator && events.iter().any(is_update_targeting_event) {
+        return Err(Error::OnlyCreatorCanUpdateTargetingRules);
     }
 
     if is_in_withdraw_period {

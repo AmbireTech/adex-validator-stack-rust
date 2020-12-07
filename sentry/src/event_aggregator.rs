@@ -1,7 +1,7 @@
 use crate::access::check_access;
 use crate::access::Error as AccessError;
 use crate::db::event_aggregate::insert_event_aggregate;
-use crate::db::get_channel_by_id;
+use crate::db::{get_channel_by_id, update_targeting_rules};
 use crate::db::DbPool;
 use crate::event_reducer;
 use crate::Application;
@@ -142,6 +142,12 @@ impl EventAggregator {
             AccessError::UnAuthenticated => ResponseError::Unauthorized,
             _ => ResponseError::BadRequest(e.to_string()),
         })?;
+
+        events.iter()
+            .for_each(async |e| match e {
+                Event::UpdateTargeting { targeting_rules } => update_targeting_rules(&app.pool, &channel_id, &targeting_rules).await?,
+                _ => false,
+            });
 
         events.iter().for_each(|ev| {
             match event_reducer::reduce(

@@ -1,4 +1,5 @@
 use crate::validator::MessageTypes;
+use crate::targeting::Rule;
 use crate::{BigNum, Channel, ChannelId, ValidatorId};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -56,6 +57,10 @@ pub enum Event {
         earners: Vec<Earner>,
     },
     /// only the creator can send this event
+    UpdateTargeting {
+        targeting_rules: Vec<Rule>,
+    },
+    /// only the creator can send this event
     UpdateImpressionPrice {
         price: BigNum,
     },
@@ -85,6 +90,7 @@ impl fmt::Display for Event {
             Event::Impression { .. } => write!(f, "IMPRESSION"),
             Event::Click { .. } => write!(f, "CLICK"),
             Event::ImpressionWithCommission { .. } => write!(f, "IMPRESSION_WITH_COMMMISION"),
+            Event::UpdateTargeting { .. } => write!(f, "UPDATE_TARGETING"),
             Event::UpdateImpressionPrice { .. } => write!(f, "UPDATE_IMPRESSION_PRICE"),
             Event::Pay { .. } => write!(f, "PAY"),
             Event::PauseChannel => write!(f, "PAUSE_CHANNEL"),

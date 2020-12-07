@@ -2,7 +2,7 @@ use crate::db::DbPool;
 use bb8::RunError;
 use chrono::Utc;
 use primitives::validator::MessageTypes;
-use primitives::{Channel, ChannelId, ValidatorId};
+use primitives::{Channel, ChannelId, ValidatorId, targeting::Rule};
 use std::str::FromStr;
 
 pub use list_channels::list_channels;
@@ -62,6 +62,29 @@ pub async fn insert_channel(
                         Ok(row) => {
                             let inserted = row == 1;
                             Ok((inserted, connection))
+                        },
+                        Err(e) => Err((e, connection)),
+                    },
+                    Err(e) => Err((e, connection)),
+                }
+            }
+        })
+        .await
+}
+
+pub async fn update_targeting_rules(
+    pool: &DbPool,
+    channel_id: &ChannelId,
+    targeting_rules: &[Rule],
+) -> Result<bool, RunError<bb8_postgres::tokio_postgres::Error>> {
+    pool
+        .run(move |connection| {
+            async move {
+                    match connection.prepare("UPDATE channels SET targeting_rules=$1 WHERE id=$2").await {
+                    Ok(stmt) => match connection.execute(&stmt, &[&targeting_rules, &channel_id]).await {
+                        Ok(row) => {
+                            let updated = row == 1;
+                            Ok((updated, connection))
                         },
                         Err(e) => Err((e, connection)),
                     },
