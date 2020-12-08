@@ -9,32 +9,24 @@ use primitives::Channel;
 use std::cmp::PartialEq;
 use std::error;
 use std::fmt;
+use thiserror::Error;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Error)]
 pub enum Error {
+    #[error("only creator can close channel")]
     OnlyCreatorCanCloseChannel,
+    #[error("only creator can update targeting rules")]
     OnlyCreatorCanUpdateTargetingRules,
+    #[error("channel is expired")]
     ChannelIsExpired,
+    #[error("channel is in withdraw period")]
     ChannelIsInWithdrawPeriod,
+    #[error("event submission restricted")]
     ForbiddenReferrer,
+    #[error("{0}")]
     RulesError(String),
+    #[error("unauthenticated")]
     UnAuthenticated,
-}
-
-impl error::Error for Error {}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::OnlyCreatorCanCloseChannel => write!(f, "only creator can close channel"),
-            Error::OnlyCreatorCanUpdateTargetingRules => write!(f, "only creator can update targeting rules"),
-            Error::ChannelIsExpired => write!(f, "channel is expired"),
-            Error::ChannelIsInWithdrawPeriod => write!(f, "channel is in withdraw period"),
-            Error::ForbiddenReferrer => write!(f, "event submission restricted"),
-            Error::RulesError(error) => write!(f, "{}", error),
-            Error::UnAuthenticated => write!(f, "unauthenticated"),
-        }
-    }
 }
 
 // @TODO: Make pub(crate)

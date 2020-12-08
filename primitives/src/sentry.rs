@@ -53,23 +53,10 @@ pub enum Event {
         ad_slot: Option<String>,
         referrer: Option<String>,
     },
-    ImpressionWithCommission {
-        earners: Vec<Earner>,
-    },
     /// only the creator can send this event
     UpdateTargeting {
         targeting_rules: Vec<Rule>,
     },
-    /// only the creator can send this event
-    UpdateImpressionPrice {
-        price: BigNum,
-    },
-    /// only the creator can send this event
-    Pay {
-        outputs: HashMap<String, BigNum>,
-    },
-    /// only the creator can send this event
-    PauseChannel,
     /// only the creator can send this event
     Close,
 }
@@ -89,11 +76,7 @@ impl fmt::Display for Event {
         match *self {
             Event::Impression { .. } => write!(f, "IMPRESSION"),
             Event::Click { .. } => write!(f, "CLICK"),
-            Event::ImpressionWithCommission { .. } => write!(f, "IMPRESSION_WITH_COMMMISION"),
             Event::UpdateTargeting { .. } => write!(f, "UPDATE_TARGETING"),
-            Event::UpdateImpressionPrice { .. } => write!(f, "UPDATE_IMPRESSION_PRICE"),
-            Event::Pay { .. } => write!(f, "PAY"),
-            Event::PauseChannel => write!(f, "PAUSE_CHANNEL"),
             Event::Close => write!(f, "CLOSE"),
         }
     }
