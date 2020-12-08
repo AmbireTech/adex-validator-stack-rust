@@ -38,6 +38,8 @@ We need two services to be able to run `Sentry`: `Postgres` and `Redis`.
 - `$HOME/docker/volumes/postgres` - your local storage for postgres (persist the data when we remove the container)
 - `POSTGRES_PASSWORD=postgres` - the password of `postgres` user
 
+**NOTE:** Additionally you must setup 2 database - `sentry_leader` & `sentry_follower` in order for the provided examples bellow to work.
+
 ### Running Redis
 
 `docker run --rm -p 6379:6379 --name adex-validator-redis -d redis`
