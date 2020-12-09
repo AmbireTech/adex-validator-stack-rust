@@ -1,5 +1,8 @@
 use crate::{targeting::Rule, BigNum, ValidatorId};
-use chrono::{DateTime, Utc};
+use chrono::{
+    serde::{ts_milliseconds, ts_milliseconds_option},
+    DateTime, Utc,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -32,6 +35,7 @@ pub struct AdSlot {
     /// User address from the session
     pub owner: ValidatorId,
     /// UTC timestamp in milliseconds, used as nonce for escaping duplicated spec ipfs hashes
+    #[serde(with = "ts_milliseconds")]
     pub created: DateTime<Utc>,
     /// the name of the unit used in platform UI
     #[serde(default)]
@@ -45,5 +49,6 @@ pub struct AdSlot {
     #[serde(default)]
     pub archived: bool,
     /// UTC timestamp in milliseconds, changed every time modifiable property is changed
+    #[serde(with = "ts_milliseconds_option")]
     pub modified: Option<DateTime<Utc>>,
 }
