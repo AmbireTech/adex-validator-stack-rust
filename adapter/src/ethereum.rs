@@ -2,14 +2,12 @@ use crate::EthereumChannel;
 use async_trait::async_trait;
 use chrono::Utc;
 use error::*;
-use ethabi::token::Token;
-use ethkey::Password;
-use ethstore::SafeAccount;
-use futures::{compat::Future01CompatExt, TryFutureExt};
-use lazy_static::lazy_static;
-use parity_crypto::publickey::{
-    public_to_address, recover, verify_address, Address, Message, Signature,
+use ethstore::{
+    ethkey::{public_to_address, recover, verify_address, Address, Message, Password, Signature},
+    SafeAccount,
 };
+use futures::TryFutureExt;
+use lazy_static::lazy_static;
 use primitives::{
     adapter::{Adapter, AdapterResult, Error as AdapterError, KeystoreOptions, Session},
     channel_validator::ChannelValidator,
@@ -21,13 +19,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::convert::TryFrom;
 use std::fs;
-use std::sync::Arc;
 use tiny_keccak::Keccak;
 use web3::{
+    contract::tokens::Tokenizable,
     contract::{Contract, Options},
-    transports::EventLoopHandle,
     transports::Http,
-    types::U256,
+    types::{H256, U256},
     Web3,
 };
 
@@ -46,7 +43,6 @@ pub struct EthereumAdapter {
     keystore_pwd: Password,
     config: Config,
     wallet: Option<SafeAccount>,
-    event_loop: Arc<EventLoopHandle>,
     web3: Web3<Http>,
     relayer: RelayerClient,
 }
@@ -66,13 +62,12 @@ impl EthereumAdapter {
         let address = keystore_json["address"]
             .as_str()
             .map(eth_checksum::checksum)
-            .ok_or_else(|| KeystoreError::AddressMissing)?;
+            .ok_or(KeystoreError::AddressMissing)?;
 
         let address = ValidatorId::try_from(&address).map_err(KeystoreError::AddressInvalid)?;
 
-        let (eloop, transport) =
+        let transport =
             web3::transports::Http::new(&config.ethereum_network).map_err(Error::Web3)?;
-        let event_loop = Arc::new(eloop);
         let web3 = web3::Web3::new(transport);
         let relayer =
             RelayerClient::new(&config.ethereum_adapter_relayer).map_err(Error::RelayerClient)?;
@@ -83,7 +78,6 @@ impl EthereumAdapter {
             keystore_pwd: opts.keystore_pwd.into(),
             wallet: None,
             config: config.to_owned(),
-            event_loop,
             web3,
             relayer,
         })
@@ -115,7 +109,7 @@ impl Adapter for EthereumAdapter {
     fn sign(&self, state_root: &str) -> AdapterResult<String, Self::AdapterError> {
         if let Some(wallet) = &self.wallet {
             let state_root = hex::decode(state_root).map_err(VerifyError::StateRootDecoding)?;
-            let message = Message::from_slice(&hash_message(&state_root));
+            let message = Message::from(hash_message(&state_root));
             let wallet_sign = wallet
                 .sign(&self.keystore_pwd, &message)
                 .map_err(EwtSigningError::SigningMessage)?;
@@ -139,10 +133,10 @@ impl Adapter for EthereumAdapter {
             return Err(VerifyError::SignatureNotPrefixed.into());
         }
         let decoded_signature = hex::decode(&sig[2..]).map_err(VerifyError::SignatureDecoding)?;
-        let address = Address::from_slice(signer.inner());
+        let address = Address::from(*signer.inner());
         let signature = Signature::from_electrum(&decoded_signature);
         let state_root = hex::decode(state_root).map_err(VerifyError::StateRootDecoding)?;
-        let message = Message::from_slice(&hash_message(&state_root));
+        let message = Message::from(hash_message(&state_root));
 
         let verify_address = verify_address(&address, &signature, &message)
             .map_err(VerifyError::PublicKeyRecovery)?;
@@ -173,20 +167,21 @@ impl Adapter for EthereumAdapter {
             ));
         }
 
-        let contract_address: Address = self.config.ethereum_core_address.into();
-
-        let contract = Contract::from_json(self.web3.eth(), contract_address, &ADEXCORE_ABI)
-            .map_err(Error::ContractInitialization)?;
+        let contract = Contract::from_json(
+            self.web3.eth(),
+            self.config.ethereum_core_address.into(),
+            &ADEXCORE_ABI,
+        )
+        .map_err(Error::ContractInitialization)?;
 
         let channel_status: U256 = contract
             .query(
                 "states",
-                Token::FixedBytes(channel.id.as_ref().to_vec()),
+                H256(*channel.id).into_token(),
                 None,
                 Options::default(),
                 None,
             )
-            .compat()
             .await
             .map_err(Error::ContractQuerying)?;
 
@@ -261,10 +256,7 @@ impl Adapter for EthereumAdapter {
     }
 
     fn get_auth(&self, validator: &ValidatorId) -> AdapterResult<String, Self::AdapterError> {
-        let wallet = self
-            .wallet
-            .as_ref()
-            .ok_or_else(|| AdapterError::LockedWallet)?;
+        let wallet = self.wallet.as_ref().ok_or(AdapterError::LockedWallet)?;
 
         let era = Utc::now().timestamp_millis() as f64 / 60000.0;
         let payload = Payload {
@@ -382,7 +374,7 @@ pub fn ewt_sign(
         &serde_json::to_string(payload).map_err(EwtSigningError::PayloadSerialization)?,
         base64::URL_SAFE_NO_PAD,
     );
-    let message = Message::from_slice(&hash_message(
+    let message = Message::from(hash_message(
         &format!("{}.{}", header_encoded, payload_encoded).as_bytes(),
     ));
     let signature: Signature = signer
@@ -404,7 +396,7 @@ pub fn ewt_verify(
     payload_encoded: &str,
     token: &str,
 ) -> Result<VerifyPayload, EwtVerifyError> {
-    let message = Message::from_slice(&hash_message(
+    let message = Message::from(hash_message(
         &format!("{}.{}", header_encoded, payload_encoded).as_bytes(),
     ));
 
@@ -424,7 +416,7 @@ pub fn ewt_verify(
         serde_json::from_str(&payload_string).map_err(EwtVerifyError::PayloadDeserialization)?;
 
     let verified_payload = VerifyPayload {
-        from: ValidatorId::from(address.as_fixed_bytes()),
+        from: ValidatorId::from(&address.0),
         payload,
     };
 
@@ -436,13 +428,13 @@ mod test {
     use super::*;
     use crate::EthereumChannel;
     use chrono::{Duration, Utc};
-    use ethabi::token::Token;
     use hex::FromHex;
     use primitives::adapter::KeystoreOptions;
     use primitives::config::configuration;
     use primitives::ChannelId;
     use primitives::{ChannelSpec, EventSubmission, SpecValidators, ValidatorDesc};
     use std::convert::TryFrom;
+    use web3::types::Address;
 
     fn setup_eth_adapter(contract_address: Option<[u8; 20]>) -> EthereumAdapter {
         let mut config = configuration("development", None).expect("failed parse config");
@@ -577,7 +569,7 @@ mod test {
 
     #[tokio::test]
     async fn should_validate_valid_channel_properly() {
-        let (_eloop, http) =
+        let http =
             web3::transports::Http::new("http://localhost:8545").expect("failed to init transport");
 
         let web3 = web3::Web3::new(http);
@@ -604,10 +596,8 @@ mod test {
                 opt.gas = Some(6_721_975.into());
             }))
             .execute(token_bytecode, (), leader_account)
-            .expect("Correct parameters are passed to the constructor.")
-            .compat()
             .await
-            .expect("failed to wait");
+            .expect("Correct parameters are passed to the constructor.");
 
         let adex_contract = Contract::deploy(web3.eth(), &ADEXCORE_ABI)
             .expect("invalid adex contract")
@@ -617,23 +607,17 @@ mod test {
                 opt.gas = Some(6_721_975.into());
             }))
             .execute(adex_bytecode, (), leader_account)
-            .expect("Correct parameters are passed to the constructor.")
-            .compat()
             .await
-            .expect("failed to init adex contract");
+            .expect("Correct parameters are passed to the constructor.");
 
         // contract call set balance
         token_contract
             .call(
                 "setBalanceTo",
-                (
-                    Token::Address(leader_account),
-                    Token::Uint(U256::from(2000 as u64)),
-                ),
+                (Address::from(leader_account), U256::from(2000_u64)),
                 leader_account,
                 Options::default(),
             )
-            .compat()
             .await
             .expect("Failed to set balance");
 
@@ -697,7 +681,6 @@ mod test {
                 leader_account,
                 Options::default(),
             )
-            .compat()
             .await
             .expect("open channel");
 

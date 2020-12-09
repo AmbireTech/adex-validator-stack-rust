@@ -44,7 +44,7 @@ pub mod units_for_slot {
     pub mod response {
 
         use crate::{
-            targeting::{Map, Rule},
+            targeting::{Input, Rule},
             BigNum, ChannelId, ChannelSpec, SpecValidators, ValidatorId, IPFS,
         };
         use chrono::{
@@ -57,7 +57,7 @@ pub mod units_for_slot {
         #[derive(Debug, Serialize, Deserialize, PartialEq)]
         #[serde(rename_all = "camelCase")]
         pub struct Response {
-            pub targeting_input_base: Map,
+            pub targeting_input_base: Input,
             pub accepted_referrers: Vec<Url>,
             pub fallback_unit: Option<AdUnit>,
             pub campaigns: Vec<Campaign>,

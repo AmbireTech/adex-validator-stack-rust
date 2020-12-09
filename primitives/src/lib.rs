@@ -18,9 +18,11 @@ pub mod merkle_tree;
 pub mod sentry;
 pub mod supermarket;
 pub mod targeting;
-pub mod targeting_tag;
 
 pub mod util {
+    pub use api::ApiUrl;
+
+    pub mod api;
     pub mod tests {
         use slog::{o, Discard, Drain, Logger};
 
@@ -48,7 +50,6 @@ pub use self::channel::{Channel, ChannelId, ChannelSpec, SpecValidator, SpecVali
 pub use self::config::Config;
 pub use self::event_submission::EventSubmission;
 pub use self::ipfs::IPFS;
-pub use self::targeting_tag::TargetingTag;
 pub use self::validator::{ValidatorDesc, ValidatorId};
 
 #[derive(Debug, PartialEq, Eq)]

@@ -44,10 +44,7 @@ pub async fn check_access(
     channel: &Channel,
     events: &[Event],
 ) -> Result<(), Error> {
-    let is_close_event = |e: &Event| match e {
-        Event::Close => true,
-        _ => false,
-    };
+    let is_close_event = |e: &Event| matches!(e, Event::Close);
 
     let has_close_event = events.iter().all(is_close_event);
     let current_time = Utc::now();

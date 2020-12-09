@@ -71,17 +71,11 @@ pub enum Event {
 
 impl Event {
     pub fn is_click_event(&self) -> bool {
-        match *self {
-            Event::Click { .. } => true,
-            _ => false,
-        }
+        matches!(self, Event::Click { .. })
     }
 
     pub fn is_impression_event(&self) -> bool {
-        match *self {
-            Event::Impression { .. } => true,
-            _ => false,
-        }
+        matches!(self, Event::Impression { .. })
     }
 }
 

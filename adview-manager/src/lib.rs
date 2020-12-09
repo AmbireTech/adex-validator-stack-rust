@@ -4,7 +4,7 @@
 use adex_primitives::{
     supermarket::units_for_slot,
     supermarket::units_for_slot::response::{AdUnit, Campaign},
-    targeting::{self, input, Value},
+    targeting::{self, input},
     BigNum, ChannelId, SpecValidators, ValidatorId, IPFS,
 };
 use async_std::{sync::RwLock, task::block_on};
@@ -323,10 +323,9 @@ impl Manager {
             })
             .unwrap_or(u64::MAX);
 
-        input.set_ad_view(input::AdView {
+        input.ad_view = Some(input::AdView {
             seconds_since_campaign_impression,
             has_custom_preferences: false,
-            // TODO: Check this empty default!
             navigator_language: self.options.navigator_language.clone().unwrap_or_default(),
         });
 
@@ -435,17 +434,12 @@ impl Manager {
         let units_for_slot = self.get_market_demand_resp().await?;
         let campaigns = &units_for_slot.campaigns;
         let fallback_unit = units_for_slot.fallback_unit;
-        let targeting_input = input::Getter {
-            base: units_for_slot.targeting_input_base,
-            ad_unit: None,
-            channel: None,
-            last_approved: None,
-            deposit_asset: None,
-        };
+        let targeting_input = units_for_slot.targeting_input_base;
 
         let hostname = targeting_input
-            .try_get("adSlot.hostname")
-            .and_then(Value::try_string)
+            .ad_slot
+            .as_ref()
+            .map(|ad_slot| ad_slot.hostname.clone())
             .unwrap_or_default();
 
         // Stickiness is when we keep showing an ad unit for a slot for some time in order to achieve fair impression value
@@ -474,15 +468,16 @@ impl Manager {
                 if block_on(self.is_campaign_sticky(campaign.channel.id)) {
                     return vec![];
                 }
-                let mut campaign_input = targeting_input.clone();
+
                 let campaign_id = campaign.channel.id;
-                campaign_input.channel = Some(campaign.channel.clone());
+
+                let mut unit_input = targeting_input.clone().with_market_channel(campaign.channel.clone());
 
                 campaign
                     .units_with_price
                     .iter()
                     .filter(|unit_with_price| {
-                        campaign_input.ad_unit = Some(unit_with_price.unit.clone());
+                        unit_input.ad_unit_id = Some(unit_with_price.unit.id.clone());
 
                         let mut output = targeting::Output {
                             show: true,
@@ -496,7 +491,7 @@ impl Manager {
 
                         targeting::eval_with_callback(
                             &campaign.targeting_rules,
-                            &input::Input::Getter(campaign_input.clone()),
+                            &unit_input,
                             &mut output,
                             Some(on_type_error)
                         );

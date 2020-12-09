@@ -85,7 +85,7 @@ impl EventAggregator {
                 // fetch channel
                 let channel = get_channel_by_id(&app.pool, &channel_id)
                     .await?
-                    .ok_or_else(|| ResponseError::NotFound)?;
+                    .ok_or(ResponseError::NotFound)?;
 
                 let withdraw_period_start = channel.spec.withdraw_period_start;
                 let channel_id = channel.id;

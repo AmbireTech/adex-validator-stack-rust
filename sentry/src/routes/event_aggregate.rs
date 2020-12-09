@@ -24,7 +24,7 @@ pub async fn list_channel_event_aggregates<A: Adapter>(
     let auth = req
         .extensions()
         .get::<Auth>()
-        .ok_or_else(|| ResponseError::Unauthorized)?;
+        .ok_or(ResponseError::Unauthorized)?;
 
     let query =
         serde_urlencoded::from_str::<EventAggregatesQuery>(req.uri().query().unwrap_or(""))?;

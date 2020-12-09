@@ -1,18 +1,23 @@
-FROM rust:1.40 as builder
+# Builder
+FROM rust:1.48.0 as builder
 
-MAINTAINER dev@adex.network
+LABEL maintainer="dev@adex.network"
 
 WORKDIR /usr/src/app
 
 COPY . .
 
-RUN cargo install --path validator_worker --all-features
+# We intall the validator_worker binary with all features in Release mode
+# Inlcude the full backtrace for easier debugging
+RUN RUST_BACKTRACE=full cargo install --path validator_worker --all-features
 
 WORKDIR /usr/local/bin
 
 RUN cp $CARGO_HOME/bin/validator_worker .
 
-FROM ubuntu:18.04
+FROM ubuntu:20.04
+
+RUN apt update && apt-get install -y libssl-dev ca-certificates
 
 # `ethereum` or `dummy`
 ENV ADAPTER=
@@ -33,8 +38,6 @@ ENV SENTRY_URL=
 ENV SINGLE_TICK=
 
 WORKDIR /usr/local/bin
-
-RUN apt update && apt-get install -y libssl-dev ca-certificates
 
 COPY docs/config/cloudflare_origin.crt /usr/local/share/ca-certificates/
 
