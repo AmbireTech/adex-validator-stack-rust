@@ -7,8 +7,6 @@ use primitives::event_submission::{RateLimit, Rule};
 use primitives::sentry::Event;
 use primitives::Channel;
 use std::cmp::PartialEq;
-use std::error;
-use std::fmt;
 use thiserror::Error;
 
 #[derive(Debug, PartialEq, Eq, Error)]
@@ -46,12 +44,12 @@ pub async fn check_access(
     let current_time = Utc::now();
     let is_in_withdraw_period = current_time > channel.spec.withdraw_period_start;
 
-    if has_close_event && is_in_withdraw_period {
-        return Ok(());
-    }
-
     if current_time > channel.valid_until {
         return Err(Error::ChannelIsExpired);
+    }
+
+    if has_close_event && is_in_withdraw_period {
+        return Ok(());
     }
 
     let (is_creator, auth_uid) = match auth {

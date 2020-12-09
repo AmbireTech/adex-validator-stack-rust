@@ -1,8 +1,8 @@
 use crate::access::check_access;
 use crate::access::Error as AccessError;
 use crate::db::event_aggregate::insert_event_aggregate;
-use crate::db::{get_channel_by_id, update_targeting_rules};
 use crate::db::DbPool;
+use crate::db::{get_channel_by_id, update_targeting_rules};
 use crate::event_reducer;
 use crate::Application;
 use crate::ResponseError;
@@ -10,6 +10,7 @@ use crate::Session;
 use crate::{analytics_recorder, Auth};
 use async_std::sync::RwLock;
 use chrono::Utc;
+use futures::stream::{self, StreamExt};
 use lazy_static::lazy_static;
 use primitives::adapter::Adapter;
 use primitives::sentry::{Event, EventAggregate};
@@ -138,16 +139,24 @@ impl EventAggregator {
             AccessError::OnlyCreatorCanCloseChannel | AccessError::ForbiddenReferrer => {
                 ResponseError::Forbidden(e.to_string())
             }
+            AccessError::OnlyCreatorCanUpdateTargetingRules => {
+                ResponseError::Forbidden(e.to_string())
+            }
             AccessError::RulesError(error) => ResponseError::TooManyRequests(error),
             AccessError::UnAuthenticated => ResponseError::Unauthorized,
             _ => ResponseError::BadRequest(e.to_string()),
         })?;
 
-        events.iter()
-            .for_each(async |e| match e {
-                Event::UpdateTargeting { targeting_rules } => update_targeting_rules(&app.pool, &channel_id, &targeting_rules).await?,
-                _ => false,
-            });
+        let events_stream = stream::iter(events);
+        let events_eval = events_stream.then(|ev| async move {
+            match ev {
+                Event::UpdateTargeting { targeting_rules } => {
+                    update_targeting_rules(&app.pool, &channel_id, &targeting_rules).await
+                }
+                _ => Ok(false),
+            }
+        });
+        events_eval.collect::<Vec<_>>().await;
 
         events.iter().for_each(|ev| {
             match event_reducer::reduce(
@@ -185,5 +194,3 @@ impl EventAggregator {
         Ok(())
     }
 }
-
-

@@ -3222,6 +3222,7 @@ dependencies = [
  "serde_json",
  "serde_urlencoded",
  "slog",
+ "thiserror",
  "tokio 0.2.23",
 ]
 
