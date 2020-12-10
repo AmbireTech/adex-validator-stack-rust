@@ -79,15 +79,38 @@ mod rules {
         de::{SeqAccess, Visitor},
         Deserialize, Deserializer, Serialize,
     };
-    use std::fmt;
+    use std::{
+        fmt,
+        ops::{Deref, DerefMut},
+    };
 
     use super::Rule;
 
-    #[derive(Serialize, Debug, Clone, Eq, PartialEq)]
+    #[derive(Serialize, Debug, Default, Clone, Eq, PartialEq)]
     #[serde(transparent)]
     /// The Rules is just a `Vec<Rule>` with one difference:
     /// When Deserializing it will skip invalid `Rule` instead of returning an error
-    pub struct Rules(Vec<Rule>);
+    pub struct Rules(pub Vec<Rule>);
+
+    impl Rules {
+        pub fn new() -> Self {
+            Self(vec![])
+        }
+    }
+
+    impl Deref for Rules {
+        type Target = Vec<Rule>;
+
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
+    impl DerefMut for Rules {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.0
+        }
+    }
 
     impl<'de> Deserialize<'de> for Rules {
         fn deserialize<D>(deserializer: D) -> Result<Rules, D::Error>
@@ -1251,7 +1274,7 @@ pub mod postgres {
     use postgres_types::{accepts, to_sql_checked, IsNull, Json, ToSql, Type};
     use std::error::Error;
 
-    impl ToSql for Rule {
+    impl ToSql for Rules {
         fn to_sql(
             &self,
             ty: &Type,

@@ -1,5 +1,6 @@
 use crate::{
     channel::{Pricing, PricingBounds},
+    targeting::Rules,
     BigNum, Channel, ChannelId, ChannelSpec, EventSubmission, SpecValidators, ValidatorDesc,
     ValidatorId, IPFS,
 };
@@ -64,7 +65,7 @@ lazy_static! {
             creator: ValidatorId::try_from("033ed90e0fec3f3ea1c9b005c724d704501e0196").expect("Should be valid ValidatorId"),
             deposit_asset: "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359".to_string(),
             deposit_amount: 1_000.into(),
-            targeting_rules: vec![],
+            targeting_rules: Rules::new(),
             // UNIX timestamp for 2100-01-01
             valid_until: Utc.timestamp(4_102_444_800, 0),
             spec: ChannelSpec {
@@ -72,7 +73,7 @@ lazy_static! {
                 validators: SpecValidators::new(DUMMY_VALIDATOR_LEADER.clone(), DUMMY_VALIDATOR_FOLLOWER.clone()),
                 max_per_impression: 10.into(),
                 min_per_impression: 1.into(),
-                targeting_rules: vec![],
+                targeting_rules: Rules::new(),
                 event_submission: Some(EventSubmission { allow: vec![] }),
                 // July 29, 2019 7:00:00 AM
                 created: Utc.timestamp(1_564_383_600, 0),

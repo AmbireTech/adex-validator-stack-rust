@@ -45,6 +45,10 @@ pub struct AdUnit {
     #[serde(default)]
     pub archived: bool,
     /// UTC timestamp in milliseconds, changed every time modifiable property is changed
-    #[serde(default, with = "ts_milliseconds_option", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        with = "ts_milliseconds_option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub modified: Option<DateTime<Utc>>,
 }
