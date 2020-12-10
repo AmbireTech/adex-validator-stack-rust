@@ -38,6 +38,62 @@ fn get_default_input() -> Input {
         .with_balances(input_balances)
 }
 
+mod rules_test {
+    use super::{Function, Rule, Rules, Value};
+    use serde_json::{from_value, json};
+
+    #[test]
+    fn test_rules_should_be_empty_when_single_invalid_rule() {
+        let rule = json!([
+            {
+                "onlyShowIf": {
+                    "undefined": [
+                        [],
+                        {"get":"userAgentOS"}
+                    ]
+                }
+            }
+        ]);
+
+        let deser = from_value::<Rules>(rule).expect("should deserialize by skipping invalid rule");
+
+        assert!(deser.0.is_empty())
+    }
+
+    #[test]
+    fn test_rules_should_not_be_empty_when_one_invalid_rule() {
+        let rule = json!([
+            {
+                "intersects": [
+                    {"get": "adSlot.categories"},
+                    ["News", "Bitcoin"]
+                ]
+            },
+            {
+                "onlyShowIf": {
+                    "undefined": [
+                        [],
+                        {"get":"userAgentOS"}
+                    ]
+                }
+            }
+        ]);
+
+        let deser = from_value::<Rules>(rule).expect("should deserialize by skipping invalid rule");
+
+        assert_eq!(1, deser.0.len());
+
+        let expected = Rule::Function(Function::new_intersects(
+            Rule::Function(Function::new_get("adSlot.categories")),
+            Rule::Value(Value::Array(vec![
+                Value::new_string("News"),
+                Value::new_string("Bitcoin"),
+            ])),
+        ));
+        assert_eq!(expected, deser.0[0])
+    }
+}
+
 mod dsl_test {
     use super::*;
 

@@ -10,6 +10,8 @@ use std::{
     str::FromStr,
 };
 
+pub use rules::Rules;
+
 use super::{
     input::{channel::Getter as ChannelGetter, Get},
     Input, Output,
@@ -71,6 +73,59 @@ impl fmt::Display for Error {
 }
 
 impl std::error::Error for Error {}
+
+mod rules {
+    use serde::{
+        de::{SeqAccess, Visitor},
+        Deserialize, Deserializer, Serialize,
+    };
+    use std::fmt;
+
+    use super::Rule;
+
+    #[derive(Serialize, Debug, Clone, Eq, PartialEq)]
+    #[serde(transparent)]
+    /// The Rules is just a `Vec<Rule>` with one difference:
+    /// When Deserializing it will skip invalid `Rule` instead of returning an error
+    pub struct Rules(Vec<Rule>);
+
+    impl<'de> Deserialize<'de> for Rules {
+        fn deserialize<D>(deserializer: D) -> Result<Rules, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            deserializer.deserialize_seq(RulesVisitor)
+        }
+    }
+
+    struct RulesVisitor;
+
+    impl<'de> Visitor<'de> for RulesVisitor {
+        type Value = Rules;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            formatter.write_str("a sequence of Rules")
+        }
+
+        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+        where
+            A: SeqAccess<'de>,
+        {
+            let mut vec = Vec::with_capacity(seq.size_hint().unwrap_or(0));
+
+            // Since we want to filter wrong Rules, instead of returning an error
+            // we transpose the `Result<Option<T>, ..>` to `Option<Result<T, ..>>`
+            while let Some(result) = seq.next_element().transpose() {
+                // push only valid rules
+                if let Ok(rule) = result {
+                    vec.push(rule);
+                }
+            }
+
+            Ok(Rules(vec))
+        }
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(untagged)]
