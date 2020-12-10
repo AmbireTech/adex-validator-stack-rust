@@ -28,6 +28,7 @@ pub struct AdUnit {
     /// Advertised URL
     pub target_url: String,
     /// Number; minimum targeting score (optional)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub min_targeting_score: Option<f64>,
     /// user address from the session
     pub owner: ValidatorId,
@@ -35,13 +36,15 @@ pub struct AdUnit {
     #[serde(with = "ts_milliseconds")]
     pub created: DateTime<Utc>,
     /// the name of the unit used in platform UI
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
     /// arbitrary text used in platform UI
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     /// user can change it - used for filtering in platform UI
     #[serde(default)]
     pub archived: bool,
     /// UTC timestamp in milliseconds, changed every time modifiable property is changed
-    #[serde(with = "ts_milliseconds_option")]
+    #[serde(default, with = "ts_milliseconds_option", skip_serializing_if = "Option::is_none")]
     pub modified: Option<DateTime<Utc>>,
 }
