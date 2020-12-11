@@ -1,7 +1,7 @@
 use crate::validator::MessageTypes;
 use crate::{BigNum, Channel, ChannelId, ValidatorId};
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 use std::hash::Hash;
@@ -122,19 +122,7 @@ pub struct ChannelListResponse {
     pub channels: Vec<Channel>,
     pub total_pages: u64,
     pub total: u64,
-    // TODO:
-    #[serde(deserialize_with = "page_u64_from_string")]
     pub page: u64,
-}
-
-fn page_u64_from_string<'de, D>(deserializer: D) -> Result<u64, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let page_string = String::deserialize(deserializer)?;
-
-    // parse from `String` to `u64`
-    page_string.parse().map_err(serde::de::Error::custom)
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
