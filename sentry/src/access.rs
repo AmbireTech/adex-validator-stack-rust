@@ -169,7 +169,6 @@ async fn apply_rule(
             }
 
             let seconds = rate_limit.time_frame.as_secs_f32().ceil();
-
             redis::cmd("SETEX")
                 .arg(&key)
                 .arg(seconds as i32)
@@ -215,6 +214,7 @@ mod test {
     use primitives::sentry::Event;
     use primitives::util::tests::prep_db::{DUMMY_CHANNEL, IDS};
     use primitives::{Channel, Config, EventSubmission};
+    use chrono::TimeZone;
 
     use crate::db::redis_connection;
     use crate::Session;
@@ -250,6 +250,20 @@ mod test {
                 ad_unit: None,
                 ad_slot: None,
                 referrer: None,
+            })
+            .collect()
+    }
+
+    fn get_close_events(count: i8) -> Vec<Event> {
+        (0..count)
+            .map(|_| Event::Close)
+            .collect()
+    }
+
+    fn get_update_targeting_events(count: i8) -> Vec<Event> {
+        (0..count)
+            .map(|_| Event::UpdateTargeting {
+                targeting_rules: vec![],
             })
             .collect()
     }
@@ -360,5 +374,450 @@ mod test {
         )
         .await;
         assert_eq!(Ok(()), response);
+    }
+
+    #[tokio::test]
+    async fn check_access_past_channel_valid_until() {
+        let (config, redis) = setup().await;
+
+        let auth = Auth {
+            era: 0,
+            uid: IDS["follower"],
+        };
+
+        let session = Session {
+            ip: Default::default(),
+            referrer_header: None,
+            country: None,
+            os: None,
+        };
+
+        let rule = Rule {
+            uids: None,
+            rate_limit: Some(RateLimit {
+                limit_type: "ip".to_string(),
+                time_frame: Duration::from_millis(1),
+            }),
+        };
+        let mut channel = get_channel(rule);
+        channel.valid_until = Utc.datetime_from_str("1970-01-01 12:00:09", "%Y-%m-%d %H:%M:%S").expect("should be valid datetime");
+
+        let err_response = check_access(
+            &redis,
+            &session,
+            Some(&auth),
+            &config.ip_rate_limit,
+            &channel,
+            &get_impression_events(2),
+        )
+        .await;
+
+        assert_eq!(Err(Error::ChannelIsExpired), err_response);
+    }
+
+    #[tokio::test]
+    async fn check_access_close_event_in_withdraw_period() {
+        let (config, redis) = setup().await;
+
+        let auth = Auth {
+            era: 0,
+            uid: IDS["follower"],
+        };
+
+        let session = Session {
+            ip: Default::default(),
+            referrer_header: None,
+            country: None,
+            os: None,
+        };
+
+        let rule = Rule {
+            uids: None,
+            rate_limit: Some(RateLimit {
+                limit_type: "ip".to_string(),
+                time_frame: Duration::from_millis(1),
+            }),
+        };
+        let mut channel = get_channel(rule);
+        channel.spec.withdraw_period_start = Utc.datetime_from_str("1970-01-01 12:00:09", "%Y-%m-%d %H:%M:%S").expect("should be valid datetime");
+
+        let ok_response = check_access(
+            &redis,
+            &session,
+            Some(&auth),
+            &config.ip_rate_limit,
+            &channel,
+            &get_close_events(1),
+        )
+        .await;
+
+        assert_eq!(Ok(()), ok_response);
+    }
+
+    #[tokio::test]
+    async fn check_access_close_event_and_is_creator() {
+        let (config, redis) = setup().await;
+
+        let auth = Auth {
+            era: 0,
+            uid: IDS["follower"],
+        };
+
+        let session = Session {
+            ip: Default::default(),
+            referrer_header: None,
+            country: None,
+            os: None,
+        };
+
+        let rule = Rule {
+            uids: None,
+            rate_limit: Some(RateLimit {
+                limit_type: "ip".to_string(),
+                time_frame: Duration::from_millis(1),
+            }),
+        };
+        let mut channel = get_channel(rule);
+        channel.creator = IDS["follower"];
+
+        let ok_response = check_access(
+            &redis,
+            &session,
+            Some(&auth),
+            &config.ip_rate_limit,
+            &channel,
+            &get_close_events(1),
+        )
+        .await;
+
+        assert_eq!(Ok(()), ok_response);
+    }
+
+    #[tokio::test]
+    async fn check_access_update_targeting_event_and_is_creator() {
+        let (config, redis) = setup().await;
+
+        let auth = Auth {
+            era: 0,
+            uid: IDS["follower"],
+        };
+
+        let session = Session {
+            ip: Default::default(),
+            referrer_header: None,
+            country: None,
+            os: None,
+        };
+
+        let rule = Rule {
+            uids: None,
+            rate_limit: Some(RateLimit {
+                limit_type: "ip".to_string(),
+                time_frame: Duration::from_millis(1),
+            }),
+        };
+        let mut channel = get_channel(rule);
+        channel.creator = IDS["follower"];
+
+        let ok_response = check_access(
+            &redis,
+            &session,
+            Some(&auth),
+            &config.ip_rate_limit,
+            &channel,
+            &get_update_targeting_events(1),
+        )
+        .await;
+
+        assert_eq!(Ok(()), ok_response);
+    }
+
+    #[tokio::test]
+    async fn not_creator_and_there_are_close_events() {
+        let (config, redis) = setup().await;
+
+        let auth = Auth {
+            era: 0,
+            uid: IDS["follower"],
+        };
+
+        let session = Session {
+            ip: Default::default(),
+            referrer_header: None,
+            country: None,
+            os: None,
+        };
+
+        let rule = Rule {
+            uids: None,
+            rate_limit: Some(RateLimit {
+                limit_type: "ip".to_string(),
+                time_frame: Duration::from_millis(1),
+            }),
+        };
+        let mut channel = get_channel(rule);
+        channel.creator = IDS["leader"];
+        let mixed_events = vec![Event::Impression {
+            publisher: IDS["publisher2"],
+            ad_unit: None,
+            ad_slot: None,
+            referrer: None,
+        }, Event::Close, Event::UpdateTargeting {
+            targeting_rules: vec![],
+        }];
+        let err_response = check_access(
+            &redis,
+            &session,
+            Some(&auth),
+            &config.ip_rate_limit,
+            &channel,
+            &mixed_events,
+        )
+        .await;
+
+        assert_eq!(Err(Error::OnlyCreatorCanCloseChannel), err_response);
+    }
+
+    #[tokio::test]
+    async fn not_creator_and_there_are_update_targeting_events() {
+        let (config, redis) = setup().await;
+
+        let auth = Auth {
+            era: 0,
+            uid: IDS["follower"],
+        };
+
+        let session = Session {
+            ip: Default::default(),
+            referrer_header: None,
+            country: None,
+            os: None,
+        };
+
+        let rule = Rule {
+            uids: None,
+            rate_limit: Some(RateLimit {
+                limit_type: "ip".to_string(),
+                time_frame: Duration::from_millis(1),
+            }),
+        };
+        let mut channel = get_channel(rule);
+        channel.creator = IDS["leader"];
+        let mixed_events = vec![Event::Impression {
+            publisher: IDS["publisher2"],
+            ad_unit: None,
+            ad_slot: None,
+            referrer: None,
+        }, Event::UpdateTargeting {
+            targeting_rules: vec![],
+        }];
+        let err_response = check_access(
+            &redis,
+            &session,
+            Some(&auth),
+            &config.ip_rate_limit,
+            &channel,
+            &mixed_events,
+        )
+        .await;
+
+        assert_eq!(Err(Error::OnlyCreatorCanUpdateTargetingRules), err_response);
+    }
+
+    #[tokio::test]
+    async fn in_withdraw_period_no_close_events() {
+        let (config, redis) = setup().await;
+
+        let auth = Auth {
+            era: 0,
+            uid: IDS["follower"],
+        };
+
+        let session = Session {
+            ip: Default::default(),
+            referrer_header: None,
+            country: None,
+            os: None,
+        };
+
+        let rule = Rule {
+            uids: None,
+            rate_limit: Some(RateLimit {
+                limit_type: "ip".to_string(),
+                time_frame: Duration::from_millis(1),
+            }),
+        };
+        let mut channel = get_channel(rule);
+        channel.spec.withdraw_period_start = Utc.datetime_from_str("1970-01-01 12:00:09", "%Y-%m-%d %H:%M:%S").expect("should be valid datetime");
+
+        let err_response = check_access(
+            &redis,
+            &session,
+            Some(&auth),
+            &config.ip_rate_limit,
+            &channel,
+            &get_impression_events(2),
+        )
+        .await;
+
+        assert_eq!(Err(Error::ChannelIsInWithdrawPeriod), err_response);
+    }
+
+    #[tokio::test]
+    async fn with_forbidden_country() {
+        let (config, redis) = setup().await;
+
+        let auth = Auth {
+            era: 0,
+            uid: IDS["follower"],
+        };
+
+        let session = Session {
+            ip: Default::default(),
+            referrer_header: None,
+            country: Some("XX".into()),
+            os: None,
+        };
+
+        let rule = Rule {
+            uids: None,
+            rate_limit: Some(RateLimit {
+                limit_type: "ip".to_string(),
+                time_frame: Duration::from_millis(1),
+            }),
+        };
+        let channel = get_channel(rule);
+
+        let err_response = check_access(
+            &redis,
+            &session,
+            Some(&auth),
+            &config.ip_rate_limit,
+            &channel,
+            &get_impression_events(2),
+        )
+        .await;
+
+        assert_eq!(Err(Error::ForbiddenReferrer), err_response);
+    }
+
+    #[tokio::test]
+    async fn with_forbidden_referrer() {
+        let (config, redis) = setup().await;
+
+        let auth = Auth {
+            era: 0,
+            uid: IDS["follower"],
+        };
+
+        let session = Session {
+            ip: Default::default(),
+            referrer_header: Some("http://127.0.0.1".into()),
+            country: None,
+            os: None,
+        };
+
+        let rule = Rule {
+            uids: None,
+            rate_limit: Some(RateLimit {
+                limit_type: "ip".to_string(),
+                time_frame: Duration::from_millis(1),
+            }),
+        };
+        let channel = get_channel(rule);
+
+        let err_response = check_access(
+            &redis,
+            &session,
+            Some(&auth),
+            &config.ip_rate_limit,
+            &channel,
+            &get_impression_events(2),
+        )
+        .await;
+
+        assert_eq!(Err(Error::ForbiddenReferrer), err_response);
+    }
+
+    #[tokio::test]
+    async fn no_rate_limit() {
+        let (config, redis) = setup().await;
+
+        let auth = Auth {
+            era: 0,
+            uid: IDS["follower"],
+        };
+
+        let session = Session {
+            ip: Default::default(),
+            referrer_header: None,
+            country: None,
+            os: None,
+        };
+
+        let rule = Rule {
+            uids: None,
+            rate_limit: None,
+        };
+        let channel = get_channel(rule);
+
+        let ok_response = check_access(
+            &redis,
+            &session,
+            Some(&auth),
+            &config.ip_rate_limit,
+            &channel,
+            &get_impression_events(1),
+        )
+        .await;
+
+        assert_eq!(Ok(()), ok_response);
+    }
+
+    #[tokio::test]
+    async fn applied_rules() {
+        let (config, redis) = setup().await;
+
+        let auth = Auth {
+            era: 0,
+            uid: IDS["follower"],
+        };
+
+        let session = Session {
+            ip: Default::default(),
+            referrer_header: None,
+            country: None,
+            os: None,
+        };
+
+        let rule = Rule {
+            uids: None,
+            rate_limit: Some(RateLimit {
+                limit_type: "ip".to_string(),
+                time_frame: Duration::from_millis(60_000),
+            }),
+        };
+        let channel = get_channel(rule);
+
+        let ok_response = check_access(
+            &redis,
+            &session,
+            Some(&auth),
+            &config.ip_rate_limit,
+            &channel,
+            &get_impression_events(1),
+        )
+        .await;
+
+        assert_eq!(Ok(()), ok_response);
+        let key = "adexRateLimit:061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088:".to_string();
+        let value = "1".to_string();
+
+        let value_in_redis = redis::cmd("GET")
+            .arg(&key)
+            .query_async::<_, String>(&mut redis.clone())
+            .await
+            .expect("should exist in redis");
+        assert_eq!(&value, &value_in_redis);
     }
 }
