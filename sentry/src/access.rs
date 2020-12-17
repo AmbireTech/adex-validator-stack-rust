@@ -375,6 +375,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn check_access_past_channel_valid_until() {
         let (config, redis) = setup().await;
 
@@ -416,6 +417,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn check_access_close_event_in_withdraw_period() {
         let (config, redis) = setup().await;
 
@@ -457,6 +459,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn check_access_close_event_and_is_creator() {
         let (config, redis) = setup().await;
 
@@ -496,6 +499,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn check_access_update_targeting_event_and_is_creator() {
         let (config, redis) = setup().await;
 
@@ -535,6 +539,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn not_creator_and_there_are_close_events() {
         let (config, redis) = setup().await;
 
@@ -585,6 +590,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn not_creator_and_there_are_update_targeting_events() {
         let (config, redis) = setup().await;
 
@@ -634,6 +640,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn in_withdraw_period_no_close_events() {
         let (config, redis) = setup().await;
 
@@ -675,6 +682,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn with_forbidden_country() {
         let (config, redis) = setup().await;
 
@@ -713,6 +721,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn with_forbidden_referrer() {
         let (config, redis) = setup().await;
 
@@ -751,6 +760,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn no_rate_limit() {
         let (config, redis) = setup().await;
 
@@ -786,6 +796,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn applied_rules() {
         let (config, redis) = setup().await;
 
