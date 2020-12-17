@@ -209,12 +209,12 @@ fn forbidden_country(session: &Session) -> bool {
 mod test {
     use std::time::Duration;
 
+    use chrono::TimeZone;
     use primitives::config::configuration;
     use primitives::event_submission::{RateLimit, Rule};
     use primitives::sentry::Event;
     use primitives::util::tests::prep_db::{DUMMY_CHANNEL, IDS};
     use primitives::{Channel, Config, EventSubmission};
-    use chrono::TimeZone;
 
     use crate::db::redis_connection;
     use crate::Session;
@@ -255,9 +255,7 @@ mod test {
     }
 
     fn get_close_events(count: i8) -> Vec<Event> {
-        (0..count)
-            .map(|_| Event::Close)
-            .collect()
+        (0..count).map(|_| Event::Close).collect()
     }
 
     fn get_update_targeting_events(count: i8) -> Vec<Event> {
@@ -400,7 +398,9 @@ mod test {
             }),
         };
         let mut channel = get_channel(rule);
-        channel.valid_until = Utc.datetime_from_str("1970-01-01 12:00:09", "%Y-%m-%d %H:%M:%S").expect("should be valid datetime");
+        channel.valid_until = Utc
+            .datetime_from_str("1970-01-01 12:00:09", "%Y-%m-%d %H:%M:%S")
+            .expect("should be valid datetime");
 
         let err_response = check_access(
             &redis,
@@ -439,7 +439,9 @@ mod test {
             }),
         };
         let mut channel = get_channel(rule);
-        channel.spec.withdraw_period_start = Utc.datetime_from_str("1970-01-01 12:00:09", "%Y-%m-%d %H:%M:%S").expect("should be valid datetime");
+        channel.spec.withdraw_period_start = Utc
+            .datetime_from_str("1970-01-01 12:00:09", "%Y-%m-%d %H:%M:%S")
+            .expect("should be valid datetime");
 
         let ok_response = check_access(
             &redis,
@@ -557,14 +559,18 @@ mod test {
         };
         let mut channel = get_channel(rule);
         channel.creator = IDS["leader"];
-        let mixed_events = vec![Event::Impression {
-            publisher: IDS["publisher2"],
-            ad_unit: None,
-            ad_slot: None,
-            referrer: None,
-        }, Event::Close, Event::UpdateTargeting {
-            targeting_rules: vec![],
-        }];
+        let mixed_events = vec![
+            Event::Impression {
+                publisher: IDS["publisher2"],
+                ad_unit: None,
+                ad_slot: None,
+                referrer: None,
+            },
+            Event::Close,
+            Event::UpdateTargeting {
+                targeting_rules: vec![],
+            },
+        ];
         let err_response = check_access(
             &redis,
             &session,
@@ -603,14 +609,17 @@ mod test {
         };
         let mut channel = get_channel(rule);
         channel.creator = IDS["leader"];
-        let mixed_events = vec![Event::Impression {
-            publisher: IDS["publisher2"],
-            ad_unit: None,
-            ad_slot: None,
-            referrer: None,
-        }, Event::UpdateTargeting {
-            targeting_rules: vec![],
-        }];
+        let mixed_events = vec![
+            Event::Impression {
+                publisher: IDS["publisher2"],
+                ad_unit: None,
+                ad_slot: None,
+                referrer: None,
+            },
+            Event::UpdateTargeting {
+                targeting_rules: vec![],
+            },
+        ];
         let err_response = check_access(
             &redis,
             &session,
@@ -648,7 +657,9 @@ mod test {
             }),
         };
         let mut channel = get_channel(rule);
-        channel.spec.withdraw_period_start = Utc.datetime_from_str("1970-01-01 12:00:09", "%Y-%m-%d %H:%M:%S").expect("should be valid datetime");
+        channel.spec.withdraw_period_start = Utc
+            .datetime_from_str("1970-01-01 12:00:09", "%Y-%m-%d %H:%M:%S")
+            .expect("should be valid datetime");
 
         let err_response = check_access(
             &redis,
@@ -810,7 +821,8 @@ mod test {
         .await;
 
         assert_eq!(Ok(()), ok_response);
-        let key = "adexRateLimit:061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088:".to_string();
+        let key = "adexRateLimit:061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088:"
+            .to_string();
         let value = "1".to_string();
 
         let value_in_redis = redis::cmd("GET")

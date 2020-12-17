@@ -159,7 +159,7 @@ impl EventAggregator {
         let events_eval = events_eval.collect::<Vec<_>>().await;
         let events_eval: Result<Vec<bool>, bb8::RunError<_>> = events_eval.into_iter().collect();
         if let Err(e) = events_eval {
-            return Err(ResponseError::BadRequest(e.to_string()))
+            return Err(ResponseError::BadRequest(e.to_string()));
         };
 
         events.iter().for_each(|ev| {
