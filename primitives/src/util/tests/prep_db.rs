@@ -1,4 +1,9 @@
-use crate::{AdUnit, BigNum, Channel, ChannelId, ChannelSpec, EventSubmission, IPFS, SpecValidators, ValidatorDesc, ValidatorId, channel::{Pricing, PricingBounds}, targeting::Rules};
+use crate::{
+    channel::{Pricing, PricingBounds},
+    targeting::Rules,
+    AdUnit, BigNum, Channel, ChannelId, ChannelSpec, EventSubmission, SpecValidators,
+    ValidatorDesc, ValidatorId, IPFS,
+};
 use chrono::{TimeZone, Utc};
 use fake::faker::{Faker, Number};
 use hex::FromHex;

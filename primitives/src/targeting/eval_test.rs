@@ -810,39 +810,39 @@ mod math_functions {
 
         let cases = vec![
             (
-                Value::BigNum(1.into()),
                 Value::BigNum(10.into()),
                 Value::BigNum(100.into()),
+                Value::BigNum(1.into()),
                 Value::Bool(false),
             ),
             (
                 Value::BigNum(10.into()),
-                Value::BigNum(10.into()),
                 Value::BigNum(100.into()),
+                Value::BigNum(10.into()),
                 Value::Bool(true),
             ),
             (
+                Value::BigNum(10.into()),
+                Value::BigNum(100.into()),
                 Value::BigNum(50.into()),
+                Value::Bool(true),
+            ),
+            (
                 Value::BigNum(10.into()),
+                Value::BigNum(100.into()),
                 Value::BigNum(100.into()),
                 Value::Bool(true),
             ),
             (
-                Value::BigNum(100.into()),
                 Value::BigNum(10.into()),
                 Value::BigNum(100.into()),
-                Value::Bool(true),
-            ),
-            (
                 Value::BigNum(1000.into()),
-                Value::BigNum(10.into()),
-                Value::BigNum(100.into()),
                 Value::Bool(false),
             ),
         ];
 
-        for (value, start, end, expected) in cases.into_iter() {
-            let rule = Rule::Function(Function::new_between(value, start, end));
+        for (start, end, value, expected) in cases.into_iter() {
+            let rule = Rule::Function(Function::new_between(start, end, value));
 
             assert_eq!(Ok(Some(expected)), rule.eval(&input, &mut output));
         }
@@ -1188,10 +1188,7 @@ mod string_and_array {
         ];
 
         for (arr, value, expected) in cases.into_iter() {
-            let rule = Rule::Function(Function::new_in(
-                Value::Array(arr),
-                value,
-            ));
+            let rule = Rule::Function(Function::new_in(Value::Array(arr), value));
             let expected = Some(Value::Bool(expected));
 
             assert_eq!(Ok(expected), rule.eval(&input, &mut output));
@@ -1228,10 +1225,7 @@ mod string_and_array {
         ];
 
         for (arr, value, expected) in cases.into_iter() {
-            let rule = Rule::Function(Function::new_nin(
-                Value::Array(arr),
-                value,
-            ));
+            let rule = Rule::Function(Function::new_nin(Value::Array(arr), value));
             let expected = Some(Value::Bool(expected));
 
             assert_eq!(Ok(expected), rule.eval(&input, &mut output));

@@ -258,6 +258,9 @@ pub enum Function {
     /// Gets the element at a certain position (second value) of an array (first value)
     At(Box<Rule>, Box<Rule>),
     /// Note: this is inclusive of the start and end value
+    /// 0 - start
+    /// 1 - end
+    /// 2 - value
     Between(Box<Rule>, Box<Rule>, Box<Rule>),
     Split(Box<Rule>, Box<Rule>),
     StartsWith(Box<Rule>, Box<Rule>),
@@ -381,14 +384,14 @@ impl Function {
     }
 
     pub fn new_between(
-        value: impl Into<Rule>,
         start: impl Into<Rule>,
         end: impl Into<Rule>,
+        value: impl Into<Rule>,
     ) -> Self {
         Self::Between(
-            Box::new(value.into()),
             Box::new(start.into()),
             Box::new(end.into()),
+            Box::new(value.into()),
         )
     }
 
@@ -687,26 +690,26 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
                 None
             }
         }
-        Function::IfNot(first_rule, second_rule) => {
-            let eval_if = eval(input, output, first_rule)?
+        Function::IfNot(if_rule, else_rule) => {
+            let eval_if = eval(input, output, if_rule)?
                 .ok_or(Error::TypeError)?
                 .try_bool()?;
 
             if !eval_if {
-                eval(input, output, second_rule)?
+                eval(input, output, else_rule)?
             } else {
                 None
             }
         }
-        Function::IfElse(first_rule, second_rule, third_rule) => {
-            let eval_if = eval(input, output, first_rule)?
+        Function::IfElse(if_rule, then_rule, else_rule) => {
+            let eval_if = eval(input, output, if_rule)?
                 .ok_or(Error::TypeError)?
                 .try_bool()?;
 
             if eval_if {
-                eval(input, output, second_rule)?
+                eval(input, output, then_rule)?
             } else {
-                eval(input, output, third_rule)?
+                eval(input, output, else_rule)?
             }
         }
         Function::And(first_rule, second_rule) => {
@@ -889,10 +892,10 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
             Some(Value::Bool(a.iter().any(|x| b.contains(x))))
         }
         Function::In(array_value, search_value) => {
-            let a = eval(input, output, array_value)?.ok_or(Error::TypeError)?
-            .try_array()?;
-            let b = eval(input, output, search_value)?
-                .ok_or(Error::TypeError)?;
+            let a = eval(input, output, array_value)?
+                .ok_or(Error::TypeError)?
+                .try_array()?;
+            let b = eval(input, output, search_value)?.ok_or(Error::TypeError)?;
 
             Some(Value::Bool(a.contains(&b)))
         }
@@ -903,7 +906,7 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
                 .try_bool()?;
             Some(Value::Bool(!is_in))
         }
-        Function::Between(value_rule, min_rule, max_rule) => {
+        Function::Between(min_rule, max_rule, value_rule) => {
             let is_gte_start = Function::Gte(value_rule.clone(), min_rule.clone())
                 .eval(input, output)?
                 .ok_or(Error::TypeError)?
