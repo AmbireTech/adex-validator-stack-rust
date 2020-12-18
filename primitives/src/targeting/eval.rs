@@ -372,12 +372,12 @@ impl Function {
         Self::Intersects(Box::new(lhs.into()), Box::new(rhs.into()))
     }
 
-    pub fn new_in(lhs: impl Into<Rule>, rhs: impl Into<Rule>) -> Self {
-        Self::In(Box::new(lhs.into()), Box::new(rhs.into()))
+    pub fn new_in(array: impl Into<Rule>, value: impl Into<Rule>) -> Self {
+        Self::In(Box::new(array.into()), Box::new(value.into()))
     }
 
-    pub fn new_nin(lhs: impl Into<Rule>, rhs: impl Into<Rule>) -> Self {
-        Self::Nin(Box::new(lhs.into()), Box::new(rhs.into()))
+    pub fn new_nin(array: impl Into<Rule>, value: impl Into<Rule>) -> Self {
+        Self::Nin(Box::new(array.into()), Box::new(value.into()))
     }
 
     pub fn new_between(
@@ -888,101 +888,105 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
 
             Some(Value::Bool(a.iter().any(|x| b.contains(x))))
         }
-        Function::In(first_rule, second_rule) => {
-            let a = eval(input, output, first_rule)?.ok_or(Error::TypeError)?;
-            let b = eval(input, output, second_rule)?
-                .ok_or(Error::TypeError)?
-                .try_array()?;
+        Function::In(array_value, search_value) => {
+            let a = eval(input, output, array_value)?.ok_or(Error::TypeError)?
+            .try_array()?;
+            let b = eval(input, output, search_value)?
+                .ok_or(Error::TypeError)?;
 
-            Some(Value::Bool(b.contains(&a)))
+            Some(Value::Bool(a.contains(&b)))
         }
-        Function::Nin(first_rule, second_rule) => {
-            let is_in = Function::In(first_rule.clone(), second_rule.clone())
+        Function::Nin(array_value, search_value) => {
+            let is_in = Function::In(array_value.clone(), search_value.clone())
                 .eval(input, output)?
                 .ok_or(Error::TypeError)?
                 .try_bool()?;
             Some(Value::Bool(!is_in))
         }
-        Function::Between(first_rule, second_rule, third_rule) => {
-            let is_gte_start = Function::Gte(first_rule.clone(), second_rule.clone())
+        Function::Between(value_rule, min_rule, max_rule) => {
+            let is_gte_start = Function::Gte(value_rule.clone(), min_rule.clone())
                 .eval(input, output)?
                 .ok_or(Error::TypeError)?
                 .try_bool()?;
 
-            let is_lte_end = Function::Lte(first_rule.clone(), third_rule.clone())
+            let is_lte_end = Function::Lte(value_rule.clone(), max_rule.clone())
                 .eval(input, output)?
                 .ok_or(Error::TypeError)?
                 .try_bool()?;
+
             Some(Value::Bool(is_gte_start && is_lte_end))
         }
-        Function::At(first_rule, second_rule) => {
-            let mut first_eval = first_rule
+        Function::At(array_rule, index_rule) => {
+            let mut array_value = array_rule
                 .eval(input, output)?
                 .ok_or(Error::TypeError)?
                 .try_array()?;
-            let second_eval = second_rule
+            let index_value = index_rule
                 .eval(input, output)?
                 .ok_or(Error::TypeError)?
                 .try_number()?
                 .as_u64()
                 .ok_or(Error::TypeError)?;
-            let index = usize::try_from(second_eval).map_err(|_| Error::TypeError)?;
-            if first_eval.get(index).is_none() {
+            let index = usize::try_from(index_value).map_err(|_| Error::TypeError)?;
+
+            if array_value.get(index).is_none() {
                 return Err(Error::TypeError);
             } else {
-                Some(first_eval.swap_remove(index))
+                Some(array_value.swap_remove(index))
             }
         }
-        Function::Split(first_rule, second_rule) => {
-            let first_eval = first_rule
+        Function::Split(string_rule, pattern_rule) => {
+            let string_value = string_rule
                 .eval(input, output)?
                 .ok_or(Error::TypeError)?
                 .try_string()?;
-            let second_eval = second_rule
+            let pattern_value = pattern_rule
                 .eval(input, output)?
                 .ok_or(Error::TypeError)?
                 .try_string()?;
 
-            let after_split = first_eval
-                .split(&second_eval)
+            let after_split = string_value
+                .split(&pattern_value)
                 .map(Value::new_string)
                 .collect();
+
             Some(Value::Array(after_split))
         }
-        Function::StartsWith(first_rule, second_rule) => {
-            let first_eval = first_rule
+        Function::StartsWith(string_rule, starts_with_rule) => {
+            let string_value = string_rule
                 .eval(input, output)?
                 .ok_or(Error::TypeError)?
                 .try_string()?;
-            let second_eval = second_rule
-                .eval(input, output)?
-                .ok_or(Error::TypeError)?
-                .try_string()?;
-
-            Some(Value::Bool(first_eval.starts_with(&second_eval)))
-        }
-        Function::EndsWith(first_rule, second_rule) => {
-            let first_eval = first_rule
-                .eval(input, output)?
-                .ok_or(Error::TypeError)?
-                .try_string()?;
-            let second_eval = second_rule
+            let starts_with_value = starts_with_rule
                 .eval(input, output)?
                 .ok_or(Error::TypeError)?
                 .try_string()?;
 
-            Some(Value::Bool(first_eval.ends_with(&second_eval)))
+            Some(Value::Bool(string_value.starts_with(&starts_with_value)))
         }
-        Function::OnlyShowIf(first_rule) => {
-            let first_eval = first_rule
+        Function::EndsWith(string_rule, ends_with_rule) => {
+            let string_value = string_rule
+                .eval(input, output)?
+                .ok_or(Error::TypeError)?
+                .try_string()?;
+            let ends_with_value = ends_with_rule
+                .eval(input, output)?
+                .ok_or(Error::TypeError)?
+                .try_string()?;
+
+            Some(Value::Bool(string_value.ends_with(&ends_with_value)))
+        }
+        Function::OnlyShowIf(rule) => {
+            let eval = rule
                 .eval(input, output)?
                 .ok_or(Error::TypeError)?
                 .try_bool()?;
-            let new_rule = Box::new(Rule::Value(Value::Bool(first_eval)));
+            let new_rule = Box::new(Rule::Value(Value::Bool(eval)));
+
             Function::Set(String::from("show"), new_rule).eval(input, output)?
         }
-        Function::GetPriceInUsd(first_rule) => {
-            let amount = first_rule
+        Function::GetPriceInUsd(amount_rule) => {
+            let amount = amount_rule
                 .eval(input, output)?
                 .ok_or(Error::TypeError)?
                 .try_bignum()?;

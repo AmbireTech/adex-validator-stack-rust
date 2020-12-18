@@ -1168,29 +1168,29 @@ mod string_and_array {
 
         let cases = vec![
             (
-                Value::BigNum(1.into()),
-                Value::Array(vec![
+                vec![
                     Value::BigNum(1.into()),
                     Value::BigNum(2.into()),
                     Value::BigNum(3.into()),
-                ]),
+                ],
+                Value::BigNum(1.into()),
                 true,
             ),
             (
-                Value::BigNum(0.into()),
-                Value::Array(vec![
+                vec![
                     Value::BigNum(1.into()),
                     Value::BigNum(2.into()),
                     Value::BigNum(3.into()),
-                ]),
+                ],
+                Value::BigNum(0.into()),
                 false,
             ),
         ];
 
-        for (value, arr, expected) in cases.into_iter() {
+        for (arr, value, expected) in cases.into_iter() {
             let rule = Rule::Function(Function::new_in(
-                Rule::Value(value.clone()),
-                Rule::Value(arr.clone()),
+                Value::Array(arr),
+                value,
             ));
             let expected = Some(Value::Bool(expected));
 
@@ -1206,33 +1206,33 @@ mod string_and_array {
             price: Default::default(),
         };
 
-        let cases = [
+        let cases = vec![
             (
-                Value::new_number(1),
-                Value::Array(vec![
+                vec![
                     Value::new_number(1),
                     Value::new_number(2),
                     Value::new_number(3),
-                ]),
+                ],
+                Value::new_number(1),
                 false,
             ),
             (
-                Value::new_number(0),
-                Value::Array(vec![
+                vec![
                     Value::new_number(1),
                     Value::new_number(2),
                     Value::new_number(3),
-                ]),
+                ],
+                Value::new_number(0),
                 true,
             ),
         ];
 
-        for (value, arr, expected) in cases.iter() {
+        for (arr, value, expected) in cases.into_iter() {
             let rule = Rule::Function(Function::new_nin(
-                Rule::Value(value.clone()),
-                Rule::Value(arr.clone()),
+                Value::Array(arr),
+                value,
             ));
-            let expected = Some(Value::Bool(*expected));
+            let expected = Some(Value::Bool(expected));
 
             assert_eq!(Ok(expected), rule.eval(&input, &mut output));
         }
