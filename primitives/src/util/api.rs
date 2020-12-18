@@ -56,6 +56,10 @@ impl ApiUrl {
         // this join is safe, since we always prefix the Url with `/`
         self.0.join(stripped)
     }
+
+    pub fn to_url(&self) -> Url {
+        self.0.clone()
+    }
 }
 
 impl fmt::Debug for ApiUrl {
