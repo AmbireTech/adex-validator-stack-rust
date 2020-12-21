@@ -232,6 +232,16 @@ impl SpecValidators {
         }
     }
 
+    pub fn find_index(&self, validator_id: &ValidatorId) -> i32 {
+        if &self.leader().id == validator_id {
+            0
+        } else if &self.follower().id == validator_id {
+            1
+        } else {
+            -1
+        }
+    }
+
     pub fn iter(&self) -> Iter<'_> {
         Iter::new(&self)
     }
