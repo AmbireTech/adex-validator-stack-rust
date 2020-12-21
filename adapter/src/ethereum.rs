@@ -295,7 +295,6 @@ impl RelayerClient {
     ) -> Result<bool, AdapterError<Error>> {
         use reqwest::Response;
         use std::collections::HashMap;
-
         let relay_url = format!(
             "{}/identity/by-owner/{}",
             self.relayer_url,
@@ -313,7 +312,6 @@ impl RelayerClient {
         let has_privileges = identities_owned
             .get(identity)
             .map_or(false, |privileges| *privileges > 0);
-
         Ok(has_privileges)
     }
 }
@@ -435,6 +433,10 @@ mod test {
     use primitives::{ChannelSpec, EventSubmission, SpecValidators, ValidatorDesc};
     use std::convert::TryFrom;
     use web3::types::Address;
+    use wiremock::{
+        matchers::{method, path},
+        Mock, MockServer, ResponseTemplate,
+    };
 
     fn setup_eth_adapter(contract_address: Option<[u8; 20]>) -> EthereumAdapter {
         let mut config = configuration("development", None).expect("failed parse config");
@@ -543,12 +545,23 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn test_session_from_token() {
         use primitives::ToETHChecksum;
+        use std::collections::HashMap;
+
         let identity = ValidatorId::try_from("0x5B04DBc513F90CaAFAa09307Ad5e3C65EB4b26F0").unwrap();
+        let server = MockServer::start().await;
+        let mut identities_owned: HashMap<ValidatorId, u8> = HashMap::new();
+        identities_owned.insert(identity, 2);
 
         let mut eth_adapter = setup_eth_adapter(None);
+
+        Mock::given(method("GET"))
+            .and(path(format!("/identity/by-owner/{}", eth_adapter.whoami())))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&identities_owned))
+            .mount(&server)
+            .await;
+
         eth_adapter.unlock().expect("should unlock eth adapter");
         let wallet = eth_adapter.wallet.clone();
 
