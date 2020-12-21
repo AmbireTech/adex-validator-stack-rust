@@ -8,7 +8,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 
-use crate::{targeting::Rule, AdUnit, BigNum, EventSubmission, ValidatorDesc, ValidatorId};
+use crate::{targeting::Rules, AdUnit, BigNum, EventSubmission, ValidatorDesc, ValidatorId};
 use hex::{FromHex, FromHexError};
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Copy, Clone, Hash)]
@@ -96,7 +96,7 @@ pub struct Channel {
     #[serde(with = "ts_seconds")]
     pub valid_until: DateTime<Utc>,
     #[serde(default)]
-    pub targeting_rules: Vec<Rule>,
+    pub targeting_rules: Rules,
     pub spec: ChannelSpec,
 }
 
@@ -181,7 +181,7 @@ pub struct ChannelSpec {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ad_units: Vec<AdUnit>,
     #[serde(default)]
-    pub targeting_rules: Vec<Rule>,
+    pub targeting_rules: Rules,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
@@ -370,7 +370,7 @@ mod test {
 pub mod postgres {
     use super::ChannelId;
     use super::{Channel, ChannelSpec};
-    use crate::targeting::Rule;
+    use crate::targeting::Rules;
     use bytes::BytesMut;
     use hex::FromHex;
     use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
@@ -385,7 +385,7 @@ pub mod postgres {
                 deposit_asset: row.get("deposit_asset"),
                 deposit_amount: row.get("deposit_amount"),
                 valid_until: row.get("valid_until"),
-                targeting_rules: row.get::<_, Json<Vec<Rule>>>("targeting_rules").0,
+                targeting_rules: row.get::<_, Json<Rules>>("targeting_rules").0,
                 spec: row.get::<_, Json<ChannelSpec>>("spec").0,
             }
         }
