@@ -427,9 +427,9 @@ mod test {
     use crate::EthereumChannel;
     use chrono::{Duration, Utc};
     use hex::FromHex;
-    use primitives::adapter::KeystoreOptions;
     use primitives::config::configuration;
     use primitives::ChannelId;
+    use primitives::{adapter::KeystoreOptions, targeting::Rules};
     use primitives::{ChannelSpec, EventSubmission, SpecValidators, ValidatorDesc};
     use std::convert::TryFrom;
     use web3::types::Address;
@@ -664,13 +664,13 @@ mod test {
             deposit_asset: eth_checksum::checksum(&format!("{:?}", token_contract.address())),
             deposit_amount: 2_000.into(),
             valid_until: Utc::now() + Duration::days(2),
-            targeting_rules: vec![],
+            targeting_rules: Rules::new(),
             spec: ChannelSpec {
                 title: None,
                 validators: SpecValidators::new(leader_validator_desc, follower_validator_desc),
                 max_per_impression: 10.into(),
                 min_per_impression: 10.into(),
-                targeting_rules: vec![],
+                targeting_rules: Rules::new(),
                 event_submission: Some(EventSubmission { allow: vec![] }),
                 created: Utc::now(),
                 active_from: None,
