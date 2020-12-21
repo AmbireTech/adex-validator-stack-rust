@@ -140,7 +140,7 @@ async fn on_new_state<'a, A: Adapter + 'static>(
     let signature = iface.adapter.sign(&new_state.state_root)?;
     let health_threshold = u64::from(iface.config.health_threshold_promilles);
     let is_healthy = health >= health_threshold;
-    let exhausted = proposed_balances.clone().values().sum::<BigNum>() == iface.channel.deposit_amount;
+    let exhausted = proposed_balances.values().sum::<BigNum>() == iface.channel.deposit_amount;
 
     let propagation_result = iface
         .propagate(&[&MessageTypes::ApproveState(ApproveState {

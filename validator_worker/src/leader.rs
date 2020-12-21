@@ -49,7 +49,7 @@ async fn on_new_accounting<A: Adapter + 'static>(
 
     let signature = iface.adapter.sign(&state_root)?;
 
-    let exhausted = new_accounting.balances.clone().values().sum::<BigNum>() == iface.channel.deposit_amount;
+    let exhausted = new_accounting.balances.values().sum::<BigNum>() == iface.channel.deposit_amount;
 
     let propagation_results = iface
         .propagate(&[&MessageTypes::NewState(NewState {
