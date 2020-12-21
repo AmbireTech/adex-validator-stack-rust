@@ -98,6 +98,12 @@ pub struct Channel {
     #[serde(default)]
     pub targeting_rules: Vec<Rule>,
     pub spec: ChannelSpec,
+    #[serde(default)]
+    pub exhausted: Vec<bool>
+}
+
+pub fn channel_exhausted(channel: &Channel) -> bool {
+    channel.exhausted.len() == 2 && channel.exhausted.iter().all(|&x| x == true)
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
@@ -387,6 +393,7 @@ pub mod postgres {
                 valid_until: row.get("valid_until"),
                 targeting_rules: row.get::<_, Json<Vec<Rule>>>("targeting_rules").0,
                 spec: row.get::<_, Json<ChannelSpec>>("spec").0,
+                exhausted: row.get("exhausted"),
             }
         }
     }

@@ -82,6 +82,7 @@ lazy_static! {
                 ad_units: vec![],
                 pricing_bounds: Some(PricingBounds {impression: None, click: Some(Pricing { max: 0.into(), min: 0.into()})}),
             },
+            exhausted: Default::default(),
         }
     };
 
