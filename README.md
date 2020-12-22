@@ -22,6 +22,7 @@ Requirements:
 - Docker
 
 #### Linux
+
 - `build-essentials` is required to build the project (error: `linker ``cc`` not found`)
 - The crate `openssl-sys` requires `libssl-dev` and `pkg-config` for Ubuntu.
 
