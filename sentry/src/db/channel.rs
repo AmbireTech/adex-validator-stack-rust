@@ -101,23 +101,22 @@ pub async fn update_exhausted_channel(
     channel: &Channel,
     index: i32,
 ) -> Result<bool, RunError<bb8_postgres::tokio_postgres::Error>> {
-    pool
-        .run(move | connection| {
-            async move {
-                match connection.prepare("UPDATE channels SET exhausted[$1] = true WHERE id = $2").await {
-                    Ok(stmt) => match connection.execute(&stmt, &[&index, &channel.id]).await {
-                        Ok(row) => {
-                            let updated = row == 1;
-                            Ok((updated, connection))
-                        },
-                        Err(e) => Err((e, connection)),
-                    },
-                    Err(e) => Err((e, connection)),
+    pool.run(move |connection| async move {
+        match connection
+            .prepare("UPDATE channels SET exhausted[$1] = true WHERE id = $2")
+            .await
+        {
+            Ok(stmt) => match connection.execute(&stmt, &[&index, &channel.id]).await {
+                Ok(row) => {
+                    let updated = row == 1;
+                    Ok((updated, connection))
                 }
-            }
-        })
-        .await
-
+                Err(e) => Err((e, connection)),
+            },
+            Err(e) => Err((e, connection)),
+        }
+    })
+    .await
 }
 
 mod list_channels {
