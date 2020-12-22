@@ -44,7 +44,7 @@ pub mod units_for_slot {
     pub mod response {
 
         use crate::{
-            targeting::{Input, Rule},
+            targeting::{Input, Rules},
             BigNum, ChannelId, ChannelSpec, SpecValidators, ValidatorId, IPFS,
         };
         use chrono::{
@@ -75,7 +75,7 @@ pub mod units_for_slot {
         pub struct Campaign {
             #[serde(flatten)]
             pub channel: Channel,
-            pub targeting_rules: Vec<Rule>,
+            pub targeting_rules: Rules,
             pub units_with_price: Vec<UnitsWithPrice>,
         }
 
