@@ -254,15 +254,14 @@ pub async fn create_validator_messages<A: Adapter + 'static>(
             .await?;
 
             if channel_is_exhausted {
-                // can never be -1
-                let validator_index = channel.spec.validators.find_index(&session.uid);                
-                update_exhausted_channel(
-                    &app.pool,
-                    &channel,
-                    validator_index
-                ).await?;
+                if let Some(validator_index) = channel.spec.validators.find_index(&session.uid) {
+                    update_exhausted_channel(
+                        &app.pool,
+                        &channel,
+                        validator_index
+                    ).await?;
+                }
             }
-
 
             Ok(success_response(serde_json::to_string(&SuccessResponse {
                 success: true,
