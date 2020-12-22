@@ -679,6 +679,7 @@ mod test {
                 ad_units: vec![],
                 pricing_bounds: None,
             },
+            exhausted: Default::default(),
         };
 
         // convert to eth channel

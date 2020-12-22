@@ -165,6 +165,8 @@ pub struct ApproveState {
     pub state_root: String,
     pub signature: String,
     pub is_healthy: bool,
+    #[serde(default)]
+    pub exhausted: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -173,6 +175,8 @@ pub struct NewState {
     pub state_root: String,
     pub signature: String,
     pub balances: BalancesMap,
+    #[serde(default)]
+    pub exhausted: bool,
 }
 
 #[derive(Default, Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]

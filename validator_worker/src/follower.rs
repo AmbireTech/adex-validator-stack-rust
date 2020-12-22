@@ -3,7 +3,7 @@ use std::fmt;
 
 use primitives::adapter::{Adapter, AdapterErrorKind};
 use primitives::validator::{ApproveState, MessageTypes, NewState, RejectState};
-use primitives::BalancesMap;
+use primitives::{BalancesMap, BigNum};
 
 use crate::core::follower_rules::{get_health, is_valid_transition};
 use crate::heartbeat::{heartbeat, HeartbeatStatus};
@@ -140,12 +140,14 @@ async fn on_new_state<'a, A: Adapter + 'static>(
     let signature = iface.adapter.sign(&new_state.state_root)?;
     let health_threshold = u64::from(iface.config.health_threshold_promilles);
     let is_healthy = health >= health_threshold;
+    let exhausted = proposed_balances.values().sum::<BigNum>() == iface.channel.deposit_amount;
 
     let propagation_result = iface
         .propagate(&[&MessageTypes::ApproveState(ApproveState {
             state_root: proposed_state_root,
             signature,
             is_healthy,
+            exhausted,
         })])
         .await;
 

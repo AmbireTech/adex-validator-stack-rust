@@ -6,6 +6,7 @@ CREATE TABLE channels
     deposit_amount VARCHAR(255)             NOT NULL,
     valid_until    TIMESTAMP(2) WITH TIME ZONE NOT NULL,
     spec           JSONB                    NOT NULL,
+    exhausted      BOOLEAN[2]
 
     PRIMARY KEY (id)
 );

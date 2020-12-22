@@ -1,5 +1,8 @@
 use crate::db::event_aggregate::{latest_approve_state, latest_heartbeats, latest_new_state};
-use crate::db::{get_channel_by_id, insert_channel, insert_validator_messages, list_channels};
+use crate::db::{
+    get_channel_by_id, insert_channel, insert_validator_messages, list_channels,
+    update_exhausted_channel,
+};
 use crate::{success_response, Application, Auth, ResponseError, RouteParams, Session};
 use bb8::RunError;
 use bb8_postgres::tokio_postgres::error;
@@ -238,6 +241,12 @@ pub async fn create_validator_messages<A: Adapter + 'static>(
         .get("messages")
         .ok_or_else(|| ResponseError::BadRequest("missing messages body".to_string()))?;
 
+    let channel_is_exhausted = messages.iter().any(|message| match message {
+        MessageTypes::ApproveState(approve) => approve.exhausted,
+        MessageTypes::NewState(new_state) => new_state.exhausted,
+        _ => false,
+    });
+
     match channel.spec.validators.find(&session.uid) {
         None => Err(ResponseError::Unauthorized),
         _ => {
@@ -245,6 +254,12 @@ pub async fn create_validator_messages<A: Adapter + 'static>(
                 insert_validator_messages(&app.pool, &channel, &session.uid, &message)
             }))
             .await?;
+
+            if channel_is_exhausted {
+                if let Some(validator_index) = channel.spec.validators.find_index(&session.uid) {
+                    update_exhausted_channel(&app.pool, &channel, validator_index).await?;
+                }
+            }
 
             Ok(success_response(serde_json::to_string(&SuccessResponse {
                 success: true,

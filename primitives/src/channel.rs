@@ -98,6 +98,12 @@ pub struct Channel {
     #[serde(default)]
     pub targeting_rules: Rules,
     pub spec: ChannelSpec,
+    #[serde(default)]
+    pub exhausted: Vec<bool>,
+}
+
+pub fn channel_exhausted(channel: &Channel) -> bool {
+    channel.exhausted.len() == 2 && channel.exhausted.iter().all(|&x| x)
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
@@ -221,6 +227,16 @@ impl SpecValidators {
             Some(SpecValidator::Leader(&self.leader()))
         } else if &self.follower().id == validator_id {
             Some(SpecValidator::Follower(&self.follower()))
+        } else {
+            None
+        }
+    }
+
+    pub fn find_index(&self, validator_id: &ValidatorId) -> Option<i32> {
+        if &self.leader().id == validator_id {
+            Some(0)
+        } else if &self.follower().id == validator_id {
+            Some(1)
         } else {
             None
         }
@@ -387,6 +403,7 @@ pub mod postgres {
                 valid_until: row.get("valid_until"),
                 targeting_rules: row.get::<_, Json<Rules>>("targeting_rules").0,
                 spec: row.get::<_, Json<ChannelSpec>>("spec").0,
+                exhausted: row.get("exhausted"),
             }
         }
     }
