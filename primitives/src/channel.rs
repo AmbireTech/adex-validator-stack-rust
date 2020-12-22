@@ -99,11 +99,11 @@ pub struct Channel {
     pub targeting_rules: Rules,
     pub spec: ChannelSpec,
     #[serde(default)]
-    pub exhausted: Vec<bool>
+    pub exhausted: Vec<bool>,
 }
 
 pub fn channel_exhausted(channel: &Channel) -> bool {
-    channel.exhausted.len() == 2 && channel.exhausted.iter().all(|&x| x == true)
+    channel.exhausted.len() == 2 && channel.exhausted.iter().all(|&x| x)
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
