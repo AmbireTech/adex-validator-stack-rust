@@ -6,20 +6,18 @@ jobs:
   ci-flow:
     name: Runs `cargo make ci-flow` - Tests, clippy & rustfmt
     runs-on: ubuntu-latest
-    services:
-      ganache-cli:
-        image: docker://trufflesuite/ganache-cli:latest
-        ports:
-          - 8545:8545
-        volumes:
-          - ${GITHUB_WORKSPACE}/adapter/scripts:/scripts
-        options: --entrypoint /scripts/ganache-cli.sh
     steps:
       - uses: actions/checkout@v2
         with:
           submodules: true
-      - uses: zhulik/redis-action@1.1.0
-      - uses: harmon758/postgresql-action@v1
+      - name: ganache-cli
+        uses: docker://trufflesuite/ganache-cli:latest
+        with:
+          entrypoint: ./adapter/scripts/ganache-cli.sh
+      - name: Redis
+        uses: zhulik/redis-action@1.1.0
+      - name: Postgres
+        uses: harmon758/postgresql-action@v1
         with:
           # the used database will also be `postgres`
           postgresql user: postgres
