@@ -10,7 +10,6 @@ use crate::Session;
 use crate::{analytics_recorder, Auth};
 use async_std::sync::RwLock;
 use chrono::Utc;
-use futures::stream::{self, StreamExt};
 use lazy_static::lazy_static;
 use primitives::adapter::Adapter;
 use primitives::sentry::{Event, EventAggregate};
@@ -147,20 +146,12 @@ impl EventAggregator {
             _ => ResponseError::BadRequest(e.to_string()),
         })?;
 
-        let events_stream = stream::iter(events);
-        let events_eval = events_stream.then(|ev| async move {
-            match ev {
-                Event::UpdateTargeting { targeting_rules } => {
-                    update_targeting_rules(&app.pool, &channel_id, &targeting_rules).await
-                }
-                _ => Ok(false),
+        let ut_ev = events.iter().find(|ev| matches!(ev, Event::UpdateTargeting { .. }));
+        if let Some(ev) = ut_ev {
+            if let Event::UpdateTargeting{ targeting_rules } = ev {
+                update_targeting_rules(&app.pool, &channel_id, &targeting_rules).await?;
             }
-        });
-        let events_eval = events_eval.collect::<Vec<_>>().await;
-        let events_eval: Result<Vec<bool>, bb8::RunError<_>> = events_eval.into_iter().collect();
-        if let Err(e) = events_eval {
-            return Err(ResponseError::BadRequest(e.to_string()));
-        };
+        }
 
         events.iter().for_each(|ev| {
             match event_reducer::reduce(
