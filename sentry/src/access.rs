@@ -5,6 +5,7 @@ use redis::aio::MultiplexedConnection;
 use crate::{Auth, Session};
 use primitives::event_submission::{RateLimit, Rule};
 use primitives::sentry::Event;
+use primitives::targeting::Rules;
 use primitives::Channel;
 use std::cmp::PartialEq;
 use thiserror::Error;
@@ -261,7 +262,7 @@ mod test {
     fn get_update_targeting_events(count: i8) -> Vec<Event> {
         (0..count)
             .map(|_| Event::UpdateTargeting {
-                targeting_rules: vec![],
+                targeting_rules: Rules::new(),
             })
             .collect()
     }
@@ -571,7 +572,7 @@ mod test {
             },
             Event::Close,
             Event::UpdateTargeting {
-                targeting_rules: vec![],
+                targeting_rules: Rules::new(),
             },
         ];
         let err_response = check_access(
@@ -621,7 +622,7 @@ mod test {
                 referrer: None,
             },
             Event::UpdateTargeting {
-                targeting_rules: vec![],
+                targeting_rules: Rules::new(),
             },
         ];
         let err_response = check_access(
