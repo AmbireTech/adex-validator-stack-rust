@@ -146,9 +146,11 @@ impl EventAggregator {
             _ => ResponseError::BadRequest(e.to_string()),
         })?;
 
-        let ut_ev = events.iter().find(|ev| matches!(ev, Event::UpdateTargeting { .. }));
+        let ut_ev = events
+            .iter()
+            .find(|ev| matches!(ev, Event::UpdateTargeting { .. }));
         if let Some(ev) = ut_ev {
-            if let Event::UpdateTargeting{ targeting_rules } = ev {
+            if let Event::UpdateTargeting { targeting_rules } = ev {
                 update_targeting_rules(&app.pool, &channel_id, &targeting_rules).await?;
             }
         }
