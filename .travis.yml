@@ -34,7 +34,8 @@ jobs:
         - which cargo-make || cargo install cargo-make
       script:
         - cargo make ci-flow
-      
+      services:
+        - redis
     - stage: release validator
       # Disable the default Rust `install` & `script` from Travis
       install:
