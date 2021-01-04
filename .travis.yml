@@ -31,14 +31,14 @@ jobs:
       before_cache:
         - rm -rf /home/travis/.cargo/registry
     - stage: deploy
-      if: tag IS present
+      if: (tag IS present) AND (tag =~ ^validator-v)
       before_deploy:
         - cargo build -p validator_worker --release --all-features --target x86_64-unknown-linux-gnu
-        - cp target/x86_64-unknown-linux-gnu/release/validator_worker validator_worker-v$TRAVIS_TAG
+        - cp target/x86_64-unknown-linux-gnu/release/validator_worker $TRAVIS_TAG
       deploy:
         provider: releases
         api_key: $GITHUB_API_TOKEN
-        file: $TRAVIS_BUILD_DIR/validator_worker-v$TRAVIS_TAG
+        file: $TRAVIS_BUILD_DIR/$TRAVIS_TAG
         skip_cleanup: true
         draft: true
         on:
