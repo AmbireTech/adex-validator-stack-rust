@@ -2,7 +2,7 @@ use crate::db::DbPool;
 use bb8::RunError;
 use chrono::Utc;
 use primitives::validator::MessageTypes;
-use primitives::{targeting::Rule, Channel, ChannelId, ValidatorId};
+use primitives::{targeting::Rules, Channel, ChannelId, ValidatorId};
 use std::str::FromStr;
 
 pub use list_channels::list_channels;
@@ -75,7 +75,7 @@ pub async fn insert_channel(
 pub async fn update_targeting_rules(
     pool: &DbPool,
     channel_id: &ChannelId,
-    targeting_rules: &[Rule],
+    targeting_rules: &Rules,
 ) -> Result<bool, RunError<bb8_postgres::tokio_postgres::Error>> {
     pool.run(move |connection| async move {
         match connection

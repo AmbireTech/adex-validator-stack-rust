@@ -1,4 +1,4 @@
-use crate::targeting::Rule;
+use crate::targeting::Rules;
 use crate::validator::MessageTypes;
 use crate::{BigNum, Channel, ChannelId, ValidatorId};
 use chrono::{DateTime, Utc};
@@ -54,7 +54,7 @@ pub enum Event {
         referrer: Option<String>,
     },
     /// only the creator can send this event
-    UpdateTargeting { targeting_rules: Vec<Rule> },
+    UpdateTargeting { targeting_rules: Rules },
     /// only the creator can send this event
     Close,
 }
