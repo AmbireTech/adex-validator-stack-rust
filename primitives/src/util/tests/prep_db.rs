@@ -1,7 +1,8 @@
 use crate::{
     channel::{Pricing, PricingBounds},
-    BigNum, Channel, ChannelId, ChannelSpec, EventSubmission, SpecValidators, ValidatorDesc,
-    ValidatorId,
+    targeting::Rules,
+    AdUnit, BigNum, Channel, ChannelId, ChannelSpec, EventSubmission, SpecValidators,
+    ValidatorDesc, ValidatorId, IPFS,
 };
 use chrono::{TimeZone, Utc};
 use fake::faker::{Faker, Number};
@@ -36,7 +37,7 @@ lazy_static! {
         auth.insert("user".into(), "x8c9v1b2".into());
         auth.insert("publisher".into(), "testing".into());
         auth.insert("publisher2".into(), "testing2".into());
-        auth.insert("creator".into(), "0x033ed90e0fec3f3ea1c9b005c724d704501e0196".into());
+        auth.insert("creator".into(), "0x033Ed90e0FeC3F3ea1C9b005C724D704501e0196".into());
         auth.insert("tester".into(), "AUTH_awesomeTester".into());
 
         auth
@@ -64,6 +65,7 @@ lazy_static! {
             creator: ValidatorId::try_from("033ed90e0fec3f3ea1c9b005c724d704501e0196").expect("Should be valid ValidatorId"),
             deposit_asset: "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359".to_string(),
             deposit_amount: 1_000.into(),
+            targeting_rules: Rules::new(),
             // UNIX timestamp for 2100-01-01
             valid_until: Utc.timestamp(4_102_444_800, 0),
             spec: ChannelSpec {
@@ -71,17 +73,95 @@ lazy_static! {
                 validators: SpecValidators::new(DUMMY_VALIDATOR_LEADER.clone(), DUMMY_VALIDATOR_FOLLOWER.clone()),
                 max_per_impression: 10.into(),
                 min_per_impression: 1.into(),
-                targeting: vec![],
-                min_targeting_score: None,
+                targeting_rules: Rules::new(),
                 event_submission: Some(EventSubmission { allow: vec![] }),
                 // July 29, 2019 7:00:00 AM
-                created: Some(Utc.timestamp(1_564_383_600, 0)),
+                created: Utc.timestamp(1_564_383_600, 0),
                 active_from: None,
                 nonce: Some(nonce),
                 withdraw_period_start: Utc.timestamp_millis(4_073_414_400_000),
                 ad_units: vec![],
                 pricing_bounds: Some(PricingBounds {impression: None, click: Some(Pricing { max: 0.into(), min: 0.into()})}),
             },
+            exhausted: Default::default(),
         }
     };
+
+    pub static ref DUMMY_AD_UNITS: [AdUnit; 4] = [
+        AdUnit {
+            ipfs: IPFS::try_from("Qmasg8FrbuSQpjFu3kRnZF9beg8rEBFrqgi1uXDRwCbX5f")
+                .expect("should convert"),
+            media_url: "ipfs://QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR".to_string(),
+            media_mime: "image/jpeg".to_string(),
+            target_url: "https://www.adex.network/?stremio-test-banner-1".to_string(),
+            archived: false,
+            description: Some("Dummy AdUnit description 1".to_string()),
+            ad_type: "legacy_250x250".to_string(),
+            /// Timestamp: 1 564 383 600
+            created: Utc.ymd(2019, 7, 29).and_hms(9, 0, 0),
+            min_targeting_score: None,
+            modified: None,
+            owner: IDS["publisher"],
+            title: Some("Dummy AdUnit 3".to_string()),
+        },
+        AdUnit {
+            ipfs: IPFS::try_from("QmVhRDGXoM3Fg3HZD5xwMuxtb9ZErwC8wHt8CjsfxaiUbZ")
+                .expect("should convert"),
+            media_url: "ipfs://QmQB7uz7Gxfy7wqAnrnBcZFaVJLos8J9gn8mRcHQU6dAi1".to_string(),
+            media_mime: "image/jpeg".to_string(),
+            target_url: "https://www.adex.network/?adex-campaign=true&pub=stremio".to_string(),
+            archived: false,
+            description: Some("Dummy AdUnit description 2".to_string()),
+            ad_type: "legacy_250x250".to_string(),
+            /// Timestamp: 1 564 383 600
+            created: Utc.ymd(2019, 7, 29).and_hms(9, 0, 0),
+            min_targeting_score: None,
+            modified: None,
+            owner: IDS["publisher"],
+            title: Some("Dummy AdUnit 2".to_string()),
+        },
+        AdUnit {
+            ipfs: IPFS::try_from("QmYwcpMjmqJfo9ot1jGe9rfXsszFV1WbEA59QS7dEVHfJi")
+                .expect("should convert"),
+            media_url: "ipfs://QmQB7uz7Gxfy7wqAnrnBcZFaVJLos8J9gn8mRcHQU6dAi1".to_string(),
+            media_mime: "image/jpeg".to_string(),
+            target_url: "https://www.adex.network/?adex-campaign=true".to_string(),
+            archived: false,
+            description: Some("Dummy AdUnit description 3".to_string()),
+            ad_type: "legacy_250x250".to_string(),
+            /// Timestamp: 1 564 383 600
+            created: Utc.ymd(2019, 7, 29).and_hms(9, 0, 0),
+            min_targeting_score: None,
+            modified: None,
+            owner: IDS["publisher"],
+            title: Some("Dummy AdUnit 3".to_string()),
+        },
+        AdUnit {
+            ipfs: IPFS::try_from("QmTAF3FsFDS7Ru8WChoD9ofiHTH8gAQfR4mYSnwxqTDpJH")
+                .expect("should convert"),
+            media_url: "ipfs://QmQAcfBJpDDuH99A4p3pFtUmQwamS8UYStP5HxHC7bgYXY".to_string(),
+            media_mime: "image/jpeg".to_string(),
+            target_url: "https://adex.network".to_string(),
+            archived: false,
+            description: Some("Dummy AdUnit description 4".to_string()),
+            ad_type: "legacy_250x250".to_string(),
+            /// Timestamp: 1 564 383 600
+            created: Utc.ymd(2019, 7, 29).and_hms(9, 0, 0),
+            min_targeting_score: None,
+            modified: None,
+            owner: IDS["publisher"],
+            title: Some("Dummy AdUnit 4".to_string()),
+        },
+    ];
+
+    // CID V0
+    pub static ref DUMMY_IPFS: [IPFS; 5] = [
+        IPFS::try_from("QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR").expect("Valid IPFS V0"),
+        IPFS::try_from("Qmasg8FrbuSQpjFu3kRnZF9beg8rEBFrqgi1uXDRwCbX5f").expect("Valid IPFS V0"),
+        IPFS::try_from("QmQnu8zrHsuVvnTJsEgDHYA8c1MmRL7YLiMD8uzDUJKcNq").expect("Valid IPFS V0"),
+        IPFS::try_from("QmYYBULc9QDEaDr8HAXvVWHDmFfL2GvyumYRr1g4ERBC96").expect("Valid IPFS V0"),
+        // V1 of the V0 ipfs: `QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR`
+        IPFS::try_from("bafybeif2h3mynaf3ylgdbs6arf6mczqycargt5cqm3rmel3wpjarlswway").expect("Valid IPFS V1"),
+    ];
+
 }

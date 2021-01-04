@@ -1,4 +1,5 @@
 use std::convert::TryFrom;
+use std::fmt;
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, Mul, Sub};
 use std::str::FromStr;
@@ -9,19 +10,7 @@ use num_derive::{Num, NumOps, One, Zero};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(
-    Serialize,
-    Deserialize,
-    Debug,
-    Clone,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    NumOps,
-    One,
-    Zero,
-    Num,
-    Default,
+    Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, NumOps, One, Zero, Num, Default,
 )]
 pub struct BigNum(
     #[serde(
@@ -54,6 +43,18 @@ impl BigNum {
 
     pub fn to_str_radix(&self, radix: u32) -> String {
         self.0.to_str_radix(radix)
+    }
+
+    pub fn from_bytes_be(buf: &[u8]) -> Self {
+        Self(BigUint::from_bytes_be(buf))
+    }
+}
+
+impl fmt::Debug for BigNum {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let radix = 10;
+        let value = self.to_str_radix(radix);
+        write!(f, "BigNum(radix: {}; {})", radix, value)
     }
 }
 
@@ -200,6 +201,14 @@ impl TryFrom<&str> for BigNum {
     }
 }
 
+impl FromStr for BigNum {
+    type Err = super::DomainError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        BigNum::try_from(s)
+    }
+}
+
 impl ToString for BigNum {
     fn to_string(&self) -> String {
         self.0.to_str_radix(10)
@@ -250,10 +259,7 @@ pub mod postgres {
         }
 
         fn accepts(ty: &Type) -> bool {
-            match *ty {
-                Type::TEXT | Type::VARCHAR => true,
-                _ => false,
-            }
+            matches!(*ty, Type::TEXT | Type::VARCHAR)
         }
     }
 
@@ -267,10 +273,7 @@ pub mod postgres {
         }
 
         fn accepts(ty: &Type) -> bool {
-            match *ty {
-                Type::TEXT | Type::VARCHAR => true,
-                _ => false,
-            }
+            matches!(*ty, Type::TEXT | Type::VARCHAR)
         }
 
         fn to_sql_checked(

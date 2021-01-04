@@ -1,28 +1,60 @@
 use std::error::Error;
+use std::fmt;
 
-use primitives::adapter::Adapter;
+use primitives::adapter::{Adapter, AdapterErrorKind};
 use primitives::validator::{ApproveState, MessageTypes, NewState, RejectState};
-use primitives::BalancesMap;
+use primitives::{BalancesMap, BigNum};
 
 use crate::core::follower_rules::{get_health, is_valid_transition};
-use crate::heartbeat::heartbeat;
-use crate::sentry_interface::SentryApi;
+use crate::heartbeat::{heartbeat, HeartbeatStatus};
+use crate::sentry_interface::{PropagationResult, SentryApi};
 use crate::{get_state_root_hash, producer};
 use chrono::Utc;
 
-enum InvalidNewState {
+#[derive(Debug)]
+pub enum InvalidNewState {
     RootHash,
     Signature,
     Transition,
     Health,
 }
 
-enum NewStateResult {
-    Ok,
-    Err(InvalidNewState),
+impl fmt::Display for InvalidNewState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use InvalidNewState::*;
+
+        let string = match self {
+            RootHash => "InvalidRootHash",
+            Signature => "InvalidSignature",
+            Transition => "InvalidTransition",
+            Health => "TooLowHealth",
+        };
+
+        write!(f, "{}", string)
+    }
 }
 
-pub async fn tick<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result<(), Box<dyn Error>> {
+#[derive(Debug)]
+pub enum ApproveStateResult<AE: AdapterErrorKind> {
+    /// If None, Conditions for handling the new state haven't been met
+    Sent(Option<Vec<PropagationResult<AE>>>),
+    RejectedState {
+        reason: InvalidNewState,
+        state_root: String,
+        propagation: Vec<PropagationResult<AE>>,
+    },
+}
+
+#[derive(Debug)]
+pub struct TickStatus<AE: AdapterErrorKind> {
+    pub heartbeat: HeartbeatStatus<AE>,
+    pub approve_state: ApproveStateResult<AE>,
+    pub producer_tick: producer::TickStatus<AE>,
+}
+
+pub async fn tick<A: Adapter + 'static>(
+    iface: &SentryApi<A>,
+) -> Result<TickStatus<A::AdapterError>, Box<dyn Error>> {
     let from = &iface.channel.spec.validators.leader().id;
     let new_msg_response = iface.get_latest_msg(from, &["NewState"]).await?;
     let new_msg = match new_msg_response {
@@ -42,21 +74,34 @@ pub async fn tick<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result<(), Box<
 
     let latest_is_responded_to = match (&new_msg, &our_latest_msg_state_root) {
         (Some(new_msg), Some(state_root)) => &new_msg.state_root == state_root,
-        (_, _) => false,
+        _ => false,
     };
 
-    let (balances, _) = producer::tick(&iface).await?;
-    if let (Some(new_state), false) = (new_msg, latest_is_responded_to) {
-        on_new_state(&iface, &balances, &new_state).await?;
-    }
-    heartbeat(&iface, balances).await.map(|_| ())
+    let producer_tick = producer::tick(&iface).await?;
+    let empty_balances = BalancesMap::default();
+    let balances = match &producer_tick {
+        producer::TickStatus::Sent { new_accounting, .. } => &new_accounting.balances,
+        producer::TickStatus::NoNewEventAggr(balances) => balances,
+        producer::TickStatus::EmptyBalances => &empty_balances,
+    };
+    let approve_state_result = if let (Some(new_state), false) = (new_msg, latest_is_responded_to) {
+        on_new_state(&iface, &balances, &new_state).await?
+    } else {
+        ApproveStateResult::Sent(None)
+    };
+
+    Ok(TickStatus {
+        heartbeat: heartbeat(&iface, &balances).await?,
+        approve_state: approve_state_result,
+        producer_tick,
+    })
 }
 
 async fn on_new_state<'a, A: Adapter + 'static>(
     iface: &'a SentryApi<A>,
     balances: &'a BalancesMap,
     new_state: &'a NewState,
-) -> Result<NewStateResult, Box<dyn Error>> {
+) -> Result<ApproveStateResult<A::AdapterError>, Box<dyn Error>> {
     let proposed_balances = new_state.balances.clone();
     let proposed_state_root = new_state.state_root.clone();
     if proposed_state_root != hex::encode(get_state_root_hash(&iface, &proposed_balances)?) {
@@ -95,35 +140,28 @@ async fn on_new_state<'a, A: Adapter + 'static>(
     let signature = iface.adapter.sign(&new_state.state_root)?;
     let health_threshold = u64::from(iface.config.health_threshold_promilles);
     let is_healthy = health >= health_threshold;
+    let exhausted = proposed_balances.values().sum::<BigNum>() == iface.channel.deposit_amount;
 
-    iface
+    let propagation_result = iface
         .propagate(&[&MessageTypes::ApproveState(ApproveState {
             state_root: proposed_state_root,
             signature,
             is_healthy,
+            exhausted,
         })])
         .await;
 
-    Ok(NewStateResult::Ok)
+    Ok(ApproveStateResult::Sent(Some(propagation_result)))
 }
 
 async fn on_error<'a, A: Adapter + 'static>(
     iface: &'a SentryApi<A>,
     new_state: &'a NewState,
     status: InvalidNewState,
-) -> NewStateResult {
-    use InvalidNewState::*;
-    let reason = match &status {
-        RootHash => "InvalidRootHash",
-        Signature => "InvalidSignature",
-        Transition => "InvalidTransition",
-        Health => "TooLowHealth",
-    }
-    .to_string();
-
-    iface
+) -> ApproveStateResult<A::AdapterError> {
+    let propagation = iface
         .propagate(&[&MessageTypes::RejectState(RejectState {
-            reason,
+            reason: status.to_string(),
             state_root: new_state.state_root.clone(),
             signature: new_state.signature.clone(),
             balances: Some(new_state.balances.clone()),
@@ -132,5 +170,9 @@ async fn on_error<'a, A: Adapter + 'static>(
         })])
         .await;
 
-    NewStateResult::Err(status)
+    ApproveStateResult::RejectedState {
+        reason: status,
+        state_root: new_state.state_root.clone(),
+        propagation,
+    }
 }

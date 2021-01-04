@@ -2,17 +2,29 @@ use std::error::Error;
 
 use chrono::{TimeZone, Utc};
 
-use primitives::adapter::Adapter;
+use primitives::adapter::{Adapter, AdapterErrorKind};
 use primitives::validator::{Accounting, MessageTypes};
-use primitives::BalancesMap;
+use primitives::{BalancesMap, ChannelId};
 
 use crate::core::events::merge_aggrs;
-use crate::sentry_interface::SentryApi;
+use crate::sentry_interface::{PropagationResult, SentryApi};
 use slog::info;
 
-pub type Result = std::result::Result<(BalancesMap, Option<Accounting>), Box<dyn Error>>;
+#[derive(Debug)]
+pub enum TickStatus<AE: AdapterErrorKind> {
+    Sent {
+        channel: ChannelId,
+        new_accounting: Accounting,
+        accounting_propagation: Vec<PropagationResult<AE>>,
+        event_counts: usize,
+    },
+    NoNewEventAggr(BalancesMap),
+    EmptyBalances,
+}
 
-pub async fn tick<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result {
+pub async fn tick<A: Adapter + 'static>(
+    iface: &SentryApi<A>,
+) -> Result<TickStatus<A::AdapterError>, Box<dyn Error>> {
     let validator_msg_resp = iface.get_our_latest_msg(&["Accounting"]).await?;
 
     let accounting = match validator_msg_resp {
@@ -29,10 +41,10 @@ pub async fn tick<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result {
         .await?;
 
     if aggrs.events.is_empty() {
-        return Ok((accounting.balances, None));
+        return Ok(TickStatus::NoNewEventAggr(accounting.balances));
     }
 
-    let (balances, new_accounting) = merge_aggrs(&accounting, &aggrs.events, &iface.channel)?;
+    let new_accounting = merge_aggrs(&accounting, &aggrs.events, &iface.channel)?;
 
     if new_accounting.balances.is_empty() {
         info!(
@@ -40,7 +52,7 @@ pub async fn tick<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result {
             "channel {}: empty Accounting balances, skipping propagation", iface.channel.id
         );
 
-        Ok((balances, None))
+        Ok(TickStatus::EmptyBalances)
     } else {
         info!(
             iface.logger,
@@ -50,8 +62,12 @@ pub async fn tick<A: Adapter + 'static>(iface: &SentryApi<A>) -> Result {
         );
 
         let message_types = MessageTypes::Accounting(new_accounting.clone());
-        iface.propagate(&[&message_types]).await;
 
-        Ok((balances, Some(new_accounting)))
+        Ok(TickStatus::Sent {
+            channel: iface.channel.id,
+            accounting_propagation: iface.propagate(&[&message_types]).await,
+            new_accounting,
+            event_counts: aggrs.events.len(),
+        })
     }
 }

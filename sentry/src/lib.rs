@@ -1,37 +1,35 @@
 #![deny(clippy::all)]
 #![deny(rust_2018_idioms)]
 
-use crate::chain::chain;
 use crate::db::DbPool;
 use crate::event_aggregator::EventAggregator;
-use crate::middleware::auth;
-use crate::middleware::channel::{channel_load, get_channel_id};
-use crate::middleware::cors::{cors, Cors};
 use crate::routes::channel::channel_status;
 use crate::routes::event_aggregate::list_channel_event_aggregates;
 use crate::routes::validator_message::{extract_params, list_validator_messages};
 use chrono::Utc;
-use futures::future::{BoxFuture, FutureExt};
 use hyper::{Body, Method, Request, Response, StatusCode};
 use lazy_static::lazy_static;
+use middleware::{
+    auth::{AuthRequired, Authenticate},
+    channel::{ChannelLoad, GetChannelId},
+    cors::{cors, Cors},
+};
+use middleware::{Chain, Middleware};
 use primitives::adapter::Adapter;
+use primitives::sentry::ValidationErrorResponse;
 use primitives::{Config, ValidatorId};
 use redis::aio::MultiplexedConnection;
 use regex::Regex;
 use routes::analytics::{advanced_analytics, advertiser_analytics, analytics, publisher_analytics};
 use routes::cfg::config;
 use routes::channel::{
-    channel_list, create_channel, create_validator_messages, insert_events, last_approved,
+    channel_list, channel_validate, create_channel, create_validator_messages, insert_events,
+    last_approved,
 };
-use slog::{error, Logger};
+use slog::Logger;
 use std::collections::HashMap;
 
-pub mod middleware {
-    pub mod auth;
-    pub mod channel;
-    pub mod cors;
-}
-
+pub mod middleware;
 pub mod routes {
     pub mod analytics;
     pub mod cfg;
@@ -42,10 +40,10 @@ pub mod routes {
 
 pub mod access;
 pub mod analytics_recorder;
-mod chain;
 pub mod db;
 pub mod event_aggregator;
 pub mod event_reducer;
+pub mod payout;
 
 lazy_static! {
     static ref CHANNEL_GET_BY_ID: Regex =
@@ -58,22 +56,7 @@ lazy_static! {
     static ref ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
     static ref ADVERTISER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-advertiser/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
     static ref PUBLISHER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-publisher/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
-    static ref CREATE_EVENTS_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events(/.*)?$").expect("The regex should be valid");
-
-}
-
-fn auth_required_middleware<'a, A: Adapter>(
-    req: Request<Body>,
-    _: &Application<A>,
-) -> BoxFuture<'a, Result<Request<Body>, ResponseError>> {
-    async move {
-        if req.extensions().get::<Session>().is_some() {
-            Ok(req)
-        } else {
-            Err(ResponseError::Unauthorized)
-        }
-    }
-    .boxed()
+    static ref CREATE_EVENTS_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events/?$").expect("The regex should be valid");
 }
 
 #[derive(Debug)]
@@ -97,7 +80,6 @@ pub struct Application<A: Adapter> {
     pub pool: DbPool,
     pub config: Config,
     pub event_aggregator: EventAggregator,
-    __secret: (),
 }
 
 impl<A: Adapter + 'static> Application<A> {
@@ -115,7 +97,6 @@ impl<A: Adapter + 'static> Application<A> {
             redis,
             pool,
             event_aggregator: Default::default(),
-            __secret: (),
         }
     }
 
@@ -127,23 +108,20 @@ impl<A: Adapter + 'static> Application<A> {
             None => Default::default(),
         };
 
-        let req = match auth::for_request(req, &self.adapter, self.redis.clone()).await {
+        let req = match Authenticate.call(req, &self).await {
             Ok(req) => req,
-            Err(error) => {
-                error!(&self.logger, "{}", &error; "module" => "middleware-auth");
-                return map_response_error(ResponseError::BadRequest("invalid auth".into()));
-            }
+            Err(error) => return map_response_error(error),
         };
 
-        let path = req.uri().path().to_string();
-        let mut response = match (path.as_ref(), req.method()) {
+        let mut response = match (req.uri().path(), req.method()) {
             ("/cfg", &Method::GET) => config(req, &self).await,
             ("/channel", &Method::POST) => create_channel(req, &self).await,
             ("/channel/list", &Method::GET) => channel_list(req, &self).await,
+            ("/channel/validate", &Method::POST) => channel_validate(req, &self).await,
 
             ("/analytics", &Method::GET) => analytics(req, &self).await,
             ("/analytics/advanced", &Method::GET) => {
-                let req = match chain(req, &self, vec![Box::new(auth_required_middleware)]).await {
+                let req = match AuthRequired.call(req, &self).await {
                     Ok(req) => req,
                     Err(error) => {
                         return map_response_error(error);
@@ -153,7 +131,7 @@ impl<A: Adapter + 'static> Application<A> {
                 advanced_analytics(req, &self).await
             }
             ("/analytics/for-advertiser", &Method::GET) => {
-                let req = match chain(req, &self, vec![Box::new(auth_required_middleware)]).await {
+                let req = match AuthRequired.call(req, &self).await {
                     Ok(req) => req,
                     Err(error) => {
                         return map_response_error(error);
@@ -162,7 +140,7 @@ impl<A: Adapter + 'static> Application<A> {
                 advertiser_analytics(req, &self).await
             }
             ("/analytics/for-publisher", &Method::GET) => {
-                let req = match chain(req, &self, vec![Box::new(auth_required_middleware)]).await {
+                let req = match AuthRequired.call(req, &self).await {
                     Ok(req) => req,
                     Err(error) => {
                         return map_response_error(error);
@@ -199,12 +177,12 @@ async fn analytics_router<A: Adapter + 'static>(
                     .map_or("".to_string(), |m| m.as_str().to_string())]);
                 req.extensions_mut().insert(param);
 
-                let req = chain(
-                    req,
-                    app,
-                    vec![Box::new(channel_load), Box::new(get_channel_id)],
-                )
-                .await?;
+                // apply middlewares
+                req = Chain::new()
+                    .chain(ChannelLoad)
+                    .chain(GetChannelId)
+                    .apply(req, app)
+                    .await?;
 
                 analytics(req, app).await
             } else if let Some(caps) = ADVERTISER_ANALYTICS_BY_CHANNEL_ID.captures(route) {
@@ -213,12 +191,12 @@ async fn analytics_router<A: Adapter + 'static>(
                     .map_or("".to_string(), |m| m.as_str().to_string())]);
                 req.extensions_mut().insert(param);
 
-                let req = chain(
-                    req,
-                    app,
-                    vec![Box::new(auth_required_middleware), Box::new(get_channel_id)],
-                )
-                .await?;
+                // apply middlewares
+                req = Chain::new()
+                    .chain(AuthRequired)
+                    .chain(GetChannelId)
+                    .apply(req, app)
+                    .await?;
 
                 advertiser_analytics(req, app).await
             } else if let Some(caps) = PUBLISHER_ANALYTICS_BY_CHANNEL_ID.captures(route) {
@@ -227,12 +205,12 @@ async fn analytics_router<A: Adapter + 'static>(
                     .map_or("".to_string(), |m| m.as_str().to_string())]);
                 req.extensions_mut().insert(param);
 
-                let req = chain(
-                    req,
-                    app,
-                    vec![Box::new(auth_required_middleware), Box::new(get_channel_id)],
-                )
-                .await?;
+                // apply middlewares
+                req = Chain::new()
+                    .chain(AuthRequired)
+                    .chain(GetChannelId)
+                    .apply(req, app)
+                    .await?;
 
                 publisher_analytics(req, app).await
             } else {
@@ -249,10 +227,17 @@ async fn channels_router<A: Adapter + 'static>(
 ) -> Result<Response<Body>, ResponseError> {
     let (path, method) = (req.uri().path().to_owned(), req.method());
 
-    // example with
-    // @TODO remove later
     // regex matching for routes with params
-    if let (Some(caps), &Method::GET) = (LAST_APPROVED_BY_CHANNEL_ID.captures(&path), method) {
+    if let (Some(caps), &Method::POST) = (CREATE_EVENTS_BY_CHANNEL_ID.captures(&path), method) {
+        let param = RouteParams(vec![caps
+            .get(1)
+            .map_or("".to_string(), |m| m.as_str().to_string())]);
+
+        req.extensions_mut().insert(param);
+
+        insert_events(req, app).await
+    } else if let (Some(caps), &Method::GET) = (LAST_APPROVED_BY_CHANNEL_ID.captures(&path), method)
+    {
         let param = RouteParams(vec![caps
             .get(1)
             .map_or("".to_string(), |m| m.as_str().to_string())]);
@@ -267,7 +252,7 @@ async fn channels_router<A: Adapter + 'static>(
             .map_or("".to_string(), |m| m.as_str().to_string())]);
         req.extensions_mut().insert(param);
 
-        let req = channel_load(req, app).await?;
+        req = ChannelLoad.call(req, app).await?;
         channel_status(req, app).await
     } else if let (Some(caps), &Method::GET) = (CHANNEL_VALIDATOR_MESSAGES.captures(&path), method)
     {
@@ -277,12 +262,7 @@ async fn channels_router<A: Adapter + 'static>(
 
         req.extensions_mut().insert(param);
 
-        let req = match chain(req, app, vec![Box::new(channel_load)]).await {
-            Ok(req) => req,
-            Err(error) => {
-                return Err(error);
-            }
-        };
+        req = ChannelLoad.call(req, app).await?;
 
         // @TODO: Move this to a middleware?!
         let extract_params = match extract_params(caps.get(2).map_or("", |m| m.as_str())) {
@@ -301,24 +281,15 @@ async fn channels_router<A: Adapter + 'static>(
 
         req.extensions_mut().insert(param);
 
-        let req = match chain(
-            req,
-            app,
-            vec![Box::new(auth_required_middleware), Box::new(channel_load)],
-        )
-        .await
-        {
-            Ok(req) => req,
-            Err(error) => {
-                return Err(error);
-            }
-        };
+        let req = Chain::new()
+            .chain(AuthRequired)
+            .chain(ChannelLoad)
+            .apply(req, app)
+            .await?;
 
         create_validator_messages(req, &app).await
     } else if let (Some(caps), &Method::GET) = (CHANNEL_EVENTS_AGGREGATES.captures(&path), method) {
-        if req.extensions().get::<Session>().is_none() {
-            return Err(ResponseError::Unauthorized);
-        }
+        req = AuthRequired.call(req, app).await?;
 
         let param = RouteParams(vec![
             caps.get(1)
@@ -328,23 +299,9 @@ async fn channels_router<A: Adapter + 'static>(
         ]);
         req.extensions_mut().insert(param);
 
-        let req = chain(req, app, vec![Box::new(channel_load)]).await?;
+        req = ChannelLoad.call(req, app).await?;
 
         list_channel_event_aggregates(req, app).await
-    } else if let (Some(caps), &Method::POST) =
-        (CREATE_EVENTS_BY_CHANNEL_ID.captures(&path), method)
-    {
-        if req.extensions().get::<Session>().is_none() {
-            return Err(ResponseError::Unauthorized);
-        }
-
-        let param = RouteParams(vec![caps
-            .get(1)
-            .map_or("".to_string(), |m| m.as_str().to_string())]);
-
-        req.extensions_mut().insert(param);
-
-        insert_events(req, app).await
     } else {
         Err(ResponseError::NotFound)
     }
@@ -354,7 +311,11 @@ async fn channels_router<A: Adapter + 'static>(
 pub enum ResponseError {
     NotFound,
     BadRequest(String),
+    FailedValidation(String),
     Unauthorized,
+    Forbidden(String),
+    Conflict(String),
+    TooManyRequests(String),
 }
 
 impl<T> From<T> for ResponseError
@@ -368,6 +329,12 @@ where
     }
 }
 
+impl Into<Response<Body>> for ResponseError {
+    fn into(self) -> Response<Body> {
+        map_response_error(self)
+    }
+}
+
 pub fn map_response_error(error: ResponseError) -> Response<Body> {
     match error {
         ResponseError::NotFound => not_found(),
@@ -376,6 +343,10 @@ pub fn map_response_error(error: ResponseError) -> Response<Body> {
             "invalid authorization".to_string(),
             StatusCode::UNAUTHORIZED,
         ),
+        ResponseError::Forbidden(e) => bad_response(e, StatusCode::FORBIDDEN),
+        ResponseError::Conflict(e) => bad_response(e, StatusCode::CONFLICT),
+        ResponseError::TooManyRequests(e) => bad_response(e, StatusCode::TOO_MANY_REQUESTS),
+        ResponseError::FailedValidation(e) => bad_validation_response(e),
     }
 }
 
@@ -388,7 +359,7 @@ pub fn not_found() -> Response<Body> {
 
 pub fn bad_response(response_body: String, status_code: StatusCode) -> Response<Body> {
     let mut error_response = HashMap::new();
-    error_response.insert("error", response_body);
+    error_response.insert("message", response_body);
 
     let body = Body::from(serde_json::to_string(&error_response).expect("serialise err response"));
 
@@ -398,6 +369,25 @@ pub fn bad_response(response_body: String, status_code: StatusCode) -> Response<
         .insert("Content-type", "application/json".parse().unwrap());
 
     *response.status_mut() = status_code;
+
+    response
+}
+
+pub fn bad_validation_response(response_body: String) -> Response<Body> {
+    let error_response = ValidationErrorResponse {
+        status_code: 400,
+        message: response_body.clone(),
+        validation: vec![response_body],
+    };
+
+    let body = Body::from(serde_json::to_string(&error_response).expect("serialise err response"));
+
+    let mut response = Response::new(body);
+    response
+        .headers_mut()
+        .insert("Content-type", "application/json".parse().unwrap());
+
+    *response.status_mut() = StatusCode::BAD_REQUEST;
 
     response
 }
@@ -423,9 +413,14 @@ pub fn epoch() -> f64 {
 // @TODO: Make pub(crate)
 #[derive(Debug, Clone)]
 pub struct Session {
-    pub era: i64,
-    pub uid: ValidatorId,
     pub ip: Option<String>,
     pub country: Option<String>,
     pub referrer_header: Option<String>,
+    pub os: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Auth {
+    pub era: i64,
+    pub uid: ValidatorId,
 }

@@ -1,8 +1,10 @@
 use crate::channel::{Channel, ChannelError, SpecValidator, SpecValidators};
 use crate::config::Config;
+use crate::BigNum;
 use crate::ValidatorId;
 use chrono::Utc;
 use std::cmp::PartialEq;
+use time::Duration;
 
 pub trait ChannelValidator {
     fn is_channel_valid(
@@ -12,12 +14,28 @@ pub trait ChannelValidator {
     ) -> Result<(), ChannelError> {
         let adapter_channel_validator = match channel.spec.validators.find(validator_identity) {
             // check if the channel validators include our adapter identity
-            SpecValidator::None => return Err(ChannelError::AdapterNotIncluded),
-            SpecValidator::Leader(validator) | SpecValidator::Follower(validator) => validator,
+            None => return Err(ChannelError::AdapterNotIncluded),
+            Some(SpecValidator::Leader(validator)) | Some(SpecValidator::Follower(validator)) => {
+                validator
+            }
         };
 
         if channel.valid_until < Utc::now() {
-            return Err(ChannelError::PassedValidUntil);
+            return Err(ChannelError::InvalidValidUntil(
+                "channel.validUntil has passed".to_string(),
+            ));
+        }
+
+        if channel.valid_until > (Utc::now() + Duration::days(365)) {
+            return Err(ChannelError::InvalidValidUntil(
+                "channel.validUntil should not be greater than one year".to_string(),
+            ));
+        }
+
+        if channel.spec.withdraw_period_start > channel.valid_until {
+            return Err(ChannelError::InvalidValidUntil(
+                "channel withdrawPeriodStart is invalid".to_string(),
+            ));
         }
 
         if !all_validators_listed(&channel.spec.validators, &config.validators_whitelist) {
@@ -38,6 +56,17 @@ pub trait ChannelValidator {
 
         if adapter_channel_validator.fee < config.minimal_fee {
             return Err(ChannelError::MinimumValidatorFeeNotMet);
+        }
+
+        let total_validator_fee: BigNum = channel
+            .spec
+            .validators
+            .iter()
+            .map(|v| v.fee.clone())
+            .fold(BigNum::from(0), |acc, x| acc + x);
+
+        if total_validator_fee >= channel.deposit_amount {
+            return Err(ChannelError::FeeConstraintViolated);
         }
 
         Ok(())

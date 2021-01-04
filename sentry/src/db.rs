@@ -35,8 +35,10 @@ lazy_static! {
 }
 
 pub async fn redis_connection() -> Result<MultiplexedConnection, RedisError> {
-    let client = redis::Client::open(REDIS_URL.as_str()).expect("Wrong redis connection url");
-    client.get_multiplexed_tokio_connection().await
+    let client = redis::Client::open(REDIS_URL.as_str())?;
+    let (connection, driver) = client.get_multiplexed_async_connection().await?;
+    tokio::spawn(driver);
+    Ok(connection)
 }
 
 pub async fn postgres_connection() -> Result<DbPool, bb8_postgres::tokio_postgres::Error> {
@@ -82,7 +84,10 @@ pub async fn setup_migrations(environment: &str) {
         };
     }
 
-    let mut migrations = vec![make_migration!("20190806011140_initial-tables")];
+    let mut migrations = vec![
+        make_migration!("20190806011140_initial-tables"),
+        make_migration!("20200625092729_channel-targeting-rules"),
+    ];
 
     if environment == "development" {
         // seeds database tables for testing

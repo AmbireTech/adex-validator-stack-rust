@@ -1,9 +1,9 @@
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize, Serializer};
-use serde_hex::{SerHex, StrictPfx};
+use hex::FromHex;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 
-use crate::{BalancesMap, BigNum, DomainError, ToETHChecksum};
+use crate::{targeting::Value, BalancesMap, BigNum, DomainError, ToETHChecksum};
 use std::convert::TryFrom;
 
 #[derive(Debug)]
@@ -14,9 +14,35 @@ pub enum ValidatorError {
     InvalidTransition,
 }
 
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[serde(transparent)]
-pub struct ValidatorId(#[serde(with = "SerHex::<StrictPfx>")] [u8; 20]);
+pub struct ValidatorId(
+    #[serde(
+        deserialize_with = "validator_id_from_str",
+        serialize_with = "SerHex::<StrictPfx>::serialize"
+    )]
+    [u8; 20],
+);
+
+impl fmt::Debug for ValidatorId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ValidatorId({})", self.to_hex_prefix_string())
+    }
+}
+
+fn validator_id_from_str<'de, D>(deserializer: D) -> Result<[u8; 20], D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let validator_id = String::deserialize(deserializer)?;
+    if validator_id.is_empty() || validator_id.len() != 42 {
+        return Err(serde::de::Error::custom(
+            "invalid validator id length".to_string(),
+        ));
+    }
+
+    <[u8; 20] as FromHex>::from_hex(&validator_id[2..]).map_err(serde::de::Error::custom)
+}
 
 impl ValidatorId {
     pub fn inner(&self) -> &[u8; 20] {
@@ -61,11 +87,13 @@ impl AsRef<[u8]> for ValidatorId {
 impl TryFrom<&str> for ValidatorId {
     type Error = DomainError;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let hex_value = if value.len() == 42 {
-            &value[2..]
-        } else {
-            value
-        };
+        let hex_value = match value {
+            value if value.len() == 42 => Ok(&value[2..]),
+            value if value.len() == 40 => Ok(value),
+            _ => Err(DomainError::InvalidArgument(
+                "invalid validator id length".to_string(),
+            )),
+        }?;
 
         let result = hex::decode(hex_value).map_err(|_| {
             DomainError::InvalidArgument("Failed to deserialize validator id".to_string())
@@ -86,6 +114,7 @@ impl TryFrom<&str> for ValidatorId {
 
 impl TryFrom<&String> for ValidatorId {
     type Error = DomainError;
+
     fn try_from(value: &String) -> Result<Self, Self::Error> {
         ValidatorId::try_from(value.as_str())
     }
@@ -97,10 +126,23 @@ impl fmt::Display for ValidatorId {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+impl TryFrom<Value> for ValidatorId {
+    type Error = DomainError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        let string = value.try_string().map_err(|err| {
+            DomainError::InvalidArgument(format!("Value is not a string: {}", err))
+        })?;
+
+        Self::try_from(&string)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ValidatorDesc {
     pub id: ValidatorId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fee_addr: Option<ValidatorId>,
     pub url: String,
     pub fee: BigNum,
@@ -108,7 +150,7 @@ pub struct ValidatorDesc {
 
 // Validator Message Types
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Accounting {
     #[serde(rename = "lastEvAggr")]
@@ -117,23 +159,27 @@ pub struct Accounting {
     pub balances: BalancesMap,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ApproveState {
     pub state_root: String,
     pub signature: String,
     pub is_healthy: bool,
+    #[serde(default)]
+    pub exhausted: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct NewState {
     pub state_root: String,
     pub signature: String,
     pub balances: BalancesMap,
+    #[serde(default)]
+    pub exhausted: bool,
 }
 
-#[derive(Default, Serialize, Deserialize, Debug, Clone)]
+#[derive(Default, Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct RejectState {
     pub reason: String,
@@ -143,7 +189,7 @@ pub struct RejectState {
     pub timestamp: Option<DateTime<Utc>>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Heartbeat {
     pub signature: String,
@@ -161,7 +207,7 @@ impl Heartbeat {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(tag = "type")]
 pub enum MessageTypes {
     ApproveState(ApproveState),
@@ -189,10 +235,7 @@ pub mod postgres {
         }
 
         fn accepts(ty: &Type) -> bool {
-            match *ty {
-                Type::TEXT | Type::VARCHAR => true,
-                _ => false,
-            }
+            matches!(*ty, Type::TEXT | Type::VARCHAR)
         }
     }
 

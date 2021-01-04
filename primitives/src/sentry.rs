@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::hash::Hash;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LastApproved {
     /// NewState can be None if the channel is brand new
@@ -15,21 +15,21 @@ pub struct LastApproved {
     pub approve_state: Option<ApproveStateValidatorMessage>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct NewStateValidatorMessage {
     pub from: ValidatorId,
     pub received: DateTime<Utc>,
     pub msg: MessageTypes,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct ApproveStateValidatorMessage {
     pub from: ValidatorId,
     pub received: DateTime<Utc>,
     pub msg: MessageTypes,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct HeartbeatValidatorMessage {
     pub from: ValidatorId,
     pub received: DateTime<Utc>,
@@ -37,7 +37,7 @@ pub struct HeartbeatValidatorMessage {
 }
 
 #[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum Event {
     #[serde(rename_all = "camelCase")]
     Impression {
@@ -71,17 +71,11 @@ pub enum Event {
 
 impl Event {
     pub fn is_click_event(&self) -> bool {
-        match *self {
-            Event::Click { .. } => true,
-            _ => false,
-        }
+        matches!(self, Event::Click { .. })
     }
 
     pub fn is_impression_event(&self) -> bool {
-        match *self {
-            Event::Impression { .. } => true,
-            _ => false,
-        }
+        matches!(self, Event::Impression { .. })
     }
 }
 
@@ -99,7 +93,7 @@ impl fmt::Display for Event {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Earner {
     #[serde(rename = "publisher")]
     pub address: String,
@@ -127,12 +121,17 @@ pub struct AggregateEvents {
 pub struct ChannelListResponse {
     pub channels: Vec<Channel>,
     pub total_pages: u64,
+    pub total: u64,
+    pub page: u64,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LastApprovedResponse {
     pub last_approved: Option<LastApproved>,
+    /// None -> withHeartbeat=true wasn't passed
+    /// Some(vec![]) (empty vec) or Some(heartbeats) - withHeartbeat=true was passed
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub heartbeats: Option<Vec<HeartbeatValidatorMessage>>,
 }
 
@@ -158,6 +157,14 @@ pub struct ValidatorMessageResponse {
 pub struct EventAggregateResponse {
     pub channel: Channel,
     pub events: Vec<EventAggregate>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ValidationErrorResponse {
+    pub status_code: u64,
+    pub message: String,
+    pub validation: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -204,6 +211,35 @@ impl fmt::Display for ChannelReport {
             ChannelReport::Hostname => write!(f, "reportChannelToHostname"),
             ChannelReport::HostnamePay => write!(f, "reportChannelToHostnamePay"),
         }
+    }
+}
+
+pub mod channel_list {
+    use crate::ValidatorId;
+    use chrono::{serde::ts_seconds, DateTime, Utc};
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct ChannelListQuery {
+        #[serde(default = "default_page")]
+        pub page: u64,
+        /// filters the list on `valid_until >= valid_until_ge`
+        /// It should be the same timestamp format as the `Channel.valid_until`: **seconds**
+        #[serde(with = "ts_seconds", default = "Utc::now", rename = "validUntil")]
+        pub valid_until_ge: DateTime<Utc>,
+        pub creator: Option<String>,
+        /// filters the channels containing a specific validator if provided
+        pub validator: Option<ValidatorId>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct LastApprovedQuery {
+        pub with_heartbeat: Option<String>,
+    }
+
+    fn default_page() -> u64 {
+        0
     }
 }
 

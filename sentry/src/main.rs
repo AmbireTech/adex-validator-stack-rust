@@ -1,7 +1,7 @@
 #![deny(clippy::all)]
 #![deny(rust_2018_idioms)]
 
-use clap::{App, Arg};
+use clap::{crate_version, App, Arg};
 
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
 use hyper::service::{make_service_fn, service_fn};
@@ -20,7 +20,7 @@ const DEFAULT_PORT: u16 = 8005;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = App::new("Sentry")
-        .version("0.1")
+        .version(crate_version!())
         .arg(
             Arg::with_name("config")
                 .help("the config file for the validator worker")
@@ -50,12 +50,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .help("the identity to use with the dummy adapter")
                 .takes_value(true),
         )
-        .arg(
-            Arg::with_name("clustered")
-                .long("clustered")
-                .short("c")
-                .help("Run app in cluster mode with multiple workers"),
-        )
         .get_matches();
 
     let environment = std::env::var("ENV").unwrap_or_else(|_| "development".into());
@@ -64,7 +58,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or_else(|_| DEFAULT_PORT);
     let config_file = cli.value_of("config");
     let config = configuration(&environment, config_file).unwrap();
-    let clustered = cli.is_present("clustered");
 
     let adapter = match cli.value_of("adapter").unwrap() {
         "ethereum" => {
@@ -112,7 +105,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         AdapterTypes::EthereumAdapter(adapter) => {
             run(
                 Application::new(*adapter, config, logger, redis, postgres),
-                clustered,
                 port,
             )
             .await
@@ -120,7 +112,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         AdapterTypes::DummyAdapter(adapter) => {
             run(
                 Application::new(*adapter, config, logger, redis, postgres),
-                clustered,
                 port,
             )
             .await
@@ -131,12 +122,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Starts the `hyper` `Server`.
-async fn run<A: Adapter + 'static>(app: Application<A>, _clustered: bool, port: u16) {
+async fn run<A: Adapter + 'static>(app: Application<A>, port: u16) {
     let addr = ([127, 0, 0, 1], port).into();
     let logger = app.logger.clone();
     info!(&logger, "Listening on port {}!", port);
 
-    let make_service = make_service_fn(move |_| {
+    let make_service = make_service_fn(|_| {
         let server = app.clone();
         async move {
             Ok::<_, Error>(service_fn(move |req| {

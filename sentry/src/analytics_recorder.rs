@@ -1,4 +1,5 @@
 use crate::epoch;
+use crate::payout::get_payout;
 use crate::Session;
 use primitives::sentry::Event;
 use primitives::sentry::{ChannelReport, PublisherReport};
@@ -6,20 +7,6 @@ use primitives::{BigNum, Channel};
 use redis::aio::MultiplexedConnection;
 use redis::pipe;
 use slog::{error, Logger};
-
-pub fn get_payout(channel: &Channel, event: &Event) -> BigNum {
-    match event {
-        Event::Impression { .. } => channel.spec.min_per_impression.clone(),
-        Event::Click { .. } => channel
-            .spec
-            .pricing_bounds
-            .as_ref()
-            .and_then(|pricing_bound| pricing_bound.click.as_ref())
-            .map(|click| click.min.clone())
-            .unwrap_or_default(),
-        _ => Default::default(),
-    }
-}
 
 pub async fn record(
     mut conn: MultiplexedConnection,
@@ -47,10 +34,18 @@ pub async fn record(
                 referrer,
             } => {
                 let divisor = BigNum::from(10u64.pow(18));
-                let pay_amount = get_payout(&channel, event)
-                    .div_floor(&divisor)
-                    .to_f64()
-                    .expect("should always have a payout");
+
+                let pay_amount = match get_payout(&logger, &channel, event, &session) {
+                    Ok(Some((_, payout))) => payout.div_floor(&divisor)
+                        .to_f64()
+                        .expect("Should always have a payout in f64 after division"),
+                    // This should never happen, as the conditions we are checking for in the .filter are the same as getPayout's
+                    Ok(None) => return,
+                    Err(err) => {
+                        error!(&logger, "Getting the payout failed: {}", &err; "module" => "analytics-recorder", "err" => ?err);
+                        return
+                    },
+                };
 
                 if let Some(ad_unit) = ad_unit {
                     db.zincr(

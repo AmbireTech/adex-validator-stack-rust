@@ -1,5 +1,5 @@
 use crate::access::check_access;
-use crate::analytics_recorder;
+use crate::access::Error as AccessError;
 use crate::db::event_aggregate::insert_event_aggregate;
 use crate::db::get_channel_by_id;
 use crate::db::DbPool;
@@ -7,6 +7,7 @@ use crate::event_reducer;
 use crate::Application;
 use crate::ResponseError;
 use crate::Session;
+use crate::{analytics_recorder, Auth};
 use async_std::sync::RwLock;
 use chrono::Utc;
 use lazy_static::lazy_static;
@@ -68,6 +69,7 @@ impl EventAggregator {
         app: &'a Application<A>,
         channel_id: &ChannelId,
         session: &Session,
+        auth: Option<&Auth>,
         events: &'a [Event],
     ) -> Result<(), ResponseError> {
         let recorder = self.recorder.clone();
@@ -83,7 +85,7 @@ impl EventAggregator {
                 // fetch channel
                 let channel = get_channel_by_id(&app.pool, &channel_id)
                     .await?
-                    .ok_or_else(|| ResponseError::NotFound)?;
+                    .ok_or(ResponseError::NotFound)?;
 
                 let withdraw_period_start = channel.spec.withdraw_period_start;
                 let channel_id = channel.id;
@@ -123,22 +125,39 @@ impl EventAggregator {
             }
         };
 
-        let has_access = check_access(
+        check_access(
             &app.redis,
-            &session,
+            session,
+            auth,
             &app.config.ip_rate_limit,
             &record.channel,
             events,
         )
-        .await;
-        if let Err(e) = has_access {
-            return Err(ResponseError::BadRequest(e.to_string()));
-        }
+        .await
+        .map_err(|e| match e {
+            AccessError::OnlyCreatorCanCloseChannel | AccessError::ForbiddenReferrer => {
+                ResponseError::Forbidden(e.to_string())
+            }
+            AccessError::RulesError(error) => ResponseError::TooManyRequests(error),
+            AccessError::UnAuthenticated => ResponseError::Unauthorized,
+            _ => ResponseError::BadRequest(e.to_string()),
+        })?;
 
-        events
-            .iter()
-            .for_each(|ev| event_reducer::reduce(&record.channel, &mut record.aggregate, ev));
+        events.iter().for_each(|ev| {
+            match event_reducer::reduce(
+                &app.logger,
+                &record.channel,
+                &mut record.aggregate,
+                ev,
+                &session,
+            ) {
+                Ok(_) => {}
+                Err(err) => error!(&app.logger, "Event Reducer failed"; "error" => ?err ),
+            }
+        });
 
+        // only time we don't have session is during
+        // an unauthenticated close event
         if ANALYTICS_RECORDER.is_some() {
             tokio::spawn(analytics_recorder::record(
                 redis.clone(),
