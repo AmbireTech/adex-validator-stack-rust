@@ -8,7 +8,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 
-use crate::{targeting::Rule, AdUnit, BigNum, EventSubmission, ValidatorDesc, ValidatorId};
+use crate::{targeting::Rules, AdUnit, BigNum, EventSubmission, ValidatorDesc, ValidatorId};
 use hex::{FromHex, FromHexError};
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Copy, Clone, Hash)]
@@ -96,8 +96,14 @@ pub struct Channel {
     #[serde(with = "ts_seconds")]
     pub valid_until: DateTime<Utc>,
     #[serde(default)]
-    pub targeting_rules: Vec<Rule>,
+    pub targeting_rules: Rules,
     pub spec: ChannelSpec,
+    #[serde(default)]
+    pub exhausted: Vec<bool>,
+}
+
+pub fn channel_exhausted(channel: &Channel) -> bool {
+    channel.exhausted.len() == 2 && channel.exhausted.iter().all(|&x| x)
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
@@ -181,7 +187,7 @@ pub struct ChannelSpec {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ad_units: Vec<AdUnit>,
     #[serde(default)]
-    pub targeting_rules: Vec<Rule>,
+    pub targeting_rules: Rules,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
@@ -221,6 +227,16 @@ impl SpecValidators {
             Some(SpecValidator::Leader(&self.leader()))
         } else if &self.follower().id == validator_id {
             Some(SpecValidator::Follower(&self.follower()))
+        } else {
+            None
+        }
+    }
+
+    pub fn find_index(&self, validator_id: &ValidatorId) -> Option<i32> {
+        if &self.leader().id == validator_id {
+            Some(0)
+        } else if &self.follower().id == validator_id {
+            Some(1)
         } else {
             None
         }
@@ -370,7 +386,7 @@ mod test {
 pub mod postgres {
     use super::ChannelId;
     use super::{Channel, ChannelSpec};
-    use crate::targeting::Rule;
+    use crate::targeting::Rules;
     use bytes::BytesMut;
     use hex::FromHex;
     use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
@@ -385,8 +401,9 @@ pub mod postgres {
                 deposit_asset: row.get("deposit_asset"),
                 deposit_amount: row.get("deposit_amount"),
                 valid_until: row.get("valid_until"),
-                targeting_rules: row.get::<_, Json<Vec<Rule>>>("targeting_rules").0,
+                targeting_rules: row.get::<_, Json<Rules>>("targeting_rules").0,
                 spec: row.get::<_, Json<ChannelSpec>>("spec").0,
+                exhausted: row.get("exhausted"),
             }
         }
     }

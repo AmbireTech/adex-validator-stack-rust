@@ -38,6 +38,62 @@ fn get_default_input() -> Input {
         .with_balances(input_balances)
 }
 
+mod rules_test {
+    use super::{Function, Rule, Rules, Value};
+    use serde_json::{from_value, json};
+
+    #[test]
+    fn test_rules_should_be_empty_when_single_invalid_rule() {
+        let rule = json!([
+            {
+                "onlyShowIf": {
+                    "undefined": [
+                        [],
+                        {"get":"userAgentOS"}
+                    ]
+                }
+            }
+        ]);
+
+        let deser = from_value::<Rules>(rule).expect("should deserialize by skipping invalid rule");
+
+        assert!(deser.0.is_empty())
+    }
+
+    #[test]
+    fn test_rules_should_not_be_empty_when_one_invalid_rule() {
+        let rule = json!([
+            {
+                "intersects": [
+                    {"get": "adSlot.categories"},
+                    ["News", "Bitcoin"]
+                ]
+            },
+            {
+                "onlyShowIf": {
+                    "undefined": [
+                        [],
+                        {"get":"userAgentOS"}
+                    ]
+                }
+            }
+        ]);
+
+        let deser = from_value::<Rules>(rule).expect("should deserialize by skipping invalid rule");
+
+        assert_eq!(1, deser.0.len());
+
+        let expected = Rule::Function(Function::new_intersects(
+            Rule::Function(Function::new_get("adSlot.categories")),
+            Rule::Value(Value::Array(vec![
+                Value::new_string("News"),
+                Value::new_string("Bitcoin"),
+            ])),
+        ));
+        assert_eq!(expected, deser.0[0])
+    }
+}
+
 mod dsl_test {
     use super::*;
 
@@ -754,39 +810,39 @@ mod math_functions {
 
         let cases = vec![
             (
-                Value::BigNum(1.into()),
                 Value::BigNum(10.into()),
                 Value::BigNum(100.into()),
+                Value::BigNum(1.into()),
                 Value::Bool(false),
             ),
             (
                 Value::BigNum(10.into()),
-                Value::BigNum(10.into()),
                 Value::BigNum(100.into()),
+                Value::BigNum(10.into()),
                 Value::Bool(true),
             ),
             (
+                Value::BigNum(10.into()),
+                Value::BigNum(100.into()),
                 Value::BigNum(50.into()),
+                Value::Bool(true),
+            ),
+            (
                 Value::BigNum(10.into()),
+                Value::BigNum(100.into()),
                 Value::BigNum(100.into()),
                 Value::Bool(true),
             ),
             (
-                Value::BigNum(100.into()),
                 Value::BigNum(10.into()),
                 Value::BigNum(100.into()),
-                Value::Bool(true),
-            ),
-            (
                 Value::BigNum(1000.into()),
-                Value::BigNum(10.into()),
-                Value::BigNum(100.into()),
                 Value::Bool(false),
             ),
         ];
 
-        for (value, start, end, expected) in cases.into_iter() {
-            let rule = Rule::Function(Function::new_between(value, start, end));
+        for (start, end, value, expected) in cases.into_iter() {
+            let rule = Rule::Function(Function::new_between(start, end, value));
 
             assert_eq!(Ok(Some(expected)), rule.eval(&input, &mut output));
         }
@@ -1112,30 +1168,27 @@ mod string_and_array {
 
         let cases = vec![
             (
-                Value::BigNum(1.into()),
-                Value::Array(vec![
+                vec![
                     Value::BigNum(1.into()),
                     Value::BigNum(2.into()),
                     Value::BigNum(3.into()),
-                ]),
+                ],
+                Value::BigNum(1.into()),
                 true,
             ),
             (
-                Value::BigNum(0.into()),
-                Value::Array(vec![
+                vec![
                     Value::BigNum(1.into()),
                     Value::BigNum(2.into()),
                     Value::BigNum(3.into()),
-                ]),
+                ],
+                Value::BigNum(0.into()),
                 false,
             ),
         ];
 
-        for (value, arr, expected) in cases.into_iter() {
-            let rule = Rule::Function(Function::new_in(
-                Rule::Value(value.clone()),
-                Rule::Value(arr.clone()),
-            ));
+        for (arr, value, expected) in cases.into_iter() {
+            let rule = Rule::Function(Function::new_in(Value::Array(arr), value));
             let expected = Some(Value::Bool(expected));
 
             assert_eq!(Ok(expected), rule.eval(&input, &mut output));
@@ -1150,33 +1203,30 @@ mod string_and_array {
             price: Default::default(),
         };
 
-        let cases = [
+        let cases = vec![
             (
-                Value::new_number(1),
-                Value::Array(vec![
+                vec![
                     Value::new_number(1),
                     Value::new_number(2),
                     Value::new_number(3),
-                ]),
+                ],
+                Value::new_number(1),
                 false,
             ),
             (
-                Value::new_number(0),
-                Value::Array(vec![
+                vec![
                     Value::new_number(1),
                     Value::new_number(2),
                     Value::new_number(3),
-                ]),
+                ],
+                Value::new_number(0),
                 true,
             ),
         ];
 
-        for (value, arr, expected) in cases.iter() {
-            let rule = Rule::Function(Function::new_nin(
-                Rule::Value(value.clone()),
-                Rule::Value(arr.clone()),
-            ));
-            let expected = Some(Value::Bool(*expected));
+        for (arr, value, expected) in cases.into_iter() {
+            let rule = Rule::Function(Function::new_nin(Value::Array(arr), value));
+            let expected = Some(Value::Bool(expected));
 
             assert_eq!(Ok(expected), rule.eval(&input, &mut output));
         }

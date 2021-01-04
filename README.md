@@ -22,6 +22,7 @@ Requirements:
 - Docker
 
 #### Linux
+
 - `build-essentials` is required to build the project (error: `linker ``cc`` not found`)
 - The crate `openssl-sys` requires `libssl-dev` and `pkg-config` for Ubuntu.
 
@@ -39,7 +40,7 @@ We need two services to be able to run `Sentry`: `Postgres` and `Redis`.
 
 ### Running Redis
 
-`docker run --rm --name adex-validator-redis -d redis`
+`docker run --rm -p 6379:6379 --name adex-validator-redis -d redis`
 
 ### Running Sentry Rest API
 
