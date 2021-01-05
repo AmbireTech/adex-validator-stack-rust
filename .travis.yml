@@ -27,6 +27,14 @@ jobs:
   fast_finish: true
   include:
     - stage: run all tests
+      env:
+      - DOCKER_COMPOSE_VERSION=1.27.4
+
+      before_install:
+        - sudo rm /usr/local/bin/docker-compose
+        - curl -L https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-`uname -s`-`uname -m` > docker-compose
+        - chmod +x docker-compose
+        - sudo mv docker-compose /usr/local/bin
       # @TODO: Maybe run a separate weekly job and use the cached cargo-make from there
       install:
         - which cargo-make || cargo install cargo-make
