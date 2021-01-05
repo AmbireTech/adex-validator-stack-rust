@@ -28,8 +28,9 @@ services:
       - adex-external
   # Service: Ganache-cli - test RPC client
   ganache-cli:
-    build: .
-    context: adapter/scripts
+    build: ./adapter/scripts
+    image: adex-adapter-ganache
+    container_name: adex-ganache-cli
     networks:
       - adex-leader
       - adex-external
