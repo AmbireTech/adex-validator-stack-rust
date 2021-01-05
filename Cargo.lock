@@ -3668,6 +3668,7 @@ dependencies = [
  "serde_json",
  "serde_urlencoded 0.6.1",
  "slog",
+ "thiserror",
  "tokio 0.2.23",
 ]
 

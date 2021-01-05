@@ -1,8 +1,8 @@
 use crate::access::check_access;
 use crate::access::Error as AccessError;
 use crate::db::event_aggregate::insert_event_aggregate;
-use crate::db::get_channel_by_id;
 use crate::db::DbPool;
+use crate::db::{get_channel_by_id, update_targeting_rules};
 use crate::event_reducer;
 use crate::Application;
 use crate::ResponseError;
@@ -138,10 +138,22 @@ impl EventAggregator {
             AccessError::OnlyCreatorCanCloseChannel | AccessError::ForbiddenReferrer => {
                 ResponseError::Forbidden(e.to_string())
             }
+            AccessError::OnlyCreatorCanUpdateTargetingRules => {
+                ResponseError::Forbidden(e.to_string())
+            }
             AccessError::RulesError(error) => ResponseError::TooManyRequests(error),
             AccessError::UnAuthenticated => ResponseError::Unauthorized,
             _ => ResponseError::BadRequest(e.to_string()),
         })?;
+
+        let new_targeting_rules = events.iter().find_map(|ev| match ev {
+            Event::UpdateTargeting { targeting_rules } => Some(targeting_rules),
+            _ => None,
+        });
+
+        if let Some(new_rules) = new_targeting_rules {
+            update_targeting_rules(&app.pool, &channel_id, &new_rules).await?;
+        }
 
         events.iter().for_each(|ev| {
             match event_reducer::reduce(
