@@ -31,6 +31,8 @@ services:
     build: ./adapter/scripts
     image: adex-adapter-ganache
     container_name: adex-ganache-cli
+    ports:
+      - "8545:8545"
     networks:
       - adex-leader
       - adex-external
