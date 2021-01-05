@@ -31,24 +31,29 @@ jobs:
     name: Build & Create draft release of validator-v* tag
     runs-on: ubuntu-latest
     needs: ci-flow
-    if: ${{ startsWith($GIT_TAG, 'validator-v' }}
-    env:
-      # See https://github.community/t/how-to-get-just-the-tag-name/16241/7
-      GIT_TAG: ${{ github.ref/refs\/tags\// }}
+    if: startsWith(github.event.ref, 'refs/tags/validator-v')
     steps:
+    # See https://github.community/t/how-to-get-just-the-tag-name/16241/10
+    - name: Set Validator version, binary name and current date for release
+      id: get_validator_tag
+      run: |
+        echo ::set-output name=VALIDATOR_VERSION::${GITHUB_REF#refs/tags/validator-v}
+        echo ::set-output name=VALIDATOR_BIN_NAME::${GITHUB_REF#refs/tags/}
+        echo ::set-output name=TODAY_DATE_STRING::$(date -u +'%d %b %Y')
+      shell: bash
     - name: Build validator-v* (x86_64-unknown-linux-gnu)
       run: |
         cargo build -p validator_worker --release --all-features --target x86_64-unknown-linux-gnu
-        cp target/x86_64-unknown-linux-gnu/release/validator_worker ${{ GIT_TAG }}
-    - name: Create release for ${{ GIT_TAG }}
+        cp target/x86_64-unknown-linux-gnu/release/validator_worker ${{ steps.get_validator_tag.outputs.VALIDATOR_BIN_NAME }}
+    - name: Create release for ${{ steps.get_validator_tag.outputs.VALIDATOR_BIN_NAME }}
       id: create_release
       uses: actions/create-release@v1
       env:
         # This token is provided by Actions, you do not need to create your own token
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ GIT_TAG }}
-        release_name: Validator worker ${{ GIT_TAG/validator-/ }} (Day Month-short-name Year)
+        tag_name: ${{ steps.get_validator_tag.outputs.VALIDATOR_BIN_NAME }}
+        release_name: Validator worker v${{ steps.get_validator_tag.outputs.VALIDATOR_VERSION }} (${{ steps.get_validator_tag.outputs.TODAY_DATE_STRING }})
         body: |
           Fully featured Validator implementation written in Rust.
 
@@ -64,7 +69,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
-        upload_url: ${{ steps.create_release.outputs.upload_url }} 
-        asset_path: ./${{ GIT_TAG }}
-        asset_name: ${{ GIT_TAG }}
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./${{ steps.get_validator_tag.outputs.VALIDATOR_BIN_NAME }}
+        asset_name: ${{ steps.get_validator_tag.outputs.VALIDATOR_BIN_NAME }}
         asset_content_type: application/octet-stream
