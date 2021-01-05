@@ -6,4 +6,3 @@ target
 .old
 Migrant.toml
 node_modules/
-adapter/resources/keystore.json

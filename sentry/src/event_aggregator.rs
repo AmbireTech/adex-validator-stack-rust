@@ -153,7 +153,7 @@ impl EventAggregator {
 
         if let Some(new_rules) = new_targeting_rules {
             update_targeting_rules(&app.pool, &channel_id, &new_rules).await?;
-        };
+        }
 
         events.iter().for_each(|ev| {
             match event_reducer::reduce(
