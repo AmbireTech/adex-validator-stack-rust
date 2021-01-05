@@ -16,8 +16,6 @@ jobs:
         with:
           # https://docs.docker.com/compose/reference/overview/
           cli-args: "-f docker-compose.ci.yml up -d"
-      - name: ganache-cli
-        uses: docker://trufflesuite/ganache-cli:latest
       - uses: actions-rs/toolchain@v1
         with:
           # No need to add `toolchain`, it will use `rust-toolchain` file instead
