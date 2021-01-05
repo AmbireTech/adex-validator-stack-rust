@@ -5,7 +5,6 @@ use redis::aio::MultiplexedConnection;
 use crate::{Auth, Session};
 use primitives::event_submission::{RateLimit, Rule};
 use primitives::sentry::Event;
-use primitives::targeting::Rules;
 use primitives::Channel;
 use std::cmp::PartialEq;
 use thiserror::Error;
@@ -214,6 +213,7 @@ mod test {
     use primitives::config::configuration;
     use primitives::event_submission::{RateLimit, Rule};
     use primitives::sentry::Event;
+    use primitives::targeting::Rules;
     use primitives::util::tests::prep_db::{DUMMY_CHANNEL, IDS};
     use primitives::{Channel, Config, EventSubmission};
 

@@ -146,14 +146,14 @@ impl EventAggregator {
             _ => ResponseError::BadRequest(e.to_string()),
         })?;
 
-        let ut_ev = events
-            .iter()
-            .find(|ev| matches!(ev, Event::UpdateTargeting { .. }));
-        if let Some(ev) = ut_ev {
-            if let Event::UpdateTargeting { targeting_rules } = ev {
-                update_targeting_rules(&app.pool, &channel_id, &targeting_rules).await?;
-            }
-        }
+        let new_targeting_rules = events.iter().find_map(|ev| match ev {
+            Event::UpdateTargeting { targeting_rules } => Some(targeting_rules),
+            _ => None,
+        });
+
+        if let Some(new_rules) = new_targeting_rules {
+            update_targeting_rules(&app.pool, &channel_id, &new_rules).await?;
+        };
 
         events.iter().for_each(|ev| {
             match event_reducer::reduce(
