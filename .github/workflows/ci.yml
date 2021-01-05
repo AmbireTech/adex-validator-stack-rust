@@ -27,5 +27,44 @@ jobs:
         # Running cargo make doesn't successfully start `ganache`
         run: |
           cargo make ci-flow
-      # todo: Build binary on git tag
-      # todo: Make a github Draft release
+  release-validator:
+    name: Build & Create draft release of validator-v* tag
+    runs-on: ubuntu-latest
+    needs: ci-flow
+    if: ${{ startsWith($GIT_TAG, 'validator-v' }}
+    env:
+      # See https://github.community/t/how-to-get-just-the-tag-name/16241/7
+      GIT_TAG: ${{ github.ref/refs\/tags\// }}
+    steps:
+    - name: Build validator-v* (x86_64-unknown-linux-gnu)
+      run: |
+        cargo build -p validator_worker --release --all-features --target x86_64-unknown-linux-gnu
+        cp target/x86_64-unknown-linux-gnu/release/validator_worker ${{ GIT_TAG }}
+    - name: Create release for ${{ GIT_TAG }}
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        # This token is provided by Actions, you do not need to create your own token
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ GIT_TAG }}
+        release_name: Validator worker ${{ GIT_TAG/validator-/ }} (Day Month-short-name Year)
+        body: |
+          Fully featured Validator implementation written in Rust.
+
+          All the issues related to this release can be found here:
+          TODO:
+          - Add information for release in CHANGELOG.md
+          - Add the CHANGELOG.md content here
+        draft: true
+        prerelease: false
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+        upload_url: ${{ steps.create_release.outputs.upload_url }} 
+        asset_path: ./${{ GIT_TAG }}
+        asset_name: ${{ GIT_TAG }}
+        asset_content_type: application/octet-stream
