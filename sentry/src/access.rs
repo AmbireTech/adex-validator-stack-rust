@@ -441,8 +441,8 @@ mod test {
         };
         let mut channel = get_channel(rule);
         channel.spec.withdraw_period_start = Utc
-            .datetime_from_str("1970-01-01 12:00:09", "%Y-%m-%d %H:%M:%S")
-            .expect("should be valid datetime");
+        .ymd(1970, 1, 1)
+        .and_hms(12, 0, 9);
 
         let ok_response = check_access(
             &redis,
@@ -664,8 +664,8 @@ mod test {
         };
         let mut channel = get_channel(rule);
         channel.spec.withdraw_period_start = Utc
-            .datetime_from_str("1970-01-01 12:00:09", "%Y-%m-%d %H:%M:%S")
-            .expect("should be valid datetime");
+            .ymd(1970, 1, 1)
+            .and_hms(12, 0, 9);
 
         let err_response = check_access(
             &redis,
