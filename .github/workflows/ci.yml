@@ -10,18 +10,14 @@ jobs:
       - uses: actions/checkout@v2
         with:
           submodules: true
+      # Runs all services needed for testing
+      - name: run docker-compose
+        uses: sudo-bot/action-docker-compose@latest
+        with:
+          # https://docs.docker.com/compose/reference/overview/
+          cli-args: "-f docker-compose.ci.yml up -d"
       - name: ganache-cli
         uses: docker://trufflesuite/ganache-cli:latest
-        with:
-          entrypoint: ./adapter/scripts/ganache-cli.sh
-      - name: Redis
-        uses: zhulik/redis-action@1.1.0
-      - name: Postgres
-        uses: harmon758/postgresql-action@v1
-        with:
-          # the used database will also be `postgres`
-          postgresql user: postgres
-          postgresql password: postgres
       - uses: actions-rs/toolchain@v1
         with:
           # No need to add `toolchain`, it will use `rust-toolchain` file instead
@@ -30,7 +26,7 @@ jobs:
           components: clippy, rustfmt
       - uses: davidB/rust-cargo-make@v1
       - name: Run `cargo make ci-flow`
-      # Running cargo make doesn't successfully start `ganache`
+        # Running cargo make doesn't successfully start `ganache`
         run: |
           cargo make ci-flow
       # todo: Build binary on git tag
