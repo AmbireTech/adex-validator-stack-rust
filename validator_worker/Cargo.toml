@@ -1,6 +1,6 @@
 [package]
 name = "validator_worker"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Lachezar Lechev <lachezar@adex.network>", "Samparsky <sam@adex.network>"]
 edition = "2018"
 

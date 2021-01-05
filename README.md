@@ -40,6 +40,8 @@ We need two services to be able to run `Sentry`: `Postgres` and `Redis`.
 - `$HOME/docker/volumes/postgres` - your local storage for postgres (persist the data when we remove the container)
 - `POSTGRES_PASSWORD=postgres` - the password of `postgres` user
 
+**NOTE:** Additionally you must setup 2 databases - `sentry_leader` & `sentry_follower` in order for the provided examples bellow to work.
+
 ### Running Redis
 
 `docker run --rm -p 6379:6379 --name adex-validator-redis -d redis`
@@ -103,6 +105,7 @@ For full list, check out [primitives/src/util/tests/prep_db.rs#L29-L43](./primit
 
 - `ENV` - `production` or `development`; *default*: `development` - passing this env. variable will use the default configuration paths - [`docs/config/dev.toml`](./docs/config/dev.toml) (for `development`) or [`docs/config/prod.toml`](./docs/config/prod.toml) (for `production`). Otherwise you can pass your own configuration file path to the binary (check `cargo run -p sentry --help` for more information). In `development` it will make sure Sentry to seed the database.
 - `PORT` - *default*: `8005` - The local port that Sentry API will be accessible at
+- `IP_ADDR` - *default*: `127.0.0.1` - the IP address that the API should be listening to
 - `ANALYTICS_RECORDER` - accepts any non-zero value - whether or not to start the `Analytics recorder` that will track analytics stats for payout events (`IMPRESSION` & `CLICK`)
 ##### Adapter
 - `KEYSTORE_PWD` - Password for the `Keystore file`, only available when using `Ethereum Adapter` (`--adapter ethereum`)
