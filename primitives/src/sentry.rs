@@ -1,3 +1,4 @@
+use crate::targeting::Rules;
 use crate::validator::MessageTypes;
 use crate::{BigNum, Channel, ChannelId, ValidatorId};
 use chrono::{DateTime, Utc};
@@ -52,19 +53,8 @@ pub enum Event {
         ad_slot: Option<String>,
         referrer: Option<String>,
     },
-    ImpressionWithCommission {
-        earners: Vec<Earner>,
-    },
     /// only the creator can send this event
-    UpdateImpressionPrice {
-        price: BigNum,
-    },
-    /// only the creator can send this event
-    Pay {
-        outputs: HashMap<String, BigNum>,
-    },
-    /// only the creator can send this event
-    PauseChannel,
+    UpdateTargeting { targeting_rules: Rules },
     /// only the creator can send this event
     Close,
 }
@@ -84,10 +74,7 @@ impl fmt::Display for Event {
         match *self {
             Event::Impression { .. } => write!(f, "IMPRESSION"),
             Event::Click { .. } => write!(f, "CLICK"),
-            Event::ImpressionWithCommission { .. } => write!(f, "IMPRESSION_WITH_COMMMISION"),
-            Event::UpdateImpressionPrice { .. } => write!(f, "UPDATE_IMPRESSION_PRICE"),
-            Event::Pay { .. } => write!(f, "PAY"),
-            Event::PauseChannel => write!(f, "PAUSE_CHANNEL"),
+            Event::UpdateTargeting { .. } => write!(f, "UPDATE_TARGETING"),
             Event::Close => write!(f, "CLOSE"),
         }
     }
