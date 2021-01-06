@@ -1,5 +1,4 @@
-# AdEx Validator Stack in Rust [![TravisCI master](https://travis-ci.com/AdExNetwork/adex-validator-stack-rust.svg?token=TBKq9g6p9sWDrzNyX4kC&branch=master)](https://travis-ci.com/AdExNetwork/adex-validator-stack-rust) [![GH Actions CI](https://github.com/AdExNetwork/adex-validator-stack-rust/workflows/Continuous%20Integration/badge.svg)](https://github.com/AdExNetwork/adex-validator-stack-rust/actions)
-
+# AdEx Validator Stack in Rust [![CI](https://github.com/AdExNetwork/adex-validator-stack-rust/workflows/Continuous%20Integration/badge.svg)](https://github.com/AdExNetwork/adex-validator-stack-rust/actions)
 
 The Rust implementation of the Validator Stack
 
