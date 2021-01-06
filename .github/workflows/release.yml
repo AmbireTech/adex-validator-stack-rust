@@ -2,12 +2,11 @@ on:
   push:
     tags:
       - "validator-v*"
-
-name: Release
+name: Prepare draft releases
 
 jobs:
   release-validator:
-    name: Build & Create draft release of validator-v* tag
+    name: Build & Create draft release for validator-v* tag
     runs-on: ubuntu-latest
     if: startsWith(github.event.ref, 'refs/tags/validator-v')
     steps:
