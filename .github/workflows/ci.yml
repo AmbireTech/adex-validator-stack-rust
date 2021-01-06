@@ -4,7 +4,7 @@ name: Continuous Integration
 
 jobs:
   ci-flow:
-    name: Runs `cargo make ci-flow` - Tests, clippy & rustfmt
+    name: cargo make ci-flow - Tests, clippy & rustfmt
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -27,57 +27,3 @@ jobs:
         # Running cargo make doesn't successfully start `ganache`
         run: |
           cargo make ci-flow
-  release-validator:
-    name: Build & Create draft release of validator-v* tag
-    runs-on: ubuntu-latest
-    needs: ci-flow
-    if: startsWith(github.event.ref, 'refs/tags/validator-v')
-    steps:
-    - uses: actions/checkout@v2
-      with:
-        submodules: true
-    # See https://github.community/t/how-to-get-just-the-tag-name/16241/10
-    - name: Set Validator version, binary name and current date for release
-      id: get_validator_tag
-      run: |
-        echo ::set-output name=VALIDATOR_VERSION::${GITHUB_REF#refs/tags/validator-v}
-        echo ::set-output name=VALIDATOR_BIN_NAME::${GITHUB_REF#refs/tags/}
-        echo ::set-output name=TODAY_DATE_STRING::$(date -u +'%d %b %Y')
-      shell: bash
-    - uses: actions-rs/toolchain@v1
-      with:
-        # No need to add `toolchain`, it will use `rust-toolchain` file instead
-        profile: default
-        override: true
-    - name: Build validator-v* (x86_64-unknown-linux-gnu)
-      run: |
-        cargo build -p validator_worker --release --all-features --target x86_64-unknown-linux-gnu
-        cp target/x86_64-unknown-linux-gnu/release/validator_worker ${{ steps.get_validator_tag.outputs.VALIDATOR_BIN_NAME }}
-    - name: Create release for ${{ steps.get_validator_tag.outputs.VALIDATOR_BIN_NAME }}
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        # This token is provided by Actions, you do not need to create your own token
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ steps.get_validator_tag.outputs.VALIDATOR_BIN_NAME }}
-        release_name: Validator worker v${{ steps.get_validator_tag.outputs.VALIDATOR_VERSION }} (${{ steps.get_validator_tag.outputs.TODAY_DATE_STRING }})
-        body: |
-          Fully featured Validator implementation written in Rust.
-
-          All the issues related to this release can be found here:
-          TODO:
-          - Add information for release in CHANGELOG.md
-          - Add the CHANGELOG.md content here
-        draft: true
-        prerelease: false
-    - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./${{ steps.get_validator_tag.outputs.VALIDATOR_BIN_NAME }}
-        asset_name: ${{ steps.get_validator_tag.outputs.VALIDATOR_BIN_NAME }}
-        asset_content_type: application/octet-stream
