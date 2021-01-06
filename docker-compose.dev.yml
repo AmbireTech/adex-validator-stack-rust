@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  sentry-leader:
+    depends_on:
+      - postgres-leader
+      - redis-leader
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile-sentry
+    container_name: adex-sentry-leader
+    ports:
+      - "8005:8005"
+    environment:
+      - ENV=development
+      - PORT=8005
+      - POSTGRES_DB=sentry_leader
+      # set the correct Hosts of the leader's Postgres & Redis
+      - POSTGRES_HOST=postgres-leader
+      - REDIS_URL=redis://redis-leader:6379
+    env_file:
+      - validator-leader.dev.env
+    networks:
+      - adex-leader
+      - adex-external
+  validator-leader:
+    depends_on:
+      - sentry-leader
+    build: .
+    container_name: adex-validator-leader
+    restart: unless-stopped
+    # For Ethereum adapter
+    #volumes:
+    #  - "/root/keystore.json:/app/keystore.json"
+    environment:
+      - ENV=development
+      # override the .env file default that is using `localhost`
+      - SENTRY_URL=http://adex-sentry-leader:8005
+    env_file:
+      - validator-leader.dev.env
+    depends_on:
+      - sentry-leader
+    networks:
+      - adex-leader
+  postgres-leader:
+    image: postgres
+    container_name: adex-postgres-leader
+    restart: always
+    # expose:
+    #   - "5432"
+    ports:
+      - "5432:5432"
+    # volumes: $HOME/docker/volumes/postgres:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=sentry_leader
+    networks:
+      - adex-leader
+      # - adex-external
+  redis-leader:
+    image: redis
+    container_name: adex-redis-leader
+    restart: always
+    # expose:
+    #   - "6379"
+    ports: 
+      - "6379:6379"
+    networks:
+      - adex-leader
+      - adex-external
+# TODO: only in Production/CI
+  # ganache-cli:
+  #   image: 
+
+networks:
+  adex-leader:
+    internal: true
+  adex-external:

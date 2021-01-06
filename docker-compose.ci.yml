@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # Service: Postgres
+  postgres-leader:
+    image: postgres
+    container_name: adex-postgres-leader
+    restart: always
+    ports:
+      - "5432:5432"
+    # volumes: $HOME/docker/volumes/postgres:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=sentry_leader
+    networks:
+      - adex-leader
+      - adex-external
+  # Service: Redis
+  redis-leader:
+    image: redis
+    container_name: adex-redis-leader
+    restart: always
+    # Publish ports to Host to be able to debug
+    ports: 
+      - "6379:6379"
+    networks:
+      - adex-leader
+      - adex-external
+  # Service: Ganache-cli - test RPC client
+  ganache-cli:
+    build: ./adapter/scripts
+    image: adex-adapter-ganache
+    container_name: adex-ganache-cli
+    ports:
+      - "8545:8545"
+    networks:
+      - adex-leader
+      - adex-external
+
+networks:
+  adex-leader:
+    internal: true
+  adex-external:
