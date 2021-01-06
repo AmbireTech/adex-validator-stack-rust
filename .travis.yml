@@ -20,8 +20,9 @@ env:
 
 stages:
   - name: run all tests
-  - name: release validator
-    if: (tag IS present) AND (tag =~ ^validator-v)
+  # Disable release since we use Github Actions for this instead
+  # - name: release validator
+  #   if: (tag IS present) AND (tag =~ ^validator-v)
 
 jobs:
   fast_finish: true

@@ -33,6 +33,9 @@ jobs:
     needs: ci-flow
     if: startsWith(github.event.ref, 'refs/tags/validator-v')
     steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: true
     # See https://github.community/t/how-to-get-just-the-tag-name/16241/10
     - name: Set Validator version, binary name and current date for release
       id: get_validator_tag
@@ -41,6 +44,11 @@ jobs:
         echo ::set-output name=VALIDATOR_BIN_NAME::${GITHUB_REF#refs/tags/}
         echo ::set-output name=TODAY_DATE_STRING::$(date -u +'%d %b %Y')
       shell: bash
+    - uses: actions-rs/toolchain@v1
+      with:
+        # No need to add `toolchain`, it will use `rust-toolchain` file instead
+        profile: default
+        override: true
     - name: Build validator-v* (x86_64-unknown-linux-gnu)
       run: |
         cargo build -p validator_worker --release --all-features --target x86_64-unknown-linux-gnu
