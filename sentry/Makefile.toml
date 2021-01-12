@@ -7,16 +7,13 @@ dependencies = [
   "pre-build",
   "build",
   "post-build",
-  "ganache-up",
+  "services-up",
   "test-flow",
-  "ganache-down",
+  "services-down",
 ]
 
-[tasks.ganache-up]
-script = '''
-docker-compose -f ../docker-compose.ci.yml up -d ganache-cli \
-&& sleep 10
-'''
+[tasks.services-up]
+script = "docker-compose -f ../docker-compose.ci.yml up -d redis-leader"
 
-[tasks.ganache-down]
+[tasks.services-down]
 script = "docker-compose -f ../docker-compose.ci.yml down"
