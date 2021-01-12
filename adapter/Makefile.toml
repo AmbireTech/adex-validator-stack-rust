@@ -13,11 +13,7 @@ dependencies = [
 ]
 
 [tasks.ganache-start]
-# condition = { env_false = ["IS_DOCKER_GANACHE_RUNNING"]}
-# if [ "$(docker start adex-ganache-cli 2>/dev/null)" -eq "adex-ganache-cli"]; docker run --rm --name adex-ganache-cli --detach --publish 8545:8545 --volume ${CARGO_MAKE_WORKING_DIRECTORY}/../scripts:/scripts --entrypoint /scripts/ganache-cli.sh trufflesuite/ganache-cli:latest fi
 script = { file = "scripts/start-docker.sh" }
 
 [tasks.ganache-stop]
-script = [
-    "docker stop adex-ganache-cli"
-]
+script = { file = "scripts/stop-docker.sh" }

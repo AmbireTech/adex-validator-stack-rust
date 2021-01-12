@@ -1,2 +1,2 @@
 #!/bin/bash
-docker stop -adex-ganache-cli
+docker stop adex-ganache-cli

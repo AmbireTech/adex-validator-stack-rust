@@ -8,7 +8,7 @@ use std::time::Duration;
 use clap::{crate_version, App, Arg};
 use futures::future::{join, join_all};
 use tokio::runtime::Runtime;
-use tokio::time::{delay_for, timeout};
+use tokio::time::{sleep, timeout};
 
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
 use primitives::adapter::{Adapter, DummyAdapterOptions, KeystoreOptions};
@@ -141,7 +141,7 @@ fn run<A: Adapter + 'static>(
     };
 
     // Create the runtime
-    let mut rt = Runtime::new()?;
+    let rt = Runtime::new()?;
 
     if is_single_tick {
         rt.block_on(iterate_channels(args, &logger));
@@ -155,7 +155,7 @@ fn run<A: Adapter + 'static>(
 async fn infinite<A: Adapter + 'static>(args: Args<A>, logger: &Logger) {
     loop {
         let arg = args.clone();
-        let delay_future = delay_for(Duration::from_millis(arg.config.wait_time as u64));
+        let delay_future = sleep(Duration::from_millis(arg.config.wait_time as u64));
         let _result = join(iterate_channels(arg, logger), delay_future).await;
     }
 }

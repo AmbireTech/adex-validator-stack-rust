@@ -79,7 +79,7 @@ impl Url {
     }
 }
 
-#[derive(Debug, Clone, Error, Eq, PartialEq)]
+#[derive(Debug, Error)]
 pub enum UrlError {
     #[error("Parsing the IPFS Cid failed")]
     IPFS(#[from] cid::Error),
@@ -214,8 +214,8 @@ mod test {
 
         // v0 != v1
         assert_ne!(
-            IPFS::try_from(TESTS_IPFS_V0[0]),
-            IPFS::try_from(TESTS_IPFS_V1[0])
+            IPFS::try_from(TESTS_IPFS_V0[0]).expect("Should create V0 IPFS"),
+            IPFS::try_from(TESTS_IPFS_V1[0]).expect("Should create V1 IPFS")
         )
     }
 
@@ -248,19 +248,19 @@ mod test {
 
         // Invalid cases
         // CID V0 - Invalid scheme - valid IPFS
-        assert_eq!(
-            Err(UrlError::NoPrefix),
-            "https://QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR".parse::<Url>()
-        );
+        assert!(matches!(
+            "https://QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR".parse::<Url>(),
+            Err(UrlError::NoPrefix)
+        ));
         // CID V0 - Invalid scheme - valid IPFS
-        assert_eq!(
+        assert!(matches!(
+            "ipfs://NotValid".parse::<Url>(),
             Err(UrlError::IPFS(cid::Error::ParsingError)),
-            "ipfs://NotValid".parse::<Url>()
-        );
+        ));
         // CID V1 - Invalid scheme - valid IPFS
-        assert_eq!(
+        assert!(matches!(
+            "https://bafybeif2h3mynaf3ylgdbs6arf6mczqycargt5cqm3rmel3wpjarlswway".parse::<Url>(),
             Err(UrlError::NoPrefix),
-            "https://bafybeif2h3mynaf3ylgdbs6arf6mczqycargt5cqm3rmel3wpjarlswway".parse::<Url>()
-        );
+        ));
     }
 }

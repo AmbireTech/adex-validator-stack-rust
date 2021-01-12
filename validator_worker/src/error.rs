@@ -4,7 +4,7 @@ use std::fmt;
 
 #[derive(Debug)]
 pub enum TickError {
-    TimedOut(tokio::time::Elapsed),
+    TimedOut(tokio::time::error::Elapsed),
     Tick(Box<dyn std::error::Error>),
 }
 

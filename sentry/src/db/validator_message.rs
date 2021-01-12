@@ -21,22 +21,18 @@ pub async fn get_validator_messages(
 
     add_message_types_params(&mut where_clauses, &mut params, message_types);
 
-    pool
-        .run(move |connection| {
-            async move {
-                let statement = format!(r#"SELECT "from", msg, received FROM validator_messages WHERE {} ORDER BY received DESC LIMIT {}"#, where_clauses.join(" AND "), limit);
-                match connection.prepare(&statement).await {
-                    Ok(select) => match connection.query(&select, params.as_slice()).await {
-                        Ok(results) => {
-                            let messages = results.iter().map(ValidatorMessage::from).collect();
-                            Ok((messages, connection))},
-                        Err(e) => Err((e, connection)),
-                    },
-                    Err(e) => Err((e, connection)),
-                }
-            }
-        })
-        .await
+    let connection = pool.get().await?;
+
+    let statement = format!(
+        r#"SELECT "from", msg, received FROM validator_messages WHERE {} ORDER BY received DESC LIMIT {}"#,
+        where_clauses.join(" AND "),
+        limit
+    );
+    let select = connection.prepare(&statement).await?;
+    let results = connection.query(&select, params.as_slice()).await?;
+    let messages = results.iter().map(ValidatorMessage::from).collect();
+
+    Ok(messages)
 }
 
 fn add_message_types_params<'a>(
