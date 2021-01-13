@@ -13,7 +13,7 @@ pub async fn get_channel_by_id(
 ) -> Result<Option<Channel>, RunError<bb8_postgres::tokio_postgres::Error>> {
     let connection = pool.get().await?;
 
-    let select = connection.prepare("SELECT id, creator, deposit_asset, deposit_amount, valid_until, targeting_rules, spec FROM channels WHERE id = $1 LIMIT 1").await?;
+    let select = connection.prepare("SELECT id, creator, deposit_asset, deposit_amount, valid_until, targeting_rules, spec, exhausted FROM channels WHERE id = $1 LIMIT 1").await?;
 
     let results = connection.query(&select, &[&id]).await?;
 
@@ -29,7 +29,7 @@ pub async fn get_channel_by_id_and_validator(
 
     let validator = serde_json::Value::from_str(&format!(r#"[{{"id": "{}"}}]"#, validator_id))
         .expect("Not a valid json");
-    let query = "SELECT id, creator, deposit_asset, deposit_amount, valid_until, targeting_rules, spec FROM channels WHERE id = $1 AND spec->'validators' @> $2 LIMIT 1";
+    let query = "SELECT id, creator, deposit_asset, deposit_amount, valid_until, targeting_rules, spec, exhausted FROM channels WHERE id = $1 AND spec->'validators' @> $2 LIMIT 1";
     let select = connection.prepare(query).await?;
 
     let results = connection.query(&select, &[&id, &validator]).await?;
@@ -43,7 +43,7 @@ pub async fn insert_channel(
 ) -> Result<bool, RunError<bb8_postgres::tokio_postgres::Error>> {
     let connection = pool.get().await?;
 
-    let stmt = connection.prepare("INSERT INTO channels (id, creator, deposit_asset, deposit_amount, valid_until, targeting_rules, spec) values ($1, $2, $3, $4, $5, $6, $7)").await?;
+    let stmt = connection.prepare("INSERT INTO channels (id, creator, deposit_asset, deposit_amount, valid_until, targeting_rules, spec, exhausted) values ($1, $2, $3, $4, $5, $6, $7, $8)").await?;
 
     let row = connection
         .execute(
@@ -56,6 +56,7 @@ pub async fn insert_channel(
                 &channel.valid_until,
                 &channel.targeting_rules,
                 &channel.spec,
+                &channel.exhausted
             ],
         )
         .await?;
@@ -106,14 +107,16 @@ pub async fn insert_validator_messages(
 pub async fn update_exhausted_channel(
     pool: &DbPool,
     channel: &Channel,
-    index: i32,
+    index: u32,
 ) -> Result<bool, RunError<bb8_postgres::tokio_postgres::Error>> {
     let connection = pool.get().await?;
 
     let stmt = connection
         .prepare("UPDATE channels SET exhausted[$1] = true WHERE id = $2")
         .await?;
-    let row = connection.execute(&stmt, &[&index, &channel.id]).await?;
+    // WARNING: By default PostgreSQL uses a one-based numbering convention for arrays, that is, an array of n elements starts with array[1] and ends with array[n].
+    // this is why we add +1 to the index
+    let row = connection.execute(&stmt, &[&(index+1), &channel.id]).await?;
 
     let updated = row == 1;
     Ok(updated)
@@ -160,7 +163,7 @@ mod list_channels {
         let connection = pool.get().await?;
 
         // To understand why we use Order by, see Postgres Documentation: https://www.postgresql.org/docs/8.1/queries-limit.html
-        let statement = format!("SELECT id, creator, deposit_asset, deposit_amount, valid_until, targeting_rules, spec FROM channels WHERE {} ORDER BY spec->>'created' DESC LIMIT {} OFFSET {}", where_clauses.join(" AND "), limit, skip);
+        let statement = format!("SELECT id, creator, deposit_asset, deposit_amount, valid_until, targeting_rules, spec, exhausted FROM channels WHERE {} ORDER BY spec->>'created' DESC LIMIT {} OFFSET {}", where_clauses.join(" AND "), limit, skip);
         let stmt = connection.prepare(&statement).await?;
 
         let rows = connection.query(&stmt, params.as_slice()).await?;
