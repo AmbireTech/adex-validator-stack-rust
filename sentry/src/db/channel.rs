@@ -56,7 +56,7 @@ pub async fn insert_channel(
                 &channel.valid_until,
                 &channel.targeting_rules,
                 &channel.spec,
-                &channel.exhausted
+                &channel.exhausted,
             ],
         )
         .await?;
@@ -116,7 +116,9 @@ pub async fn update_exhausted_channel(
         .await?;
     // WARNING: By default PostgreSQL uses a one-based numbering convention for arrays, that is, an array of n elements starts with array[1] and ends with array[n].
     // this is why we add +1 to the index
-    let row = connection.execute(&stmt, &[&(index+1), &channel.id]).await?;
+    let row = connection
+        .execute(&stmt, &[&(index + 1), &channel.id])
+        .await?;
 
     let updated = row == 1;
     Ok(updated)
