@@ -64,7 +64,7 @@ The password for the Keystore file can be set using the [environment variable `K
 
 - Leader
     ```bash
-    POSTGRES_DB="sentry_leader" PORT=8006 cargo run -p sentry -- \
+    POSTGRES_DB="sentry_leader" PORT=8005 KEYSTORE_PWD=adexvalidator cargo run -p sentry -- \
         --adapter ethereum \
         --keystoreFile ./adapter/resources/keystore.json \
         ./docs/config/dev.toml
@@ -72,7 +72,7 @@ The password for the Keystore file can be set using the [environment variable `K
 
 - Follower
     ```bash
-    POSTGRES_DB="sentry_follower" PORT=8006 cargo run -p sentry -- \
+    POSTGRES_DB="sentry_follower" PORT=8006 KEYSTORE_PWD=adexvalidator cargo run -p sentry -- \
         --adapter ethereum \
         --keystoreFile ./adapter/resources/keystore.json
         ./docs/config/dev.toml
