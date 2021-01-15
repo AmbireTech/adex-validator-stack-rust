@@ -139,10 +139,10 @@ The password for the Keystore file can be set using the environment variable `KE
     Assuming you have [Sentry API running](#running-sentry-rest-api) for the **Leader** on port `8005`:
 
     ```bash
-    cargo run -p validator_worker
-        --adapter ethereum
-        --keystoreFile ./adapter/resources/keystore.json
-        --sentryUrl http://127.0.0.1:8005
+    KEYSTORE_PWD=adexvalidator cargo run -p validator_worker -- \
+        --adapter ethereum \
+        --keystoreFile ./adapter/resources/keystore.json \
+        --sentryUrl http://127.0.0.1:8005 \
         ./docs/config/dev.toml
     ```
 
@@ -151,10 +151,10 @@ The password for the Keystore file can be set using the environment variable `KE
     Assuming you have [Sentry API running](#running-sentry-rest-api) for the **Follower** on port `8006`:
 
     ```bash
-    cargo run -p validator_worker
-        --adapter ethereum
-        --keystoreFile ./adapter/resources/keystore.json
-        --sentryUrl http://127.0.0.1:8006
+    KEYSTORE_PWD=adexvalidator cargo run -p validator_worker -- \
+        --adapter ethereum \
+        --keystoreFile ./adapter/resources/keystore.json \
+        --sentryUrl http://127.0.0.1:8006 \
         ./docs/config/dev.toml
     ```
 
@@ -164,10 +164,10 @@ The password for the Keystore file can be set using the environment variable `KE
     Assuming you have [Sentry API running](#running-sentry-rest-api) for the **Leader** on port `8005`:
 
     ```bash
-    cargo run -p validator_worker
-        --adapter dummy
-        --dummyIdentity ce07CbB7e054514D590a0262C93070D838bFBA2e
-        --sentryUrl http://127.0.0.1:8005
+    cargo run -p validator_worker -- \
+        --adapter dummy \
+        --dummyIdentity ce07CbB7e054514D590a0262C93070D838bFBA2e \
+        --sentryUrl http://127.0.0.1:8005 \
         ./docs/config/dev.toml
     ```
 
@@ -176,10 +176,10 @@ The password for the Keystore file can be set using the environment variable `KE
     Assuming you have [Sentry API running](#running-sentry-rest-api) for the **Follower** on port `8006`:
 
     ```bash
-    cargo run -p validator_worker
-        --adapter dummy
-        --dummyIdentity c91763d7f14ac5c5ddfbcd012e0d2a61ab9bded3
-        --sentryUrl http://127.0.0.1:8006
+    cargo run -p validator_worker -- \
+        --adapter dummy \
+        --dummyIdentity c91763d7f14ac5c5ddfbcd012e0d2a61ab9bded3 \
+        --sentryUrl http://127.0.0.1:8006 \
         ./docs/config/dev.toml
     ```
 
