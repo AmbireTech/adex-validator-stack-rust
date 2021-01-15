@@ -12,13 +12,13 @@ num-integer = "0.1"
 # (De)Serialization & Http requests
 serde = {version = "^1.0", features = ['derive']}
 serde_json = "^1.0"
-reqwest = { version = "0.10", features = ["json"] }
+reqwest = { version = "0.11", features = ["json"] }
 url = { version = "^2.1", features = ["serde"]}
 # Logging
 slog = { version = "^2.5.2" , features = ["max_level_trace"] }
 # Async
-async-std = "1.6"
+async-std = "^1.8"
 # Other
 lazy_static = "1.4"
 thiserror = "^1.0"
-rand = "0.7"
+rand = "^0.8"
