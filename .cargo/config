@@ -1,0 +1,20 @@
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source."https://github.com/elpiel/openethereum"]
+git = "https://github.com/elpiel/openethereum"
+branch = "remove-dir-depenedency-for-ethstore"
+replace-with = "vendored-sources"
+
+[source."https://github.com/elpiel/rust-web3"]
+git = "https://github.com/elpiel/rust-web3"
+rev = "bba005dabd75ababdc590c40cd84d94b9bdb9988"
+replace-with = "vendored-sources"
+
+[source."https://github.com/paritytech/rust-secp256k1"]
+git = "https://github.com/paritytech/rust-secp256k1"
+rev = "ccc06e7480148b723eb44ac56cf4d20eec380b6f"
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "vendor"

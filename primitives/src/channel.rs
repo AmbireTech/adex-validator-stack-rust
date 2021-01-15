@@ -403,7 +403,7 @@ pub mod postgres {
                 valid_until: row.get("valid_until"),
                 targeting_rules: row.get::<_, Json<Rules>>("targeting_rules").0,
                 spec: row.get::<_, Json<ChannelSpec>>("spec").0,
-                exhausted: row.get("exhausted"),
+                exhausted: row.get::<_, Json<Vec<bool>>>("exhausted").0,
             }
         }
     }

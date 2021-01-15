@@ -5,7 +5,7 @@ authors = ["Lachezar Lechev <lachezar@adex.network>, Omidiora Samuel <sam@adex.n
 edition = "2018"
 
 [features]
-postgres = ["postgres-types", "bytes", "tokio-postgres"]
+postgres = ["postgres-types", "bytes", "tokio-postgres", "postgres_array"]
 
 [dependencies]
 # (De)Serialization
@@ -46,6 +46,8 @@ rand = "^0.6"
 postgres-types = { version = "0.1.0", optional = true }
 bytes = { version = "0.5", optional = true }
 tokio-postgres = { version = "0.5.1", optional = true, features = ["with-chrono-0_4", "with-serde_json-1"] }
+postgres_array = { version = "0.11.0", optional = true } 
+
 # Futures
 futures = "0.3"
 async-trait = "0.1.40"

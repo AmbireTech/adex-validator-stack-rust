@@ -5,9 +5,26 @@ LABEL maintainer="dev@adex.network"
 
 WORKDIR /usr/src/app
 
+RUN mkdir -p primitives/src/ adapter/src/ sentry/src/
+
+COPY ./primitives/Cargo.toml ./primitives/Cargo.toml
+RUN touch ./primitives/src/lib.rs && echo "pub fn main() {println!(\"cargo:rerun-if-changed=\\\"/tmp/<projectname>/build.rs\\\"\");}" >> ./primitives/src/lib.rs
+
+COPY ./adapter/Cargo.toml ./adapter/Cargo.toml
+RUN touch ./adapter/src/lib.rs && echo "pub fn main() {println!(\"cargo:rerun-if-changed=\\\"/tmp/<projectname>/build.rs\\\"\");}" >> ./adapter/src/lib.rs
+
+COPY ./sentry/Cargo.toml ./sentry/Cargo.toml
+RUN touch ./sentry/src/main.rs && echo "fn main() {println!(\"cargo:rerun-if-changed=\\\"/tmp/<projectname>/build.rs\\\"\");}" >> ./sentry/src/main.rs
+
+COPY ./Cargo.lock ./Cargo.lock
+RUN touch Cargo.toml && echo "[workspace] members = [ "primitives", "adapter", "sentry", ]" >> Cargo.toml
+
+# this build step will cache your dependencies
+RUN cargo vendor
+
 COPY . .
 
-# We intall the sentry binary with all features in Release mode
+# We install the sentry binary with all features in Release mode
 # Inlcude the full backtrace for easier debugging
 RUN RUST_BACKTRACE=full cargo install --path sentry --all-features
 
@@ -39,6 +56,10 @@ COPY docs/config/cloudflare_origin.crt /usr/local/share/ca-certificates/
 RUN update-ca-certificates
 
 COPY --from=builder /usr/local/bin/sentry .
+RUN mkdir scripts
+COPY  ./scripts ./scripts
+
+ENTRYPOINT ["./scripts/entrypoint.sh"]
 
 CMD sentry -a ${ADAPTER:-ethereum} \
             ${KEYSTORE_FILE:+-k $KEYSTORE_FILE} \

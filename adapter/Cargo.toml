@@ -14,7 +14,7 @@ serde = { version = "^1.0", features = ['derive'] }
 serde_json = "1.0"
 serde-hex = "0.1.0"
 # Ethereum
-web3 = { git = "https://github.com/elpiel/rust-web3" }
+web3 = { git = "https://github.com/elpiel/rust-web3", rev = "bba005dabd75ababdc590c40cd84d94b9bdb9988" }
 eth_checksum = "0.1.1"
 tiny-keccak = "1.5"
 ethstore = { git = "https://github.com/elpiel/openethereum", branch = "remove-dir-depenedency-for-ethstore" }
