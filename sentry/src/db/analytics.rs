@@ -22,22 +22,15 @@ pub async fn advertiser_channel_ids(
     pool: &DbPool,
     creator: &ValidatorId,
 ) -> Result<Vec<ChannelId>, RunError<bb8_postgres::tokio_postgres::Error>> {
-    pool.run(move |connection| async move {
-        match connection
-            .prepare("SELECT id FROM channels WHERE creator = $1")
-            .await
-        {
-            Ok(stmt) => match connection.query(&stmt, &[creator]).await {
-                Ok(rows) => {
-                    let channel_ids: Vec<ChannelId> = rows.iter().map(ChannelId::from).collect();
-                    Ok((channel_ids, connection))
-                }
-                Err(e) => Err((e, connection)),
-            },
-            Err(e) => Err((e, connection)),
-        }
-    })
-    .await
+    let connection = pool.get().await?;
+
+    let stmt = connection
+        .prepare("SELECT id FROM channels WHERE creator = $1")
+        .await?;
+    let rows = connection.query(&stmt, &[creator]).await?;
+
+    let channel_ids: Vec<ChannelId> = rows.iter().map(ChannelId::from).collect();
+    Ok(channel_ids)
 }
 
 fn metric_to_column(metric: &str) -> String {
@@ -122,21 +115,15 @@ pub async fn get_analytics(
         applied_limit,
     );
 
+    let connection = pool.get().await?;
+
     // execute query
-    pool.run(move |connection| async move {
-        match connection.prepare(&sql_query).await {
-            Ok(stmt) => match connection.query(&stmt, &params).await {
-                Ok(rows) => {
-                    let analytics: Vec<AnalyticsData> =
-                        rows.iter().map(AnalyticsData::from).collect();
-                    Ok((analytics, connection))
-                }
-                Err(e) => Err((e, connection)),
-            },
-            Err(e) => Err((e, connection)),
-        }
-    })
-    .await
+    let stmt = connection.prepare(&sql_query).await?;
+    let rows = connection.query(&stmt, &params).await?;
+
+    let analytics: Vec<AnalyticsData> = rows.iter().map(AnalyticsData::from).collect();
+
+    Ok(analytics)
 }
 
 fn get_time_frame(timeframe: &str) -> (i64, i64) {

@@ -17,10 +17,13 @@ COPY ./sentry/Cargo.toml ./sentry/Cargo.toml
 RUN touch ./sentry/src/main.rs && echo "fn main() {println!(\"cargo:rerun-if-changed=\\\"/tmp/<projectname>/build.rs\\\"\");}" >> ./sentry/src/main.rs
 
 COPY ./Cargo.lock ./Cargo.lock
-RUN touch Cargo.toml && echo "[workspace] members = [ "primitives", "adapter", "sentry", ]" >> Cargo.toml
+RUN touch Cargo.toml && echo "[workspace]\n members = [ 'primitives', 'adapter', 'sentry' ]" >> Cargo.toml
 
 # this build step will cache your dependencies
-RUN cargo vendor
+RUN cargo build -p sentry --release
+RUN rm -f target/release/deps/sentry*
+# RUN rm -f target/release/deps/adapter*
+# RUN rm -f target/release/deps/primitives*
 
 COPY . .
 

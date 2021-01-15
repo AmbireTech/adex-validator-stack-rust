@@ -13,7 +13,10 @@ use primitives::ValidatorId;
 use sentry::db::{postgres_connection, redis_connection, setup_migrations};
 use sentry::Application;
 use slog::{error, info, Logger};
-use std::{convert::TryFrom, net::{IpAddr, Ipv4Addr, SocketAddr}};
+use std::{
+    convert::TryFrom,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+};
 
 const DEFAULT_PORT: u16 = 8005;
 const DEFAULT_IP_ADDR: IpAddr = IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0));
@@ -59,7 +62,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or_else(|_| DEFAULT_PORT);
 
     let ip_addr = std::env::var("IP_ADDR")
-        .map(|s| s.parse::<IpAddr>().expect("Invalid Ip address was provided"))
+        .map(|s| {
+            s.parse::<IpAddr>()
+                .expect("Invalid Ip address was provided")
+        })
         .unwrap_or_else(|_| DEFAULT_IP_ADDR);
 
     let socket_addr: SocketAddr = (ip_addr, port).into();
