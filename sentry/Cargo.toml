@@ -6,8 +6,8 @@ edition = "2018"
 
 [dependencies]
 # Futures
-futures = "0.3.1"
-async-std = "1.4.0"
+futures = "^0.3"
+async-std = "^1"
 async-trait = "^0.1"
 # Primitives
 primitives = { path = "../primitives", features = ["postgres"] }
@@ -15,24 +15,24 @@ adapter = { version = "0.1", path = "../adapter" }
 chrono = { version = "0.4", features = ["serde"] }
 hex = "0.4"
 # CLI
-clap = "2.33.0"
+clap = "^2.33"
 # Server
-tokio = { version = "0.2.9", features = ["macros", "rt-threaded"] }
-hyper = { version = "0.13", features = ["stream"] }
+tokio = { version = "1", features = ["macros", "time", "rt-multi-thread"] }
+hyper = { version = "0.14", features = ["stream", "runtime", "http1", "server"] }
 regex = "1"
 # Database
-redis = "0.15"
-bb8 = "0.4"
-bb8-postgres = { version = "0.4", features = ["with-chrono-0_4", "with-serde_json-1"] }
+redis = { version = "0.19", features = ["aio", "tokio-comp"] }
+bb8 = "0.7"
+bb8-postgres = { version = "0.7", features = ["with-chrono-0_4", "with-serde_json-1"] }
 
 # Migrations
-migrant_lib = { version = "0.27", features = ["d-postgres"] }
+migrant_lib = { version = "^0.30", features = ["d-postgres"] }
 # Logger
 slog = { version = "^2.2.3", features = ["max_level_trace"] }
 # Serde
 serde = { version = "^1.0", features = ['derive'] }
 serde_json = "^1.0"
-serde_urlencoded = "0.6.1"
+serde_urlencoded = "^0.7"
 # Other
 lazy_static = "1.4.0"
 thiserror = "^1.0"

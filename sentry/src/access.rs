@@ -440,9 +440,7 @@ mod test {
             }),
         };
         let mut channel = get_channel(rule);
-        channel.spec.withdraw_period_start = Utc
-        .ymd(1970, 1, 1)
-        .and_hms(12, 0, 9);
+        channel.spec.withdraw_period_start = Utc.ymd(1970, 1, 1).and_hms(12, 0, 9);
 
         let ok_response = check_access(
             &redis,
@@ -663,9 +661,7 @@ mod test {
             }),
         };
         let mut channel = get_channel(rule);
-        channel.spec.withdraw_period_start = Utc
-            .ymd(1970, 1, 1)
-            .and_hms(12, 0, 9);
+        channel.spec.withdraw_period_start = Utc.ymd(1970, 1, 1).and_hms(12, 0, 9);
 
         let err_response = check_access(
             &redis,
