@@ -5,6 +5,8 @@ LABEL maintainer="dev@adex.network"
 
 WORKDIR /usr/src/app
 
+# An hack that build step will cache your dependencies
+
 RUN mkdir -p primitives/src/ adapter/src/ sentry/src/
 
 COPY ./primitives/Cargo.toml ./primitives/Cargo.toml
@@ -19,16 +21,20 @@ RUN touch ./sentry/src/main.rs && echo "fn main() {println!(\"cargo:rerun-if-cha
 COPY ./Cargo.lock ./Cargo.lock
 RUN touch Cargo.toml && echo "[workspace]\n members = [ 'primitives', 'adapter', 'sentry' ]" >> Cargo.toml
 
-# this build step will cache your dependencies
 RUN cargo build -p sentry --release
+
+# remove the not needed artifacts
 RUN rm -f target/release/deps/sentry*
-# RUN rm -f target/release/deps/adapter*
-# RUN rm -f target/release/deps/primitives*
+RUN rm -f target/release/deps/adapter*
+RUN rm -f target/release/deps/primitives*
+RUN rm -f target/release/deps/libadapter*
+RUN rm -f target/release/deps/libprimitives*
 
 COPY . .
 
 # We install the sentry binary with all features in Release mode
 # Inlcude the full backtrace for easier debugging
+
 RUN RUST_BACKTRACE=full cargo install --path sentry --all-features
 
 WORKDIR /usr/local/bin
