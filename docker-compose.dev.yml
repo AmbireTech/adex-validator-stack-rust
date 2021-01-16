@@ -58,24 +58,6 @@ services:
       - adex-leader
       - adex-external
 
-  # validator-leader:
-  #   depends_on:
-  #     - sentry-leader
-  #   build: .
-  #   container_name: adex-validator-leader
-  #   restart: unless-stopped
-  #   # For Ethereum adapter
-  #   #volumes:
-  #   #  - "/root/keystore.json:/app/keystore.json"
-  #   environment:
-  #     - ENV=development
-  #     # override the .env file default that is using `localhost`
-  #     - SENTRY_URL=http://adex-sentry-leader:8005
-  #   env_file:
-  #     - validator-leader.dev.env
-  #   networks:
-  #     - adex-leader
-  
   postgres:
     image: postgres
     container_name: adex-postgres
@@ -85,9 +67,8 @@ services:
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_USER=adex
-      - POSTGRES_MULTIPLE_DATABASES=sentry_leader,sentry_follower
+      <<: *postgres
+      POSTGRES_MULTIPLE_DATABASES: sentry_leader,sentry_follower
     networks:
     - adex-leader
     - adex-external

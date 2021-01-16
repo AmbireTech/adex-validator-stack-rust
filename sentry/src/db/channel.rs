@@ -112,7 +112,7 @@ pub async fn update_exhausted_channel(
     let connection = pool.get().await?;
 
     let stmt = connection
-        .prepare("UPDATE channels SET exhausted = jsonb_set(exhausted, '{$1}', true, false) WHERE id = $2")
+        .prepare("UPDATE channels SET exhausted[$1] = true WHERE id = $2")
         .await?;
     // WARNING: By default PostgreSQL uses a one-based numbering convention for arrays, that is, an array of n elements starts with array[1] and ends with array[n].
     // this is why we add +1 to the index

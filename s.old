@@ -1,5 +1,0 @@
-RUN ls -larth target/release/deps/
-
-RUN rm -f target/release/deps/sentry*
-RUN rm -f target/release/deps/adapter*
-RUN rm -f target/release/deps/primitives*

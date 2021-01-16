@@ -5,7 +5,7 @@ LABEL maintainer="dev@adex.network"
 
 WORKDIR /usr/src/app
 
-# An hack that build step will cache your dependencies
+# A hack around the build step that will cache dependencies and make builds faster
 
 RUN mkdir -p primitives/src/ adapter/src/ sentry/src/
 
@@ -64,9 +64,11 @@ COPY docs/config/cloudflare_origin.crt /usr/local/share/ca-certificates/
 
 RUN update-ca-certificates
 
-COPY --from=builder /usr/local/bin/sentry .
 RUN mkdir scripts
-COPY  ./scripts ./scripts
+
+COPY ./scripts/sentry-docker ./scripts
+
+COPY --from=builder /usr/local/bin/sentry .
 
 ENTRYPOINT ["./scripts/entrypoint.sh"]
 
