@@ -1,3 +1,6 @@
 [submodule "lib/protocol-eth"]
 	path = lib/protocol-eth
 	url = https://github.com/AdExNetwork/adex-protocol-eth
+[submodule "lib/validator"]
+	path = lib/validator
+	url = https://github.com/AdExNetwork/adex-validator
