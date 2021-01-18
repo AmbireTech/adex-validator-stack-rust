@@ -85,7 +85,6 @@ pub async fn setup_migrations(environment: &str) {
 
     let mut migrations = vec![
         make_migration!("20190806011140_initial-tables"),
-        make_migration!("20200625092729_channel-targeting-rules"),
     ];
 
     if environment == "development" {
