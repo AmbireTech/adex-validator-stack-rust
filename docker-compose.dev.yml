@@ -7,13 +7,7 @@ x-postgres-configuration: &postgres
 
 x-base-sentry-configuration: &sentry
   ENV: development
-  REDIS_URL: redis://redis:6379
   ADAPTER: 'dummy'
-
-networks:
-  adex-leader:
-    internal: true
-  adex-external:
 
 services:
   sentry-leader:
@@ -33,9 +27,7 @@ services:
       PORT: 8005
       POSTGRES_DB: sentry_leader
       DUMMY_IDENTITY: 'ce07CbB7e054514D590a0262C93070D838bFBA2e'
-    networks:
-      - adex-leader
-      - adex-external
+      REDIS_URL: redis://redis:6379/0
 
   sentry-follower:
     depends_on:
@@ -54,9 +46,7 @@ services:
       PORT: 8006
       POSTGRES_DB: sentry_follower
       DUMMY_IDENTITY: 'c91763d7f14ac5c5ddfbcd012e0d2a61ab9bded3'
-    networks:
-      - adex-leader
-      - adex-external
+      REDIS_URL: redis://redis:6379/1
 
   postgres:
     image: postgres
@@ -69,25 +59,15 @@ services:
     environment:
       <<: *postgres
       POSTGRES_MULTIPLE_DATABASES: sentry_leader,sentry_follower
-    networks:
-    - adex-leader
-    - adex-external
 
   redis:
     image: redis
     container_name: adex-redis
     restart: always
-    networks:
-      - adex-leader
-      - adex-external
 
   ganache:
     build: ./scripts/ethereum
-    image: adex-adapter-ganache
+    image: adex-ganache
     container_name: adex-ganache-cli
     ports:
       - "8545:8545"
-    networks:
-      - adex-leader
-      - adex-external
-

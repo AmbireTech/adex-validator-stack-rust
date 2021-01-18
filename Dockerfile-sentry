@@ -10,20 +10,20 @@ WORKDIR /usr/src/app
 RUN mkdir -p primitives/src/ adapter/src/ sentry/src/
 
 COPY ./primitives/Cargo.toml ./primitives/Cargo.toml
-RUN touch ./primitives/src/lib.rs && echo "pub fn main() {println!(\"cargo:rerun-if-changed=\\\"/tmp/<projectname>/build.rs\\\"\");}" >> ./primitives/src/lib.rs
+RUN touch ./primitives/src/lib.rs && echo "pub fn main() {println!(\"cargo:rerun-if-changed=\\\"/tmp/build.rs\\\"\");}" >> ./primitives/src/lib.rs
 
 COPY ./adapter/Cargo.toml ./adapter/Cargo.toml
-RUN touch ./adapter/src/lib.rs && echo "pub fn main() {println!(\"cargo:rerun-if-changed=\\\"/tmp/<projectname>/build.rs\\\"\");}" >> ./adapter/src/lib.rs
+RUN touch ./adapter/src/lib.rs && echo "pub fn main() {println!(\"cargo:rerun-if-changed=\\\"/tmp/build.rs\\\"\");}" >> ./adapter/src/lib.rs
 
 COPY ./sentry/Cargo.toml ./sentry/Cargo.toml
-RUN touch ./sentry/src/main.rs && echo "fn main() {println!(\"cargo:rerun-if-changed=\\\"/tmp/<projectname>/build.rs\\\"\");}" >> ./sentry/src/main.rs
+RUN touch ./sentry/src/main.rs && echo "fn main() {println!(\"cargo:rerun-if-changed=\\\"/tmp/build.rs\\\"\");}" >> ./sentry/src/main.rs
 
 COPY ./Cargo.lock ./Cargo.lock
 RUN touch Cargo.toml && echo "[workspace]\n members = [ 'primitives', 'adapter', 'sentry' ]" >> Cargo.toml
 
 RUN cargo build -p sentry --release
 
-# remove the not needed artifacts
+# remove the not needed build artifacts
 RUN rm -f target/release/deps/sentry*
 RUN rm -f target/release/deps/adapter*
 RUN rm -f target/release/deps/primitives*
