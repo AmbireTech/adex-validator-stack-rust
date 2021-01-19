@@ -1,8 +1,6 @@
 use bb8::Pool;
-use bb8_postgres::tokio_postgres::NoTls;
-use bb8_postgres::PostgresConnectionManager;
-use redis::aio::MultiplexedConnection;
-use redis::RedisError;
+use bb8_postgres::{tokio_postgres::NoTls, PostgresConnectionManager};
+use redis::{aio::MultiplexedConnection, RedisError};
 use std::env;
 
 use lazy_static::lazy_static;
@@ -83,10 +81,7 @@ pub async fn setup_migrations(environment: &str) {
         };
     }
 
-    let mut migrations = vec![
-        make_migration!("20190806011140_initial-tables"),
-        make_migration!("20200625092729_channel-targeting-rules"),
-    ];
+    let mut migrations = vec![make_migration!("20190806011140_initial-tables")];
 
     if environment == "development" {
         // seeds database tables for testing
