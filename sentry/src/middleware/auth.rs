@@ -39,7 +39,7 @@ impl<A: Adapter + 'static> Middleware<A> for AuthRequired {
         request: Request<Body>,
         _application: &'a Application<A>,
     ) -> Result<Request<Body>, ResponseError> {
-        if request.extensions().get::<Session>().is_some() {
+        if request.extensions().get::<Auth>().is_some() {
             Ok(request)
         } else {
             Err(ResponseError::Unauthorized)

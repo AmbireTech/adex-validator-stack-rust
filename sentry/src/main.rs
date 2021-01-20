@@ -19,7 +19,7 @@ use std::{
 };
 
 const DEFAULT_PORT: u16 = 8005;
-const DEFAULT_IP_ADDR: IpAddr = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
+const DEFAULT_IP_ADDR: IpAddr = IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0));
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
