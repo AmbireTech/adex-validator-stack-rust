@@ -1,5 +1,3 @@
 target/
-scripts/
-node_modules
 Dockerfile
 docker-compose.yml
