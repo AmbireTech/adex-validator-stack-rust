@@ -36,3 +36,4 @@ serde_urlencoded = "0.6.1"
 # Other
 lazy_static = "1.4.0"
 thiserror = "^1.0"
+serial_test = "0.5.1"
