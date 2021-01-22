@@ -8,8 +8,6 @@ before_cache:
 rust:
   - 1.48.0
 os: linux
-# add nodejs for ganche-cli
-node_js: "12.12.0"
 # Need to cache the whole `.cargo` directory to keep .crates.toml for
 # cargo-update to work
 cache:
@@ -22,20 +20,31 @@ env:
 
 stages:
   - name: run all tests
-  - name: release validator
-    if: (tag IS present) AND (tag =~ ^validator-v)
+  # Disable release since we use Github Actions for this instead
+  # - name: release validator
+  #   if: (tag IS present) AND (tag =~ ^validator-v)
 
 jobs:
   fast_finish: true
   include:
     - stage: run all tests
+      env:
+      - DOCKER_COMPOSE_VERSION=1.27.4
+
+      before_install:
+        - sudo rm /usr/local/bin/docker-compose
+        - curl -L https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-`uname -s`-`uname -m` > docker-compose
+        - chmod +x docker-compose
+        - sudo mv docker-compose /usr/local/bin
       # @TODO: Maybe run a separate weekly job and use the cached cargo-make from there
       install:
         - which cargo-make || cargo install cargo-make
       script:
+        # run docker-compose setting up all required services for tests
+        - docker-compose -f docker-compose.ci.yml up -d
         - cargo make ci-flow
       services:
-        - redis
+        - docker
     - stage: release validator
       # Disable the default Rust `install` & `script` from Travis
       install:

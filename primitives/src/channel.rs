@@ -102,8 +102,10 @@ pub struct Channel {
     pub exhausted: Vec<bool>,
 }
 
-pub fn channel_exhausted(channel: &Channel) -> bool {
-    channel.exhausted.len() == 2 && channel.exhausted.iter().all(|&x| x)
+impl Channel {
+    pub fn is_exhausted(&self) -> bool {
+        self.exhausted.len() == 2 && self.exhausted.iter().all(|&x| x)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
@@ -232,7 +234,7 @@ impl SpecValidators {
         }
     }
 
-    pub fn find_index(&self, validator_id: &ValidatorId) -> Option<i32> {
+    pub fn find_index(&self, validator_id: &ValidatorId) -> Option<u32> {
         if &self.leader().id == validator_id {
             Some(0)
         } else if &self.follower().id == validator_id {

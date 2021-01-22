@@ -1,12 +1,13 @@
 CREATE TABLE channels
 (
-    id             VARCHAR(66)              NOT NULL,
-    creator        VARCHAR(255)             NOT NULL,
-    deposit_asset  VARCHAR(42)              NOT NULL,
-    deposit_amount VARCHAR(255)             NOT NULL,
-    valid_until    TIMESTAMP(2) WITH TIME ZONE NOT NULL,
-    spec           JSONB                    NOT NULL,
-    exhausted      BOOLEAN[2]
+    id              VARCHAR(66)              NOT NULL,
+    creator         VARCHAR(255)             NOT NULL,
+    deposit_asset   VARCHAR(42)              NOT NULL,
+    deposit_amount  VARCHAR(255)             NOT NULL,
+    valid_until     TIMESTAMP(2) WITH TIME ZONE NOT NULL,
+    spec            JSONB                    NOT NULL,
+    targeting_rules JSONB DEFAULT '[]'       NOT NULL,
+    exhausted       BOOLEAN[2] DEFAULT '{}'  NOT NULL,
 
     PRIMARY KEY (id)
 );

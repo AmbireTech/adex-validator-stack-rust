@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use std::env;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::time::delay_for;
+use tokio::time::sleep;
 
 lazy_static! {
     pub static ref ANALYTICS_RECORDER: Option<String> = env::var("ANALYTICS_RECORDER").ok();
@@ -113,7 +113,7 @@ impl EventAggregator {
                                 break;
                             }
 
-                            delay_for(Duration::from_millis(aggr_throttle as u64)).await;
+                            sleep(Duration::from_millis(aggr_throttle as u64)).await;
                             store(&dbpool, &channel_id, &logger, recorder.clone()).await;
                         }
                     });

@@ -17,12 +17,10 @@ use primitives::{
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::convert::TryFrom;
-use std::fs;
+use std::{convert::TryFrom, fs};
 use tiny_keccak::Keccak;
 use web3::{
-    contract::tokens::Tokenizable,
-    contract::{Contract, Options},
+    contract::{tokens::Tokenizable, Contract, Options},
     transports::Http,
     types::{H256, U256},
     Web3,
@@ -174,16 +172,18 @@ impl Adapter for EthereumAdapter {
         )
         .map_err(Error::ContractInitialization)?;
 
-        let channel_status: U256 = contract
-            .query(
+        let channel_status: U256 = tokio_compat_02::FutureExt::compat(async {
+            tokio_compat_02::FutureExt::compat(contract.query(
                 "states",
                 H256(*channel.id).into_token(),
                 None,
                 Options::default(),
                 None,
-            )
+            ))
             .await
-            .map_err(Error::ContractQuerying)?;
+        })
+        .await
+        .map_err(Error::ContractQuerying)?;
 
         if channel_status != *CHANNEL_STATE_ACTIVE {
             Err(AdapterError::Adapter(
@@ -594,45 +594,55 @@ mod test {
             .expect("failed to parse leader account");
 
         // tokenbytecode.json
-        let token_bytecode = include_str!("../test/resources/tokenbytecode.json");
+        let token_bytecode =
+            include_str!("../test/resources/tokenbytecode.json").trim_end_matches("\n");
         // token_abi.json
         let token_abi = include_bytes!("../test/resources/tokenabi.json");
         // adexbytecode.json
-        let adex_bytecode = include_str!("../../lib/protocol-eth/resources/bytecode/AdExCore.json");
+        let adex_bytecode = include_str!("../../lib/protocol-eth/resources/bytecode/AdExCore.json")
+            .trim_end_matches("\n");
 
         // deploy contracts
-        let token_contract = Contract::deploy(web3.eth(), token_abi)
-            .expect("invalid token token contract")
-            .confirmations(0)
-            .options(Options::with(|opt| {
-                opt.gas_price = Some(1.into());
-                opt.gas = Some(6_721_975.into());
-            }))
-            .execute(token_bytecode, (), leader_account)
+        let token_contract = tokio_compat_02::FutureExt::compat(async {
+            Contract::deploy(web3.eth(), token_abi)
+                .expect("invalid token token contract")
+                .confirmations(0)
+                .options(Options::with(|opt| {
+                    opt.gas_price = Some(1.into());
+                    opt.gas = Some(6_721_975.into());
+                }))
+                .execute(token_bytecode, (), leader_account)
+        })
+        .await;
+
+        let token_contract = tokio_compat_02::FutureExt::compat(token_contract)
             .await
             .expect("Correct parameters are passed to the constructor.");
 
-        let adex_contract = Contract::deploy(web3.eth(), &ADEXCORE_ABI)
-            .expect("invalid adex contract")
-            .confirmations(0)
-            .options(Options::with(|opt| {
-                opt.gas_price = Some(1.into());
-                opt.gas = Some(6_721_975.into());
-            }))
-            .execute(adex_bytecode, (), leader_account)
+        let adex_contract = tokio_compat_02::FutureExt::compat(async {
+            Contract::deploy(web3.eth(), &ADEXCORE_ABI)
+                .expect("invalid adex contract")
+                .confirmations(0)
+                .options(Options::with(|opt| {
+                    opt.gas_price = Some(1.into());
+                    opt.gas = Some(6_721_975.into());
+                }))
+                .execute(adex_bytecode, (), leader_account)
+        })
+        .await;
+        let adex_contract = tokio_compat_02::FutureExt::compat(adex_contract)
             .await
             .expect("Correct parameters are passed to the constructor.");
 
         // contract call set balance
-        token_contract
-            .call(
-                "setBalanceTo",
-                (Address::from(leader_account), U256::from(2000_u64)),
-                leader_account,
-                Options::default(),
-            )
-            .await
-            .expect("Failed to set balance");
+        tokio_compat_02::FutureExt::compat(token_contract.call(
+            "setBalanceTo",
+            (Address::from(leader_account), U256::from(2000_u64)),
+            leader_account,
+            Options::default(),
+        ))
+        .await
+        .expect("Failed to set balance");
 
         let leader_validator_desc = ValidatorDesc {
             // keystore.json address (same with js)
@@ -688,15 +698,14 @@ mod test {
         let sol_tuple = eth_channel.to_solidity_tuple();
 
         // contract call open channel
-        adex_contract
-            .call(
-                "channelOpen",
-                (sol_tuple,),
-                leader_account,
-                Options::default(),
-            )
-            .await
-            .expect("open channel");
+        tokio_compat_02::FutureExt::compat(adex_contract.call(
+            "channelOpen",
+            (sol_tuple,),
+            leader_account,
+            Options::default(),
+        ))
+        .await
+        .expect("open channel");
 
         let contract_addr = adex_contract.address().to_fixed_bytes();
         let channel_id = eth_channel.hash(&contract_addr);

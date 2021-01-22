@@ -1,4 +1,4 @@
-# AdEx Validator Stack in Rust [![Build Status](https://travis-ci.com/AdExNetwork/adex-validator-stack-rust.svg?token=TBKq9g6p9sWDrzNyX4kC&branch=master)](https://travis-ci.com/AdExNetwork/adex-validator-stack-rust)
+# AdEx Validator Stack in Rust [![CI](https://github.com/AdExNetwork/adex-validator-stack-rust/workflows/Continuous%20Integration/badge.svg)](https://github.com/AdExNetwork/adex-validator-stack-rust/actions)
 
 The Rust implementation of the Validator Stack
 
@@ -20,6 +20,8 @@ Requirements:
   Check the [`rust-toolchain`](./rust-toolchain) file for specific version of rust.
   - [`cargo-make`](https://github.com/sagiegurari/cargo-make)
 - Docker
+- Node 14 (LTS) & npm
+    Used for running a local Ethereum node with `ganache-cli` for automated tests in the `Ethereum Adapter` ([adapter/src/ethereum.rs](./adapter/src/ethereum.rs), also check [scripts/ethereum.sh](./scripts/ethereum.sh))
 
 #### Linux
 
@@ -37,6 +39,8 @@ We need two services to be able to run `Sentry`: `Postgres` and `Redis`.
 
 - `$HOME/docker/volumes/postgres` - your local storage for postgres (persist the data when we remove the container)
 - `POSTGRES_PASSWORD=postgres` - the password of `postgres` user
+
+**NOTE:** Additionally you must setup 2 databases - `sentry_leader` & `sentry_follower` in order for the provided examples bellow to work.
 
 ### Running Redis
 
@@ -60,7 +64,7 @@ The password for the Keystore file can be set using the [environment variable `K
 
 - Leader
     ```bash
-    POSTGRES_DB="sentry_leader" PORT=8006 cargo run -p sentry -- \
+    POSTGRES_DB="sentry_leader" PORT=8005 KEYSTORE_PWD=adexvalidator cargo run -p sentry -- \
         --adapter ethereum \
         --keystoreFile ./adapter/resources/keystore.json \
         ./docs/config/dev.toml
@@ -68,7 +72,7 @@ The password for the Keystore file can be set using the [environment variable `K
 
 - Follower
     ```bash
-    POSTGRES_DB="sentry_follower" PORT=8006 cargo run -p sentry -- \
+    POSTGRES_DB="sentry_follower" PORT=8006 KEYSTORE_PWD=adexvalidator cargo run -p sentry -- \
         --adapter ethereum \
         --keystoreFile ./adapter/resources/keystore.json
         ./docs/config/dev.toml
@@ -101,6 +105,7 @@ For full list, check out [primitives/src/util/tests/prep_db.rs#L29-L43](./primit
 
 - `ENV` - `production` or `development`; *default*: `development` - passing this env. variable will use the default configuration paths - [`docs/config/dev.toml`](./docs/config/dev.toml) (for `development`) or [`docs/config/prod.toml`](./docs/config/prod.toml) (for `production`). Otherwise you can pass your own configuration file path to the binary (check `cargo run -p sentry --help` for more information). In `development` it will make sure Sentry to seed the database.
 - `PORT` - *default*: `8005` - The local port that Sentry API will be accessible at
+- `IP_ADDR` - *default*: `0.0.0.0` - the IP address that the API should be listening to
 - `ANALYTICS_RECORDER` - accepts any non-zero value - whether or not to start the `Analytics recorder` that will track analytics stats for payout events (`IMPRESSION` & `CLICK`)
 ##### Adapter
 - `KEYSTORE_PWD` - Password for the `Keystore file`, only available when using `Ethereum Adapter` (`--adapter ethereum`)
@@ -134,10 +139,10 @@ The password for the Keystore file can be set using the environment variable `KE
     Assuming you have [Sentry API running](#running-sentry-rest-api) for the **Leader** on port `8005`:
 
     ```bash
-    cargo run -p validator_worker
-        --adapter ethereum
-        --keystoreFile ./adapter/resources/keystore.json
-        --sentryUrl http://127.0.0.1:8005
+    KEYSTORE_PWD=adexvalidator cargo run -p validator_worker -- \
+        --adapter ethereum \
+        --keystoreFile ./adapter/resources/keystore.json \
+        --sentryUrl http://127.0.0.1:8005 \
         ./docs/config/dev.toml
     ```
 
@@ -146,10 +151,10 @@ The password for the Keystore file can be set using the environment variable `KE
     Assuming you have [Sentry API running](#running-sentry-rest-api) for the **Follower** on port `8006`:
 
     ```bash
-    cargo run -p validator_worker
-        --adapter ethereum
-        --keystoreFile ./adapter/resources/keystore.json
-        --sentryUrl http://127.0.0.1:8006
+    KEYSTORE_PWD=adexvalidator cargo run -p validator_worker -- \
+        --adapter ethereum \
+        --keystoreFile ./adapter/resources/keystore.json \
+        --sentryUrl http://127.0.0.1:8006 \
         ./docs/config/dev.toml
     ```
 
@@ -159,10 +164,10 @@ The password for the Keystore file can be set using the environment variable `KE
     Assuming you have [Sentry API running](#running-sentry-rest-api) for the **Leader** on port `8005`:
 
     ```bash
-    cargo run -p validator_worker
-        --adapter dummy
-        --dummyIdentity ce07CbB7e054514D590a0262C93070D838bFBA2e
-        --sentryUrl http://127.0.0.1:8005
+    cargo run -p validator_worker -- \
+        --adapter dummy \
+        --dummyIdentity ce07CbB7e054514D590a0262C93070D838bFBA2e \
+        --sentryUrl http://127.0.0.1:8005 \
         ./docs/config/dev.toml
     ```
 
@@ -171,10 +176,10 @@ The password for the Keystore file can be set using the environment variable `KE
     Assuming you have [Sentry API running](#running-sentry-rest-api) for the **Follower** on port `8006`:
 
     ```bash
-    cargo run -p validator_worker
-        --adapter dummy
-        --dummyIdentity c91763d7f14ac5c5ddfbcd012e0d2a61ab9bded3
-        --sentryUrl http://127.0.0.1:8006
+    cargo run -p validator_worker -- \
+        --adapter dummy \
+        --dummyIdentity c91763d7f14ac5c5ddfbcd012e0d2a61ab9bded3 \
+        --sentryUrl http://127.0.0.1:8006 \
         ./docs/config/dev.toml
     ```
 

@@ -8,5 +8,5 @@ VALUES
     '1000',
     to_timestamp(4102444800),
     '[]',
-    '{"targeting_rules": [], "minPerImpression":"1","maxPerImpression":"10","created":1564383600000,"pricingBounds":{"CLICK":{"min":"0","max":"0"}},"withdrawPeriodStart":4073414400000,"validators":[{"id":"0xce07CbB7e054514D590a0262C93070D838bFBA2e","url":"http://localhost:8005","fee":"100"},{"id":"0xC91763D7F14ac5c5dDfBCD012e0D2A61ab9bDED3","url":"http://localhost:8006","fee":"100"}]}'
+    '{"targeting_rules": [], "minPerImpression":"1","maxPerImpression":"10","created":1564383600000,"pricingBounds":{"CLICK":{"min":"0","max":"0"}},"withdrawPeriodStart":4073414400000,"validators":[{"id":"0xce07CbB7e054514D590a0262C93070D838bFBA2e","url":"http://localhost:8005","fee":"100"},{"id":"0xC91763D7F14ac5c5dDfBCD012e0D2A61ab9bDED3","url":"http://localhost:8006","fee":"100"}]}',
 );

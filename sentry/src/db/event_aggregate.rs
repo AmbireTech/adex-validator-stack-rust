@@ -17,19 +17,17 @@ pub async fn latest_approve_state(
     pool: &DbPool,
     channel: &Channel,
 ) -> Result<Option<ApproveStateValidatorMessage>, RunError<bb8_postgres::tokio_postgres::Error>> {
-    pool
-        .run(move |connection| {
-            async move {
-                match connection.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'ApproveState' ORDER BY received DESC LIMIT 1").await {
-                    Ok(select) => match connection.query(&select, &[&channel.id, &channel.spec.validators.follower().id]).await {
-                        Ok(rows) => Ok((rows.get(0).map(ApproveStateValidatorMessage::from), connection)),
-                        Err(e) => Err((e, connection)),
-                    },
-                    Err(e) => Err((e, connection)),
-                }
-            }
-        })
-        .await
+    let connection = pool.get().await?;
+
+    let select = connection.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'ApproveState' ORDER BY received DESC LIMIT 1").await?;
+    let rows = connection
+        .query(
+            &select,
+            &[&channel.id, &channel.spec.validators.follower().id],
+        )
+        .await?;
+
+    Ok(rows.get(0).map(ApproveStateValidatorMessage::from))
 }
 
 pub async fn latest_new_state(
@@ -37,19 +35,21 @@ pub async fn latest_new_state(
     channel: &Channel,
     state_root: &str,
 ) -> Result<Option<NewStateValidatorMessage>, RunError<bb8_postgres::tokio_postgres::Error>> {
-    pool
-    .run(move |connection| {
-        async move {
-            match connection.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'NewState' AND msg->> 'stateRoot' = $3 ORDER BY received DESC LIMIT 1").await {
-                Ok(select) => match connection.query(&select, &[&channel.id, &channel.spec.validators.leader().id, &state_root]).await {
-                    Ok(rows) => Ok((rows.get(0).map(NewStateValidatorMessage::from), connection)),
-                    Err(e) => Err((e, connection)),
-                },
-                Err(e) => Err((e, connection)),
-            }
-        }
-    })
-    .await
+    let connection = pool.get().await?;
+
+    let select = connection.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'NewState' AND msg->> 'stateRoot' = $3 ORDER BY received DESC LIMIT 1").await?;
+    let rows = connection
+        .query(
+            &select,
+            &[
+                &channel.id,
+                &channel.spec.validators.leader().id,
+                &state_root,
+            ],
+        )
+        .await?;
+
+    Ok(rows.get(0).map(NewStateValidatorMessage::from))
 }
 
 pub async fn latest_heartbeats(
@@ -57,19 +57,14 @@ pub async fn latest_heartbeats(
     channel_id: &ChannelId,
     validator_id: &ValidatorId,
 ) -> Result<Vec<HeartbeatValidatorMessage>, RunError<bb8_postgres::tokio_postgres::Error>> {
-    pool
-    .run(move |connection| {
-        async move {
-            match connection.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'Heartbeat' ORDER BY received DESC LIMIT 2").await {
-                Ok(select) => match connection.query(&select, &[&channel_id, &validator_id]).await {
-                    Ok(rows) => Ok((rows.iter().map(HeartbeatValidatorMessage::from).collect(), connection)),
-                    Err(e) => Err((e, connection)),
-                },
-                Err(e) => Err((e, connection)),
-            }
-        }
-    })
-    .await
+    let connection = pool.get().await?;
+
+    let select = connection.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'Heartbeat' ORDER BY received DESC LIMIT 2").await?;
+    let rows = connection
+        .query(&select, &[&channel_id, &validator_id])
+        .await?;
+
+    Ok(rows.iter().map(HeartbeatValidatorMessage::from).collect())
 }
 
 pub async fn list_event_aggregates(
@@ -97,15 +92,14 @@ pub async fn list_event_aggregates(
         where_clauses.push(format!("created > ${}", params.len()));
     }
 
-    let event_aggregates = pool
-        .run(move |connection| {
-            async move {
-                let where_clause = if !where_clauses.is_empty() {
-                    where_clauses.join(" AND ").to_string()
-                } else {
-                    "".to_string()
-                };
-                let statement = format!(
+    let connection = pool.get().await?;
+
+    let where_clause = if !where_clauses.is_empty() {
+        where_clauses.join(" AND ").to_string()
+    } else {
+        "".to_string()
+    };
+    let statement = format!(
                     "
                         WITH aggregates AS (
                             SELECT
@@ -131,22 +125,10 @@ pub async fn list_event_aggregates(
                         ) SELECT channel_id, created, jsonb_object_agg(event_type , data) as events FROM aggregates GROUP BY channel_id, created
                     ", where_clause, limit);
 
-                match connection.prepare(&statement).await {
-                    Ok(stmt) => {
-                        match connection.query(&stmt, params.as_slice()).await {
-                            Ok(rows) => {
-                                let event_aggregates = rows.iter().map(EventAggregate::from).collect();
+    let stmt = connection.prepare(&statement).await?;
+    let rows = connection.query(&stmt, params.as_slice()).await?;
 
-                                Ok((event_aggregates, connection))
-                            },
-                            Err(e) => Err((e, connection)),
-                        }
-                    },
-                    Err(e) => Err((e, connection)),
-                }
-            }
-        })
-        .await?;
+    let event_aggregates = rows.iter().map(EventAggregate::from).collect();
 
     Ok(event_aggregates)
 }
@@ -197,38 +179,48 @@ pub async fn insert_event_aggregate(
         }
     }
 
-    let result = pool
-        .run(move |connection| {
-            async move {
-                let mut err: Option<Error> = None;
-                let sink = match connection.copy_in("COPY event_aggregates(channel_id, created, event_type, count, payout, earner) FROM STDIN BINARY").await {
-                    Ok(sink) => sink,
-                    Err(e) => return Err((e, connection))
-                };
+    let connection = pool.get().await?;
 
-                let created = Utc::now(); // time discrepancy
+    let mut err: Option<Error> = None;
+    let sink = connection.copy_in("COPY event_aggregates(channel_id, created, event_type, count, payout, earner) FROM STDIN BINARY").await?;
 
-                let writer = BinaryCopyInWriter::new(sink, &[Type::VARCHAR, Type::TIMESTAMPTZ, Type::VARCHAR, Type::VARCHAR, Type::VARCHAR, Type::VARCHAR]);
-                pin_mut!(writer);
-                for item in data {
-                    if let Err(e) = writer.as_mut().write(&[&item.id, &created, &item.event_type, &item.event_count, &item.event_payout, &item.earner]).await {
-                        err = Some(e);
-                        break;
-                    }
-                }
+    let created = Utc::now(); // time discrepancy
 
-                match err {
-                    Some(e) => Err((e, connection)),
-                    None  =>  {
-                        if let Err(e) = writer.finish().await {
-                            return Err((e, connection));
-                        };
-                        Ok((true, connection))
-                    }
-                }
-            }
-        })
-        .await?;
+    let writer = BinaryCopyInWriter::new(
+        sink,
+        &[
+            Type::VARCHAR,
+            Type::TIMESTAMPTZ,
+            Type::VARCHAR,
+            Type::VARCHAR,
+            Type::VARCHAR,
+            Type::VARCHAR,
+        ],
+    );
+    pin_mut!(writer);
+    for item in data {
+        if let Err(e) = writer
+            .as_mut()
+            .write(&[
+                &item.id,
+                &created,
+                &item.event_type,
+                &item.event_count,
+                &item.event_payout,
+                &item.earner,
+            ])
+            .await
+        {
+            err = Some(e);
+            break;
+        }
+    }
 
-    Ok(result)
+    match err {
+        Some(e) => Err(bb8::RunError::from(e)),
+        None => {
+            writer.finish().await?;
+            Ok(true)
+        }
+    }
 }

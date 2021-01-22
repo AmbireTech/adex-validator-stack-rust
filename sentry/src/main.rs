@@ -13,9 +13,13 @@ use primitives::ValidatorId;
 use sentry::db::{postgres_connection, redis_connection, setup_migrations};
 use sentry::Application;
 use slog::{error, info, Logger};
-use std::convert::TryFrom;
+use std::{
+    convert::TryFrom,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+};
 
 const DEFAULT_PORT: u16 = 8005;
+const DEFAULT_IP_ADDR: IpAddr = IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0));
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -56,6 +60,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let port = std::env::var("PORT")
         .map(|s| s.parse::<u16>().expect("Invalid port(u16) was provided"))
         .unwrap_or_else(|_| DEFAULT_PORT);
+
+    let ip_addr = std::env::var("IP_ADDR")
+        .map(|s| {
+            s.parse::<IpAddr>()
+                .expect("Invalid Ip address was provided")
+        })
+        .unwrap_or_else(|_| DEFAULT_IP_ADDR);
+
+    let socket_addr: SocketAddr = (ip_addr, port).into();
+
     let config_file = cli.value_of("config");
     let config = configuration(&environment, config_file).unwrap();
 
@@ -90,8 +104,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let dummy_adapter = DummyAdapter::init(options, &config);
             AdapterTypes::DummyAdapter(Box::new(dummy_adapter))
         }
-        // @TODO exit gracefully
-        _ => panic!("We don't have any other adapters implemented yet!"),
+        _ => panic!("You can only use `ethereum` & `dummy` adapters!"),
     };
 
     let logger = logger();
@@ -105,14 +118,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         AdapterTypes::EthereumAdapter(adapter) => {
             run(
                 Application::new(*adapter, config, logger, redis, postgres),
-                port,
+                socket_addr,
             )
             .await
         }
         AdapterTypes::DummyAdapter(adapter) => {
             run(
                 Application::new(*adapter, config, logger, redis, postgres),
-                port,
+                socket_addr,
             )
             .await
         }
@@ -122,10 +135,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Starts the `hyper` `Server`.
-async fn run<A: Adapter + 'static>(app: Application<A>, port: u16) {
-    let addr = ([127, 0, 0, 1], port).into();
+async fn run<A: Adapter + 'static>(app: Application<A>, socket_addr: SocketAddr) {
     let logger = app.logger.clone();
-    info!(&logger, "Listening on port {}!", port);
+    info!(&logger, "Listening on socket address: {}!", socket_addr);
 
     let make_service = make_service_fn(|_| {
         let server = app.clone();
@@ -137,7 +149,7 @@ async fn run<A: Adapter + 'static>(app: Application<A>, port: u16) {
         }
     });
 
-    let server = Server::bind(&addr).serve(make_service);
+    let server = Server::bind(&socket_addr).serve(make_service);
 
     if let Err(e) = server.await {
         error!(&logger, "server error: {}", e; "main" => "run");
