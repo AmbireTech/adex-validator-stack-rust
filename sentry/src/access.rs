@@ -221,7 +221,6 @@ mod test {
     use crate::Session;
 
     use super::*;
-    use serial_test::serial;
 
     async fn setup(db_index: usize) -> (Config, MultiplexedConnection) {
         let mut redis = redis_connection().await.expect("Couldn't connect to Redis");
@@ -272,7 +271,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[serial]
     async fn session_uid_rate_limit() {
         let (config, redis) = setup(0).await;
 
@@ -327,7 +325,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[serial]
     async fn ip_rate_limit() {
         let (config, redis) = setup(1).await;
 
@@ -382,7 +379,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[serial]
     async fn check_access_past_channel_valid_until() {
         let (config, redis) = setup(2).await;
 
@@ -422,7 +418,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[serial]
     async fn check_access_close_event_in_withdraw_period() {
         let (config, redis) = setup(3).await;
 
@@ -446,7 +441,9 @@ mod test {
             }),
         };
         let mut channel = get_channel(rule);
-        channel.spec.withdraw_period_start = Utc.ymd(1970, 1, 1).and_hms(12, 0, 9);
+        channel.spec.withdraw_period_start = Utc
+        .ymd(1970, 1, 1)
+        .and_hms(12, 0, 9);
 
         let ok_response = check_access(
             &redis,
@@ -462,7 +459,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[serial]
     async fn check_access_close_event_and_is_creator() {
         let (config, redis) = setup(4).await;
 
@@ -502,7 +498,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[serial]
     async fn check_access_update_targeting_event_and_is_creator() {
         let (config, redis) = setup(5).await;
 
@@ -542,7 +537,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[serial]
     async fn not_creator_and_there_are_close_events() {
         let (config, redis) = setup(6).await;
 
@@ -593,7 +587,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[serial]
     async fn not_creator_and_there_are_update_targeting_events() {
         let (config, redis) = setup(7).await;
 
@@ -643,7 +636,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[serial]
     async fn in_withdraw_period_no_close_events() {
         let (config, redis) = setup(8).await;
 
@@ -667,7 +659,9 @@ mod test {
             }),
         };
         let mut channel = get_channel(rule);
-        channel.spec.withdraw_period_start = Utc.ymd(1970, 1, 1).and_hms(12, 0, 9);
+        channel.spec.withdraw_period_start = Utc
+            .ymd(1970, 1, 1)
+            .and_hms(12, 0, 9);
 
         let err_response = check_access(
             &redis,
@@ -683,7 +677,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[serial]
     async fn with_forbidden_country() {
         let (config, redis) = setup(9).await;
 
@@ -722,7 +715,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[serial]
     async fn with_forbidden_referrer() {
         let (config, redis) = setup(10).await;
 
@@ -761,7 +753,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[serial]
     async fn no_rate_limit() {
         let (config, redis) = setup(11).await;
 
@@ -797,7 +788,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[serial]
+    #[ignore]
     async fn applied_rules() {
         let (config, redis) = setup(12).await;
 
