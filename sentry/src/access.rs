@@ -229,7 +229,7 @@ mod test {
             .arg(db_index)
             .query_async::<_, String>(&mut redis)
             .await;
-        // run `FLUSHALL` to clean any leftovers of other tests
+        // run `FLUSHDB` to clean any leftovers of other tests
         let _ = redis::cmd("FLUSHDB")
             .query_async::<_, String>(&mut redis)
             .await;
