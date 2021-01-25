@@ -138,7 +138,7 @@ mod test {
 
     use super::*;
 
-    async fn setup() -> (DummyAdapter, MultiplexedConnection) {
+    async fn setup(db_index: usize) -> (DummyAdapter, MultiplexedConnection) {
         let adapter_options = DummyAdapterOptions {
             dummy_identity: IDS["leader"],
             dummy_auth: IDS.clone(),
@@ -146,8 +146,12 @@ mod test {
         };
         let config = configuration("development", None).expect("Dev config should be available");
         let mut redis = redis_connection().await.expect("Couldn't connect to Redis");
-        // run `FLUSHALL` to clean any leftovers of other tests
-        let _ = redis::cmd("FLUSHALL")
+        let _ = redis::cmd("SELECT")
+            .arg(db_index)
+            .query_async::<_, String>(&mut redis)
+            .await;
+        // run `FLUSHDB` to clean any leftovers of other tests
+        let _ = redis::cmd("FLUSHDB")
             .query_async::<_, String>(&mut redis)
             .await;
         (DummyAdapter::init(adapter_options, &config), redis)
@@ -159,7 +163,7 @@ mod test {
             .body(Body::empty())
             .expect("should never fail!");
 
-        let (dummy_adapter, redis) = setup().await;
+        let (dummy_adapter, redis) = setup(0).await;
         let no_auth = for_request(no_auth_req, &dummy_adapter, redis.clone())
             .await
             .expect("Handling the Request shouldn't have failed");
@@ -197,7 +201,7 @@ mod test {
 
     #[tokio::test]
     async fn session_from_correct_authentication_token() {
-        let (dummy_adapter, redis) = setup().await;
+        let (dummy_adapter, redis) = setup(1).await;
 
         let token = AUTH["leader"].clone();
         let auth_header = format!("Bearer {}", token);
