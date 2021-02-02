@@ -36,3 +36,5 @@ serde_urlencoded = "^0.7"
 # Other
 lazy_static = "1.4.0"
 thiserror = "^1.0"
+deadpool = "0.7.0"
+once_cell = "1.5.2"

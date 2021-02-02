@@ -17,8 +17,6 @@ pub use self::validator_message::*;
 pub type DbPool = Pool<PostgresConnectionManager<NoTls>>;
 
 lazy_static! {
-    static ref REDIS_URL: String =
-        env::var("REDIS_URL").unwrap_or_else(|_| String::from("redis://127.0.0.1:6379"));
     static ref POSTGRES_USER: String =
         env::var("POSTGRES_USER").unwrap_or_else(|_| String::from("postgres"));
     static ref POSTGRES_PASSWORD: String =
@@ -32,8 +30,8 @@ lazy_static! {
     static ref POSTGRES_DB: Option<String> = env::var("POSTGRES_DB").ok();
 }
 
-pub async fn redis_connection() -> Result<MultiplexedConnection, RedisError> {
-    let client = redis::Client::open(REDIS_URL.as_str())?;
+pub async fn redis_connection(url: &str) -> Result<MultiplexedConnection, RedisError> {
+    let client = redis::Client::open(url)?;
 
     client.get_multiplexed_async_connection().await
 }

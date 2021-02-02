@@ -133,6 +133,7 @@ mod test {
     use primitives::adapter::DummyAdapterOptions;
     use primitives::config::configuration;
     use primitives::util::tests::prep_db::{AUTH, IDS};
+    use std::env;
 
     use crate::db::redis_connection;
 
@@ -145,7 +146,8 @@ mod test {
             dummy_auth_tokens: AUTH.clone(),
         };
         let config = configuration("development", None).expect("Dev config should be available");
-        let mut redis = redis_connection().await.expect("Couldn't connect to Redis");
+        let url = env::var("REDIS_URL").unwrap_or_else(|_| String::from("redis://127.0.0.1:6379"));
+        let mut redis = redis_connection(url.as_str()).await.expect("Couldn't connect to Redis");
         let _ = redis::cmd("SELECT")
             .arg(db_index)
             .query_async::<_, String>(&mut redis)

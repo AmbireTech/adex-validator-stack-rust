@@ -208,6 +208,8 @@ fn forbidden_country(session: &Session) -> bool {
 #[cfg(test)]
 mod test {
     use std::time::Duration;
+    use std::collections::HashMap;
+    use std::sync::Mutex;
 
     use chrono::TimeZone;
     use primitives::config::configuration;
@@ -217,13 +219,81 @@ mod test {
     use primitives::util::tests::prep_db::{DUMMY_CHANNEL, IDS};
     use primitives::{Channel, Config, EventSubmission};
 
-    use crate::db::redis_connection;
+    use deadpool::managed::{Manager, RecycleResult};
+    use once_cell::sync::OnceCell;
+
+    use crate::db::{redis_connection};
     use crate::Session;
 
     use super::*;
 
+    struct Connection {
+        available: bool,
+        connection: MultiplexedConnection,
+    }
+
+    impl Connection {
+        pub async fn new() -> Connection {
+            let redis = redis_connection("redis://127.0.0.1:6379").await.expect("Couldn't connect to Redis");
+            Connection {
+                available: true,
+                connection: redis,
+            }
+        }
+    }
+
+    struct RedisManager {
+        connections: HashMap<u8, Connection>,
+    }
+
+    impl RedisManager {
+        pub async fn new(size: u8) -> RedisManager {
+            let mut connections = HashMap::new();
+            for i in 0..size {
+                let conn = Connection::new().await;
+                connections.insert(i, conn);
+            };
+            RedisManager {
+                connections
+            }
+        }
+    }
+
+
+    impl Manager<Connection, Error> for RedisManager {
+        fn create(self) -> Result<Connection, Error> {
+            for (id, value) in self.connections.into_iter() {
+                if value.available == true {
+                    self.connections[&id].available = false;
+                    return Ok(value);
+                }
+            }
+            Err(Error::ChannelIsExpired)
+        }
+        fn recycle(self, conn: &mut Connection) -> RecycleResult<Error> {
+            conn.available = true;
+            Ok(())
+        }
+    }
+
+    type Pool = deadpool::managed::Pool<Connection, Error>;
+
+
+    async fn global_pool() -> &'static Mutex<Pool> {
+        static POOL: OnceCell<Mutex<Pool>> = OnceCell::new();
+
+        let manager = RedisManager::new(16).await;
+        POOL.get_or_init(|| {
+            let pool = Pool::new(manager, 16);
+            Mutex::new(pool)
+        })
+    }
+
+
     async fn setup(db_index: usize) -> (Config, MultiplexedConnection) {
-        let mut redis = redis_connection().await.expect("Couldn't connect to Redis");
+        let pool = global_pool().await.lock().expect("Failed to retrieve pool");
+        let mut redis = pool.get().await.expect("should get a connection");
+        // let redis = rs
         let config = configuration("development", None).expect("Failed to get dev configuration");
         let _ = redis::cmd("SELECT")
             .arg(db_index)
