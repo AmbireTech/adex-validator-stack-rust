@@ -240,6 +240,14 @@ mod test {
                 connection: redis,
             }
         }
+
+        pub fn make_unavailable(&self) {
+            self.available = false;
+        }
+
+        pub fn make_available(&self) {
+            self.available = true;
+        }
     }
 
     struct RedisManager {
@@ -261,17 +269,17 @@ mod test {
 
 
     impl Manager<Connection, Error> for RedisManager {
-        fn create(self) -> Result<Connection, Error> {
+        fn create(&self) -> Result<Connection, Error> {
             for (id, value) in self.connections.into_iter() {
                 if value.available == true {
-                    self.connections[&id].available = false;
+                    self.connections[&id].make_unavailable();
                     return Ok(value);
                 }
             }
             Err(Error::ChannelIsExpired)
         }
-        fn recycle(self, conn: &mut Connection) -> RecycleResult<Error> {
-            conn.available = true;
+        fn recycle(&self, conn: &mut Connection) -> RecycleResult<Error> {
+            conn.make_available();
             Ok(())
         }
     }
