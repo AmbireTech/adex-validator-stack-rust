@@ -120,3 +120,143 @@ pub async fn setup_migrations(environment: &str) {
         .reload()
         .expect("Reloading config for migration failed");
 }
+
+#[cfg(test)]
+pub mod redis_pool {
+
+    use dashmap::DashMap;
+    use deadpool::managed::{Manager as ManagerTrait, RecycleResult};
+    // use redis::aio::ConnectionLike;
+    use thiserror::Error;
+
+    use crate::db::redis_connection;
+    use async_trait::async_trait;
+
+    use once_cell::sync::Lazy;
+
+    use super::*;
+
+    pub type Pool = deadpool::managed::Pool<Database, Error>;
+
+    pub static TESTS_POOL: Lazy<Pool> = Lazy::new(|| {
+        Pool::new(
+            Manager::new(16),
+            16,
+        )
+    });
+
+    #[derive(Clone)]
+    pub struct Database {
+        available: bool,
+        pub connection: MultiplexedConnection,
+    }
+
+    // impl ConnectionLike for Database {
+    //     fn req_packed_command<'a>(&'a mut self, cmd: &'a redis::Cmd) -> redis::RedisFuture<'a, redis::Value> {
+    //         self.connection.req_packed_command(cmd)
+    //     }
+
+    //     fn req_packed_commands<'a>(
+    //     &'a mut self,
+    //     cmd: &'a redis::Pipeline,
+    //     offset: usize,
+    //     count: usize,
+    // ) -> redis::RedisFuture<'a, Vec<redis::Value>> {
+    //     self.connection.req_packed_commands(cmd, offset, count)
+    // }
+
+    //     fn get_db(&self) -> i64 {
+    //         self.connection.get_db()
+    //     }
+    // }
+
+    impl std::ops::Deref for Database {
+        type Target = MultiplexedConnection;
+
+        fn deref(&self) -> &Self::Target {
+            &self.connection
+        }
+    }
+
+    impl std::ops::DerefMut for Database {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.connection
+        }
+    }
+
+
+    pub struct Manager {
+        connections: DashMap<u8, Option<Database>>,
+    }
+
+    impl Manager {
+        pub fn new(size: u8) -> Self {
+            Self {
+                connections: (0..size)
+                    .into_iter()
+                    .map(|conn_index| (conn_index, None))
+                    .collect(),
+            }
+        }
+
+        pub async fn flush_db(
+            connection: &mut MultiplexedConnection,
+        ) -> Result<String, RedisError> {
+            redis::cmd("FLUSHDB")
+                .query_async::<_, String>(connection)
+                .await
+        }
+    }
+
+    #[derive(Debug, Error)]
+    pub enum Error {
+        // when we can't create more databases and all are used
+        #[error("No more databases can be created")]
+        OutOfBound,
+        #[error("A redis error occurred")]
+        Redis(#[from] RedisError),
+    }
+
+    #[async_trait]
+    impl ManagerTrait<Database, Error> for Manager {
+        async fn create(&self) -> Result<Database, Error> {
+            for mut record in self.connections.iter_mut() {
+                let database = record.value_mut().as_mut();
+
+                match database {
+                    Some(database) if database.available => {
+                        // run `FLUSHDB` to clean any leftovers of previous tests
+                        Self::flush_db(&mut database.connection).await?;
+
+                        database.available = false;
+                        return Ok(database.clone());
+                    }
+                    // if Some but not available, skip it
+                    Some(_) => continue,
+                    None => {
+                        let redis_conn =
+                            redis_connection(&format!("redis://127.0.0.1:6379/{}", record.key()))
+                                .await?;
+
+                        let database = Database {
+                            available: false,
+                            connection: redis_conn.clone(),
+                        };
+
+                        *record.value_mut() = Some(database.clone());
+
+                        return Ok(database);
+                    }
+                }
+            }
+
+            Err(Error::OutOfBound)
+        }
+
+        async fn recycle(&self, database: &mut Database) -> RecycleResult<Error> {
+            database.available = true;
+
+            Ok(())
+        }
+    }
+}
