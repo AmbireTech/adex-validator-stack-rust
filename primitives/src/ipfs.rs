@@ -7,7 +7,7 @@ const URL_PREFIX: &str = "ipfs://";
 
 pub use cid::{Cid, Error};
 
-#[derive(Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Hash, Clone, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(try_from = "String", into = "String")]
 pub struct IPFS(pub cid::Cid);
 
