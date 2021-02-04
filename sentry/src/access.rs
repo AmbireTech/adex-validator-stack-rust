@@ -210,6 +210,7 @@ mod test {
     use std::time::Duration;
     use std::collections::HashMap;
     use std::sync::Mutex;
+    use async_trait::async_trait;
 
     use chrono::TimeZone;
     use primitives::config::configuration;
@@ -227,6 +228,7 @@ mod test {
 
     use super::*;
 
+    #[derive(Copy)]
     struct Connection {
         available: bool,
         connection: MultiplexedConnection,
@@ -250,6 +252,7 @@ mod test {
         }
     }
 
+
     struct RedisManager {
         connections: HashMap<u8, Connection>,
     }
@@ -267,17 +270,23 @@ mod test {
         }
     }
 
+    #[async_trait]
     impl Manager<Connection, Error> for RedisManager {
-        fn create(&self) -> Result<Connection, Error> {
+        async fn create(&self) -> Result<Connection, Error> {
             for (id, value) in self.connections.into_iter() {
                 if value.available == true {
+                    value.make_unavailable();
                     return Ok(value);
                 }
             }
             Err(Error::ChannelIsExpired)
         }
-        fn recycle(&self, conn: &mut Connection) -> RecycleResult<Error> {
+        async fn recycle(&self, conn: &mut Connection) -> RecycleResult<Error> {
             conn.make_available();
+            // run `FLUSHDB` to clean any leftovers of other tests
+            let _ = redis::cmd("FLUSHDB")
+                .query_async::<_, String>(&mut conn.connection)
+                .await;
             Ok(())
         }
     }
@@ -299,17 +308,11 @@ mod test {
     async fn setup(db_index: usize) -> (Config, MultiplexedConnection) {
         let pool = global_pool().await.lock().expect("Failed to retrieve pool");
         let mut redis = pool.get().await.expect("should get a connection");
-        redis.make_unavailable();
         let config = configuration("development", None).expect("Failed to get dev configuration");
-        let _ = redis::cmd("SELECT")
-            .arg(db_index)
-            .query_async::<_, String>(&mut redis)
-            .await;
-        // run `FLUSHDB` to clean any leftovers of other tests
-        let _ = redis::cmd("FLUSHDB")
-            .query_async::<_, String>(&mut redis)
-            .await;
-
+        // let _ = redis::cmd("SELECT")
+        //     .arg(db_index)
+        //     .query_async::<_, String>(&mut redis)
+        //     .await;
         (config, redis)
     }
 
