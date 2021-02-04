@@ -260,7 +260,7 @@ mod test {
             for i in 0..size {
                 let conn = Connection::new().await;
                 connections.insert(i, conn);
-            };
+            }
             RedisManager {
                 connections
             }
