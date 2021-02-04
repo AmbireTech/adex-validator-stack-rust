@@ -267,12 +267,10 @@ mod test {
         }
     }
 
-
     impl Manager<Connection, Error> for RedisManager {
         fn create(&self) -> Result<Connection, Error> {
             for (id, value) in self.connections.into_iter() {
                 if value.available == true {
-                    self.connections[&id].make_unavailable();
                     return Ok(value);
                 }
             }
@@ -301,7 +299,7 @@ mod test {
     async fn setup(db_index: usize) -> (Config, MultiplexedConnection) {
         let pool = global_pool().await.lock().expect("Failed to retrieve pool");
         let mut redis = pool.get().await.expect("should get a connection");
-        // let redis = rs
+        redis.make_unavailable();
         let config = configuration("development", None).expect("Failed to get dev configuration");
         let _ = redis::cmd("SELECT")
             .arg(db_index)
