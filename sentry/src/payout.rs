@@ -9,9 +9,14 @@ use primitives::{
 use slog::{error, Logger};
 use std::cmp::{max, min};
 
-type Result = std::result::Result<Option<(ValidatorId, BigNum)>, Error>;
+pub type PayoutResult = std::result::Result<Option<(ValidatorId, BigNum)>, Error>;
 
-pub fn get_payout(logger: &Logger, channel: &Channel, event: &Event, session: &Session) -> Result {
+pub fn get_payout(
+    logger: &Logger,
+    channel: &Channel,
+    event: &Event,
+    session: &Session,
+) -> PayoutResult {
     let event_type = event.to_string();
 
     match event {

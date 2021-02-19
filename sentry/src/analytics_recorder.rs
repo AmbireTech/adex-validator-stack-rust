@@ -1,5 +1,5 @@
 use crate::epoch;
-use crate::payout::get_payout;
+use crate::payout::PayoutResult;
 use crate::Session;
 use primitives::sentry::Event;
 use primitives::sentry::{ChannelReport, PublisherReport};
@@ -13,6 +13,7 @@ pub async fn record(
     channel: Channel,
     session: Session,
     events: Vec<Event>,
+    payouts: Vec<PayoutResult>,
     logger: Logger,
 ) {
     let mut db = pipe();
@@ -20,7 +21,8 @@ pub async fn record(
     events
         .iter()
         .filter(|&ev| ev.is_click_event() || ev.is_impression_event())
-        .for_each(|event: &Event| match event {
+        .enumerate()
+        .for_each(|(i, event)| match event {
             Event::Impression {
                 publisher,
                 ad_unit,
@@ -34,8 +36,7 @@ pub async fn record(
                 referrer,
             } => {
                 let divisor = BigNum::from(10u64.pow(18));
-
-                let pay_amount = match get_payout(&logger, &channel, event, &session) {
+                let pay_amount = match &payouts[i] {
                     Ok(Some((_, payout))) => payout.div_floor(&divisor)
                         .to_f64()
                         .expect("Should always have a payout in f64 after division"),

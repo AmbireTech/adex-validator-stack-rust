@@ -4,6 +4,7 @@ use crate::db::event_aggregate::insert_event_aggregate;
 use crate::db::DbPool;
 use crate::db::{get_channel_by_id, update_targeting_rules};
 use crate::event_reducer;
+use crate::payout::{get_payout, PayoutResult};
 use crate::Application;
 use crate::ResponseError;
 use crate::Session;
@@ -97,7 +98,6 @@ impl EventAggregator {
                 // insert into
                 channel_recorder.insert(channel_id.to_owned(), record);
 
-                //
                 // spawn async task that persists
                 // the channel events to database
                 if aggr_throttle > 0 {
@@ -155,18 +155,31 @@ impl EventAggregator {
             update_targeting_rules(&app.pool, &channel_id, &new_rules).await?;
         }
 
-        events.iter().for_each(|ev| {
+        // Pre-computing all payouts once
+        let payouts: Vec<PayoutResult> = events
+            .iter()
+            .filter(|ev| ev.is_click_event() || ev.is_impression_event())
+            .map(|ev| get_payout(&app.logger, &record.channel, ev, &session))
+            .collect();
+
+        events.iter().enumerate().for_each(|(i, ev)| {
             match event_reducer::reduce(
                 &app.logger,
                 &record.channel,
                 &mut record.aggregate,
                 ev,
+                &payouts[i],
                 &session,
             ) {
                 Ok(_) => {}
                 Err(err) => error!(&app.logger, "Event Reducer failed"; "error" => ?err ),
             }
         });
+
+        // We don't want to save empty aggregates
+        if event_reducer::is_empty(&record.aggregate) {
+            return Ok(());
+        }
 
         // only time we don't have session is during
         // an unauthenticated close event
@@ -176,6 +189,7 @@ impl EventAggregator {
                 record.channel.clone(),
                 session.clone(),
                 events.to_owned().to_vec(),
+                payouts,
                 app.logger.clone(),
             ));
         }
