@@ -15,8 +15,8 @@ use sentry::Application;
 use slog::{error, info, Logger};
 use std::{
     convert::TryFrom,
+    env,
     net::{IpAddr, Ipv4Addr, SocketAddr},
-    env
 };
 
 const DEFAULT_PORT: u16 = 8005;

@@ -210,24 +210,28 @@ mod test {
     use std::time::Duration;
 
     use chrono::TimeZone;
-    use primitives::config::configuration;
-    use primitives::event_submission::{RateLimit, Rule};
-    use primitives::sentry::Event;
-    use primitives::targeting::Rules;
-    use primitives::util::tests::prep_db::{DUMMY_CHANNEL, IDS};
-    use primitives::{Channel, Config, EventSubmission};
+    use primitives::{
+        config::configuration,
+        event_submission::{RateLimit, Rule},
+        sentry::Event,
+        targeting::Rules,
+        util::tests::prep_db::{DUMMY_CHANNEL, IDS},
+        Channel, Config, EventSubmission,
+    };
 
-    use deadpool::managed::{Object};
+    use deadpool::managed::Object;
 
-    use crate::db::{redis_pool::{Database, TESTS_POOL}};
-    use crate::Session;
+    use crate::{
+        db::redis_pool::{Database, TESTS_POOL},
+        Session,
+    };
 
     use super::*;
 
     async fn setup() -> (Config, Object<Database, crate::db::redis_pool::Error>) {
         let connection = TESTS_POOL.get().await.expect("Should return Object");
         let config = configuration("development", None).expect("Failed to get dev configuration");
-        
+
         (config, connection)
     }
 
@@ -291,7 +295,7 @@ mod test {
         let channel = get_channel(rule);
 
         let response = check_access(
-            &database.connection,
+            &database,
             &session,
             Some(&auth),
             &config.ip_rate_limit,
@@ -302,7 +306,7 @@ mod test {
         assert_eq!(Ok(()), response);
 
         let err_response = check_access(
-            &database.connection,
+            &database,
             &session,
             Some(&auth),
             &config.ip_rate_limit,
@@ -344,7 +348,7 @@ mod test {
         let channel = get_channel(rule);
 
         let err_response = check_access(
-            &database.connection,
+            &database,
             &session,
             Some(&auth),
             &config.ip_rate_limit,
@@ -361,7 +365,7 @@ mod test {
         );
 
         let response = check_access(
-            &database.connection,
+            &database,
             &session,
             Some(&auth),
             &config.ip_rate_limit,
@@ -399,7 +403,7 @@ mod test {
         channel.valid_until = Utc.ymd(1970, 1, 1).and_hms(12, 00, 9);
 
         let err_response = check_access(
-            &database.connection,
+            &database,
             &session,
             Some(&auth),
             &config.ip_rate_limit,
@@ -438,7 +442,7 @@ mod test {
         channel.spec.withdraw_period_start = Utc.ymd(1970, 1, 1).and_hms(12, 0, 9);
 
         let ok_response = check_access(
-            &database.connection,
+            &database,
             &session,
             Some(&auth),
             &config.ip_rate_limit,
@@ -477,7 +481,7 @@ mod test {
         channel.creator = IDS["follower"];
 
         let ok_response = check_access(
-            &database.connection,
+            &database,
             &session,
             Some(&auth),
             &config.ip_rate_limit,
@@ -516,7 +520,7 @@ mod test {
         channel.creator = IDS["follower"];
 
         let ok_response = check_access(
-            &database.connection,
+            &database,
             &session,
             Some(&auth),
             &config.ip_rate_limit,
@@ -566,7 +570,7 @@ mod test {
             },
         ];
         let err_response = check_access(
-            &database.connection,
+            &database,
             &session,
             Some(&auth),
             &config.ip_rate_limit,
@@ -615,7 +619,7 @@ mod test {
             },
         ];
         let err_response = check_access(
-            &database.connection,
+            &database,
             &session,
             Some(&auth),
             &config.ip_rate_limit,
@@ -654,7 +658,7 @@ mod test {
         channel.spec.withdraw_period_start = Utc.ymd(1970, 1, 1).and_hms(12, 0, 9);
 
         let err_response = check_access(
-            &database.connection,
+            &database,
             &session,
             Some(&auth),
             &config.ip_rate_limit,
@@ -692,7 +696,7 @@ mod test {
         let channel = get_channel(rule);
 
         let err_response = check_access(
-            &database.connection,
+            &database,
             &session,
             Some(&auth),
             &config.ip_rate_limit,
@@ -730,7 +734,7 @@ mod test {
         let channel = get_channel(rule);
 
         let err_response = check_access(
-            &database.connection,
+            &database,
             &session,
             Some(&auth),
             &config.ip_rate_limit,
@@ -765,7 +769,7 @@ mod test {
         let channel = get_channel(rule);
 
         let ok_response = check_access(
-            &database.connection,
+            &database,
             &session,
             Some(&auth),
             &config.ip_rate_limit,
@@ -803,7 +807,7 @@ mod test {
         let channel = get_channel(rule);
 
         let ok_response = check_access(
-            &database.connection,
+            &database,
             &session,
             Some(&auth),
             &config.ip_rate_limit,
@@ -819,6 +823,7 @@ mod test {
 
         let value_in_redis = redis::cmd("GET")
             .arg(&key)
+            // Deref can't work here, so we need to call the `Object` -> `Database.connection`
             .query_async::<_, String>(&mut database.connection)
             .await
             .expect("should exist in redis");

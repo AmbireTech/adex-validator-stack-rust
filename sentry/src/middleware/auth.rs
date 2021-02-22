@@ -147,7 +147,9 @@ mod test {
         };
         let config = configuration("development", None).expect("Dev config should be available");
         let url = env::var("REDIS_URL").unwrap_or_else(|_| String::from("redis://127.0.0.1:6379"));
-        let mut redis = redis_connection(url.as_str()).await.expect("Couldn't connect to Redis");
+        let mut redis = redis_connection(url.as_str())
+            .await
+            .expect("Couldn't connect to Redis");
         let _ = redis::cmd("SELECT")
             .arg(db_index)
             .query_async::<_, String>(&mut redis)
