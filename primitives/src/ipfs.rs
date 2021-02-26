@@ -11,6 +11,17 @@ pub use cid::{Cid, Error};
 #[serde(try_from = "String", into = "String")]
 pub struct IPFS(pub cid::Cid);
 
+impl slog::Value for IPFS {
+    fn serialize(
+        &self,
+        _record: &slog::Record<'_>,
+        key: slog::Key,
+        serializer: &mut dyn slog::Serializer,
+    ) -> slog::Result {
+        serializer.emit_str(key, &self.0.to_string())
+    }
+}
+
 impl fmt::Debug for IPFS {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "IPFS({})", self.0.to_string())
@@ -28,6 +39,12 @@ impl FromStr for IPFS {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::try_from(s)
+    }
+}
+
+impl AsRef<IPFS> for IPFS {
+    fn as_ref(&self) -> &IPFS {
+        &self
     }
 }
 
