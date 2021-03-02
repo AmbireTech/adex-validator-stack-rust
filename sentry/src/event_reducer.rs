@@ -1,32 +1,25 @@
 use crate::{
-    payout::{get_payout, PayoutResult},
     Session,
 };
 use primitives::{
     sentry::{AggregateEvents, Event, EventAggregate},
     BigNum, Channel, ValidatorId,
 };
-use slog::{info, Logger};
+use slog::Logger;
 
 pub(crate) fn reduce(
     logger: &Logger,
     channel: &Channel,
     initial_aggr: &mut EventAggregate,
     ev: &Event,
-    payout: &PayoutResult,
+    payout: &Option<(ValidatorId, BigNum)>,
     session: &Session,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let event_type = ev.to_string();
-    if let Ok(Some(payout)) = payout {
-        info!(&logger, "Event type {}, with payout Validator ID: {}, and Pricing of {}", event_type, payout.0, &payout.1.to_string());
-        let cloned_payout = (payout.0, payout.1.clone());
-        let merge = merge_payable_event(Some(&initial_aggr.events[&event_type]), cloned_payout);
-        initial_aggr.events.insert(event_type.clone(), merge);
-    }
+
     match ev {
         Event::Impression { publisher, .. } => {
             let impression = initial_aggr.events.get(&event_type);
-            let payout = get_payout(logger, &channel, &ev, session)?;
             let merge = merge_payable_event(
                 impression,
                 payout.unwrap_or_else(|| (*publisher, Default::default())),
@@ -36,7 +29,6 @@ pub(crate) fn reduce(
         }
         Event::Click { publisher, .. } => {
             let clicks = initial_aggr.events.get(&event_type);
-            let payout = get_payout(logger, &channel, &ev, session)?;
             let merge = merge_payable_event(
                 clicks,
                 payout.unwrap_or_else(|| (*publisher, Default::default())),
@@ -57,11 +49,6 @@ pub(crate) fn reduce(
     };
 
     Ok(())
-}
-
-pub fn is_empty(aggr: &EventAggregate) -> bool {
-    // Not sure here
-    aggr.events.len() == 0
 }
 
 /// payable_event is either an IMPRESSION or a CLICK

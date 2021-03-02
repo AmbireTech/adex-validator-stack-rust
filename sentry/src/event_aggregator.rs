@@ -4,7 +4,7 @@ use crate::db::event_aggregate::insert_event_aggregate;
 use crate::db::DbPool;
 use crate::db::{get_channel_by_id, update_targeting_rules};
 use crate::event_reducer;
-use crate::payout::{get_payout, PayoutResult};
+use crate::payout::{get_payout};
 use crate::Application;
 use crate::ResponseError;
 use crate::Session;
@@ -14,7 +14,7 @@ use chrono::Utc;
 use lazy_static::lazy_static;
 use primitives::adapter::Adapter;
 use primitives::sentry::{Event, EventAggregate};
-use primitives::{Channel, ChannelId};
+use primitives::{Channel, ChannelId, BigNum, ValidatorId};
 use slog::{error, Logger};
 use std::collections::HashMap;
 use std::env;
@@ -156,28 +156,31 @@ impl EventAggregator {
         }
 
         // Pre-computing all payouts once
-        let payouts: Vec<PayoutResult> = events
-            .iter()
+        let payouts: Vec<(&Event, Option<(ValidatorId, BigNum)>)> = events
+            .into_iter()
             .filter(|ev| ev.is_click_event() || ev.is_impression_event())
-            .map(|ev| get_payout(&app.logger, &record.channel, ev, &session))
-            .collect();
+            .map(|ev| {
+                let payout = get_payout(&app.logger, &record.channel, ev, &session);
+                (ev, payout)
+            })
+            .collect()?;
 
-        events.iter().enumerate().for_each(|(i, ev)| {
+        payouts.iter().for_each(|(ev, payout)| {
             match event_reducer::reduce(
                 &app.logger,
                 &record.channel,
                 &mut record.aggregate,
                 ev,
-                &payouts[i],
+                &payout,
                 &session,
             ) {
-                Ok(_) => {}
-                Err(err) => error!(&app.logger, "Event Reducer failed"; "error" => ?err ),
+                Ok(_) => {},
+                Err(err) => error!(&app.logger, "Event Reducred failed"; "error" => ?err),
             }
         });
 
         // We don't want to save empty aggregates
-        if event_reducer::is_empty(&record.aggregate) {
+        if record.aggregate.events.is_empty() {
             return Ok(());
         }
 

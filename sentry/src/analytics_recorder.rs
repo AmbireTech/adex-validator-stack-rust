@@ -1,9 +1,8 @@
 use crate::epoch;
-use crate::payout::PayoutResult;
 use crate::Session;
 use primitives::sentry::Event;
 use primitives::sentry::{ChannelReport, PublisherReport};
-use primitives::{BigNum, Channel};
+use primitives::{BigNum, Channel, ValidatorId};
 use redis::aio::MultiplexedConnection;
 use redis::pipe;
 use slog::{error, Logger};
@@ -13,16 +12,15 @@ pub async fn record(
     channel: Channel,
     session: Session,
     events: Vec<Event>,
-    payouts: Vec<PayoutResult>,
+    payouts: Vec<(&Event, Option<(ValidatorId, BigNum)>)>,
     logger: Logger,
 ) {
     let mut db = pipe();
 
-    events
+    payouts
         .iter()
-        .filter(|&ev| ev.is_click_event() || ev.is_impression_event())
-        .enumerate()
-        .for_each(|(i, event)| match event {
+        .filter(|(ev, _)| ev.is_click_event() || ev.is_impression_event())
+        .for_each(|(event, payout)| match event {
             Event::Impression {
                 publisher,
                 ad_unit,
@@ -36,16 +34,12 @@ pub async fn record(
                 referrer,
             } => {
                 let divisor = BigNum::from(10u64.pow(18));
-                let pay_amount = match &payouts[i] {
-                    Ok(Some((_, payout))) => payout.div_floor(&divisor)
+                let pay_amount = match payout {
+                    Some((_, payout)) => payout.div_floor(&divisor)
                         .to_f64()
                         .expect("Should always have a payout in f64 after division"),
                     // This should never happen, as the conditions we are checking for in the .filter are the same as getPayout's
-                    Ok(None) => return,
-                    Err(err) => {
-                        error!(&logger, "Getting the payout failed: {}", &err; "module" => "analytics-recorder", "err" => ?err);
-                        return
-                    },
+                    None => return
                 };
 
                 if let Some(ad_unit) = ad_unit {
