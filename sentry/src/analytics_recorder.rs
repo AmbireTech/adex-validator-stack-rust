@@ -7,17 +7,17 @@ use redis::aio::MultiplexedConnection;
 use redis::pipe;
 use slog::{error, Logger};
 
+// Records only payout events
 pub async fn record(
     mut conn: MultiplexedConnection,
     channel: Channel,
     session: Session,
-    events: Vec<Event>,
-    payouts: Vec<(&Event, Option<(ValidatorId, BigNum)>)>,
+    events: Vec<(Event, Option<(ValidatorId, BigNum)>)>,
     logger: Logger,
 ) {
     let mut db = pipe();
 
-    payouts
+    events
         .iter()
         .filter(|(ev, _)| ev.is_click_event() || ev.is_impression_event())
         .for_each(|(event, payout)| match event {
@@ -35,11 +35,12 @@ pub async fn record(
             } => {
                 let divisor = BigNum::from(10u64.pow(18));
                 let pay_amount = match payout {
-                    Some((_, payout)) => payout.div_floor(&divisor)
+                    Some((_, payout)) => payout
+                        .div_floor(&divisor)
                         .to_f64()
                         .expect("Should always have a payout in f64 after division"),
                     // This should never happen, as the conditions we are checking for in the .filter are the same as getPayout's
-                    None => return
+                    None => return,
                 };
 
                 if let Some(ad_unit) = ad_unit {

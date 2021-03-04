@@ -11,12 +11,7 @@ use std::cmp::{max, min};
 
 pub type Result = std::result::Result<Option<(ValidatorId, BigNum)>, Error>;
 
-pub fn get_payout(
-    logger: &Logger,
-    channel: &Channel,
-    event: &Event,
-    session: &Session,
-) -> Result {
+pub fn get_payout(logger: &Logger, channel: &Channel, event: &Event, session: &Session) -> Result {
     let event_type = event.to_string();
 
     match event {

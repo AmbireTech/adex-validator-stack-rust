@@ -201,14 +201,14 @@ pub async fn insert_events<A: Adapter + 'static>(
     let channel_id = ChannelId::from_hex(route_params.index(0))?;
 
     let body_bytes = hyper::body::to_bytes(req_body).await?;
-    let request_body = serde_json::from_slice::<HashMap<String, Vec<Event>>>(&body_bytes)?;
+    let mut request_body = serde_json::from_slice::<HashMap<String, Vec<Event>>>(&body_bytes)?;
 
     let events = request_body
-        .get("events")
+        .remove("events")
         .ok_or_else(|| ResponseError::BadRequest("invalid request".to_string()))?;
 
     app.event_aggregator
-        .record(app, &channel_id, session, auth, &events)
+        .record(app, &channel_id, session, auth, events)
         .await?;
 
     Ok(Response::builder()
