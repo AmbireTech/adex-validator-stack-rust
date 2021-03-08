@@ -1,19 +1,13 @@
-use crate::{
-    Session,
-};
 use primitives::{
     sentry::{AggregateEvents, Event, EventAggregate},
     BigNum, Channel, ValidatorId,
 };
-use slog::Logger;
 
 pub(crate) fn reduce(
-    logger: &Logger,
     channel: &Channel,
     initial_aggr: &mut EventAggregate,
     ev: &Event,
     payout: &Option<(ValidatorId, BigNum)>,
-    session: &Session,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let event_type = ev.to_string();
 
@@ -22,7 +16,9 @@ pub(crate) fn reduce(
             let impression = initial_aggr.events.get(&event_type);
             let merge = merge_payable_event(
                 impression,
-                payout.unwrap_or_else(|| (*publisher, Default::default())),
+                payout
+                    .to_owned()
+                    .unwrap_or_else(|| (*publisher, Default::default())),
             );
 
             initial_aggr.events.insert(event_type, merge);
@@ -31,7 +27,9 @@ pub(crate) fn reduce(
             let clicks = initial_aggr.events.get(&event_type);
             let merge = merge_payable_event(
                 clicks,
-                payout.unwrap_or_else(|| (*publisher, Default::default())),
+                payout
+                    .to_owned()
+                    .unwrap_or_else(|| (*publisher, Default::default())),
             );
 
             initial_aggr.events.insert(event_type, merge);
@@ -79,15 +77,13 @@ fn merge_payable_event(
 mod test {
     use super::*;
     use chrono::Utc;
-    use primitives::util::tests::{
-        discard_logger,
-        prep_db::{DUMMY_CHANNEL, IDS},
+    use primitives::{
+        util::tests::prep_db::{DUMMY_CHANNEL, IDS},
+        BigNum,
     };
-    use primitives::BigNum;
 
     #[test]
     fn test_reduce() {
-        let logger = discard_logger();
         let mut channel: Channel = DUMMY_CHANNEL.clone();
         channel.deposit_amount = 100.into();
         // make immutable again
@@ -106,23 +102,9 @@ mod test {
             referrer: None,
         };
 
-        let session = Session {
-            ip: Default::default(),
-            country: None,
-            referrer_header: None,
-            os: None,
-        };
-
         for i in 0..101 {
-            reduce(
-                &logger,
-                &channel,
-                &mut event_aggr,
-                &event,
-                &Ok(None),
-                &session,
-            )
-            .expect(&format!("Should be able to reduce event #{}", i));
+            reduce(&channel, &mut event_aggr, &event, &None)
+                .expect(&format!("Should be able to reduce event #{}", i));
         }
 
         assert_eq!(event_aggr.channel_id, channel.id);
