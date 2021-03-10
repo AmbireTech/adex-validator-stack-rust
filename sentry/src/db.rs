@@ -164,6 +164,12 @@ pub mod redis_pool {
         connections: DashMap<u8, Option<Database>>,
     }
 
+    impl Default for Manager {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
     impl Manager {
         /// The maximum databases that Redis has by default is 16, with DB `0` as default.
         const CONNECTIONS: u8 = 16;
@@ -237,7 +243,7 @@ pub mod redis_pool {
             // run `FLUSHDB` to clean any leftovers of previous tests
             Self::flush_db(&mut database.connection)
                 .await
-                .map_err(|err| RecycleError::Backend(err))?;
+                .map_err(RecycleError::Backend)?;
             database.available = true;
 
             Ok(())

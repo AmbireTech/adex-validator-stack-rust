@@ -127,17 +127,13 @@ fn get_request_ip(req: &Request<Body>) -> Option<String> {
 
 #[cfg(test)]
 mod test {
-    use hyper::Request;
     use adapter::DummyAdapter;
+    use hyper::Request;
     use primitives::adapter::DummyAdapterOptions;
 
     use primitives::util::tests::prep_db::{AUTH, IDS};
 
-
-    use primitives::{
-        config::configuration,
-        Config,
-    };
+    use primitives::{config::configuration};
 
     use deadpool::managed::Object;
 
@@ -145,7 +141,6 @@ mod test {
         db::redis_pool::{Database, TESTS_POOL},
         Session,
     };
-    use std::env;
 
     use super::*;
 
@@ -157,7 +152,6 @@ mod test {
             dummy_auth_tokens: AUTH.clone(),
         };
         let config = configuration("development", None).expect("Dev config should be available");
-        let url = env::var("REDIS_URL").unwrap_or_else(|_| String::from("redis://127.0.0.1:6379"));
 
         (DummyAdapter::init(adapter_options, &config), connection)
     }
