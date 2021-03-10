@@ -19,7 +19,7 @@ impl<A: Adapter + 'static> Middleware<A> for Authenticate {
         request: Request<Body>,
         application: &'a Application<A>,
     ) -> Result<Request<Body>, ResponseError> {
-        for_request(request, &application.adapter, application.redis.clone())
+        for_request(request, &application.adapter, &application.redis.clone())
             .await
             .map_err(|error| {
                 slog::error!(&application.logger, "{}", &error; "module" => "middleware-auth");
@@ -52,7 +52,7 @@ impl<A: Adapter + 'static> Middleware<A> for AuthRequired {
 async fn for_request(
     mut req: Request<Body>,
     adapter: &impl Adapter,
-    redis: MultiplexedConnection,
+    redis: &MultiplexedConnection,
 ) -> Result<Request<Body>, Box<dyn error::Error>> {
     let referrer = req
         .headers()
@@ -128,18 +128,29 @@ fn get_request_ip(req: &Request<Body>) -> Option<String> {
 #[cfg(test)]
 mod test {
     use hyper::Request;
-
     use adapter::DummyAdapter;
     use primitives::adapter::DummyAdapterOptions;
-    use primitives::config::configuration;
-    use primitives::util::tests::prep_db::{AUTH, IDS};
-    use std::env;
 
-    use crate::db::redis_connection;
+    use primitives::util::tests::prep_db::{AUTH, IDS};
+
+
+    use primitives::{
+        config::configuration,
+        Config,
+    };
+
+    use deadpool::managed::Object;
+
+    use crate::{
+        db::redis_pool::{Database, TESTS_POOL},
+        Session,
+    };
+    use std::env;
 
     use super::*;
 
-    async fn setup(db_index: usize) -> (DummyAdapter, MultiplexedConnection) {
+    async fn setup() -> (DummyAdapter, Object<Database, crate::db::redis_pool::Error>) {
+        let connection = TESTS_POOL.get().await.expect("Should return Object");
         let adapter_options = DummyAdapterOptions {
             dummy_identity: IDS["leader"],
             dummy_auth: IDS.clone(),
@@ -147,18 +158,8 @@ mod test {
         };
         let config = configuration("development", None).expect("Dev config should be available");
         let url = env::var("REDIS_URL").unwrap_or_else(|_| String::from("redis://127.0.0.1:6379"));
-        let mut redis = redis_connection(url.as_str())
-            .await
-            .expect("Couldn't connect to Redis");
-        let _ = redis::cmd("SELECT")
-            .arg(db_index)
-            .query_async::<_, String>(&mut redis)
-            .await;
-        // run `FLUSHDB` to clean any leftovers of other tests
-        let _ = redis::cmd("FLUSHDB")
-            .query_async::<_, String>(&mut redis)
-            .await;
-        (DummyAdapter::init(adapter_options, &config), redis)
+
+        (DummyAdapter::init(adapter_options, &config), connection)
     }
 
     #[tokio::test]
@@ -167,8 +168,8 @@ mod test {
             .body(Body::empty())
             .expect("should never fail!");
 
-        let (dummy_adapter, redis) = setup(0).await;
-        let no_auth = for_request(no_auth_req, &dummy_adapter, redis.clone())
+        let (dummy_adapter, database) = setup().await;
+        let no_auth = for_request(no_auth_req, &dummy_adapter, &database)
             .await
             .expect("Handling the Request shouldn't have failed");
 
@@ -182,7 +183,7 @@ mod test {
             .header(AUTHORIZATION, "Wrong Header")
             .body(Body::empty())
             .unwrap();
-        let incorrect_auth = for_request(incorrect_auth_req, &dummy_adapter, redis.clone())
+        let incorrect_auth = for_request(incorrect_auth_req, &dummy_adapter, &database)
             .await
             .expect("Handling the Request shouldn't have failed");
         assert!(
@@ -195,7 +196,7 @@ mod test {
             .header(AUTHORIZATION, "Bearer wrong-token")
             .body(Body::empty())
             .unwrap();
-        match for_request(non_existent_token_req, &dummy_adapter, redis).await {
+        match for_request(non_existent_token_req, &dummy_adapter, &database).await {
             Err(error) => {
                 assert!(error.to_string().contains("no session token for this auth: wrong-token"), "Wrong error received");
             }
@@ -205,7 +206,7 @@ mod test {
 
     #[tokio::test]
     async fn session_from_correct_authentication_token() {
-        let (dummy_adapter, redis) = setup(1).await;
+        let (dummy_adapter, database) = setup().await;
 
         let token = AUTH["leader"].clone();
         let auth_header = format!("Bearer {}", token);
@@ -214,7 +215,7 @@ mod test {
             .body(Body::empty())
             .unwrap();
 
-        let altered_request = for_request(req, &dummy_adapter, redis)
+        let altered_request = for_request(req, &dummy_adapter, &database)
             .await
             .expect("Valid requests should succeed");
 
