@@ -9,7 +9,7 @@ use ethstore::{
 use futures::TryFutureExt;
 use lazy_static::lazy_static;
 use primitives::{
-    adapter::{Adapter, AdapterResult, Error as AdapterError, KeystoreOptions, Session},
+    adapter::{Adapter, AdapterResult, Error as AdapterError, KeystoreOptions, Session, SpendableOutput},
     channel_validator::ChannelValidator,
     config::Config,
     Channel, ChannelId, ToETHChecksum, ValidatorId,
@@ -31,7 +31,10 @@ mod error;
 lazy_static! {
     static ref ADEXCORE_ABI: &'static [u8] =
         include_bytes!("../../lib/protocol-eth/abi/AdExCore.json");
+    static ref ERC20_ABI: &'static [u8] = include_bytes!("../../lib/protocol-eth/abi/ERC20.json");
     static ref CHANNEL_STATE_ACTIVE: U256 = 1.into();
+    //TODO
+    static ref MINIMUM_DEPOSIT_AMOUNT: U256 = 0.into();
 }
 
 #[derive(Debug, Clone)]
@@ -268,6 +271,44 @@ impl Adapter for EthereumAdapter {
 
         ewt_sign(&wallet, &self.keystore_pwd, &payload)
             .map_err(|err| AdapterError::Adapter(Error::SignMessage(err).into()))
+    }
+
+
+    async fn get_spendable(&self, channel: &Channel, spender: &ValidatorId) -> AdapterResult<SpendableOutput, Self::AdapterError> {
+        let contract = Contract::from_json(
+            self.web3.eth(),
+            self.config.ethereum_core_address.into(),
+            &ADEXCORE_ABI,
+        )
+        .map_err(Error::ContractInitialization)?;
+
+
+        // TODO: Get deposited per channel/spender from outpace
+        let mut amount: U256 = 1.into();
+
+        let to_be_deposited: U256 = tokio_compat_02::FutureExt::compat(async {
+            tokio_compat_02::FutureExt::compat(contract.query(
+                "balanceOf",
+                channel.deposit_asset.clone().into_token(),
+                None,
+                Options::default(),
+                None,
+            ))
+            .await
+        })
+        .await
+        .map_err(Error::ContractQuerying)?;
+
+        if to_be_deposited > *MINIMUM_DEPOSIT_AMOUNT {
+            amount += to_be_deposited;
+        }
+
+        Ok(SpendableOutput {
+            amount,
+            to_be_deposited,
+        })
+
+        //? Should toBeDeposited be returned if it is less than Min?
     }
 }
 

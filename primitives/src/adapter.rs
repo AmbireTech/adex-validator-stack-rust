@@ -6,10 +6,16 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::From;
 use std::fmt;
+use web3::types::U256;
 
 pub type AdapterResult<T, AE> = Result<T, Error<AE>>;
 
 pub trait AdapterErrorKind: fmt::Debug + fmt::Display {}
+
+pub struct SpendableOutput {
+    pub amount: U256,
+    pub to_be_deposited: U256,
+}
 
 #[derive(Debug)]
 pub enum Error<AE: AdapterErrorKind> {
@@ -104,4 +110,11 @@ pub trait Adapter: ChannelValidator + Send + Sync + fmt::Debug + Clone {
 
     /// Gets authentication for specific validator
     fn get_auth(&self, validator_id: &ValidatorId) -> AdapterResult<String, Self::AdapterError>;
+
+    /// Calculates and returns the total spendable amount
+    async fn get_spendable(
+        &self,
+        channel: &Channel,
+        spender: &ValidatorId
+    ) -> AdapterResult<SpendableOutput, Self::AdapterError>;
 }

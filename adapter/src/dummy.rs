@@ -2,11 +2,12 @@ use async_trait::async_trait;
 use primitives::{
     adapter::{
         Adapter, AdapterErrorKind, AdapterResult, DummyAdapterOptions, Error as AdapterError,
-        Session,
+        Session, SpendableOutput
     },
     channel_validator::ChannelValidator,
     config::Config,
     Channel, ToETHChecksum, ValidatorId,
+    BigNum
 };
 use std::collections::HashMap;
 use std::fmt;
@@ -128,5 +129,12 @@ impl Adapter for DummyAdapter {
                 self.identity
             ))),
         }
+    }
+
+    async fn get_spendable(&self, channel: &Channel, spender: &ValidatorId) -> AdapterResult<SpendableOutput, Self::AdapterError> {
+        Ok(SpendableOutput {
+            amount: 10.into(),
+            to_be_deposited: 1.into(),
+        })
     }
 }
