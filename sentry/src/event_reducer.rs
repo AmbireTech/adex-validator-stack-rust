@@ -101,10 +101,10 @@ mod test {
             ad_slot: None,
             referrer: None,
         };
-
+        let payout = Some((IDS["publisher"], BigNum::from(1)));
         for i in 0..101 {
-            reduce(&channel, &mut event_aggr, &event, &None)
-                .expect(&format!("Should be able to reduce event #{}", i));
+            reduce(&channel, &mut event_aggr, &event, &payout)
+                .unwrap_or_else(|_| panic!("Should be able to reduce event #{}", i));
         }
 
         assert_eq!(event_aggr.channel_id, channel.id);
@@ -123,9 +123,7 @@ mod test {
         assert_eq!(event_counts, &BigNum::from(101));
 
         let event_payouts = impression_event
-            .event_counts
-            .as_ref()
-            .expect("there should be event_counts set")
+            .event_payouts
             .get(&IDS["publisher"])
             .expect("There should be myAwesomePublisher event_payouts key");
         assert_eq!(event_payouts, &BigNum::from(101));
