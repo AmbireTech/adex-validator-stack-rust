@@ -278,7 +278,7 @@ impl Adapter for EthereumAdapter {
         let contract = Contract::from_json(
             self.web3.eth(),
             self.config.ethereum_core_address.into(),
-            &ADEXCORE_ABI,
+            &ERC20_ABI,
         )
         .map_err(Error::ContractInitialization)?;
 
