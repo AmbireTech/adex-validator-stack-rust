@@ -104,7 +104,7 @@ mod test {
         let payout = Some((IDS["publisher"], BigNum::from(1)));
         for i in 0..101 {
             reduce(&channel, &mut event_aggr, &event, &payout)
-                .unwrap_or_else(|_| panic!("Should be able to reduce event #{}", i));
+                .expect(&format!("Should be able to reduce event #{}", i));
         }
 
         assert_eq!(event_aggr.channel_id, channel.id);
