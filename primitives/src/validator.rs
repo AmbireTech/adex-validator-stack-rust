@@ -6,14 +6,6 @@ use std::fmt;
 use crate::{targeting::Value, BalancesMap, BigNum, DomainError, ToETHChecksum};
 use std::convert::TryFrom;
 
-#[derive(Debug)]
-pub enum ValidatorError {
-    None,
-    InvalidRootHash,
-    InvalidSignature,
-    InvalidTransition,
-}
-
 #[derive(Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[serde(transparent)]
 pub struct ValidatorId(
