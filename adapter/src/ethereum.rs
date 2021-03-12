@@ -33,8 +33,6 @@ lazy_static! {
         include_bytes!("../../lib/protocol-eth/abi/AdExCore.json");
     static ref ERC20_ABI: &'static [u8] = include_bytes!("../../lib/protocol-eth/abi/ERC20.json");
     static ref CHANNEL_STATE_ACTIVE: U256 = 1.into();
-    //TODO
-    static ref MINIMUM_DEPOSIT_AMOUNT: U256 = 0.into();
 }
 
 #[derive(Debug, Clone)]
@@ -282,7 +280,6 @@ impl Adapter for EthereumAdapter {
         )
         .map_err(Error::ContractInitialization)?;
 
-
         // TODO: Get deposited per channel/spender from outpace
         let mut amount: U256 = 1.into();
 
@@ -298,8 +295,9 @@ impl Adapter for EthereumAdapter {
         })
         .await
         .map_err(Error::ContractQuerying)?;
+        let minimum_deposit: U256 = self.config.minimal_deposit.to_string();
 
-        if to_be_deposited > *MINIMUM_DEPOSIT_AMOUNT {
+        if to_be_deposited > minimum_deposit {
             amount += to_be_deposited;
         }
 
