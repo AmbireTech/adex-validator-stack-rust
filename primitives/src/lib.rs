@@ -8,6 +8,8 @@ mod ad_unit;
 pub mod adapter;
 pub mod balances_map;
 pub mod big_num;
+pub mod campaign;
+pub mod channel_v5;
 pub mod channel;
 pub mod channel_validator;
 pub mod config;
