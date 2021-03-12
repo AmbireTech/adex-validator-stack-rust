@@ -17,8 +17,6 @@ pub use self::validator_message::*;
 pub type DbPool = Pool<PostgresConnectionManager<NoTls>>;
 
 lazy_static! {
-    static ref REDIS_URL: String =
-        env::var("REDIS_URL").unwrap_or_else(|_| String::from("redis://127.0.0.1:6379"));
     static ref POSTGRES_USER: String =
         env::var("POSTGRES_USER").unwrap_or_else(|_| String::from("postgres"));
     static ref POSTGRES_PASSWORD: String =
@@ -32,8 +30,8 @@ lazy_static! {
     static ref POSTGRES_DB: Option<String> = env::var("POSTGRES_DB").ok();
 }
 
-pub async fn redis_connection() -> Result<MultiplexedConnection, RedisError> {
-    let client = redis::Client::open(REDIS_URL.as_str())?;
+pub async fn redis_connection(url: &str) -> Result<MultiplexedConnection, RedisError> {
+    let client = redis::Client::open(url)?;
 
     client.get_multiplexed_async_connection().await
 }
@@ -121,4 +119,134 @@ pub async fn setup_migrations(environment: &str) {
     let _config = config
         .reload()
         .expect("Reloading config for migration failed");
+}
+
+#[cfg(test)]
+pub mod redis_pool {
+
+    use dashmap::DashMap;
+    use deadpool::managed::{Manager as ManagerTrait, RecycleError, RecycleResult};
+    use thiserror::Error;
+
+    use crate::db::redis_connection;
+    use async_trait::async_trait;
+
+    use once_cell::sync::Lazy;
+
+    use super::*;
+
+    pub type Pool = deadpool::managed::Pool<Database, Error>;
+
+    pub static TESTS_POOL: Lazy<Pool> =
+        Lazy::new(|| Pool::new(Manager::new(), Manager::CONNECTIONS.into()));
+
+    #[derive(Clone)]
+    pub struct Database {
+        available: bool,
+        pub connection: MultiplexedConnection,
+    }
+
+    impl std::ops::Deref for Database {
+        type Target = MultiplexedConnection;
+
+        fn deref(&self) -> &Self::Target {
+            &self.connection
+        }
+    }
+
+    impl std::ops::DerefMut for Database {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.connection
+        }
+    }
+
+    pub struct Manager {
+        connections: DashMap<u8, Option<Database>>,
+    }
+
+    impl Default for Manager {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
+    impl Manager {
+        /// The maximum databases that Redis has by default is 16, with DB `0` as default.
+        const CONNECTIONS: u8 = 16;
+        /// The default URL for connecting to the different databases
+        const URL: &'static str = "redis://127.0.0.1:6379/";
+
+        pub fn new() -> Self {
+            Self {
+                connections: (0..Self::CONNECTIONS)
+                    .into_iter()
+                    .map(|database_index| (database_index, None))
+                    .collect(),
+            }
+        }
+
+        /// Flushing (`FLUSDB`) is synchronous by default in Redis
+        pub async fn flush_db(connection: &mut MultiplexedConnection) -> Result<String, Error> {
+            redis::cmd("FLUSHDB")
+                .query_async::<_, String>(connection)
+                .await
+                .map_err(Error::Redis)
+        }
+    }
+
+    #[derive(Debug, Error)]
+    pub enum Error {
+        // when we can't create more databases and all are used
+        #[error("No more databases can be created")]
+        OutOfBound,
+        #[error("A redis error occurred")]
+        Redis(#[from] RedisError),
+    }
+
+    #[async_trait]
+    impl ManagerTrait<Database, Error> for Manager {
+        async fn create(&self) -> Result<Database, Error> {
+            for mut record in self.connections.iter_mut() {
+                let database = record.value_mut().as_mut();
+
+                match database {
+                    Some(database) if database.available => {
+                        database.available = false;
+                        return Ok(database.clone());
+                    }
+                    // if Some but not available, skip it
+                    Some(_) => continue,
+                    None => {
+                        let mut redis_conn =
+                            redis_connection(&format!("{}{}", Self::URL, record.key())).await?;
+
+                        // run `FLUSHDB` to clean any leftovers of previous tests
+                        // even from different test runs as there might be leftovers
+                        Self::flush_db(&mut redis_conn).await?;
+
+                        let database = Database {
+                            available: false,
+                            connection: redis_conn,
+                        };
+
+                        *record.value_mut() = Some(database.clone());
+
+                        return Ok(database);
+                    }
+                }
+            }
+
+            Err(Error::OutOfBound)
+        }
+
+        async fn recycle(&self, database: &mut Database) -> RecycleResult<Error> {
+            // run `FLUSHDB` to clean any leftovers of previous tests
+            Self::flush_db(&mut database.connection)
+                .await
+                .map_err(RecycleError::Backend)?;
+            database.available = true;
+
+            Ok(())
+        }
+    }
 }
