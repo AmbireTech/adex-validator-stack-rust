@@ -32,7 +32,10 @@ lazy_static! {
     static ref ADEXCORE_ABI: &'static [u8] =
         include_bytes!("../../lib/protocol-eth/abi/AdExCore.json");
     static ref ERC20_ABI: &'static [u8] = include_bytes!("../../lib/protocol-eth/abi/ERC20.json");
+    static ref OUTPACE_ABI: &'static [u8] = include_bytes!("../../lib/protocol-eth/abi/OUTPACE.json");
     static ref CHANNEL_STATE_ACTIVE: U256 = 1.into();
+    //TODO
+    static ref MINIMUM_DEPOSIT_AMOUNT: U256 = 0.into();
 }
 
 #[derive(Debug, Clone)]
@@ -273,18 +276,35 @@ impl Adapter for EthereumAdapter {
 
 
     async fn get_spendable(&self, channel: &Channel, spender: &ValidatorId) -> AdapterResult<SpendableOutput, Self::AdapterError> {
-        let contract = Contract::from_json(
+        let outpace_contract = Contract::from_json(
+            self.web3.eth(),
+            self.config.ethereum_core_address.into(),
+            &OUTPACE_ABI,
+        )
+        .map_err(Error::ContractInitialization)?;
+
+        let erc20_contract = Contract::from_json(
             self.web3.eth(),
             self.config.ethereum_core_address.into(),
             &ERC20_ABI,
         )
         .map_err(Error::ContractInitialization)?;
 
-        // TODO: Get deposited per channel/spender from outpace
-        let mut amount: U256 = 1.into();
+        let mut amount: U256 = tokio_compat_02::FutureExt::compat(async {
+            tokio_compat_02::FutureExt::compat(outpace_contract.query(
+                "deposits",
+                (channel.id.into_token(), spender.to_hex_prefix_string().into_token()),
+                None,
+                Options::default(),
+                None,
+            ))
+            .await
+        })
+        .await
+        .map_err(Error::ContractQuerying)?;
 
         let to_be_deposited: U256 = tokio_compat_02::FutureExt::compat(async {
-            tokio_compat_02::FutureExt::compat(contract.query(
+            tokio_compat_02::FutureExt::compat(erc20_contract.query(
                 "balanceOf",
                 channel.deposit_asset.clone().into_token(),
                 None,
@@ -295,9 +315,8 @@ impl Adapter for EthereumAdapter {
         })
         .await
         .map_err(Error::ContractQuerying)?;
-        let minimum_deposit: U256 = self.config.minimal_deposit.to_string();
 
-        if to_be_deposited > minimum_deposit {
+        if to_be_deposited > *MINIMUM_DEPOSIT_AMOUNT {
             amount += to_be_deposited;
         }
 
@@ -305,8 +324,6 @@ impl Adapter for EthereumAdapter {
             amount,
             to_be_deposited,
         })
-
-        //? Should toBeDeposited be returned if it is less than Min?
     }
 }
 

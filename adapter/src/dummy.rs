@@ -132,6 +132,7 @@ impl Adapter for DummyAdapter {
     }
 
     async fn get_spendable(&self, channel: &Channel, spender: &ValidatorId) -> AdapterResult<SpendableOutput, Self::AdapterError> {
+        // TODO - complete function
         Ok(SpendableOutput {
             amount: 10.into(),
             to_be_deposited: 1.into(),
