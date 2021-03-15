@@ -34,8 +34,6 @@ lazy_static! {
     static ref ERC20_ABI: &'static [u8] = include_bytes!("../../lib/protocol-eth/abi/ERC20.json");
     static ref OUTPACE_ABI: &'static [u8] = include_bytes!("../../lib/protocol-eth/abi/OUTPACE.json");
     static ref CHANNEL_STATE_ACTIVE: U256 = 1.into();
-    //TODO
-    static ref MINIMUM_DEPOSIT_AMOUNT: U256 = 0.into();
 }
 
 #[derive(Debug, Clone)]
@@ -316,7 +314,13 @@ impl Adapter for EthereumAdapter {
         .await
         .map_err(Error::ContractQuerying)?;
 
-        if to_be_deposited > *MINIMUM_DEPOSIT_AMOUNT {
+        let token_info = self.config.token_address_whitelist
+        .get(&channel.deposit_asset)
+        .ok_or(Error::TokenNotWhitelisted)?;
+
+        let minimum_deposit_amount = U256::from(token_info.min_deposit);
+
+        if to_be_deposited > minimum_deposit_amount {
             amount += to_be_deposited;
         }
 

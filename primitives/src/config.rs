@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use crate::event_submission::RateLimit;
 use crate::{BigNum, ValidatorId};
 use lazy_static::lazy_static;
@@ -12,6 +13,12 @@ lazy_static! {
     static ref PRODUCTION_CONFIG: Config =
         toml::from_str(include_str!("../../docs/config/prod.toml"))
             .expect("Failed to parse prod.toml config file");
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TokenInfo {
+    pub min_deposit: u32,
+    pub decimals: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -34,7 +41,7 @@ pub struct Config {
     pub creators_whitelist: Vec<ValidatorId>,
     pub minimal_deposit: BigNum,
     pub minimal_fee: BigNum,
-    pub token_address_whitelist: Vec<String>,
+    pub token_address_whitelist: HashMap<String, TokenInfo>,
     #[serde(with = "SerHex::<StrictPfx>")]
     pub ethereum_core_address: [u8; 20],
     pub ethereum_network: String,

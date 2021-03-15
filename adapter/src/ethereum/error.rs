@@ -22,6 +22,7 @@ pub enum Error {
     ContractQuerying(web3::contract::Error),
     /// Error occurred during verification of Signature and/or StateRoot and/or Address
     VerifyAddress(VerifyError),
+    TokenNotWhitelisted,
 }
 
 impl std::error::Error for Error {}
@@ -43,7 +44,8 @@ impl fmt::Display for Error {
                 VerifyMessage(err) => write!(f, "Verifying message: {}", err),
                 ContractInitialization(err) => write!(f, "Contract initialization: {}", err),
                 ContractQuerying(err) => write!(f, "Contract querying: {}", err),
-                VerifyAddress(err) => write!(f, "Verifying address: {}", err)
+                VerifyAddress(err) => write!(f, "Verifying address: {}", err),
+                TokenNotWhiteListed => write!(f, "Token not whitelisted")
             }
     }
 }
