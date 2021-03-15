@@ -1,6 +1,6 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-use crate::{ValidatorId as Address, BigNum, ChannelId, ValidatorId};
+use crate::{BigNum, ChannelId, ValidatorId, Address};
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Channel {
