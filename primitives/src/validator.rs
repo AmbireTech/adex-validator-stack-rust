@@ -52,7 +52,9 @@ impl AsRef<[u8]> for ValidatorId {
 impl TryFrom<&str> for ValidatorId {
     type Error = DomainError;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Address::try_from(value).map(Self)
+        Address::try_from(value)
+            .map_err(|err| DomainError::InvalidArgument(err.to_string()))
+            .map(Self)
     }
 }
 
@@ -60,7 +62,7 @@ impl TryFrom<&String> for ValidatorId {
     type Error = DomainError;
 
     fn try_from(value: &String) -> Result<Self, Self::Error> {
-        Address::try_from(value).map(Self)
+        Self::try_from(value.as_str())
     }
 }
 
@@ -91,9 +93,9 @@ pub struct ValidatorDesc {
 // Validator Message Types
 
 mod messages {
-    use chrono::{DateTime, Utc};
-    use serde::{Serialize, Deserialize};
     use crate::BalancesMap;
+    use chrono::{DateTime, Utc};
+    use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
     #[serde(rename_all = "camelCase")]
