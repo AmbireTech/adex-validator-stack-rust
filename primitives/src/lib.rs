@@ -1,10 +1,9 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
-use std::{error, fmt};
 pub use self::{
-    address::Address,
     ad_slot::AdSlot,
     ad_unit::AdUnit,
+    address::Address,
     balances_map::BalancesMap,
     big_num::BigNum,
     channel::{Channel, ChannelId, ChannelSpec, SpecValidator, SpecValidators},
@@ -13,16 +12,17 @@ pub use self::{
     ipfs::IPFS,
     validator::{ValidatorDesc, ValidatorId},
 };
+use std::{error, fmt};
 
 mod ad_slot;
 mod ad_unit;
-pub mod address;
 pub mod adapter;
+pub mod address;
 pub mod balances_map;
 pub mod big_num;
 pub mod campaign;
-pub mod channel_v5;
 pub mod channel;
+pub mod channel_v5;
 pub mod channel_validator;
 pub mod config;
 pub mod event_submission;
