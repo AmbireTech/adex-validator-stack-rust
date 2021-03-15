@@ -1,35 +1,35 @@
-use crate::{payout::get_payout, Session};
 use primitives::{
     sentry::{AggregateEvents, Event, EventAggregate},
     BigNum, Channel, ValidatorId,
 };
-use slog::Logger;
 
 pub(crate) fn reduce(
-    logger: &Logger,
     channel: &Channel,
     initial_aggr: &mut EventAggregate,
     ev: &Event,
-    session: &Session,
+    payout: &Option<(ValidatorId, BigNum)>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let event_type = ev.to_string();
+
     match ev {
         Event::Impression { publisher, .. } => {
             let impression = initial_aggr.events.get(&event_type);
-            let payout = get_payout(logger, &channel, &ev, session)?;
             let merge = merge_payable_event(
                 impression,
-                payout.unwrap_or_else(|| (*publisher, Default::default())),
+                payout
+                    .to_owned()
+                    .unwrap_or_else(|| (*publisher, Default::default())),
             );
 
             initial_aggr.events.insert(event_type, merge);
         }
         Event::Click { publisher, .. } => {
             let clicks = initial_aggr.events.get(&event_type);
-            let payout = get_payout(logger, &channel, &ev, session)?;
             let merge = merge_payable_event(
                 clicks,
-                payout.unwrap_or_else(|| (*publisher, Default::default())),
+                payout
+                    .to_owned()
+                    .unwrap_or_else(|| (*publisher, Default::default())),
             );
 
             initial_aggr.events.insert(event_type, merge);
@@ -77,15 +77,13 @@ fn merge_payable_event(
 mod test {
     use super::*;
     use chrono::Utc;
-    use primitives::util::tests::{
-        discard_logger,
-        prep_db::{DUMMY_CHANNEL, IDS},
+    use primitives::{
+        util::tests::prep_db::{DUMMY_CHANNEL, IDS},
+        BigNum,
     };
-    use primitives::BigNum;
 
     #[test]
     fn test_reduce() {
-        let logger = discard_logger();
         let mut channel: Channel = DUMMY_CHANNEL.clone();
         channel.deposit_amount = 100.into();
         // make immutable again
@@ -103,16 +101,9 @@ mod test {
             ad_slot: None,
             referrer: None,
         };
-
-        let session = Session {
-            ip: Default::default(),
-            country: None,
-            referrer_header: None,
-            os: None,
-        };
-
+        let payout = Some((IDS["publisher"], BigNum::from(1)));
         for i in 0..101 {
-            reduce(&logger, &channel, &mut event_aggr, &event, &session)
+            reduce(&channel, &mut event_aggr, &event, &payout)
                 .expect(&format!("Should be able to reduce event #{}", i));
         }
 
@@ -132,9 +123,7 @@ mod test {
         assert_eq!(event_counts, &BigNum::from(101));
 
         let event_payouts = impression_event
-            .event_counts
-            .as_ref()
-            .expect("there should be event_counts set")
+            .event_payouts
             .get(&IDS["publisher"])
             .expect("There should be myAwesomePublisher event_payouts key");
         assert_eq!(event_payouts, &BigNum::from(101));
