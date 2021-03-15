@@ -1,4 +1,6 @@
-use crate::{channel_v5::Channel, targeting::Rules, AdUnit, BigNum, EventSubmission, SpecValidators};
+use crate::{
+    channel_v5::Channel, targeting::Rules, AdUnit, BigNum, EventSubmission, ValidatorDesc,
+};
 
 use chrono::{
     serde::{ts_milliseconds, ts_milliseconds_option},
@@ -7,18 +9,41 @@ use chrono::{
 use serde::{Deserialize, Serialize};
 
 pub use pricing::{Pricing, PricingBounds};
+pub use spec::{ValidatorRole, Validators};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Campaign {
-    channel: Channel,
-    spec: CampaignSpec,
+    pub channel: Channel,
+    pub spec: CampaignSpec,
+}
+
+impl Campaign {
+    /// Matches the Channel.leader to the Campaign.spec.leader
+    /// If they match it returns `Some`, otherwise, it returns `None`
+    pub fn leader<'a>(&'a self) -> Option<&'a ValidatorDesc> {
+        if self.channel.leader == self.spec.validators.leader().id {
+            Some(self.spec.validators.leader())
+        } else {
+            None
+        }
+    }
+
+    /// Matches the Channel.follower to the Campaign.spec.follower
+    /// If they match it returns `Some`, otherwise, it returns `None`
+    pub fn follower<'a>(&'a self) -> Option<&'a ValidatorDesc> {
+        if self.channel.follower == self.spec.validators.follower().id {
+            Some(self.spec.validators.follower())
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CampaignSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
-    pub validators: SpecValidators,
+    pub validators: Validators,
     /// Event pricing bounds
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pricing_bounds: Option<PricingBounds>,
@@ -95,7 +120,120 @@ mod pricing {
         }
     }
 }
-// TODO: Move SpecValidators (spec::Validators?)
+// TODO: Double check if we require all the methods and enums, as some parts are now in the `Campaign`
+// This includes the matching of the Channel leader & follower to the Spec Validators
+pub mod spec {
+    use crate::{ValidatorDesc, ValidatorId};
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+    /// A (leader, follower) tuple
+    pub struct Validators(ValidatorDesc, ValidatorDesc);
+
+    #[derive(Debug)]
+    pub enum ValidatorRole<'a> {
+        Leader(&'a ValidatorDesc),
+        Follower(&'a ValidatorDesc),
+    }
+
+    impl<'a> ValidatorRole<'a> {
+        pub fn validator(&self) -> &'a ValidatorDesc {
+            match self {
+                ValidatorRole::Leader(validator) => validator,
+                ValidatorRole::Follower(validator) => validator,
+            }
+        }
+    }
+
+    impl Validators {
+        pub fn new(leader: ValidatorDesc, follower: ValidatorDesc) -> Self {
+            Self(leader, follower)
+        }
+
+        pub fn leader(&self) -> &ValidatorDesc {
+            &self.0
+        }
+
+        pub fn follower(&self) -> &ValidatorDesc {
+            &self.1
+        }
+
+        pub fn find(&self, validator_id: &ValidatorId) -> Option<ValidatorRole<'_>> {
+            if &self.leader().id == validator_id {
+                Some(ValidatorRole::Leader(&self.leader()))
+            } else if &self.follower().id == validator_id {
+                Some(ValidatorRole::Follower(&self.follower()))
+            } else {
+                None
+            }
+        }
+
+        pub fn find_index(&self, validator_id: &ValidatorId) -> Option<u32> {
+            if &self.leader().id == validator_id {
+                Some(0)
+            } else if &self.follower().id == validator_id {
+                Some(1)
+            } else {
+                None
+            }
+        }
+
+        pub fn iter(&self) -> Iter<'_> {
+            Iter::new(&self)
+        }
+    }
+
+    impl From<(ValidatorDesc, ValidatorDesc)> for Validators {
+        fn from((leader, follower): (ValidatorDesc, ValidatorDesc)) -> Self {
+            Self(leader, follower)
+        }
+    }
+
+    /// Fixed size iterator of 2, as we need an iterator in couple of occasions
+    impl<'a> IntoIterator for &'a Validators {
+        type Item = &'a ValidatorDesc;
+        type IntoIter = Iter<'a>;
+
+        fn into_iter(self) -> Self::IntoIter {
+            self.iter()
+        }
+    }
+
+    pub struct Iter<'a> {
+        validators: &'a Validators,
+        index: u8,
+    }
+
+    impl<'a> Iter<'a> {
+        fn new(validators: &'a Validators) -> Self {
+            Self {
+                validators,
+                index: 0,
+            }
+        }
+    }
+
+    impl<'a> Iterator for Iter<'a> {
+        type Item = &'a ValidatorDesc;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            match self.index {
+                0 => {
+                    self.index += 1;
+
+                    Some(self.validators.leader())
+                }
+                1 => {
+                    self.index += 1;
+
+                    Some(self.validators.follower())
+                }
+                _ => None,
+            }
+        }
+    }
+}
 
 // TODO: Postgres Campaign
 // TODO: Postgres CampaignSpec
+// TODO: Postgres Validators
