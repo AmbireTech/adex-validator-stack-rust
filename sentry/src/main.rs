@@ -15,6 +15,7 @@ use sentry::Application;
 use slog::{error, info, Logger};
 use std::{
     convert::TryFrom,
+    env,
     net::{IpAddr, Ipv4Addr, SocketAddr},
 };
 
@@ -108,7 +109,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let logger = logger();
-    let redis = redis_connection().await?;
+    let url = env::var("REDIS_URL").unwrap_or_else(|_| String::from("redis://127.0.0.1:6379"));
+    let redis = redis_connection(url.as_str()).await?;
     info!(&logger, "Checking connection and applying migrations...");
     // Check connection and setup migrations before setting up Postgres
     setup_migrations(&environment).await;

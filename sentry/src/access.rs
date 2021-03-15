@@ -210,28 +210,29 @@ mod test {
     use std::time::Duration;
 
     use chrono::TimeZone;
-    use primitives::config::configuration;
-    use primitives::event_submission::{RateLimit, Rule};
-    use primitives::sentry::Event;
-    use primitives::targeting::Rules;
-    use primitives::util::tests::prep_db::{DUMMY_CHANNEL, IDS};
-    use primitives::{Channel, Config, EventSubmission};
+    use primitives::{
+        config::configuration,
+        event_submission::{RateLimit, Rule},
+        sentry::Event,
+        targeting::Rules,
+        util::tests::prep_db::{DUMMY_CHANNEL, IDS},
+        Channel, Config, EventSubmission,
+    };
 
-    use crate::db::redis_connection;
-    use crate::Session;
+    use deadpool::managed::Object;
+
+    use crate::{
+        db::redis_pool::{Database, TESTS_POOL},
+        Session,
+    };
 
     use super::*;
 
-    async fn setup() -> (Config, MultiplexedConnection) {
-        let mut redis = redis_connection().await.expect("Couldn't connect to Redis");
+    async fn setup() -> (Config, Object<Database, crate::db::redis_pool::Error>) {
+        let connection = TESTS_POOL.get().await.expect("Should return Object");
         let config = configuration("development", None).expect("Failed to get dev configuration");
 
-        // run `FLUSHALL` to clean any leftovers of other tests
-        let _ = redis::cmd("FLUSHALL")
-            .query_async::<_, String>(&mut redis)
-            .await;
-
-        (config, redis)
+        (config, connection)
     }
 
     fn get_channel(with_rule: Rule) -> Channel {
@@ -269,7 +270,7 @@ mod test {
 
     #[tokio::test]
     async fn session_uid_rate_limit() {
-        let (config, redis) = setup().await;
+        let (config, database) = setup().await;
 
         let auth = Auth {
             era: 0,
@@ -294,7 +295,7 @@ mod test {
         let channel = get_channel(rule);
 
         let response = check_access(
-            &redis,
+            &database,
             &session,
             Some(&auth),
             &config.ip_rate_limit,
@@ -305,7 +306,7 @@ mod test {
         assert_eq!(Ok(()), response);
 
         let err_response = check_access(
-            &&redis,
+            &database,
             &session,
             Some(&auth),
             &config.ip_rate_limit,
@@ -323,7 +324,7 @@ mod test {
 
     #[tokio::test]
     async fn ip_rate_limit() {
-        let (config, redis) = setup().await;
+        let (config, database) = setup().await;
 
         let auth = Auth {
             era: 0,
@@ -347,7 +348,7 @@ mod test {
         let channel = get_channel(rule);
 
         let err_response = check_access(
-            &redis,
+            &database,
             &session,
             Some(&auth),
             &config.ip_rate_limit,
@@ -364,7 +365,7 @@ mod test {
         );
 
         let response = check_access(
-            &redis,
+            &database,
             &session,
             Some(&auth),
             &config.ip_rate_limit,
@@ -376,9 +377,8 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn check_access_past_channel_valid_until() {
-        let (config, redis) = setup().await;
+        let (config, database) = setup().await;
 
         let auth = Auth {
             era: 0,
@@ -403,7 +403,7 @@ mod test {
         channel.valid_until = Utc.ymd(1970, 1, 1).and_hms(12, 00, 9);
 
         let err_response = check_access(
-            &redis,
+            &database,
             &session,
             Some(&auth),
             &config.ip_rate_limit,
@@ -416,9 +416,8 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn check_access_close_event_in_withdraw_period() {
-        let (config, redis) = setup().await;
+        let (config, database) = setup().await;
 
         let auth = Auth {
             era: 0,
@@ -443,7 +442,7 @@ mod test {
         channel.spec.withdraw_period_start = Utc.ymd(1970, 1, 1).and_hms(12, 0, 9);
 
         let ok_response = check_access(
-            &redis,
+            &database,
             &session,
             Some(&auth),
             &config.ip_rate_limit,
@@ -456,9 +455,8 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn check_access_close_event_and_is_creator() {
-        let (config, redis) = setup().await;
+        let (config, database) = setup().await;
 
         let auth = Auth {
             era: 0,
@@ -483,7 +481,7 @@ mod test {
         channel.creator = IDS["follower"];
 
         let ok_response = check_access(
-            &redis,
+            &database,
             &session,
             Some(&auth),
             &config.ip_rate_limit,
@@ -496,9 +494,8 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn check_access_update_targeting_event_and_is_creator() {
-        let (config, redis) = setup().await;
+        let (config, database) = setup().await;
 
         let auth = Auth {
             era: 0,
@@ -523,7 +520,7 @@ mod test {
         channel.creator = IDS["follower"];
 
         let ok_response = check_access(
-            &redis,
+            &database,
             &session,
             Some(&auth),
             &config.ip_rate_limit,
@@ -536,9 +533,8 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn not_creator_and_there_are_close_events() {
-        let (config, redis) = setup().await;
+        let (config, database) = setup().await;
 
         let auth = Auth {
             era: 0,
@@ -574,7 +570,7 @@ mod test {
             },
         ];
         let err_response = check_access(
-            &redis,
+            &database,
             &session,
             Some(&auth),
             &config.ip_rate_limit,
@@ -587,9 +583,8 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn not_creator_and_there_are_update_targeting_events() {
-        let (config, redis) = setup().await;
+        let (config, database) = setup().await;
 
         let auth = Auth {
             era: 0,
@@ -624,7 +619,7 @@ mod test {
             },
         ];
         let err_response = check_access(
-            &redis,
+            &database,
             &session,
             Some(&auth),
             &config.ip_rate_limit,
@@ -637,9 +632,8 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn in_withdraw_period_no_close_events() {
-        let (config, redis) = setup().await;
+        let (config, database) = setup().await;
 
         let auth = Auth {
             era: 0,
@@ -664,7 +658,7 @@ mod test {
         channel.spec.withdraw_period_start = Utc.ymd(1970, 1, 1).and_hms(12, 0, 9);
 
         let err_response = check_access(
-            &redis,
+            &database,
             &session,
             Some(&auth),
             &config.ip_rate_limit,
@@ -677,9 +671,8 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn with_forbidden_country() {
-        let (config, redis) = setup().await;
+        let (config, database) = setup().await;
 
         let auth = Auth {
             era: 0,
@@ -703,7 +696,7 @@ mod test {
         let channel = get_channel(rule);
 
         let err_response = check_access(
-            &redis,
+            &database,
             &session,
             Some(&auth),
             &config.ip_rate_limit,
@@ -716,9 +709,8 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn with_forbidden_referrer() {
-        let (config, redis) = setup().await;
+        let (config, database) = setup().await;
 
         let auth = Auth {
             era: 0,
@@ -742,7 +734,7 @@ mod test {
         let channel = get_channel(rule);
 
         let err_response = check_access(
-            &redis,
+            &database,
             &session,
             Some(&auth),
             &config.ip_rate_limit,
@@ -755,9 +747,8 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn no_rate_limit() {
-        let (config, redis) = setup().await;
+        let (config, database) = setup().await;
 
         let auth = Auth {
             era: 0,
@@ -778,7 +769,7 @@ mod test {
         let channel = get_channel(rule);
 
         let ok_response = check_access(
-            &redis,
+            &database,
             &session,
             Some(&auth),
             &config.ip_rate_limit,
@@ -791,9 +782,8 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn applied_rules() {
-        let (config, redis) = setup().await;
+        let (config, mut database) = setup().await;
 
         let auth = Auth {
             era: 0,
@@ -817,7 +807,7 @@ mod test {
         let channel = get_channel(rule);
 
         let ok_response = check_access(
-            &redis,
+            &database,
             &session,
             Some(&auth),
             &config.ip_rate_limit,
@@ -833,7 +823,8 @@ mod test {
 
         let value_in_redis = redis::cmd("GET")
             .arg(&key)
-            .query_async::<_, String>(&mut redis.clone())
+            // Deref can't work here, so we need to call the `Object` -> `Database.connection`
+            .query_async::<_, String>(&mut database.connection)
             .await
             .expect("should exist in redis");
         assert_eq!(&value, &value_in_redis);
