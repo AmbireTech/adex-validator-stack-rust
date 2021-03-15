@@ -316,7 +316,7 @@ impl Adapter for EthereumAdapter {
 
         let token_info = self.config.token_address_whitelist
         .get(&channel.deposit_asset)
-        .ok_or(Error::TokenNotWhitelisted)?;
+        .ok_or(Error::TokenNotWhitelisted(channel.deposit_asset.clone()))?;
 
         let minimum_deposit_amount = U256::from(token_info.min_deposit);
 
