@@ -25,6 +25,10 @@ slog-async = "^2.3.0"
 thiserror = "^1.0"
 chrono = { version = "0.4", features = ["serde"] }
 time = "0.1.42"
+# For encoding the Channel to a ChannelId
+ethabi = "13.0.0"
+# For the nonce U256
+ethereum-types = "0.11"
 # Macro for easier derive of Display & FromStr
 parse-display = "^0.4.1"
 # CID & multihash / multibase
