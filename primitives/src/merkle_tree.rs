@@ -1,9 +1,7 @@
 use merkletree::{hash::Algorithm, merkle, merkle::VecStore, proof::Proof};
-use std::fmt;
-use std::hash::Hasher;
-use std::iter::FromIterator;
+use std::{fmt, iter::FromIterator};
 use thiserror::Error;
-use tiny_keccak::Keccak;
+use tiny_keccak::{Hasher, Keccak};
 
 #[derive(Clone)]
 struct KeccakAlgorithm(Keccak);
@@ -16,7 +14,7 @@ impl fmt::Debug for KeccakAlgorithm {
 
 impl KeccakAlgorithm {
     pub fn new() -> KeccakAlgorithm {
-        KeccakAlgorithm(Keccak::new_keccak256())
+        KeccakAlgorithm(Keccak::v256())
     }
 }
 
@@ -26,7 +24,7 @@ impl Default for KeccakAlgorithm {
     }
 }
 
-impl Hasher for KeccakAlgorithm {
+impl std::hash::Hasher for KeccakAlgorithm {
     #[inline]
     fn write(&mut self, msg: &[u8]) {
         self.0.update(msg)
@@ -50,7 +48,7 @@ impl Algorithm<MerkleItem> for KeccakAlgorithm {
 
     #[inline]
     fn reset(&mut self) {
-        self.0 = Keccak::new_keccak256()
+        self.0 = Keccak::v256()
     }
 
     fn leaf(&mut self, leaf: MerkleItem) -> MerkleItem {
@@ -58,6 +56,8 @@ impl Algorithm<MerkleItem> for KeccakAlgorithm {
     }
 
     fn node(&mut self, left: MerkleItem, right: MerkleItem, _height: usize) -> MerkleItem {
+        use std::hash::Hasher;
+
         // This is a check for odd number of leaves items
         // left == right since the right is a duplicate of left
         // return the item unencoded as the JS impl

@@ -60,7 +60,7 @@ pub struct Active {
 impl Campaign {
     /// Matches the Channel.leader to the Campaign.spec.leader
     /// If they match it returns `Some`, otherwise, it returns `None`
-    pub fn leader<'a>(&'a self) -> Option<&'a ValidatorDesc> {
+    pub fn leader(&self) -> Option<&'_ ValidatorDesc> {
         if self.channel.leader == self.validators.leader().id {
             Some(self.validators.leader())
         } else {
@@ -70,7 +70,7 @@ impl Campaign {
 
     /// Matches the Channel.follower to the Campaign.spec.follower
     /// If they match it returns `Some`, otherwise, it returns `None`
-    pub fn follower<'a>(&'a self) -> Option<&'a ValidatorDesc> {
+    pub fn follower(&self) -> Option<&'_ ValidatorDesc> {
         if self.channel.follower == self.validators.follower().id {
             Some(self.validators.follower())
         } else {
