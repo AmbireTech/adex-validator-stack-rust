@@ -54,7 +54,7 @@ pub struct Active {
     /// A sane value should be lower than channel.validUntil * 1000 and higher than created
     /// It's recommended to set this at least one month prior to channel.validUntil * 1000
     #[serde(with = "ts_milliseconds")]
-    pub active_to: DateTime<Utc>,
+    pub to: DateTime<Utc>,
 }
 
 impl Campaign {
