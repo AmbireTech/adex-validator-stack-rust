@@ -1,5 +1,5 @@
 use crate::{
-    channel_v5::Channel, targeting::Rules, AdUnit, BigNum, EventSubmission, ValidatorDesc,
+    channel_v5::Channel, targeting::Rules, AdUnit, Address, EventSubmission, ValidatorDesc,
 };
 
 use chrono::{
@@ -7,22 +7,62 @@ use chrono::{
     DateTime, Utc,
 };
 use serde::{Deserialize, Serialize};
+use serde_with::with_prefix;
 
 pub use pricing::{Pricing, PricingBounds};
-pub use spec::{ValidatorRole, Validators};
+pub use validators::{ValidatorRole, Validators};
+
+with_prefix!(prefix_active "active_");
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Campaign {
     pub channel: Channel,
-    pub spec: CampaignSpec,
+    pub creator: Address,
+    pub validators: Validators,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// Event pricing bounds
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pricing_bounds: Option<PricingBounds>,
+    /// EventSubmission object, applies to event submission (POST /channel/:id/events)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event_submission: Option<EventSubmission>,
+    /// An array of AdUnit (optional)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ad_units: Vec<AdUnit>,
+    #[serde(default)]
+    pub targeting_rules: Rules,
+    /// A millisecond timestamp of when the campaign was created
+    #[serde(with = "ts_milliseconds")]
+    pub created: DateTime<Utc>,
+    /// A millisecond timestamp representing the time you want this campaign to become active (optional)
+    /// Used by the AdViewManager & Targeting AIP#31
+    #[serde(flatten, with = "prefix_active")]
+    pub active: Active,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Active {
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "ts_milliseconds_option"
+    )]
+    pub from: Option<DateTime<Utc>>,
+    /// A millisecond timestamp of when the campaign should enter a withdraw period
+    /// (no longer accept any events other than CHANNEL_CLOSE)
+    /// A sane value should be lower than channel.validUntil * 1000 and higher than created
+    /// It's recommended to set this at least one month prior to channel.validUntil * 1000
+    #[serde(with = "ts_milliseconds")]
+    pub active_to: DateTime<Utc>,
 }
 
 impl Campaign {
     /// Matches the Channel.leader to the Campaign.spec.leader
     /// If they match it returns `Some`, otherwise, it returns `None`
     pub fn leader<'a>(&'a self) -> Option<&'a ValidatorDesc> {
-        if self.channel.leader == self.spec.validators.leader().id {
-            Some(self.spec.validators.leader())
+        if self.channel.leader == self.validators.leader().id {
+            Some(self.validators.leader())
         } else {
             None
         }
@@ -31,50 +71,12 @@ impl Campaign {
     /// Matches the Channel.follower to the Campaign.spec.follower
     /// If they match it returns `Some`, otherwise, it returns `None`
     pub fn follower<'a>(&'a self) -> Option<&'a ValidatorDesc> {
-        if self.channel.follower == self.spec.validators.follower().id {
-            Some(self.spec.validators.follower())
+        if self.channel.follower == self.validators.follower().id {
+            Some(self.validators.follower())
         } else {
             None
         }
     }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CampaignSpec {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
-    pub validators: Validators,
-    /// Event pricing bounds
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub pricing_bounds: Option<PricingBounds>,
-    /// EventSubmission object, applies to event submission (POST /channel/:id/events)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub event_submission: Option<EventSubmission>,
-    /// A millisecond timestamp of when the campaign was created
-    #[serde(with = "ts_milliseconds")]
-    pub created: DateTime<Utc>,
-    /// A millisecond timestamp representing the time you want this campaign to become active (optional)
-    /// Used by the AdViewManager & Targeting AIP#31
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "ts_milliseconds_option"
-    )]
-    pub active_from: Option<DateTime<Utc>>,
-    /// A random number to ensure the campaignSpec hash is unique
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub nonce: Option<BigNum>,
-    /// A millisecond timestamp of when the campaign should enter a withdraw period
-    /// (no longer accept any events other than CHANNEL_CLOSE)
-    /// A sane value should be lower than channel.validUntil * 1000 and higher than created
-    /// It's recommended to set this at least one month prior to channel.validUntil * 1000
-    #[serde(with = "ts_milliseconds")]
-    pub withdraw_period_start: DateTime<Utc>,
-    /// An array of AdUnit (optional)
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub ad_units: Vec<AdUnit>,
-    #[serde(default)]
-    pub targeting_rules: Rules,
 }
 
 mod pricing {
@@ -121,8 +123,8 @@ mod pricing {
     }
 }
 // TODO: Double check if we require all the methods and enums, as some parts are now in the `Campaign`
-// This includes the matching of the Channel leader & follower to the Spec Validators
-pub mod spec {
+// This includes the matching of the Channel leader & follower to the Validators
+pub mod validators {
     use crate::{ValidatorDesc, ValidatorId};
     use serde::{Deserialize, Serialize};
 
