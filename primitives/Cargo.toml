@@ -31,12 +31,10 @@ parse-display = "^0.4.1"
 cid = "0.6"
 hex = "0.4"
 merkletree = "0.10.0"
-tiny-keccak = "1.5"
-rust-crypto = "0.2"
-url = { version = "=2.2", features = ["serde"]}
+tiny-keccak = { version = "^2.0", features = ["keccak"] }
+url = { version = "=2.2", features = ["serde"] }
 # Numbers - BigNum, Numbers, Traits and Derives
-num-bigint = { version = "^0.3", features = ["serde"] }
-num = "0.3"
+num = { version = "0.4", features = ["serde", "num-bigint"] }
 num-traits = "0.2"
 num-derive = "0.3"
 # Fixtures
