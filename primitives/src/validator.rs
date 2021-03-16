@@ -16,6 +16,14 @@ impl fmt::Debug for ValidatorId {
 }
 
 impl ValidatorId {
+    pub fn as_bytes(&self) -> &[u8; 20] {
+        self.0.as_bytes()
+    }
+
+    pub fn to_address(&self) -> Address {
+        self.0
+    }
+
     pub fn inner(&self) -> &[u8; 20] {
         &self.0.as_bytes()
     }
