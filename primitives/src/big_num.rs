@@ -1,11 +1,12 @@
-use std::convert::TryFrom;
-use std::fmt;
-use std::iter::Sum;
-use std::ops::{Add, AddAssign, Div, Mul, Sub};
-use std::str::FromStr;
+use std::{
+    convert::TryFrom,
+    fmt,
+    iter::Sum,
+    ops::{Add, AddAssign, Div, Mul, Sub},
+    str::FromStr,
+};
 
-use num::rational::Ratio;
-use num::{BigUint, CheckedSub, Integer};
+use num::{rational::Ratio, BigUint, CheckedSub, Integer};
 use num_derive::{Num, NumOps, One, Zero};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
