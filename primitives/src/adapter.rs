@@ -1,6 +1,6 @@
 use crate::channel::ChannelError;
 use crate::channel_validator::ChannelValidator;
-use crate::{Channel, DomainError, ValidatorId};
+use crate::{Channel, DomainError, ValidatorId, BigNum};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -12,9 +12,9 @@ pub type AdapterResult<T, AE> = Result<T, Error<AE>>;
 
 pub trait AdapterErrorKind: fmt::Debug + fmt::Display {}
 
-pub struct SpendableOutput {
-    pub amount: U256,
-    pub to_be_deposited: U256,
+pub struct Deposit {
+    pub total: U256,
+    pub pending: U256,
 }
 
 #[derive(Debug)]
@@ -112,9 +112,9 @@ pub trait Adapter: ChannelValidator + Send + Sync + fmt::Debug + Clone {
     fn get_auth(&self, validator_id: &ValidatorId) -> AdapterResult<String, Self::AdapterError>;
 
     /// Calculates and returns the total spendable amount
-    async fn get_spendable(
+    async fn get_deposit(
         &self,
         channel: &Channel,
-        spender: &ValidatorId
-    ) -> AdapterResult<SpendableOutput, Self::AdapterError>;
+        user: &ValidatorId
+    ) -> AdapterResult<Deposit, Self::AdapterError>;
 }

@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use primitives::{
     adapter::{
         Adapter, AdapterErrorKind, AdapterResult, DummyAdapterOptions, Error as AdapterError,
-        Session, SpendableOutput
+        Session, Deposit
     },
     channel_validator::ChannelValidator,
     config::Config,
@@ -131,11 +131,11 @@ impl Adapter for DummyAdapter {
         }
     }
 
-    async fn get_spendable(&self, channel: &Channel, spender: &ValidatorId) -> AdapterResult<SpendableOutput, Self::AdapterError> {
+    async fn get_deposit(&self, channel: &Channel, spender: &ValidatorId) -> AdapterResult<Deposit, Self::AdapterError> {
         // TODO - complete function
-        Ok(SpendableOutput {
-            amount: 10.into(),
-            to_be_deposited: 1.into(),
+        Ok(Deposit {
+            total: 10.into(),
+            pending: 1.into(),
         })
     }
 }

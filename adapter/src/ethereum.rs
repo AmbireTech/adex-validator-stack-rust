@@ -9,7 +9,7 @@ use ethstore::{
 use futures::TryFutureExt;
 use lazy_static::lazy_static;
 use primitives::{
-    adapter::{Adapter, AdapterResult, Error as AdapterError, KeystoreOptions, Session, SpendableOutput},
+    adapter::{Adapter, AdapterResult, Error as AdapterError, KeystoreOptions, Session, Deposit},
     channel_validator::ChannelValidator,
     config::Config,
     Channel, ChannelId, ToETHChecksum, ValidatorId,
@@ -273,7 +273,7 @@ impl Adapter for EthereumAdapter {
     }
 
 
-    async fn get_spendable(&self, channel: &Channel, spender: &ValidatorId) -> AdapterResult<SpendableOutput, Self::AdapterError> {
+    async fn get_deposit(&self, channel: &Channel, user: &ValidatorId) -> AdapterResult<Deposit, Self::AdapterError> {
         let outpace_contract = Contract::from_json(
             self.web3.eth(),
             self.config.ethereum_core_address.into(),
@@ -288,10 +288,10 @@ impl Adapter for EthereumAdapter {
         )
         .map_err(Error::ContractInitialization)?;
 
-        let mut amount: U256 = tokio_compat_02::FutureExt::compat(async {
+        let mut total: U256 = tokio_compat_02::FutureExt::compat(async {
             tokio_compat_02::FutureExt::compat(outpace_contract.query(
                 "deposits",
-                (channel.id.into_token(), spender.to_hex_prefix_string().into_token()),
+                (channel.id.into_token(), user.to_hex_prefix_string().into_token()),
                 None,
                 Options::default(),
                 None,
@@ -301,7 +301,7 @@ impl Adapter for EthereumAdapter {
         .await
         .map_err(Error::ContractQuerying)?;
 
-        let to_be_deposited: U256 = tokio_compat_02::FutureExt::compat(async {
+        let pending: U256 = tokio_compat_02::FutureExt::compat(async {
             tokio_compat_02::FutureExt::compat(erc20_contract.query(
                 "balanceOf",
                 channel.deposit_asset.clone().into_token(),
@@ -318,15 +318,15 @@ impl Adapter for EthereumAdapter {
         .get(&channel.deposit_asset)
         .ok_or(Error::TokenNotWhitelisted(channel.deposit_asset.clone()))?;
 
-        let minimum_deposit_amount = U256::from(token_info.min_deposit);
+        let minimum_deposit_amount = U256::from(token_info.min_token_units_for_deposit);
 
-        if to_be_deposited > minimum_deposit_amount {
-            amount += to_be_deposited;
+        if pending > minimum_deposit_amount {
+            total += pending;
         }
 
-        Ok(SpendableOutput {
-            amount,
-            to_be_deposited,
+        Ok(Deposit {
+            total,
+            pending,
         })
     }
 }

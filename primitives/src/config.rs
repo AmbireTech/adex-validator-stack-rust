@@ -17,7 +17,7 @@ lazy_static! {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TokenInfo {
-    pub min_deposit: u32,
+    pub min_token_units_for_deposit: u32,
     pub decimals: u32,
 }
 
