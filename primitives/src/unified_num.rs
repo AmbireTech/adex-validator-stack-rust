@@ -76,7 +76,7 @@ impl fmt::Debug for UnifiedNum {
 
 impl One for UnifiedNum {
     fn one() -> Self {
-        Self(BigNum::from(10_000_000))
+        Self(BigNum::from(100_000_000))
     }
 }
 
@@ -247,6 +247,7 @@ impl CheckedSub for UnifiedNum {
 #[cfg(test)]
 mod test {
     use super::*;
+    use num::Zero;
 
     #[test]
     fn unified_num_displays_correctly() {
@@ -256,6 +257,8 @@ mod test {
         let random_value = UnifiedNum::from(144_903_000_567_000);
 
         assert_eq!("1.00000000", &one.to_string());
+        assert_eq!("1.00000000", &UnifiedNum::one().to_string());
+        assert_eq!("0.00000000", &UnifiedNum::zero().to_string());
         assert_eq!("0.10000000", &zero_point_one.to_string());
         assert_eq!("0.00000001", &smallest_value.to_string());
         assert_eq!("1449030.00567000", &random_value.to_string());
