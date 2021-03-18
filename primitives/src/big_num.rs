@@ -59,6 +59,12 @@ impl fmt::Debug for BigNum {
     }
 }
 
+impl fmt::Display for BigNum {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
 impl Integer for BigNum {
     fn div_floor(&self, other: &Self) -> Self {
         self.0.div_floor(&other.0).into()
@@ -250,12 +256,6 @@ impl FromStr for BigNum {
     }
 }
 
-impl ToString for BigNum {
-    fn to_string(&self) -> String {
-        self.0.to_str_radix(10)
-    }
-}
-
 impl From<u64> for BigNum {
     fn from(value: u64) -> Self {
         Self(BigUint::from(value))
@@ -337,5 +337,12 @@ mod test {
 
         let expected: BigNum = 11.into();
         assert_eq!(expected, &big_num * &ratio);
+    }
+    #[test]
+    fn bignum_formatting() {
+        let bignum: BigNum = 5000.into();
+
+        assert_eq!("5000", &bignum.to_string());
+        assert_eq!("BigNum(radix: 10; 5000)", &format!("{:?}", &bignum));
     }
 }
