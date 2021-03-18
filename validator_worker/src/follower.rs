@@ -121,10 +121,7 @@ async fn on_new_state<'a, A: Adapter + 'static>(
         .last_approved
         .and_then(|last_approved| last_approved.new_state)
     {
-        Some(new_state) => match new_state.msg {
-            MessageTypes::NewState(new_state) => new_state.balances,
-            _ => Default::default(),
-        },
+        Some(new_state) => new_state.msg.into_inner().balances,
         _ => Default::default(),
     };
 
