@@ -1,40 +1,66 @@
-use crate::targeting::Rules;
-use crate::validator::MessageTypes;
-use crate::{BigNum, Channel, ChannelId, ValidatorId};
+use crate::{
+    targeting::Rules,
+    validator::Type as MessageType,
+    validator::{ApproveState, Heartbeat, MessageTypes, NewState},
+    BigNum, Channel, ChannelId, ValidatorId,
+};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::fmt;
-use std::hash::Hash;
+use std::{collections::HashMap, fmt, hash::Hash};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LastApproved {
     /// NewState can be None if the channel is brand new
-    pub new_state: Option<NewStateValidatorMessage>,
+    pub new_state: Option<MessageResponse<NewState>>,
     /// ApproveState can be None if the channel is brand new
-    pub approve_state: Option<ApproveStateValidatorMessage>,
+    pub approve_state: Option<MessageResponse<ApproveState>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct NewStateValidatorMessage {
+pub struct MessageResponse<T: MessageType> {
     pub from: ValidatorId,
     pub received: DateTime<Utc>,
-    pub msg: MessageTypes,
+    pub msg: message::Message<T>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct ApproveStateValidatorMessage {
-    pub from: ValidatorId,
-    pub received: DateTime<Utc>,
-    pub msg: MessageTypes,
-}
+pub mod message {
+    use std::{convert::TryFrom, ops::Deref};
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct HeartbeatValidatorMessage {
-    pub from: ValidatorId,
-    pub received: DateTime<Utc>,
-    pub msg: MessageTypes,
+    use crate::validator::messages::*;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+    #[serde(try_from = "MessageTypes", into = "MessageTypes")]
+    pub struct Message<T: Type>(T);
+
+    impl<T: Type> Message<T> {
+        pub fn into_inner(self) -> T {
+            self.0
+        }
+    }
+
+    impl<T: Type> Deref for Message<T> {
+        type Target = T;
+
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
+    impl<T: Type> TryFrom<MessageTypes> for Message<T> {
+        type Error = MessageTypeError<T>;
+
+        fn try_from(value: MessageTypes) -> Result<Self, Self::Error> {
+            <T as TryFrom<MessageTypes>>::try_from(value).map(Self)
+        }
+    }
+
+    impl<T: Type> Into<MessageTypes> for Message<T> {
+        fn into(self) -> MessageTypes {
+            self.0.into()
+        }
+    }
 }
 
 #[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
@@ -119,7 +145,7 @@ pub struct LastApprovedResponse {
     /// None -> withHeartbeat=true wasn't passed
     /// Some(vec![]) (empty vec) or Some(heartbeats) - withHeartbeat=true was passed
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub heartbeats: Option<Vec<HeartbeatValidatorMessage>>,
+    pub heartbeats: Option<Vec<MessageResponse<Heartbeat>>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -232,16 +258,16 @@ pub mod channel_list {
 
 #[cfg(feature = "postgres")]
 mod postgres {
-    use super::{
-        ApproveStateValidatorMessage, HeartbeatValidatorMessage, NewStateValidatorMessage,
-        ValidatorMessage,
+    use super::{MessageResponse, ValidatorMessage};
+    use crate::{
+        sentry::EventAggregate,
+        validator::{messages::Type as MessageType, MessageTypes},
     };
-    use crate::sentry::EventAggregate;
-    use crate::validator::MessageTypes;
     use bytes::BytesMut;
     use postgres_types::{accepts, to_sql_checked, IsNull, Json, ToSql, Type};
-    use std::error::Error;
-    use tokio_postgres::Row;
+    use serde::Deserialize;
+    use std::convert::TryFrom;
+    use tokio_postgres::{Error, Row};
 
     impl From<&Row> for EventAggregate {
         fn from(row: &Row) -> Self {
@@ -263,33 +289,20 @@ mod postgres {
         }
     }
 
-    impl From<&Row> for ApproveStateValidatorMessage {
-        fn from(row: &Row) -> Self {
-            Self {
-                from: row.get("from"),
-                received: row.get("received"),
-                msg: row.get::<_, Json<MessageTypes>>("msg").0,
-            }
-        }
-    }
+    impl<T> TryFrom<&Row> for MessageResponse<T>
+    where
+        T: MessageType,
+        for<'de> T: Deserialize<'de>,
+    {
+        type Error = Error;
 
-    impl From<&Row> for NewStateValidatorMessage {
-        fn from(row: &Row) -> Self {
-            Self {
+        fn try_from(row: &Row) -> Result<Self, Self::Error> {
+            Ok(Self {
                 from: row.get("from"),
                 received: row.get("received"),
-                msg: row.get::<_, Json<MessageTypes>>("msg").0,
-            }
-        }
-    }
-
-    impl From<&Row> for HeartbeatValidatorMessage {
-        fn from(row: &Row) -> Self {
-            Self {
-                from: row.get("from"),
-                received: row.get("received"),
-                msg: row.get::<_, Json<MessageTypes>>("msg").0,
-            }
+                // guard against mistakes from wrong Queries
+                msg: row.try_get::<_, Json<_>>("msg")?.0,
+            })
         }
     }
 
@@ -298,7 +311,7 @@ mod postgres {
             &self,
             ty: &Type,
             w: &mut BytesMut,
-        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+        ) -> Result<IsNull, Box<dyn std::error::Error + Sync + Send>> {
             Json(self).to_sql(ty, w)
         }
 

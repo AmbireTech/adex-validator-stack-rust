@@ -1,22 +1,23 @@
 use crate::db::DbPool;
 use bb8::RunError;
-use bb8_postgres::tokio_postgres::binary_copy::BinaryCopyInWriter;
-use bb8_postgres::tokio_postgres::types::{ToSql, Type};
-use bb8_postgres::tokio_postgres::Error;
+use bb8_postgres::tokio_postgres::{
+    binary_copy::BinaryCopyInWriter,
+    types::{ToSql, Type},
+    Error,
+};
 use chrono::{DateTime, Utc};
 use futures::pin_mut;
-use primitives::sentry::{
-    ApproveStateValidatorMessage, EventAggregate, HeartbeatValidatorMessage,
-    NewStateValidatorMessage,
+use primitives::{
+    sentry::{EventAggregate, MessageResponse},
+    validator::{ApproveState, Heartbeat, NewState},
+    BigNum, Channel, ChannelId, ValidatorId,
 };
-use primitives::BigNum;
-use primitives::{Channel, ChannelId, ValidatorId};
-use std::ops::Add;
+use std::{convert::TryFrom, ops::Add};
 
 pub async fn latest_approve_state(
     pool: &DbPool,
     channel: &Channel,
-) -> Result<Option<ApproveStateValidatorMessage>, RunError<bb8_postgres::tokio_postgres::Error>> {
+) -> Result<Option<MessageResponse<ApproveState>>, RunError<bb8_postgres::tokio_postgres::Error>> {
     let connection = pool.get().await?;
 
     let select = connection.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'ApproveState' ORDER BY received DESC LIMIT 1").await?;
@@ -27,14 +28,17 @@ pub async fn latest_approve_state(
         )
         .await?;
 
-    Ok(rows.get(0).map(ApproveStateValidatorMessage::from))
+    rows.get(0)
+        .map(MessageResponse::<ApproveState>::try_from)
+        .transpose()
+        .map_err(RunError::User)
 }
 
 pub async fn latest_new_state(
     pool: &DbPool,
     channel: &Channel,
     state_root: &str,
-) -> Result<Option<NewStateValidatorMessage>, RunError<bb8_postgres::tokio_postgres::Error>> {
+) -> Result<Option<MessageResponse<NewState>>, RunError<bb8_postgres::tokio_postgres::Error>> {
     let connection = pool.get().await?;
 
     let select = connection.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'NewState' AND msg->> 'stateRoot' = $3 ORDER BY received DESC LIMIT 1").await?;
@@ -49,14 +53,17 @@ pub async fn latest_new_state(
         )
         .await?;
 
-    Ok(rows.get(0).map(NewStateValidatorMessage::from))
+    rows.get(0)
+        .map(MessageResponse::<NewState>::try_from)
+        .transpose()
+        .map_err(RunError::User)
 }
 
 pub async fn latest_heartbeats(
     pool: &DbPool,
     channel_id: &ChannelId,
     validator_id: &ValidatorId,
-) -> Result<Vec<HeartbeatValidatorMessage>, RunError<bb8_postgres::tokio_postgres::Error>> {
+) -> Result<Vec<MessageResponse<Heartbeat>>, RunError<bb8_postgres::tokio_postgres::Error>> {
     let connection = pool.get().await?;
 
     let select = connection.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'Heartbeat' ORDER BY received DESC LIMIT 2").await?;
@@ -64,7 +71,10 @@ pub async fn latest_heartbeats(
         .query(&select, &[&channel_id, &validator_id])
         .await?;
 
-    Ok(rows.iter().map(HeartbeatValidatorMessage::from).collect())
+    rows.iter()
+        .map(MessageResponse::<Heartbeat>::try_from)
+        .collect::<Result<_, _>>()
+        .map_err(RunError::User)
 }
 
 pub async fn list_event_aggregates(

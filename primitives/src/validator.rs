@@ -100,11 +100,149 @@ pub struct ValidatorDesc {
 
 // Validator Message Types
 
-mod messages {
+pub mod messages {
+    use std::{any::type_name, convert::TryFrom, fmt, marker::PhantomData};
+    use thiserror::Error;
+
     use crate::BalancesMap;
     use chrono::{DateTime, Utc};
     use serde::{Deserialize, Serialize};
 
+    #[derive(Error, Debug)]
+    pub struct MessageTypeError<T: Type> {
+        expected: PhantomData<T>,
+        actual: String,
+    }
+
+    impl<T: Type> MessageTypeError<T> {
+        pub fn for_actual<A: Type>(_actual: &A) -> Self {
+            Self {
+                expected: PhantomData::default(),
+                actual: type_name::<A>().to_string(),
+            }
+        }
+    }
+
+    impl<T: Type> fmt::Display for MessageTypeError<T> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(
+                f,
+                "Expected {} message type but the actual is {}",
+                type_name::<T>(),
+                self.actual
+            )
+        }
+    }
+
+    pub trait Type:
+        fmt::Debug
+        + Into<MessageTypes>
+        + TryFrom<MessageTypes, Error = MessageTypeError<Self>>
+        + Clone
+        + PartialEq
+        + Eq
+    {
+    }
+
+    impl Type for Accounting {}
+    impl TryFrom<MessageTypes> for Accounting {
+        type Error = MessageTypeError<Self>;
+
+        fn try_from(value: MessageTypes) -> Result<Self, Self::Error> {
+            match value {
+                MessageTypes::ApproveState(msg) => Err(MessageTypeError::for_actual(&msg)),
+                MessageTypes::NewState(msg) => Err(MessageTypeError::for_actual(&msg)),
+                MessageTypes::RejectState(msg) => Err(MessageTypeError::for_actual(&msg)),
+                MessageTypes::Heartbeat(msg) => Err(MessageTypeError::for_actual(&msg)),
+                MessageTypes::Accounting(accounting) => Ok(accounting),
+            }
+        }
+    }
+    impl Into<MessageTypes> for Accounting {
+        fn into(self) -> MessageTypes {
+            MessageTypes::Accounting(self)
+        }
+    }
+
+    impl Type for ApproveState {}
+    impl TryFrom<MessageTypes> for ApproveState {
+        type Error = MessageTypeError<Self>;
+
+        fn try_from(value: MessageTypes) -> Result<Self, Self::Error> {
+            match value {
+                MessageTypes::NewState(msg) => Err(MessageTypeError::for_actual(&msg)),
+                MessageTypes::RejectState(msg) => Err(MessageTypeError::for_actual(&msg)),
+                MessageTypes::Heartbeat(msg) => Err(MessageTypeError::for_actual(&msg)),
+                MessageTypes::Accounting(msg) => Err(MessageTypeError::for_actual(&msg)),
+                MessageTypes::ApproveState(approve_state) => Ok(approve_state),
+            }
+        }
+    }
+    impl Into<MessageTypes> for ApproveState {
+        fn into(self) -> MessageTypes {
+            MessageTypes::ApproveState(self)
+        }
+    }
+
+    impl Type for NewState {}
+    impl TryFrom<MessageTypes> for NewState {
+        type Error = MessageTypeError<Self>;
+
+        fn try_from(value: MessageTypes) -> Result<Self, Self::Error> {
+            match value {
+                MessageTypes::ApproveState(msg) => Err(MessageTypeError::for_actual(&msg)),
+                MessageTypes::RejectState(msg) => Err(MessageTypeError::for_actual(&msg)),
+                MessageTypes::Heartbeat(msg) => Err(MessageTypeError::for_actual(&msg)),
+                MessageTypes::Accounting(msg) => Err(MessageTypeError::for_actual(&msg)),
+                MessageTypes::NewState(new_state) => Ok(new_state),
+            }
+        }
+    }
+    impl Into<MessageTypes> for NewState {
+        fn into(self) -> MessageTypes {
+            MessageTypes::NewState(self)
+        }
+    }
+
+    impl Type for RejectState {}
+    impl TryFrom<MessageTypes> for RejectState {
+        type Error = MessageTypeError<Self>;
+
+        fn try_from(value: MessageTypes) -> Result<Self, Self::Error> {
+            match value {
+                MessageTypes::ApproveState(msg) => Err(MessageTypeError::for_actual(&msg)),
+                MessageTypes::NewState(msg) => Err(MessageTypeError::for_actual(&msg)),
+                MessageTypes::Heartbeat(msg) => Err(MessageTypeError::for_actual(&msg)),
+                MessageTypes::Accounting(msg) => Err(MessageTypeError::for_actual(&msg)),
+                MessageTypes::RejectState(reject_state) => Ok(reject_state),
+            }
+        }
+    }
+    impl Into<MessageTypes> for RejectState {
+        fn into(self) -> MessageTypes {
+            MessageTypes::RejectState(self)
+        }
+    }
+
+    impl Type for Heartbeat {}
+    impl TryFrom<MessageTypes> for Heartbeat {
+        type Error = MessageTypeError<Self>;
+
+        fn try_from(value: MessageTypes) -> Result<Self, Self::Error> {
+            match value {
+                MessageTypes::ApproveState(msg) => Err(MessageTypeError::for_actual(&msg)),
+                MessageTypes::NewState(msg) => Err(MessageTypeError::for_actual(&msg)),
+                MessageTypes::RejectState(msg) => Err(MessageTypeError::for_actual(&msg)),
+                MessageTypes::Accounting(msg) => Err(MessageTypeError::for_actual(&msg)),
+                MessageTypes::Heartbeat(heartbeat) => Ok(heartbeat),
+            }
+        }
+    }
+    impl Into<MessageTypes> for Heartbeat {
+        fn into(self) -> MessageTypes {
+            MessageTypes::Heartbeat(self)
+        }
+    }
     #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
     #[serde(rename_all = "camelCase")]
     pub struct Accounting {

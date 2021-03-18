@@ -138,13 +138,7 @@ pub async fn last_approved<A: Adapter>(
         None => return Ok(default_response),
     };
 
-    let state_root = match approve_state.msg.clone() {
-        MessageTypes::ApproveState(approve_state) => approve_state.state_root,
-        _ => {
-            error!(&app.logger, "{}", "failed to retrieve approved"; "module" => "last_approved");
-            return Err(ResponseError::BadRequest("an error occurred".to_string()));
-        }
-    };
+    let state_root = approve_state.msg.state_root.clone();
 
     let new_state = latest_new_state(&app.pool, &channel, &state_root).await?;
     if new_state.is_none() {
