@@ -13,7 +13,7 @@ serde = { version = "^1.0", features = ['derive'] }
 serde_json = "1.0"
 serde-hex = "0.1.0"
 serde_millis = "0.1.1"
-# Used prefixes on field for targeting::Input
+# Used prefixes on field for targeting::Input, and `campaign::Active`
 serde_with = "1.6"
 # Configuration
 toml = "0.5"
@@ -25,18 +25,20 @@ slog-async = "^2.3.0"
 thiserror = "^1.0"
 chrono = { version = "0.4", features = ["serde"] }
 time = "0.1.42"
+# For encoding the Channel to a ChannelId
+ethabi = "13.0.0"
+# For the nonce U256
+ethereum-types = "0.11"
 # Macro for easier derive of Display & FromStr
 parse-display = "^0.4.1"
 # CID & multihash / multibase
 cid = "0.6"
 hex = "0.4"
 merkletree = "0.10.0"
-tiny-keccak = "1.5"
-rust-crypto = "0.2"
-url = { version = "=2.2", features = ["serde"]}
+tiny-keccak = { version = "^2.0", features = ["keccak"] }
+url = { version = "=2.2", features = ["serde"] }
 # Numbers - BigNum, Numbers, Traits and Derives
-num-bigint = { version = "^0.3", features = ["serde"] }
-num = "0.3"
+num = { version = "0.4", features = ["serde", "num-bigint"] }
 num-traits = "0.2"
 num-derive = "0.3"
 # Fixtures
