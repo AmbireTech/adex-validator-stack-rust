@@ -6,7 +6,7 @@ use std::{
     str::FromStr,
 };
 
-use num::{rational::Ratio, BigUint, CheckedSub, Integer};
+use num::{pow::Pow, rational::Ratio, BigUint, CheckedSub, Integer};
 use num_derive::{Num, NumOps, One, Zero};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -96,6 +96,46 @@ impl Integer for BigNum {
         let (quotient, remainder) = self.0.div_rem(&other.0);
 
         (quotient.into(), remainder.into())
+    }
+}
+
+impl Pow<BigNum> for BigNum {
+    type Output = BigNum;
+
+    fn pow(self, rhs: BigNum) -> Self::Output {
+        Self(self.0.pow(rhs.0))
+    }
+}
+
+impl Pow<&BigNum> for BigNum {
+    type Output = BigNum;
+
+    fn pow(self, rhs: &BigNum) -> Self::Output {
+        BigNum(self.0.pow(&rhs.0))
+    }
+}
+
+impl Pow<BigNum> for &BigNum {
+    type Output = BigNum;
+
+    fn pow(self, rhs: BigNum) -> Self::Output {
+        BigNum(Pow::pow(&self.0, rhs.0))
+    }
+}
+
+impl Pow<&BigNum> for &BigNum {
+    type Output = BigNum;
+
+    fn pow(self, rhs: &BigNum) -> Self::Output {
+        BigNum(Pow::pow(&self.0, &rhs.0))
+    }
+}
+
+impl Pow<u8> for BigNum {
+    type Output = BigNum;
+
+    fn pow(self, rhs: u8) -> Self::Output {
+        BigNum(self.0.pow(rhs))
     }
 }
 
