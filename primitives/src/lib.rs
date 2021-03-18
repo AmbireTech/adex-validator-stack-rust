@@ -1,14 +1,28 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
-use std::error;
-use std::fmt;
+pub use self::{
+    ad_slot::AdSlot,
+    ad_unit::AdUnit,
+    address::Address,
+    balances_map::BalancesMap,
+    big_num::BigNum,
+    channel::{Channel, ChannelId, ChannelSpec, SpecValidator, SpecValidators},
+    config::Config,
+    event_submission::EventSubmission,
+    ipfs::IPFS,
+    validator::{ValidatorDesc, ValidatorId},
+};
+use std::{error, fmt};
 
 mod ad_slot;
 mod ad_unit;
 pub mod adapter;
+pub mod address;
 pub mod balances_map;
 pub mod big_num;
+pub mod campaign;
 pub mod channel;
+pub mod channel_v5;
 pub mod channel_validator;
 pub mod config;
 pub mod event_submission;
@@ -42,16 +56,6 @@ pub mod analytics;
 mod eth_checksum;
 pub mod validator;
 
-pub use self::ad_slot::AdSlot;
-pub use self::ad_unit::AdUnit;
-pub use self::balances_map::BalancesMap;
-pub use self::big_num::BigNum;
-pub use self::channel::{Channel, ChannelId, ChannelSpec, SpecValidator, SpecValidators};
-pub use self::config::Config;
-pub use self::event_submission::EventSubmission;
-pub use self::ipfs::IPFS;
-pub use self::validator::{ValidatorDesc, ValidatorId};
-
 #[derive(Debug, PartialEq, Eq)]
 pub enum DomainError {
     InvalidArgument(String),
@@ -82,3 +86,21 @@ pub trait ToETHChecksum: AsRef<[u8]> {
 }
 
 impl ToETHChecksum for &[u8; 20] {}
+
+pub trait ToHex {
+    // Hex encoded `String`, **without** __Checksum__ming the string
+    fn to_hex(&self) -> String;
+
+    // Hex encoded `0x` prefixed `String`, **without** __Checksum__ming the string
+    fn to_hex_prefixed(&self) -> String;
+}
+
+impl<T: AsRef<[u8]>> ToHex for T {
+    fn to_hex(&self) -> String {
+        hex::encode(self.as_ref())
+    }
+
+    fn to_hex_prefixed(&self) -> String {
+        format!("0x{}", self.as_ref().to_hex())
+    }
+}

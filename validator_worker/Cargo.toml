@@ -13,7 +13,7 @@ path = "src/lib.rs"
 primitives = { path = "../primitives" }
 adapter = { version = "0.1", path = "../adapter" }
 chrono = { version = "0.4", features = ["serde"] }
-num = "0.3"
+num = "0.4"
 num-traits = "0.2"
 # To/From Hex
 hex = "0.4"

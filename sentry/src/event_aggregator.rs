@@ -4,6 +4,7 @@ use crate::db::event_aggregate::insert_event_aggregate;
 use crate::db::DbPool;
 use crate::db::{get_channel_by_id, update_targeting_rules};
 use crate::event_reducer;
+use crate::payout::get_payout;
 use crate::Application;
 use crate::ResponseError;
 use crate::Session;
@@ -13,7 +14,7 @@ use chrono::Utc;
 use lazy_static::lazy_static;
 use primitives::adapter::Adapter;
 use primitives::sentry::{Event, EventAggregate};
-use primitives::{Channel, ChannelId};
+use primitives::{BigNum, Channel, ChannelId, ValidatorId};
 use slog::{error, Logger};
 use std::collections::HashMap;
 use std::env;
@@ -64,13 +65,13 @@ async fn store(db: &DbPool, channel_id: &ChannelId, logger: &Logger, recorder: R
 }
 
 impl EventAggregator {
-    pub async fn record<'a, A: Adapter>(
+    pub async fn record<A: Adapter>(
         &self,
-        app: &'a Application<A>,
+        app: &Application<A>,
         channel_id: &ChannelId,
         session: &Session,
         auth: Option<&Auth>,
-        events: &'a [Event],
+        events: Vec<Event>,
     ) -> Result<(), ResponseError> {
         let recorder = self.recorder.clone();
         let aggr_throttle = app.config.aggr_throttle;
@@ -97,7 +98,6 @@ impl EventAggregator {
                 // insert into
                 channel_recorder.insert(channel_id.to_owned(), record);
 
-                //
                 // spawn async task that persists
                 // the channel events to database
                 if aggr_throttle > 0 {
@@ -131,7 +131,7 @@ impl EventAggregator {
             auth,
             &app.config.ip_rate_limit,
             &record.channel,
-            events,
+            &events,
         )
         .await
         .map_err(|e| match e {
@@ -155,18 +155,29 @@ impl EventAggregator {
             update_targeting_rules(&app.pool, &channel_id, &new_rules).await?;
         }
 
-        events.iter().for_each(|ev| {
-            match event_reducer::reduce(
-                &app.logger,
-                &record.channel,
-                &mut record.aggregate,
-                ev,
-                &session,
-            ) {
-                Ok(_) => {}
-                Err(err) => error!(&app.logger, "Event Reducer failed"; "error" => ?err ),
-            }
-        });
+        // Pre-computing all payouts once
+        let events_with_payout: Vec<(Event, Option<(ValidatorId, BigNum)>)> = events
+            .iter()
+            .filter(|ev| ev.is_click_event() || ev.is_impression_event())
+            .map(|ev| {
+                let payout = match get_payout(&app.logger, &record.channel, &ev, &session) {
+                    Ok(payout) => payout,
+                    Err(err) => return Err(err),
+                };
+
+                match event_reducer::reduce(&record.channel, &mut record.aggregate, &ev, &payout) {
+                    Ok(_) => {}
+                    Err(err) => error!(&app.logger, "Event Reducred failed"; "error" => ?err),
+                }
+
+                Ok((ev.clone(), payout))
+            })
+            .collect::<Result<_, _>>()?;
+
+        // We don't want to save empty aggregates
+        if record.aggregate.events.is_empty() {
+            return Ok(());
+        }
 
         // only time we don't have session is during
         // an unauthenticated close event
@@ -175,7 +186,7 @@ impl EventAggregator {
                 redis.clone(),
                 record.channel.clone(),
                 session.clone(),
-                events.to_owned().to_vec(),
+                events_with_payout,
                 app.logger.clone(),
             ));
         }
