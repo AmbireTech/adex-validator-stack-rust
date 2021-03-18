@@ -1,6 +1,7 @@
-use num::{CheckedSub, Integer, One};
+use num::{pow::Pow, CheckedSub, Integer, One};
 use num_derive::{Num, NumOps, Zero};
 use std::{
+    cmp::Ordering,
     fmt,
     iter::Sum,
     ops::{Add, AddAssign, Div, Mul, Sub},
@@ -13,7 +14,7 @@ use crate::BigNum;
 pub struct UnifiedNum(BigNum);
 
 impl UnifiedNum {
-    pub const PRECISION: usize = 8;
+    pub const PRECISION: u8 = 8;
 
     pub fn div_floor(&self, other: &Self) -> Self {
         Self(self.0.div_floor(&other.0))
@@ -25,6 +26,17 @@ impl UnifiedNum {
 
     pub fn to_u64(&self) -> Option<u64> {
         self.0.to_u64()
+    }
+
+    /// Transform the UnifiedNum precision 8 to a new precision
+    pub fn to_precision(&self, precision: u8) -> BigNum {
+        match precision.cmp(&Self::PRECISION) {
+            Ordering::Equal => self.0.clone(),
+            Ordering::Less => self
+                .0
+                .div_floor(&BigNum::from(10).pow(Self::PRECISION - precision)),
+            Ordering::Greater => (&self.0).mul(&BigNum::from(10).pow(precision - Self::PRECISION)),
+        }
     }
 }
 
@@ -44,9 +56,10 @@ impl fmt::Display for UnifiedNum {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut string_value = self.0.to_str_radix(10);
         let value_length = string_value.len();
+        let precision: usize = Self::PRECISION.into();
 
-        if value_length > Self::PRECISION {
-            string_value.insert_str(value_length - Self::PRECISION, ".");
+        if value_length > precision {
+            string_value.insert_str(value_length - precision, ".");
 
             f.write_str(&string_value)
         } else {
@@ -104,6 +117,38 @@ impl Integer for UnifiedNum {
         let (quotient, remainder) = self.0.div_rem(&other.0);
 
         (quotient.into(), remainder.into())
+    }
+}
+
+impl Pow<UnifiedNum> for UnifiedNum {
+    type Output = UnifiedNum;
+
+    fn pow(self, rhs: UnifiedNum) -> Self::Output {
+        Self(self.0.pow(rhs.0))
+    }
+}
+
+impl Pow<&UnifiedNum> for UnifiedNum {
+    type Output = UnifiedNum;
+
+    fn pow(self, rhs: &UnifiedNum) -> Self::Output {
+        UnifiedNum(self.0.pow(&rhs.0))
+    }
+}
+
+impl Pow<UnifiedNum> for &UnifiedNum {
+    type Output = UnifiedNum;
+
+    fn pow(self, rhs: UnifiedNum) -> Self::Output {
+        UnifiedNum((&self.0).pow(rhs.0))
+    }
+}
+
+impl Pow<&UnifiedNum> for &UnifiedNum {
+    type Output = UnifiedNum;
+
+    fn pow(self, rhs: &UnifiedNum) -> Self::Output {
+        UnifiedNum((&self.0).pow(&rhs.0))
     }
 }
 
@@ -201,7 +246,7 @@ impl CheckedSub for UnifiedNum {
 
 #[cfg(test)]
 mod test {
-    use crate::UnifiedNum;
+    use super::*;
 
     #[test]
     fn unified_num_displays_correctly() {
@@ -214,5 +259,36 @@ mod test {
         assert_eq!("0.10000000", &zero_point_one.to_string());
         assert_eq!("0.00000001", &smallest_value.to_string());
         assert_eq!("1449030.00567000", &random_value.to_string());
+    }
+
+    #[test]
+    fn test_convert_unified_num_to_new_precision() {
+        let dai_precision: u8 = 18;
+        let usdt_precision: u8 = 6;
+        let same_precision = UnifiedNum::PRECISION;
+
+        let dai_power = BigNum::from(10).pow(BigNum::from(dai_precision as u64));
+
+        // 321.00000000
+        let dai_unified = UnifiedNum::from(32_100_000_000_u64);
+        let dai_expected = BigNum::from(321_u64) * dai_power;
+        assert_eq!(dai_expected, dai_unified.to_precision(dai_precision));
+
+        // 321.00000777 - should floor to 321.000007 (precision 6)
+        let usdt_unified = UnifiedNum::from(32_100_000_777_u64);
+        let usdt_expected = BigNum::from(321_000_007_u64);
+        assert_eq!(
+            usdt_expected,
+            usdt_unified.to_precision(usdt_precision),
+            "It should floor the result of USDT"
+        );
+
+        // 321.00000999
+        let same_unified = UnifiedNum::from(32_100_000_777_u64);
+        assert_eq!(
+            same_unified.0,
+            same_unified.to_precision(same_precision),
+            "It should not make any adjustments to the precision"
+        );
     }
 }
