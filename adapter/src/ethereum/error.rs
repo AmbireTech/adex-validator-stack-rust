@@ -1,5 +1,5 @@
 use primitives::adapter::{AdapterErrorKind, Error as AdapterError};
-use primitives::ChannelId;
+use primitives::{ChannelId, Address};
 use std::fmt;
 
 #[derive(Debug)]
@@ -22,7 +22,7 @@ pub enum Error {
     ContractQuerying(web3::contract::Error),
     /// Error occurred during verification of Signature and/or StateRoot and/or Address
     VerifyAddress(VerifyError),
-    TokenNotWhitelisted(String),
+    TokenNotWhitelisted(Address),
 }
 
 impl std::error::Error for Error {}

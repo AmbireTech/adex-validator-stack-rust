@@ -7,7 +7,7 @@ use primitives::{
     channel_validator::ChannelValidator,
     config::Config,
     Channel, ToETHChecksum, ValidatorId,
-    BigNum
+    BigNum, Address
 };
 use std::collections::HashMap;
 use std::fmt;
@@ -131,7 +131,7 @@ impl Adapter for DummyAdapter {
         }
     }
 
-    async fn get_deposit(&self, channel: &Channel, spender: &ValidatorId) -> AdapterResult<Deposit, Self::AdapterError> {
+    async fn get_deposit(&self, channel: &Channel, spender: &Address) -> AdapterResult<Deposit, Self::AdapterError> {
         // TODO - complete function
         Ok(Deposit {
             total: 10.into(),

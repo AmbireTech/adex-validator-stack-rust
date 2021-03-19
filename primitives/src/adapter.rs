@@ -1,20 +1,19 @@
 use crate::channel::ChannelError;
 use crate::channel_validator::ChannelValidator;
-use crate::{Channel, DomainError, ValidatorId, BigNum};
+use crate::{Channel, DomainError, ValidatorId, BigNum, Address};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::From;
 use std::fmt;
-use web3::types::U256;
 
 pub type AdapterResult<T, AE> = Result<T, Error<AE>>;
 
 pub trait AdapterErrorKind: fmt::Debug + fmt::Display {}
 
 pub struct Deposit {
-    pub total: U256,
-    pub pending: U256,
+    pub total: BigNum,
+    pub pending: BigNum,
 }
 
 #[derive(Debug)]
@@ -115,6 +114,6 @@ pub trait Adapter: ChannelValidator + Send + Sync + fmt::Debug + Clone {
     async fn get_deposit(
         &self,
         channel: &Channel,
-        user: &ValidatorId
+        user: &Address
     ) -> AdapterResult<Deposit, Self::AdapterError>;
 }

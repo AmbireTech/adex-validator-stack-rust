@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 use crate::event_submission::RateLimit;
-use crate::{BigNum, ValidatorId};
+use crate::{BigNum, ValidatorId, Address};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 use std::fs;
+use std::num::NonZeroU8;
 
 lazy_static! {
     static ref DEVELOPMENT_CONFIG: Config =
@@ -17,8 +18,8 @@ lazy_static! {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TokenInfo {
-    pub min_token_units_for_deposit: u32,
-    pub decimals: u32,
+    pub min_token_units_for_deposit: BigNum,
+    pub decimals: NonZeroU8,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -41,7 +42,7 @@ pub struct Config {
     pub creators_whitelist: Vec<ValidatorId>,
     pub minimal_deposit: BigNum,
     pub minimal_fee: BigNum,
-    pub token_address_whitelist: HashMap<String, TokenInfo>,
+    pub token_address_whitelist: HashMap<Address, TokenInfo>,
     #[serde(with = "SerHex::<StrictPfx>")]
     pub ethereum_core_address: [u8; 20],
     pub ethereum_network: String,

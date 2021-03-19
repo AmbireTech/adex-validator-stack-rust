@@ -12,7 +12,7 @@ use primitives::{
     adapter::{Adapter, AdapterResult, Error as AdapterError, KeystoreOptions, Session, Deposit},
     channel_validator::ChannelValidator,
     config::Config,
-    Channel, ChannelId, ToETHChecksum, ValidatorId,
+    Channel, ChannelId, ToETHChecksum, ValidatorId, Address as PrimitivesAddress, BigNum
 };
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -22,9 +22,10 @@ use tiny_keccak::Keccak;
 use web3::{
     contract::{tokens::Tokenizable, Contract, Options},
     transports::Http,
-    types::{H256, U256},
+    types::{H256, U256, H160, Bytes},
     Web3,
 };
+use ethabi::FixedBytes;
 
 mod error;
 
@@ -273,7 +274,7 @@ impl Adapter for EthereumAdapter {
     }
 
 
-    async fn get_deposit(&self, channel: &Channel, user: &ValidatorId) -> AdapterResult<Deposit, Self::AdapterError> {
+    async fn get_deposit(&self, channel: &Channel, user: &PrimitivesAddress) -> AdapterResult<Deposit, Self::AdapterError> {
         let outpace_contract = Contract::from_json(
             self.web3.eth(),
             self.config.ethereum_core_address.into(),
@@ -281,9 +282,11 @@ impl Adapter for EthereumAdapter {
         )
         .map_err(Error::ContractInitialization)?;
 
+        // TODO: fix
+        let deposit_asset_as_address = PrimitivesAddress::try_from(&channel.deposit_asset).unwrap();
         let erc20_contract = Contract::from_json(
             self.web3.eth(),
-            self.config.ethereum_core_address.into(),
+            deposit_asset_as_address.as_bytes().into(),
             &ERC20_ABI,
         )
         .map_err(Error::ContractInitialization)?;
@@ -291,7 +294,7 @@ impl Adapter for EthereumAdapter {
         let mut total: U256 = tokio_compat_02::FutureExt::compat(async {
             tokio_compat_02::FutureExt::compat(outpace_contract.query(
                 "deposits",
-                (channel.id.into_token(), user.to_hex_prefix_string().into_token()),
+                (H256(*channel.id).into_token(), H160(*user.as_bytes()).into_token()),
                 None,
                 Options::default(),
                 None,
@@ -304,7 +307,7 @@ impl Adapter for EthereumAdapter {
         let pending: U256 = tokio_compat_02::FutureExt::compat(async {
             tokio_compat_02::FutureExt::compat(erc20_contract.query(
                 "balanceOf",
-                channel.deposit_asset.clone().into_token(),
+                Bytes(channel.deposit_asset.as_bytes().to_vec()).into_token(),
                 None,
                 Options::default(),
                 None,
@@ -315,13 +318,11 @@ impl Adapter for EthereumAdapter {
         .map_err(Error::ContractQuerying)?;
 
         let token_info = self.config.token_address_whitelist
-        .get(&channel.deposit_asset)
-        .ok_or(Error::TokenNotWhitelisted(channel.deposit_asset.clone()))?;
+        .get(&deposit_asset_as_address)
+        .ok_or(Error::TokenNotWhitelisted(deposit_asset_as_address.clone()))?;
 
-        let minimum_deposit_amount = U256::from(token_info.min_token_units_for_deposit);
-
-        if pending > minimum_deposit_amount {
-            total += pending;
+        if pending > token_info.min_token_units_for_deposit {
+            total += &pending;
         }
 
         Ok(Deposit {
