@@ -9,24 +9,23 @@ use ethstore::{
 use futures::TryFutureExt;
 use lazy_static::lazy_static;
 use primitives::{
-    adapter::{Adapter, AdapterResult, Error as AdapterError, KeystoreOptions, Session, Deposit},
+    adapter::{Adapter, AdapterResult, Deposit, Error as AdapterError, KeystoreOptions, Session},
     channel_validator::ChannelValidator,
     config::Config,
-    Channel, ChannelId, ToETHChecksum, ValidatorId, Address as PrimitivesAddress, BigNum
+    Address as PrimitivesAddress, BigNum, Channel, ChannelId, ToETHChecksum, ValidatorId,
 };
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::str::FromStr;
 use std::{convert::TryFrom, fs};
 use tiny_keccak::Keccak;
 use web3::{
     contract::{tokens::Tokenizable, Contract, Options},
     transports::Http,
-    types::{H256, U256, H160, Bytes},
+    types::{Bytes, H160, H256, U256},
     Web3,
 };
-use ethabi::FixedBytes;
-use std::str::FromStr;
 
 mod error;
 
@@ -34,7 +33,8 @@ lazy_static! {
     static ref ADEXCORE_ABI: &'static [u8] =
         include_bytes!("../../lib/protocol-eth/abi/AdExCore.json");
     static ref ERC20_ABI: &'static [u8] = include_bytes!("../../lib/protocol-eth/abi/ERC20.json");
-    static ref OUTPACE_ABI: &'static [u8] = include_bytes!("../../lib/protocol-eth/abi/OUTPACE.json");
+    static ref OUTPACE_ABI: &'static [u8] =
+        include_bytes!("../../lib/protocol-eth/abi/OUTPACE.json");
     static ref CHANNEL_STATE_ACTIVE: U256 = 1.into();
 }
 
@@ -274,8 +274,11 @@ impl Adapter for EthereumAdapter {
             .map_err(|err| AdapterError::Adapter(Error::SignMessage(err).into()))
     }
 
-
-    async fn get_deposit(&self, channel: &Channel, user: &PrimitivesAddress) -> AdapterResult<Deposit, Self::AdapterError> {
+    async fn get_deposit(
+        &self,
+        channel: &Channel,
+        user: &PrimitivesAddress,
+    ) -> AdapterResult<Deposit, Self::AdapterError> {
         let outpace_contract = Contract::from_json(
             self.web3.eth(),
             self.config.ethereum_core_address.into(),
@@ -292,10 +295,13 @@ impl Adapter for EthereumAdapter {
         )
         .map_err(Error::ContractInitialization)?;
 
-        let mut total: H256 = tokio_compat_02::FutureExt::compat(async {
+        let total: H256 = tokio_compat_02::FutureExt::compat(async {
             tokio_compat_02::FutureExt::compat(outpace_contract.query(
                 "deposits",
-                (H256(*channel.id).into_token(), H160(*user.as_bytes()).into_token()),
+                (
+                    H256(*channel.id).into_token(),
+                    H160(*user.as_bytes()).into_token(),
+                ),
                 None,
                 Options::default(),
                 None,
@@ -320,18 +326,17 @@ impl Adapter for EthereumAdapter {
         .map_err(Error::ContractQuerying)?;
         let pending = BigNum::from_str(&pending.to_string())?;
 
-        let token_info = self.config.token_address_whitelist
-        .get(&deposit_asset_as_address)
-        .ok_or(Error::TokenNotWhitelisted(deposit_asset_as_address.clone()))?;
+        let token_info = self
+            .config
+            .token_address_whitelist
+            .get(&deposit_asset_as_address)
+            .ok_or(Error::TokenNotWhitelisted(deposit_asset_as_address))?;
 
         if pending > token_info.min_token_units_for_deposit {
             total += &pending;
         }
 
-        Ok(Deposit {
-            total,
-            pending,
-        })
+        Ok(Deposit { total, pending })
     }
 }
 

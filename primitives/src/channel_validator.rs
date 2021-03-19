@@ -1,13 +1,13 @@
 use crate::channel::{Channel, ChannelError, SpecValidator, SpecValidators};
 use crate::config::{Config, TokenInfo};
+use crate::Address;
 use crate::BigNum;
 use crate::ValidatorId;
 use chrono::Utc;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
-use time::Duration;
-use crate::Address;
 use std::convert::TryFrom;
+use time::Duration;
 
 pub trait ChannelValidator {
     fn is_channel_valid(
@@ -105,5 +105,6 @@ pub fn asset_listed(channel: &Channel, whitelist: &HashMap<Address, TokenInfo>) 
     whitelist.is_empty()
         || whitelist
             .keys()
-            .any(|allowed| allowed == &Address::try_from(&channel.deposit_asset).unwrap()) // TODO: fix
+            .any(|allowed| allowed == &Address::try_from(&channel.deposit_asset).unwrap())
+    // TODO: fix
 }

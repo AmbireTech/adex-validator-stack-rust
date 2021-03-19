@@ -27,4 +27,4 @@ creators_whitelist = []
 minimal_deposit = "0"
 minimal_fee = "0"
 validators_whitelist = []
-token_address_whitelist = [{ address = '0x73967c6a0904aa032c103b4104747e88c566b1a2', min_token_units_for_deposit = 100000000, precision = 18}]
+token_address_whitelist = [{ address = '0x73967c6a0904aa032c103b4104747e88c566b1a2', min_token_units_for_deposit = '100000000', precision = 18}]

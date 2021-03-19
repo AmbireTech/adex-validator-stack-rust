@@ -1,11 +1,13 @@
-use std::collections::HashMap;
 use crate::event_submission::RateLimit;
-use crate::{BigNum, ValidatorId, Address};
+use crate::{Address, BigNum, ValidatorId};
 use lazy_static::lazy_static;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_hex::{SerHex, StrictPfx};
+use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::fs;
 use std::num::NonZeroU8;
+use std::str::FromStr;
 
 lazy_static! {
     static ref DEVELOPMENT_CONFIG: Config =
@@ -42,12 +44,44 @@ pub struct Config {
     pub creators_whitelist: Vec<ValidatorId>,
     pub minimal_deposit: BigNum,
     pub minimal_fee: BigNum,
+    #[serde(deserialize_with = "deserialize_token_whitelist")]
     pub token_address_whitelist: HashMap<Address, TokenInfo>,
     #[serde(with = "SerHex::<StrictPfx>")]
     pub ethereum_core_address: [u8; 20],
     pub ethereum_network: String,
     pub ethereum_adapter_relayer: String,
     pub validators_whitelist: Vec<ValidatorId>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct ConfigWhitelist {
+    address: String,
+    min_token_units_for_deposit: String,
+    precision: NonZeroU8,
+}
+
+fn deserialize_token_whitelist<'de, D>(
+    deserializer: D,
+) -> Result<HashMap<Address, TokenInfo>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let mut tokens_whitelist = HashMap::new();
+    let array: Vec<ConfigWhitelist> = Deserialize::deserialize(deserializer)?;
+    array.into_iter().for_each(|i| {
+        // TODO: Remove unwraps
+        tokens_whitelist.insert(
+            Address::try_from(&i.address).unwrap(),
+            TokenInfo {
+                min_token_units_for_deposit: BigNum::from_str(&i.min_token_units_for_deposit)
+                    .unwrap(),
+                decimals: i.precision,
+            },
+        );
+    });
+
+    Ok(tokens_whitelist)
+    // Ok(BigUint::from_str(&num).map_err(serde::de::Error::custom)?)
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

@@ -1,13 +1,12 @@
 use async_trait::async_trait;
 use primitives::{
     adapter::{
-        Adapter, AdapterErrorKind, AdapterResult, DummyAdapterOptions, Error as AdapterError,
-        Session, Deposit
+        Adapter, AdapterErrorKind, AdapterResult, Deposit, DummyAdapterOptions,
+        Error as AdapterError, Session,
     },
     channel_validator::ChannelValidator,
     config::Config,
-    Channel, ToETHChecksum, ValidatorId,
-    BigNum, Address
+    Address, BigNum, Channel, ToETHChecksum, ValidatorId,
 };
 use std::collections::HashMap;
 use std::fmt;
@@ -131,7 +130,11 @@ impl Adapter for DummyAdapter {
         }
     }
 
-    async fn get_deposit(&self, channel: &Channel, spender: &Address) -> AdapterResult<Deposit, Self::AdapterError> {
+    async fn get_deposit(
+        &self,
+        channel: &Channel,
+        spender: &Address,
+    ) -> AdapterResult<Deposit, Self::AdapterError> {
         // TODO - complete function
         Ok(Deposit {
             total: 10.into(),

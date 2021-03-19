@@ -1,6 +1,6 @@
 use crate::channel::ChannelError;
 use crate::channel_validator::ChannelValidator;
-use crate::{Channel, DomainError, ValidatorId, BigNum, Address};
+use crate::{Address, BigNum, Channel, DomainError, ValidatorId};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -114,6 +114,6 @@ pub trait Adapter: ChannelValidator + Send + Sync + fmt::Debug + Clone {
     async fn get_deposit(
         &self,
         channel: &Channel,
-        user: &Address
+        user: &Address,
     ) -> AdapterResult<Deposit, Self::AdapterError>;
 }

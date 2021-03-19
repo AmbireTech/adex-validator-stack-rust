@@ -9,7 +9,6 @@ dependencies = [
  "byteorder 1.4.3",
  "chrono",
  "eth_checksum",
- "ethabi",
  "ethstore",
  "futures 0.3.13",
  "hex",
