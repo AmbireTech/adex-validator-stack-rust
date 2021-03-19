@@ -35,6 +35,10 @@ pub mod message {
     pub struct Message<T: Type>(T);
 
     impl<T: Type> Message<T> {
+        pub fn new(message: T) -> Self {
+            Self(message)
+        }
+
         pub fn into_inner(self) -> T {
             self.0
         }
@@ -59,6 +63,46 @@ pub mod message {
     impl<T: Type> Into<MessageTypes> for Message<T> {
         fn into(self) -> MessageTypes {
             self.0.into()
+        }
+    }
+
+    #[cfg(test)]
+    mod test {
+        use super::*;
+        use crate::sentry::MessageResponse;
+        use chrono::{TimeZone, Utc};
+        use serde_json::{from_value, json, to_value};
+
+        #[test]
+        fn de_serialization_of_a_message() {
+            let approve_state_message = json!({
+                "from":"0x2892f6C41E0718eeeDd49D98D648C789668cA67d",
+                "msg": {
+                    "type":"ApproveState",
+                    "stateRoot":"4739522efc1e81499541621759dadb331eaf08829d6a3851b4b654dfaddc9935",
+                    "signature":"0x00128a39b715e87475666c3220fc0400bf34a84d24f77571d2b4e1e88b141d52305438156e526ff4fe96b7a13e707ab2f6f3ca00bd928dabc7f516b56cfe6fd61c",
+                    "isHealthy":true,
+                    "exhausted":false
+                },
+                "received":"2021-01-05T14:00:48.549Z"
+            });
+
+            let actual_message: MessageResponse<ApproveState> =
+                from_value(approve_state_message.clone()).expect("Should deserialize");
+            let expected_message = MessageResponse {
+                from: "0x2892f6C41E0718eeeDd49D98D648C789668cA67d".parse().expect("Valid ValidatorId"),
+                received: Utc.ymd(2021, 1, 5).and_hms_milli(14,0,48, 549),
+                msg: Message::new(ApproveState {
+                    state_root: "4739522efc1e81499541621759dadb331eaf08829d6a3851b4b654dfaddc9935".to_string(),
+                    signature: "0x00128a39b715e87475666c3220fc0400bf34a84d24f77571d2b4e1e88b141d52305438156e526ff4fe96b7a13e707ab2f6f3ca00bd928dabc7f516b56cfe6fd61c".to_string(),
+                    is_healthy: true,
+                    exhausted: false,
+                }),
+            };
+
+            pretty_assertions::assert_eq!(expected_message, actual_message);
+            pretty_assertions::assert_eq!(to_value(expected_message).expect("should serialize"), approve_state_message);
+            
         }
     }
 }
