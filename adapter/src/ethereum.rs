@@ -26,6 +26,7 @@ use web3::{
     Web3,
 };
 use ethabi::FixedBytes;
+use std::str::FromStr;
 
 mod error;
 
@@ -291,7 +292,7 @@ impl Adapter for EthereumAdapter {
         )
         .map_err(Error::ContractInitialization)?;
 
-        let mut total: U256 = tokio_compat_02::FutureExt::compat(async {
+        let mut total: H256 = tokio_compat_02::FutureExt::compat(async {
             tokio_compat_02::FutureExt::compat(outpace_contract.query(
                 "deposits",
                 (H256(*channel.id).into_token(), H160(*user.as_bytes()).into_token()),
@@ -303,8 +304,9 @@ impl Adapter for EthereumAdapter {
         })
         .await
         .map_err(Error::ContractQuerying)?;
+        let mut total = BigNum::from_str(&total.to_string())?;
 
-        let pending: U256 = tokio_compat_02::FutureExt::compat(async {
+        let pending: H256 = tokio_compat_02::FutureExt::compat(async {
             tokio_compat_02::FutureExt::compat(erc20_contract.query(
                 "balanceOf",
                 Bytes(channel.deposit_asset.as_bytes().to_vec()).into_token(),
@@ -316,6 +318,7 @@ impl Adapter for EthereumAdapter {
         })
         .await
         .map_err(Error::ContractQuerying)?;
+        let pending = BigNum::from_str(&pending.to_string())?;
 
         let token_info = self.config.token_address_whitelist
         .get(&deposit_asset_as_address)
