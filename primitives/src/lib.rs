@@ -71,6 +71,12 @@ impl fmt::Display for DomainError {
     }
 }
 
+impl From<address::Error> for DomainError {
+    fn from(error: address::Error) -> Self {
+        Self::InvalidArgument(error.to_string())
+    }
+}
+
 impl error::Error for DomainError {
     fn cause(&self) -> Option<&dyn error::Error> {
         None

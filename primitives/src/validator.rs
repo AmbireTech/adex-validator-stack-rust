@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, fmt, str::FromStr};
 
-use crate::{targeting::Value, Address, BigNum, DomainError, ToETHChecksum, ToHex};
+use crate::{address::Error, targeting::Value, Address, BigNum, DomainError, ToETHChecksum, ToHex};
 
 pub use messages::*;
 
@@ -58,7 +58,7 @@ impl AsRef<[u8]> for ValidatorId {
 }
 
 impl FromStr for ValidatorId {
-    type Err = crate::address::Error;
+    type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Address::try_from(s).map(Self)
@@ -66,16 +66,14 @@ impl FromStr for ValidatorId {
 }
 
 impl TryFrom<&str> for ValidatorId {
-    type Error = DomainError;
+    type Error = Error;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Address::try_from(value)
-            .map_err(|err| DomainError::InvalidArgument(err.to_string()))
-            .map(Self)
+        Address::try_from(value).map(Self)
     }
 }
 
 impl TryFrom<&String> for ValidatorId {
-    type Error = DomainError;
+    type Error = Error;
 
     fn try_from(value: &String) -> Result<Self, Self::Error> {
         Self::try_from(value.as_str())

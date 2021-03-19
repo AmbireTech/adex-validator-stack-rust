@@ -101,8 +101,10 @@ pub mod message {
             };
 
             pretty_assertions::assert_eq!(expected_message, actual_message);
-            pretty_assertions::assert_eq!(to_value(expected_message).expect("should serialize"), approve_state_message);
-            
+            pretty_assertions::assert_eq!(
+                to_value(expected_message).expect("should serialize"),
+                approve_state_message
+            );
         }
     }
 }
