@@ -5,7 +5,6 @@ use primitives::adapter::Adapter;
 use primitives::sentry::ValidatorMessageResponse;
 use primitives::{Channel, DomainError, ValidatorId};
 use serde::Deserialize;
-use std::convert::TryFrom;
 
 #[derive(Deserialize)]
 pub struct ValidatorMessagesListQuery {
@@ -28,7 +27,7 @@ pub fn extract_params(from_path: &str) -> Result<(Option<ValidatorId>, Vec<Strin
         // filter an empty string
         .filter(|string| !string.is_empty())
         // then try to map it to ValidatorId
-        .map(|string| ValidatorId::try_from(*string))
+        .map(|string| string.parse())
         // Transpose in order to check for an error from the conversion
         .transpose()?;
 

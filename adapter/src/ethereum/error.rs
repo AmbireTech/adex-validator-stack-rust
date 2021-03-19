@@ -84,7 +84,7 @@ pub enum KeystoreError {
     /// `address` key is missing from the keystore file
     AddressMissing,
     /// The `address` key in the keystore file is not a valid `ValidatorId`
-    AddressInvalid(primitives::DomainError),
+    AddressInvalid(primitives::address::Error),
     /// reading the keystore file failed
     ReadingFile(std::io::Error),
     /// Deserializing the keystore file failed
