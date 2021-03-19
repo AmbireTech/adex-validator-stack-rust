@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::{convert::TryFrom, fmt};
+use std::{convert::TryFrom, fmt, str::FromStr};
 
 use crate::{targeting::Value, Address, BigNum, DomainError, ToETHChecksum, ToHex};
 
@@ -57,6 +57,14 @@ impl AsRef<[u8]> for ValidatorId {
     }
 }
 
+impl FromStr for ValidatorId {
+    type Err = crate::address::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Address::try_from(s).map(Self)
+    }
+}
+
 impl TryFrom<&str> for ValidatorId {
     type Error = DomainError;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
@@ -98,8 +106,7 @@ pub struct ValidatorDesc {
     pub fee: BigNum,
 }
 
-// Validator Message Types
-
+/// Validator Message Types
 pub mod messages {
     use std::{any::type_name, convert::TryFrom, fmt, marker::PhantomData};
     use thiserror::Error;
