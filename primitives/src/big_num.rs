@@ -10,6 +10,8 @@ use num::{pow::Pow, rational::Ratio, BigUint, CheckedSub, Integer};
 use num_derive::{Num, NumOps, One, Zero};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use crate::UnifiedNum;
+
 #[derive(
     Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, NumOps, One, Zero, Num, Default,
 )]
@@ -265,6 +267,12 @@ impl From<u64> for BigNum {
 impl From<BigUint> for BigNum {
     fn from(value: BigUint) -> Self {
         Self(value)
+    }
+}
+
+impl<'a> Sum<&'a UnifiedNum> for BigNum {
+    fn sum<I: Iterator<Item = &'a UnifiedNum>>(iter: I) -> BigNum {
+        BigNum(iter.map(|unified| BigUint::from(unified.to_u64())).sum())
     }
 }
 
