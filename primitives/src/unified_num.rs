@@ -1,5 +1,6 @@
-use num::{pow::Pow, CheckedSub, Integer, One};
-use num_derive::{Num, NumOps, Zero};
+use num::{pow::Pow, CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Integer, One};
+use num_derive::{FromPrimitive, Num, NumCast, NumOps, ToPrimitive, Zero};
+use num_traits::CheckedRem;
 use std::{
     cmp::Ordering,
     fmt,
@@ -10,8 +11,22 @@ use std::{
 use crate::BigNum;
 
 /// Unified precision Number with precision 8
-#[derive(Num, NumOps, Zero, Default, PartialEq, Eq, PartialOrd, Ord)]
-pub struct UnifiedNum(BigNum);
+#[derive(
+    Clone,
+    Copy,
+    Num,
+    NumOps,
+    NumCast,
+    ToPrimitive,
+    FromPrimitive,
+    Zero,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+)]
+pub struct UnifiedNum(u64);
 
 impl UnifiedNum {
     pub const PRECISION: u8 = 8;
@@ -20,41 +35,50 @@ impl UnifiedNum {
         Self(self.0.div_floor(&other.0))
     }
 
-    pub fn to_f64(&self) -> Option<f64> {
-        self.0.to_f64()
+    pub fn to_u64(&self) -> u64 {
+        self.0
     }
 
-    pub fn to_u64(&self) -> Option<u64> {
-        self.0.to_u64()
+    pub fn checked_add(&self, rhs: &UnifiedNum) -> Option<Self> {
+        CheckedAdd::checked_add(self, rhs)
+    }
+
+    pub fn checked_sub(&self, rhs: &UnifiedNum) -> Option<Self> {
+        CheckedSub::checked_sub(self, rhs)
+    }
+
+    pub fn checked_mul(&self, rhs: &UnifiedNum) -> Option<Self> {
+        CheckedMul::checked_mul(self, rhs)
+    }
+
+    pub fn checked_div(&self, rhs: &UnifiedNum) -> Option<Self> {
+        CheckedDiv::checked_div(self, rhs)
+    }
+
+    pub fn checked_rem(&self, rhs: &UnifiedNum) -> Option<Self> {
+        CheckedRem::checked_rem(self, rhs)
     }
 
     /// Transform the UnifiedNum precision 8 to a new precision
     pub fn to_precision(&self, precision: u8) -> BigNum {
+        let inner = BigNum::from(self.0);
         match precision.cmp(&Self::PRECISION) {
-            Ordering::Equal => self.0.clone(),
-            Ordering::Less => self
-                .0
-                .div_floor(&BigNum::from(10).pow(Self::PRECISION - precision)),
-            Ordering::Greater => (&self.0).mul(&BigNum::from(10).pow(precision - Self::PRECISION)),
+            Ordering::Equal => inner,
+            Ordering::Less => inner.div_floor(&BigNum::from(10).pow(Self::PRECISION - precision)),
+            Ordering::Greater => inner.mul(&BigNum::from(10).pow(precision - Self::PRECISION)),
         }
     }
 }
 
 impl From<u64> for UnifiedNum {
     fn from(number: u64) -> Self {
-        Self(BigNum::from(number))
-    }
-}
-
-impl From<BigNum> for UnifiedNum {
-    fn from(number: BigNum) -> Self {
         Self(number)
     }
 }
 
 impl fmt::Display for UnifiedNum {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut string_value = self.0.to_str_radix(10);
+        let mut string_value = self.0.to_string();
         let value_length = string_value.len();
         let precision: usize = Self::PRECISION.into();
 
@@ -76,7 +100,7 @@ impl fmt::Debug for UnifiedNum {
 
 impl One for UnifiedNum {
     fn one() -> Self {
-        Self(BigNum::from(100_000_000))
+        Self(100_000_000)
     }
 }
 
@@ -120,44 +144,11 @@ impl Integer for UnifiedNum {
     }
 }
 
-impl Pow<UnifiedNum> for UnifiedNum {
-    type Output = UnifiedNum;
-
-    fn pow(self, rhs: UnifiedNum) -> Self::Output {
-        Self(self.0.pow(rhs.0))
-    }
-}
-
-impl Pow<&UnifiedNum> for UnifiedNum {
-    type Output = UnifiedNum;
-
-    fn pow(self, rhs: &UnifiedNum) -> Self::Output {
-        UnifiedNum(self.0.pow(&rhs.0))
-    }
-}
-
-impl Pow<UnifiedNum> for &UnifiedNum {
-    type Output = UnifiedNum;
-
-    fn pow(self, rhs: UnifiedNum) -> Self::Output {
-        UnifiedNum((&self.0).pow(rhs.0))
-    }
-}
-
-impl Pow<&UnifiedNum> for &UnifiedNum {
-    type Output = UnifiedNum;
-
-    fn pow(self, rhs: &UnifiedNum) -> Self::Output {
-        UnifiedNum((&self.0).pow(&rhs.0))
-    }
-}
-
 impl Add<&UnifiedNum> for &UnifiedNum {
     type Output = UnifiedNum;
 
     fn add(self, rhs: &UnifiedNum) -> Self::Output {
-        let bignum = &self.0 + &rhs.0;
-        UnifiedNum(bignum)
+        UnifiedNum(self.0 + rhs.0)
     }
 }
 
@@ -171,8 +162,7 @@ impl Sub<&UnifiedNum> for &UnifiedNum {
     type Output = UnifiedNum;
 
     fn sub(self, rhs: &UnifiedNum) -> Self::Output {
-        let bignum = &self.0 - &rhs.0;
-        UnifiedNum(bignum)
+        UnifiedNum(self.0 - rhs.0)
     }
 }
 
@@ -180,8 +170,7 @@ impl Sub<&UnifiedNum> for UnifiedNum {
     type Output = UnifiedNum;
 
     fn sub(self, rhs: &UnifiedNum) -> Self::Output {
-        let bignum = &self.0 - &rhs.0;
-        UnifiedNum(bignum)
+        UnifiedNum(self.0 - rhs.0)
     }
 }
 
@@ -189,8 +178,7 @@ impl Sub<UnifiedNum> for &UnifiedNum {
     type Output = UnifiedNum;
 
     fn sub(self, rhs: UnifiedNum) -> Self::Output {
-        let bignum = &self.0 - &rhs.0;
-        UnifiedNum(bignum)
+        UnifiedNum(self.0 - rhs.0)
     }
 }
 
@@ -198,8 +186,7 @@ impl Div<&UnifiedNum> for &UnifiedNum {
     type Output = UnifiedNum;
 
     fn div(self, rhs: &UnifiedNum) -> Self::Output {
-        let bignum = &self.0 / &rhs.0;
-        UnifiedNum(bignum)
+        UnifiedNum(self.0 / rhs.0)
     }
 }
 
@@ -207,8 +194,7 @@ impl Div<&UnifiedNum> for UnifiedNum {
     type Output = UnifiedNum;
 
     fn div(self, rhs: &UnifiedNum) -> Self::Output {
-        let bignum = &self.0 / &rhs.0;
-        UnifiedNum(bignum)
+        UnifiedNum(self.0 / rhs.0)
     }
 }
 
@@ -216,8 +202,7 @@ impl Mul<&UnifiedNum> for &UnifiedNum {
     type Output = UnifiedNum;
 
     fn mul(self, rhs: &UnifiedNum) -> Self::Output {
-        let bignum = &self.0 * &rhs.0;
-        UnifiedNum(bignum)
+        UnifiedNum(self.0 * rhs.0)
     }
 }
 
@@ -225,22 +210,44 @@ impl Mul<&UnifiedNum> for UnifiedNum {
     type Output = UnifiedNum;
 
     fn mul(self, rhs: &UnifiedNum) -> Self::Output {
-        let bignum = &self.0 * &rhs.0;
-        UnifiedNum(bignum)
+        UnifiedNum(self.0 * rhs.0)
     }
 }
 
-impl<'a> Sum<&'a UnifiedNum> for UnifiedNum {
-    fn sum<I: Iterator<Item = &'a UnifiedNum>>(iter: I) -> Self {
-        let sum_uint = iter.map(|big_num| &big_num.0).sum();
+impl<'a> Sum<&'a UnifiedNum> for Option<UnifiedNum> {
+    fn sum<I: Iterator<Item = &'a UnifiedNum>>(mut iter: I) -> Self {
+        iter.try_fold(0_u64, |acc, unified| acc.checked_add(unified.0))
+            .map(UnifiedNum)
+    }
+}
 
-        Self(sum_uint)
+impl CheckedAdd for UnifiedNum {
+    fn checked_add(&self, v: &Self) -> Option<Self> {
+        self.0.checked_add(v.0).map(Self)
     }
 }
 
 impl CheckedSub for UnifiedNum {
     fn checked_sub(&self, v: &Self) -> Option<Self> {
-        self.0.checked_sub(&v.0).map(Self)
+        self.0.checked_sub(v.0).map(Self)
+    }
+}
+
+impl CheckedMul for UnifiedNum {
+    fn checked_mul(&self, v: &Self) -> Option<Self> {
+        self.0.checked_mul(v.0).map(Self)
+    }
+}
+
+impl CheckedDiv for UnifiedNum {
+    fn checked_div(&self, v: &Self) -> Option<Self> {
+        self.0.checked_div(v.0).map(Self)
+    }
+}
+
+impl CheckedRem for UnifiedNum {
+    fn checked_rem(&self, v: &Self) -> Option<Self> {
+        self.0.checked_rem(v.0).map(Self)
     }
 }
 
@@ -248,6 +255,19 @@ impl CheckedSub for UnifiedNum {
 mod test {
     use super::*;
     use num::Zero;
+
+    #[test]
+    fn unified_num_sum() {
+        let num_max = UnifiedNum(u64::MAX);
+        let num_1 = UnifiedNum(1);
+        let num_5 = UnifiedNum(5);
+
+        let succeeding_sum: Option<UnifiedNum> = [num_1, num_5].iter().sum();
+        let overflow_sum: Option<UnifiedNum> = [num_1, num_max].iter().sum();
+
+        assert_eq!(Some(UnifiedNum(6)), succeeding_sum);
+        assert_eq!(None, overflow_sum);
+    }
 
     #[test]
     fn unified_num_displays_correctly() {
@@ -289,7 +309,7 @@ mod test {
         // 321.00000999
         let same_unified = UnifiedNum::from(32_100_000_777_u64);
         assert_eq!(
-            same_unified.0,
+            BigNum::from(same_unified.0),
             same_unified.to_precision(same_precision),
             "It should not make any adjustments to the precision"
         );
