@@ -133,7 +133,7 @@ mod test {
 
     use primitives::util::tests::prep_db::{AUTH, IDS};
 
-    use primitives::{config::configuration};
+    use primitives::config::configuration;
 
     use deadpool::managed::Object;
 
