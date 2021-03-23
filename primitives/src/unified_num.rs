@@ -309,7 +309,7 @@ mod test {
             "It should floor the result of USDT"
         );
 
-        // 321.00000999
+        // 321.00000777
         let same_unified = UnifiedNum::from(32_100_000_777_u64);
         assert_eq!(
             BigNum::from(same_unified.0),
