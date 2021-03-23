@@ -35,6 +35,10 @@ pub async fn tick<A: Adapter + 'static>(
             balances: Default::default(),
         },
     };
+    
+    //
+    // TODO #381: AIP#61 Merge all Spender Aggregates and create a new Accounting
+    //
 
     let aggrs = iface
         .get_event_aggregates(accounting.last_event_aggregate)
