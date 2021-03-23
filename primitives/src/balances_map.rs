@@ -1,14 +1,12 @@
-use std::collections::BTreeMap;
+use std::{collections::{BTreeMap, btree_map::{Entry, IntoIter, Iter, Values}}, iter::FromIterator, ops::Index};
 
 use crate::{BigNum, ValidatorId};
-use std::collections::btree_map::{Entry, IntoIter, Iter, Values};
 
 use serde::{Deserialize, Serialize};
-use std::iter::FromIterator;
-use std::ops::Index;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(transparent)]
+// TODO: AIP#61 Change the `ValidatorId` to `Address`
 pub struct BalancesMap(BTreeMap<ValidatorId, BigNum>);
 
 impl Index<&'_ ValidatorId> for BalancesMap {
