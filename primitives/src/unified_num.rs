@@ -1,19 +1,22 @@
-use num::{pow::Pow, CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Integer, One};
+use num::{traits::CheckedRem, pow::Pow, CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Integer, One};
 use num_derive::{FromPrimitive, Num, NumCast, NumOps, ToPrimitive, Zero};
-use num_traits::CheckedRem;
 use std::{
     cmp::Ordering,
     fmt,
     iter::Sum,
     ops::{Add, AddAssign, Div, Mul, Sub},
 };
-
+use serde::{Serialize, Deserialize};
 use crate::BigNum;
 
-/// Unified Number with a precision of 8 digits after the decimal point
+/// Unified Number with a precision of 8 digits after the decimal point.
+///
 /// The number can be a maximum of `u64::MAX` (the underlying type),
-/// or in a `UnifiedNum` value `184_467_440_737.09551615`
-/// The actual number is handled as a unsigned number and only the display shows the decimal point
+/// or in a `UnifiedNum` value `184_467_440_737.09551615`.
+/// The actual number is handled as a unsigned number and only the display shows the decimal point.
+///
+/// This number is (de)serialized as a Javascript number which is `f64`.
+/// As far as the numbers don't exceed `2**63`, the Javascript number should be sufficient without losing precision
 #[derive(
     Clone,
     Copy,
@@ -28,6 +31,8 @@ use crate::BigNum;
     Eq,
     PartialOrd,
     Ord,
+    Serialize,
+    Deserialize
 )]
 pub struct UnifiedNum(u64);
 
