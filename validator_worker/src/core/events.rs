@@ -6,6 +6,10 @@ use primitives::{BalancesMap, BigNum, Channel, DomainError};
 
 use crate::core::fees::get_balances_after_fees_tree;
 
+
+//
+// TODO #381: AIP#61 Remove the fees and use the new Spender Aggregates
+//
 pub(crate) fn merge_aggrs(
     accounting: &Accounting,
     aggregates: &[EventAggregate],
