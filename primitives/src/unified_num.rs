@@ -10,7 +10,10 @@ use std::{
 
 use crate::BigNum;
 
-/// Unified precision Number with precision 8
+/// Unified Number with a precision of 8 digits after the decimal point
+/// The number can be a maximum of `u64::MAX` (the underlying type),
+/// or in a `UnifiedNum` value `184_467_440_737.09551615`
+/// The actual number is handled as a unsigned number and only the display shows the decimal point
 #[derive(
     Clone,
     Copy,
