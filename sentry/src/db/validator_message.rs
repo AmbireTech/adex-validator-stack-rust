@@ -1,8 +1,7 @@
 use crate::db::DbPool;
 use bb8::RunError;
 use bb8_postgres::tokio_postgres::types::ToSql;
-use primitives::sentry::ValidatorMessage;
-use primitives::{ChannelId, ValidatorId};
+use primitives::{sentry::ValidatorMessage, ChannelId, ValidatorId};
 
 pub async fn get_validator_messages(
     pool: &DbPool,
