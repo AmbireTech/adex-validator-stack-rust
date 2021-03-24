@@ -133,12 +133,12 @@ impl Adapter for DummyAdapter {
     async fn get_deposit(
         &self,
         channel: &Channel,
-        spender: &Address,
+        address: &Address,
     ) -> AdapterResult<Deposit, Self::AdapterError> {
         // TODO - complete function
         Ok(Deposit {
             total: 10.into(),
-            pending: 1.into(),
+            still_on_create_2: 1.into(),
         })
     }
 }

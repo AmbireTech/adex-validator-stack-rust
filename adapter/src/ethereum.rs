@@ -277,7 +277,7 @@ impl Adapter for EthereumAdapter {
     async fn get_deposit(
         &self,
         channel: &Channel,
-        user: &PrimitivesAddress,
+        address: &PrimitivesAddress,
     ) -> AdapterResult<Deposit, Self::AdapterError> {
         let outpace_contract = Contract::from_json(
             self.web3.eth(),
@@ -300,7 +300,7 @@ impl Adapter for EthereumAdapter {
                 "deposits",
                 (
                     H256(*channel.id).into_token(),
-                    H160(*user.as_bytes()).into_token(),
+                    H160(*address.as_bytes()).into_token(),
                 ),
                 None,
                 Options::default(),
@@ -312,7 +312,7 @@ impl Adapter for EthereumAdapter {
         .map_err(Error::ContractQuerying)?;
         let mut total = BigNum::from_str(&total.to_string())?;
 
-        let pending: H256 = tokio_compat_02::FutureExt::compat(async {
+        let still_on_create_2: H256 = tokio_compat_02::FutureExt::compat(async {
             tokio_compat_02::FutureExt::compat(erc20_contract.query(
                 "balanceOf",
                 Bytes(channel.deposit_asset.as_bytes().to_vec()).into_token(),
@@ -324,7 +324,7 @@ impl Adapter for EthereumAdapter {
         })
         .await
         .map_err(Error::ContractQuerying)?;
-        let pending = BigNum::from_str(&pending.to_string())?;
+        let still_on_create_2 = BigNum::from_str(&still_on_create_2.to_string())?;
 
         let token_info = self
             .config
@@ -332,11 +332,14 @@ impl Adapter for EthereumAdapter {
             .get(&deposit_asset_as_address)
             .ok_or(Error::TokenNotWhitelisted(deposit_asset_as_address))?;
 
-        if pending > token_info.min_token_units_for_deposit {
-            total += &pending;
+        if still_on_create_2 > token_info.min_token_units_for_deposit {
+            total += &still_on_create_2;
         }
 
-        Ok(Deposit { total, pending })
+        Ok(Deposit {
+            total,
+            still_on_create_2,
+        })
     }
 }
 

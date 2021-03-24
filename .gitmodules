@@ -1,4 +1,4 @@
 [submodule "lib/protocol-eth"]
 	path = lib/protocol-eth
 	url = https://github.com/AdExNetwork/adex-protocol-eth/
-	branch = outpace-abi-json
+	branch = guardian-separate-claim

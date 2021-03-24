@@ -13,7 +13,7 @@ pub trait AdapterErrorKind: fmt::Debug + fmt::Display {}
 
 pub struct Deposit {
     pub total: BigNum,
-    pub pending: BigNum,
+    pub still_on_create_2: BigNum,
 }
 
 #[derive(Debug)]
@@ -114,6 +114,6 @@ pub trait Adapter: ChannelValidator + Send + Sync + fmt::Debug + Clone {
     async fn get_deposit(
         &self,
         channel: &Channel,
-        user: &Address,
+        address: &Address,
     ) -> AdapterResult<Deposit, Self::AdapterError>;
 }
