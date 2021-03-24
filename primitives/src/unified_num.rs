@@ -34,6 +34,7 @@ use crate::BigNum;
     Serialize,
     Deserialize
 )]
+#[serde(transparent)]
 pub struct UnifiedNum(u64);
 
 impl UnifiedNum {
@@ -278,7 +279,7 @@ mod test {
     }
 
     #[test]
-    fn unified_num_displays_correctly() {
+    fn unified_num_displays_and_de_serializes_correctly() {
         let one = UnifiedNum::from(100_000_000);
         let zero_point_one = UnifiedNum::from(10_000_000);
         let smallest_value = UnifiedNum::from(1);
@@ -290,6 +291,8 @@ mod test {
         assert_eq!("0.10000000", &zero_point_one.to_string());
         assert_eq!("0.00000001", &smallest_value.to_string());
         assert_eq!("1449030.00567000", &random_value.to_string());
+
+        assert_eq!(serde_json::Value::Number(100_000_000.into()), serde_json::to_value(one).expect("Should serialize"))
     }
 
     #[test]
