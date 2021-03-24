@@ -25,6 +25,7 @@ slog-async = "^2.3.0"
 thiserror = "^1.0"
 chrono = { version = "0.4", features = ["serde"] }
 time = "0.1.42"
+uuid = { version = "0.8", features = ["v4"] }
 # For encoding the Channel to a ChannelId
 ethabi = "13.0.0"
 # For the nonce U256
