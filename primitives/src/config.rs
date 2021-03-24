@@ -81,7 +81,6 @@ where
     });
 
     Ok(tokens_whitelist)
-    // Ok(BigUint::from_str(&num).map_err(serde::de::Error::custom)?)
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

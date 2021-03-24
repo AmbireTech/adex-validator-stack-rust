@@ -105,6 +105,6 @@ pub fn asset_listed(channel: &Channel, whitelist: &HashMap<Address, TokenInfo>) 
     whitelist.is_empty()
         || whitelist
             .keys()
+            // TODO: fix
             .any(|allowed| allowed == &Address::try_from(&channel.deposit_asset).unwrap())
-    // TODO: fix
 }

@@ -310,6 +310,7 @@ impl Adapter for EthereumAdapter {
         })
         .await
         .map_err(Error::ContractQuerying)?;
+
         let mut total = BigNum::from_str(&total.to_string())?;
 
         let still_on_create_2: H256 = tokio_compat_02::FutureExt::compat(async {
@@ -324,6 +325,7 @@ impl Adapter for EthereumAdapter {
         })
         .await
         .map_err(Error::ContractQuerying)?;
+
         let still_on_create_2 = BigNum::from_str(&still_on_create_2.to_string())?;
 
         let token_info = self
