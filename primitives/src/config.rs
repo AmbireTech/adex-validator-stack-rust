@@ -55,8 +55,8 @@ pub struct Config {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct ConfigWhitelist {
-    address: String,
-    min_token_units_for_deposit: String,
+    address: Address,
+    min_token_units_for_deposit: BigNum,
     precision: NonZeroU8,
 }
 
@@ -68,18 +68,16 @@ where
 {
     let mut tokens_whitelist = HashMap::new();
     let array: Vec<ConfigWhitelist> = Deserialize::deserialize(deserializer)?;
-    for i in array {
-        let addr = Address::try_from(&i.address).map_err(serde::de::Error::custom)?;
-        let min_token_units_for_deposit = BigNum::from_str(&i.min_token_units_for_deposit)
-        .map_err(serde::de::Error::custom)?;
+
+    array.into_iter().for_each(|i| {
         tokens_whitelist.insert(
-            addr,
+            i.address,
             TokenInfo {
-                min_token_units_for_deposit,
+                min_token_units_for_deposit: i.min_token_units_for_deposit,
                 decimals: i.precision,
             },
         );
-    }
+    });
 
     Ok(tokens_whitelist)
 }
