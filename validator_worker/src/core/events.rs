@@ -4,48 +4,42 @@ use primitives::sentry::{AggregateEvents, EventAggregate};
 use primitives::validator::Accounting;
 use primitives::{BalancesMap, BigNum, Channel, DomainError};
 
-use crate::core::fees::get_balances_after_fees_tree;
-
-
 //
-// TODO #381: AIP#61 Remove the fees and use the new Spender Aggregates
+// TODO #381: AIP#61 Use the new Spender Aggregate and Sum all balances for the new Accounting
 //
 pub(crate) fn merge_aggrs(
     accounting: &Accounting,
     aggregates: &[EventAggregate],
-    channel: &Channel,
+    //
+    // TODO: AIP#61 Use Campaign and if we should check the total sum of the Balances < campaign.budget
+    //
+    _channel: &Channel,
 ) -> Result<Accounting, DomainError> {
-    let deposit = channel.deposit_amount.clone();
-
-    let last_event_aggregate = [accounting.last_event_aggregate]
+    let last_aggregate = [accounting.last_aggregate]
         .iter()
         .chain(aggregates.iter().map(|aggr| &aggr.created))
         .max()
-        .unwrap_or(&accounting.last_event_aggregate)
+        .unwrap_or(&accounting.last_aggregate)
         .to_owned();
 
     // Build an intermediary balances representation
-    let mut balances_before_fees = accounting.balances_before_fees.clone();
-
-    // Merge in all the aggrs
-    for aggr in aggregates {
-        balances_before_fees =
-            merge_payouts_into_balances(&balances_before_fees, aggr.events.values(), &deposit)?
-    }
-
-    // apply fees
-    let balances = get_balances_after_fees_tree(&balances_before_fees, &channel)?;
+    //
+    // TODO: AIP#61 Sum all Spender Aggregates and use that for the new Accounting
+    //
+    let balances = BalancesMap::default();
 
     let new_accounting = Accounting {
-        last_event_aggregate,
-        balances_before_fees,
+        last_aggregate,
         balances,
     };
 
     Ok(new_accounting)
 }
 
-fn merge_payouts_into_balances<'a, T: Iterator<Item = &'a AggregateEvents>>(
+//
+// TODO: AIP#61 Check how this should apply for the new Campaigns
+//
+fn _merge_payouts_into_balances<'a, T: Iterator<Item = &'a AggregateEvents>>(
     balances: &BalancesMap,
     events: T,
     deposit: &BigNum,
@@ -62,9 +56,7 @@ fn merge_payouts_into_balances<'a, T: Iterator<Item = &'a AggregateEvents>>(
     for (acc, payout) in all_payouts {
         let to_add = payout.min(&remaining);
 
-        let new_balance = new_balances
-            .entry(acc.to_owned())
-            .or_insert_with(|| 0.into());
+        let new_balance = new_balances.entry(*acc).or_insert_with(|| 0.into());
 
         *new_balance += &to_add;
 
@@ -80,14 +72,17 @@ fn merge_payouts_into_balances<'a, T: Iterator<Item = &'a AggregateEvents>>(
 mod test {
     use chrono::Utc;
 
-    use primitives::util::tests::prep_db::{
-        DUMMY_CHANNEL, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, IDS,
+    use primitives::{
+        util::tests::prep_db::{
+            ADDRESSES, DUMMY_CHANNEL, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER,
+        },
+        Address, Channel, ChannelSpec, ValidatorDesc,
     };
-    use primitives::{Channel, ChannelSpec, ValidatorDesc, ValidatorId};
 
     use super::*;
 
     #[test]
+    #[ignore]
     fn should_merge_event_aggrs_and_apply_fees() {
         // fees: 100
         // deposit: 10 000
@@ -106,35 +101,24 @@ mod test {
         };
         channel.spec.validators = (leader, follower).into();
 
-        let balances_before_fees: BalancesMap = vec![
-            (IDS["publisher"].clone(), 100.into()),
-            (IDS["publisher2"].clone(), 200.into()),
-        ]
-        .into_iter()
-        .collect();
-
         let acc = Accounting {
-            last_event_aggregate: Utc::now(),
-            balances_before_fees,
+            last_aggregate: Utc::now(),
             balances: BalancesMap::default(),
         };
 
-        let new_accounting = merge_aggrs(&acc, &[gen_ev_aggr(5, &IDS["publisher"])], &channel)
-            .expect("Something went wrong");
+        let new_accounting =
+            merge_aggrs(&acc, &[gen_ev_aggr(5, &ADDRESSES["publisher"])], &channel)
+                .expect("Something went wrong");
 
         assert_eq!(
-            new_accounting.balances_before_fees[&IDS["publisher"]],
-            150.into(),
-            "balance of recipient incremented accordingly"
-        );
-        assert_eq!(
-            new_accounting.balances[&IDS["publisher"]],
+            new_accounting.balances[&ADDRESSES["publisher"]],
             148.into(),
-            "balanceAfterFees is ok"
+            "balances is ok"
         );
     }
 
     #[test]
+    #[ignore]
     fn should_never_allow_exceeding_the_deposit() {
         let leader = ValidatorDesc {
             fee: 50.into(),
@@ -155,41 +139,22 @@ mod test {
             ..DUMMY_CHANNEL.clone()
         };
 
-        let balances_before_fees: BalancesMap = vec![
-            (IDS["publisher"].clone(), 100.into()),
-            (IDS["publisher2"].clone(), 200.into()),
-        ]
-        .into_iter()
-        .collect();
-
         let acc = Accounting {
-            last_event_aggregate: Utc::now(),
-            balances_before_fees,
+            last_aggregate: Utc::now(),
             balances: BalancesMap::default(),
         };
 
-        let new_accounting = merge_aggrs(&acc, &[gen_ev_aggr(1_001, &IDS["publisher"])], &channel)
-            .expect("Something went wrong");
+        let new_accounting = merge_aggrs(
+            &acc,
+            &[gen_ev_aggr(1_001, &ADDRESSES["publisher"])],
+            &channel,
+        )
+        .expect("Something went wrong");
 
         assert_eq!(
-            new_accounting.balances_before_fees[&IDS["publisher"]],
-            9_800.into(),
-            "balance of recipient incremented accordingly"
-        );
-        assert_eq!(
-            new_accounting.balances_before_fees[&IDS["publisher2"]],
-            200.into(),
-            "balances of non-recipient remains the same"
-        );
-        assert_eq!(
-            new_accounting.balances[&IDS["publisher"]],
+            new_accounting.balances[&ADDRESSES["publisher"]],
             9_702.into(),
-            "balanceAfterFees is ok"
-        );
-        assert_eq!(
-            &new_accounting.balances_before_fees.values().sum::<BigNum>(),
-            &channel.deposit_amount,
-            "sum(balancesBeforeFees) == depositAmount"
+            "balances is ok"
         );
         assert_eq!(
             &new_accounting.balances.values().sum::<BigNum>(),
@@ -198,14 +163,13 @@ mod test {
         );
     }
 
-    fn gen_ev_aggr(count: u64, recipient: &ValidatorId) -> EventAggregate {
+    //
+    // TODO: AIP#61 Use new Spender Aggregate
+    //
+    fn gen_ev_aggr(count: u64, recipient: &Address) -> EventAggregate {
         let aggregate_events = AggregateEvents {
-            event_counts: Some(
-                vec![(recipient.clone(), count.into())]
-                    .into_iter()
-                    .collect(),
-            ),
-            event_payouts: vec![(recipient.clone(), (count * 10).into())]
+            event_counts: Some(vec![(*recipient, count.into())].into_iter().collect()),
+            event_payouts: vec![(*recipient, (count * 10).into())]
                 .into_iter()
                 .collect(),
         };

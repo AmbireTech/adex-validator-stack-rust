@@ -3,7 +3,7 @@ use chrono::{TimeZone, Utc};
 use super::*;
 use crate::{
     targeting::input,
-    util::tests::prep_db::{DUMMY_CHANNEL, DUMMY_IPFS, IDS},
+    util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, DUMMY_IPFS},
     BalancesMap,
 };
 
@@ -19,14 +19,14 @@ fn get_default_input() -> Input {
         global: input::Global {
             ad_slot_id: "ad_slot_id Value".to_string(),
             ad_slot_type: "ad_slot_type Value".to_string(),
-            publisher_id: IDS["leader"],
+            publisher_id: ADDRESSES["leader"],
             country: Some("bg".to_string()),
             event_type: "IMPRESSION".to_string(),
             seconds_since_epoch: Utc.ymd(2020, 11, 06).and_hms(12, 0, 0),
             user_agent_os: Some("os".to_string()),
             user_agent_browser_family: Some("family".to_string()),
         },
-        channel: None,
+        campaign: None,
         balances: None,
         ad_unit_id: Some(DUMMY_IPFS[0].clone()),
         ad_slot: None,
@@ -34,7 +34,7 @@ fn get_default_input() -> Input {
 
     // Set the Channel, Balances and AdUnit for the Input
     init_input
-        .with_channel(DUMMY_CHANNEL.clone())
+        .with_campaign(DUMMY_CAMPAIGN.clone())
         .with_balances(input_balances)
 }
 
@@ -270,11 +270,11 @@ mod dsl_test {
 
     #[test]
     fn test_set_eval() {
-        use crate::channel::{Pricing, PricingBounds};
-        use crate::util::tests::prep_db::DUMMY_CHANNEL;
+        use crate::campaign::{Pricing, PricingBounds};
+        use crate::util::tests::prep_db::DUMMY_CAMPAIGN;
 
-        let mut channel = DUMMY_CHANNEL.clone();
-        channel.spec.pricing_bounds = Some(PricingBounds {
+        let mut campaign = DUMMY_CAMPAIGN.clone();
+        campaign.pricing_bounds = Some(PricingBounds {
             impression: Some(Pricing {
                 min: 1_000.into(),
                 max: 2_000.into(),
@@ -286,7 +286,7 @@ mod dsl_test {
         });
 
         let input = get_default_input();
-        let mut output = Output::from(&channel);
+        let mut output = Output::from(&campaign);
 
         assert_eq!(Some(&BigNum::from(1_000)), output.price.get("IMPRESSION"));
 
@@ -1376,9 +1376,9 @@ mod string_and_array {
             price: Default::default(),
         };
         for (key, value) in &*DEPOSIT_ASSETS_MAP {
-            let mut asset_channel = DUMMY_CHANNEL.clone();
-            asset_channel.deposit_asset = key.to_string();
-            let input = get_default_input().with_channel(asset_channel);
+            let mut asset_campaign = DUMMY_CAMPAIGN.clone();
+            asset_campaign.channel.token = *key;
+            let input = get_default_input().with_campaign(asset_campaign);
 
             let amount_crypto = BigNum::from(100).mul(value);
             let amount_usd = Some(Value::Number(
