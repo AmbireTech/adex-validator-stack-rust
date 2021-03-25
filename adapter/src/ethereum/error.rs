@@ -1,5 +1,6 @@
 use primitives::adapter::{AdapterErrorKind, Error as AdapterError};
 use primitives::{Address, ChannelId};
+use primitives::address::Error as AddressError;
 use std::fmt;
 
 #[derive(Debug)]
@@ -23,6 +24,7 @@ pub enum Error {
     /// Error occurred during verification of Signature and/or StateRoot and/or Address
     VerifyAddress(VerifyError),
     TokenNotWhitelisted(Address),
+    InvalidDepositAsset(AddressError),
 }
 
 impl std::error::Error for Error {}
@@ -46,6 +48,7 @@ impl fmt::Display for Error {
                 ContractQuerying(err) => write!(f, "Contract querying: {}", err),
                 VerifyAddress(err) => write!(f, "Verifying address: {}", err),
                 TokenNotWhitelisted(deposit_asset) => write!(f, "Token not whitelisted: {}", deposit_asset),
+                InvalidDepositAsset(err) => write!(f, "Deposit asset {} is invalid", err),
             }
     }
 }

@@ -68,17 +68,18 @@ where
 {
     let mut tokens_whitelist = HashMap::new();
     let array: Vec<ConfigWhitelist> = Deserialize::deserialize(deserializer)?;
-    array.into_iter().for_each(|i| {
-        // TODO: Remove unwraps
+    for i in array {
+        let addr = Address::try_from(&i.address).map_err(serde::de::Error::custom)?;
+        let min_token_units_for_deposit = BigNum::from_str(&i.min_token_units_for_deposit)
+        .map_err(serde::de::Error::custom)?;
         tokens_whitelist.insert(
-            Address::try_from(&i.address).unwrap(),
+            addr,
             TokenInfo {
-                min_token_units_for_deposit: BigNum::from_str(&i.min_token_units_for_deposit)
-                    .unwrap(),
+                min_token_units_for_deposit,
                 decimals: i.precision,
             },
         );
-    });
+    }
 
     Ok(tokens_whitelist)
 }

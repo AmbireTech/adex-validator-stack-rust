@@ -286,8 +286,9 @@ impl Adapter for EthereumAdapter {
         )
         .map_err(Error::ContractInitialization)?;
 
-        // TODO: fix
-        let deposit_asset_as_address = PrimitivesAddress::try_from(&channel.deposit_asset).unwrap();
+        let deposit_asset_as_address = PrimitivesAddress::try_from(&channel.deposit_asset)
+        .map_err(Error::InvalidDepositAsset)?;
+
         let erc20_contract = Contract::from_json(
             self.web3.eth(),
             deposit_asset_as_address.as_bytes().into(),

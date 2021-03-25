@@ -100,11 +100,12 @@ pub fn creator_listed(channel: &Channel, whitelist: &[ValidatorId]) -> bool {
 }
 
 pub fn asset_listed(channel: &Channel, whitelist: &HashMap<Address, TokenInfo>) -> bool {
+    // TODO: Fix unwrap
+    let asset_as_address = Address::try_from(&channel.deposit_asset).unwrap();
     // if the list is empty, return true, as we don't have a whitelist to restrict us to
     // or if we have a list, check if it includes the `channel.deposit_asset`
     whitelist.is_empty()
         || whitelist
             .keys()
-            // TODO: fix
-            .any(|allowed| allowed == &Address::try_from(&channel.deposit_asset).unwrap())
+            .any(|allowed| allowed == &asset_as_address)
 }
