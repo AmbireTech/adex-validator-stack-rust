@@ -46,13 +46,13 @@ pub async fn record(
                 if let Some(ad_unit) = ad_unit {
                     db.zincr(
                         format!("{}:{}:{}", PublisherReport::AdUnit, event, publisher),
-                        ad_unit,
+                        ad_unit.to_string(),
                         1,
                     )
                     .ignore();
                     db.zincr(
                         format!("{}:{}:{}", ChannelReport::AdUnit, event, publisher),
-                        ad_unit,
+                        ad_unit.to_string(),
                         1,
                     )
                     .ignore();
@@ -61,13 +61,13 @@ pub async fn record(
                 if let Some(ad_slot) = ad_slot {
                     db.zincr(
                         format!("{}:{}:{}", PublisherReport::AdSlot, event, publisher),
-                        ad_slot,
+                        ad_slot.to_string(),
                         1,
                     )
                     .ignore();
                     db.zincr(
                         format!("{}:{}:{}", PublisherReport::AdSlotPay, event, publisher),
-                        ad_slot,
+                        ad_slot.to_string(),
                         pay_amount,
                     )
                     .ignore();

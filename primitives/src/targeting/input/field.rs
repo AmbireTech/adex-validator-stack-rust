@@ -148,6 +148,7 @@ impl Into<String> for Channel {
 #[display(style = "camelCase")]
 pub enum Balances {
     CampaignTotalSpent,
+    // TODO: AIP#61 Should be dropped since we can't know
     PublisherEarnedFromCampaign,
 }
 

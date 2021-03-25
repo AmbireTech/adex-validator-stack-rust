@@ -35,7 +35,7 @@ pub fn get_health(channel: &Channel, our: &BalancesMap, approved: &BalancesMap) 
 
 #[cfg(test)]
 mod test {
-    use primitives::util::tests::prep_db::{DUMMY_CHANNEL, IDS};
+    use primitives::util::tests::prep_db::{ADDRESSES, DUMMY_CHANNEL};
 
     use super::*;
 
@@ -62,7 +62,7 @@ mod test {
 
     #[test]
     fn is_valid_transition_a_valid_transition() {
-        let next = vec![(IDS["publisher"].clone(), 100.into())]
+        let next = vec![(ADDRESSES["publisher"].clone(), 100.into())]
             .into_iter()
             .collect();
 
@@ -75,8 +75,8 @@ mod test {
     #[test]
     fn is_valid_transition_more_funds_than_dummy_channel() {
         let next = vec![
-            (IDS["publisher"].clone(), 51.into()),
-            (IDS["publisher2"].clone(), 50.into()),
+            (ADDRESSES["publisher"].clone(), 51.into()),
+            (ADDRESSES["publisher2"].clone(), 50.into()),
         ]
         .into_iter()
         .collect();
@@ -89,11 +89,11 @@ mod test {
 
     #[test]
     fn is_valid_transition_single_value_is_lower() {
-        let prev = vec![(IDS["publisher"].clone(), 55.into())]
+        let prev = vec![(ADDRESSES["publisher"].clone(), 55.into())]
             .into_iter()
             .collect();
 
-        let next = vec![(IDS["publisher"].clone(), 54.into())]
+        let next = vec![(ADDRESSES["publisher"].clone(), 54.into())]
             .into_iter()
             .collect();
 
@@ -105,13 +105,13 @@ mod test {
 
     #[test]
     fn is_valid_transition_a_value_is_lower_but_overall_sum_is_higher() {
-        let prev = vec![(IDS["publisher"].clone(), 55.into())]
+        let prev = vec![(ADDRESSES["publisher"].clone(), 55.into())]
             .into_iter()
             .collect();
 
         let next = vec![
-            (IDS["publisher"].clone(), 54.into()),
-            (IDS["publisher2"].clone(), 3.into()),
+            (ADDRESSES["publisher"].clone(), 54.into()),
+            (ADDRESSES["publisher2"].clone(), 3.into()),
         ]
         .into_iter()
         .collect();
@@ -125,13 +125,13 @@ mod test {
     #[test]
     fn is_valid_transition_overall_sum_is_lower() {
         let prev = vec![
-            (IDS["publisher"].clone(), 54.into()),
-            (IDS["publisher2"].clone(), 3.into()),
+            (ADDRESSES["publisher"].clone(), 54.into()),
+            (ADDRESSES["publisher2"].clone(), 3.into()),
         ]
         .into_iter()
         .collect();
 
-        let next = vec![(IDS["publisher"].clone(), 54.into())]
+        let next = vec![(ADDRESSES["publisher"].clone(), 54.into())]
             .into_iter()
             .collect();
 
@@ -144,13 +144,13 @@ mod test {
     #[test]
     fn is_valid_transition_overall_sum_is_the_same_but_we_remove_an_entry() {
         let prev = vec![
-            (IDS["publisher"].clone(), 54.into()),
-            (IDS["publisher2"].clone(), 3.into()),
+            (ADDRESSES["publisher"].clone(), 54.into()),
+            (ADDRESSES["publisher2"].clone(), 3.into()),
         ]
         .into_iter()
         .collect();
 
-        let next = vec![(IDS["publisher"].clone(), 57.into())]
+        let next = vec![(ADDRESSES["publisher"].clone(), 57.into())]
             .into_iter()
             .collect();
 
@@ -163,13 +163,13 @@ mod test {
     #[test]
     fn is_valid_transition_transition_to_a_state_with_a_negative_number() {
         let prev = vec![
-            (IDS["publisher"].clone(), 54.into()),
-            (IDS["publisher2"].clone(), 3.into()),
+            (ADDRESSES["publisher"].clone(), 54.into()),
+            (ADDRESSES["publisher2"].clone(), 3.into()),
         ]
         .into_iter()
         .collect();
 
-        let next = vec![(IDS["publisher"].clone(), 57.into())]
+        let next = vec![(ADDRESSES["publisher"].clone(), 57.into())]
             .into_iter()
             .collect();
 
@@ -182,7 +182,7 @@ mod test {
     #[test]
     fn get_health_the_approved_balance_tree_gte_our_accounting_is_healthy() {
         let channel = get_dummy_channel(50);
-        let our = vec![(IDS["publisher"].clone(), 50.into())]
+        let our = vec![(ADDRESSES["publisher"].clone(), 50.into())]
             .into_iter()
             .collect();
         assert!(get_health(&channel, &our, &our) >= HEALTH_THRESHOLD);
@@ -191,7 +191,7 @@ mod test {
             get_health(
                 &channel,
                 &our,
-                &vec![(IDS["publisher"].clone(), 60.into())]
+                &vec![(ADDRESSES["publisher"].clone(), 60.into())]
                     .into_iter()
                     .collect()
             ) >= HEALTH_THRESHOLD
@@ -200,7 +200,7 @@ mod test {
 
     #[test]
     fn get_health_the_approved_balance_tree_is_positive_our_accounting_is_0_and_it_is_healthy() {
-        let approved = vec![(IDS["publisher"].clone(), 50.into())]
+        let approved = vec![(ADDRESSES["publisher"].clone(), 50.into())]
             .into_iter()
             .collect();
 
@@ -217,10 +217,10 @@ mod test {
         assert!(
             get_health(
                 &channel,
-                &vec![(IDS["publisher"].clone(), 80.into())]
+                &vec![(ADDRESSES["publisher"].clone(), 80.into())]
                     .into_iter()
                     .collect(),
-                &vec![(IDS["publisher"].clone(), 79.into())]
+                &vec![(ADDRESSES["publisher"].clone(), 79.into())]
                     .into_iter()
                     .collect()
             ) >= HEALTH_THRESHOLD
@@ -229,10 +229,10 @@ mod test {
         assert!(
             get_health(
                 &channel,
-                &vec![(IDS["publisher"].clone(), 2.into())]
+                &vec![(ADDRESSES["publisher"].clone(), 2.into())]
                     .into_iter()
                     .collect(),
-                &vec![(IDS["publisher"].clone(), 1.into())]
+                &vec![(ADDRESSES["publisher"].clone(), 1.into())]
                     .into_iter()
                     .collect()
             ) >= HEALTH_THRESHOLD
@@ -246,10 +246,10 @@ mod test {
         assert!(
             get_health(
                 &channel,
-                &vec![(IDS["publisher"].clone(), 80.into())]
+                &vec![(ADDRESSES["publisher"].clone(), 80.into())]
                     .into_iter()
                     .collect(),
-                &vec![(IDS["publisher"].clone(), 70.into())]
+                &vec![(ADDRESSES["publisher"].clone(), 70.into())]
                     .into_iter()
                     .collect()
             ) < HEALTH_THRESHOLD
@@ -263,10 +263,10 @@ mod test {
         assert!(
             get_health(
                 &channel,
-                &vec![(IDS["publisher"].clone(), 80.into())]
+                &vec![(ADDRESSES["publisher"].clone(), 80.into())]
                     .into_iter()
                     .collect(),
-                &vec![(IDS["publisher2"].clone(), 80.into())]
+                &vec![(ADDRESSES["publisher2"].clone(), 80.into())]
                     .into_iter()
                     .collect()
             ) < HEALTH_THRESHOLD
@@ -275,12 +275,12 @@ mod test {
         assert!(
             get_health(
                 &channel,
-                &vec![(IDS["publisher"].clone(), 80.into())]
+                &vec![(ADDRESSES["publisher"].clone(), 80.into())]
                     .into_iter()
                     .collect(),
                 &vec![
-                    (IDS["publisher2"].clone(), 40.into()),
-                    (IDS["publisher"].clone(), 40.into())
+                    (ADDRESSES["publisher2"].clone(), 40.into()),
+                    (ADDRESSES["publisher"].clone(), 40.into())
                 ]
                 .into_iter()
                 .collect()
@@ -290,12 +290,12 @@ mod test {
         assert!(
             get_health(
                 &channel,
-                &vec![(IDS["publisher"].clone(), 80.into())]
+                &vec![(ADDRESSES["publisher"].clone(), 80.into())]
                     .into_iter()
                     .collect(),
                 &vec![
-                    (IDS["publisher2"].clone(), 20.into()),
-                    (IDS["publisher"].clone(), 60.into())
+                    (ADDRESSES["publisher2"].clone(), 20.into()),
+                    (ADDRESSES["publisher"].clone(), 60.into())
                 ]
                 .into_iter()
                 .collect()
@@ -305,12 +305,12 @@ mod test {
         assert!(
             get_health(
                 &channel,
-                &vec![(IDS["publisher"].clone(), 80.into())]
+                &vec![(ADDRESSES["publisher"].clone(), 80.into())]
                     .into_iter()
                     .collect(),
                 &vec![
-                    (IDS["publisher2"].clone(), 2.into()),
-                    (IDS["publisher"].clone(), 78.into())
+                    (ADDRESSES["publisher2"].clone(), 2.into()),
+                    (ADDRESSES["publisher"].clone(), 78.into())
                 ]
                 .into_iter()
                 .collect()
@@ -321,12 +321,12 @@ mod test {
             get_health(
                 &channel,
                 &vec![
-                    (IDS["publisher"].clone(), 100.into()),
-                    (IDS["publisher2"].clone(), 1.into())
+                    (ADDRESSES["publisher"].clone(), 100.into()),
+                    (ADDRESSES["publisher2"].clone(), 1.into())
                 ]
                 .into_iter()
                 .collect(),
-                &vec![(IDS["publisher"].clone(), 100.into())]
+                &vec![(ADDRESSES["publisher"].clone(), 100.into())]
                     .into_iter()
                     .collect()
             ) >= HEALTH_THRESHOLD

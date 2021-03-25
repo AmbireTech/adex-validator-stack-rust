@@ -30,24 +30,26 @@ pub async fn tick<A: Adapter + 'static>(
     let accounting = match validator_msg_resp {
         Some(MessageTypes::Accounting(accounting)) => accounting,
         _ => Accounting {
-            last_event_aggregate: Utc.timestamp(0, 0),
-            balances_before_fees: Default::default(),
+            last_aggregate: Utc.timestamp(0, 0),
             balances: Default::default(),
         },
     };
-    
+
     //
     // TODO #381: AIP#61 Merge all Spender Aggregates and create a new Accounting
     //
 
     let aggrs = iface
-        .get_event_aggregates(accounting.last_event_aggregate)
+        .get_event_aggregates(accounting.last_aggregate)
         .await?;
 
     if aggrs.events.is_empty() {
         return Ok(TickStatus::NoNewEventAggr(accounting.balances));
     }
 
+    //
+    // TODO: AIP#61 Merge all Spender Aggregates when it's implemented
+    //
     let new_accounting = merge_aggrs(&accounting, &aggrs.events, &iface.channel)?;
 
     if new_accounting.balances.is_empty() {

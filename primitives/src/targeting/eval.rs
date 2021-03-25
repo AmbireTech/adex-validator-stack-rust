@@ -1,4 +1,4 @@
-use crate::BigNum;
+use crate::{Address, BigNum};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_json::{value::Value as SerdeValue, Number};
@@ -13,7 +13,7 @@ use std::{
 pub use rules::Rules;
 
 use super::{
-    input::{channel::Getter as ChannelGetter, Get},
+    input::{campaign::Getter as ChannelGetter, Get},
     Input, Output,
 };
 
@@ -26,16 +26,22 @@ pub enum Error {
     TypeError,
     UnknownVariable,
 }
-pub const DAI_ADDR: &str = "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359";
-pub const USDT_ADDR: &str = "0xdac17f958d2ee523a2206206994597c13d831ec7";
-pub const USDC_ADDR: &str = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
 
 lazy_static! {
-    pub static ref DEPOSIT_ASSETS_MAP: HashMap<String, BigNum> = {
+    pub static ref DAI_ADDR: Address = "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359"
+        .parse()
+        .expect("Valid Address");
+    pub static ref USDT_ADDR: Address = "0xdac17f958d2ee523a2206206994597c13d831ec7"
+        .parse()
+        .expect("Valid Address");
+    pub static ref USDC_ADDR: Address = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+        .parse()
+        .expect("Valid Address");
+    pub static ref DEPOSIT_ASSETS_MAP: HashMap<Address, BigNum> = {
         let mut assets = HashMap::new();
-        assets.insert(DAI_ADDR.into(), BigNum::from(10u64.pow(18)));
-        assets.insert(USDT_ADDR.into(), BigNum::from(10u64.pow(6)));
-        assets.insert(USDC_ADDR.into(), BigNum::from(10u64.pow(18)));
+        assets.insert(*DAI_ADDR, BigNum::from(10u64.pow(18)));
+        assets.insert(*USDT_ADDR, BigNum::from(10u64.pow(6)));
+        assets.insert(*USDC_ADDR, BigNum::from(10u64.pow(18)));
 
         assets
     };
@@ -996,13 +1002,17 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
 
             // if there is no way to get the deposit_asset, then fail with UnknownVariable
             // since we can't calculate the price in USD
-            let deposit_asset = match &input.channel {
-                Some(Get::Getter(ChannelGetter::Full(full_channel))) => {
-                    Ok(full_channel.channel.deposit_asset.clone())
+            let deposit_asset = match &input.campaign {
+                Some(Get::Getter(ChannelGetter::Full(full_campaign))) => {
+                    Ok(full_campaign.campaign.channel.token)
                 }
-                Some(Get::Getter(ChannelGetter::Market(channel))) => {
-                    Ok(channel.deposit_asset.clone())
-                }
+                //
+                // TODO: AIP#61 Replace with Campaign
+                //
+                Some(Get::Getter(ChannelGetter::Market(channel))) => channel
+                    .deposit_asset
+                    .parse::<Address>()
+                    .map_err(|_| Error::TypeError),
                 // In case of a Values - we don't have the deposit_asset on hand so we fail in that case
                 // In case of None we also fail
                 _ => Err(Error::UnknownVariable),
