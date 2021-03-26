@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use chrono::Utc;
 use error::*;
 use ethstore::{
-    ethkey::{public_to_address, recover, verify_address, Address, Message, Password, Signature},
+    ethkey::{public_to_address, recover, verify_address, Address as EthAddress, Message, Password, Signature},
     SafeAccount,
 };
 use futures::TryFutureExt;
@@ -12,7 +12,7 @@ use primitives::{
     adapter::{Adapter, AdapterResult, Deposit, Error as AdapterError, KeystoreOptions, Session},
     channel_validator::ChannelValidator,
     config::Config,
-    Address as PrimitivesAddress, BigNum, Channel, ChannelId, ToETHChecksum, ValidatorId,
+    Address, BigNum, Channel, ChannelId, ToETHChecksum, ValidatorId,
 };
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -135,7 +135,7 @@ impl Adapter for EthereumAdapter {
             return Err(VerifyError::SignatureNotPrefixed.into());
         }
         let decoded_signature = hex::decode(&sig[2..]).map_err(VerifyError::SignatureDecoding)?;
-        let address = Address::from(*signer.inner());
+        let address = EthAddress::from(*signer.inner());
         let signature = Signature::from_electrum(&decoded_signature);
         let state_root = hex::decode(state_root).map_err(VerifyError::StateRootDecoding)?;
         let message = Message::from(hash_message(&state_root));
@@ -277,7 +277,7 @@ impl Adapter for EthereumAdapter {
     async fn get_deposit(
         &self,
         channel: &Channel,
-        address: &PrimitivesAddress,
+        address: &Address,
     ) -> AdapterResult<Deposit, Self::AdapterError> {
         let outpace_contract = Contract::from_json(
             self.web3.eth(),
@@ -286,7 +286,7 @@ impl Adapter for EthereumAdapter {
         )
         .map_err(Error::ContractInitialization)?;
 
-        let deposit_asset_as_address = PrimitivesAddress::try_from(&channel.deposit_asset)
+        let deposit_asset_as_address = Address::try_from(&channel.deposit_asset)
         .map_err(Error::InvalidDepositAsset)?;
 
         let erc20_contract = Contract::from_json(
