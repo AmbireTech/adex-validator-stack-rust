@@ -1,5 +1,7 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
+use std::{error, fmt};
+
 pub use self::{
     ad_slot::AdSlot,
     ad_unit::AdUnit,
@@ -10,14 +12,15 @@ pub use self::{
     config::Config,
     event_submission::EventSubmission,
     ipfs::IPFS,
+    unified_num::UnifiedNum,
     validator::{ValidatorDesc, ValidatorId},
 };
-use std::{error, fmt};
 
 mod ad_slot;
 mod ad_unit;
 pub mod adapter;
 pub mod address;
+pub mod analytics;
 pub mod balances_map;
 pub mod big_num;
 pub mod campaign;
@@ -25,6 +28,7 @@ pub mod channel;
 pub mod channel_v5;
 pub mod channel_validator;
 pub mod config;
+mod eth_checksum;
 pub mod event_submission;
 pub mod ipfs;
 pub mod market;
@@ -32,6 +36,8 @@ pub mod merkle_tree;
 pub mod sentry;
 pub mod supermarket;
 pub mod targeting;
+mod unified_num;
+pub mod validator;
 
 pub mod util {
     pub use api::ApiUrl;
@@ -52,9 +58,6 @@ pub mod util {
 
     pub mod logging;
 }
-pub mod analytics;
-mod eth_checksum;
-pub mod validator;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum DomainError {
@@ -68,6 +71,12 @@ impl fmt::Display for DomainError {
             DomainError::InvalidArgument(err) => write!(f, "{}", err),
             DomainError::RuleViolation(err) => write!(f, "{}", err),
         }
+    }
+}
+
+impl From<address::Error> for DomainError {
+    fn from(error: address::Error) -> Self {
+        Self::InvalidArgument(error.to_string())
     }
 }
 

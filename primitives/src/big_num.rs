@@ -1,13 +1,16 @@
-use std::convert::TryFrom;
-use std::fmt;
-use std::iter::Sum;
-use std::ops::{Add, AddAssign, Div, Mul, Sub};
-use std::str::FromStr;
+use std::{
+    convert::TryFrom,
+    fmt,
+    iter::Sum,
+    ops::{Add, AddAssign, Div, Mul, Sub},
+    str::FromStr,
+};
 
-use num::rational::Ratio;
-use num::{BigUint, CheckedSub, Integer};
+use num::{pow::Pow, rational::Ratio, BigUint, CheckedSub, Integer};
 use num_derive::{Num, NumOps, One, Zero};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+use crate::UnifiedNum;
 
 #[derive(
     Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, NumOps, One, Zero, Num, Default,
@@ -58,6 +61,12 @@ impl fmt::Debug for BigNum {
     }
 }
 
+impl fmt::Display for BigNum {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
 impl Integer for BigNum {
     fn div_floor(&self, other: &Self) -> Self {
         self.0.div_floor(&other.0).into()
@@ -95,6 +104,46 @@ impl Integer for BigNum {
         let (quotient, remainder) = self.0.div_rem(&other.0);
 
         (quotient.into(), remainder.into())
+    }
+}
+
+impl Pow<BigNum> for BigNum {
+    type Output = BigNum;
+
+    fn pow(self, rhs: BigNum) -> Self::Output {
+        Self(self.0.pow(rhs.0))
+    }
+}
+
+impl Pow<&BigNum> for BigNum {
+    type Output = BigNum;
+
+    fn pow(self, rhs: &BigNum) -> Self::Output {
+        BigNum(self.0.pow(&rhs.0))
+    }
+}
+
+impl Pow<BigNum> for &BigNum {
+    type Output = BigNum;
+
+    fn pow(self, rhs: BigNum) -> Self::Output {
+        BigNum(Pow::pow(&self.0, rhs.0))
+    }
+}
+
+impl Pow<&BigNum> for &BigNum {
+    type Output = BigNum;
+
+    fn pow(self, rhs: &BigNum) -> Self::Output {
+        BigNum(Pow::pow(&self.0, &rhs.0))
+    }
+}
+
+impl Pow<u8> for BigNum {
+    type Output = BigNum;
+
+    fn pow(self, rhs: u8) -> Self::Output {
+        BigNum(self.0.pow(rhs))
     }
 }
 
@@ -209,12 +258,6 @@ impl FromStr for BigNum {
     }
 }
 
-impl ToString for BigNum {
-    fn to_string(&self) -> String {
-        self.0.to_str_radix(10)
-    }
-}
-
 impl From<u64> for BigNum {
     fn from(value: u64) -> Self {
         Self(BigUint::from(value))
@@ -224,6 +267,12 @@ impl From<u64> for BigNum {
 impl From<BigUint> for BigNum {
     fn from(value: BigUint) -> Self {
         Self(value)
+    }
+}
+
+impl<'a> Sum<&'a UnifiedNum> for BigNum {
+    fn sum<I: Iterator<Item = &'a UnifiedNum>>(iter: I) -> BigNum {
+        BigNum(iter.map(|unified| BigUint::from(unified.to_u64())).sum())
     }
 }
 
@@ -296,5 +345,12 @@ mod test {
 
         let expected: BigNum = 11.into();
         assert_eq!(expected, &big_num * &ratio);
+    }
+    #[test]
+    fn bignum_formatting() {
+        let bignum: BigNum = 5000.into();
+
+        assert_eq!("5000", &bignum.to_string());
+        assert_eq!("BigNum(radix: 10; 5000)", &format!("{:?}", &bignum));
     }
 }
