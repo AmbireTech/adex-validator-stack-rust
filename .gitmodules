@@ -1,0 +1,4 @@
+[submodule "lib/protocol-eth"]
+	path = lib/protocol-eth
+	url = git@github.com:AdExNetwork/adex-protocol-eth.git
+	branch = guardian-separate-claim
