@@ -4,6 +4,7 @@ use primitives::{
         Adapter, AdapterErrorKind, AdapterResult, Deposit, DummyAdapterOptions,
         Error as AdapterError, Session,
     },
+    channel_v5::Channel as ChannelV5,
     channel_validator::ChannelValidator,
     config::Config,
     Address, BigNum, Channel, ToETHChecksum, ValidatorId,
@@ -132,7 +133,7 @@ impl Adapter for DummyAdapter {
 
     async fn get_deposit(
         &self,
-        channel: &Channel,
+        channel: &ChannelV5,
         address: &Address,
     ) -> AdapterResult<Deposit, Self::AdapterError> {
         // TODO - complete function

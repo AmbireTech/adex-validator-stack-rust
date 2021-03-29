@@ -13,6 +13,7 @@ use futures::TryFutureExt;
 use lazy_static::lazy_static;
 use primitives::{
     adapter::{Adapter, AdapterResult, Deposit, Error as AdapterError, KeystoreOptions, Session},
+    channel_v5::Channel as ChannelV5,
     channel_validator::ChannelValidator,
     config::Config,
     Address, BigNum, Channel, ChannelId, ToETHChecksum, ValidatorId,
@@ -280,7 +281,7 @@ impl Adapter for EthereumAdapter {
 
     async fn get_deposit(
         &self,
-        channel: &Channel,
+        channel: &ChannelV5,
         address: &Address,
     ) -> AdapterResult<Deposit, Self::AdapterError> {
         let outpace_contract = Contract::from_json(
@@ -290,21 +291,15 @@ impl Adapter for EthereumAdapter {
         )
         .map_err(Error::ContractInitialization)?;
 
-        let deposit_asset_as_address =
-            Address::try_from(&channel.deposit_asset).map_err(Error::InvalidDepositAsset)?;
-
-        let erc20_contract = Contract::from_json(
-            self.web3.eth(),
-            deposit_asset_as_address.as_bytes().into(),
-            &ERC20_ABI,
-        )
-        .map_err(Error::ContractInitialization)?;
+        let erc20_contract =
+            Contract::from_json(self.web3.eth(), channel.token.as_bytes().into(), &ERC20_ABI)
+                .map_err(Error::ContractInitialization)?;
 
         let total: H256 = tokio_compat_02::FutureExt::compat(async {
             tokio_compat_02::FutureExt::compat(outpace_contract.query(
                 "deposits",
                 (
-                    H256(*channel.id).into_token(),
+                    H256(*channel.id()).into_token(),
                     H160(*address.as_bytes()).into_token(),
                 ),
                 None,
@@ -321,7 +316,7 @@ impl Adapter for EthereumAdapter {
         let still_on_create_2: H256 = tokio_compat_02::FutureExt::compat(async {
             tokio_compat_02::FutureExt::compat(erc20_contract.query(
                 "balanceOf",
-                Bytes(channel.deposit_asset.as_bytes().to_vec()).into_token(),
+                Bytes(channel.token.as_bytes().to_vec()).into_token(),
                 None,
                 Options::default(),
                 None,
@@ -336,8 +331,8 @@ impl Adapter for EthereumAdapter {
         let token_info = self
             .config
             .token_address_whitelist
-            .get(&deposit_asset_as_address)
-            .ok_or(Error::TokenNotWhitelisted(deposit_asset_as_address))?;
+            .get(&channel.token)
+            .ok_or(Error::TokenNotWhitelisted(channel.token))?;
 
         if still_on_create_2 > token_info.min_token_units_for_deposit {
             total += &still_on_create_2;

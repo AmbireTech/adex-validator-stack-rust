@@ -2837,7 +2837,6 @@ dependencies = [
  "tokio-postgres 0.7.0",
  "toml",
  "url",
- "web3",
 ]
 
 [[package]]

@@ -1,6 +1,6 @@
 use crate::channel::ChannelError;
 use crate::channel_validator::ChannelValidator;
-use crate::{Address, BigNum, Channel, DomainError, ValidatorId};
+use crate::{channel_v5::Channel as ChannelV5, Address, BigNum, Channel, DomainError, ValidatorId};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -113,7 +113,7 @@ pub trait Adapter: ChannelValidator + Send + Sync + fmt::Debug + Clone {
     /// Calculates and returns the total spendable amount
     async fn get_deposit(
         &self,
-        channel: &Channel,
+        channel: &ChannelV5,
         address: &Address,
     ) -> AdapterResult<Deposit, Self::AdapterError>;
 }

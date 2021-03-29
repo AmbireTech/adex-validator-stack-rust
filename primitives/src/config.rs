@@ -19,7 +19,7 @@ lazy_static! {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TokenInfo {
     pub min_token_units_for_deposit: BigNum,
-    pub decimals: NonZeroU8,
+    pub precision: NonZeroU8,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -64,18 +64,20 @@ fn deserialize_token_whitelist<'de, D>(
 where
     D: Deserializer<'de>,
 {
-    let mut tokens_whitelist = HashMap::new();
     let array: Vec<ConfigWhitelist> = Deserialize::deserialize(deserializer)?;
 
-    array.into_iter().for_each(|i| {
-        tokens_whitelist.insert(
-            i.address,
-            TokenInfo {
-                min_token_units_for_deposit: i.min_token_units_for_deposit,
-                decimals: i.precision,
-            },
-        );
-    });
+    let tokens_whitelist: HashMap<Address, TokenInfo> = array
+        .into_iter()
+        .map(|i| {
+            (
+                i.address,
+                TokenInfo {
+                    min_token_units_for_deposit: i.min_token_units_for_deposit,
+                    precision: i.precision,
+                },
+            )
+        })
+        .collect();
 
     Ok(tokens_whitelist)
 }
