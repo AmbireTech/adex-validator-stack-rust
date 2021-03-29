@@ -4,10 +4,8 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 use std::collections::HashMap;
-use std::convert::TryFrom;
 use std::fs;
 use std::num::NonZeroU8;
-use std::str::FromStr;
 
 lazy_static! {
     static ref DEVELOPMENT_CONFIG: Config =

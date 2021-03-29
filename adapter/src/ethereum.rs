@@ -3,7 +3,10 @@ use async_trait::async_trait;
 use chrono::Utc;
 use error::*;
 use ethstore::{
-    ethkey::{public_to_address, recover, verify_address, Address as EthAddress, Message, Password, Signature},
+    ethkey::{
+        public_to_address, recover, verify_address, Address as EthAddress, Message, Password,
+        Signature,
+    },
     SafeAccount,
 };
 use futures::TryFutureExt;
@@ -287,8 +290,8 @@ impl Adapter for EthereumAdapter {
         )
         .map_err(Error::ContractInitialization)?;
 
-        let deposit_asset_as_address = Address::try_from(&channel.deposit_asset)
-        .map_err(Error::InvalidDepositAsset)?;
+        let deposit_asset_as_address =
+            Address::try_from(&channel.deposit_asset).map_err(Error::InvalidDepositAsset)?;
 
         let erc20_contract = Contract::from_json(
             self.web3.eth(),
