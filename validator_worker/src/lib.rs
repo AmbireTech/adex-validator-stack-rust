@@ -50,7 +50,7 @@ mod test {
 
     fn setup_iface(channel: &Channel) -> SentryApi<DummyAdapter> {
         let adapter_options = DummyAdapterOptions {
-            dummy_identity: IDS["leader"].clone(),
+            dummy_identity: IDS["leader"],
             dummy_auth: IDS.clone(),
             dummy_auth_tokens: AUTH.clone(),
         };
@@ -68,8 +68,8 @@ mod test {
         let iface = setup_iface(&channel);
 
         let balances: BalancesMap = vec![
-            (ADDRESSES["publisher"].clone(), 1.into()),
-            (ADDRESSES["tester"].clone(), 2.into()),
+            (ADDRESSES["publisher"], 1.into()),
+            (ADDRESSES["tester"], 2.into()),
         ]
         .into_iter()
         .collect();
@@ -89,7 +89,7 @@ mod test {
 
         let iface = setup_iface(&channel);
 
-        let balances: BalancesMap = vec![(ADDRESSES["publisher"].clone(), 0.into())]
+        let balances: BalancesMap = vec![(ADDRESSES["publisher"], 0.into())]
             .into_iter()
             .collect();
 
