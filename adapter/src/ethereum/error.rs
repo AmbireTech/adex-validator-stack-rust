@@ -1,6 +1,8 @@
-use primitives::adapter::{AdapterErrorKind, Error as AdapterError};
-use primitives::address::Error as AddressError;
-use primitives::{Address, ChannelId};
+use primitives::{
+    adapter::{AdapterErrorKind, Error as AdapterError},
+    address::Error as AddressError,
+    Address, ChannelId
+};
 use std::fmt;
 
 #[derive(Debug)]

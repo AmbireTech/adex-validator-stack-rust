@@ -26,6 +26,7 @@ use std::{convert::TryFrom, fs};
 use tiny_keccak::Keccak;
 use web3::{
     contract::{tokens::Tokenizable, Contract, Options},
+    ethabi::Token,
     transports::Http,
     types::{Bytes, H160, H256, U256},
     Web3,
@@ -62,7 +63,6 @@ impl EthereumAdapter {
     pub fn init(opts: KeystoreOptions, config: &Config) -> AdapterResult<EthereumAdapter, Error> {
         let keystore_contents =
             fs::read_to_string(&opts.keystore_file).map_err(KeystoreError::ReadingFile)?;
-
         let keystore_json: Value =
             serde_json::from_str(&keystore_contents).map_err(KeystoreError::Deserialization)?;
 
@@ -299,7 +299,7 @@ impl Adapter for EthereumAdapter {
             tokio_compat_02::FutureExt::compat(outpace_contract.query(
                 "deposits",
                 (
-                    H256(*channel.id()).into_token(),
+                    channel.id().into_token(),
                     H160(*address.as_bytes()).into_token(),
                 ),
                 None,
@@ -313,7 +313,7 @@ impl Adapter for EthereumAdapter {
 
         let mut total = BigNum::from_str(&total.to_string())?;
 
-        let still_on_create_2: H256 = tokio_compat_02::FutureExt::compat(async {
+        let still_on_create_2: U256 = tokio_compat_02::FutureExt::compat(async {
             tokio_compat_02::FutureExt::compat(erc20_contract.query(
                 "balanceOf",
                 Bytes(channel.token.as_bytes().to_vec()).into_token(),
@@ -326,7 +326,7 @@ impl Adapter for EthereumAdapter {
         .await
         .map_err(Error::ContractQuerying)?;
 
-        let still_on_create_2 = BigNum::from_str(&still_on_create_2.to_string())?;
+        let still_on_create_2: BigNum = still_on_create_2.to_string().parse()?;
 
         let token_info = self
             .config
@@ -501,10 +501,12 @@ mod test {
     use crate::EthereumChannel;
     use chrono::{Duration, Utc};
     use hex::FromHex;
-    use primitives::config::configuration;
-    use primitives::ChannelId;
-    use primitives::{adapter::KeystoreOptions, targeting::Rules};
-    use primitives::{ChannelSpec, EventSubmission, SpecValidators, ValidatorDesc};
+    use primitives::{
+        config::configutaion,
+        adapter::KeystoreOptions,
+        targeting::Rules,
+        ChannelId, ChannelSpec, EventSubmission, SpecValidators, ValidatorDesc
+    };
     use std::convert::TryFrom;
     use web3::types::Address;
     use wiremock::{
