@@ -32,7 +32,8 @@ mod error;
 lazy_static! {
     static ref ADEXCORE_ABI: &'static [u8] =
         include_bytes!("../../lib/protocol-eth/abi/AdExCore.json");
-    static ref ERC20_ABI: &'static [u8] = include_bytes!("../../lib/protocol-eth/abi/ERC20.json");
+    // TODO: Fix it once ERC20 and OUTPACE are merged
+    static ref ERC20_ABI: &'static [u8] = include_bytes!("../ERC20.json");
     static ref OUTPACE_ABI: &'static [u8] =
         include_bytes!("../../lib/protocol-eth/abi/OUTPACE.json");
     static ref CHANNEL_STATE_ACTIVE: U256 = 1.into();
