@@ -36,6 +36,7 @@ pub mod market;
 pub mod merkle_tree;
 pub mod sentry;
 pub mod supermarket;
+pub mod spender;
 pub mod targeting;
 mod unified_num;
 pub mod validator;

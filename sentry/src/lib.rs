@@ -44,6 +44,7 @@ pub mod db;
 pub mod event_aggregator;
 pub mod event_reducer;
 pub mod payout;
+pub mod spender;
 
 lazy_static! {
     static ref CHANNEL_GET_BY_ID: Regex =
