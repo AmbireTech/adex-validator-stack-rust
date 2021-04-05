@@ -1,13 +1,15 @@
-use num::{traits::CheckedRem, pow::Pow, CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Integer, One};
+use crate::BigNum;
+use num::{
+    pow::Pow, traits::CheckedRem, CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Integer, One,
+};
 use num_derive::{FromPrimitive, Num, NumCast, NumOps, ToPrimitive, Zero};
+use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
     fmt,
     iter::Sum,
     ops::{Add, AddAssign, Div, Mul, Sub},
 };
-use serde::{Serialize, Deserialize};
-use crate::BigNum;
 
 /// Unified Number with a precision of 8 digits after the decimal point.
 ///
@@ -32,7 +34,7 @@ use crate::BigNum;
     PartialOrd,
     Ord,
     Serialize,
-    Deserialize
+    Deserialize,
 )]
 #[serde(transparent)]
 pub struct UnifiedNum(u64);
@@ -46,6 +48,10 @@ impl UnifiedNum {
 
     pub fn to_u64(&self) -> u64 {
         self.0
+    }
+
+    pub fn to_bignum(&self) -> BigNum {
+        BigNum::from(self.0)
     }
 
     pub fn checked_add(&self, rhs: &UnifiedNum) -> Option<Self> {
@@ -292,7 +298,10 @@ mod test {
         assert_eq!("0.00000001", &smallest_value.to_string());
         assert_eq!("1449030.00567000", &random_value.to_string());
 
-        assert_eq!(serde_json::Value::Number(100_000_000.into()), serde_json::to_value(one).expect("Should serialize"))
+        assert_eq!(
+            serde_json::Value::Number(100_000_000.into()),
+            serde_json::to_value(one).expect("Should serialize")
+        )
     }
 
     #[test]

@@ -1,4 +1,4 @@
-use crate::{channel::Pricing, BigNum, Channel};
+use crate::{campaign::Pricing, BigNum, Campaign};
 
 pub use eval::*;
 use serde_json::Number;
@@ -9,25 +9,15 @@ pub use input::{field::GetField, Input};
 mod eval;
 pub mod input;
 
-pub fn get_pricing_bounds(channel: &Channel, event_type: &str) -> Pricing {
-    channel
-        .spec
+pub fn get_pricing_bounds(campaign: &Campaign, event_type: &str) -> Pricing {
+    campaign
         .pricing_bounds
         .as_ref()
         .and_then(|pricing_bounds| pricing_bounds.get(event_type))
         .cloned()
-        .unwrap_or_else(|| {
-            if event_type == "IMPRESSION" {
-                Pricing {
-                    min: channel.spec.min_per_impression.clone().max(1.into()),
-                    max: channel.spec.max_per_impression.clone().max(1.into()),
-                }
-            } else {
-                Pricing {
-                    min: 0.into(),
-                    max: 0.into(),
-                }
-            }
+        .unwrap_or_else(|| Pricing {
+            min: 0.into(),
+            max: 0.into(),
         })
 }
 
@@ -67,9 +57,9 @@ impl Output {
     }
 }
 
-impl From<&Channel> for Output {
-    fn from(channel: &Channel) -> Self {
-        let price = match &channel.spec.pricing_bounds {
+impl From<&Campaign> for Output {
+    fn from(campaign: &Campaign) -> Self {
+        let price = match &campaign.pricing_bounds {
             Some(pricing_bounds) => pricing_bounds
                 .to_vec()
                 .into_iter()
@@ -112,11 +102,11 @@ mod test {
 
     #[test]
     fn test_output_from_channel() {
-        use crate::channel::{Pricing, PricingBounds};
-        use crate::util::tests::prep_db::DUMMY_CHANNEL;
+        use crate::campaign::{Pricing, PricingBounds};
+        use crate::util::tests::prep_db::DUMMY_CAMPAIGN;
 
-        let mut channel = DUMMY_CHANNEL.clone();
-        channel.spec.pricing_bounds = Some(PricingBounds {
+        let mut campaign = DUMMY_CAMPAIGN.clone();
+        campaign.pricing_bounds = Some(PricingBounds {
             impression: Some(Pricing {
                 min: 1_000.into(),
                 max: 2_000.into(),
@@ -127,7 +117,7 @@ mod test {
             }),
         });
 
-        let output = Output::from(&channel);
+        let output = Output::from(&campaign);
 
         assert_eq!(true, output.show);
         assert_eq!(1.0, output.boost);

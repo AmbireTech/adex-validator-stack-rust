@@ -3,8 +3,11 @@ use crate::access::Error as AccessError;
 use crate::db::event_aggregate::insert_event_aggregate;
 use crate::db::DbPool;
 use crate::db::{get_channel_by_id, update_targeting_rules};
-use crate::event_reducer;
-use crate::payout::get_payout;
+//
+// TODO: AIP#61 Event Aggregator should be replaced with the Spender aggregator & Event Analytics
+//
+// use crate::event_reducer;
+// use crate::payout::get_payout;
 use crate::Application;
 use crate::ResponseError;
 use crate::Session;
@@ -155,24 +158,27 @@ impl EventAggregator {
             update_targeting_rules(&app.pool, &channel_id, &new_rules).await?;
         }
 
+        //
+        // TODO: AIP#61 Events & payouts should be separated in to Analytics & Spender Aggregator
+        //
         // Pre-computing all payouts once
-        let events_with_payout: Vec<(Event, Option<(ValidatorId, BigNum)>)> = events
-            .iter()
-            .filter(|ev| ev.is_click_event() || ev.is_impression_event())
-            .map(|ev| {
-                let payout = match get_payout(&app.logger, &record.channel, &ev, &session) {
-                    Ok(payout) => payout,
-                    Err(err) => return Err(err),
-                };
+        let events_with_payout: Vec<(Event, Option<(ValidatorId, BigNum)>)> = vec![]; /* events
+                                                                                      .iter()
+                                                                                      .filter(|ev| ev.is_click_event() || ev.is_impression_event())
+                                                                                      .map(|ev| {
+                                                                                          let payout = match get_payout(&app.logger, &record.channel, &ev, &session) {
+                                                                                              Ok(payout) => payout,
+                                                                                              Err(err) => return Err(err),
+                                                                                          };
 
-                match event_reducer::reduce(&record.channel, &mut record.aggregate, &ev, &payout) {
-                    Ok(_) => {}
-                    Err(err) => error!(&app.logger, "Event Reducred failed"; "error" => ?err),
-                }
+                                                                                          match event_reducer::reduce(&record.channel, &mut record.aggregate, &ev, &payout) {
+                                                                                              Ok(_) => {}
+                                                                                              Err(err) => error!(&app.logger, "Event Reducred failed"; "error" => ?err),
+                                                                                          }
 
-                Ok((ev.clone(), payout))
-            })
-            .collect::<Result<_, _>>()?;
+                                                                                          Ok((ev.clone(), payout))
+                                                                                      })
+                                                                                      .collect::<Result<_, _>>()?; */
 
         // We don't want to save empty aggregates
         if record.aggregate.events.is_empty() {

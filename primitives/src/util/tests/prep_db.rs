@@ -1,15 +1,16 @@
 use crate::{
+    campaign::{self, Active, Validators},
     channel::{Pricing, PricingBounds},
+    channel_v5::{self, Nonce},
     targeting::Rules,
-    AdUnit, BigNum, Channel, ChannelId, ChannelSpec, EventSubmission, SpecValidators,
-    ValidatorDesc, ValidatorId, IPFS,
+    AdUnit, Address, BigNum, Campaign, Channel, ChannelId, ChannelSpec, EventSubmission,
+    SpecValidators, UnifiedNum, ValidatorDesc, ValidatorId, IPFS,
 };
 use chrono::{TimeZone, Utc};
 use fake::faker::{Faker, Number};
 use hex::FromHex;
 use lazy_static::lazy_static;
-use std::collections::HashMap;
-use std::convert::TryFrom;
+use std::{collections::HashMap, convert::TryFrom};
 
 lazy_static! {
     // dummy auth
@@ -27,6 +28,33 @@ lazy_static! {
 
         ids
     };
+
+    pub static ref ADDRESSES: HashMap<String, Address> = {
+        let mut addresses = HashMap::new();
+
+        addresses.insert("leader".into(),  Address::try_from("0xce07CbB7e054514D590a0262C93070D838bFBA2e").expect("failed to parse id"));
+        addresses.insert("follower".into(), Address::try_from("0xc91763d7f14ac5c5ddfbcd012e0d2a61ab9bded3").expect("failed to parse id"));
+        addresses.insert("user".into(), Address::try_from("0x20754168c00a6e58116ccfd0a5f7d1bb66c5de9d").expect("failed to parse id"));
+        addresses.insert("publisher".into(), Address::try_from("0xb7d3f81e857692d13e9d63b232a90f4a1793189e").expect("failed to parse id"));
+        addresses.insert("publisher2".into(), Address::try_from("0x2054b0c1339309597ad04ba47f4590f8cdb4e305").expect("failed to parse id"));
+        addresses.insert("creator".into(), Address::try_from("0x033ed90e0fec3f3ea1c9b005c724d704501e0196").expect("failed to parse id"));
+        addresses.insert("tester".into(), Address::try_from("0x2892f6C41E0718eeeDd49D98D648C789668cA67d").expect("failed to parse id"));
+        // These are the real Addresses of these stablecoins, however, they are only used for testing!
+        addresses.insert("DAI".into(), Address::try_from("0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359").expect("failed to parse id"));
+        addresses.insert("USDT".into(), Address::try_from("0xdac17f958d2ee523a2206206994597c13d831ec7").expect("failed to parse id"));
+        addresses.insert("USDC".into(), Address::try_from("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48").expect("failed to parse id"));
+
+        addresses
+    };
+
+    pub static ref TOKENS: HashMap<String, Address> = {
+        let mut tokens = HashMap::new();
+
+        tokens.insert("DAI".into(), "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359".parse::<Address>().expect("Should parse"));
+
+        tokens
+    };
+
     // dummy auth tokens
     // authorization tokens
     pub static ref AUTH: HashMap<String, String> = {
@@ -55,6 +83,33 @@ lazy_static! {
         url: "http://localhost:8006".to_string(),
         fee: 100.into(),
         fee_addr: None,
+    };
+
+    pub static ref DUMMY_CAMPAIGN: Campaign = {
+        Campaign {
+            id: "0x936da01f9abd4d9d80c702af85c822a8".parse().expect("Should parse"),
+            channel: channel_v5::Channel {
+                leader: IDS["leader"],
+                follower: IDS["follower"],
+                guardian: IDS["tester"].to_address(),
+                token: TOKENS["DAI"],
+                nonce: Nonce::from(987_654_321_u32),
+            },
+            creator: IDS["creator"].to_address(),
+            // 1000.00000000
+            budget: UnifiedNum::from(100_000_000_000),
+            validators: Validators::new(DUMMY_VALIDATOR_LEADER.clone(), DUMMY_VALIDATOR_FOLLOWER.clone()),
+            title: Some("Dummy Campaign".to_string()),
+            pricing_bounds: Some(campaign::PricingBounds {impression: Some(campaign::Pricing { min: 1.into(), max: 10.into()}), click: Some(campaign::Pricing { min: 0.into(), max: 0.into()})}),
+            event_submission: Some(EventSubmission { allow: vec![] }),
+            ad_units: vec![],
+            targeting_rules: Rules::new(),
+            created: Utc.ymd(2021, 2, 1).and_hms(7,0,0),
+            active: Active {
+                to: Utc.ymd(2099, 1, 30).and_hms(0,0,0),
+                from: None,
+            },
+        }
     };
 
     pub static ref DUMMY_CHANNEL: Channel = {

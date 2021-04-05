@@ -107,7 +107,13 @@ impl Channel {
         self.exhausted.len() == 2 && self.exhausted.iter().all(|&x| x)
     }
 }
-
+//
+//
+//
+// TODO REMOVE
+//
+//
+//
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct Pricing {
     pub max: BigNum,

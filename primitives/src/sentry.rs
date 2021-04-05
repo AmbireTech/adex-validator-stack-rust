@@ -1,8 +1,7 @@
 use crate::{
     targeting::Rules,
-    validator::Type as MessageType,
-    validator::{ApproveState, Heartbeat, MessageTypes, NewState},
-    BigNum, Channel, ChannelId, ValidatorId,
+    validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
+    Address, BalancesMap, BigNum, Channel, ChannelId, ValidatorId, IPFS,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -114,21 +113,31 @@ pub mod message {
 pub enum Event {
     #[serde(rename_all = "camelCase")]
     Impression {
-        publisher: ValidatorId,
-        ad_unit: Option<String>,
-        ad_slot: Option<String>,
+        publisher: Address,
+        ad_unit: Option<IPFS>,
+        ad_slot: Option<IPFS>,
         referrer: Option<String>,
     },
+    #[serde(rename_all = "camelCase")]
     Click {
-        publisher: ValidatorId,
-        ad_unit: Option<String>,
-        ad_slot: Option<String>,
+        publisher: Address,
+        ad_unit: Option<IPFS>,
+        ad_slot: Option<IPFS>,
         referrer: Option<String>,
     },
     /// only the creator can send this event
+    #[serde(rename_all = "camelCase")]
     UpdateTargeting { targeting_rules: Rules },
+    /// Closes the `Campaign`
     /// only the creator can send this event
+    #[serde(rename_all = "camelCase")]
     Close,
+    /// TODO: AIP#61 Check and explain who can send this event as well as when it can be received
+    /// A map of earners which gets merged in the `spender::Aggregate`
+    /// NOTE: Does **not** contain any fees!
+    /// This even can be used to pay to yourself, but this is irrelevant as it's your funds you are paying yourself.
+    #[serde(rename_all = "camelCase")]
+    Pay { payout: BalancesMap },
 }
 
 impl Event {
@@ -139,16 +148,27 @@ impl Event {
     pub fn is_impression_event(&self) -> bool {
         matches!(self, Event::Impression { .. })
     }
+
+    pub fn as_str(&self) -> &str {
+        self.as_ref()
+    }
+}
+
+impl AsRef<str> for Event {
+    fn as_ref(&self) -> &str {
+        match *self {
+            Event::Impression { .. } => "IMPRESSION",
+            Event::Click { .. } => "CLICK",
+            Event::UpdateTargeting { .. } => "UPDATE_TARGETING",
+            Event::Close => "CLOSE",
+            Event::Pay { .. } => "PAY",
+        }
+    }
 }
 
 impl fmt::Display for Event {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            Event::Impression { .. } => write!(f, "IMPRESSION"),
-            Event::Click { .. } => write!(f, "CLICK"),
-            Event::UpdateTargeting { .. } => write!(f, "UPDATE_TARGETING"),
-            Event::Close => write!(f, "CLOSE"),
-        }
+        f.write_str(self.as_ref())
     }
 }
 
@@ -171,8 +191,8 @@ pub struct EventAggregate {
 #[serde(rename_all = "camelCase")]
 pub struct AggregateEvents {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub event_counts: Option<HashMap<ValidatorId, BigNum>>,
-    pub event_payouts: HashMap<ValidatorId, BigNum>,
+    pub event_counts: Option<HashMap<Address, BigNum>>,
+    pub event_payouts: HashMap<Address, BigNum>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -363,5 +383,35 @@ mod postgres {
 
         accepts!(JSONB);
         to_sql_checked!();
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::util::tests::prep_db::{ADDRESSES, DUMMY_IPFS};
+    use serde_json::json;
+
+    #[test]
+    pub fn de_serialize_events() {
+        let click = Event::Click {
+            publisher: ADDRESSES["publisher"],
+            ad_unit: Some(DUMMY_IPFS[0].clone()),
+            ad_slot: Some(DUMMY_IPFS[1].clone()),
+            referrer: Some("some_referrer".to_string()),
+        };
+
+        let click_json = json!({
+            "type": "CLICK",
+            "publisher": "0xB7d3F81E857692d13e9D63b232A90F4A1793189E",
+            "adUnit": "QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR",
+            "adSlot": "Qmasg8FrbuSQpjFu3kRnZF9beg8rEBFrqgi1uXDRwCbX5f",
+            "referrer": "some_referrer"
+        });
+
+        pretty_assertions::assert_eq!(
+            click_json,
+            serde_json::to_value(click).expect("should serialize")
+        );
     }
 }
