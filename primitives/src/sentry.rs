@@ -172,13 +172,6 @@ impl fmt::Display for Event {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct Earner {
-    #[serde(rename = "publisher")]
-    pub address: String,
-    pub promilles: u64,
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EventAggregate {

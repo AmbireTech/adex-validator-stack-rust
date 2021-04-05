@@ -106,10 +106,13 @@ impl TryFrom<Value> for ValidatorId {
 #[serde(rename_all = "camelCase")]
 pub struct ValidatorDesc {
     pub id: ValidatorId,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub fee_addr: Option<Address>,
-    pub url: String,
+    /// The validator fee in pro milles (per 1000)
     pub fee: UnifiedNum,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// The address which will receive the fees
+    pub fee_addr: Option<Address>,
+    /// The url of the Validator on which is the API
+    pub url: String,
 }
 
 /// Validator Message Types
