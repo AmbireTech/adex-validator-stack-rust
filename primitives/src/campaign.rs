@@ -1,6 +1,6 @@
 use crate::{
     channel_v5::Channel, targeting::Rules, AdUnit, Address, EventSubmission, UnifiedNum,
-    ValidatorDesc,
+    ValidatorDesc, ValidatorId,
 };
 
 use chrono::{

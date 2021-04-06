@@ -1,4 +1,4 @@
-use crate::{Address, BalancesMap, UnifiedNum, channel_v5::Channel};
+use crate::{channel_v5::Channel, Address, BalancesMap, UnifiedNum};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 

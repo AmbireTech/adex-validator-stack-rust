@@ -24,7 +24,7 @@ impl Aggregator {
 }
 
 pub mod fee {
-    pub const PRO_MILLE: UnifiedNum = UnifiedNum::from_u64(1000);
+    pub const PRO_MILLE: UnifiedNum = UnifiedNum::from_u64(1_000);
 
     use primitives::{Address, Campaign, DomainError, UnifiedNum, ValidatorId};
 
@@ -40,7 +40,7 @@ pub mod fee {
             Some(validator) => {
                 // should never overflow
                 let fee_payout = payout
-                    .checked_mul(validator.fee)
+                    .checked_mul(&validator.fee)
                     .ok_or(DomainError::InvalidArgument(
                         "payout calculation overflow".to_string(),
                     ))?

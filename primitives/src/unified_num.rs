@@ -346,7 +346,7 @@ mod test {
         let pro_milles = UnifiedNum::from(1_000);
         let division = one_sevens.div(&pro_milles);
         let fee = UnifiedNum::from(7);
-        
+
         assert_eq!(UnifiedNum::from(100_007), division);
         // e.g. fee of 7 pro milles
         assert_eq!(UnifiedNum::from(700_049), division * &fee);
@@ -359,12 +359,12 @@ mod test {
         let pro_milles = UnifiedNum::from(1_000);
         let fee = UnifiedNum::from(7);
         let multiply = one_sevens.mul(&fee);
-        
+
         // assert_eq!(UnifiedNum::from(100_007), multiply);
         // e.g. fee of 7 pro milles
         assert_eq!(UnifiedNum::from(700_049), multiply.div(&pro_milles));
     }
-    
+
     #[test]
     fn div_rem_fee_calculation() {
         // 1.00007777
@@ -380,8 +380,14 @@ mod test {
         assert_eq!(&expected_remainder, &remainder);
 
         let expected_fee_of_remainder = UnifiedNum::from(5_439).div_floor(&pro_milles);
-        assert_eq!(expected_fee_of_remainder, (&expected_remainder * &fee).div_floor(&pro_milles));
+        assert_eq!(
+            expected_fee_of_remainder,
+            (&expected_remainder * &fee).div_floor(&pro_milles)
+        );
 
-        assert_eq!(UnifiedNum::from(700_054), main_fee + expected_fee_of_remainder);
+        assert_eq!(
+            UnifiedNum::from(700_054),
+            main_fee + expected_fee_of_remainder
+        );
     }
 }
