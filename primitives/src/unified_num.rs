@@ -338,50 +338,40 @@ mod test {
             "It should not make any adjustments to the precision"
         );
     }
+}
 
-    #[test]
-    fn div_and_floor_fee_calculation() {
-        // 1.00007777
-        let one_sevens = UnifiedNum::from(100_007_777_u64);
-        let pro_milles = UnifiedNum::from(1_000);
-        let division = one_sevens.div(&pro_milles);
-        let fee = UnifiedNum::from(7);
-        
-        assert_eq!(UnifiedNum::from(100_007), division);
-        // e.g. fee of 7 pro milles
-        assert_eq!(UnifiedNum::from(700_049), division * &fee);
+#[cfg(feature = "postgres")]
+// TODO: Test UnifiedNum postgres impl
+mod postgres {
+    use super::UnifiedNum;
+    use bytes::BytesMut;
+    use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
+    use std::{
+        convert::{TryFrom, TryInto},
+        error::Error,
+    };
+
+    impl<'a> FromSql<'a> for UnifiedNum {
+        fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<UnifiedNum, Box<dyn Error + Sync + Send>> {
+            let value = <i64 as FromSql>::from_sql(ty, raw)?;
+
+            Ok(UnifiedNum(u64::try_from(value)?))
+        }
+
+        accepts!(INT8);
     }
 
-    #[test]
-    fn mul_first_and_div_fee_calculation() {
-        // 1.00007777
-        let one_sevens = UnifiedNum::from(100_007_777_u64);
-        let pro_milles = UnifiedNum::from(1_000);
-        let fee = UnifiedNum::from(7);
-        let multiply = one_sevens.mul(&fee);
-        
-        // assert_eq!(UnifiedNum::from(100_007), multiply);
-        // e.g. fee of 7 pro milles
-        assert_eq!(UnifiedNum::from(700_049), multiply.div(&pro_milles));
-    }
-    
-    #[test]
-    fn div_rem_fee_calculation() {
-        // 1.00007777
-        let one_sevens = UnifiedNum::from(100_007_777_u64);
-        let pro_milles = UnifiedNum::from(1_000);
-        let fee = UnifiedNum::from(7);
+    impl ToSql for UnifiedNum {
+        fn to_sql(
+            &self,
+            ty: &Type,
+            w: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+            <i64 as ToSql>::to_sql(&self.0.try_into()?, ty, w)
+        }
 
-        let (quotient, remainder) = one_sevens.div_rem(&pro_milles);
-        let main_fee = quotient * &fee;
-        assert_eq!(&UnifiedNum::from(700_049), &main_fee);
+        accepts!(INT8);
 
-        let expected_remainder = UnifiedNum::from(777);
-        assert_eq!(&expected_remainder, &remainder);
-
-        let expected_fee_of_remainder = UnifiedNum::from(5_439).div_floor(&pro_milles);
-        assert_eq!(expected_fee_of_remainder, (&expected_remainder * &fee).div_floor(&pro_milles));
-
-        assert_eq!(UnifiedNum::from(700_054), main_fee + expected_fee_of_remainder);
+        to_sql_checked!();
     }
 }
