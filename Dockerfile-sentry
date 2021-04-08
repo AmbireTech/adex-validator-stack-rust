@@ -1,5 +1,5 @@
 # Builder
-FROM rust:1.48.0 as builder
+FROM rust:latest as builder
 
 LABEL maintainer="dev@adex.network"
 
@@ -33,9 +33,9 @@ RUN rm -f target/release/deps/libprimitives*
 COPY . .
 
 # We install the sentry binary with all features in Release mode
-# Inlcude the full backtrace for easier debugging
+# Include the full backtrace for easier debugging
 
-RUN RUST_BACKTRACE=full cargo install --path sentry --all-features
+RUN RUST_BACKTRACE=full cargo install --locked --path sentry --all-features
 
 WORKDIR /usr/local/bin
 
