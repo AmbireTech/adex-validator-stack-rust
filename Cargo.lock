@@ -958,6 +958,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "deadpool-postgres"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5452506f60a0ceca624c4becc948f9f0ae67f35fc0ae471b9dcb841d110cf70a"
+dependencies = [
+ "async-trait",
+ "config",
+ "deadpool",
+ "futures 0.3.12",
+ "log",
+ "serde",
+ "tokio 1.0.2",
+ "tokio-postgres 0.7.0",
+]
+
+[[package]]
 name = "derive_more"
 version = "0.99.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2857,6 +2873,7 @@ dependencies = [
  "bytes 1.0.1",
  "chrono",
  "cid",
+ "deadpool-postgres",
  "ethabi",
  "ethereum-types 0.11.0",
  "fake",
@@ -2867,6 +2884,7 @@ dependencies = [
  "num",
  "num-derive",
  "num-traits",
+ "once_cell",
  "parse-display",
  "postgres-types 0.2.0",
  "pretty_assertions",
@@ -2882,6 +2900,7 @@ dependencies = [
  "thiserror",
  "time 0.1.43",
  "tiny-keccak 2.0.2",
+ "tokio 1.0.2",
  "tokio-postgres 0.7.0",
  "toml",
  "url",
