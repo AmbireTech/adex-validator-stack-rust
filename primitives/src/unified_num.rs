@@ -374,4 +374,42 @@ mod postgres {
 
         to_sql_checked!();
     }
+
+    #[cfg(test)]
+    mod test {
+        use super::*;
+        use crate::util::tests::prep_db::postgres::POSTGRES_POOL;
+
+        #[tokio::test]
+        async fn from_and_to_sql() {
+            let client = POSTGRES_POOL.get().await.unwrap();
+
+            let sql_type = "BIGINT";
+            let (val, repr) = (
+                UnifiedNum(9_223_372_036_854_775_708_u64),
+                "9223372036854775708",
+            );
+
+            // from SQL
+            {
+                let rows = client
+                    .query(&*format!("SELECT {}::{}", repr, sql_type), &[])
+                    .await
+                    .unwrap();
+                let result: UnifiedNum = rows[0].get(0);
+
+                assert_eq!(&val, &result);
+            }
+
+            // to SQL
+            {
+                let rows = client
+                    .query(&*format!("SELECT $1::{}", sql_type), &[&val])
+                    .await
+                    .unwrap();
+                let result = rows[0].get(0);
+                assert_eq!(&val, &result);
+            }
+        }
+    }
 }
