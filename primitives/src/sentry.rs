@@ -1,9 +1,4 @@
-use crate::{
-    targeting::Rules,
-    validator::Type as MessageType,
-    validator::{ApproveState, Heartbeat, MessageTypes, NewState},
-    BigNum, Channel, ChannelId, ValidatorId,
-};
+use crate::{Address, BalancesMap, BigNum, Channel, ChannelId, IPFS, ValidatorId, targeting::Rules, validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType}};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt, hash::Hash};
