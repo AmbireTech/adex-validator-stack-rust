@@ -1,48 +1,68 @@
-CREATE TABLE channels
-(
-    id              VARCHAR(66)              NOT NULL,
-    creator         VARCHAR(255)             NOT NULL,
-    deposit_asset   VARCHAR(42)              NOT NULL,
-    deposit_amount  VARCHAR(255)             NOT NULL,
-    valid_until     TIMESTAMP(2) WITH TIME ZONE NOT NULL,
-    spec            JSONB                    NOT NULL,
-    targeting_rules JSONB DEFAULT '[]'       NOT NULL,
-    exhausted       BOOLEAN[2] DEFAULT '{}'  NOT NULL,
-
+CREATE TABLE campaigns (
+    id varchar(34) NOT NULL,
+    channel_id varchar(66) NOT NULL,
+    channel jsonb NOT NULL,
+    creator varchar(42) NOT NULL,
+    budget numeric(20, 8) NOT NULL,
+    validators jsonb NOT NULL,
+    title varchar(255) NULL,
+    pricing_bounds jsonb DEFAULT '{}' NULL,
+    event_submission jsonb DEFAULT '{}' NULL,
+    ad_units jsonb DEFAULT '[]' NOT NULL,
+    targeting_rules jsonb DEFAULT '[]' NOT NULL,
+    created timestamp(2) with time zone NOT NULL,
+    active_from timestamp(2) with time zone NULL,
+    active_to timestamp(2) with time zone NOT NULL,
     PRIMARY KEY (id)
 );
 
-CREATE INDEX idx_channel_valid_until ON channels (valid_until);
-CREATE INDEX idx_channels_spec_created ON channels ((spec ->> 'created'));
+CREATE INDEX idx_campaign_active_to ON campaign (active_to);
 
-CREATE TABLE validator_messages
-(
-    channel_id VARCHAR(66)              NOT NULL REFERENCES channels (id) ON DELETE RESTRICT,
-    "from"     VARCHAR(255)             NOT NULL,
-    msg        JSONB                    NOT NULL,
-    received   TIMESTAMP(2) WITH TIME ZONE NOT NULL
+CREATE INDEX idx_campaign_created ON campaign (created);
+
+CREATE TABLE spendable (
+    spender varchar(42) NOT NULL,
+    channel_id varchar(66) NOT NULL,
+    channel jsonb NOT NULL,
+    total numeric(20, 8) NOT NULL,
+    still_on_create2 numeric(20, 8),
+    PRIMARY KEY (spender, channel_id)
+);
+
+CREATE TABLE validator_messages (
+    -- TODO: Should the validator message be reference to channel_id or campaign_id?
+    channel_id varchar(66) NOT NULL, -- REFERENCES channels (id) ON DELETE RESTRICT,
+    "from" varchar(255) NOT NULL,
+    msg jsonb NOT NULL,
+    received timestamp(2) with time zone NOT NULL
 );
 
 CREATE INDEX idx_validator_messages_received ON validator_messages (received);
+
 CREATE INDEX idx_validator_messages_msg_type ON validator_messages ((msg ->> 'type'));
+
 CREATE INDEX idx_validator_messages_msg_state_root ON validator_messages ((msg ->> 'stateRoot'));
 
-CREATE TABLE event_aggregates
-(
-    channel_id VARCHAR(66)              NOT NULL REFERENCES channels (id) ON DELETE RESTRICT,
-    created    TIMESTAMP(2) WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    event_type VARCHAR(255)             NOT NULL,
-    earner     VARCHAR(255),
-    count      VARCHAR                   NOT NULL,
-    payout     VARCHAR                   NOT NULL
+-- TODO: AIP#61 Alter Event Aggregates
+CREATE TABLE event_aggregates (
+    channel_id varchar(66) NOT NULL REFERENCES channels (id) ON DELETE RESTRICT,
+    created timestamp(2) with time zone NOT NULL DEFAULT NOW(),
+    event_type varchar(255) NOT NULL,
+    earner varchar(42),
+    -- todo: AIP#61 check the count and payout
+    count varchar NOT NULL,
+    payout varchar NOT NULL
 );
 
 CREATE INDEX idx_event_aggregates_created ON event_aggregates (created);
+
 CREATE INDEX idx_event_aggregates_channel ON event_aggregates (channel_id);
+
 CREATE INDEX idx_event_aggregates_event_type ON event_aggregates (event_type);
 
-CREATE AGGREGATE jsonb_object_agg(jsonb) (
-  SFUNC = 'jsonb_concat',
-  STYPE = jsonb,
-  INITCOND = '{}'
+CREATE AGGREGATE jsonb_object_agg (jsonb) (
+    SFUNC = 'jsonb_concat',
+    STYPE = jsonb,
+    INITCOND = '{}'
 );
+
