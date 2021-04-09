@@ -220,3 +220,44 @@ lazy_static! {
     ];
 
 }
+
+#[cfg(all(test, feature = "postgres"))]
+pub mod postgres {
+    use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
+    use lazy_static::lazy_static;
+    use once_cell::sync::Lazy;
+    use std::env;
+    use tokio_postgres::{Config, NoTls};
+
+    // TODO: Fix these values for usage in CI
+    lazy_static! {
+        static ref POSTGRES_USER: String =
+            env::var("POSTGRES_USER").unwrap_or_else(|_| String::from("postgres"));
+        static ref POSTGRES_PASSWORD: String =
+            env::var("POSTGRES_PASSWORD").unwrap_or_else(|_| String::from("postgres"));
+        static ref POSTGRES_HOST: String =
+            env::var("POSTGRES_HOST").unwrap_or_else(|_| String::from("localhost"));
+        static ref POSTGRES_PORT: u16 = env::var("POSTGRES_PORT")
+            .unwrap_or_else(|_| String::from("5432"))
+            .parse()
+            .unwrap();
+        static ref POSTGRES_DB: Option<String> = env::var("POSTGRES_DB").ok();
+    }
+
+    pub static POSTGRES_POOL: Lazy<Pool> = Lazy::new(|| {
+        let mut config = Config::new();
+
+        config
+            .user(&POSTGRES_USER)
+            .password(POSTGRES_PASSWORD.as_str())
+            .host(&POSTGRES_HOST)
+            .port(*POSTGRES_PORT);
+
+        let mgr_config = ManagerConfig {
+            recycling_method: RecyclingMethod::Fast,
+        };
+        let mgr = Manager::from_config(config, NoTls, mgr_config);
+        let pool = Pool::new(mgr, 16);
+        pool
+    });
+}

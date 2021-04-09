@@ -339,3 +339,77 @@ mod test {
         );
     }
 }
+
+#[cfg(feature = "postgres")]
+// TODO: Test UnifiedNum postgres impl
+mod postgres {
+    use super::UnifiedNum;
+    use bytes::BytesMut;
+    use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
+    use std::{
+        convert::{TryFrom, TryInto},
+        error::Error,
+    };
+
+    impl<'a> FromSql<'a> for UnifiedNum {
+        fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<UnifiedNum, Box<dyn Error + Sync + Send>> {
+            let value = <i64 as FromSql>::from_sql(ty, raw)?;
+
+            Ok(UnifiedNum(u64::try_from(value)?))
+        }
+
+        accepts!(INT8);
+    }
+
+    impl ToSql for UnifiedNum {
+        fn to_sql(
+            &self,
+            ty: &Type,
+            w: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+            <i64 as ToSql>::to_sql(&self.0.try_into()?, ty, w)
+        }
+
+        accepts!(INT8);
+
+        to_sql_checked!();
+    }
+
+    #[cfg(test)]
+    mod test {
+        use super::*;
+        use crate::util::tests::prep_db::postgres::POSTGRES_POOL;
+
+        #[tokio::test]
+        async fn from_and_to_sql() {
+            let client = POSTGRES_POOL.get().await.unwrap();
+
+            let sql_type = "BIGINT";
+            let (val, repr) = (
+                UnifiedNum(9_223_372_036_854_775_708_u64),
+                "9223372036854775708",
+            );
+
+            // from SQL
+            {
+                let rows = client
+                    .query(&*format!("SELECT {}::{}", repr, sql_type), &[])
+                    .await
+                    .unwrap();
+                let result: UnifiedNum = rows[0].get(0);
+
+                assert_eq!(&val, &result);
+            }
+
+            // to SQL
+            {
+                let rows = client
+                    .query(&*format!("SELECT $1::{}", sql_type), &[&val])
+                    .await
+                    .unwrap();
+                let result = rows[0].get(0);
+                assert_eq!(&val, &result);
+            }
+        }
+    }
+}

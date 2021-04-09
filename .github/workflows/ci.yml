@@ -27,3 +27,9 @@ jobs:
         # Running cargo make doesn't successfully start `ganache`
         run: |
           cargo make ci-flow
+        # set environment variables for `primitives` postgres tests
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_HOST: localhost
+          POSTGRES_DB: sentry_leader
