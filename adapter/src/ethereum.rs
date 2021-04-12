@@ -26,9 +26,8 @@ use std::{convert::TryFrom, fs};
 use tiny_keccak::Keccak;
 use web3::{
     contract::{tokens::Tokenizable, Contract, Options},
-    ethabi::Token,
     transports::Http,
-    types::{Bytes, H160, H256, U256},
+    types::{H160, H256, U256},
     Web3,
 };
 
@@ -295,12 +294,12 @@ impl Adapter for EthereumAdapter {
             Contract::from_json(self.web3.eth(), channel.token.as_bytes().into(), &ERC20_ABI)
                 .map_err(Error::ContractInitialization)?;
 
-        let total: H256 = tokio_compat_02::FutureExt::compat(async {
+        let total: U256 = tokio_compat_02::FutureExt::compat(async {
             tokio_compat_02::FutureExt::compat(outpace_contract.query(
                 "deposits",
                 (
-                    channel.id().into_token(),
-                    H160(*address.as_bytes()).into_token(),
+                    *channel.id(),
+                    H160(*address.as_bytes()),
                 ),
                 None,
                 Options::default(),
@@ -316,7 +315,7 @@ impl Adapter for EthereumAdapter {
         let still_on_create_2: U256 = tokio_compat_02::FutureExt::compat(async {
             tokio_compat_02::FutureExt::compat(erc20_contract.query(
                 "balanceOf",
-                Bytes(channel.token.as_bytes().to_vec()).into_token(),
+                H160(*channel.token.as_bytes()),
                 None,
                 Options::default(),
                 None,
@@ -502,13 +501,15 @@ mod test {
     use chrono::{Duration, Utc};
     use hex::FromHex;
     use primitives::{
-        config::configutaion,
         adapter::KeystoreOptions,
+        channel_v5::Nonce,
+        config::{configuration, TokenInfo},
         targeting::Rules,
         ChannelId, ChannelSpec, EventSubmission, SpecValidators, ValidatorDesc
     };
     use std::convert::TryFrom;
-    use web3::types::Address;
+    use std::num::NonZeroU8;
+    use web3::types::Address as EthAddress;
     use wiremock::{
         matchers::{method, path},
         Mock, MockServer, ResponseTemplate,
@@ -645,7 +646,7 @@ mod test {
         let payload = Payload {
             id: eth_adapter.whoami().to_checksum(),
             era: era.floor() as i64,
-            identity: Some(identity.clone()),
+            identity: Some(identity),
             address: eth_adapter.whoami().to_checksum(),
         };
 
@@ -662,10 +663,10 @@ mod test {
             web3::transports::Http::new("http://localhost:8545").expect("failed to init transport");
 
         let web3 = web3::Web3::new(http);
-        let leader_account: Address = "Df08F82De32B8d460adbE8D72043E3a7e25A3B39"
+        let leader_account: EthAddress = "Df08F82De32B8d460adbE8D72043E3a7e25A3B39"
             .parse()
             .expect("failed to parse leader account");
-        let _follower_account: Address = "6704Fbfcd5Ef766B287262fA2281C105d57246a6"
+        let _follower_account: EthAddress = "6704Fbfcd5Ef766B287262fA2281C105d57246a6"
             .parse()
             .expect("failed to parse leader account");
 
@@ -713,7 +714,7 @@ mod test {
         // contract call set balance
         tokio_compat_02::FutureExt::compat(token_contract.call(
             "setBalanceTo",
-            (Address::from(leader_account), U256::from(2000_u64)),
+            (EthAddress::from(leader_account), U256::from(2000_u64)),
             leader_account,
             Options::default(),
         ))
@@ -787,9 +788,16 @@ mod test {
         let channel_id = eth_channel.hash(&contract_addr);
         // set id to proper id
         valid_channel.id = ChannelId::from(channel_id);
-
+        let token_address = Address::from(&token_contract.address().to_fixed_bytes());
         // eth adapter
         let mut eth_adapter = setup_eth_adapter(Some(contract_addr));
+        eth_adapter.config.token_address_whitelist.insert(
+            token_address,
+            TokenInfo {
+                min_token_units_for_deposit: BigNum::from(1000000),
+                precision: NonZeroU8::new(18).expect("should create NonZeroU8"),
+            },
+        );
         eth_adapter.unlock().expect("should unlock eth adapter");
         // validate channel
         let result = eth_adapter
@@ -798,5 +806,79 @@ mod test {
             .expect("failed to validate channel");
 
         assert!(result, "should validate valid channel correctly");
+    }
+
+    #[tokio::test]
+    async fn should_get_correct_deposit() {
+        let http =
+            web3::transports::Http::new("http://localhost:8545").expect("failed to init transport");
+
+        let web3 = web3::Web3::new(http);
+        let leader_account: EthAddress = "Df08F82De32B8d460adbE8D72043E3a7e25A3B39"
+            .parse()
+            .expect("failed to parse leader account");
+        // tokenbytecode.json
+        let token_bytecode =
+            include_str!("../test/resources/tokenbytecode.json").trim_end_matches("\n");
+        // token_abi.json
+        let token_abi = include_bytes!("../test/resources/tokenabi.json");
+
+        // deploy contracts
+        let token_contract = tokio_compat_02::FutureExt::compat(async {
+            Contract::deploy(web3.eth(), token_abi)
+                .expect("invalid token token contract")
+                .confirmations(0)
+                .options(Options::with(|opt| {
+                    opt.gas_price = Some(1.into());
+                    opt.gas = Some(6_721_975.into());
+                }))
+                .execute(token_bytecode, (), leader_account)
+        })
+        .await;
+
+        let token_contract = tokio_compat_02::FutureExt::compat(token_contract)
+            .await
+            .expect("Correct parameters are passed to the constructor.");
+        let leader = ValidatorId::try_from("2bdeafae53940669daa6f519373f686c1f3d3393")
+            .expect("failed to create id");
+        let follower = ValidatorId::try_from("6704Fbfcd5Ef766B287262fA2281C105d57246a6")
+            .expect("failed to create id");
+        let nonce = Nonce::from(12345_u32);
+        let guardian: Address = Address::try_from("0000000000000000000000000000000000000000")
+            .expect("should create an address");
+        let token_address = token_contract.address().to_fixed_bytes();
+
+        let token: Address = Address::from(&token_contract.address().to_fixed_bytes());
+        let spender: Address = Address::try_from("0000000000000000000000000000000000000000")
+            .expect("should create an address");
+        let channel_to_pass = ChannelV5 {
+            leader,
+            follower,
+            guardian,
+            token,
+            nonce,
+        };
+
+        let mut eth_adapter = setup_eth_adapter(Some(token_address));
+        eth_adapter.config.token_address_whitelist.insert(
+            token,
+            TokenInfo {
+                min_token_units_for_deposit: BigNum::from(1000000),
+                precision: NonZeroU8::new(18).expect("should create NonZeroU8"),
+            },
+        );
+        eth_adapter.unlock().expect("should unlock eth adapter");
+
+        let deposit = eth_adapter
+            .get_deposit(&channel_to_pass, &spender)
+            .await
+            .expect("should get deposit");
+
+        let expected_deposit = Deposit {
+            total: BigNum::from(0),
+            still_on_create_2: BigNum::from(0),
+        };
+        assert_eq!(deposit.total, expected_deposit.total);
+        assert_eq!(deposit.still_on_create_2, expected_deposit.still_on_create_2);
     }
 }

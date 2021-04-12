@@ -27,4 +27,18 @@ creators_whitelist = []
 minimal_deposit = "0"
 minimal_fee = "0"
 validators_whitelist = []
-token_address_whitelist = []
+
+[[token_address_whitelist]]
+address = '0x73967c6a0904aa032c103b4104747e88c566b1a2' #DAI
+min_token_units_for_deposit = '100000000'
+precision = 18
+
+[[token_address_whitelist]]
+address = '0x509ee0d083ddf8ac028f2a56731412edd63223b9' #USDT
+min_token_units_for_deposit = '100000000'
+precision = 6
+
+[[token_address_whitelist]]
+address = '0x44dcfcead37be45206af6079648988b29284b2c6' #USDC
+min_token_units_for_deposit = '100000000'
+precision = 6
