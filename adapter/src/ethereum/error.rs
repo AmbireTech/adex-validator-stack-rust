@@ -1,7 +1,7 @@
 use primitives::{
     adapter::{AdapterErrorKind, Error as AdapterError},
     address::Error as AddressError,
-    Address, ChannelId
+    Address, ChannelId,
 };
 use std::fmt;
 

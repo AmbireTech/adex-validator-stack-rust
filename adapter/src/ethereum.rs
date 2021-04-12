@@ -297,10 +297,7 @@ impl Adapter for EthereumAdapter {
         let total: U256 = tokio_compat_02::FutureExt::compat(async {
             tokio_compat_02::FutureExt::compat(outpace_contract.query(
                 "deposits",
-                (
-                    *channel.id(),
-                    H160(*address.as_bytes()),
-                ),
+                (*channel.id(), H160(*address.as_bytes())),
                 None,
                 Options::default(),
                 None,
@@ -505,7 +502,7 @@ mod test {
         channel_v5::Nonce,
         config::{configuration, TokenInfo},
         targeting::Rules,
-        ChannelId, ChannelSpec, EventSubmission, SpecValidators, ValidatorDesc
+        ChannelId, ChannelSpec, EventSubmission, SpecValidators, ValidatorDesc,
     };
     use std::convert::TryFrom;
     use std::num::NonZeroU8;
@@ -849,7 +846,7 @@ mod test {
         let token_address = token_contract.address().to_fixed_bytes();
 
         let token: Address = Address::from(&token_contract.address().to_fixed_bytes());
-        let spender: Address = Address::try_from("0000000000000000000000000000000000000000")
+        let spender: Address = Address::try_from("0x3d9C9C9673B2E3e9046137E752C5F8dCE823A1bB")
             .expect("should create an address");
         let channel_to_pass = ChannelV5 {
             leader,
@@ -874,11 +871,15 @@ mod test {
             .await
             .expect("should get deposit");
 
+        // TODO: Mock contract output
         let expected_deposit = Deposit {
             total: BigNum::from(0),
             still_on_create_2: BigNum::from(0),
         };
         assert_eq!(deposit.total, expected_deposit.total);
-        assert_eq!(deposit.still_on_create_2, expected_deposit.still_on_create_2);
+        assert_eq!(
+            deposit.still_on_create_2,
+            expected_deposit.still_on_create_2
+        );
     }
 }
