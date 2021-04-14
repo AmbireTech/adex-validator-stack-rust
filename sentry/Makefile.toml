@@ -12,8 +12,11 @@ dependencies = [
   "services-down",
 ]
 
+[tasks.test]
+env = { "POSTGRES_DB" = "sentry_leader" }
+
 [tasks.services-up]
-script = "docker-compose -f ../docker-compose.ci.yml up -d redis-leader"
+script = "docker-compose -f ../docker-compose.ci.yml up -d redis-leader postgres-leader"
 
 [tasks.services-down]
 script = "docker-compose -f ../docker-compose.ci.yml down"
