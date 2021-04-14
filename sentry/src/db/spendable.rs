@@ -1,15 +1,7 @@
 use std::convert::TryFrom;
 
-use primitives::{channel_v5::Channel, Address, ChannelId, UnifiedNum};
-use tokio_postgres::{Client, Error, Row};
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct Spendable {
-    spender: Address,
-    channel: Channel,
-    total: UnifiedNum,
-    still_on_create2: UnifiedNum,
-}
+use primitives::{spender::Spendable, Address, ChannelId};
+use tokio_postgres::{Client, Error};
 
 /// ```text
 /// INSERT INTO spendable (spender, channel_id, channel, total, still_on_create2)
@@ -25,8 +17,8 @@ pub async fn insert_spendable(client: &Client, spendable: &Spendable) -> Result<
                 &spendable.spender,
                 &spendable.channel.id(),
                 &spendable.channel,
-                &spendable.total,
-                &spendable.still_on_create2,
+                &spendable.deposit.total,
+                &spendable.deposit.still_on_create2,
             ],
         )
         .await?;
@@ -51,22 +43,10 @@ pub async fn fetch_spendable(
     Spendable::try_from(row)
 }
 
-impl TryFrom<Row> for Spendable {
-    type Error = Error;
-
-    fn try_from(row: Row) -> Result<Self, Self::Error> {
-        Ok(Spendable {
-            spender: row.try_get("spender")?,
-            channel: row.try_get("channel")?,
-            total: row.try_get("total")?,
-            still_on_create2: row.try_get("still_on_create2")?,
-        })
-    }
-}
-
 #[cfg(test)]
 mod test {
     use primitives::{
+        spender::{Deposit, Spendable},
         util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN},
         UnifiedNum,
     };
@@ -86,8 +66,10 @@ mod test {
         let spendable = Spendable {
             spender: ADDRESSES["user"],
             channel: DUMMY_CAMPAIGN.channel.clone(),
-            total: UnifiedNum::from(100_000_000),
-            still_on_create2: UnifiedNum::from(500_000),
+            deposit: Deposit {
+                total: UnifiedNum::from(100_000_000),
+                still_on_create2: UnifiedNum::from(500_000),
+            },
         };
         let is_inserted = insert_spendable(&test_client, &spendable)
             .await
