@@ -8,6 +8,7 @@ use lazy_static::lazy_static;
 pub mod analytics;
 mod channel;
 pub mod event_aggregate;
+pub mod spendable;
 mod validator_message;
 
 pub use self::channel::*;
