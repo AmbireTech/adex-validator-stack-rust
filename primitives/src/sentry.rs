@@ -1,4 +1,8 @@
-use crate::{Address, BalancesMap, BigNum, Channel, ChannelId, IPFS, ValidatorId, targeting::Rules, validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType}};
+use crate::{
+    targeting::Rules,
+    validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
+    Address, BalancesMap, BigNum, Channel, ChannelId, ValidatorId, IPFS,
+};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt, hash::Hash};
@@ -55,9 +59,9 @@ pub mod message {
         }
     }
 
-    impl<T: Type> Into<MessageTypes> for Message<T> {
-        fn into(self) -> MessageTypes {
-            self.0.into()
+    impl<T: Type> From<Message<T>> for MessageTypes {
+        fn from(message: Message<T>) -> Self {
+            message.0.into()
         }
     }
 

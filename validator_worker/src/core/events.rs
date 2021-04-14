@@ -6,7 +6,8 @@ use primitives::{BalancesMap, BigNum, Channel, DomainError};
 
 //
 // TODO #381: AIP#61 Use the new Spender Aggregate and Sum all balances for the new Accounting
-//
+// & Temporary allow unnecessary_wraps
+#[allow(clippy::unnecessary_wraps)]
 pub(crate) fn merge_aggrs(
     accounting: &Accounting,
     aggregates: &[EventAggregate],
