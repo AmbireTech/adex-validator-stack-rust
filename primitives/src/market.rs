@@ -98,9 +98,9 @@ mod ad_unit {
         }
     }
 
-    impl Into<Vec<Shim>> for AdUnitsResponse {
-        fn into(self) -> Vec<Shim> {
-            self.0.into_iter().map(Into::into).collect()
+    impl From<AdUnitsResponse> for Vec<Shim> {
+        fn from(shim: AdUnitsResponse) -> Self {
+            shim.0.into_iter().map(Into::into).collect()
         }
     }
 
@@ -152,21 +152,21 @@ mod ad_unit {
         pub modified: Option<DateTime<Utc>>,
     }
 
-    impl Into<AdUnit> for Shim {
-        fn into(self) -> AdUnit {
-            AdUnit {
-                ipfs: self.ipfs,
-                ad_type: self.ad_type,
-                media_url: self.media_url,
-                media_mime: self.media_mime,
-                target_url: self.target_url,
-                min_targeting_score: self.min_targeting_score,
-                owner: self.owner,
-                created: self.created,
-                title: self.title,
-                description: self.description,
-                archived: self.archived,
-                modified: self.modified,
+    impl From<Shim> for AdUnit {
+        fn from(shim: Shim) -> Self {
+            Self {
+                ipfs: shim.ipfs,
+                ad_type: shim.ad_type,
+                media_url: shim.media_url,
+                media_mime: shim.media_mime,
+                target_url: shim.target_url,
+                min_targeting_score: shim.min_targeting_score,
+                owner: shim.owner,
+                created: shim.created,
+                title: shim.title,
+                description: shim.description,
+                archived: shim.archived,
+                modified: shim.modified,
             }
         }
     }
@@ -284,21 +284,21 @@ mod ad_slot {
         }
     }
 
-    impl Into<AdSlot> for Shim {
-        fn into(self) -> AdSlot {
-            AdSlot {
-                ipfs: self.ipfs,
-                ad_type: self.ad_type,
-                min_per_impression: self.min_per_impression,
-                rules: self.rules,
-                fallback_unit: self.fallback_unit,
-                owner: self.owner,
-                created: self.created,
-                title: self.title,
-                description: self.description,
-                website: self.website,
-                archived: self.archived,
-                modified: self.modified,
+    impl From<Shim> for AdSlot {
+        fn from(shim: Shim) -> Self {
+            Self {
+                ipfs: shim.ipfs,
+                ad_type: shim.ad_type,
+                min_per_impression: shim.min_per_impression,
+                rules: shim.rules,
+                fallback_unit: shim.fallback_unit,
+                owner: shim.owner,
+                created: shim.created,
+                title: shim.title,
+                description: shim.description,
+                website: shim.website,
+                archived: shim.archived,
+                modified: shim.modified,
             }
         }
     }
