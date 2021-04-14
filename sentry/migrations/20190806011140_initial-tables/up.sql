@@ -3,7 +3,7 @@ CREATE TABLE campaigns (
     channel_id varchar(66) NOT NULL,
     channel jsonb NOT NULL,
     creator varchar(42) NOT NULL,
-    budget numeric(20, 8) NOT NULL,
+    budget bigint NOT NULL,
     validators jsonb NOT NULL,
     title varchar(255) NULL,
     pricing_bounds jsonb DEFAULT '{}' NULL,
@@ -16,16 +16,16 @@ CREATE TABLE campaigns (
     PRIMARY KEY (id)
 );
 
-CREATE INDEX idx_campaign_active_to ON campaign (active_to);
+CREATE INDEX idx_campaign_active_to ON campaigns (active_to);
 
-CREATE INDEX idx_campaign_created ON campaign (created);
+CREATE INDEX idx_campaign_created ON campaigns (created);
 
 CREATE TABLE spendable (
     spender varchar(42) NOT NULL,
     channel_id varchar(66) NOT NULL,
     channel jsonb NOT NULL,
-    total numeric(20, 8) NOT NULL,
-    still_on_create2 numeric(20, 8),
+    total bigint NOT NULL,
+    still_on_create2 bigint NOT NULL,
     PRIMARY KEY (spender, channel_id)
 );
 
@@ -45,7 +45,7 @@ CREATE INDEX idx_validator_messages_msg_state_root ON validator_messages ((msg -
 
 -- TODO: AIP#61 Alter Event Aggregates
 CREATE TABLE event_aggregates (
-    channel_id varchar(66) NOT NULL REFERENCES channels (id) ON DELETE RESTRICT,
+    channel_id varchar(66) NOT NULL, -- REFERENCES channels (id) ON DELETE RESTRICT,
     created timestamp(2) with time zone NOT NULL DEFAULT NOW(),
     event_type varchar(255) NOT NULL,
     earner varchar(42),
