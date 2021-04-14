@@ -92,9 +92,9 @@ impl Input {
     }
 }
 
-impl Into<Map> for Input {
-    fn into(self) -> Map {
-        self.to_map()
+impl From<Input> for Map {
+    fn from(input: Input) -> Self {
+        input.to_map()
     }
 }
 

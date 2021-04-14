@@ -174,9 +174,9 @@ pub mod messages {
             }
         }
     }
-    impl Into<MessageTypes> for Accounting {
-        fn into(self) -> MessageTypes {
-            MessageTypes::Accounting(self)
+    impl From<Accounting> for MessageTypes {
+        fn from(accounting: Accounting) -> Self {
+            MessageTypes::Accounting(accounting)
         }
     }
 
@@ -194,9 +194,9 @@ pub mod messages {
             }
         }
     }
-    impl Into<MessageTypes> for ApproveState {
-        fn into(self) -> MessageTypes {
-            MessageTypes::ApproveState(self)
+    impl From<ApproveState> for MessageTypes {
+        fn from(approve_state: ApproveState) -> Self {
+            MessageTypes::ApproveState(approve_state)
         }
     }
 
@@ -214,9 +214,10 @@ pub mod messages {
             }
         }
     }
-    impl Into<MessageTypes> for NewState {
-        fn into(self) -> MessageTypes {
-            MessageTypes::NewState(self)
+
+    impl From<NewState> for MessageTypes {
+        fn from(new_state: NewState) -> Self {
+            MessageTypes::NewState(new_state)
         }
     }
 
@@ -234,9 +235,10 @@ pub mod messages {
             }
         }
     }
-    impl Into<MessageTypes> for RejectState {
-        fn into(self) -> MessageTypes {
-            MessageTypes::RejectState(self)
+
+    impl From<RejectState> for MessageTypes {
+        fn from(reject_state: RejectState) -> Self {
+            MessageTypes::RejectState(reject_state)
         }
     }
 
@@ -254,11 +256,13 @@ pub mod messages {
             }
         }
     }
-    impl Into<MessageTypes> for Heartbeat {
-        fn into(self) -> MessageTypes {
-            MessageTypes::Heartbeat(self)
+
+    impl From<Heartbeat> for MessageTypes {
+        fn from(heartbeat: Heartbeat) -> Self {
+            MessageTypes::Heartbeat(heartbeat)
         }
     }
+
     #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
     #[serde(rename_all = "camelCase")]
     pub struct Accounting {

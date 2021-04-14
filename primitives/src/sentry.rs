@@ -59,9 +59,9 @@ pub mod message {
         }
     }
 
-    impl<T: Type> Into<MessageTypes> for Message<T> {
-        fn into(self) -> MessageTypes {
-            self.0.into()
+    impl<T: Type> From<Message<T>> for MessageTypes {
+        fn from(message: Message<T>) -> Self {
+            message.0.into()
         }
     }
 

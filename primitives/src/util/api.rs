@@ -100,9 +100,9 @@ impl TryFrom<Url> for ApiUrl {
     }
 }
 
-impl Into<Url> for ApiUrl {
-    fn into(self) -> Url {
-        self.0
+impl From<ApiUrl> for Url {
+    fn from(api_url: ApiUrl) -> Self {
+        api_url.0
     }
 }
 

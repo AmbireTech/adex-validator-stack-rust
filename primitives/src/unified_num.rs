@@ -102,7 +102,7 @@ impl fmt::Display for UnifiedNum {
         let precision: usize = Self::PRECISION.into();
 
         if value_length > precision {
-            string_value.insert_str(value_length - precision, ".");
+            string_value.insert(value_length - precision, '.');
 
             f.write_str(&string_value)
         } else {
