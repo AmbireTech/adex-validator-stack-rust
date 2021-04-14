@@ -205,16 +205,16 @@ impl TryFrom<SerdeValue> for Value {
     }
 }
 
-impl Into<SerdeValue> for Value {
-    fn into(self) -> SerdeValue {
-        match self {
-            Value::Bool(bool) => SerdeValue::Bool(bool),
-            Value::Number(number) => SerdeValue::Number(number),
-            Value::String(string) => SerdeValue::String(string),
+impl From<Value> for SerdeValue {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Bool(bool) => Self::Bool(bool),
+            Value::Number(number) => Self::Number(number),
+            Value::String(string) => Self::String(string),
             Value::Array(array) => {
-                SerdeValue::Array(array.into_iter().map(|value| value.into()).collect())
+                Self::Array(array.into_iter().map(|value| value.into()).collect())
             }
-            Value::BigNum(bignum) => SerdeValue::String(bignum.to_string()),
+            Value::BigNum(bignum) => Self::String(bignum.to_string()),
         }
     }
 }
