@@ -18,6 +18,7 @@ use primitives::{
     config::Config,
     Address, BigNum, Channel, ChannelId, ToETHChecksum, ValidatorId,
 };
+use rand::{thread_rng, RngCore};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -88,6 +89,25 @@ impl EthereumAdapter {
             relayer,
         })
     }
+}
+
+fn get_counterfactual_address(token: Address) -> H160 {
+    let mut salt: [u8; 32] = [0; 32];
+    thread_rng().fill_bytes(&mut salt);
+    let mut init_code = Keccak::new_keccak256();
+    init_code.update(b"0x00");
+    let mut hashed_init_code: [u8; 32] = [0; 32];
+    init_code.finalize(&mut hashed_init_code);
+
+    let mut result = Keccak::new_keccak256();
+    result.update(b"0xff");
+    result.update(token.as_bytes());
+    result.update(&salt);
+    result.update(&hashed_init_code);
+    let mut res: [u8; 20] = [0; 20];
+    result.finalize(&mut res);
+
+    H160::from(res)
 }
 
 #[async_trait]
@@ -309,10 +329,11 @@ impl Adapter for EthereumAdapter {
 
         let mut total = BigNum::from_str(&total.to_string())?;
 
+        let counterfactual_address = get_counterfactual_address(channel.token);
         let still_on_create_2: U256 = tokio_compat_02::FutureExt::compat(async {
             tokio_compat_02::FutureExt::compat(erc20_contract.query(
                 "balanceOf",
-                H160(*channel.token.as_bytes()),
+                counterfactual_address,
                 None,
                 Options::default(),
                 None,
