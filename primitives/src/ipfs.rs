@@ -9,6 +9,7 @@ pub use cid::{Cid, Error};
 
 #[derive(Hash, Clone, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(try_from = "String", into = "String")]
+#[allow(clippy::upper_case_acronyms)]
 pub struct IPFS(pub cid::Cid);
 
 impl slog::Value for IPFS {
@@ -42,15 +43,9 @@ impl FromStr for IPFS {
     }
 }
 
-impl AsRef<IPFS> for IPFS {
-    fn as_ref(&self) -> &IPFS {
-        &self
-    }
-}
-
-impl Into<String> for IPFS {
-    fn into(self) -> String {
-        self.0.into()
+impl From<IPFS> for String {
+    fn from(ipfs: IPFS) -> Self {
+        ipfs.0.to_string()
     }
 }
 
@@ -99,34 +94,35 @@ impl Url {
 #[derive(Debug, Error)]
 pub enum UrlError {
     #[error("Parsing the IPFS Cid failed")]
+    #[allow(clippy::upper_case_acronyms)]
     IPFS(#[from] cid::Error),
     #[error("Url should start with {} prefix", URL_PREFIX)]
     NoPrefix,
 }
 
-impl Into<url::Url> for Url {
-    fn into(self) -> url::Url {
-        (&self).into()
+impl From<Url> for url::Url {
+    fn from(url: Url) -> Self {
+        (&url).into()
     }
 }
 
-impl Into<url::Url> for &Url {
-    fn into(self) -> url::Url {
-        let url_string = self.to_string();
+impl From<&Url> for url::Url {
+    fn from(url: &Url) -> Self {
+        let url_string = url.to_string();
 
         url::Url::parse(&url_string).expect("This should never fail")
     }
 }
 
-impl Into<String> for Url {
-    fn into(self) -> String {
-        self.to_string()
+impl From<Url> for String {
+    fn from(url: Url) -> Self {
+        url.to_string()
     }
 }
 
-impl Into<String> for &Url {
-    fn into(self) -> String {
-        self.to_string()
+impl From<&Url> for String {
+    fn from(url: &Url) -> Self {
+        url.to_string()
     }
 }
 

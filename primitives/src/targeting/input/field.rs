@@ -63,9 +63,9 @@ pub enum Field {
     AdSlot(AdSlot),
 }
 
-impl Into<String> for Field {
-    fn into(self) -> String {
-        self.to_string()
+impl From<Field> for String {
+    fn from(field: Field) -> Self {
+        field.to_string()
     }
 }
 
@@ -135,9 +135,9 @@ impl TryFrom<String> for Channel {
     }
 }
 
-impl Into<String> for Channel {
-    fn into(self) -> String {
-        self.to_string()
+impl From<Channel> for String {
+    fn from(channel: Channel) -> Self {
+        channel.to_string()
     }
 }
 
@@ -159,9 +159,9 @@ impl TryFrom<String> for Balances {
     }
 }
 
-impl Into<String> for Balances {
-    fn into(self) -> String {
-        self.to_string()
+impl From<Balances> for String {
+    fn from(balances: Balances) -> Self {
+        balances.to_string()
     }
 }
 
@@ -184,9 +184,9 @@ impl TryFrom<String> for AdSlot {
     }
 }
 
-impl Into<String> for AdSlot {
-    fn into(self) -> String {
-        self.to_string()
+impl From<AdSlot> for String {
+    fn from(ad_slot: AdSlot) -> Self {
+        ad_slot.to_string()
     }
 }
 
@@ -206,9 +206,9 @@ impl TryFrom<String> for AdView {
     }
 }
 
-impl Into<String> for AdView {
-    fn into(self) -> String {
-        self.to_string()
+impl From<AdView> for String {
+    fn from(ad_view: AdView) -> Self {
+        ad_view.to_string()
     }
 }
 
@@ -225,6 +225,7 @@ pub enum Global {
     EventType,
     SecondsSinceEpoch,
     #[display("userAgentOS")]
+    #[allow(clippy::upper_case_acronyms)]
     UserAgentOS,
     UserAgentBrowserFamily,
 }
@@ -237,9 +238,9 @@ impl TryFrom<String> for Global {
     }
 }
 
-impl Into<String> for Global {
-    fn into(self) -> String {
-        self.to_string()
+impl From<Global> for String {
+    fn from(global: Global) -> Self {
+        global.to_string()
     }
 }
 

@@ -232,7 +232,7 @@ where
     D: Deserializer<'de>,
 {
     let num = String::deserialize(deserializer)?;
-    Ok(BigUint::from_str(&num).map_err(serde::de::Error::custom)?)
+    BigUint::from_str(&num).map_err(serde::de::Error::custom)
 }
 
 fn biguint_to_str<S>(num: &BigUint, serializer: S) -> Result<S::Ok, S::Error>
