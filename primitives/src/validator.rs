@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, fmt, str::FromStr};
 
-use crate::{address::Error, targeting::Value, Address, BigNum, DomainError, ToETHChecksum, ToHex};
+use crate::{
+    address::Error, targeting::Value, Address, DomainError, ToETHChecksum, ToHex, UnifiedNum,
+};
 
 pub use messages::*;
 
@@ -44,6 +46,12 @@ impl ValidatorId {
 }
 
 impl ToETHChecksum for ValidatorId {}
+
+impl From<&Address> for ValidatorId {
+    fn from(address: &Address) -> Self {
+        Self(*address)
+    }
+}
 
 impl From<&[u8; 20]> for ValidatorId {
     fn from(bytes: &[u8; 20]) -> Self {
@@ -99,9 +107,9 @@ impl TryFrom<Value> for ValidatorId {
 pub struct ValidatorDesc {
     pub id: ValidatorId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub fee_addr: Option<ValidatorId>,
+    pub fee_addr: Option<Address>,
     pub url: String,
-    pub fee: BigNum,
+    pub fee: UnifiedNum,
 }
 
 /// Validator Message Types
@@ -163,9 +171,9 @@ pub mod messages {
             }
         }
     }
-    impl Into<MessageTypes> for Accounting {
-        fn into(self) -> MessageTypes {
-            MessageTypes::Accounting(self)
+    impl From<Accounting> for MessageTypes {
+        fn from(accounting: Accounting) -> Self {
+            MessageTypes::Accounting(accounting)
         }
     }
 
@@ -183,9 +191,9 @@ pub mod messages {
             }
         }
     }
-    impl Into<MessageTypes> for ApproveState {
-        fn into(self) -> MessageTypes {
-            MessageTypes::ApproveState(self)
+    impl From<ApproveState> for MessageTypes {
+        fn from(approve_state: ApproveState) -> Self {
+            MessageTypes::ApproveState(approve_state)
         }
     }
 
@@ -203,9 +211,10 @@ pub mod messages {
             }
         }
     }
-    impl Into<MessageTypes> for NewState {
-        fn into(self) -> MessageTypes {
-            MessageTypes::NewState(self)
+
+    impl From<NewState> for MessageTypes {
+        fn from(new_state: NewState) -> Self {
+            MessageTypes::NewState(new_state)
         }
     }
 
@@ -223,9 +232,10 @@ pub mod messages {
             }
         }
     }
-    impl Into<MessageTypes> for RejectState {
-        fn into(self) -> MessageTypes {
-            MessageTypes::RejectState(self)
+
+    impl From<RejectState> for MessageTypes {
+        fn from(reject_state: RejectState) -> Self {
+            MessageTypes::RejectState(reject_state)
         }
     }
 
@@ -243,18 +253,18 @@ pub mod messages {
             }
         }
     }
-    impl Into<MessageTypes> for Heartbeat {
-        fn into(self) -> MessageTypes {
-            MessageTypes::Heartbeat(self)
+
+    impl From<Heartbeat> for MessageTypes {
+        fn from(heartbeat: Heartbeat) -> Self {
+            MessageTypes::Heartbeat(heartbeat)
         }
     }
+
     #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
     #[serde(rename_all = "camelCase")]
     pub struct Accounting {
-        #[serde(rename = "lastEvAggr")]
-        pub last_event_aggregate: DateTime<Utc>,
-        pub balances_before_fees: BalancesMap,
         pub balances: BalancesMap,
+        pub last_aggregate: DateTime<Utc>,
     }
 
     #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -263,6 +273,9 @@ pub mod messages {
         pub state_root: String,
         pub signature: String,
         pub is_healthy: bool,
+        //
+        // TODO: AIP#61 Remove exhausted property
+        //
         #[serde(default)]
         pub exhausted: bool,
     }
@@ -273,6 +286,9 @@ pub mod messages {
         pub state_root: String,
         pub signature: String,
         pub balances: BalancesMap,
+        //
+        // TODO: AIP#61 Remove exhausted property
+        //
         #[serde(default)]
         pub exhausted: bool,
     }

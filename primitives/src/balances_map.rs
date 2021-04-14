@@ -1,46 +1,58 @@
-use std::collections::BTreeMap;
-
-use crate::{BigNum, ValidatorId};
-use std::collections::btree_map::{Entry, IntoIter, Iter, Values};
-
 use serde::{Deserialize, Serialize};
-use std::iter::FromIterator;
-use std::ops::Index;
+use std::{
+    collections::{
+        btree_map::{Entry, IntoIter, Iter, Values},
+        BTreeMap,
+    },
+    iter::FromIterator,
+    ops::Index,
+};
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+use crate::{Address, BigNum, UnifiedNum};
+
+pub type UnifiedMap = Map<Address, UnifiedNum>;
+pub type BalancesMap = Map<Address, BigNum>;
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(transparent)]
-pub struct BalancesMap(BTreeMap<ValidatorId, BigNum>);
+pub struct Map<K: Ord, V>(BTreeMap<K, V>);
 
-impl Index<&'_ ValidatorId> for BalancesMap {
-    type Output = BigNum;
+impl<K: Ord, V> Default for Map<K, V> {
+    fn default() -> Self {
+        Map(BTreeMap::default())
+    }
+}
 
-    fn index(&self, index: &ValidatorId) -> &Self::Output {
+impl<K: Ord, V> Index<&'_ K> for Map<K, V> {
+    type Output = V;
+
+    fn index(&self, index: &K) -> &Self::Output {
         self.0.index(index)
     }
 }
 
-impl BalancesMap {
-    pub fn iter(&self) -> Iter<'_, ValidatorId, BigNum> {
+impl<K: Ord, V> Map<K, V> {
+    pub fn iter(&self) -> Iter<'_, K, V> {
         self.0.iter()
     }
 
-    pub fn values(&self) -> Values<'_, ValidatorId, BigNum> {
+    pub fn values(&self) -> Values<'_, K, V> {
         self.0.values()
     }
 
-    pub fn get(&self, key: &ValidatorId) -> Option<&BigNum> {
+    pub fn get(&self, key: &K) -> Option<&V> {
         self.0.get(key)
     }
 
-    pub fn contains_key(&self, key: &ValidatorId) -> bool {
+    pub fn contains_key(&self, key: &K) -> bool {
         self.0.contains_key(key)
     }
 
-    pub fn entry(&mut self, key: ValidatorId) -> Entry<'_, ValidatorId, BigNum> {
+    pub fn entry(&mut self, key: K) -> Entry<'_, K, V> {
         self.0.entry(key)
     }
 
-    pub fn insert(&mut self, key: ValidatorId, value: BigNum) -> Option<BigNum> {
+    pub fn insert(&mut self, key: K, value: V) -> Option<V> {
         self.0.insert(key, value)
     }
 
@@ -53,18 +65,18 @@ impl BalancesMap {
     }
 }
 
-impl FromIterator<(ValidatorId, BigNum)> for BalancesMap {
-    fn from_iter<I: IntoIterator<Item = (ValidatorId, BigNum)>>(iter: I) -> Self {
+impl<K: Ord, V> FromIterator<(K, V)> for Map<K, V> {
+    fn from_iter<I: IntoIterator<Item = (K, V)>>(iter: I) -> Self {
         // @TODO: Is there better way to do this?
-        let btree_map: BTreeMap<ValidatorId, BigNum> = iter.into_iter().collect();
+        let btree_map: BTreeMap<K, V> = iter.into_iter().collect();
 
-        BalancesMap(btree_map)
+        Map(btree_map)
     }
 }
 
-impl IntoIterator for BalancesMap {
-    type Item = (ValidatorId, BigNum);
-    type IntoIter = IntoIter<ValidatorId, BigNum>;
+impl<K: Ord, V> IntoIterator for Map<K, V> {
+    type Item = (K, V);
+    type IntoIter = IntoIter<K, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
@@ -73,26 +85,53 @@ impl IntoIterator for BalancesMap {
 
 #[cfg(test)]
 mod test {
+    use serde_json::json;
+
     use super::*;
-    use crate::util::tests::prep_db::IDS;
-    use crate::BigNum;
+    use crate::util::tests::prep_db::ADDRESSES;
 
     #[test]
-    fn test_balances_map_serialization() {
-        let data = vec![
-            (IDS["leader"].clone(), BigNum::from(50_u64)),
-            (IDS["follower"].clone(), BigNum::from(100_u64)),
-        ];
+    fn test_unified_map_de_serialization() {
+        let unified_map: UnifiedMap = vec![
+            (ADDRESSES["leader"].clone(), UnifiedNum::from(50_u64)),
+            (ADDRESSES["follower"].clone(), UnifiedNum::from(100_u64)),
+        ]
+        .into_iter()
+        .collect();
 
-        let balances_map: BalancesMap = data.into_iter().collect();
+        let actual_json = serde_json::to_value(&unified_map).expect("Should serialize it");
+        let expected_json = json!({
+            "0xC91763D7F14ac5c5dDfBCD012e0D2A61ab9bDED3":100,
+            "0xce07CbB7e054514D590a0262C93070D838bFBA2e":50
+        });
 
-        let actual_json = serde_json::to_string(&balances_map).expect("Should serialize it");
-        let expected_json = r#"{"0xC91763D7F14ac5c5dDfBCD012e0D2A61ab9bDED3":"100","0xce07CbB7e054514D590a0262C93070D838bFBA2e":"50"}"#;
+        assert_eq!(expected_json, actual_json);
+
+        let balances_map_from_json: UnifiedMap =
+            serde_json::from_value(actual_json).expect("Should deserialize it");
+
+        assert_eq!(unified_map, balances_map_from_json);
+    }
+
+    #[test]
+    fn test_balances_map_de_serialization() {
+        let balances_map: BalancesMap = vec![
+            (ADDRESSES["leader"].clone(), BigNum::from(50_u64)),
+            (ADDRESSES["follower"].clone(), BigNum::from(100_u64)),
+        ]
+        .into_iter()
+        .collect();
+
+        let actual_json = serde_json::to_value(&balances_map).expect("Should serialize it");
+        let expected_json = json!({
+            "0xC91763D7F14ac5c5dDfBCD012e0D2A61ab9bDED3":"100",
+            "0xce07CbB7e054514D590a0262C93070D838bFBA2e":"50"
+        });
 
         assert_eq!(expected_json, actual_json);
 
         let balances_map_from_json: BalancesMap =
-            serde_json::from_str(&actual_json).expect("Should deserialize it");
+            serde_json::from_value(actual_json).expect("Should deserialize it");
 
         assert_eq!(balances_map, balances_map_from_json);
     }
@@ -100,15 +139,19 @@ mod test {
     #[test]
     fn test_balances_map_deserialization_with_same_keys() {
         // the first is ETH Checksummed, the second is lowercase!
-        let json = r#"{"0xC91763D7F14ac5c5dDfBCD012e0D2A61ab9bDED3":"100","0xc91763d7f14ac5c5ddfbcd012e0d2a61ab9bded3":"20","0xce07CbB7e054514D590a0262C93070D838bFBA2e":"50"}"#;
+        let json = json!({
+            "0xC91763D7F14ac5c5dDfBCD012e0D2A61ab9bDED3":"100",
+            "0xc91763d7f14ac5c5ddfbcd012e0d2a61ab9bded3":"20",
+            "0xce07CbB7e054514D590a0262C93070D838bFBA2e":"50"
+        });
 
         let actual_deserialized: BalancesMap =
-            serde_json::from_str(&json).expect("Should deserialize it");
+            serde_json::from_value(json).expect("Should deserialize it");
 
         let expected_deserialized: BalancesMap = vec![
-            (IDS["leader"].clone(), BigNum::from(50_u64)),
+            (ADDRESSES["leader"].clone(), BigNum::from(50_u64)),
             // only the second should be accepted, as it appears second in the string and it's the latest one
-            (IDS["follower"].clone(), BigNum::from(20_u64)),
+            (ADDRESSES["follower"].clone(), BigNum::from(20_u64)),
         ]
         .into_iter()
         .collect();

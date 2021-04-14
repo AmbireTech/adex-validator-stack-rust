@@ -8,6 +8,9 @@ use std::cmp::PartialEq;
 use std::collections::HashMap;
 use time::Duration;
 
+//
+// TODO: AIP#61 How relevant is this validator? Check and remove if it's obsolete
+//
 pub trait ChannelValidator {
     fn is_channel_valid(
         config: &Config,
@@ -56,7 +59,7 @@ pub trait ChannelValidator {
             return Err(ChannelError::MinimumDepositNotMet);
         }
 
-        if adapter_channel_validator.fee < config.minimal_fee {
+        if BigNum::from(adapter_channel_validator.fee.to_u64()) < config.minimal_fee {
             return Err(ChannelError::MinimumValidatorFeeNotMet);
         }
 
@@ -64,7 +67,7 @@ pub trait ChannelValidator {
             .spec
             .validators
             .iter()
-            .map(|v| v.fee.clone())
+            .map(|v| BigNum::from(v.fee.to_u64()))
             .fold(BigNum::from(0), |acc, x| acc + x);
 
         if total_validator_fee >= channel.deposit_amount {

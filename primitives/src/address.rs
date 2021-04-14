@@ -1,6 +1,6 @@
 use hex::{FromHex, FromHexError};
 use serde::{Deserialize, Serialize, Serializer};
-use std::{convert::TryFrom, fmt};
+use std::{convert::TryFrom, fmt, str::FromStr};
 use thiserror::Error;
 
 use crate::{targeting::Value, DomainError, ToETHChecksum, ToHex};
@@ -28,6 +28,10 @@ pub struct Address(
 impl Address {
     pub fn as_bytes(&self) -> &[u8; 20] {
         &self.0
+    }
+
+    pub fn from_bytes(bytes: &[u8; 20]) -> Self {
+        Self(*bytes)
     }
 }
 
@@ -67,6 +71,14 @@ impl AsRef<[u8]> for Address {
     }
 }
 
+impl FromStr for Address {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(from_bytes(s, Prefix::Insensitive)?))
+    }
+}
+
 impl TryFrom<&str> for Address {
     type Error = Error;
 
@@ -80,6 +92,14 @@ impl TryFrom<&String> for Address {
 
     fn try_from(value: &String) -> Result<Self, Self::Error> {
         Self::try_from(value.as_str())
+    }
+}
+
+impl TryFrom<&[u8]> for Address {
+    type Error = Error;
+
+    fn try_from(slice: &[u8]) -> Result<Self, Self::Error> {
+        Ok(Self(from_bytes(slice, Prefix::Insensitive)?))
     }
 }
 
@@ -133,5 +153,48 @@ pub fn from_bytes<T: AsRef<[u8]>>(from: T, prefix: Prefix) -> Result<[u8; 20], E
         },
         (Prefix::Without, 40) | (Prefix::Insensitive, 40) => from_hex(bytes),
         _ => Err(Error::Length),
+    }
+}
+
+#[cfg(feature = "postgres")]
+pub mod postgres {
+    use super::Address;
+    use crate::ToETHChecksum;
+    use bytes::BytesMut;
+    use postgres_types::{FromSql, IsNull, ToSql, Type};
+    use std::error::Error;
+
+    impl<'a> FromSql<'a> for Address {
+        fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+            let str_slice = <&str as FromSql>::from_sql(ty, raw)?;
+
+            Ok(str_slice.parse()?)
+        }
+
+        fn accepts(ty: &Type) -> bool {
+            matches!(*ty, Type::TEXT | Type::VARCHAR)
+        }
+    }
+
+    impl ToSql for Address {
+        fn to_sql(
+            &self,
+            ty: &Type,
+            w: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+            self.to_checksum().to_sql(ty, w)
+        }
+
+        fn accepts(ty: &Type) -> bool {
+            <String as ToSql>::accepts(ty)
+        }
+
+        fn to_sql_checked(
+            &self,
+            ty: &Type,
+            out: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+            self.to_checksum().to_sql_checked(ty, out)
+        }
     }
 }

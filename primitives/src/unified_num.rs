@@ -1,6 +1,9 @@
-use num::{pow::Pow, CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Integer, One};
+use crate::BigNum;
+use num::{
+    pow::Pow, traits::CheckedRem, CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Integer, One,
+};
 use num_derive::{FromPrimitive, Num, NumCast, NumOps, ToPrimitive, Zero};
-use num_traits::CheckedRem;
+use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
     fmt,
@@ -8,12 +11,14 @@ use std::{
     ops::{Add, AddAssign, Div, Mul, Sub},
 };
 
-use crate::BigNum;
-
-/// Unified Number with a precision of 8 digits after the decimal point
+/// Unified Number with a precision of 8 digits after the decimal point.
+///
 /// The number can be a maximum of `u64::MAX` (the underlying type),
-/// or in a `UnifiedNum` value `184_467_440_737.09551615`
-/// The actual number is handled as a unsigned number and only the display shows the decimal point
+/// or in a `UnifiedNum` value `184_467_440_737.09551615`.
+/// The actual number is handled as a unsigned number and only the display shows the decimal point.
+///
+/// This number is (de)serialized as a Javascript number which is `f64`.
+/// As far as the numbers don't exceed `2**63`, the Javascript number should be sufficient without losing precision
 #[derive(
     Clone,
     Copy,
@@ -28,7 +33,10 @@ use crate::BigNum;
     Eq,
     PartialOrd,
     Ord,
+    Serialize,
+    Deserialize,
 )]
+#[serde(transparent)]
 pub struct UnifiedNum(u64);
 
 impl UnifiedNum {
@@ -38,8 +46,16 @@ impl UnifiedNum {
         Self(self.0.div_floor(&other.0))
     }
 
-    pub fn to_u64(&self) -> u64 {
+    pub const fn from_u64(value: u64) -> Self {
+        Self(value)
+    }
+
+    pub const fn to_u64(&self) -> u64 {
         self.0
+    }
+
+    pub fn to_bignum(&self) -> BigNum {
+        BigNum::from(self.0)
     }
 
     pub fn checked_add(&self, rhs: &UnifiedNum) -> Option<Self> {
@@ -86,7 +102,7 @@ impl fmt::Display for UnifiedNum {
         let precision: usize = Self::PRECISION.into();
 
         if value_length > precision {
-            string_value.insert_str(value_length - precision, ".");
+            string_value.insert(value_length - precision, '.');
 
             f.write_str(&string_value)
         } else {
@@ -273,7 +289,7 @@ mod test {
     }
 
     #[test]
-    fn unified_num_displays_correctly() {
+    fn unified_num_displays_and_de_serializes_correctly() {
         let one = UnifiedNum::from(100_000_000);
         let zero_point_one = UnifiedNum::from(10_000_000);
         let smallest_value = UnifiedNum::from(1);
@@ -285,6 +301,11 @@ mod test {
         assert_eq!("0.10000000", &zero_point_one.to_string());
         assert_eq!("0.00000001", &smallest_value.to_string());
         assert_eq!("1449030.00567000", &random_value.to_string());
+
+        assert_eq!(
+            serde_json::Value::Number(100_000_000.into()),
+            serde_json::to_value(one).expect("Should serialize")
+        )
     }
 
     #[test]
@@ -316,5 +337,79 @@ mod test {
             same_unified.to_precision(same_precision),
             "It should not make any adjustments to the precision"
         );
+    }
+}
+
+#[cfg(feature = "postgres")]
+// TODO: Test UnifiedNum postgres impl
+mod postgres {
+    use super::UnifiedNum;
+    use bytes::BytesMut;
+    use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
+    use std::{
+        convert::{TryFrom, TryInto},
+        error::Error,
+    };
+
+    impl<'a> FromSql<'a> for UnifiedNum {
+        fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<UnifiedNum, Box<dyn Error + Sync + Send>> {
+            let value = <i64 as FromSql>::from_sql(ty, raw)?;
+
+            Ok(UnifiedNum(u64::try_from(value)?))
+        }
+
+        accepts!(INT8);
+    }
+
+    impl ToSql for UnifiedNum {
+        fn to_sql(
+            &self,
+            ty: &Type,
+            w: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+            <i64 as ToSql>::to_sql(&self.0.try_into()?, ty, w)
+        }
+
+        accepts!(INT8);
+
+        to_sql_checked!();
+    }
+
+    #[cfg(test)]
+    mod test {
+        use super::*;
+        use crate::util::tests::prep_db::postgres::POSTGRES_POOL;
+
+        #[tokio::test]
+        async fn from_and_to_sql() {
+            let client = POSTGRES_POOL.get().await.unwrap();
+
+            let sql_type = "BIGINT";
+            let (val, repr) = (
+                UnifiedNum(9_223_372_036_854_775_708_u64),
+                "9223372036854775708",
+            );
+
+            // from SQL
+            {
+                let rows = client
+                    .query(&*format!("SELECT {}::{}", repr, sql_type), &[])
+                    .await
+                    .unwrap();
+                let result: UnifiedNum = rows[0].get(0);
+
+                assert_eq!(&val, &result);
+            }
+
+            // to SQL
+            {
+                let rows = client
+                    .query(&*format!("SELECT $1::{}", sql_type), &[&val])
+                    .await
+                    .unwrap();
+                let result = rows[0].get(0);
+                assert_eq!(&val, &result);
+            }
+        }
     }
 }
