@@ -183,22 +183,6 @@ pub struct Campaign {
     pub active: Active,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Active {
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "ts_milliseconds_option"
-    )]
-    pub from: Option<DateTime<Utc>>,
-    /// A millisecond timestamp of when the campaign should enter a withdraw period
-    /// (no longer accept any events other than CHANNEL_CLOSE)
-    /// A sane value should be lower than channel.validUntil * 1000 and higher than created
-    /// It's recommended to set this at least one month prior to channel.validUntil * 1000
-    #[serde(with = "ts_milliseconds")]
-    pub to: DateTime<Utc>,
-}
-
 impl Campaign {
     /// Matches the Channel.leader to the Campaign.spec.leader
     /// If they match it returns `Some`, otherwise, it returns `None`
