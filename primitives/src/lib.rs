@@ -8,6 +8,7 @@ pub use self::{
     address::Address,
     balances_map::BalancesMap,
     big_num::BigNum,
+    campaign::{Campaign, CampaignId},
     channel::{Channel, ChannelId, ChannelSpec, SpecValidator, SpecValidators},
     config::Config,
     event_submission::EventSubmission,
@@ -87,6 +88,7 @@ impl error::Error for DomainError {
 }
 
 /// Trait that creates a String which is `0x` prefixed and encodes the bytes by `eth_checksum`
+#[allow(clippy::upper_case_acronyms)]
 pub trait ToETHChecksum: AsRef<[u8]> {
     fn to_checksum(&self) -> String {
         // checksum replaces `0x` prefix and adds one itself

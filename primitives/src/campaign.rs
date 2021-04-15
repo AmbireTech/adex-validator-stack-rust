@@ -1,5 +1,6 @@
 use crate::{
-    channel_v5::Channel, targeting::Rules, AdUnit, Address, EventSubmission, ValidatorDesc,
+    channel_v5::Channel, targeting::Rules, AdUnit, Address, EventSubmission, UnifiedNum,
+    ValidatorDesc,
 };
 
 use chrono::{
@@ -9,15 +10,156 @@ use chrono::{
 use serde::{Deserialize, Serialize};
 use serde_with::with_prefix;
 
-pub use pricing::{Pricing, PricingBounds};
-pub use validators::{ValidatorRole, Validators};
+pub use {
+    campaign_id::CampaignId,
+    pricing::{Pricing, PricingBounds},
+    validators::{ValidatorRole, Validators},
+};
 
 with_prefix!(prefix_active "active_");
 
-#[derive(Debug, Serialize, Deserialize)]
+mod campaign_id {
+    use crate::ToHex;
+    use hex::{FromHex, FromHexError};
+    use serde::{
+        de::{self, Visitor},
+        Deserialize, Deserializer, Serialize, Serializer,
+    };
+    use std::{fmt, str::FromStr};
+    use thiserror::Error;
+    use uuid::Uuid;
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    /// an Id of 16 bytes, (de)serialized as a `0x` prefixed hex
+    /// In this implementation of the `CampaignId` the value is generated from a `Uuid::new_v4().to_simple()`
+    pub struct CampaignId([u8; 16]);
+
+    impl CampaignId {
+        pub fn new() -> Self {
+            Self::default()
+        }
+
+        pub fn as_bytes(&self) -> &[u8; 16] {
+            &self.0
+        }
+
+        pub fn from_bytes(bytes: &[u8; 16]) -> Self {
+            Self(*bytes)
+        }
+    }
+
+    impl Default for CampaignId {
+        fn default() -> Self {
+            Self(*Uuid::new_v4().as_bytes())
+        }
+    }
+
+    impl AsRef<[u8]> for CampaignId {
+        fn as_ref(&self) -> &[u8] {
+            &self.0
+        }
+    }
+
+    impl AsRef<[u8; 16]> for CampaignId {
+        fn as_ref(&self) -> &[u8; 16] {
+            &self.0
+        }
+    }
+
+    #[derive(Debug, Error)]
+    pub enum Error {
+        /// the `0x` prefix is missing
+        #[error("Expected a `0x` prefix")]
+        ExpectedPrefix,
+        #[error(transparent)]
+        InvalidHex(#[from] FromHexError),
+    }
+
+    impl FromStr for CampaignId {
+        type Err = Error;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            match s.strip_prefix("0x") {
+                Some(hex) => Ok(Self(<[u8; 16]>::from_hex(hex)?)),
+                None => Err(Error::ExpectedPrefix),
+            }
+        }
+    }
+
+    impl fmt::Display for CampaignId {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str(&self.0.to_hex_prefixed())
+        }
+    }
+
+    impl Serialize for CampaignId {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            serializer.serialize_str(&self.0.to_hex_prefixed())
+        }
+    }
+
+    impl<'de> Deserialize<'de> for CampaignId {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            deserializer.deserialize_str(StringIdVisitor)
+        }
+    }
+
+    struct StringIdVisitor;
+
+    impl<'de> Visitor<'de> for StringIdVisitor {
+        type Value = CampaignId;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            formatter.write_str("a string of a `0x` prefixed hex with 16 bytes")
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            value
+                .parse::<CampaignId>()
+                .map_err(|err| E::custom(err.to_string()))
+        }
+
+        fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            self.visit_str(&value)
+        }
+    }
+
+    #[cfg(test)]
+    mod test {
+        use serde_json::{to_value, Value};
+
+        use super::*;
+
+        #[test]
+        fn de_serializes_campaign_id() {
+            let id = CampaignId::new();
+
+            assert_eq!(
+                Value::String(id.0.to_hex_prefixed()),
+                to_value(id).expect("Should serialize")
+            );
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Campaign {
+    pub id: CampaignId,
     pub channel: Channel,
     pub creator: Address,
+    pub budget: UnifiedNum,
     pub validators: Validators,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
@@ -41,22 +183,6 @@ pub struct Campaign {
     pub active: Active,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Active {
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "ts_milliseconds_option"
-    )]
-    pub from: Option<DateTime<Utc>>,
-    /// A millisecond timestamp of when the campaign should enter a withdraw period
-    /// (no longer accept any events other than CHANNEL_CLOSE)
-    /// A sane value should be lower than channel.validUntil * 1000 and higher than created
-    /// It's recommended to set this at least one month prior to channel.validUntil * 1000
-    #[serde(with = "ts_milliseconds")]
-    pub to: DateTime<Utc>,
-}
-
 impl Campaign {
     /// Matches the Channel.leader to the Campaign.spec.leader
     /// If they match it returns `Some`, otherwise, it returns `None`
@@ -77,6 +203,32 @@ impl Campaign {
             None
         }
     }
+
+    /// Returns the pricing of a given event
+    pub fn pricing(&self, event: &str) -> Option<&Pricing> {
+        self.pricing_bounds
+            .as_ref()
+            .and_then(|bound| bound.get(event))
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Active {
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "ts_milliseconds_option"
+    )]
+    pub from: Option<DateTime<Utc>>,
+    //
+    // TODO: AIP#61 Update docs
+    //
+    /// A millisecond timestamp of when the campaign should enter a withdraw period
+    /// (no longer accept any events other than CHANNEL_CLOSE)
+    /// A sane value should be lower than channel.validUntil * 1000 and higher than created
+    /// It's recommended to set this at least one month prior to channel.validUntil * 1000
+    #[serde(with = "ts_milliseconds")]
+    pub to: DateTime<Utc>,
 }
 
 mod pricing {
@@ -85,8 +237,8 @@ mod pricing {
 
     #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
     pub struct Pricing {
-        pub max: BigNum,
         pub min: BigNum,
+        pub max: BigNum,
     }
 
     #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]

@@ -1,13 +1,17 @@
 use primitives::{
     sentry::{AggregateEvents, Event, EventAggregate},
-    BigNum, Channel, ValidatorId,
+    Address, BigNum, Channel,
 };
 
+//
+// TODO: AIP#61 remove `allow(dead_code)` and see what should be changed for Spender Aggregate
+//
+#[allow(dead_code)]
 pub(crate) fn reduce(
     channel: &Channel,
     initial_aggr: &mut EventAggregate,
     ev: &Event,
-    payout: &Option<(ValidatorId, BigNum)>,
+    payout: &Option<(Address, BigNum)>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let event_type = ev.to_string();
 
@@ -36,8 +40,12 @@ pub(crate) fn reduce(
         }
         Event::Close => {
             let close_event = AggregateEvents {
-                event_counts: Some(vec![(channel.creator, 1.into())].into_iter().collect()),
-                event_payouts: vec![(channel.creator, channel.deposit_amount.clone())]
+                event_counts: Some(
+                    vec![(channel.creator.to_address(), 1.into())]
+                        .into_iter()
+                        .collect(),
+                ),
+                event_payouts: vec![(channel.creator.to_address(), channel.deposit_amount.clone())]
                     .into_iter()
                     .collect(),
             };
@@ -52,7 +60,7 @@ pub(crate) fn reduce(
 /// payable_event is either an IMPRESSION or a CLICK
 fn merge_payable_event(
     payable_event: Option<&AggregateEvents>,
-    payout: (ValidatorId, BigNum),
+    payout: (Address, BigNum),
 ) -> AggregateEvents {
     let mut payable_event = payable_event.cloned().unwrap_or_default();
 
@@ -78,7 +86,7 @@ mod test {
     use super::*;
     use chrono::Utc;
     use primitives::{
-        util::tests::prep_db::{DUMMY_CHANNEL, IDS},
+        util::tests::prep_db::{ADDRESSES, DUMMY_CHANNEL},
         BigNum,
     };
 
@@ -96,12 +104,12 @@ mod test {
         };
 
         let event = Event::Impression {
-            publisher: IDS["publisher"],
+            publisher: ADDRESSES["publisher"],
             ad_unit: None,
             ad_slot: None,
             referrer: None,
         };
-        let payout = Some((IDS["publisher"], BigNum::from(1)));
+        let payout = Some((ADDRESSES["publisher"], BigNum::from(1)));
         for i in 0..101 {
             reduce(&channel, &mut event_aggr, &event, &payout)
                 .expect(&format!("Should be able to reduce event #{}", i));
@@ -118,13 +126,13 @@ mod test {
             .event_counts
             .as_ref()
             .expect("there should be event_counts set")
-            .get(&IDS["publisher"])
+            .get(&ADDRESSES["publisher"])
             .expect("There should be myAwesomePublisher event_counts key");
         assert_eq!(event_counts, &BigNum::from(101));
 
         let event_payouts = impression_event
             .event_payouts
-            .get(&IDS["publisher"])
+            .get(&ADDRESSES["publisher"])
             .expect("There should be myAwesomePublisher event_payouts key");
         assert_eq!(event_payouts, &BigNum::from(101));
     }

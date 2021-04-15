@@ -215,7 +215,7 @@ mod test {
         event_submission::{RateLimit, Rule},
         sentry::Event,
         targeting::Rules,
-        util::tests::prep_db::{DUMMY_CHANNEL, IDS},
+        util::tests::prep_db::{ADDRESSES, DUMMY_CHANNEL, IDS},
         Channel, Config, EventSubmission,
     };
 
@@ -248,7 +248,7 @@ mod test {
     fn get_impression_events(count: i8) -> Vec<Event> {
         (0..count)
             .map(|_| Event::Impression {
-                publisher: IDS["publisher2"],
+                publisher: ADDRESSES["publisher2"],
                 ad_unit: None,
                 ad_slot: None,
                 referrer: None,
@@ -559,7 +559,7 @@ mod test {
         channel.creator = IDS["leader"];
         let mixed_events = vec![
             Event::Impression {
-                publisher: IDS["publisher2"],
+                publisher: ADDRESSES["publisher2"],
                 ad_unit: None,
                 ad_slot: None,
                 referrer: None,
@@ -609,7 +609,7 @@ mod test {
         channel.creator = IDS["leader"];
         let mixed_events = vec![
             Event::Impression {
-                publisher: IDS["publisher2"],
+                publisher: ADDRESSES["publisher2"],
                 ad_unit: None,
                 ad_slot: None,
                 referrer: None,
