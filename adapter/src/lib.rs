@@ -6,13 +6,13 @@ use std::error::Error;
 
 use chrono::{DateTime, Utc};
 use hex::FromHex;
-use primitives::{channel::ChannelError, BigNum, Channel, ValidatorId};
+use primitives::{channel::ChannelError, Address, BigNum, Channel, ValidatorId};
 use sha2::{Digest, Sha256};
 use std::convert::TryFrom;
 use tiny_keccak::Keccak;
 use web3::{
     ethabi::{encode, token::Token},
-    types::{Address, U256},
+    types::{Address as EthAddress, U256},
 };
 
 pub use self::dummy::DummyAdapter;
@@ -46,9 +46,9 @@ pub fn get_signable_state_root(
     Ok(res)
 }
 
-pub fn get_balance_leaf(acc: &ValidatorId, amnt: &BigNum) -> Result<[u8; 32], Box<dyn Error>> {
+pub fn get_balance_leaf(acc: &Address, amnt: &BigNum) -> Result<[u8; 32], Box<dyn Error>> {
     let tokens = [
-        Token::Address(Address::from_slice(acc.inner())),
+        Token::Address(EthAddress::from_slice(acc.as_bytes())),
         Token::Uint(
             U256::from_dec_str(&amnt.to_str_radix(10))
                 .map_err(|_| ChannelError::InvalidArgument("failed to parse amt".into()))?,
@@ -67,11 +67,11 @@ pub fn get_balance_leaf(acc: &ValidatorId, amnt: &BigNum) -> Result<[u8; 32], Bo
 
 // OnChain channel Representation
 pub struct EthereumChannel {
-    pub creator: Address,
-    pub token_addr: Address,
+    pub creator: EthAddress,
+    pub token_addr: EthAddress,
     pub token_amount: U256,
     pub valid_until: U256,
-    pub validators: Vec<Address>,
+    pub validators: Vec<EthAddress>,
     pub spec: [u8; 32],
 }
 
@@ -121,8 +121,8 @@ impl EthereumChannel {
             return Err(ChannelError::InvalidArgument("invalid token amount".into()));
         }
 
-        let creator = Address::from_slice(creator);
-        let token_addr = Address::from_slice(token_addr);
+        let creator = EthAddress::from_slice(creator);
+        let token_addr = EthAddress::from_slice(token_addr);
         let token_amount = U256::from_dec_str(&token_amount)
             .map_err(|_| ChannelError::InvalidArgument("failed to parse token amount".into()))?;
         let valid_until = U256::from_dec_str(&valid_until.timestamp().to_string())
@@ -130,7 +130,7 @@ impl EthereumChannel {
 
         let validators = validators
             .iter()
-            .map(|v| Address::from_slice(v.inner()))
+            .map(|v| EthAddress::from_slice(v.as_bytes()))
             .collect();
 
         Ok(Self {
@@ -145,7 +145,7 @@ impl EthereumChannel {
 
     pub fn hash(&self, contract_addr: &[u8; 20]) -> [u8; 32] {
         let tokens = [
-            Token::Address(Address::from_slice(contract_addr)),
+            Token::Address(EthAddress::from_slice(contract_addr)),
             Token::Address(self.creator.to_owned()),
             Token::Address(self.token_addr.to_owned()),
             Token::Uint(self.token_amount.to_owned()),

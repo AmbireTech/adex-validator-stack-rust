@@ -201,6 +201,10 @@ pub async fn insert_events<A: Adapter + 'static>(
         .remove("events")
         .ok_or_else(|| ResponseError::BadRequest("invalid request".to_string()))?;
 
+    //
+    // TODO #381: AIP#61 Spender Aggregator should be called
+    //
+
     app.event_aggregator
         .record(app, &channel_id, session, auth, events)
         .await?;
