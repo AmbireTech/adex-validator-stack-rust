@@ -853,6 +853,7 @@ mod test {
                 .execute(token_bytecode, (), leader_account)
         })
         .await;
+        // deploy contracts
 
         let token_contract = tokio_compat_02::FutureExt::compat(token_contract)
             .await

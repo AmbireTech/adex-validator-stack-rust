@@ -1,17 +1,15 @@
 use async_trait::async_trait;
-use lazy_static::lazy_static;
 use primitives::{
     adapter::{
         Adapter, AdapterErrorKind, AdapterResult, Deposit, DummyAdapterOptions,
         Error as AdapterError, Session,
     },
-    channel_v5::{Channel as ChannelV5, Nonce},
+    channel_v5::Channel as ChannelV5,
     channel_validator::ChannelValidator,
-    config::{Config, TokenInfo},
-    Address, BigNum, Channel, ChannelId, ToETHChecksum, ValidatorId,
+    config::Config,
+    Address, BigNum, Channel, ToETHChecksum, ValidatorId,
 };
-use std::ops::Add;
-use std::{collections::HashMap, convert::TryFrom, fmt};
+use std::{collections::HashMap, fmt};
 
 #[derive(Debug, Clone)]
 pub struct DummyAdapter {
@@ -21,24 +19,6 @@ pub struct DummyAdapter {
     session_tokens: HashMap<String, ValidatorId>,
     // Auth tokens that we've generated to authenticate with someone (address => token)
     authorization_tokens: HashMap<String, String>,
-    // Generated for retrieving deposit of channel-spender pair
-    deposits: HashMap<(ChannelId, Address), BigNum>,
-    // Generated for retrieving balances of tokens
-    token_balances: HashMap<Address, BigNum>,
-}
-
-lazy_static! {
-    static ref DUMMY_V5_CHANNEL: ChannelV5 = ChannelV5 {
-        leader: ValidatorId::try_from("2bdeafae53940669daa6f519373f686c1f3d3393")
-            .expect("failed to create id"),
-        follower: ValidatorId::try_from("6704Fbfcd5Ef766B287262fA2281C105d57246a6")
-            .expect("failed to create id"),
-        guardian: Address::try_from("0000000000000000000000000000000000000000")
-            .expect("failed to create address"),
-        token: Address::try_from("0x73967c6a0904aa032c103b4104747e88c566b1a2")
-            .expect("should create an address"),
-        nonce: Nonce::from(12345_u32),
-    };
 }
 
 // Enables DummyAdapter to be able to
@@ -52,37 +32,8 @@ impl DummyAdapter {
             config: config.to_owned(),
             session_tokens: opts.dummy_auth,
             authorization_tokens: opts.dummy_auth_tokens,
-            deposits: generate_deposits(),
-            token_balances: generate_balances(&config.token_address_whitelist),
         }
     }
-}
-
-fn generate_deposits() -> HashMap<(ChannelId, Address), BigNum> {
-    let mut deposits = HashMap::new();
-    deposits.insert(
-        (
-            DUMMY_V5_CHANNEL.id(),
-            Address::try_from("1111111111111111111111111111111111111111").expect("should generate"),
-        ),
-        BigNum::try_from("1000000000000").expect("should make bignum"),
-    );
-    deposits
-}
-
-fn generate_balances(whitelist: &HashMap<Address, TokenInfo>) -> HashMap<Address, BigNum> {
-    let mut balances = HashMap::new();
-    whitelist.keys().for_each(|k| {
-        balances.insert(
-            *k,
-            whitelist
-                .get(k)
-                .unwrap()
-                .min_token_units_for_deposit
-                .clone(),
-        );
-    });
-    balances
 }
 
 #[derive(Debug)]
@@ -181,72 +132,12 @@ impl Adapter for DummyAdapter {
 
     async fn get_deposit(
         &self,
-        channel: &ChannelV5,
-        address: &Address,
+        _channel: &ChannelV5,
+        _address: &Address,
     ) -> AdapterResult<Deposit, Self::AdapterError> {
-        let mut total = self
-            .deposits
-            .get(&(channel.id(), *address))
-            .unwrap()
-            .clone();
-        let still_on_create_2 = self.token_balances.get(&channel.token).unwrap().clone();
-        let token_info = self
-            .config
-            .token_address_whitelist
-            .get(&channel.token)
-            .unwrap();
-
-        if still_on_create_2 > token_info.min_token_units_for_deposit {
-            total = total.add(still_on_create_2.clone());
-        }
-
         Ok(Deposit {
-            total,
-            still_on_create_2,
+            total: BigNum::from(1000000),
+            still_on_create_2: BigNum::from(0),
         })
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use primitives::{
-        config::configuration,
-        util::tests::prep_db::{AUTH, IDS},
-    };
-    use std::convert::TryFrom;
-
-    fn setup_dummy_adapter(dummy_identity: &str) -> DummyAdapter {
-        let config = configuration("development", None).expect("failed parse config");
-
-        let options = DummyAdapterOptions {
-            dummy_identity: ValidatorId::try_from(dummy_identity).expect("should generate id"),
-            dummy_auth: IDS.clone(),
-            dummy_auth_tokens: AUTH.clone(),
-        };
-
-        DummyAdapter::init(options, &config)
-    }
-
-    #[tokio::test]
-    async fn test_dummy_get_deposit() {
-        let dummy_adapter = setup_dummy_adapter("0000000000000000000000000000000000000000");
-
-        let spender: Address = Address::try_from("1111111111111111111111111111111111111111")
-            .expect("should create an address");
-        let deposit = dummy_adapter
-            .get_deposit(&DUMMY_V5_CHANNEL, &spender)
-            .await
-            .expect("should get deposit");
-        let expected_total = dummy_adapter
-            .deposits
-            .get(&(DUMMY_V5_CHANNEL.id(), spender))
-            .expect("should get balance");
-        assert_eq!(deposit.total, *expected_total);
-        let expected_on_create_2 = dummy_adapter
-            .token_balances
-            .get(&DUMMY_V5_CHANNEL.token)
-            .expect("should get token");
-        assert_eq!(deposit.still_on_create_2, *expected_on_create_2);
     }
 }
