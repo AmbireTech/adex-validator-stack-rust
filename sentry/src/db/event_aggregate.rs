@@ -10,7 +10,7 @@ use futures::pin_mut;
 use primitives::{
     sentry::{EventAggregate, MessageResponse},
     validator::{ApproveState, Heartbeat, NewState},
-    BigNum, Channel, ChannelId, ValidatorId,
+    Address, BigNum, Channel, ChannelId, ValidatorId,
 };
 use std::{convert::TryFrom, ops::Add};
 
@@ -147,7 +147,7 @@ pub async fn list_event_aggregates(
 struct EventData {
     id: ChannelId,
     event_type: String,
-    earner: Option<ValidatorId>,
+    earner: Option<Address>,
     event_count: BigNum,
     event_payout: BigNum,
 }
