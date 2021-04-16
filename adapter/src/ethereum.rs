@@ -93,7 +93,6 @@ impl EthereumAdapter {
 
 fn get_counterfactual_address(token: Address) -> H160 {
     let mut salt: [u8; 32] = [0; 32];
-    thread_rng().fill_bytes(&mut salt);
     let mut init_code = Keccak::new_keccak256();
     init_code.update(b"0x00");
     let mut hashed_init_code: [u8; 32] = [0; 32];
