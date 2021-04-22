@@ -18,6 +18,8 @@ CREATE TABLE campaigns (
 
 CREATE INDEX idx_campaign_active_to ON campaigns (active_to);
 
+CREATE INDEX idx_campaign_creator ON campaigns (creator);
+
 CREATE INDEX idx_campaign_created ON campaigns (created);
 
 CREATE TABLE spendable (
