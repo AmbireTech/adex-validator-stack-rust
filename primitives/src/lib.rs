@@ -35,6 +35,7 @@ pub mod ipfs;
 pub mod market;
 pub mod merkle_tree;
 pub mod sentry;
+pub mod spender;
 pub mod supermarket;
 pub mod targeting;
 mod unified_num;

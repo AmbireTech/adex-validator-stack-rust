@@ -205,6 +205,13 @@ pub async fn insert_events<A: Adapter + 'static>(
     // TODO #381: AIP#61 Spender Aggregator should be called
     //
 
+    // handle events - check access
+    // handle events - Update targeting rules
+    // calculate payout
+    // distribute fees
+    // handle spending - Spender Aggregate
+    // handle events - aggregate Events and put into analytics
+
     app.event_aggregator
         .record(app, &channel_id, session, auth, events)
         .await?;

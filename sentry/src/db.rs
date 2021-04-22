@@ -8,6 +8,7 @@ use lazy_static::lazy_static;
 pub mod analytics;
 mod channel;
 pub mod event_aggregate;
+pub mod spendable;
 mod validator_message;
 
 pub use self::channel::*;
@@ -44,8 +45,8 @@ pub async fn postgres_connection() -> Result<DbPool, bb8_postgres::tokio_postgre
         .password(POSTGRES_PASSWORD.as_str())
         .host(POSTGRES_HOST.as_str())
         .port(*POSTGRES_PORT);
-    if let Some(db) = POSTGRES_DB.clone() {
-        config.dbname(&db);
+    if let Some(db) = POSTGRES_DB.as_ref() {
+        config.dbname(db);
     }
     let pg_mgr = PostgresConnectionManager::new(config, NoTls);
 
@@ -79,6 +80,8 @@ pub async fn setup_migrations(environment: &str) {
         };
     }
 
+    // NOTE: Make sure to update list of migrations for the tests as well!
+    // `postgres_pool::MIGRATIONS`
     let mut migrations = vec![make_migration!("20190806011140_initial-tables")];
 
     if environment == "development" {
@@ -119,6 +122,164 @@ pub async fn setup_migrations(environment: &str) {
     let _config = config
         .reload()
         .expect("Reloading config for migration failed");
+}
+
+#[cfg(test)]
+pub mod postgres_pool {
+    use std::{
+        ops::{Deref, DerefMut},
+        sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
+        },
+    };
+
+    use deadpool::managed::{Manager as ManagerTrait, RecycleResult};
+    use deadpool_postgres::ClientWrapper;
+    use once_cell::sync::Lazy;
+    use tokio_postgres::{
+        tls::{MakeTlsConnect, TlsConnect},
+        Client, Error, SimpleQueryMessage, Socket,
+    };
+
+    use async_trait::async_trait;
+
+    use super::{POSTGRES_DB, POSTGRES_HOST, POSTGRES_PASSWORD, POSTGRES_PORT, POSTGRES_USER};
+
+    pub type Pool = deadpool::managed::Pool<Schema, Error>;
+
+    /// we must have a duplication of the migration because of how migrant is handling migratoins
+    /// we need to separately setup test migrations
+    pub static MIGRATIONS: &[&str] = &["20190806011140_initial-tables"];
+
+    pub static TESTS_POOL: Lazy<Pool> = Lazy::new(|| {
+        use deadpool_postgres::{ManagerConfig, RecyclingMethod};
+        use tokio_postgres::tls::NoTls;
+        let mut config = bb8_postgres::tokio_postgres::Config::new();
+
+        config
+            .user(POSTGRES_USER.as_str())
+            .password(POSTGRES_PASSWORD.as_str())
+            .host(POSTGRES_HOST.as_str())
+            .port(*POSTGRES_PORT);
+        if let Some(db) = POSTGRES_DB.as_ref() {
+            config.dbname(db);
+        }
+
+        let deadpool_manager = deadpool_postgres::Manager::from_config(
+            config,
+            NoTls,
+            ManagerConfig {
+                recycling_method: RecyclingMethod::Verified,
+            },
+        );
+
+        Pool::new(
+            Manager {
+                postgres_manager: Arc::new(deadpool_manager),
+                index: AtomicUsize::new(0),
+            },
+            15,
+        )
+    });
+
+    /// A Scheme is used to isolate test runs from each other
+    /// we need to know the name of the schema we've created.
+    /// This will allow us the drop the schema when we are recycling the connection
+    pub struct Schema {
+        /// The schema name that will be created by the pool `CREATE SCHEMA`
+        /// This schema will be set as the connection `search_path` (`SET SCHEMA` for short)
+        pub name: String,
+        pub client: ClientWrapper,
+    }
+
+    impl Deref for Schema {
+        type Target = tokio_postgres::Client;
+        fn deref(&self) -> &tokio_postgres::Client {
+            &self.client
+        }
+    }
+
+    impl DerefMut for Schema {
+        fn deref_mut(&mut self) -> &mut tokio_postgres::Client {
+            &mut self.client
+        }
+    }
+
+    struct Manager<T: MakeTlsConnect<Socket> + Send + Sync> {
+        postgres_manager: Arc<deadpool_postgres::Manager<T>>,
+        index: AtomicUsize,
+    }
+
+    #[async_trait]
+    impl<T> ManagerTrait<Schema, tokio_postgres::Error> for Manager<T>
+    where
+        T: MakeTlsConnect<Socket> + Clone + Sync + Send + 'static,
+        T::Stream: Sync + Send,
+        T::TlsConnect: Sync + Send,
+        <T::TlsConnect as TlsConnect<Socket>>::Future: Send,
+    {
+        async fn create(&self) -> Result<Schema, tokio_postgres::Error> {
+            let client = self.postgres_manager.create().await?;
+
+            let conn_index = self.index.fetch_add(1, Ordering::SeqCst);
+            let schema_name = format!("test_{}", conn_index);
+
+            // 1. Drop the schema if it exists - if a test failed before, the schema wouldn't have been removed
+            // 2. Create schema
+            // 3. Set the `search_path` (SET SCHEMA) - this way we don't have to define schema on queries or table creation
+
+            let queries = format!(
+                "DROP SCHEMA IF EXISTS {0} CASCADE; CREATE SCHEMA {0}; SET SESSION SCHEMA '{0}';",
+                schema_name
+            );
+
+            let result = client.simple_query(&queries).await?;
+
+            assert_eq!(3, result.len());
+            assert!(matches!(result[0], SimpleQueryMessage::CommandComplete(..)));
+            assert!(matches!(result[1], SimpleQueryMessage::CommandComplete(..)));
+            assert!(matches!(result[2], SimpleQueryMessage::CommandComplete(..)));
+
+            Ok(Schema {
+                name: schema_name,
+                client,
+            })
+        }
+
+        async fn recycle(&self, schema: &mut Schema) -> RecycleResult<tokio_postgres::Error> {
+            let queries = format!("DROP SCHEMA {0} CASCADE;", schema.name);
+            let result = schema.simple_query(&queries).await?;
+            assert_eq!(2, result.len());
+            assert!(matches!(result[0], SimpleQueryMessage::CommandComplete(..)));
+            assert!(matches!(result[1], SimpleQueryMessage::CommandComplete(..)));
+
+            self.postgres_manager.recycle(&mut schema.client).await
+        }
+    }
+
+    pub async fn setup_test_migrations(client: &Client) -> Result<(), Error> {
+        let full_query: String = MIGRATIONS
+            .iter()
+            .map(|migration| {
+                use std::{
+                    fs::File,
+                    io::{BufReader, Read},
+                };
+                let file = File::open(format!("migrations/{}/up.sql", migration))
+                    .expect("File migration couldn't be opened");
+                let mut buf_reader = BufReader::new(file);
+                let mut contents = String::new();
+
+                buf_reader
+                    .read_to_string(&mut contents)
+                    .expect("File migration couldn't be read");
+                contents
+            })
+            .collect();
+
+        client.batch_execute(&full_query).await
+    }
 }
 
 #[cfg(test)]

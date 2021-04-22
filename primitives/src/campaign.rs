@@ -1,6 +1,6 @@
 use crate::{
     channel_v5::Channel, targeting::Rules, AdUnit, Address, EventSubmission, UnifiedNum,
-    ValidatorDesc,
+    ValidatorDesc, ValidatorId,
 };
 
 use chrono::{
@@ -184,6 +184,14 @@ pub struct Campaign {
 }
 
 impl Campaign {
+    pub fn find_validator(&self, validator: ValidatorId) -> Option<&'_ ValidatorDesc> {
+        match (self.leader(), self.follower()) {
+            (Some(leader), _) if leader.id == validator => Some(leader),
+            (_, Some(follower)) if follower.id == validator => Some(follower),
+            _ => None,
+        }
+    }
+
     /// Matches the Channel.leader to the Campaign.spec.leader
     /// If they match it returns `Some`, otherwise, it returns `None`
     pub fn leader(&self) -> Option<&'_ ValidatorDesc> {
