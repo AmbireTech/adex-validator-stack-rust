@@ -1,6 +1,7 @@
 use crate::EthereumChannel;
 use async_trait::async_trait;
 use chrono::Utc;
+use create2::calc_addr;
 use error::*;
 use ethstore::{
     ethkey::{
@@ -18,7 +19,6 @@ use primitives::{
     config::Config,
     Address, BigNum, Channel, ChannelId, ToETHChecksum, ValidatorId,
 };
-use rand::{thread_rng, RngCore};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -27,6 +27,7 @@ use std::{convert::TryFrom, fs};
 use tiny_keccak::Keccak;
 use web3::{
     contract::{tokens::Tokenizable, Contract, Options},
+    ethabi::{encode, Token},
     transports::Http,
     types::{H160, H256, U256},
     Web3,
@@ -37,11 +38,14 @@ mod error;
 lazy_static! {
     static ref ADEXCORE_ABI: &'static [u8] =
         include_bytes!("../../lib/protocol-eth/abi/AdExCore.json");
-    // TODO: Fix it once ERC20 and OUTPACE are merged
-    static ref ERC20_ABI: &'static [u8] = include_bytes!("../ERC20.json");
     static ref OUTPACE_ABI: &'static [u8] =
         include_bytes!("../../lib/protocol-eth/abi/OUTPACE.json");
     static ref CHANNEL_STATE_ACTIVE: U256 = 1.into();
+    // TODO: Fix it once ERC20 and OUTPACE are merged
+    static ref ERC20_ABI: &'static [u8] = include_bytes!("../ERC20.json");
+    // TODO: Open PR with those in protocol-eth and sync module once it's ready
+    static ref SWEEPER_ABI: &'static [u8] = include_bytes!("../Sweeper.json");
+    static ref DEPOSITOR_BYTECODE: &'static [u8] = include_bytes!("../Depositor.bin");
 }
 
 #[derive(Debug, Clone)]
@@ -91,22 +95,31 @@ impl EthereumAdapter {
     }
 }
 
-fn get_counterfactual_address(token: Address) -> H160 {
-    let mut salt: [u8; 32] = [0; 32];
-    let mut init_code = Keccak::new_keccak256();
-    init_code.update(b"0x00");
-    let mut hashed_init_code: [u8; 32] = [0; 32];
-    init_code.finalize(&mut hashed_init_code);
-
-    let mut result = Keccak::new_keccak256();
-    result.update(b"0xff");
-    result.update(token.as_bytes());
-    result.update(&salt);
-    result.update(&hashed_init_code);
-    let mut res: [u8; 20] = [0; 20];
-    result.finalize(&mut res);
-
-    H160::from(res)
+fn get_counterfactual_address(
+    sweeper: H160,
+    channel: &ChannelV5,
+    outpace: H160,
+    depositor: &Address,
+) -> H160 {
+    let salt: [u8; 32] = [0; 32];
+    let mut init_code: Vec<u8> = DEPOSITOR_BYTECODE.to_vec();
+    let channel_as_token_vec: Vec<Token> = vec![
+        Token::Address(channel.leader.as_bytes().into()),
+        Token::Address(channel.follower.as_bytes().into()),
+        Token::Address(channel.guardian.as_bytes().into()),
+        Token::Address(channel.token.as_bytes().into()),
+        Token::FixedBytes(channel.nonce.to_bytes().to_vec()),
+    ];
+    // TODO: Encode channel too
+    let mut encoded_params = encode(&[
+        Token::Tuple(channel_as_token_vec),
+        Token::Address(outpace),
+        Token::Address(H160(*depositor.as_bytes())),
+    ])
+    .to_vec();
+    init_code.append(&mut encoded_params);
+    let address = calc_addr(sweeper.as_fixed_bytes(), &salt, &init_code);
+    H160::from(address)
 }
 
 #[async_trait]
@@ -300,7 +313,7 @@ impl Adapter for EthereumAdapter {
     async fn get_deposit(
         &self,
         channel: &ChannelV5,
-        address: &Address,
+        depositor_address: &Address,
     ) -> AdapterResult<Deposit, Self::AdapterError> {
         let outpace_contract = Contract::from_json(
             self.web3.eth(),
@@ -313,10 +326,20 @@ impl Adapter for EthereumAdapter {
             Contract::from_json(self.web3.eth(), channel.token.as_bytes().into(), &ERC20_ABI)
                 .map_err(Error::ContractInitialization)?;
 
+        let sweeper_contract = Contract::from_json(
+            self.web3.eth(),
+            self.config.ethereum_core_address.into(), //-???
+            &SWEEPER_ABI,
+        )
+        .map_err(Error::ContractInitialization)?;
+
+        let sweeper_address = sweeper_contract.address();
+        let outpace_address = outpace_contract.address();
+
         let total: U256 = tokio_compat_02::FutureExt::compat(async {
             tokio_compat_02::FutureExt::compat(outpace_contract.query(
                 "deposits",
-                (*channel.id(), H160(*address.as_bytes())),
+                (*channel.id(), H160(*depositor_address.as_bytes())),
                 None,
                 Options::default(),
                 None,
@@ -328,7 +351,12 @@ impl Adapter for EthereumAdapter {
 
         let mut total = BigNum::from_str(&total.to_string())?;
 
-        let counterfactual_address = get_counterfactual_address(channel.token);
+        let counterfactual_address = get_counterfactual_address(
+            sweeper_address,
+            channel,
+            outpace_address,
+            depositor_address,
+        );
         let still_on_create_2: U256 = tokio_compat_02::FutureExt::compat(async {
             tokio_compat_02::FutureExt::compat(erc20_contract.query(
                 "balanceOf",
