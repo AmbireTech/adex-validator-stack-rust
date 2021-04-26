@@ -1,11 +1,9 @@
-use crate::db::event_aggregate::{latest_approve_state, latest_heartbeats, latest_new_state};
 use crate::db::{
+    event_aggregate::{latest_approve_state, latest_heartbeats, latest_new_state},
     get_channel_by_id, insert_channel, insert_validator_messages, list_channels,
-    update_exhausted_channel,
+    update_exhausted_channel, PoolError,
 };
 use crate::{success_response, Application, Auth, ResponseError, RouteParams, Session};
-use bb8::RunError;
-use bb8_postgres::tokio_postgres::error;
 use futures::future::try_join_all;
 use hex::FromHex;
 use hyper::{Body, Request, Response};
@@ -20,6 +18,7 @@ use primitives::{
 };
 use slog::error;
 use std::collections::HashMap;
+use tokio_postgres::error::SqlState;
 
 pub async fn channel_status<A: Adapter>(
     req: Request<Body>,
@@ -59,10 +58,13 @@ pub async fn create_channel<A: Adapter>(
     match insert_channel(&app.pool, &channel).await {
         Err(error) => {
             error!(&app.logger, "{}", &error; "module" => "create_channel");
+
             match error {
-                RunError::User(e) if e.code() == Some(&error::SqlState::UNIQUE_VIOLATION) => Err(
-                    ResponseError::Conflict("channel already exists".to_string()),
-                ),
+                PoolError::Backend(error) if error.code() == Some(&SqlState::UNIQUE_VIOLATION) => {
+                    Err(ResponseError::Conflict(
+                        "channel already exists".to_string(),
+                    ))
+                }
                 _ => Err(error_response),
             }
         }

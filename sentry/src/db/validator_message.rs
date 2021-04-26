@@ -1,7 +1,7 @@
-use crate::db::DbPool;
-use bb8::RunError;
-use bb8_postgres::tokio_postgres::types::ToSql;
 use primitives::{sentry::ValidatorMessage, ChannelId, ValidatorId};
+use tokio_postgres::types::ToSql;
+
+use super::{DbPool, PoolError};
 
 pub async fn get_validator_messages(
     pool: &DbPool,
@@ -9,7 +9,9 @@ pub async fn get_validator_messages(
     validator_id: &Option<ValidatorId>,
     message_types: &[String],
     limit: u64,
-) -> Result<Vec<ValidatorMessage>, RunError<bb8_postgres::tokio_postgres::Error>> {
+) -> Result<Vec<ValidatorMessage>, PoolError> {
+    let client = pool.get().await?;
+
     let mut where_clauses: Vec<String> = vec!["channel_id = $1".to_string()];
     let mut params: Vec<&(dyn ToSql + Sync)> = vec![&channel_id];
 
@@ -20,15 +22,13 @@ pub async fn get_validator_messages(
 
     add_message_types_params(&mut where_clauses, &mut params, message_types);
 
-    let connection = pool.get().await?;
-
     let statement = format!(
         r#"SELECT "from", msg, received FROM validator_messages WHERE {} ORDER BY received DESC LIMIT {}"#,
         where_clauses.join(" AND "),
         limit
     );
-    let select = connection.prepare(&statement).await?;
-    let results = connection.query(&select, params.as_slice()).await?;
+    let select = client.prepare(&statement).await?;
+    let results = client.query(&select, params.as_slice()).await?;
     let messages = results.iter().map(ValidatorMessage::from).collect();
 
     Ok(messages)

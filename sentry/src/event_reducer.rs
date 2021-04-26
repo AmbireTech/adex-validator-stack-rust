@@ -6,7 +6,7 @@ use primitives::{
 //
 // TODO: AIP#61 remove `allow(dead_code)` and see what should be changed for Spender Aggregate
 //
-#[allow(dead_code)]
+#[allow(dead_code, clippy::unnecessary_wraps)]
 pub(crate) fn reduce(
     channel: &Channel,
     initial_aggr: &mut EventAggregate,
