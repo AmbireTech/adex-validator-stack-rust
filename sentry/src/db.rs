@@ -145,12 +145,12 @@ pub mod tests_postgres {
     };
 
     use deadpool::managed::{Manager as ManagerTrait, RecycleResult};
-    use deadpool_postgres::{ManagerConfig, PoolError};
+    use deadpool_postgres::ManagerConfig;
     use tokio_postgres::{NoTls, SimpleQueryMessage};
 
     use async_trait::async_trait;
 
-    use super::DbPool;
+    use super::{DbPool, PoolError};
 
     pub type Pool = deadpool::managed::Pool<Database, PoolError>;
 
@@ -239,12 +239,19 @@ pub mod tests_postgres {
             let created_db = format!("CREATE DATABASE {0};", db_name);
             let temp_client = self.base_pool.get().await?;
 
-            temp_client.execute(drop_db.as_str(), &[]).await?;
-            temp_client.execute(created_db.as_str(), &[]).await?;
+            let drop_db_result = temp_client.simple_query(drop_db.as_str()).await?;
+            assert_eq!(1, drop_db_result.len());
+            assert!(matches!(
+                drop_db_result[0],
+                SimpleQueryMessage::CommandComplete(..)
+            ));
 
-            // assert_eq!(2, result.len());
-            // assert!(matches!(result[0], SimpleQueryMessage::CommandComplete(..)));
-            // assert!(matches!(result[1], SimpleQueryMessage::CommandComplete(..)));
+            let create_db_result = temp_client.simple_query(created_db.as_str()).await?;
+            assert_eq!(1, create_db_result.len());
+            assert!(matches!(
+                create_db_result[0],
+                SimpleQueryMessage::CommandComplete(..)
+            ));
 
             let mut config = self.base_config.clone();
             // set the database in the configuration of the inside Pool (used for tests)

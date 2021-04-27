@@ -253,6 +253,10 @@ pub mod postgres {
             .host(&POSTGRES_HOST)
             .port(*POSTGRES_PORT);
 
+        if let Some(db) = POSTGRES_DB.as_ref() {
+            config.dbname(db);
+        }
+
         let mgr_config = ManagerConfig {
             recycling_method: RecyclingMethod::Fast,
         };
