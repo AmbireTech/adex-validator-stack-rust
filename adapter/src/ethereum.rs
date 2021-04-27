@@ -110,7 +110,6 @@ fn get_counterfactual_address(
         Token::Address(channel.token.as_bytes().into()),
         Token::FixedBytes(channel.nonce.to_bytes().to_vec()),
     ];
-    // TODO: Encode channel too
     let mut encoded_params = encode(&[
         Token::Tuple(channel_as_token_vec),
         Token::Address(outpace),
