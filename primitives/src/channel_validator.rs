@@ -7,7 +7,7 @@ use std::cmp::PartialEq;
 use time::Duration;
 
 //
-// TODO: AIP#61 How relevant is this validator? Check and remove if it's obsolete
+// TODO: AIP#61 OBSOLETE, remove once we remove the Channel Create!How relevant is this validator? Check and remove if it's obsolete
 //
 pub trait ChannelValidator {
     fn is_channel_valid(
@@ -45,7 +45,7 @@ pub trait ChannelValidator {
             return Err(ChannelError::UnlistedValidator);
         }
 
-        if !creator_listed(&channel, &config.creators_whitelist) {
+        if !creator_listed(&channel, &config.creators_whitelist.iter().map(Into::into).collect::<Vec<_>>()) {
             return Err(ChannelError::UnlistedCreator);
         }
 

@@ -1,5 +1,4 @@
-use crate::event_submission::RateLimit;
-use crate::{BigNum, ValidatorId};
+use crate::{event_submission::RateLimit, Address, BigNum, ValidatorId};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_hex::{SerHex, StrictPfx};
@@ -31,7 +30,7 @@ pub struct Config {
     pub validator_tick_timeout: u32,
     pub ip_rate_limit: RateLimit,  // HashMap??
     pub sid_rate_limit: RateLimit, // HashMap ??
-    pub creators_whitelist: Vec<ValidatorId>,
+    pub creators_whitelist: Vec<Address>,
     pub minimal_deposit: BigNum,
     pub minimal_fee: BigNum,
     pub token_address_whitelist: Vec<String>,

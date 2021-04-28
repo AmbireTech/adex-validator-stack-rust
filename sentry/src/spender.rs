@@ -36,11 +36,11 @@ pub mod fee {
         campaign: &Campaign,
         for_validator: ValidatorId,
     ) -> Result<Option<UnifiedNum>, DomainError> {
-        let payout = match campaign.find_validator(for_validator) {
-            Some(validator) => {
+        let payout = match campaign.find_validator(&for_validator) {
+            Some(validator_role) => {
                 // should never overflow
                 let fee_payout = payout
-                    .checked_mul(&validator.fee)
+                    .checked_mul(&validator_role.validator().fee)
                     .ok_or_else(|| {
                         DomainError::InvalidArgument("payout calculation overflow".to_string())
                     })?
