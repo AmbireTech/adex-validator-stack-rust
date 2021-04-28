@@ -335,21 +335,20 @@ impl Adapter for EthereumAdapter {
         let sweeper_address = sweeper_contract.address();
         let outpace_address = outpace_contract.address();
 
-        // let total: U256 = tokio_compat_02::FutureExt::compat(async {
-        //     tokio_compat_02::FutureExt::compat(outpace_contract.query(
-        //         "deposits",
-        //         (*channel.id(), H160(*depositor_address.as_bytes())),
-        //         None,
-        //         Options::default(),
-        //         None,
-        //     ))
-        //     .await
-        // })
-        // .await
-        // .map_err(Error::ContractQuerying)?;
+        let total: U256 = tokio_compat_02::FutureExt::compat(async {
+            tokio_compat_02::FutureExt::compat(outpace_contract.query(
+                "deposits",
+                (*channel.id(), H160(*depositor_address.as_bytes())),
+                None,
+                Options::default(),
+                None,
+            ))
+            .await
+        })
+        .await
+        .map_err(Error::ContractQuerying)?;
 
-        // let mut total = BigNum::from_str(&total.to_string())?;
-        let mut total = BigNum::from(0);
+        let mut total = BigNum::from_str(&total.to_string())?;
 
         let counterfactual_address = get_counterfactual_address(
             sweeper_address,
