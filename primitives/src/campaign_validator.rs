@@ -1,4 +1,4 @@
-use crate::{Address, Campaign, UnifiedNum, ValidatorId, campaign::Validators, config::Config};
+use crate::{campaign::Validators, config::Config, Address, Campaign, UnifiedNum, ValidatorId};
 use chrono::Utc;
 use std::cmp::PartialEq;
 use thiserror::Error;
@@ -40,11 +40,10 @@ impl Validator for Campaign {
         config: &Config,
         validator_identity: &ValidatorId,
     ) -> Result<Validation, Error> {
-
         // check if the channel validators include our adapter identity
         let whoami_validator = match self.find_validator(validator_identity) {
             Some(role) => role.validator(),
-            None => return Ok(Validation::AdapterNotIncluded)
+            None => return Ok(Validation::AdapterNotIncluded),
         };
 
         if self.active.to < Utc::now() {
@@ -95,9 +94,7 @@ pub fn all_validators_listed(validators: &Validators, whitelist: &[ValidatorId])
     } else {
         let found_validators = whitelist
             .iter()
-            .filter(|&allowed| {
-                validators.find(allowed).is_some()
-            })
+            .filter(|&allowed| validators.find(allowed).is_some())
             // this will ensure that if we find the 2 validators earlier
             // we don't go over the other values of the whitelist
             .take(2);
@@ -109,7 +106,10 @@ pub fn all_validators_listed(validators: &Validators, whitelist: &[ValidatorId])
 pub fn creator_listed(campaign: &Campaign, whitelist: &[Address]) -> bool {
     // if the list is empty, return true, as we don't have a whitelist to restrict us to
     // or if we have a list, check if it includes the `channel.creator`
-    whitelist.is_empty() || whitelist.iter().any(|allowed| allowed.eq(&campaign.creator))
+    whitelist.is_empty()
+        || whitelist
+            .iter()
+            .any(|allowed| allowed.eq(&campaign.creator))
 }
 
 pub fn asset_listed(campaign: &Campaign, whitelist: &[String]) -> bool {

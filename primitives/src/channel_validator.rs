@@ -45,7 +45,14 @@ pub trait ChannelValidator {
             return Err(ChannelError::UnlistedValidator);
         }
 
-        if !creator_listed(&channel, &config.creators_whitelist.iter().map(Into::into).collect::<Vec<_>>()) {
+        if !creator_listed(
+            &channel,
+            &config
+                .creators_whitelist
+                .iter()
+                .map(Into::into)
+                .collect::<Vec<_>>(),
+        ) {
             return Err(ChannelError::UnlistedCreator);
         }
 
