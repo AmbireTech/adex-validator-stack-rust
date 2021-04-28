@@ -45,7 +45,7 @@ lazy_static! {
     static ref ERC20_ABI: &'static [u8] = include_bytes!("../ERC20.json");
     // TODO: Open PR with those in protocol-eth and sync module once it's ready
     static ref SWEEPER_ABI: &'static [u8] = include_bytes!("../Sweeper.json");
-    static ref DEPOSITOR_BYTECODE: &'static [u8] = include_bytes!("../Depositor.bin");
+    static ref DEPOSITOR_BYTECODE: &'static [u8] = include_bytes!("../Depositorbytecode.json");
 }
 
 #[derive(Debug, Clone)]
@@ -943,6 +943,10 @@ mod test {
         // tokenbytecode.json
         let token_bytecode =
             include_str!("../test/resources/tokenbytecode.json").trim_end_matches("\n");
+        // Outpacebytecode.json
+        let outpace_bytecode = include_str!("../OUTPACEbytecode.json").trim_end_matches("\n");
+        // Sweeperbytecode.json
+        let sweeper_bytecode = include_str!("../Sweeperbytecode.json").trim_end_matches("\n");
         // token_abi.json
         let token_abi = include_bytes!("../test/resources/tokenabi.json");
 
@@ -962,6 +966,35 @@ mod test {
         let token_contract = tokio_compat_02::FutureExt::compat(token_contract)
             .await
             .expect("Correct parameters are passed to the constructor.");
+
+        let sweeper_contract = tokio_compat_02::FutureExt::compat(async {
+            Contract::deploy(web3.eth(), &SWEEPER_ABI)
+                .expect("invalid sweeper contract")
+                .confirmations(0)
+                .options(Options::default())
+                .execute(sweeper_bytecode, (), leader_account)
+        })
+        .await;
+
+        let sweeper_contract = tokio_compat_02::FutureExt::compat(sweeper_contract)
+            .await
+            .expect("Correct parameters are passed to the constructor.");
+
+        let outpace_contract = tokio_compat_02::FutureExt::compat(async {
+            Contract::deploy(web3.eth(), &OUTPACE_ABI)
+                .expect("invalid outpace contract")
+                .confirmations(0)
+                .options(Options::default())
+                .execute(outpace_bytecode, (), leader_account)
+        })
+        .await;
+
+        let outpace_contract = tokio_compat_02::FutureExt::compat(outpace_contract)
+            .await
+            .expect("Correct parameters are passed to the constructor.");
+
+        let outpace_address = outpace_contract.address();
+        let sweeper_address = sweeper_contract.address();
 
         let leader = ValidatorId::try_from("2bdeafae53940669daa6f519373f686c1f3d3393")
             .expect("failed to create id");
@@ -1001,6 +1034,13 @@ mod test {
             },
         );
         eth_adapter.unlock().expect("should unlock eth adapter");
+
+        let counterfactual_address = get_counterfactual_address(
+            sweeper_address,
+            &channel_to_pass,
+            outpace_address,
+            &spender,
+        );
 
         let deposit = eth_adapter
             .get_deposit(&channel_to_pass, &spender)
