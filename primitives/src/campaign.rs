@@ -188,7 +188,9 @@ impl Campaign {
     pub fn find_validator(&self, validator: &ValidatorId) -> Option<ValidatorRole<'_>> {
         match (self.leader(), self.follower()) {
             (Some(leader), _) if &leader.id == validator => Some(ValidatorRole::Leader(leader)),
-            (_, Some(follower)) if &follower.id == validator => Some(ValidatorRole::Follower(follower)),
+            (_, Some(follower)) if &follower.id == validator => {
+                Some(ValidatorRole::Follower(follower))
+            }
             _ => None,
         }
     }
@@ -282,7 +284,7 @@ pub mod validators {
     use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
-    /// Unordered list of the validators representing the leader & follower 
+    /// Unordered list of the validators representing the leader & follower
     pub struct Validators(ValidatorDesc, ValidatorDesc);
 
     #[derive(Debug, PartialEq, Eq, Clone)]
@@ -371,6 +373,103 @@ pub mod validators {
     }
 }
 
-// TODO: Postgres Campaign
-// TODO: Postgres CampaignSpec
-// TODO: Postgres Validators
+#[cfg(feature = "postgres")]
+mod postgres {
+
+    use super::{Active, Campaign, CampaignId, PricingBounds, Validators};
+    use bytes::BytesMut;
+    use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
+    use std::error::Error;
+    use tokio_postgres::Row;
+
+    impl From<&Row> for Campaign {
+        fn from(row: &Row) -> Self {
+            Self {
+                id: row.get("id"),
+                channel: row.get("channel"),
+                creator: row.get("creator"),
+                budget: row.get("budget"),
+                validators: row.get("validators"),
+                title: row.get("title"),
+                pricing_bounds: row.get("pricing_bounds"),
+                event_submission: row.get("event_submission"),
+                ad_units: row.get("ad_units"),
+                targeting_rules: row.get("targeting_rules"),
+                created: row.get("created"),
+                active: Active {
+                    from: row.get("active_from"),
+                    to: row.get("active_to"),
+                },
+            }
+        }
+    }
+
+    impl<'a> FromSql<'a> for CampaignId {
+        fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+            let str_slice = <&str as FromSql>::from_sql(ty, raw)?;
+
+            Ok(str_slice.parse()?)
+        }
+
+        accepts!(TEXT, VARCHAR);
+    }
+
+    impl ToSql for CampaignId {
+        fn to_sql(
+            &self,
+            ty: &Type,
+            w: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+            self.to_string().to_sql(ty, w)
+        }
+
+        accepts!(TEXT, VARCHAR);
+        to_sql_checked!();
+    }
+
+    impl<'a> FromSql<'a> for Validators {
+        fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+            let json = <Json<Self> as FromSql>::from_sql(ty, raw)?;
+
+            Ok(json.0)
+        }
+
+        accepts!(JSONB);
+    }
+
+    impl ToSql for Validators {
+        fn to_sql(
+            &self,
+            ty: &Type,
+            w: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+            Json(self).to_sql(ty, w)
+        }
+
+        accepts!(JSONB);
+        to_sql_checked!();
+    }
+
+    impl<'a> FromSql<'a> for PricingBounds {
+        fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+            let json = <Json<Self> as FromSql>::from_sql(ty, raw)?;
+
+            Ok(json.0)
+        }
+
+        accepts!(JSONB);
+    }
+
+    impl ToSql for PricingBounds {
+        fn to_sql(
+            &self,
+            ty: &Type,
+            w: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+            Json(self).to_sql(ty, w)
+        }
+
+        accepts!(JSONB);
+        to_sql_checked!();
+    }
+}
