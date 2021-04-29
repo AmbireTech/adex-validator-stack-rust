@@ -6,6 +6,7 @@ use tokio_postgres::NoTls;
 use lazy_static::lazy_static;
 
 pub mod analytics;
+mod campaign;
 mod channel;
 pub mod event_aggregate;
 pub mod spendable;
