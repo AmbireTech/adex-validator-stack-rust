@@ -19,6 +19,11 @@ validator_tick_timeout = 10000
 ip_rate_limit = { type = 'ip', timeframe = 1200000 }
 sid_rate_limit = { type = 'sid', timeframe = 0 }
 ethereum_core_address = '0x333420fc6a897356e69b62417cd17ff012177d2b'
+# TODO: Replace with real contract address
+outpace_address = '0x333420fc6a897356e69b62417cd17ff012177d2b'
+# TODO: Replace with real contract address
+sweeper_address = '0x333420fc6a897356e69b62417cd17ff012177d2b'
+
 ethereum_network = 'http://localhost:8545'
 ethereum_adapter_relayer = 'https://relayer.adex.network'
 

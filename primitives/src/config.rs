@@ -44,8 +44,14 @@ pub struct Config {
     pub minimal_fee: BigNum,
     #[serde(deserialize_with = "deserialize_token_whitelist")]
     pub token_address_whitelist: HashMap<Address, TokenInfo>,
+    /// DEPRECATED since this is v4!
+    #[deprecated(note = "REMOVE, this is V4")]
     #[serde(with = "SerHex::<StrictPfx>")]
     pub ethereum_core_address: [u8; 20],
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub outpace_address: [u8; 20],
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub sweeper_address: [u8; 20],
     pub ethereum_network: String,
     pub ethereum_adapter_relayer: String,
     pub validators_whitelist: Vec<ValidatorId>,
