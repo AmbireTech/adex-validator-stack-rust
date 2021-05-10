@@ -44,6 +44,7 @@ pub mod db;
 pub mod event_aggregator;
 pub mod event_reducer;
 pub mod payout;
+pub mod spender;
 
 lazy_static! {
     static ref CHANNEL_GET_BY_ID: Regex =
@@ -328,10 +329,9 @@ where
         ResponseError::BadRequest("Bad Request: try again later".into())
     }
 }
-
-impl Into<Response<Body>> for ResponseError {
-    fn into(self) -> Response<Body> {
-        map_response_error(self)
+impl From<ResponseError> for Response<Body> {
+    fn from(response_error: ResponseError) -> Self {
+        map_response_error(response_error)
     }
 }
 

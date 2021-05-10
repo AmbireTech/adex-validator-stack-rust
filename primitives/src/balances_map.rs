@@ -17,6 +17,14 @@ pub type BalancesMap = Map<Address, BigNum>;
 #[serde(transparent)]
 pub struct Map<K: Ord, V>(BTreeMap<K, V>);
 
+impl Map<Address, UnifiedNum> {
+    pub fn to_precision(&self, precision: u8) -> BalancesMap {
+        self.iter()
+            .map(|(address, unified_num)| (*address, unified_num.to_precision(precision)))
+            .collect()
+    }
+}
+
 impl<K: Ord, V> Default for Map<K, V> {
     fn default() -> Self {
         Map(BTreeMap::default())

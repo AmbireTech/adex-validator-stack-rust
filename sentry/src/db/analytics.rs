@@ -1,16 +1,15 @@
-use crate::db::DbPool;
-use crate::epoch;
-use crate::Auth;
-use bb8::RunError;
-use bb8_postgres::tokio_postgres::types::ToSql;
+use crate::{epoch, Auth};
 use chrono::Utc;
-use primitives::analytics::{AnalyticsData, AnalyticsQuery, ANALYTICS_QUERY_LIMIT};
-use primitives::sentry::{AdvancedAnalyticsResponse, ChannelReport, PublisherReport};
-use primitives::{ChannelId, ValidatorId};
-use redis::aio::MultiplexedConnection;
-use redis::cmd;
+use primitives::{
+    analytics::{AnalyticsData, AnalyticsQuery, ANALYTICS_QUERY_LIMIT},
+    sentry::{AdvancedAnalyticsResponse, ChannelReport, PublisherReport},
+    ChannelId, ValidatorId,
+};
+use redis::{aio::MultiplexedConnection, cmd};
 use std::collections::HashMap;
-use std::error::Error;
+use tokio_postgres::types::ToSql;
+
+use super::{DbPool, PoolError};
 
 pub enum AnalyticsType {
     Advertiser { auth: Auth },
@@ -21,13 +20,13 @@ pub enum AnalyticsType {
 pub async fn advertiser_channel_ids(
     pool: &DbPool,
     creator: &ValidatorId,
-) -> Result<Vec<ChannelId>, RunError<bb8_postgres::tokio_postgres::Error>> {
-    let connection = pool.get().await?;
+) -> Result<Vec<ChannelId>, PoolError> {
+    let client = pool.get().await?;
 
-    let stmt = connection
+    let stmt = client
         .prepare("SELECT id FROM channels WHERE creator = $1")
         .await?;
-    let rows = connection.query(&stmt, &[creator]).await?;
+    let rows = client.query(&stmt, &[creator]).await?;
 
     let channel_ids: Vec<ChannelId> = rows.iter().map(ChannelId::from).collect();
     Ok(channel_ids)
@@ -47,7 +46,9 @@ pub async fn get_analytics(
     analytics_type: AnalyticsType,
     segment_by_channel: bool,
     channel_id: Option<&ChannelId>,
-) -> Result<Vec<AnalyticsData>, RunError<bb8_postgres::tokio_postgres::Error>> {
+) -> Result<Vec<AnalyticsData>, PoolError> {
+    let client = pool.get().await?;
+
     // converts metric to column
     let metric = metric_to_column(&query.metric);
 
@@ -115,11 +116,9 @@ pub async fn get_analytics(
         applied_limit,
     );
 
-    let connection = pool.get().await?;
-
     // execute query
-    let stmt = connection.prepare(&sql_query).await?;
-    let rows = connection.query(&stmt, &params).await?;
+    let stmt = client.prepare(&sql_query).await?;
+    let rows = client.query(&stmt, &params).await?;
 
     let analytics: Vec<AnalyticsData> = rows.iter().map(AnalyticsData::from).collect();
 
@@ -144,11 +143,11 @@ fn get_time_frame(timeframe: &str) -> (i64, i64) {
 async fn stat_pair(
     mut conn: MultiplexedConnection,
     key: &str,
-) -> Result<HashMap<String, f64>, Box<dyn Error>> {
+) -> Result<HashMap<String, f64>, Box<dyn std::error::Error>> {
     let data = cmd("ZRANGE")
         .arg(key)
-        .arg(0 as u64)
-        .arg(-1 as i64)
+        .arg(0_u64)
+        .arg(-1_i64)
         .arg("WITHSCORES")
         .query_async::<_, Vec<String>>(&mut conn)
         .await?;
@@ -169,7 +168,7 @@ pub async fn get_advanced_reports(
     event_type: &str,
     publisher: &ValidatorId,
     channel_ids: &[ChannelId],
-) -> Result<AdvancedAnalyticsResponse, Box<dyn Error>> {
+) -> Result<AdvancedAnalyticsResponse, Box<dyn std::error::Error>> {
     let publisher_reports = [
         PublisherReport::AdUnit,
         PublisherReport::AdSlot,
