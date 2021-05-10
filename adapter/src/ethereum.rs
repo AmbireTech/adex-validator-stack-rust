@@ -37,16 +37,11 @@ use test_utils::*;
 mod error;
 
 lazy_static! {
-    // TODO: Deprecated! This is v4!
-    static ref ADEXCORE_ABI: &'static [u8] =
-        include_bytes!("../../lib/protocol-eth/abi/AdExCore.json");
     static ref OUTPACE_ABI: &'static [u8] =
         include_bytes!("../../lib/protocol-eth/abi/OUTPACE.json");
-    // TODO: Fix it once ERC20 and OUTPACE are merged
-    static ref ERC20_ABI: &'static [u8] = include_str!("../ERC20.json").trim_end_matches('\n').as_bytes();
-    // TODO: Open PR with those in protocol-eth and sync module once it's ready
-    static ref SWEEPER_ABI: &'static [u8] = include_bytes!("../Sweeper.json");
-    static ref DEPOSITOR_BYTECODE: &'static [u8] = include_bytes!("../Depositorbytecode.json");
+    static ref ERC20_ABI: &'static [u8] = include_str!("../../lib/protocol-eth/abi/ERC20.json").trim_end_matches('\n').as_bytes();
+    static ref SWEEPER_ABI: &'static [u8] = include_bytes!("../../lib/protocol-eth/abi/Sweeper.json");
+    static ref DEPOSITOR_BYTECODE: &'static [u8] = include_bytes!("../../lib/protocol-eth/resources/bytecode/Depositor.json");
 }
 
 #[cfg(test)]
