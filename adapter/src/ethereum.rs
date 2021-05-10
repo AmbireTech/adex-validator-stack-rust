@@ -39,9 +39,13 @@ mod error;
 lazy_static! {
     static ref OUTPACE_ABI: &'static [u8] =
         include_bytes!("../../lib/protocol-eth/abi/OUTPACE.json");
-    static ref ERC20_ABI: &'static [u8] = include_str!("../../lib/protocol-eth/abi/ERC20.json").trim_end_matches('\n').as_bytes();
-    static ref SWEEPER_ABI: &'static [u8] = include_bytes!("../../lib/protocol-eth/abi/Sweeper.json");
-    static ref DEPOSITOR_BYTECODE: &'static [u8] = include_bytes!("../../lib/protocol-eth/resources/bytecode/Depositor.json");
+    static ref ERC20_ABI: &'static [u8] = include_str!("../../lib/protocol-eth/abi/ERC20.json")
+        .trim_end_matches('\n')
+        .as_bytes();
+    static ref SWEEPER_ABI: &'static [u8] =
+        include_bytes!("../../lib/protocol-eth/abi/Sweeper.json");
+    static ref DEPOSITOR_BYTECODE: &'static [u8] =
+        include_bytes!("../../lib/protocol-eth/resources/bytecode/Depositor.json");
 }
 
 #[cfg(test)]
