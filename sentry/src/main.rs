@@ -114,7 +114,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!(&logger, "Checking connection and applying migrations...");
     // Check connection and setup migrations before setting up Postgres
     setup_migrations(&environment).await;
-    let postgres = postgres_connection().await?;
+    let postgres = postgres_connection(42).await;
 
     match adapter {
         AdapterTypes::EthereumAdapter(adapter) => {

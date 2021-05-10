@@ -41,9 +41,9 @@ pub mod fee {
                 // should never overflow
                 let fee_payout = payout
                     .checked_mul(&validator.fee)
-                    .ok_or(DomainError::InvalidArgument(
-                        "payout calculation overflow".to_string(),
-                    ))?
+                    .ok_or_else(|| {
+                        DomainError::InvalidArgument("payout calculation overflow".to_string())
+                    })?
                     .div_floor(&PRO_MILLE);
 
                 Some(fee_payout)

@@ -1,10 +1,3 @@
-use crate::db::DbPool;
-use bb8::RunError;
-use bb8_postgres::tokio_postgres::{
-    binary_copy::BinaryCopyInWriter,
-    types::{ToSql, Type},
-    Error,
-};
 use chrono::{DateTime, Utc};
 use futures::pin_mut;
 use primitives::{
@@ -13,15 +6,21 @@ use primitives::{
     Address, BigNum, Channel, ChannelId, ValidatorId,
 };
 use std::{convert::TryFrom, ops::Add};
+use tokio_postgres::{
+    binary_copy::BinaryCopyInWriter,
+    types::{ToSql, Type},
+};
+
+use super::{DbPool, PoolError};
 
 pub async fn latest_approve_state(
     pool: &DbPool,
     channel: &Channel,
-) -> Result<Option<MessageResponse<ApproveState>>, RunError<bb8_postgres::tokio_postgres::Error>> {
-    let connection = pool.get().await?;
+) -> Result<Option<MessageResponse<ApproveState>>, PoolError> {
+    let client = pool.get().await?;
 
-    let select = connection.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'ApproveState' ORDER BY received DESC LIMIT 1").await?;
-    let rows = connection
+    let select = client.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'ApproveState' ORDER BY received DESC LIMIT 1").await?;
+    let rows = client
         .query(
             &select,
             &[&channel.id, &channel.spec.validators.follower().id],
@@ -31,18 +30,18 @@ pub async fn latest_approve_state(
     rows.get(0)
         .map(MessageResponse::<ApproveState>::try_from)
         .transpose()
-        .map_err(RunError::User)
+        .map_err(PoolError::Backend)
 }
 
 pub async fn latest_new_state(
     pool: &DbPool,
     channel: &Channel,
     state_root: &str,
-) -> Result<Option<MessageResponse<NewState>>, RunError<bb8_postgres::tokio_postgres::Error>> {
-    let connection = pool.get().await?;
+) -> Result<Option<MessageResponse<NewState>>, PoolError> {
+    let client = pool.get().await?;
 
-    let select = connection.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'NewState' AND msg->> 'stateRoot' = $3 ORDER BY received DESC LIMIT 1").await?;
-    let rows = connection
+    let select = client.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'NewState' AND msg->> 'stateRoot' = $3 ORDER BY received DESC LIMIT 1").await?;
+    let rows = client
         .query(
             &select,
             &[
@@ -56,25 +55,23 @@ pub async fn latest_new_state(
     rows.get(0)
         .map(MessageResponse::<NewState>::try_from)
         .transpose()
-        .map_err(RunError::User)
+        .map_err(PoolError::Backend)
 }
 
 pub async fn latest_heartbeats(
     pool: &DbPool,
     channel_id: &ChannelId,
     validator_id: &ValidatorId,
-) -> Result<Vec<MessageResponse<Heartbeat>>, RunError<bb8_postgres::tokio_postgres::Error>> {
-    let connection = pool.get().await?;
+) -> Result<Vec<MessageResponse<Heartbeat>>, PoolError> {
+    let client = pool.get().await?;
 
-    let select = connection.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'Heartbeat' ORDER BY received DESC LIMIT 2").await?;
-    let rows = connection
-        .query(&select, &[&channel_id, &validator_id])
-        .await?;
+    let select = client.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'Heartbeat' ORDER BY received DESC LIMIT 2").await?;
+    let rows = client.query(&select, &[&channel_id, &validator_id]).await?;
 
     rows.iter()
         .map(MessageResponse::<Heartbeat>::try_from)
         .collect::<Result<_, _>>()
-        .map_err(RunError::User)
+        .map_err(PoolError::Backend)
 }
 
 pub async fn list_event_aggregates(
@@ -83,7 +80,9 @@ pub async fn list_event_aggregates(
     limit: u32,
     from: &Option<ValidatorId>,
     after: &Option<DateTime<Utc>>,
-) -> Result<Vec<EventAggregate>, RunError<bb8_postgres::tokio_postgres::Error>> {
+) -> Result<Vec<EventAggregate>, PoolError> {
+    let client = pool.get().await?;
+
     let (mut where_clauses, mut params) = (vec![], Vec::<&(dyn ToSql + Sync)>::new());
     let id = channel_id.to_string();
     params.push(&id);
@@ -101,8 +100,6 @@ pub async fn list_event_aggregates(
         params.push(after);
         where_clauses.push(format!("created > ${}", params.len()));
     }
-
-    let connection = pool.get().await?;
 
     let where_clause = if !where_clauses.is_empty() {
         where_clauses.join(" AND ").to_string()
@@ -135,8 +132,8 @@ pub async fn list_event_aggregates(
                         ) SELECT channel_id, created, jsonb_object_agg(event_type , data) as events FROM aggregates GROUP BY channel_id, created
                     ", where_clause, limit);
 
-    let stmt = connection.prepare(&statement).await?;
-    let rows = connection.query(&stmt, params.as_slice()).await?;
+    let stmt = client.prepare(&statement).await?;
+    let rows = client.query(&stmt, params.as_slice()).await?;
 
     let event_aggregates = rows.iter().map(EventAggregate::from).collect();
 
@@ -156,7 +153,7 @@ pub async fn insert_event_aggregate(
     pool: &DbPool,
     channel_id: &ChannelId,
     event: &EventAggregate,
-) -> Result<bool, RunError<bb8_postgres::tokio_postgres::Error>> {
+) -> Result<bool, PoolError> {
     let mut data: Vec<EventData> = Vec::new();
 
     for (event_type, aggr) in &event.events {
@@ -189,10 +186,10 @@ pub async fn insert_event_aggregate(
         }
     }
 
-    let connection = pool.get().await?;
+    let client = pool.get().await?;
 
-    let mut err: Option<Error> = None;
-    let sink = connection.copy_in("COPY event_aggregates(channel_id, created, event_type, count, payout, earner) FROM STDIN BINARY").await?;
+    let mut err: Option<tokio_postgres::Error> = None;
+    let sink = client.copy_in("COPY event_aggregates(channel_id, created, event_type, count, payout, earner) FROM STDIN BINARY").await?;
 
     let created = Utc::now(); // time discrepancy
 
@@ -227,7 +224,7 @@ pub async fn insert_event_aggregate(
     }
 
     match err {
-        Some(e) => Err(bb8::RunError::from(e)),
+        Some(e) => Err(PoolError::Backend(e)),
         None => {
             writer.finish().await?;
             Ok(true)

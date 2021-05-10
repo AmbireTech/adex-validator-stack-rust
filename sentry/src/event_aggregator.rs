@@ -1,17 +1,14 @@
-use crate::access::check_access;
-use crate::access::Error as AccessError;
-use crate::db::event_aggregate::insert_event_aggregate;
-use crate::db::DbPool;
-use crate::db::{get_channel_by_id, update_targeting_rules};
 //
 // TODO: AIP#61 Event Aggregator should be replaced with the Spender aggregator & Event Analytics
 //
 // use crate::event_reducer;
 // use crate::payout::get_payout;
-use crate::Application;
-use crate::ResponseError;
-use crate::Session;
-use crate::{analytics_recorder, Auth};
+use crate::{
+    access::{check_access, Error as AccessError},
+    analytics_recorder,
+    db::{event_aggregate::insert_event_aggregate, get_channel_by_id, update_targeting_rules},
+    Application, Auth, DbPool, ResponseError, Session,
+};
 use async_std::sync::RwLock;
 use chrono::Utc;
 use lazy_static::lazy_static;
@@ -50,11 +47,11 @@ pub fn new_aggr(channel_id: &ChannelId) -> EventAggregate {
     }
 }
 
-async fn store(db: &DbPool, channel_id: &ChannelId, logger: &Logger, recorder: Recorder) {
+async fn store(pool: &DbPool, channel_id: &ChannelId, logger: &Logger, recorder: Recorder) {
     let mut channel_recorder = recorder.write().await;
     let record: Option<&Record> = channel_recorder.get(channel_id);
     if let Some(data) = record {
-        if let Err(e) = insert_event_aggregate(&db, &channel_id, &data.aggregate).await {
+        if let Err(e) = insert_event_aggregate(&pool, &channel_id, &data.aggregate).await {
             error!(&logger, "{}", e; "module" => "event_aggregator", "in" => "store");
         } else {
             // reset aggr record
@@ -105,6 +102,8 @@ impl EventAggregator {
                 // the channel events to database
                 if aggr_throttle > 0 {
                     let recorder = recorder.clone();
+                    let dbpool = dbpool.clone();
+
                     tokio::spawn(async move {
                         loop {
                             // break loop if the
@@ -155,7 +154,7 @@ impl EventAggregator {
         });
 
         if let Some(new_rules) = new_targeting_rules {
-            update_targeting_rules(&app.pool, &channel_id, &new_rules).await?;
+            update_targeting_rules(&dbpool.clone(), &channel_id, &new_rules).await?;
         }
 
         //
@@ -202,7 +201,7 @@ impl EventAggregator {
         drop(channel_recorder);
 
         if aggr_throttle == 0 {
-            store(&app.pool, &channel_id, &app.logger, recorder.clone()).await;
+            store(&dbpool, &channel_id, &app.logger, recorder.clone()).await;
         }
 
         Ok(())

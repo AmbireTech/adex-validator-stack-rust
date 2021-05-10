@@ -36,10 +36,10 @@ impl<A: Adapter + 'static> Chain<A> {
     }
 
     /// Applies chained middlewares in the order they were chained
-    pub async fn apply<'a>(
+    pub async fn apply(
         &self,
         mut request: Request<Body>,
-        application: &'a Application<A>,
+        application: &Application<A>,
     ) -> Result<Request<Body>, ResponseError> {
         for middleware in self.0.iter() {
             request = middleware.call(request, application).await?;
