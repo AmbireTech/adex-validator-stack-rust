@@ -137,7 +137,7 @@ impl Adapter for DummyAdapter {
     ) -> AdapterResult<Deposit, Self::AdapterError> {
         Ok(Deposit {
             total: BigNum::from(1000000),
-            still_on_create_2: BigNum::from(0),
+            still_on_create2: BigNum::from(0),
         })
     }
 }

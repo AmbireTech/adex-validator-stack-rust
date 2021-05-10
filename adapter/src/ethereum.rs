@@ -1,4 +1,3 @@
-use crate::EthereumChannel;
 use async_trait::async_trait;
 use chrono::Utc;
 use create2::calc_addr;
@@ -17,35 +16,91 @@ use primitives::{
     channel_v5::Channel as ChannelV5,
     channel_validator::ChannelValidator,
     config::Config,
-    Address, BigNum, Channel, ChannelId, ToETHChecksum, ValidatorId,
+    Address, BigNum, Channel, ToETHChecksum, ValidatorId,
 };
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::str::FromStr;
-use std::{convert::TryFrom, fs};
+use std::{convert::TryFrom, fs, str::FromStr};
 use tiny_keccak::Keccak;
 use web3::{
-    contract::{tokens::Tokenizable, Contract, Options},
+    contract::{Contract, Options},
     ethabi::{encode, Token},
     transports::Http,
-    types::{H160, H256, U256},
+    types::{H160, U256},
     Web3,
 };
+
+#[cfg(test)]
+use test_utils::*;
 
 mod error;
 
 lazy_static! {
+    // TODO: Deprecated! This is v4!
     static ref ADEXCORE_ABI: &'static [u8] =
         include_bytes!("../../lib/protocol-eth/abi/AdExCore.json");
     static ref OUTPACE_ABI: &'static [u8] =
         include_bytes!("../../lib/protocol-eth/abi/OUTPACE.json");
-    static ref CHANNEL_STATE_ACTIVE: U256 = 1.into();
     // TODO: Fix it once ERC20 and OUTPACE are merged
-    static ref ERC20_ABI: &'static [u8] = include_bytes!("../ERC20.json");
+    static ref ERC20_ABI: &'static [u8] = include_str!("../ERC20.json").trim_end_matches('\n').as_bytes();
     // TODO: Open PR with those in protocol-eth and sync module once it's ready
     static ref SWEEPER_ABI: &'static [u8] = include_bytes!("../Sweeper.json");
     static ref DEPOSITOR_BYTECODE: &'static [u8] = include_bytes!("../Depositorbytecode.json");
+}
+
+#[cfg(test)]
+mod test_utils {
+    use lazy_static::lazy_static;
+    use std::collections::HashMap;
+
+    use primitives::Address;
+
+    // See `adex-eth-protocol` `contracts/mocks/Token.sol`
+    lazy_static! {
+        /// Mocked Token ABI
+        pub static ref MOCK_TOKEN_ABI: &'static [u8] =
+            include_bytes!("../test/resources/mock_token_abi.json");
+        /// Mocked Token bytecode
+        pub static ref MOCK_TOKEN_BYTECODE: &'static str =
+            include_str!("../test/resources/mock_token_bytecode.json").trim_end_matches("\n");
+        /// Sweeper bytecode
+        pub static ref SWEEPER_BYTECODE: &'static str = include_str!("../Sweeperbytecode.json").trim_end_matches("\n");
+        /// Outpace bytecode
+        pub static ref OUTPACE_BYTECODE: &'static str = include_str!("../OUTPACEbytecode.json").trim_end_matches("\n");
+        pub static ref GANACHE_ADDRESSES: HashMap<String, Address> = {
+            vec![
+                (
+                    "leader".to_string(),
+                    "0x5a04A8fB90242fB7E1db7d1F51e268A03b7f93A5"
+                        .parse()
+                        .expect("Valid Address"),
+                ),
+                (
+                    "follower".to_string(),
+                    "0xe3896ebd3F32092AFC7D27e9ef7b67E26C49fB02"
+                        .parse()
+                        .expect("Valid Address"),
+                ),
+                (
+                    "creator".to_string(),
+                    "0x0E45891a570Af9e5A962F181C219468A6C9EB4e1"
+                        .parse()
+                        .expect("Valid Address"),
+                ),
+                (
+                    "advertiser".to_string(),
+                    "0x8c4B95383a46D30F056aCe085D8f453fCF4Ed66d"
+                        .parse()
+                        .expect("Valid Address"),
+                ),
+            ]
+            .into_iter()
+            .collect()
+        };
+    }
+
+    pub const GANACHE_URL: &'static str = "http://localhost:8545";
 }
 
 #[derive(Debug, Clone)]
@@ -95,6 +150,17 @@ impl EthereumAdapter {
     }
 }
 
+// TODO: replace with EthChannel when we alter it!
+pub fn channel_to_eth_channel(channel: &ChannelV5) -> Vec<Token> {
+    vec![
+        Token::Address(channel.leader.as_bytes().into()),
+        Token::Address(channel.follower.as_bytes().into()),
+        Token::Address(channel.guardian.as_bytes().into()),
+        Token::Address(channel.token.as_bytes().into()),
+        Token::FixedBytes(channel.nonce.to_bytes().to_vec()),
+    ]
+}
+
 fn get_counterfactual_address(
     sweeper: H160,
     channel: &ChannelV5,
@@ -103,13 +169,8 @@ fn get_counterfactual_address(
 ) -> H160 {
     let salt: [u8; 32] = [0; 32];
     let mut init_code: Vec<u8> = DEPOSITOR_BYTECODE.to_vec();
-    let channel_as_token_vec: Vec<Token> = vec![
-        Token::Address(channel.leader.as_bytes().into()),
-        Token::Address(channel.follower.as_bytes().into()),
-        Token::Address(channel.guardian.as_bytes().into()),
-        Token::Address(channel.token.as_bytes().into()),
-        Token::FixedBytes(channel.nonce.to_bytes().to_vec()),
-    ];
+    // TODO: Change the EthereumChannel and use it!
+    let channel_as_token_vec = channel_to_eth_channel(&channel);
     let mut encoded_params = encode(&[
         Token::Tuple(channel_as_token_vec),
         Token::Address(outpace),
@@ -181,56 +242,12 @@ impl Adapter for EthereumAdapter {
         Ok(verify_address)
     }
 
+    // TODO: Remove
     async fn validate_channel<'a>(
         &'a self,
-        channel: &'a Channel,
+        _channel: &'a Channel,
     ) -> AdapterResult<bool, Self::AdapterError> {
-        // check if channel is valid
-        EthereumAdapter::is_channel_valid(&self.config, self.whoami(), channel)
-            .map_err(AdapterError::InvalidChannel)?;
-
-        let eth_channel =
-            EthereumChannel::try_from(channel).map_err(AdapterError::InvalidChannel)?;
-
-        let eth_channel_id = ChannelId::from(eth_channel.hash(&self.config.ethereum_core_address));
-
-        if eth_channel_id != channel.id {
-            return Err(AdapterError::Adapter(
-                Error::InvalidChannelId {
-                    expected: eth_channel_id,
-                    actual: channel.id,
-                }
-                .into(),
-            ));
-        }
-
-        let contract = Contract::from_json(
-            self.web3.eth(),
-            self.config.ethereum_core_address.into(),
-            &ADEXCORE_ABI,
-        )
-        .map_err(Error::ContractInitialization)?;
-
-        let channel_status: U256 = tokio_compat_02::FutureExt::compat(async {
-            tokio_compat_02::FutureExt::compat(contract.query(
-                "states",
-                H256(*channel.id).into_token(),
-                None,
-                Options::default(),
-                None,
-            ))
-            .await
-        })
-        .await
-        .map_err(Error::ContractQuerying)?;
-
-        if channel_status != *CHANNEL_STATE_ACTIVE {
-            Err(AdapterError::Adapter(
-                Error::ChannelInactive(channel.id).into(),
-            ))
-        } else {
-            Ok(true)
-        }
+        Ok(true)
     }
 
     /// Creates a `Session` from a provided Token by calling the Contract.
@@ -316,7 +333,7 @@ impl Adapter for EthereumAdapter {
     ) -> AdapterResult<Deposit, Self::AdapterError> {
         let outpace_contract = Contract::from_json(
             self.web3.eth(),
-            self.config.ethereum_core_address.into(),
+            self.config.outpace_address.into(),
             &OUTPACE_ABI,
         )
         .map_err(Error::ContractInitialization)?;
@@ -327,7 +344,7 @@ impl Adapter for EthereumAdapter {
 
         let sweeper_contract = Contract::from_json(
             self.web3.eth(),
-            self.config.ethereum_core_address.into(), //-???
+            self.config.sweeper_address.into(),
             &SWEEPER_ABI,
         )
         .map_err(Error::ContractInitialization)?;
@@ -335,10 +352,13 @@ impl Adapter for EthereumAdapter {
         let sweeper_address = sweeper_contract.address();
         let outpace_address = outpace_contract.address();
 
-        let total: U256 = tokio_compat_02::FutureExt::compat(async {
+        let on_outpace: U256 = tokio_compat_02::FutureExt::compat(async {
             tokio_compat_02::FutureExt::compat(outpace_contract.query(
                 "deposits",
-                (*channel.id(), H160(*depositor_address.as_bytes())),
+                (
+                    Token::FixedBytes(channel.id().as_bytes().to_vec()),
+                    Token::Address(depositor_address.as_bytes().into()),
+                ),
                 None,
                 Options::default(),
                 None,
@@ -348,7 +368,7 @@ impl Adapter for EthereumAdapter {
         .await
         .map_err(Error::ContractQuerying)?;
 
-        let mut total = BigNum::from_str(&total.to_string())?;
+        let on_outpace = BigNum::from_str(&on_outpace.to_string())?;
 
         let counterfactual_address = get_counterfactual_address(
             sweeper_address,
@@ -356,7 +376,7 @@ impl Adapter for EthereumAdapter {
             outpace_address,
             depositor_address,
         );
-        let still_on_create_2: U256 = tokio_compat_02::FutureExt::compat(async {
+        let still_on_create2: U256 = tokio_compat_02::FutureExt::compat(async {
             tokio_compat_02::FutureExt::compat(erc20_contract.query(
                 "balanceOf",
                 counterfactual_address,
@@ -369,7 +389,7 @@ impl Adapter for EthereumAdapter {
         .await
         .map_err(Error::ContractQuerying)?;
 
-        let still_on_create_2: BigNum = still_on_create_2.to_string().parse()?;
+        let still_on_create2: BigNum = still_on_create2.to_string().parse()?;
 
         let token_info = self
             .config
@@ -377,14 +397,20 @@ impl Adapter for EthereumAdapter {
             .get(&channel.token)
             .ok_or(Error::TokenNotWhitelisted(channel.token))?;
 
-        if still_on_create_2 > token_info.min_token_units_for_deposit {
-            total += &still_on_create_2;
-        }
+        // Count the create2 deposit only if it's > minimum token units configured
+        let deposit = if still_on_create2 > token_info.min_token_units_for_deposit {
+            Deposit {
+                total: &still_on_create2 + &on_outpace,
+                still_on_create2,
+            }
+        } else {
+            Deposit {
+                total: on_outpace,
+                still_on_create2: BigNum::from(0),
+            }
+        };
 
-        Ok(Deposit {
-            total,
-            still_on_create_2,
-        })
+        Ok(deposit)
     }
 }
 
@@ -541,33 +567,50 @@ pub fn ewt_verify(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::EthereumChannel;
-    use chrono::{Duration, Utc};
-    use hex::FromHex;
+    use chrono::Utc;
     use primitives::{
         adapter::KeystoreOptions,
         channel_v5::Nonce,
         config::{configuration, TokenInfo},
-        targeting::Rules,
-        ChannelId, ChannelSpec, EventSubmission, SpecValidators, ValidatorDesc,
     };
-    use std::convert::TryFrom;
-    use std::num::NonZeroU8;
-    use web3::types::Address as EthAddress;
+    use std::{convert::TryFrom, num::NonZeroU8};
+    use web3::{
+        transports::Http,
+        types::{Address as EthAddress, H256},
+        Web3,
+    };
     use wiremock::{
         matchers::{method, path},
         Mock, MockServer, ResponseTemplate,
     };
 
-    fn setup_eth_adapter(contract_address: Option<[u8; 20]>) -> EthereumAdapter {
+    fn setup_eth_adapter(
+        sweeper_address: Option<[u8; 20]>,
+        outpace_address: Option<[u8; 20]>,
+        token_whitelist: Option<(Address, TokenInfo)>,
+    ) -> EthereumAdapter {
         let mut config = configuration("development", None).expect("failed parse config");
         let keystore_options = KeystoreOptions {
             keystore_file: "./test/resources/keystore.json".to_string(),
             keystore_pwd: "adexvalidator".to_string(),
         };
 
-        if let Some(ct_address) = contract_address {
-            config.ethereum_core_address = ct_address;
+        if let Some(address) = sweeper_address {
+            config.sweeper_address = address;
+        }
+
+        if let Some(address) = outpace_address {
+            config.outpace_address = address;
+        }
+
+        if let Some((address, token_info)) = token_whitelist {
+            assert!(
+                config
+                    .token_address_whitelist
+                    .insert(address, token_info)
+                    .is_none(),
+                "It should not contain the generated token prior to this call!"
+            )
         }
 
         EthereumAdapter::init(keystore_options, &config).expect("should init ethereum adapter")
@@ -575,14 +618,14 @@ mod test {
 
     #[test]
     fn should_init_and_unlock_ethereum_adapter() {
-        let mut eth_adapter = setup_eth_adapter(None);
+        let mut eth_adapter = setup_eth_adapter(None, None, None);
         eth_adapter.unlock().expect("should unlock eth adapter");
     }
 
     #[test]
     fn should_get_whoami_sign_and_verify_messages() {
         // whoami
-        let mut eth_adapter = setup_eth_adapter(None);
+        let mut eth_adapter = setup_eth_adapter(None, None, None);
         let whoami = eth_adapter.whoami();
         assert_eq!(
             whoami.to_string(),
@@ -629,7 +672,8 @@ mod test {
 
     #[test]
     fn should_generate_correct_ewt_sign_and_verify() {
-        let mut eth_adapter = setup_eth_adapter(None);
+        let mut eth_adapter = setup_eth_adapter(None, None, None);
+
         eth_adapter.unlock().expect("should unlock eth adapter");
 
         let payload = Payload {
@@ -675,7 +719,7 @@ mod test {
         let mut identities_owned: HashMap<ValidatorId, u8> = HashMap::new();
         identities_owned.insert(identity, 2);
 
-        let mut eth_adapter = setup_eth_adapter(None);
+        let mut eth_adapter = setup_eth_adapter(None, None, None);
 
         Mock::given(method("GET"))
             .and(path(format!("/identity/by-owner/{}", eth_adapter.whoami())))
@@ -702,359 +746,263 @@ mod test {
     }
 
     #[tokio::test]
-    async fn should_validate_valid_channel_properly() {
-        let http =
-            web3::transports::Http::new("http://localhost:8545").expect("failed to init transport");
+    async fn get_deposit_and_count_create2_when_min_tokens_received() {
+        let web3 = Web3::new(Http::new(&GANACHE_URL).expect("failed to init transport"));
 
-        let web3 = web3::Web3::new(http);
-        let leader_account: EthAddress = "Df08F82De32B8d460adbE8D72043E3a7e25A3B39"
-            .parse()
-            .expect("failed to parse leader account");
-        let _follower_account: EthAddress = "6704Fbfcd5Ef766B287262fA2281C105d57246a6"
-            .parse()
-            .expect("failed to parse leader account");
-
-        // tokenbytecode.json
-        let token_bytecode =
-            include_str!("../test/resources/tokenbytecode.json").trim_end_matches("\n");
-        // token_abi.json
-        let token_abi = include_bytes!("../test/resources/tokenabi.json");
-        // adexbytecode.json
-        let adex_bytecode = include_str!("../../lib/protocol-eth/resources/bytecode/AdExCore.json")
-            .trim_end_matches("\n");
+        let leader_account: EthAddress = EthAddress::from(GANACHE_ADDRESSES["leader"].as_bytes());
 
         // deploy contracts
-        let token_contract = tokio_compat_02::FutureExt::compat(async {
-            Contract::deploy(web3.eth(), token_abi)
-                .expect("invalid token token contract")
-                .confirmations(0)
-                .options(Options::with(|opt| {
-                    opt.gas_price = Some(1.into());
-                    opt.gas = Some(6_721_975.into());
-                }))
-                .execute(token_bytecode, (), leader_account)
-        })
-        .await;
-
-        let token_contract = tokio_compat_02::FutureExt::compat(token_contract)
+        let token = deploy_token_contract(&web3, 1_000)
             .await
-            .expect("Correct parameters are passed to the constructor.");
+            .expect("Correct parameters are passed to the Token constructor.");
+        let token_address = Address::from_bytes(&token.1.to_fixed_bytes());
 
-        let adex_contract = tokio_compat_02::FutureExt::compat(async {
-            Contract::deploy(web3.eth(), &ADEXCORE_ABI)
-                .expect("invalid adex contract")
-                .confirmations(0)
-                .options(Options::with(|opt| {
-                    opt.gas_price = Some(1.into());
-                    opt.gas = Some(6_721_975.into());
-                }))
-                .execute(adex_bytecode, (), leader_account)
-        })
-        .await;
-        let adex_contract = tokio_compat_02::FutureExt::compat(adex_contract)
+        let sweeper = deploy_sweeper_contract(&web3)
             .await
-            .expect("Correct parameters are passed to the constructor.");
+            .expect("Correct parameters are passed to the Sweeper constructor.");
 
-        // contract call set balance
-        tokio_compat_02::FutureExt::compat(token_contract.call(
-            "setBalanceTo",
-            (EthAddress::from(leader_account), U256::from(2000_u64)),
-            leader_account,
-            Options::default(),
-        ))
-        .await
-        .expect("Failed to set balance");
+        let outpace = deploy_outpace_contract(&web3)
+            .await
+            .expect("Correct parameters are passed to the OUTPACE constructor.");
 
-        let leader_validator_desc = ValidatorDesc {
-            // keystore.json address (same with js)
-            id: ValidatorId::try_from("2bdeafae53940669daa6f519373f686c1f3d3393")
-                .expect("failed to create id"),
-            url: "http://localhost:8005".to_string(),
-            fee: 100.into(),
-            fee_addr: None,
-        };
+        let spender = GANACHE_ADDRESSES["creator"];
 
-        let follower_validator_desc = ValidatorDesc {
-            // keystore2.json address (same with js)
-            id: ValidatorId::try_from("6704Fbfcd5Ef766B287262fA2281C105d57246a6")
-                .expect("failed to create id"),
-            url: "http://localhost:8006".to_string(),
-            fee: 100.into(),
-            fee_addr: None,
-        };
+        let channel = get_test_channel(token_address);
 
-        let mut valid_channel = Channel {
-            // to be replace with the proper id
-            id: ChannelId::from_hex(
-                "061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088",
+        let mut eth_adapter = setup_eth_adapter(
+            Some(*sweeper.0.as_fixed_bytes()),
+            Some(*outpace.0.as_fixed_bytes()),
+            Some((token_address, token.0)),
+        );
+        eth_adapter.unlock().expect("should unlock eth adapter");
+
+        let counterfactual_address =
+            get_counterfactual_address(sweeper.0, &channel, outpace.0, &spender);
+
+        // No Regular nor Create2 deposit
+        {
+            let no_deposits = eth_adapter
+                .get_deposit(&channel, &spender)
+                .await
+                .expect("should get deposit");
+
+            assert_eq!(
+                Deposit {
+                    total: BigNum::from(0),
+                    still_on_create2: BigNum::from(0),
+                },
+                no_deposits
+            );
+        }
+
+        // Regular deposit in Outpace without Create2
+        {
+            mock_set_balance(
+                &token.2,
+                *GANACHE_ADDRESSES["leader"].as_bytes(),
+                *spender.as_bytes(),
+                10_000_u64,
             )
-            .expect("prep_db: failed to deserialize channel id"),
-            // leader_account
-            creator: ValidatorId::try_from("Df08F82De32B8d460adbE8D72043E3a7e25A3B39")
-                .expect("should be valid ValidatorId"),
-            deposit_asset: eth_checksum::checksum(&format!("{:?}", token_contract.address())),
-            deposit_amount: 2_000.into(),
-            valid_until: Utc::now() + Duration::days(2),
-            targeting_rules: Rules::new(),
-            spec: ChannelSpec {
-                title: None,
-                validators: SpecValidators::new(leader_validator_desc, follower_validator_desc),
-                max_per_impression: 10.into(),
-                min_per_impression: 10.into(),
-                targeting_rules: Rules::new(),
-                event_submission: Some(EventSubmission { allow: vec![] }),
-                created: Utc::now(),
-                active_from: None,
-                nonce: None,
-                withdraw_period_start: Utc::now() + Duration::days(1),
-                ad_units: vec![],
-                pricing_bounds: None,
-            },
-            exhausted: Default::default(),
-        };
-
-        // convert to eth channel
-        let eth_channel =
-            EthereumChannel::try_from(&valid_channel).expect("failed to create eth channel");
-        let sol_tuple = eth_channel.to_solidity_tuple();
-
-        // contract call open channel
-        tokio_compat_02::FutureExt::compat(adex_contract.call(
-            "channelOpen",
-            (sol_tuple,),
-            leader_account,
-            Options::default(),
-        ))
-        .await
-        .expect("open channel");
-
-        let contract_addr = adex_contract.address().to_fixed_bytes();
-        let channel_id = eth_channel.hash(&contract_addr);
-        // set id to proper id
-        valid_channel.id = ChannelId::from(channel_id);
-        let token_address = Address::from(&token_contract.address().to_fixed_bytes());
-        // eth adapter
-        let mut eth_adapter = setup_eth_adapter(Some(contract_addr));
-        eth_adapter.config.token_address_whitelist.insert(
-            token_address,
-            TokenInfo {
-                min_token_units_for_deposit: BigNum::from(1000000),
-                precision: NonZeroU8::new(18).expect("should create NonZeroU8"),
-            },
-        );
-        eth_adapter.unlock().expect("should unlock eth adapter");
-        // validate channel
-        let result = eth_adapter
-            .validate_channel(&valid_channel)
             .await
-            .expect("failed to validate channel");
+            .expect("Failed to set balance");
 
-        assert!(result, "should validate valid channel correctly");
+            outpace_deposit(&outpace.1, &channel, *spender.as_bytes(), 10_000)
+                .await
+                .expect("Should deposit funds");
+
+            let regular_deposit = eth_adapter
+                .get_deposit(&channel, &spender)
+                .await
+                .expect("should get deposit");
+
+            assert_eq!(
+                Deposit {
+                    total: BigNum::from(10_000),
+                    still_on_create2: BigNum::from(0),
+                },
+                regular_deposit
+            );
+        }
+
+        // Deposit with less than minimum token units
+        {
+            // Set balance < minimal token units, i.e. `1_000`
+            mock_set_balance(
+                &token.2,
+                leader_account.to_fixed_bytes(),
+                counterfactual_address.to_fixed_bytes(),
+                999_u64,
+            )
+            .await
+            .expect("Failed to set balance");
+
+            let deposit_with_create2 = eth_adapter
+                .get_deposit(&channel, &spender)
+                .await
+                .expect("should get deposit");
+
+            assert_eq!(
+                Deposit {
+                    total: BigNum::from(10_000),
+                    // tokens are **less** than the minimum tokens required for deposits to count
+                    still_on_create2: BigNum::from(0),
+                },
+                deposit_with_create2
+            );
+        }
+
+        // Deposit with less than minimum token units
+        {
+            // Set balance > minimal token units
+            mock_set_balance(
+                &token.2,
+                leader_account.to_fixed_bytes(),
+                counterfactual_address.to_fixed_bytes(),
+                1_999_u64,
+            )
+            .await
+            .expect("Failed to set balance");
+
+            let deposit_with_create2 = eth_adapter
+                .get_deposit(&channel, &spender)
+                .await
+                .expect("should get deposit");
+
+            assert_eq!(
+                Deposit {
+                    total: BigNum::from(11_999),
+                    // tokens are more than the minimum tokens required for deposits to count
+                    still_on_create2: BigNum::from(1_999),
+                },
+                deposit_with_create2
+            );
+        }
     }
 
-    #[tokio::test]
-    async fn should_get_correct_deposit() {
-        let http =
-            web3::transports::Http::new("http://localhost:8545").expect("failed to init transport");
-
-        let web3 = web3::Web3::new(http);
-        let leader_account: EthAddress = "Df08F82De32B8d460adbE8D72043E3a7e25A3B39"
-            .parse()
-            .expect("failed to parse leader account");
-        // tokenbytecode.json
-        let token_bytecode =
-            include_str!("../test/resources/tokenbytecode.json").trim_end_matches("\n");
-        // token_abi.json
-        let token_abi = include_bytes!("../test/resources/tokenabi.json");
-
-        // deploy contracts
-        let token_contract = tokio_compat_02::FutureExt::compat(async {
-            Contract::deploy(web3.eth(), token_abi)
-                .expect("invalid token token contract")
-                .confirmations(0)
-                .options(Options::with(|opt| {
-                    opt.gas_price = Some(1.into());
-                    opt.gas = Some(6_721_975.into());
-                }))
-                .execute(token_bytecode, (), leader_account)
-        })
-        .await;
-        // deploy contracts
-
-        let token_contract = tokio_compat_02::FutureExt::compat(token_contract)
-            .await
-            .expect("Correct parameters are passed to the constructor.");
-        let leader = ValidatorId::try_from("2bdeafae53940669daa6f519373f686c1f3d3393")
-            .expect("failed to create id");
-        let follower = ValidatorId::try_from("6704Fbfcd5Ef766B287262fA2281C105d57246a6")
-            .expect("failed to create id");
-        let nonce = Nonce::from(12345_u32);
-        let guardian: Address = Address::try_from("0000000000000000000000000000000000000000")
-            .expect("should create an address");
-        let token_address = token_contract.address().to_fixed_bytes();
-
-        let token: Address = Address::from(&token_contract.address().to_fixed_bytes());
-        let spender: Address = Address::try_from("0x3d9C9C9673B2E3e9046137E752C5F8dCE823A1bB")
-            .expect("should create an address");
-        let channel_to_pass = ChannelV5 {
-            leader,
-            follower,
-            guardian,
-            token,
-            nonce,
-        };
-
-        let mut eth_adapter = setup_eth_adapter(Some(token_address));
-        eth_adapter.config.token_address_whitelist.insert(
-            token,
-            TokenInfo {
-                min_token_units_for_deposit: BigNum::from(1000000),
-                precision: NonZeroU8::new(18).expect("should create NonZeroU8"),
-            },
-        );
-        eth_adapter.unlock().expect("should unlock eth adapter");
-
-        let deposit = eth_adapter
-            .get_deposit(&channel_to_pass, &spender)
-            .await
-            .expect("should get deposit");
-
-        // TODO: Mock "total" output
-        let expected_deposit = Deposit {
-            total: BigNum::from(0),
-            still_on_create_2: BigNum::from(0),
-        };
-        assert_eq!(deposit.total, expected_deposit.total);
-        assert_eq!(
-            deposit.still_on_create_2,
-            expected_deposit.still_on_create_2
-        );
+    pub fn get_test_channel(token_address: Address) -> ChannelV5 {
+        ChannelV5 {
+            leader: ValidatorId::from(&GANACHE_ADDRESSES["leader"]),
+            follower: ValidatorId::from(&GANACHE_ADDRESSES["follower"]),
+            guardian: Address::try_from("0000000000000000000000000000000000000000")
+                .expect("should create an address"),
+            token: token_address,
+            nonce: Nonce::from(12345_u32),
+        }
     }
 
-    #[tokio::test]
-    async fn should_get_correct_deposit_with_left_on_create_2() {
-        let http =
-            web3::transports::Http::new("http://localhost:8545").expect("failed to init transport");
-
-        let web3 = web3::Web3::new(http);
-        let leader_account: EthAddress = "Df08F82De32B8d460adbE8D72043E3a7e25A3B39"
-            .parse()
-            .expect("failed to parse leader account");
-        // tokenbytecode.json
-        let token_bytecode =
-            include_str!("../test/resources/tokenbytecode.json").trim_end_matches("\n");
-        // Outpacebytecode.json
-        let outpace_bytecode = include_str!("../OUTPACEbytecode.json").trim_end_matches("\n");
-        // Sweeperbytecode.json
-        let sweeper_bytecode = include_str!("../Sweeperbytecode.json").trim_end_matches("\n");
-        // token_abi.json
-        let token_abi = include_bytes!("../test/resources/tokenabi.json");
-
-        // deploy contracts
-        let token_contract = tokio_compat_02::FutureExt::compat(async {
-            Contract::deploy(web3.eth(), token_abi)
-                .expect("invalid token token contract")
-                .confirmations(0)
-                .options(Options::with(|opt| {
-                    opt.gas_price = Some(1.into());
-                    opt.gas = Some(6_721_975.into());
-                }))
-                .execute(token_bytecode, (), leader_account)
-        })
-        .await;
-
-        let token_contract = tokio_compat_02::FutureExt::compat(token_contract)
-            .await
-            .expect("Correct parameters are passed to the constructor.");
-
-        let sweeper_contract = tokio_compat_02::FutureExt::compat(async {
-            Contract::deploy(web3.eth(), &SWEEPER_ABI)
-                .expect("invalid sweeper contract")
-                .confirmations(0)
-                .options(Options::default())
-                .execute(sweeper_bytecode, (), leader_account)
-        })
-        .await;
-
-        let sweeper_contract = tokio_compat_02::FutureExt::compat(sweeper_contract)
-            .await
-            .expect("Correct parameters are passed to the constructor.");
-
-        let outpace_contract = tokio_compat_02::FutureExt::compat(async {
-            Contract::deploy(web3.eth(), &OUTPACE_ABI)
-                .expect("invalid outpace contract")
-                .confirmations(0)
-                .options(Options::default())
-                .execute(outpace_bytecode, (), leader_account)
-        })
-        .await;
-
-        let outpace_contract = tokio_compat_02::FutureExt::compat(outpace_contract)
-            .await
-            .expect("Correct parameters are passed to the constructor.");
-
-        let outpace_address = outpace_contract.address();
-        let sweeper_address = sweeper_contract.address();
-
-        let leader = ValidatorId::try_from("2bdeafae53940669daa6f519373f686c1f3d3393")
-            .expect("failed to create id");
-        let follower = ValidatorId::try_from("6704Fbfcd5Ef766B287262fA2281C105d57246a6")
-            .expect("failed to create id");
-        let nonce = Nonce::from(12345_u32);
-        let guardian: Address = Address::try_from("0000000000000000000000000000000000000000")
-            .expect("should create an address");
-        let token_address = token_contract.address().to_fixed_bytes();
-
-        let token: Address = Address::from(&token_contract.address().to_fixed_bytes());
-        let spender: Address = Address::try_from("0x3d9C9C9673B2E3e9046137E752C5F8dCE823A1bB")
-            .expect("should create an address");
-        let channel_to_pass = ChannelV5 {
-            leader,
-            follower,
-            guardian,
-            token,
-            nonce,
-        };
-
+    pub async fn mock_set_balance(
+        token_contract: &Contract<Http>,
+        from: [u8; 20],
+        address: [u8; 20],
+        amount: u64,
+    ) -> web3::contract::Result<H256> {
         tokio_compat_02::FutureExt::compat(token_contract.call(
             "setBalanceTo",
-            (H160(*spender.as_bytes()), U256::from(10000_u64)),
-            leader_account,
+            (H160(address), U256::from(amount)),
+            H160(from),
             Options::default(),
         ))
         .await
-        .expect("Failed to set balance");
+    }
 
-        let mut eth_adapter = setup_eth_adapter(Some(token_address));
-        eth_adapter.config.token_address_whitelist.insert(
-            token,
-            TokenInfo {
-                min_token_units_for_deposit: BigNum::from(1000000),
-                precision: NonZeroU8::new(18).expect("should create NonZeroU8"),
-            },
-        );
-        eth_adapter.unlock().expect("should unlock eth adapter");
+    pub async fn outpace_deposit(
+        outpace_contract: &Contract<Http>,
+        channel: &ChannelV5,
+        to: [u8; 20],
+        amount: u64,
+    ) -> web3::contract::Result<H256> {
+        tokio_compat_02::FutureExt::compat(outpace_contract.call(
+            "deposit",
+            (
+                Token::Tuple(channel_to_eth_channel(channel)),
+                H160(to),
+                U256::from(amount),
+            ),
+            H160(to),
+            Options::with(|opt| {
+                opt.gas_price = Some(1.into());
+                // TODO: Check how much should this gas limit be!
+                opt.gas = Some(61_721_975.into());
+            }),
+        ))
+        .await
+    }
 
-        let counterfactual_address = get_counterfactual_address(
-            sweeper_address,
-            &channel_to_pass,
-            outpace_address,
-            &spender,
-        );
+    /// Deploys the Sweeper contract from `GANACHE_ADDRESS['leader']`
+    async fn deploy_sweeper_contract(
+        web3: &Web3<Http>,
+    ) -> web3::contract::Result<(H160, Contract<Http>)> {
+        let from_leader_account: EthAddress =
+            EthAddress::from(GANACHE_ADDRESSES["leader"].as_bytes());
 
-        let deposit = eth_adapter
-            .get_deposit(&channel_to_pass, &spender)
-            .await
-            .expect("should get deposit");
+        let feature = tokio_compat_02::FutureExt::compat(async {
+            Contract::deploy(web3.eth(), &SWEEPER_ABI)
+                .expect("Invalid ABI of Sweeper contract")
+                .confirmations(0)
+                .options(Options::with(|opt| {
+                    opt.gas_price = Some(1.into());
+                    opt.gas = Some(6_721_975.into());
+                }))
+                .execute(*SWEEPER_BYTECODE, (), from_leader_account)
+        })
+        .await;
 
-        let expected_deposit = Deposit {
-            total: BigNum::from(10000),
-            still_on_create_2: BigNum::from(10000),
+        let sweeper_contract = tokio_compat_02::FutureExt::compat(feature).await?;
+
+        Ok((sweeper_contract.address(), sweeper_contract))
+    }
+
+    /// Deploys the Outpace contract from `GANACHE_ADDRESS['leader']`
+    async fn deploy_outpace_contract(
+        web3: &Web3<Http>,
+    ) -> web3::contract::Result<(H160, Contract<Http>)> {
+        let from_leader_account: EthAddress =
+            EthAddress::from(GANACHE_ADDRESSES["leader"].as_bytes());
+
+        let feature = tokio_compat_02::FutureExt::compat(async {
+            Contract::deploy(web3.eth(), &OUTPACE_ABI)
+                .expect("Invalid ABI of Sweeper contract")
+                .confirmations(0)
+                .options(Options::with(|opt| {
+                    opt.gas_price = Some(1.into());
+                    opt.gas = Some(6_721_975.into());
+                }))
+                .execute(*OUTPACE_BYTECODE, (), from_leader_account)
+        })
+        .await;
+
+        let outpace_contract = tokio_compat_02::FutureExt::compat(feature).await?;
+
+        Ok((outpace_contract.address(), outpace_contract))
+    }
+
+    /// Deploys the Mock Token contract from `GANACHE_ADDRESS['leader']`
+    async fn deploy_token_contract(
+        web3: &Web3<Http>,
+        min_token_units: u64,
+    ) -> web3::contract::Result<(TokenInfo, H160, Contract<Http>)> {
+        let from_leader_account: EthAddress =
+            EthAddress::from(GANACHE_ADDRESSES["leader"].as_bytes());
+
+        let feature = tokio_compat_02::FutureExt::compat(async {
+            Contract::deploy(web3.eth(), &MOCK_TOKEN_ABI)
+                .expect("Invalid ABI of Mock Token contract")
+                .confirmations(0)
+                .options(Options::with(|opt| {
+                    opt.gas_price = Some(1.into());
+                    opt.gas = Some(6_721_975.into());
+                }))
+                .execute(*MOCK_TOKEN_BYTECODE, (), from_leader_account)
+        })
+        .await;
+
+        let token_contract = tokio_compat_02::FutureExt::compat(feature).await?;
+
+        let token_info = TokenInfo {
+            min_token_units_for_deposit: BigNum::from(min_token_units),
+            precision: NonZeroU8::new(18).expect("should create NonZeroU8"),
         };
-        assert_eq!(deposit.total, expected_deposit.total);
-        assert_eq!(
-            deposit.still_on_create_2,
-            expected_deposit.still_on_create_2
-        );
+
+        Ok((token_info, token_contract.address(), token_contract))
     }
 }

@@ -11,9 +11,10 @@ pub type AdapterResult<T, AE> = Result<T, Error<AE>>;
 
 pub trait AdapterErrorKind: fmt::Debug + fmt::Display {}
 
+#[derive(Debug, Eq, PartialEq)]
 pub struct Deposit {
     pub total: BigNum,
-    pub still_on_create_2: BigNum,
+    pub still_on_create2: BigNum,
 }
 
 #[derive(Debug)]
@@ -96,6 +97,7 @@ pub trait Adapter: ChannelValidator + Send + Sync + fmt::Debug + Clone {
     ) -> AdapterResult<bool, Self::AdapterError>;
 
     /// Validate a channel
+    #[deprecated(note = "REMOVE, this is v4! no longer needed")]
     async fn validate_channel<'a>(
         &'a self,
         channel: &'a Channel,
