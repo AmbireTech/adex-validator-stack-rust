@@ -60,9 +60,9 @@ mod test_utils {
         pub static ref MOCK_TOKEN_BYTECODE: &'static str =
             include_str!("../test/resources/mock_token_bytecode.json").trim_end_matches("\n");
         /// Sweeper bytecode
-        pub static ref SWEEPER_BYTECODE: &'static str = include_str!("../Sweeperbytecode.json").trim_end_matches("\n");
+        pub static ref SWEEPER_BYTECODE: &'static str = include_str!("../../lib/protocol-eth/resources/bytecode/Sweeper.json").trim_end_matches("\n");
         /// Outpace bytecode
-        pub static ref OUTPACE_BYTECODE: &'static str = include_str!("../OUTPACEbytecode.json").trim_end_matches("\n");
+        pub static ref OUTPACE_BYTECODE: &'static str = include_str!("../../lib/protocol-eth/resources/bytecode/OUTPACE.json").trim_end_matches("\n");
         pub static ref GANACHE_ADDRESSES: HashMap<String, Address> = {
             vec![
                 (
