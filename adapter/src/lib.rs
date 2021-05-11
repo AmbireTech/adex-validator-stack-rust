@@ -4,11 +4,7 @@
 
 use std::error::Error;
 
-use chrono::{DateTime, Utc};
-use hex::FromHex;
-use primitives::{channel::ChannelError, Address, BigNum, Channel, ValidatorId};
-use sha2::{Digest, Sha256};
-use std::convert::TryFrom;
+use primitives::{channel::ChannelError, Address, BigNum};
 use tiny_keccak::Keccak;
 use web3::{
     ethabi::{encode, token::Token},

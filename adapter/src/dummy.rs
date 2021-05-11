@@ -5,10 +5,10 @@ use primitives::{
         Adapter, AdapterErrorKind, AdapterResult, Deposit, DummyAdapterOptions,
         Error as AdapterError, Session,
     },
-    channel_v5::Channel as ChannelV5,
+    channel_v5::Channel,
     channel_validator::ChannelValidator,
     config::Config,
-    Address, Channel, ChannelId, ToETHChecksum, ValidatorId,
+    Address, ChannelId, ToETHChecksum, ValidatorId,
 };
 use std::{collections::HashMap, fmt, sync::Arc};
 
@@ -24,6 +24,7 @@ pub struct DummyAdapter {
 }
 
 #[derive(Debug, Clone, Default)]
+#[allow(clippy::type_complexity)]
 pub struct Deposits(Arc<DashMap<(ChannelId, Address), (usize, Vec<Deposit>)>>);
 
 impl Deposits {
@@ -165,7 +166,7 @@ impl Adapter for DummyAdapter {
 
     async fn get_deposit(
         &self,
-        channel: &ChannelV5,
+        channel: &Channel,
         address: &Address,
     ) -> AdapterResult<Deposit, Self::AdapterError> {
         self.deposits

@@ -1,11 +1,10 @@
-use crate::channel::ChannelError;
-use crate::channel_validator::ChannelValidator;
-use crate::{channel_v5::Channel as ChannelV5, Address, BigNum, Channel, DomainError, ValidatorId};
+use crate::{
+    channel::ChannelError, channel_v5::Channel, channel_validator::ChannelValidator, Address,
+    BigNum, DomainError, ValidatorId,
+};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::convert::From;
-use std::fmt;
+use std::{collections::HashMap, convert::From, fmt};
 
 pub type AdapterResult<T, AE> = Result<T, Error<AE>>;
 
@@ -108,7 +107,7 @@ pub trait Adapter: ChannelValidator + Send + Sync + fmt::Debug + Clone {
     /// Calculates and returns the total spendable amount
     async fn get_deposit(
         &self,
-        channel: &ChannelV5,
+        channel: &Channel,
         address: &Address,
     ) -> AdapterResult<Deposit, Self::AdapterError>;
 }

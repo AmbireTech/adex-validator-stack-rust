@@ -13,10 +13,10 @@ use futures::TryFutureExt;
 use lazy_static::lazy_static;
 use primitives::{
     adapter::{Adapter, AdapterResult, Deposit, Error as AdapterError, KeystoreOptions, Session},
-    channel_v5::Channel as ChannelV5,
+    channel_v5::Channel,
     channel_validator::ChannelValidator,
     config::Config,
-    Address, BigNum, Channel, ToETHChecksum, ValidatorId,
+    Address, BigNum, ToETHChecksum, ValidatorId,
 };
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -101,7 +101,7 @@ trait EthereumChannel {
     fn tokenize(&self) -> Token;
 }
 
-impl EthereumChannel for ChannelV5 {
+impl EthereumChannel for Channel {
     fn tokenize(&self) -> Token {
         let tokens = vec![
             Token::Address(self.leader.as_bytes().into()),
@@ -117,7 +117,7 @@ impl EthereumChannel for ChannelV5 {
 
 fn get_counterfactual_address(
     sweeper: H160,
-    channel: &ChannelV5,
+    channel: &Channel,
     outpace: H160,
     depositor: &Address,
 ) -> H160 {
@@ -272,7 +272,7 @@ impl Adapter for EthereumAdapter {
 
     async fn get_deposit(
         &self,
-        channel: &ChannelV5,
+        channel: &Channel,
         depositor_address: &Address,
     ) -> AdapterResult<Deposit, Self::AdapterError> {
         let outpace_contract = Contract::from_json(
@@ -845,8 +845,8 @@ mod test {
         }
     }
 
-    pub fn get_test_channel(token_address: Address) -> ChannelV5 {
-        ChannelV5 {
+    pub fn get_test_channel(token_address: Address) -> Channel {
+        Channel {
             leader: ValidatorId::from(&GANACHE_ADDRESSES["leader"]),
             follower: ValidatorId::from(&GANACHE_ADDRESSES["follower"]),
             guardian: GANACHE_ADDRESSES["advertiser"],
