@@ -35,6 +35,8 @@ use web3::{
 use test_utils::*;
 
 mod error;
+#[cfg(test)]
+mod test_utils;
 
 lazy_static! {
     static ref OUTPACE_ABI: &'static [u8] =
@@ -46,60 +48,6 @@ lazy_static! {
         include_bytes!("../../lib/protocol-eth/abi/Sweeper.json");
     static ref DEPOSITOR_BYTECODE: &'static [u8] =
         include_bytes!("../../lib/protocol-eth/resources/bytecode/Depositor.json");
-}
-
-#[cfg(test)]
-mod test_utils {
-    use lazy_static::lazy_static;
-    use std::collections::HashMap;
-
-    use primitives::Address;
-
-    // See `adex-eth-protocol` `contracts/mocks/Token.sol`
-    lazy_static! {
-        /// Mocked Token ABI
-        pub static ref MOCK_TOKEN_ABI: &'static [u8] =
-            include_bytes!("../test/resources/mock_token_abi.json");
-        /// Mocked Token bytecode
-        pub static ref MOCK_TOKEN_BYTECODE: &'static str =
-            include_str!("../test/resources/mock_token_bytecode.json").trim_end_matches("\n");
-        /// Sweeper bytecode
-        pub static ref SWEEPER_BYTECODE: &'static str = include_str!("../../lib/protocol-eth/resources/bytecode/Sweeper.json").trim_end_matches("\n");
-        /// Outpace bytecode
-        pub static ref OUTPACE_BYTECODE: &'static str = include_str!("../../lib/protocol-eth/resources/bytecode/OUTPACE.json").trim_end_matches("\n");
-        pub static ref GANACHE_ADDRESSES: HashMap<String, Address> = {
-            vec![
-                (
-                    "leader".to_string(),
-                    "0x5a04A8fB90242fB7E1db7d1F51e268A03b7f93A5"
-                        .parse()
-                        .expect("Valid Address"),
-                ),
-                (
-                    "follower".to_string(),
-                    "0xe3896ebd3F32092AFC7D27e9ef7b67E26C49fB02"
-                        .parse()
-                        .expect("Valid Address"),
-                ),
-                (
-                    "creator".to_string(),
-                    "0x0E45891a570Af9e5A962F181C219468A6C9EB4e1"
-                        .parse()
-                        .expect("Valid Address"),
-                ),
-                (
-                    "advertiser".to_string(),
-                    "0x8c4B95383a46D30F056aCe085D8f453fCF4Ed66d"
-                        .parse()
-                        .expect("Valid Address"),
-                ),
-            ]
-            .into_iter()
-            .collect()
-        };
-    }
-
-    pub const GANACHE_URL: &'static str = "http://localhost:8545";
 }
 
 #[derive(Debug, Clone)]
@@ -149,15 +97,22 @@ impl EthereumAdapter {
     }
 }
 
-// TODO: replace with EthChannel when we alter it!
-pub fn channel_to_eth_channel(channel: &ChannelV5) -> Vec<Token> {
-    vec![
-        Token::Address(channel.leader.as_bytes().into()),
-        Token::Address(channel.follower.as_bytes().into()),
-        Token::Address(channel.guardian.as_bytes().into()),
-        Token::Address(channel.token.as_bytes().into()),
-        Token::FixedBytes(channel.nonce.to_bytes().to_vec()),
-    ]
+trait EthereumChannel {
+    fn tokenize(&self) -> Token;
+}
+
+impl EthereumChannel for ChannelV5 {
+    fn tokenize(&self) -> Token {
+        let tokens = vec![
+            Token::Address(self.leader.as_bytes().into()),
+            Token::Address(self.follower.as_bytes().into()),
+            Token::Address(self.guardian.as_bytes().into()),
+            Token::Address(self.token.as_bytes().into()),
+            Token::FixedBytes(self.nonce.to_bytes().to_vec()),
+        ];
+
+        Token::Tuple(tokens)
+    }
 }
 
 fn get_counterfactual_address(
@@ -168,10 +123,8 @@ fn get_counterfactual_address(
 ) -> H160 {
     let salt: [u8; 32] = [0; 32];
     let mut init_code: Vec<u8> = DEPOSITOR_BYTECODE.to_vec();
-    // TODO: Change the EthereumChannel and use it!
-    let channel_as_token_vec = channel_to_eth_channel(&channel);
     let mut encoded_params = encode(&[
-        Token::Tuple(channel_as_token_vec),
+        channel.tokenize(),
         Token::Address(outpace),
         Token::Address(H160(*depositor.as_bytes())),
     ])
@@ -572,12 +525,8 @@ mod test {
         channel_v5::Nonce,
         config::{configuration, TokenInfo},
     };
-    use std::{convert::TryFrom, num::NonZeroU8};
-    use web3::{
-        transports::Http,
-        types::{Address as EthAddress, H256},
-        Web3,
-    };
+    use std::convert::TryFrom;
+    use web3::{transports::Http, types::Address as EthAddress, Web3};
     use wiremock::{
         matchers::{method, path},
         Mock, MockServer, ResponseTemplate,
@@ -912,144 +861,5 @@ mod test {
             token: token_address,
             nonce: Nonce::from(12345_u32),
         }
-    }
-
-    pub async fn mock_set_balance(
-        token_contract: &Contract<Http>,
-        from: [u8; 20],
-        address: [u8; 20],
-        amount: u64,
-    ) -> web3::contract::Result<H256> {
-        tokio_compat_02::FutureExt::compat(token_contract.call(
-            "setBalanceTo",
-            (H160(address), U256::from(amount)),
-            H160(from),
-            Options::default(),
-        ))
-        .await
-    }
-
-    pub async fn outpace_deposit(
-        outpace_contract: &Contract<Http>,
-        channel: &ChannelV5,
-        to: [u8; 20],
-        amount: u64,
-    ) -> web3::contract::Result<H256> {
-        tokio_compat_02::FutureExt::compat(outpace_contract.call(
-            "deposit",
-            (
-                Token::Tuple(channel_to_eth_channel(channel)),
-                H160(to),
-                U256::from(amount),
-            ),
-            H160(to),
-            Options::with(|opt| {
-                opt.gas_price = Some(1.into());
-                // TODO: Check how much should this gas limit be!
-                opt.gas = Some(61_721_975.into());
-            }),
-        ))
-        .await
-    }
-
-    pub async fn sweeper_sweep(
-        sweeper_contract: &Contract<Http>,
-        outpace_address: [u8; 20],
-        channel: &ChannelV5,
-        depositor: [u8; 20],
-    ) -> web3::contract::Result<H256> {
-        tokio_compat_02::FutureExt::compat(sweeper_contract.call(
-            "sweep",
-            (
-                Token::Address(H160(outpace_address)),
-                Token::Tuple(channel_to_eth_channel(channel)),
-                Token::Array(vec![Token::Address(H160(depositor))]),
-            ),
-            H160(depositor),
-            Options::with(|opt| {
-                opt.gas_price = Some(1.into());
-                // TODO: Check how much should this gas limit be!
-                opt.gas = Some(61_721_975.into());
-            }),
-        ))
-        .await
-    }
-
-    /// Deploys the Sweeper contract from `GANACHE_ADDRESS['leader']`
-    async fn deploy_sweeper_contract(
-        web3: &Web3<Http>,
-    ) -> web3::contract::Result<(H160, Contract<Http>)> {
-        let from_leader_account: EthAddress =
-            EthAddress::from(GANACHE_ADDRESSES["leader"].as_bytes());
-
-        let feature = tokio_compat_02::FutureExt::compat(async {
-            Contract::deploy(web3.eth(), &SWEEPER_ABI)
-                .expect("Invalid ABI of Sweeper contract")
-                .confirmations(0)
-                .options(Options::with(|opt| {
-                    opt.gas_price = Some(1.into());
-                    opt.gas = Some(6_721_975.into());
-                }))
-                .execute(*SWEEPER_BYTECODE, (), from_leader_account)
-        })
-        .await;
-
-        let sweeper_contract = tokio_compat_02::FutureExt::compat(feature).await?;
-
-        Ok((sweeper_contract.address(), sweeper_contract))
-    }
-
-    /// Deploys the Outpace contract from `GANACHE_ADDRESS['leader']`
-    async fn deploy_outpace_contract(
-        web3: &Web3<Http>,
-    ) -> web3::contract::Result<(H160, Contract<Http>)> {
-        let from_leader_account: EthAddress =
-            EthAddress::from(GANACHE_ADDRESSES["leader"].as_bytes());
-
-        let feature = tokio_compat_02::FutureExt::compat(async {
-            Contract::deploy(web3.eth(), &OUTPACE_ABI)
-                .expect("Invalid ABI of Sweeper contract")
-                .confirmations(0)
-                .options(Options::with(|opt| {
-                    opt.gas_price = Some(1.into());
-                    opt.gas = Some(6_721_975.into());
-                }))
-                .execute(*OUTPACE_BYTECODE, (), from_leader_account)
-        })
-        .await;
-
-        let outpace_contract = tokio_compat_02::FutureExt::compat(feature).await?;
-
-        Ok((outpace_contract.address(), outpace_contract))
-    }
-
-    /// Deploys the Mock Token contract from `GANACHE_ADDRESS['leader']`
-    async fn deploy_token_contract(
-        web3: &Web3<Http>,
-        min_token_units: u64,
-    ) -> web3::contract::Result<(TokenInfo, H160, Contract<Http>)> {
-        let from_leader_account: EthAddress =
-            EthAddress::from(GANACHE_ADDRESSES["leader"].as_bytes());
-
-        let feature = tokio_compat_02::FutureExt::compat(async {
-            Contract::deploy(web3.eth(), &MOCK_TOKEN_ABI)
-                .expect("Invalid ABI of Mock Token contract")
-                .confirmations(0)
-                .options(Options::with(|opt| {
-                    opt.gas_price = Some(1.into());
-                    opt.gas = Some(6_721_975.into());
-                }))
-                .execute(*MOCK_TOKEN_BYTECODE, (), from_leader_account)
-        })
-        .await;
-
-        let token_contract = tokio_compat_02::FutureExt::compat(feature).await?;
-
-        let token_info = TokenInfo {
-            min_token_units_for_deposit: BigNum::from(min_token_units),
-            precision: NonZeroU8::new(18).expect("should create NonZeroU8"),
-        };
-
-        Ok((token_info, token_contract.address(), token_contract))
     }
 }
