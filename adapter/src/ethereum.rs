@@ -50,6 +50,45 @@ lazy_static! {
         include_bytes!("../../lib/protocol-eth/resources/bytecode/Depositor.json");
 }
 
+trait EthereumChannel {
+    fn tokenize(&self) -> Token;
+}
+
+impl EthereumChannel for Channel {
+    fn tokenize(&self) -> Token {
+        let tokens = vec![
+            Token::Address(self.leader.as_bytes().into()),
+            Token::Address(self.follower.as_bytes().into()),
+            Token::Address(self.guardian.as_bytes().into()),
+            Token::Address(self.token.as_bytes().into()),
+            Token::FixedBytes(self.nonce.to_bytes().to_vec()),
+        ];
+
+        Token::Tuple(tokens)
+    }
+}
+
+fn get_counterfactual_address(
+    sweeper: H160,
+    channel: &Channel,
+    outpace: H160,
+    depositor: &Address,
+) -> H160 {
+    let salt: [u8; 32] = [0; 32];
+    let encoded_params = encode(&[
+        Token::Address(outpace),
+        channel.tokenize(),
+        Token::Address(H160(*depositor.as_bytes())),
+    ]);
+
+    let mut init_code = DEPOSITOR_BYTECODE.to_vec();
+    init_code.extend(&encoded_params);
+
+    let address = calc_addr(sweeper.as_fixed_bytes(), &salt, &init_code);
+
+    H160(address)
+}
+
 #[derive(Debug, Clone)]
 pub struct EthereumAdapter {
     address: ValidatorId,
@@ -95,43 +134,6 @@ impl EthereumAdapter {
             relayer,
         })
     }
-}
-
-trait EthereumChannel {
-    fn tokenize(&self) -> Token;
-}
-
-impl EthereumChannel for Channel {
-    fn tokenize(&self) -> Token {
-        let tokens = vec![
-            Token::Address(self.leader.as_bytes().into()),
-            Token::Address(self.follower.as_bytes().into()),
-            Token::Address(self.guardian.as_bytes().into()),
-            Token::Address(self.token.as_bytes().into()),
-            Token::FixedBytes(self.nonce.to_bytes().to_vec()),
-        ];
-
-        Token::Tuple(tokens)
-    }
-}
-
-fn get_counterfactual_address(
-    sweeper: H160,
-    channel: &Channel,
-    outpace: H160,
-    depositor: &Address,
-) -> H160 {
-    let salt: [u8; 32] = [0; 32];
-    let mut init_code: Vec<u8> = DEPOSITOR_BYTECODE.to_vec();
-    let mut encoded_params = encode(&[
-        channel.tokenize(),
-        Token::Address(outpace),
-        Token::Address(H160(*depositor.as_bytes())),
-    ])
-    .to_vec();
-    init_code.append(&mut encoded_params);
-    let address = calc_addr(sweeper.as_fixed_bytes(), &salt, &init_code);
-    H160::from(address)
 }
 
 #[async_trait]
