@@ -125,15 +125,6 @@ impl Adapter for DummyAdapter {
         Ok(is_same)
     }
 
-    async fn validate_channel<'a>(
-        &'a self,
-        channel: &'a Channel,
-    ) -> AdapterResult<bool, Self::AdapterError> {
-        DummyAdapter::is_channel_valid(&self.config, self.whoami(), channel)
-            .map(|_| true)
-            .map_err(AdapterError::InvalidChannel)
-    }
-
     async fn session_from_token<'a>(
         &'a self,
         token: &'a str,

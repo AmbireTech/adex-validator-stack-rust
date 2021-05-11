@@ -194,14 +194,6 @@ impl Adapter for EthereumAdapter {
         Ok(verify_address)
     }
 
-    // TODO: Remove
-    async fn validate_channel<'a>(
-        &'a self,
-        _channel: &'a Channel,
-    ) -> AdapterResult<bool, Self::AdapterError> {
-        Ok(true)
-    }
-
     /// Creates a `Session` from a provided Token by calling the Contract.
     /// Does **not** cache the (`Token`, `Session`) pair.
     async fn session_from_token<'a>(

@@ -96,13 +96,6 @@ pub trait Adapter: ChannelValidator + Send + Sync + fmt::Debug + Clone {
         signature: &str,
     ) -> AdapterResult<bool, Self::AdapterError>;
 
-    /// Validate a channel
-    #[deprecated(note = "REMOVE, this is v4! no longer needed")]
-    async fn validate_channel<'a>(
-        &'a self,
-        channel: &'a Channel,
-    ) -> AdapterResult<bool, Self::AdapterError>;
-
     /// Get user session from token
     async fn session_from_token<'a>(
         &'a self,
