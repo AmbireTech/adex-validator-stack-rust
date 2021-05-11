@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use dashmap::{mapref::entry::Entry, DashMap};
 use primitives::{
     adapter::{
         Adapter, AdapterErrorKind, AdapterResult, Deposit, DummyAdapterOptions,
@@ -7,9 +8,9 @@ use primitives::{
     channel_v5::Channel as ChannelV5,
     channel_validator::ChannelValidator,
     config::Config,
-    Address, BigNum, Channel, ToETHChecksum, ValidatorId,
+    Address, Channel, ChannelId, ToETHChecksum, ValidatorId,
 };
-use std::{collections::HashMap, fmt};
+use std::{collections::HashMap, fmt, sync::Arc};
 
 #[derive(Debug, Clone)]
 pub struct DummyAdapter {
@@ -19,6 +20,42 @@ pub struct DummyAdapter {
     session_tokens: HashMap<String, ValidatorId>,
     // Auth tokens that we've generated to authenticate with someone (address => token)
     authorization_tokens: HashMap<String, String>,
+    deposits: Deposits,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct Deposits(Arc<DashMap<(ChannelId, Address), (usize, Vec<Deposit>)>>);
+
+impl Deposits {
+    pub fn add_deposit(&self, channel: ChannelId, address: Address, deposit: Deposit) {
+        match self.0.entry((channel, address)) {
+            Entry::Occupied(mut deposit_calls) => {
+                // add the new deposit to the Vec
+                deposit_calls.get_mut().1.push(deposit);
+            }
+            Entry::Vacant(empty) => {
+                // add the new `(ChannelId, Address)` key and init with index 0 and the passed Deposit
+                empty.insert((0, vec![deposit]));
+            }
+        }
+    }
+
+    pub fn get_next_deposit(&self, channel: ChannelId, address: Address) -> Option<Deposit> {
+        match self.0.entry((channel, address)) {
+            Entry::Occupied(mut entry) => {
+                let (call_index, deposit_calls) = entry.get_mut();
+
+                let deposit = deposit_calls.get(*call_index).cloned()?;
+
+                // increment the index for the next call
+                *call_index = call_index
+                    .checked_add(1)
+                    .expect("Deposit call index has overflowed");
+                Some(deposit)
+            }
+            Entry::Vacant(_) => None,
+        }
+    }
 }
 
 // Enables DummyAdapter to be able to
@@ -32,7 +69,12 @@ impl DummyAdapter {
             config: config.to_owned(),
             session_tokens: opts.dummy_auth,
             authorization_tokens: opts.dummy_auth_tokens,
+            deposits: Default::default(),
         }
+    }
+
+    pub fn add_deposit_call(&self, channel: ChannelId, address: Address, deposit: Deposit) {
+        self.deposits.add_deposit(channel, address, deposit)
     }
 }
 
@@ -132,12 +174,78 @@ impl Adapter for DummyAdapter {
 
     async fn get_deposit(
         &self,
-        _channel: &ChannelV5,
-        _address: &Address,
+        channel: &ChannelV5,
+        address: &Address,
     ) -> AdapterResult<Deposit, Self::AdapterError> {
-        Ok(Deposit {
-            total: BigNum::from(1000000),
-            still_on_create2: BigNum::from(0),
-        })
+        self.deposits
+            .get_next_deposit(channel.id(), *address)
+            .ok_or_else(|| AdapterError::Adapter(Box::new(Error {})))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use primitives::{
+        config::configuration,
+        util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, IDS},
+        BigNum,
+    };
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_deposits_calls() {
+        let config = configuration("development", None).expect("Should get Config");
+        let channel = DUMMY_CAMPAIGN.channel.clone();
+        let adapter = DummyAdapter::init(
+            DummyAdapterOptions {
+                dummy_identity: IDS["leader"],
+                dummy_auth: Default::default(),
+                dummy_auth_tokens: Default::default(),
+            },
+            &config,
+        );
+
+        let address = ADDRESSES["creator"];
+
+        // no mocked deposit calls should cause an Error
+        {
+            let result = adapter.get_deposit(&channel, &address).await;
+
+            assert!(result.is_err());
+        }
+
+        let get_deposit = |total: u64, create2: u64| Deposit {
+            total: BigNum::from(total),
+            still_on_create2: BigNum::from(create2),
+        };
+
+        // add two deposit and call 3 times
+        // also check if different address does not have access to these calls
+        {
+            let deposits = [get_deposit(6969, 69), get_deposit(1000, 0)];
+            adapter.add_deposit_call(channel.id(), address, deposits[0].clone());
+            adapter.add_deposit_call(channel.id(), address, deposits[1].clone());
+
+            let first_call = adapter
+                .get_deposit(&channel, &address)
+                .await
+                .expect("Should get first mocked deposit");
+            assert_eq!(&deposits[0], &first_call);
+
+            // should not affect the Mocked deposit calls and should cause an error
+            let different_address_call = adapter.get_deposit(&channel, &ADDRESSES["leader"]).await;
+            assert!(different_address_call.is_err());
+
+            let second_call = adapter
+                .get_deposit(&channel, &address)
+                .await
+                .expect("Should get second mocked deposit");
+            assert_eq!(&deposits[1], &second_call);
+
+            // Third call should error, we've only mocked 2 calls!
+            let third_call = adapter.get_deposit(&channel, &address).await;
+            assert!(third_call.is_err());
+        }
     }
 }

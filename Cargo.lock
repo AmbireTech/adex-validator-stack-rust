@@ -9,6 +9,7 @@ dependencies = [
  "byteorder 1.4.3",
  "chrono",
  "create2",
+ "dashmap",
  "eth_checksum",
  "ethstore",
  "futures 0.3.13",
