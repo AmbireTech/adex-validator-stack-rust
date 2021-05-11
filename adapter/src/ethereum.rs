@@ -778,7 +778,7 @@ mod test {
         let counterfactual_address =
             get_counterfactual_address(sweeper.0, &channel, outpace.0, &spender);
 
-        // No Regular nor Create2 deposit
+        // No Regular nor Create2 deposits
         {
             let no_deposits = eth_adapter
                 .get_deposit(&channel, &spender)
@@ -850,7 +850,7 @@ mod test {
             );
         }
 
-        // Deposit with less than minimum token units
+        // Deposit with more than minimum token units
         {
             // Set balance > minimal token units
             mock_set_balance(
@@ -876,14 +876,39 @@ mod test {
                 deposit_with_create2
             );
         }
+
+        // Run sweeper, it should clear the previously set create2 deposit and leave the total
+        {
+            sweeper_sweep(
+                &sweeper.1,
+                outpace.0.to_fixed_bytes(),
+                &channel,
+                *spender.as_bytes(),
+            )
+            .await
+            .expect("Should sweep the Spender account");
+
+            let swept_deposit = eth_adapter
+                .get_deposit(&channel, &spender)
+                .await
+                .expect("should get deposit");
+
+            assert_eq!(
+                Deposit {
+                    total: BigNum::from(11_999),
+                    // we've just swept the account, so create2 should be empty
+                    still_on_create2: BigNum::from(0),
+                },
+                swept_deposit
+            );
+        }
     }
 
     pub fn get_test_channel(token_address: Address) -> ChannelV5 {
         ChannelV5 {
             leader: ValidatorId::from(&GANACHE_ADDRESSES["leader"]),
             follower: ValidatorId::from(&GANACHE_ADDRESSES["follower"]),
-            guardian: Address::try_from("0000000000000000000000000000000000000000")
-                .expect("should create an address"),
+            guardian: GANACHE_ADDRESSES["advertiser"],
             token: token_address,
             nonce: Nonce::from(12345_u32),
         }
@@ -918,6 +943,29 @@ mod test {
                 U256::from(amount),
             ),
             H160(to),
+            Options::with(|opt| {
+                opt.gas_price = Some(1.into());
+                // TODO: Check how much should this gas limit be!
+                opt.gas = Some(61_721_975.into());
+            }),
+        ))
+        .await
+    }
+
+    pub async fn sweeper_sweep(
+        sweeper_contract: &Contract<Http>,
+        outpace_address: [u8; 20],
+        channel: &ChannelV5,
+        depositor: [u8; 20],
+    ) -> web3::contract::Result<H256> {
+        tokio_compat_02::FutureExt::compat(sweeper_contract.call(
+            "sweep",
+            (
+                Token::Address(H160(outpace_address)),
+                Token::Tuple(channel_to_eth_channel(channel)),
+                Token::Array(vec![Token::Address(H160(depositor))]),
+            ),
+            H160(depositor),
             Options::with(|opt| {
                 opt.gas_price = Some(1.into());
                 // TODO: Check how much should this gas limit be!
