@@ -55,6 +55,7 @@ pub async fn fetch_campaign(pool: DbPool, campaign: &Campaign) -> Result<Campaig
 mod postgres {
     use std::convert::TryFrom;
     use tokio_postgres::{Error, Row};
+    use primitives::campaign::Active;
 
     use super::*;
 
