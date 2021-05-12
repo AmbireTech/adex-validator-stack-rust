@@ -33,6 +33,10 @@ pub async fn insert_campaign(pool: &DbPool, campaign: &Campaign) -> Result<bool,
     Ok(inserted)
 }
 
+/// ```text
+/// SELECT id, channel_id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to FROM campaigns
+/// WHERE id = $1 AND channel_id = $2
+/// ```
 pub async fn fetch_campaign(pool: DbPool, campaign: &Campaign) -> Result<Campaign, PoolError> {
     let client = pool.get().await?;
     let statement = client.prepare("SELECT id, channel_id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to FROM campaigns WHERE id = $1 AND channel_id = $2").await?;
@@ -57,7 +61,7 @@ mod postgres {
     impl TryFrom<&Row> for Campaign {
         type Error = Error;
 
-        fn try_from(row: Row) -> Result<Self, Self::Error> {
+        fn try_from(row: &Row) -> Result<Self, Self::Error> {
             Ok(Campaign {
                 id: row.try_get("id")?,
                 channel: row.try_get("channel")?,
@@ -70,8 +74,6 @@ mod postgres {
                 ad_units: row.try_get("ad_units")?,
                 targeting_rules: row.try_get("targeting_rules")?,
                 created: row.try_get("created")?,
-                creator: row.try_get("creator")?,
-                creator: row.try_get("creator")?,
                 active: Active {
                     to: row.try_get("active_to"),
                     from: row.try_get("active_from"),
