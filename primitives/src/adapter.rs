@@ -1,5 +1,5 @@
 use crate::{
-    channel::ChannelError, channel_v5::Channel, channel_validator::ChannelValidator, Address,
+    channel::ChannelError, channel_v5::Channel, Address,
     BigNum, DomainError, ValidatorId,
 };
 use async_trait::async_trait;
@@ -75,7 +75,7 @@ pub struct Session {
 }
 
 #[async_trait]
-pub trait Adapter: ChannelValidator + Send + Sync + fmt::Debug + Clone {
+pub trait Adapter: Send + Sync + fmt::Debug + Clone {
     type AdapterError: AdapterErrorKind + 'static;
 
     /// Unlock adapter

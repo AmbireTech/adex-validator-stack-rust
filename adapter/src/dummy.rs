@@ -6,7 +6,6 @@ use primitives::{
         Error as AdapterError, Session,
     },
     channel_v5::Channel,
-    channel_validator::ChannelValidator,
     config::Config,
     Address, ChannelId, ToETHChecksum, ValidatorId,
 };
@@ -58,10 +57,6 @@ impl Deposits {
         }
     }
 }
-
-// Enables DummyAdapter to be able to
-// check if a channel is valid
-impl ChannelValidator for DummyAdapter {}
 
 impl DummyAdapter {
     pub fn init(opts: DummyAdapterOptions, config: &Config) -> Self {

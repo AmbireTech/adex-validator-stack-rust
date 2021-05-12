@@ -8,7 +8,14 @@ use web3::{
     Web3,
 };
 
-use primitives::{channel_v5::Channel, config::TokenInfo, Address, BigNum};
+use primitives::{
+    adapter::KeystoreOptions,
+    channel_v5::{Channel, Nonce},
+    config::{configuration, TokenInfo},
+    Address, BigNum, ValidatorId,
+};
+
+use crate::EthereumAdapter;
 
 use super::{EthereumChannel, OUTPACE_ABI, SWEEPER_ABI};
 
@@ -58,6 +65,48 @@ lazy_static! {
 
 pub const GANACHE_URL: &'static str = "http://localhost:8545";
 
+pub fn get_test_channel(token_address: Address) -> Channel {
+    Channel {
+        leader: ValidatorId::from(&GANACHE_ADDRESSES["leader"]),
+        follower: ValidatorId::from(&GANACHE_ADDRESSES["follower"]),
+        guardian: GANACHE_ADDRESSES["advertiser"],
+        token: token_address,
+        nonce: Nonce::from(12345_u32),
+    }
+}
+
+pub fn setup_eth_adapter(
+    sweeper_address: Option<[u8; 20]>,
+    outpace_address: Option<[u8; 20]>,
+    token_whitelist: Option<(Address, TokenInfo)>,
+) -> EthereumAdapter {
+    let mut config = configuration("development", None).expect("failed parse config");
+    let keystore_options = KeystoreOptions {
+        keystore_file: "./test/resources/keystore.json".to_string(),
+        keystore_pwd: "adexvalidator".to_string(),
+    };
+
+    if let Some(address) = sweeper_address {
+        config.sweeper_address = address;
+    }
+
+    if let Some(address) = outpace_address {
+        config.outpace_address = address;
+    }
+
+    if let Some((address, token_info)) = token_whitelist {
+        assert!(
+            config
+                .token_address_whitelist
+                .insert(address, token_info)
+                .is_none(),
+            "It should not contain the generated token prior to this call!"
+        )
+    }
+
+    EthereumAdapter::init(keystore_options, &config).expect("should init ethereum adapter")
+}
+
 pub async fn mock_set_balance(
     token_contract: &Contract<Http>,
     from: [u8; 20],
@@ -92,6 +141,7 @@ pub async fn outpace_deposit(
     .await
 }
 
+#[allow(dead_code)]
 pub async fn sweeper_sweep(
     sweeper_contract: &Contract<Http>,
     outpace_address: [u8; 20],
@@ -127,7 +177,7 @@ pub async fn deploy_sweeper_contract(
             .confirmations(0)
             .options(Options::with(|opt| {
                 opt.gas_price = Some(1.into());
-                opt.gas = Some(6_721_975.into());
+                opt.gas = Some(756_093.into());
             }))
             .execute(*SWEEPER_BYTECODE, (), from_leader_account)
     })
@@ -150,7 +200,7 @@ pub async fn deploy_outpace_contract(
             .confirmations(0)
             .options(Options::with(|opt| {
                 opt.gas_price = Some(1.into());
-                opt.gas = Some(6_721_975.into());
+                opt.gas = Some(2_390_256.into());
             }))
             .execute(*OUTPACE_BYTECODE, (), from_leader_account)
     })
@@ -174,7 +224,7 @@ pub async fn deploy_token_contract(
             .confirmations(0)
             .options(Options::with(|opt| {
                 opt.gas_price = Some(1.into());
-                opt.gas = Some(6_721_975.into());
+                opt.gas = Some(384_095.into());
             }))
             .execute(*MOCK_TOKEN_BYTECODE, (), from_leader_account)
     })
