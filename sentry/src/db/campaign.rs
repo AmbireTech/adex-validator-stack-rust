@@ -48,40 +48,7 @@ pub async fn fetch_campaign(pool: DbPool, campaign: &Campaign) -> Result<Campaig
         )
         .await?;
 
-    Ok(Campaign::try_from(&row)?)
-}
-
-#[cfg(feature = "postgres")]
-mod postgres {
-    use std::convert::TryFrom;
-    use tokio_postgres::{Error, Row};
-    use primitives::campaign::Active;
-
-    use super::*;
-
-    impl TryFrom<&Row> for Campaign {
-        type Error = Error;
-
-        fn try_from(row: &Row) -> Result<Self, Self::Error> {
-            Ok(Campaign {
-                id: row.try_get("id")?,
-                channel: row.try_get("channel")?,
-                creator: row.try_get("creator")?,
-                budget: row.try_get("budget")?,
-                validators: row.try_get("validators")?,
-                title: row.try_get("title")?,
-                pricing_bounds: row.try_get("pricing_bounds")?,
-                event_submission: row.try_get("event_submission")?,
-                ad_units: row.try_get("ad_units")?,
-                targeting_rules: row.try_get("targeting_rules")?,
-                created: row.try_get("created")?,
-                active: Active {
-                    to: row.try_get("active_to"),
-                    from: row.try_get("active_from"),
-                },
-            })
-        }
-    }
+    Ok(Campaign::from(&row))
 }
 
 #[cfg(test)]
