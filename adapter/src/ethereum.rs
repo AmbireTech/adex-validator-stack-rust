@@ -683,9 +683,6 @@ mod test {
         let counterfactual_address =
             get_counterfactual_address(sweeper.0, &channel, outpace.0, &spender);
 
-        println!("{:?}", token_address);
-        println!("{:?}", counterfactual_address);
-
         // No Regular nor Create2 deposits
         {
             let no_deposits = eth_adapter
