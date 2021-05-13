@@ -26,11 +26,11 @@ lazy_static! {
         include_str!("../../test/resources/mock_token_abi.json");
     /// Mocked Token bytecode in JSON
     pub static ref MOCK_TOKEN_BYTECODE: &'static str =
-        include_str!("../../test/resources/mock_token_bytecode.json").trim_end_matches('\n');
-    /// Sweeper bytecode in JSON
-    pub static ref SWEEPER_BYTECODE: &'static str = include_str!("../../../lib/protocol-eth/resources/bytecode/Sweeper.json").trim_end_matches('\n');
-    /// Outpace bytecode in JSON
-    pub static ref OUTPACE_BYTECODE: &'static str = include_str!("../../../lib/protocol-eth/resources/bytecode/OUTPACE.json").trim_end_matches('\n');
+        include_str!("../../test/resources/mock_token_bytecode.bin").trim_end_matches("\n");
+    /// Sweeper bytecode
+    pub static ref SWEEPER_BYTECODE: &'static str = include_str!("../../../lib/protocol-eth/resources/bytecode/Sweeper.bin").trim_end_matches("\n");
+    /// Outpace bytecode
+    pub static ref OUTPACE_BYTECODE: &'static str = include_str!("../../../lib/protocol-eth/resources/bytecode/OUTPACE.json").trim_end_matches("\n");
     pub static ref GANACHE_ADDRESSES: HashMap<String, Address> = {
         vec![
             (
@@ -148,6 +148,8 @@ pub async fn sweeper_sweep(
     channel: &Channel,
     depositor: [u8; 20],
 ) -> web3::contract::Result<H256> {
+    let from_leader_account = H160(*GANACHE_ADDRESSES["leader"].as_bytes());
+
     tokio_compat_02::FutureExt::compat(sweeper_contract.call(
         "sweep",
         (
@@ -155,7 +157,7 @@ pub async fn sweeper_sweep(
             channel.tokenize(),
             Token::Array(vec![Token::Address(H160(depositor))]),
         ),
-        H160(depositor),
+        from_leader_account,
         Options::with(|opt| {
             opt.gas_price = Some(1.into());
             // TODO: Check how much should this gas limit be!
