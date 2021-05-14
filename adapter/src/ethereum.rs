@@ -75,13 +75,8 @@ fn get_counterfactual_address(
         channel.tokenize(),
         Token::Address(H160(*depositor.as_bytes())),
     ]);
-<<<<<<< HEAD
-
-    let mut init_code = hex::decode(*DEPOSITOR_BYTECODE).expect("here");
-=======
     
     let mut init_code = hex::decode(*DEPOSITOR_BYTECODE).expect("decoded properly");
->>>>>>> 29c861f... fix: sweeper test case
     init_code.extend(&encoded_params);
 
     let address = calc_addr(sweeper.as_fixed_bytes(), &salt, &init_code);
@@ -276,21 +271,21 @@ impl Adapter for EthereumAdapter {
         let outpace_contract = Contract::from_json(
             self.web3.eth(),
             self.config.outpace_address.into(),
-            OUTPACE_ABI.as_bytes(),
+            &OUTPACE_ABI,
         )
         .map_err(Error::ContractInitialization)?;
 
         let erc20_contract = Contract::from_json(
             self.web3.eth(),
             channel.token.as_bytes().into(),
-            &ERC20_ABI.as_bytes(),
+            &ERC20_ABI,
         )
         .map_err(Error::ContractInitialization)?;
 
         let sweeper_contract = Contract::from_json(
             self.web3.eth(),
             self.config.sweeper_address.into(),
-            SWEEPER_ABI.as_bytes(),
+            &SWEEPER_ABI,
         )
         .map_err(Error::ContractInitialization)?;
 
