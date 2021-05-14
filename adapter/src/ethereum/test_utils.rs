@@ -30,7 +30,7 @@ lazy_static! {
     /// Sweeper bytecode
     pub static ref SWEEPER_BYTECODE: &'static str = include_str!("../../../lib/protocol-eth/resources/bytecode/Sweeper.bin").trim_end_matches("\n");
     /// Outpace bytecode
-    pub static ref OUTPACE_BYTECODE: &'static str = include_str!("../../../lib/protocol-eth/resources/bytecode/OUTPACE.json").trim_end_matches("\n");
+    pub static ref OUTPACE_BYTECODE: &'static str = include_str!("../../../lib/protocol-eth/resources/bytecode/OUTPACE.bin").trim_end_matches("\n");
     pub static ref GANACHE_ADDRESSES: HashMap<String, Address> = {
         vec![
             (
