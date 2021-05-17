@@ -22,15 +22,15 @@ use super::{EthereumChannel, OUTPACE_ABI, SWEEPER_ABI};
 // See `adex-eth-protocol` `contracts/mocks/Token.sol`
 lazy_static! {
     /// Mocked Token ABI
-    pub static ref MOCK_TOKEN_ABI: &'static str =
-        include_str!("../../test/resources/mock_token_abi.json");
+    pub static ref MOCK_TOKEN_ABI: &'static [u8] =
+        include_bytes!("../../test/resources/mock_token_abi.json");
     /// Mocked Token bytecode in JSON
     pub static ref MOCK_TOKEN_BYTECODE: &'static str =
-        include_str!("../../test/resources/mock_token_bytecode.json").trim_end_matches('\n');
-    /// Sweeper bytecode in JSON
-    pub static ref SWEEPER_BYTECODE: &'static str = include_str!("../../../lib/protocol-eth/resources/bytecode/Sweeper.json").trim_end_matches('\n');
-    /// Outpace bytecode in JSON
-    pub static ref OUTPACE_BYTECODE: &'static str = include_str!("../../../lib/protocol-eth/resources/bytecode/OUTPACE.json").trim_end_matches('\n');
+        include_str!("../../test/resources/mock_token_bytecode.bin").trim_end_matches("\n");
+    /// Sweeper bytecode
+    pub static ref SWEEPER_BYTECODE: &'static str = include_str!("../../../lib/protocol-eth/resources/bytecode/Sweeper.bin").trim_end_matches("\n");
+    /// Outpace bytecode
+    pub static ref OUTPACE_BYTECODE: &'static str = include_str!("../../../lib/protocol-eth/resources/bytecode/OUTPACE.bin").trim_end_matches("\n");
     pub static ref GANACHE_ADDRESSES: HashMap<String, Address> = {
         vec![
             (
@@ -148,6 +148,8 @@ pub async fn sweeper_sweep(
     channel: &Channel,
     depositor: [u8; 20],
 ) -> web3::contract::Result<H256> {
+    let from_leader_account = H160(*GANACHE_ADDRESSES["leader"].as_bytes());
+
     tokio_compat_02::FutureExt::compat(sweeper_contract.call(
         "sweep",
         (
@@ -155,11 +157,11 @@ pub async fn sweeper_sweep(
             channel.tokenize(),
             Token::Array(vec![Token::Address(H160(depositor))]),
         ),
-        H160(depositor),
+        from_leader_account,
         Options::with(|opt| {
             opt.gas_price = Some(1.into());
             // TODO: Check how much should this gas limit be!
-            opt.gas = Some(61_721_975.into());
+            opt.gas = Some(6_721_975.into());
         }),
     ))
     .await
@@ -172,12 +174,12 @@ pub async fn deploy_sweeper_contract(
     let from_leader_account = H160(*GANACHE_ADDRESSES["leader"].as_bytes());
 
     let feature = tokio_compat_02::FutureExt::compat(async {
-        Contract::deploy(web3.eth(), SWEEPER_ABI.as_bytes())
+        Contract::deploy(web3.eth(), &SWEEPER_ABI)
             .expect("Invalid ABI of Sweeper contract")
             .confirmations(0)
             .options(Options::with(|opt| {
                 opt.gas_price = Some(1.into());
-                opt.gas = Some(756_093.into());
+                opt.gas = Some(6_721_975.into());
             }))
             .execute(*SWEEPER_BYTECODE, (), from_leader_account)
     })
@@ -195,12 +197,12 @@ pub async fn deploy_outpace_contract(
     let from_leader_account = H160(*GANACHE_ADDRESSES["leader"].as_bytes());
 
     let feature = tokio_compat_02::FutureExt::compat(async {
-        Contract::deploy(web3.eth(), OUTPACE_ABI.as_bytes())
+        Contract::deploy(web3.eth(), &OUTPACE_ABI)
             .expect("Invalid ABI of Sweeper contract")
             .confirmations(0)
             .options(Options::with(|opt| {
                 opt.gas_price = Some(1.into());
-                opt.gas = Some(2_390_256.into());
+                opt.gas = Some(6_721_975.into());
             }))
             .execute(*OUTPACE_BYTECODE, (), from_leader_account)
     })
@@ -219,12 +221,12 @@ pub async fn deploy_token_contract(
     let from_leader_account = H160(*GANACHE_ADDRESSES["leader"].as_bytes());
 
     let feature = tokio_compat_02::FutureExt::compat(async {
-        Contract::deploy(web3.eth(), MOCK_TOKEN_ABI.as_bytes())
+        Contract::deploy(web3.eth(), &MOCK_TOKEN_ABI)
             .expect("Invalid ABI of Mock Token contract")
             .confirmations(0)
             .options(Options::with(|opt| {
                 opt.gas_price = Some(1.into());
-                opt.gas = Some(384_095.into());
+                opt.gas = Some(6_721_975.into());
             }))
             .execute(*MOCK_TOKEN_BYTECODE, (), from_leader_account)
     })
