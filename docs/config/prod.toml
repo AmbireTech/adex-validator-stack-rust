@@ -19,11 +19,36 @@ validator_tick_timeout = 10000
 ip_rate_limit = { type = 'ip', timeframe = 1200000 }
 sid_rate_limit = { type = 'sid', timeframe = 0 }
 ethereum_core_address = '0x333420fc6a897356e69b62417cd17ff012177d2b'
+# TODO: Replace with real contract address
+outpace_address = '0x333420fc6a897356e69b62417cd17ff012177d2b'
+# TODO: Replace with real contract address
+sweeper_address = '0x333420fc6a897356e69b62417cd17ff012177d2b'
+
 ethereum_network = 'http://localhost:8545'
 ethereum_adapter_relayer = 'https://relayer.adex.network'
 
 creators_whitelist = []
 minimal_deposit = "0"
 minimal_fee = "0"
-token_address_whitelist = ['0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359', '0x6B175474E89094C44Da98b954EedeAC495271d0F']
 validators_whitelist = []
+
+[[token_address_whitelist]]
+address = '0x6b175474e89094c44da98b954eedeac495271d0f' #DAI
+min_token_units_for_deposit = '100000000'
+precision = 18
+
+[[token_address_whitelist]]
+address = '0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359' #SAI
+min_token_units_for_deposit = '100000000'
+precision = 18
+
+[[token_address_whitelist]]
+address = '0xdac17f958d2ee523a2206206994597c13d831ec7' #USDT
+min_token_units_for_deposit = '100000000'
+precision = 6
+
+[[token_address_whitelist]]
+address = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48' #USDC
+min_token_units_for_deposit = '100000000'
+precision = 6
+

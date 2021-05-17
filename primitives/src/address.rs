@@ -124,9 +124,9 @@ mod de {
     where
         D: Deserializer<'de>,
     {
-        let validator_id = String::deserialize(deserializer)?;
+        let address = String::deserialize(deserializer)?;
 
-        from_bytes(validator_id, Prefix::Insensitive).map_err(serde::de::Error::custom)
+        from_bytes(address, Prefix::Insensitive).map_err(serde::de::Error::custom)
     }
 }
 

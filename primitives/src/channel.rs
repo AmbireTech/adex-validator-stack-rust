@@ -21,6 +21,12 @@ pub struct ChannelId(
     [u8; 32],
 );
 
+impl ChannelId {
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+}
+
 impl fmt::Debug for ChannelId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "ChannelId({})", self)
