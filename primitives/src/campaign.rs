@@ -393,7 +393,7 @@ mod postgres {
                 title: row.get("title"),
                 pricing_bounds: row.get("pricing_bounds"),
                 event_submission: row.get("event_submission"),
-                ad_units: row.get("ad_units"),
+                ad_units: serde_json::from_value(row.get("ad_units")).unwrap(),
                 targeting_rules: row.get("targeting_rules"),
                 created: row.get("created"),
                 active: Active {
