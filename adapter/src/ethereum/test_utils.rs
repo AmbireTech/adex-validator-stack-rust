@@ -134,8 +134,7 @@ pub async fn outpace_deposit(
         H160(to),
         Options::with(|opt| {
             opt.gas_price = Some(1.into());
-            // TODO: Check how much should this gas limit be!
-            opt.gas = Some(61_721_975.into());
+            opt.gas = Some(6_721_975.into());
         }),
     ))
     .await
@@ -159,7 +158,6 @@ pub async fn sweeper_sweep(
         from_leader_account,
         Options::with(|opt| {
             opt.gas_price = Some(1.into());
-            // TODO: Check how much should this gas limit be!
             opt.gas = Some(6_721_975.into());
         }),
     ))
