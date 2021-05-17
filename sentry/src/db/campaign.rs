@@ -1,12 +1,12 @@
 use crate::db::{DbPool, PoolError};
-use primitives::{channel::ChannelId, Campaign};
+use primitives::{channel::ChannelId, AdUnit, Campaign};
 use std::convert::TryFrom;
+use tokio_postgres::types::Json;
 
 pub async fn insert_campaign(pool: &DbPool, campaign: &Campaign) -> Result<bool, PoolError> {
     let client = pool.get().await?;
-
+    let ad_units: Json<Vec<AdUnit>> = Json(campaign.ad_units.clone());
     let stmt = client.prepare("INSERT INTO campaigns (id, channel_id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)").await?;
-
     let row = client
         .execute(
             &stmt,
@@ -20,7 +20,7 @@ pub async fn insert_campaign(pool: &DbPool, campaign: &Campaign) -> Result<bool,
                 &campaign.title,
                 &campaign.pricing_bounds,
                 &campaign.event_submission,
-                &campaign.ad_units,
+                &ad_units,
                 &campaign.targeting_rules,
                 &campaign.created,
                 &campaign.active.from,
