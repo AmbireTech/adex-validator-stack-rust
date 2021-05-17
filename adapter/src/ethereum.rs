@@ -42,7 +42,11 @@ lazy_static! {
         .as_bytes();
     static ref SWEEPER_ABI: &'static [u8] =
         include_bytes!("../../lib/protocol-eth/abi/Sweeper.json");
-    static ref DEPOSITOR_BYTECODE:  &'static str = include_str!("../../lib/protocol-eth/resources/bytecode/Depositor.bin");
+    /// Ready to use init code (i.e. decoded) for calculating the create2 address
+    static ref DEPOSITOR_BYTECODE_DECODED: Vec<u8> = {
+        let bytecode = include_str!("../../lib/protocol-eth/resources/bytecode/Depositor.bin");
+        hex::decode(bytecode).expect("Decoded properly")
+    };
 }
 
 trait EthereumChannel {
@@ -75,8 +79,8 @@ fn get_counterfactual_address(
         channel.tokenize(),
         Token::Address(H160(*depositor.as_bytes())),
     ]);
-    
-    let mut init_code = hex::decode(*DEPOSITOR_BYTECODE).expect("decoded properly");
+
+    let mut init_code = DEPOSITOR_BYTECODE_DECODED.clone();
     init_code.extend(&encoded_params);
 
     let address = calc_addr(sweeper.as_fixed_bytes(), &salt, &init_code);
@@ -165,7 +169,7 @@ impl Adapter for EthereumAdapter {
     }
 
     /// `state_root` is hex string which **should not** be `0x` prefixed
-    /// `sig` is hex string wihch **should be** `0x` prefixed
+    /// `sig` is hex string which **should be** `0x` prefixed
     fn verify(
         &self,
         signer: &ValidatorId,
@@ -275,12 +279,9 @@ impl Adapter for EthereumAdapter {
         )
         .map_err(Error::ContractInitialization)?;
 
-        let erc20_contract = Contract::from_json(
-            self.web3.eth(),
-            channel.token.as_bytes().into(),
-            &ERC20_ABI,
-        )
-        .map_err(Error::ContractInitialization)?;
+        let erc20_contract =
+            Contract::from_json(self.web3.eth(), channel.token.as_bytes().into(), &ERC20_ABI)
+                .map_err(Error::ContractInitialization)?;
 
         let sweeper_contract = Contract::from_json(
             self.web3.eth(),
@@ -778,7 +779,6 @@ mod test {
         }
 
         // Run sweeper, it should clear the previously set create2 deposit and leave the total
-        // TODO: Check why the `sweep()` is failing to run and remove the `allow(dead_code)` attr of `fn sweeper_sweep`
         {
             sweeper_sweep(
                 &sweeper.1,

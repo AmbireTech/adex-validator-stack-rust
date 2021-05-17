@@ -26,11 +26,11 @@ lazy_static! {
         include_bytes!("../../test/resources/mock_token_abi.json");
     /// Mocked Token bytecode in JSON
     pub static ref MOCK_TOKEN_BYTECODE: &'static str =
-        include_str!("../../test/resources/mock_token_bytecode.bin").trim_end_matches("\n");
+        include_str!("../../test/resources/mock_token_bytecode.bin");
     /// Sweeper bytecode
-    pub static ref SWEEPER_BYTECODE: &'static str = include_str!("../../../lib/protocol-eth/resources/bytecode/Sweeper.bin").trim_end_matches("\n");
+    pub static ref SWEEPER_BYTECODE: &'static str = include_str!("../../../lib/protocol-eth/resources/bytecode/Sweeper.bin");
     /// Outpace bytecode
-    pub static ref OUTPACE_BYTECODE: &'static str = include_str!("../../../lib/protocol-eth/resources/bytecode/OUTPACE.bin").trim_end_matches("\n");
+    pub static ref OUTPACE_BYTECODE: &'static str = include_str!("../../../lib/protocol-eth/resources/bytecode/OUTPACE.bin");
     pub static ref GANACHE_ADDRESSES: HashMap<String, Address> = {
         vec![
             (
@@ -141,7 +141,6 @@ pub async fn outpace_deposit(
     .await
 }
 
-#[allow(dead_code)]
 pub async fn sweeper_sweep(
     sweeper_contract: &Contract<Http>,
     outpace_address: [u8; 20],
