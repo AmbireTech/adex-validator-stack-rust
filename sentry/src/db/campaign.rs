@@ -1,6 +1,5 @@
 use crate::db::{DbPool, PoolError};
-use primitives::{channel::ChannelId, AdUnit, Campaign};
-use std::convert::TryFrom;
+use primitives::{AdUnit, Campaign};
 use tokio_postgres::types::Json;
 
 pub async fn insert_campaign(pool: &DbPool, campaign: &Campaign) -> Result<bool, PoolError> {
@@ -35,16 +34,16 @@ pub async fn insert_campaign(pool: &DbPool, campaign: &Campaign) -> Result<bool,
 
 /// ```text
 /// SELECT id, channel_id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to FROM campaigns
-/// WHERE id = $1 AND channel_id = $2
+/// WHERE id = $1
 /// ```
 pub async fn fetch_campaign(pool: DbPool, campaign: &Campaign) -> Result<Campaign, PoolError> {
     let client = pool.get().await?;
-    let statement = client.prepare("SELECT id, channel_id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to FROM campaigns WHERE id = $1 AND channel_id = $2").await?;
+    let statement = client.prepare("SELECT id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to FROM campaigns WHERE id = $1").await?;
 
     let row = client
         .query_one(
             &statement,
-            &[&campaign.id, &ChannelId::from(campaign.channel.id())],
+            &[&campaign.id],
         )
         .await?;
 
