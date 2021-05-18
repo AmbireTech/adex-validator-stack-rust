@@ -54,22 +54,15 @@ mod test {
         UnifiedNum,
     };
 
-    use crate::db::{
-        tests_postgres::{setup_test_migrations, test_postgres_connection},
-        POSTGRES_CONFIG,
-    };
+    use crate::db::tests_postgres::{setup_test_migrations, DATABASE_POOL};
 
     use super::*;
 
     #[tokio::test]
     async fn it_inserts_and_fetches_spendable() {
-        let test_pool = test_postgres_connection(POSTGRES_CONFIG.clone())
-            .get()
-            .await
-            .unwrap();
-        // let pool = test_pool.get().await.expect("Should get a DB pool");
+        let db_pool = DATABASE_POOL.get().await.expect("Should get a DB pool");
 
-        setup_test_migrations(test_pool.clone())
+        setup_test_migrations(db_pool.clone())
             .await
             .expect("Migrations should succeed");
 
@@ -81,14 +74,14 @@ mod test {
                 still_on_create2: UnifiedNum::from(500_000),
             },
         };
-        let is_inserted = insert_spendable(test_pool.clone(), &spendable)
+        let is_inserted = insert_spendable(db_pool.clone(), &spendable)
             .await
             .expect("Should succeed");
 
         assert!(is_inserted);
 
         let fetched_spendable = fetch_spendable(
-            test_pool.clone(),
+            db_pool.clone(),
             &spendable.spender,
             &spendable.channel.id(),
         )

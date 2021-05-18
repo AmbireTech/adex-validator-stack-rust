@@ -40,12 +40,7 @@ pub async fn fetch_campaign(pool: DbPool, campaign: &Campaign) -> Result<Campaig
     let client = pool.get().await?;
     let statement = client.prepare("SELECT id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to FROM campaigns WHERE id = $1").await?;
 
-    let row = client
-        .query_one(
-            &statement,
-            &[&campaign.id],
-        )
-        .await?;
+    let row = client.query_one(&statement, &[&campaign.id]).await?;
 
     Ok(Campaign::from(&row))
 }
@@ -59,32 +54,26 @@ mod test {
         ChannelId, UnifiedNum,
     };
 
-    use crate::db::{
-        tests_postgres::{setup_test_migrations, test_postgres_connection},
-        POSTGRES_CONFIG,
-    };
+    use crate::db::tests_postgres::{setup_test_migrations, DATABASE_POOL};
 
     use super::*;
 
     #[tokio::test]
     async fn it_inserts_and_fetches_campaign() {
-        let test_pool = test_postgres_connection(POSTGRES_CONFIG.clone())
-            .get()
-            .await
-            .unwrap();
+        let db_pool = DATABASE_POOL.get().await.expect("Should get a DB pool");
 
-        setup_test_migrations(test_pool.clone())
+        setup_test_migrations(db_pool.clone())
             .await
             .expect("Migrations should succeed");
 
         let campaign_for_testing = DUMMY_CAMPAIGN.clone();
-        let is_inserted = insert_campaign(&test_pool.clone(), &campaign_for_testing)
+        let is_inserted = insert_campaign(&db_pool.clone(), &campaign_for_testing)
             .await
             .expect("Should succeed");
 
         assert!(is_inserted);
 
-        let fetched_campaign: Campaign = fetch_campaign(test_pool.clone(), &campaign_for_testing)
+        let fetched_campaign: Campaign = fetch_campaign(db_pool.clone(), &campaign_for_testing)
             .await
             .expect("Should fetch successfully");
 
