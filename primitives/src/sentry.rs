@@ -7,6 +7,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt, hash::Hash};
 
+pub mod accounting;
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LastApproved {
@@ -283,31 +285,6 @@ impl fmt::Display for ChannelReport {
             ChannelReport::Hostname => write!(f, "reportChannelToHostname"),
             ChannelReport::HostnamePay => write!(f, "reportChannelToHostnamePay"),
         }
-    }
-}
-
-pub mod accounting {
-    use crate::{
-        balances_map::UnifiedMap,
-        ChannelId
-    };
-    use chrono::{DateTime, Utc};
-    use serde::{Deserialize, Serialize};
-
-    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-    #[serde(rename_all = "camelCase")]
-    pub struct Accounting {
-        pub channel_id: ChannelId,
-        #[serde(flatten)]
-        pub balances: Balances,
-        pub updated_at: DateTime<Utc>,
-    }
-
-    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-    #[serde(rename_all = "camelCase")]
-    pub struct Balances {
-        pub earners: UnifiedMap,
-        pub spenders: UnifiedMap,
     }
 }
 
