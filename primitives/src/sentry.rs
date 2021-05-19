@@ -362,7 +362,7 @@ pub mod campaign_create {
 
     impl CreateCampaign {
         /// Creates the new `Campaign` with randomly generated `CampaignId`
-        pub fn convert_to_campaign(self) -> Campaign {
+        pub fn into_campaign(self) -> Campaign {
             Campaign {
                 id: CampaignId::new(),
                 channel: self.channel,

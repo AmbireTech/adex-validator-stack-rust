@@ -4,7 +4,7 @@ use tokio_postgres::types::Json;
 
 pub async fn insert_campaign(pool: &DbPool, campaign: &Campaign) -> Result<bool, PoolError> {
     let client = pool.get().await?;
-    let ad_units: Json<Vec<AdUnit>> = Json(campaign.ad_units.clone());
+    let ad_units = Json(campaign.ad_units.clone());
     let stmt = client.prepare("INSERT INTO campaigns (id, channel_id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)").await?;
     let row = client
         .execute(
@@ -33,7 +33,7 @@ pub async fn insert_campaign(pool: &DbPool, campaign: &Campaign) -> Result<bool,
 }
 
 /// ```text
-/// SELECT id, channel_id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to FROM campaigns
+/// SELECT id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to FROM campaigns
 /// WHERE id = $1
 /// ```
 pub async fn fetch_campaign(pool: DbPool, campaign: &Campaign) -> Result<Campaign, PoolError> {

@@ -80,13 +80,10 @@ mod test {
 
         assert!(is_inserted);
 
-        let fetched_spendable = fetch_spendable(
-            db_pool.clone(),
-            &spendable.spender,
-            &spendable.channel.id(),
-        )
-        .await
-        .expect("Should fetch successfully");
+        let fetched_spendable =
+            fetch_spendable(db_pool.clone(), &spendable.spender, &spendable.channel.id())
+                .await
+                .expect("Should fetch successfully");
 
         assert_eq!(spendable, fetched_spendable);
     }

@@ -12,7 +12,7 @@ pub async fn create_campaign<A: Adapter>(
     let campaign = serde_json::from_slice::<CreateCampaign>(&body)
         .map_err(|e| ResponseError::FailedValidation(e.to_string()))?
         // create the actual `Campaign` with random `CampaignId`
-        .convert_to_campaign();
+        .into_campaign();
 
 
     // TODO AIP#61: Validate Campaign

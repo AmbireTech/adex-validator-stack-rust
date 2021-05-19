@@ -376,7 +376,7 @@ pub mod validators {
 #[cfg(feature = "postgres")]
 mod postgres {
 
-    use super::{Active, Campaign, CampaignId, PricingBounds, Validators};
+    use super::{Active, AdUnit, Campaign, CampaignId, PricingBounds, Validators};
     use bytes::BytesMut;
     use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
     use std::error::Error;
@@ -393,7 +393,7 @@ mod postgres {
                 title: row.get("title"),
                 pricing_bounds: row.get("pricing_bounds"),
                 event_submission: row.get("event_submission"),
-                ad_units: serde_json::from_value(row.get("ad_units")).unwrap(),
+                ad_units: row.get::<_, Json<_>>("ad_units").0,
                 targeting_rules: row.get("targeting_rules"),
                 created: row.get("created"),
                 active: Active {
