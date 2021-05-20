@@ -1,19 +1,18 @@
-use crate::{campaign::Validators, config::Config, Address, Campaign, UnifiedNum, ValidatorId};
+use crate::{
+    campaign::Validators,
+    config::{Config, TokenInfo},
+    Address, Campaign, UnifiedNum, ValidatorId,
+};
 use chrono::Utc;
-use std::cmp::PartialEq;
+use std::{cmp::PartialEq, collections::HashMap};
 use thiserror::Error;
 
 pub trait Validator {
-    fn validate(
-        &self,
-        config: &Config,
-        validator_identity: &ValidatorId,
-    ) -> Result<Validation, Error>;
+    fn validate(&self, config: &Config, validator_identity: &ValidatorId) -> Result<(), Error>;
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Validation {
-    Ok,
     /// When the Adapter address is not listed in the `campaign.validators` & `campaign.channel.(leader/follower)`
     /// which in terms means, that the adapter shouldn't handle this Campaign
     AdapterNotIncluded,
@@ -32,44 +31,56 @@ pub enum Validation {
 pub enum Error {
     #[error("Summing the Validators fee results in overflow")]
     FeeSumOverflow,
+    #[error("Validation error: {0:?}")]
+    Validation(Validation),
+}
+
+impl From<Validation> for Error {
+    fn from(v: Validation) -> Self {
+        Self::Validation(v)
+    }
 }
 
 impl Validator for Campaign {
-    fn validate(
-        &self,
-        config: &Config,
-        validator_identity: &ValidatorId,
-    ) -> Result<Validation, Error> {
+    fn validate(&self, config: &Config, validator_identity: &ValidatorId) -> Result<(), Error> {
         // check if the channel validators include our adapter identity
         let whoami_validator = match self.find_validator(validator_identity) {
             Some(role) => role.validator(),
-            None => return Ok(Validation::AdapterNotIncluded),
+            None => return Err(Validation::AdapterNotIncluded.into()),
         };
 
         if self.active.to < Utc::now() {
-            return Ok(Validation::InvalidActiveTo);
+            return Err(Validation::InvalidActiveTo.into());
         }
 
         if !all_validators_listed(&self.validators, &config.validators_whitelist) {
-            return Ok(Validation::UnlistedValidator);
+            return Err(Validation::UnlistedValidator.into());
         }
 
         if !creator_listed(&self, &config.creators_whitelist) {
-            return Ok(Validation::UnlistedCreator);
+            return Err(Validation::UnlistedCreator.into());
         }
 
-        if !asset_listed(&self, &config.token_address_whitelist) {
-            return Ok(Validation::UnlistedAsset);
+        // Check if the token is listed in the Configuration
+        let token_info = config
+            .token_address_whitelist
+            .get(&self.channel.token)
+            .ok_or(Validation::UnlistedAsset)?;
+
+        // Check if the campaign budget is above the minimum deposit configured
+        if self.budget.to_precision(token_info.precision.get())
+            < token_info.min_token_units_for_deposit
+        {
+            return Err(Validation::MinimumDepositNotMet.into());
         }
 
-        // TODO AIP#61: Use configuration to check the minimum deposit of the token!
-        if self.budget < UnifiedNum::from(500) {
-            return Ok(Validation::MinimumDepositNotMet);
-        }
-
-        // TODO AIP#61: Use Configuration to check the minimum validator fee of the token!
-        if whoami_validator.fee < UnifiedNum::from(100) {
-            return Ok(Validation::MinimumValidatorFeeNotMet);
+        // Check if the validator fee is greater than the minimum configured fee
+        if whoami_validator
+            .fee
+            .to_precision(token_info.precision.get())
+            < token_info.min_validator_fee
+        {
+            return Err(Validation::MinimumValidatorFeeNotMet.into());
         }
 
         let total_validator_fee: UnifiedNum = self
@@ -81,10 +92,10 @@ impl Validator for Campaign {
             .ok_or(Error::FeeSumOverflow)?;
 
         if total_validator_fee >= self.budget {
-            return Ok(Validation::FeeConstraintViolated);
+            return Err(Validation::FeeConstraintViolated.into());
         }
 
-        Ok(Validation::Ok)
+        Ok(())
     }
 }
 
@@ -112,11 +123,11 @@ pub fn creator_listed(campaign: &Campaign, whitelist: &[Address]) -> bool {
             .any(|allowed| allowed.eq(&campaign.creator))
 }
 
-pub fn asset_listed(campaign: &Campaign, whitelist: &[String]) -> bool {
+pub fn asset_listed(campaign: &Campaign, whitelist: &HashMap<Address, TokenInfo>) -> bool {
     // if the list is empty, return true, as we don't have a whitelist to restrict us to
     // or if we have a list, check if it includes the `channel.deposit_asset`
     whitelist.is_empty()
         || whitelist
-            .iter()
-            .any(|allowed| allowed == &campaign.channel.token.to_string())
+            .keys()
+            .any(|allowed| allowed == &campaign.channel.token)
 }

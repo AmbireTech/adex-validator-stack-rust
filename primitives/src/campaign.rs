@@ -375,8 +375,7 @@ pub mod validators {
 
 #[cfg(feature = "postgres")]
 mod postgres {
-
-    use super::{Active, AdUnit, Campaign, CampaignId, PricingBounds, Validators};
+    use super::{Active, Campaign, CampaignId, PricingBounds, Validators};
     use bytes::BytesMut;
     use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
     use std::error::Error;
