@@ -1,7 +1,9 @@
 use crate::db::{DbPool, PoolError};
-use primitives::{AdUnit, Campaign};
+use primitives::Campaign;
 use tokio_postgres::types::Json;
 
+// TODO: Remove once we use this fn
+#[allow(dead_code)]
 pub async fn insert_campaign(pool: &DbPool, campaign: &Campaign) -> Result<bool, PoolError> {
     let client = pool.get().await?;
     let ad_units = Json(campaign.ad_units.clone());
@@ -36,6 +38,8 @@ pub async fn insert_campaign(pool: &DbPool, campaign: &Campaign) -> Result<bool,
 /// SELECT id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to FROM campaigns
 /// WHERE id = $1
 /// ```
+// TODO: Remove once we use this fn
+#[allow(dead_code)]
 pub async fn fetch_campaign(pool: DbPool, campaign: &Campaign) -> Result<Campaign, PoolError> {
     let client = pool.get().await?;
     let statement = client.prepare("SELECT id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to FROM campaigns WHERE id = $1").await?;
