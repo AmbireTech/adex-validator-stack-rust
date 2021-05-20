@@ -78,7 +78,7 @@ impl Validator for Campaign {
             .map(|v| &v.fee)
             .sum::<Option<_>>()
             // on overflow return an error
-            .ok_or_else(|| Error::FeeSumOverflow)?;
+            .ok_or(Error::FeeSumOverflow)?;
 
         if total_validator_fee >= self.budget {
             return Ok(Validation::FeeConstraintViolated);

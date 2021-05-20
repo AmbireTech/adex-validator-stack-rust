@@ -147,26 +147,27 @@ pub mod tests_postgres {
 
     use deadpool::managed::{Manager as ManagerTrait, RecycleResult};
     use deadpool_postgres::ManagerConfig;
+    use once_cell::sync::Lazy;
     use tokio_postgres::{NoTls, SimpleQueryMessage};
 
     use async_trait::async_trait;
 
-    use super::{DbPool, PoolError};
+    use super::{DbPool, PoolError, POSTGRES_CONFIG};
 
     pub type Pool = deadpool::managed::Pool<Database, PoolError>;
 
-    /// we must have a duplication of the migration because of how migrant is handling migratoins
-    /// we need to separately setup test migrations
-    pub static MIGRATIONS: &[&str] = &["20190806011140_initial-tables"];
-
-    pub fn test_postgres_connection(base_config: tokio_postgres::Config) -> Pool {
+    pub static DATABASE_POOL: Lazy<Pool> = Lazy::new(|| {
         let manager_config = ManagerConfig {
             recycling_method: deadpool_postgres::RecyclingMethod::Fast,
         };
-        let manager = Manager::new(base_config, manager_config);
+        let manager = Manager::new(POSTGRES_CONFIG.clone(), manager_config);
 
         Pool::new(manager, 15)
-    }
+    });
+
+    /// we must have a duplication of the migration because of how migrant is handling migrations
+    /// we need to separately setup test migrations
+    pub static MIGRATIONS: &[&str] = &["20190806011140_initial-tables"];
 
     /// A Database is used to isolate test runs from each other
     /// we need to know the name of the database we've created.
@@ -191,9 +192,8 @@ pub mod tests_postgres {
         }
     }
 
-    /// Base Pool and Config are used to create a new SCHEMA and later on
-    /// create the actual with default options set for each connection to that SCHEMA
-    /// Otherwise we cannot create/
+    /// Base Pool and Config are used to create a new DATABASE and later on
+    /// create the actual connection to the database with default options set
     pub struct Manager {
         base_config: tokio_postgres::Config,
         base_pool: deadpool_postgres::Pool,
