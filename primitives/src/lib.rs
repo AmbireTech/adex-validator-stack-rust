@@ -28,7 +28,6 @@ pub mod campaign;
 pub mod campaign_validator;
 pub mod channel;
 pub mod channel_v5;
-pub mod channel_validator;
 pub mod config;
 mod eth_checksum;
 pub mod event_submission;
