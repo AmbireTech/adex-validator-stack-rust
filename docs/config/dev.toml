@@ -29,21 +29,30 @@ ethereum_network = 'http://localhost:8545'
 ethereum_adapter_relayer = 'https://goerli-relayer.adex.network'
 
 creators_whitelist = []
-minimal_deposit = "0"
-minimal_fee = "0"
 validators_whitelist = []
 
 [[token_address_whitelist]]
-address = '0x73967c6a0904aa032c103b4104747e88c566b1a2' #DAI
+# DAI
+address = '0x73967c6a0904aa032c103b4104747e88c566b1a2'
+# 1 * 10^-10 = 0.0_000_000_001
 min_token_units_for_deposit = '100000000'
+min_validator_fee = '100000000'
 precision = 18
 
 [[token_address_whitelist]]
-address = '0x509ee0d083ddf8ac028f2a56731412edd63223b9' #USDT
-min_token_units_for_deposit = '100000000'
+# USDT
+address = '0x509ee0d083ddf8ac028f2a56731412edd63223b9'
+# 1.000_000
+min_token_units_for_deposit = '1000000'
+# 0.001
+min_validator_fee = '1000'
 precision = 6
 
 [[token_address_whitelist]]
-address = '0x44dcfcead37be45206af6079648988b29284b2c6' #USDC
+# USDC
+address = '0x44dcfcead37be45206af6079648988b29284b2c6'
+# 1.000_000
 min_token_units_for_deposit = '100000000'
+# 0.001
+min_validator_fee = '1000'
 precision = 6

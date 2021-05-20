@@ -18,6 +18,7 @@ lazy_static! {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TokenInfo {
     pub min_token_units_for_deposit: BigNum,
+    pub min_validator_fee: BigNum,
     pub precision: NonZeroU8,
 }
 
@@ -43,10 +44,6 @@ pub struct Config {
     pub minimal_fee: BigNum,
     #[serde(deserialize_with = "deserialize_token_whitelist")]
     pub token_address_whitelist: HashMap<Address, TokenInfo>,
-    /// DEPRECATED since this is v4!
-    #[deprecated(note = "REMOVE, this is V4")]
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub ethereum_core_address: [u8; 20],
     #[serde(with = "SerHex::<StrictPfx>")]
     pub outpace_address: [u8; 20],
     #[serde(with = "SerHex::<StrictPfx>")]
@@ -60,6 +57,7 @@ pub struct Config {
 struct ConfigWhitelist {
     address: Address,
     min_token_units_for_deposit: BigNum,
+    min_validator_fee: BigNum,
     precision: NonZeroU8,
 }
 
@@ -73,12 +71,13 @@ where
 
     let tokens_whitelist: HashMap<Address, TokenInfo> = array
         .into_iter()
-        .map(|i| {
+        .map(|config_whitelist| {
             (
-                i.address,
+                config_whitelist.address,
                 TokenInfo {
-                    min_token_units_for_deposit: i.min_token_units_for_deposit,
-                    precision: i.precision,
+                    min_token_units_for_deposit: config_whitelist.min_token_units_for_deposit,
+                    min_validator_fee: config_whitelist.min_validator_fee,
+                    precision: config_whitelist.precision,
                 },
             )
         })

@@ -28,27 +28,39 @@ ethereum_network = 'http://localhost:8545'
 ethereum_adapter_relayer = 'https://relayer.adex.network'
 
 creators_whitelist = []
-minimal_deposit = "0"
-minimal_fee = "0"
 validators_whitelist = []
 
+
 [[token_address_whitelist]]
-address = '0x6b175474e89094c44da98b954eedeac495271d0f' #DAI
+# DAI
+address = '0x6b175474e89094c44da98b954eedeac495271d0f'
+# 1 * 10^-10 = 0.0_000_000_001
 min_token_units_for_deposit = '100000000'
+min_validator_fee = '100000000'
 precision = 18
 
 [[token_address_whitelist]]
-address = '0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359' #SAI
+# SAI
+address = '0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359'
+# 1 * 10^-10 = 0.0_000_000_001
 min_token_units_for_deposit = '100000000'
+min_validator_fee = '100000000'
 precision = 18
 
 [[token_address_whitelist]]
-address = '0xdac17f958d2ee523a2206206994597c13d831ec7' #USDT
-min_token_units_for_deposit = '100000000'
+# USDT
+address = '0xdac17f958d2ee523a2206206994597c13d831ec7'
+# 1.000_000
+min_token_units_for_deposit = '1000000'
+# 0.001
+min_validator_fee = '1000'
 precision = 6
 
 [[token_address_whitelist]]
-address = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48' #USDC
+# USDC
+address = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'
+# 1.000_000
 min_token_units_for_deposit = '100000000'
+# 0.001
+min_validator_fee = '1000'
 precision = 6
-
