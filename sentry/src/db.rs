@@ -233,7 +233,6 @@ pub mod tests_postgres {
         async fn create(&self) -> Result<Database, PoolError> {
             let pool_index = self.index.fetch_add(1, Ordering::SeqCst);
             let db_name = format!("test_{}", pool_index);
-            dbg!(&db_name);
 
             // 1. Drop the database if it exists - if a test failed before, the database wouldn't have been removed
             // 2. Create database
