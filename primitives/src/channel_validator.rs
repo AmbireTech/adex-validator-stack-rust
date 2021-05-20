@@ -1,9 +1,11 @@
 use crate::channel::{Channel, ChannelError, SpecValidator, SpecValidators};
-use crate::config::Config;
+use crate::config::{Config, TokenInfo};
+use crate::Address;
 use crate::BigNum;
 use crate::ValidatorId;
 use chrono::Utc;
 use std::cmp::PartialEq;
+use std::collections::HashMap;
 use time::Duration;
 
 //
@@ -106,11 +108,11 @@ pub fn creator_listed(channel: &Channel, whitelist: &[ValidatorId]) -> bool {
     whitelist.is_empty() || whitelist.iter().any(|allowed| allowed.eq(&channel.creator))
 }
 
-pub fn asset_listed(channel: &Channel, whitelist: &[String]) -> bool {
+pub fn asset_listed(channel: &Channel, whitelist: &HashMap<Address, TokenInfo>) -> bool {
     // if the list is empty, return true, as we don't have a whitelist to restrict us to
     // or if we have a list, check if it includes the `channel.deposit_asset`
     whitelist.is_empty()
         || whitelist
-            .iter()
-            .any(|allowed| allowed == &channel.deposit_asset)
+            .keys()
+            .any(|allowed| allowed.to_string() == channel.deposit_asset)
 }

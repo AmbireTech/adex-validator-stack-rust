@@ -1,15 +1,20 @@
-use crate::channel::ChannelError;
-use crate::channel_validator::ChannelValidator;
-use crate::{Channel, DomainError, ValidatorId};
+use crate::{
+    channel::ChannelError, channel_v5::Channel, Address,
+    BigNum, DomainError, ValidatorId,
+};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::convert::From;
-use std::fmt;
+use std::{collections::HashMap, convert::From, fmt};
 
 pub type AdapterResult<T, AE> = Result<T, Error<AE>>;
 
 pub trait AdapterErrorKind: fmt::Debug + fmt::Display {}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Deposit {
+    pub total: BigNum,
+    pub still_on_create2: BigNum,
+}
 
 #[derive(Debug)]
 pub enum Error<AE: AdapterErrorKind> {
@@ -70,7 +75,7 @@ pub struct Session {
 }
 
 #[async_trait]
-pub trait Adapter: ChannelValidator + Send + Sync + fmt::Debug + Clone {
+pub trait Adapter: Send + Sync + fmt::Debug + Clone {
     type AdapterError: AdapterErrorKind + 'static;
 
     /// Unlock adapter
@@ -90,12 +95,6 @@ pub trait Adapter: ChannelValidator + Send + Sync + fmt::Debug + Clone {
         signature: &str,
     ) -> AdapterResult<bool, Self::AdapterError>;
 
-    /// Validate a channel
-    async fn validate_channel<'a>(
-        &'a self,
-        channel: &'a Channel,
-    ) -> AdapterResult<bool, Self::AdapterError>;
-
     /// Get user session from token
     async fn session_from_token<'a>(
         &'a self,
@@ -104,4 +103,11 @@ pub trait Adapter: ChannelValidator + Send + Sync + fmt::Debug + Clone {
 
     /// Gets authentication for specific validator
     fn get_auth(&self, validator_id: &ValidatorId) -> AdapterResult<String, Self::AdapterError>;
+
+    /// Calculates and returns the total spendable amount
+    async fn get_deposit(
+        &self,
+        channel: &Channel,
+        address: &Address,
+    ) -> AdapterResult<Deposit, Self::AdapterError>;
 }

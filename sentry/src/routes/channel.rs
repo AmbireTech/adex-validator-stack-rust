@@ -49,9 +49,10 @@ pub async fn create_channel<A: Adapter>(
     let channel = serde_json::from_slice::<Channel>(&body)
         .map_err(|e| ResponseError::FailedValidation(e.to_string()))?;
 
-    if let Err(e) = app.adapter.validate_channel(&channel).await {
-        return Err(ResponseError::BadRequest(e.to_string()));
-    }
+    // TODO AIP#61: No longer needed, remove!
+    // if let Err(e) = app.adapter.validate_channel(&channel).await {
+    //     return Err(ResponseError::BadRequest(e.to_string()));
+    // }
 
     let error_response = ResponseError::BadRequest("err occurred; please try again later".into());
 
