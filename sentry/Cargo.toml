@@ -19,6 +19,7 @@ hex = "0.4"
 clap = "^2.33"
 # Server
 tokio = { version = "1", features = ["macros", "time", "rt-multi-thread"] }
+tokio-stream = { version = "0.1", features = ["time"] }
 hyper = { version = "0.14", features = ["stream", "runtime", "http1", "server"] }
 regex = "1"
 # Database

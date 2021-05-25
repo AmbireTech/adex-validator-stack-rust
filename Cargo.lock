@@ -3459,6 +3459,7 @@ dependencies = [
  "thiserror",
  "tokio 1.3.0",
  "tokio-postgres",
+ "tokio-stream",
 ]
 
 [[package]]
