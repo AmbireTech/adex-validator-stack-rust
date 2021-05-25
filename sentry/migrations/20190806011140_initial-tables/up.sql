@@ -33,7 +33,7 @@ CREATE TABLE spendable (
 
 CREATE TABLE validator_messages (
     -- TODO: Should the validator message be reference to channel_id or campaign_id?
-    channel_id varchar(66) NOT NULL, -- REFERENCES channels (id) ON DELETE RESTRICT,
+    channel_id varchar(66) NOT NULL,
     "from" varchar(255) NOT NULL,
     msg jsonb NOT NULL,
     received timestamp(2) with time zone NOT NULL
@@ -46,21 +46,21 @@ CREATE INDEX idx_validator_messages_msg_type ON validator_messages ((msg ->> 'ty
 CREATE INDEX idx_validator_messages_msg_state_root ON validator_messages ((msg ->> 'stateRoot'));
 
 -- TODO: AIP#61 Alter Event Aggregates
-CREATE TABLE event_aggregates (
-    channel_id varchar(66) NOT NULL, -- REFERENCES channels (id) ON DELETE RESTRICT,
-    created timestamp(2) with time zone NOT NULL DEFAULT NOW(),
-    event_type varchar(255) NOT NULL,
-    earner varchar(42),
-    -- todo: AIP#61 check the count and payout
-    count varchar NOT NULL,
-    payout varchar NOT NULL
-);
+-- CREATE TABLE event_aggregates (
+--     channel_id varchar(66) NOT NULL, -- REFERENCES channels (id) ON DELETE RESTRICT,
+--     created timestamp(2) with time zone NOT NULL DEFAULT NOW(),
+--     event_type varchar(255) NOT NULL,
+--     earner varchar(42),
+--     -- todo: AIP#61 check the count and payout
+--     count varchar NOT NULL,
+--     payout varchar NOT NULL
+-- );
 
-CREATE INDEX idx_event_aggregates_created ON event_aggregates (created);
+-- CREATE INDEX idx_event_aggregates_created ON event_aggregates (created);
 
-CREATE INDEX idx_event_aggregates_channel ON event_aggregates (channel_id);
+-- CREATE INDEX idx_event_aggregates_channel ON event_aggregates (channel_id);
 
-CREATE INDEX idx_event_aggregates_event_type ON event_aggregates (event_type);
+-- CREATE INDEX idx_event_aggregates_event_type ON event_aggregates (event_type);
 
 CREATE AGGREGATE jsonb_object_agg (jsonb) (
     SFUNC = 'jsonb_concat',
@@ -68,3 +68,13 @@ CREATE AGGREGATE jsonb_object_agg (jsonb) (
     INITCOND = '{}'
 );
 
+CREATE TABLE accounting (
+    channel_id varchar(66) NOT NULL,
+    channel jsonb NOT NULL,
+    earners jsonb DEFAULT '{}' NULL,
+    spenders jsonb DEFAULT '{}' NULL,
+    updated timestamp(2) with time zone DEFAULT NULL NULL,
+    created timestamp(2) with time zone NOT NULL,
+
+    PRIMARY KEY (channel_id)
+)
