@@ -2,7 +2,8 @@
 name = "primitives"
 version = "0.1.0"
 authors = [
-  "Lachezar Lechev <lachezar@adex.network>, Omidiora Samuel <sam@adex.network>",
+  "Lachezar Lechev <lachezar@adex.network>",
+  "Omidiora Samuel <sam@adex.network>",
 ]
 edition = "2018"
 
