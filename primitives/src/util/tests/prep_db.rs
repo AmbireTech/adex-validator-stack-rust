@@ -98,7 +98,7 @@ lazy_static! {
             creator: IDS["creator"].to_address(),
             // 1000.00000000
             budget: UnifiedNum::from(100_000_000_000),
-            validators: Validators::new(DUMMY_VALIDATOR_LEADER.clone(), DUMMY_VALIDATOR_FOLLOWER.clone()),
+            validators: Validators::new((DUMMY_VALIDATOR_LEADER.clone(), DUMMY_VALIDATOR_FOLLOWER.clone())),
             title: Some("Dummy Campaign".to_string()),
             pricing_bounds: Some(campaign::PricingBounds {impression: Some(campaign::Pricing { min: 1.into(), max: 10.into()}), click: Some(campaign::Pricing { min: 0.into(), max: 0.into()})}),
             event_submission: Some(EventSubmission { allow: vec![] }),

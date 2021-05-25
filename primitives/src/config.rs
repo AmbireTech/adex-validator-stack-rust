@@ -1,5 +1,4 @@
-use crate::event_submission::RateLimit;
-use crate::{Address, BigNum, ValidatorId};
+use crate::{event_submission::RateLimit, Address, BigNum, ValidatorId};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_hex::{SerHex, StrictPfx};
@@ -19,6 +18,7 @@ lazy_static! {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TokenInfo {
     pub min_token_units_for_deposit: BigNum,
+    pub min_validator_fee: BigNum,
     pub precision: NonZeroU8,
 }
 
@@ -26,12 +26,12 @@ pub struct TokenInfo {
 #[serde(rename_all(serialize = "SCREAMING_SNAKE_CASE"))]
 pub struct Config {
     pub max_channels: u32,
+    pub channels_find_limit: u32,
     pub wait_time: u32,
     pub aggr_throttle: u32,
-    pub heartbeat_time: u32, // in milliseconds
-    pub channels_find_limit: u32,
     pub events_find_limit: u32,
     pub msgs_find_limit: u32,
+    pub heartbeat_time: u32, // in milliseconds
     pub health_threshold_promilles: u32,
     pub health_unsignable_promilles: u32,
     pub propagation_timeout: u32,
@@ -39,28 +39,23 @@ pub struct Config {
     pub validator_tick_timeout: u32,
     pub ip_rate_limit: RateLimit,  // HashMap??
     pub sid_rate_limit: RateLimit, // HashMap ??
-    pub creators_whitelist: Vec<ValidatorId>,
-    pub minimal_deposit: BigNum,
-    pub minimal_fee: BigNum,
-    #[serde(deserialize_with = "deserialize_token_whitelist")]
-    pub token_address_whitelist: HashMap<Address, TokenInfo>,
-    /// DEPRECATED since this is v4!
-    #[deprecated(note = "REMOVE, this is V4")]
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub ethereum_core_address: [u8; 20],
     #[serde(with = "SerHex::<StrictPfx>")]
     pub outpace_address: [u8; 20],
     #[serde(with = "SerHex::<StrictPfx>")]
     pub sweeper_address: [u8; 20],
     pub ethereum_network: String,
     pub ethereum_adapter_relayer: String,
+    pub creators_whitelist: Vec<Address>,
     pub validators_whitelist: Vec<ValidatorId>,
+    #[serde(deserialize_with = "deserialize_token_whitelist")]
+    pub token_address_whitelist: HashMap<Address, TokenInfo>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct ConfigWhitelist {
     address: Address,
     min_token_units_for_deposit: BigNum,
+    min_validator_fee: BigNum,
     precision: NonZeroU8,
 }
 
@@ -74,12 +69,13 @@ where
 
     let tokens_whitelist: HashMap<Address, TokenInfo> = array
         .into_iter()
-        .map(|i| {
+        .map(|config_whitelist| {
             (
-                i.address,
+                config_whitelist.address,
                 TokenInfo {
-                    min_token_units_for_deposit: i.min_token_units_for_deposit,
-                    precision: i.precision,
+                    min_token_units_for_deposit: config_whitelist.min_token_units_for_deposit,
+                    min_validator_fee: config_whitelist.min_validator_fee,
+                    precision: config_whitelist.precision,
                 },
             )
         })

@@ -234,6 +234,8 @@ pub async fn deploy_token_contract(
     let token_info = TokenInfo {
         min_token_units_for_deposit: BigNum::from(min_token_units),
         precision: NonZeroU8::new(18).expect("should create NonZeroU8"),
+        // 0.000_1
+        min_validator_fee: BigNum::from(100_000_000_000_000),
     };
 
     Ok((token_info, token_contract.address(), token_contract))
