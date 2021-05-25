@@ -218,7 +218,7 @@ pub async fn get_advanced_reports(
     }
 
     Ok(AdvancedAnalyticsResponse {
-        publisher_stats,
         by_channel_stats,
+        publisher_stats,
     })
 }
