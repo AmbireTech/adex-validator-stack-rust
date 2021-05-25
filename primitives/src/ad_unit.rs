@@ -52,3 +52,34 @@ pub struct AdUnit {
     )]
     pub modified: Option<DateTime<Utc>>,
 }
+
+#[cfg(feature = "postgres")]
+mod postgres {
+    use super::AdUnit;
+
+    use bytes::BytesMut;
+    use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
+    use std::error::Error;
+    impl<'a> FromSql<'a> for AdUnit {
+        fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+            let json = <Json<Self> as FromSql>::from_sql(ty, raw)?;
+
+            Ok(json.0)
+        }
+
+        accepts!(JSONB);
+    }
+
+    impl ToSql for AdUnit {
+        fn to_sql(
+            &self,
+            ty: &Type,
+            w: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+            Json(self).to_sql(ty, w)
+        }
+
+        accepts!(JSONB);
+        to_sql_checked!();
+    }
+}

@@ -315,6 +315,72 @@ pub mod channel_list {
     }
 }
 
+pub mod campaign_create {
+    use chrono::{serde::ts_milliseconds, DateTime, Utc};
+    use serde::{Deserialize, Serialize};
+    use serde_with::with_prefix;
+
+    use crate::{
+        campaign::{Active, PricingBounds, Validators},
+        channel_v5::Channel,
+        targeting::Rules,
+        AdUnit, Address, Campaign, CampaignId, EventSubmission, UnifiedNum,
+    };
+
+    // use the same prefix for Active
+    with_prefix!(prefix_active "active_");
+
+    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+    /// All fields are present except the `CampaignId` which is randomly created
+    /// This struct defines the Body of the request (in JSON)
+    pub struct CreateCampaign {
+        pub channel: Channel,
+        pub creator: Address,
+        pub budget: UnifiedNum,
+        pub validators: Validators,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub title: Option<String>,
+        /// Event pricing bounds
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub pricing_bounds: Option<PricingBounds>,
+        /// EventSubmission object, applies to event submission (POST /channel/:id/events)
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub event_submission: Option<EventSubmission>,
+        /// An array of AdUnit (optional)
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        pub ad_units: Vec<AdUnit>,
+        #[serde(default)]
+        pub targeting_rules: Rules,
+        /// A millisecond timestamp of when the campaign was created
+        #[serde(with = "ts_milliseconds")]
+        pub created: DateTime<Utc>,
+        /// A millisecond timestamp representing the time you want this campaign to become active (optional)
+        /// Used by the AdViewManager & Targeting AIP#31
+        #[serde(flatten, with = "prefix_active")]
+        pub active: Active,
+    }
+
+    impl CreateCampaign {
+        /// Creates the new `Campaign` with randomly generated `CampaignId`
+        pub fn into_campaign(self) -> Campaign {
+            Campaign {
+                id: CampaignId::new(),
+                channel: self.channel,
+                creator: self.creator,
+                budget: self.budget,
+                validators: self.validators,
+                title: self.title,
+                pricing_bounds: self.pricing_bounds,
+                event_submission: self.event_submission,
+                ad_units: self.ad_units,
+                targeting_rules: self.targeting_rules,
+                created: self.created,
+                active: self.active,
+            }
+        }
+    }
+}
+
 #[cfg(feature = "postgres")]
 mod postgres {
     use super::{MessageResponse, ValidatorMessage};

@@ -1,6 +1,5 @@
 use crate::{
-    channel::ChannelError, channel_v5::Channel, Address,
-    BigNum, DomainError, ValidatorId,
+    channel::ChannelError, channel_v5::Channel, Address, BigNum, DomainError, ValidatorId,
 };
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
