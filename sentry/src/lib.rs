@@ -39,6 +39,7 @@ pub mod routes {
 }
 
 pub mod access;
+pub mod accounting;
 pub mod analytics_recorder;
 pub mod db;
 pub mod event_aggregator;
