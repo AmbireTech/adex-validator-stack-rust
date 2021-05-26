@@ -16,7 +16,7 @@ dependencies = [
 env = { "POSTGRES_DB" = "sentry_leader" }
 
 [tasks.services-up]
-script = "docker-compose -f ../docker-compose.ci.yml up -d postgres-leader"
+script = "docker-compose -f ../docker-compose.ci.yml up -d postgres-leader && sleep 2"
 
 [tasks.services-down]
 script = "docker-compose -f ../docker-compose.ci.yml down"

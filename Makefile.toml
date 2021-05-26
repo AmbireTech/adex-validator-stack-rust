@@ -1,13 +1,15 @@
 [env]
 CARGO_MAKE_EXTEND_WORKSPACE_MAKEFILE = "true"
 CARGO_MAKE_CLIPPY_ARGS = "--all-features -- -D warnings"
+CARGO_MAKE_RUN_TOML_FORMAT = "true"
 
 [tasks.dev-test-flow]
 dependencies = [
-    "format-flow",
-    "clippy",
-    "pre-build",
-    "build",
-    "post-build",
-    "test-flow",
+  "format-flow",
+  "format-toml-conditioned-flow",
+  "clippy",
+  "pre-build",
+  "build",
+  "post-build",
+  "test-flow",
 ]
