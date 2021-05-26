@@ -30,8 +30,8 @@ pub(crate) fn merge_aggrs(
     let balances = BalancesMap::default();
 
     let new_accounting = Accounting {
-        last_aggregate,
         balances,
+        last_aggregate,
     };
 
     Ok(new_accounting)
@@ -103,8 +103,8 @@ mod test {
         channel.spec.validators = (leader, follower).into();
 
         let acc = Accounting {
-            last_aggregate: Utc::now(),
             balances: BalancesMap::default(),
+            last_aggregate: Utc::now(),
         };
 
         let new_accounting =

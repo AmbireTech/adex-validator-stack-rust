@@ -110,8 +110,8 @@ pub mod message {
     }
 }
 
-#[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum Event {
     #[serde(rename_all = "camelCase")]
     Impression {
