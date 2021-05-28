@@ -100,7 +100,7 @@ pub async fn process_analytics<A: Adapter>(
     )
     .await?;
 
-    let response = AnalyticsResponse { limit, aggr };
+    let response = AnalyticsResponse { aggr, limit };
 
     serde_json::to_string(&response)
         .map_err(|_| ResponseError::BadRequest("error occurred; try again later".to_string()))

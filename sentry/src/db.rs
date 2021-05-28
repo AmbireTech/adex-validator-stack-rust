@@ -141,8 +141,11 @@ pub async fn setup_migrations(environment: &str) {
 #[cfg(test)]
 pub mod tests_postgres {
     use std::{
-        ops::{Deref, DerefMut},
-        sync::atomic::{AtomicUsize, Ordering},
+        ops::Deref,
+        sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
+        },
     };
 
     use deadpool::managed::{Manager as ManagerTrait, RecycleResult};
@@ -173,6 +176,17 @@ pub mod tests_postgres {
     /// we need to know the name of the database we've created.
     /// This will allow us the drop the database when we are recycling the connection
     pub struct Database {
+        inner: Arc<DatabaseInner>,
+    }
+    impl Database {
+        pub fn new(name: String, pool: DbPool) -> Self {
+            Self {
+                inner: Arc::new(DatabaseInner { name, pool }),
+            }
+        }
+    }
+
+    struct DatabaseInner {
         /// The database name that will be created by the pool `CREATE DATABASE`
         /// This database will be set on configuration level of the underlying connection Pool for tests
         pub name: String,
@@ -182,13 +196,7 @@ pub mod tests_postgres {
     impl Deref for Database {
         type Target = deadpool_postgres::Pool;
         fn deref(&self) -> &deadpool_postgres::Pool {
-            &self.pool
-        }
-    }
-
-    impl DerefMut for Database {
-        fn deref_mut(&mut self) -> &mut deadpool_postgres::Pool {
-            &mut self.pool
+            &self.inner.pool
         }
     }
 
@@ -262,14 +270,11 @@ pub mod tests_postgres {
                 deadpool_postgres::Manager::from_config(config, NoTls, self.manager_config.clone());
             let pool = deadpool_postgres::Pool::new(manager, 15);
 
-            Ok(Database {
-                name: db_name,
-                pool,
-            })
+            Ok(Database::new(db_name, pool))
         }
 
         async fn recycle(&self, database: &mut Database) -> RecycleResult<PoolError> {
-            let queries = format!("DROP DATABASE {0} WITH (FORCE);", database.name);
+            let queries = format!("DROP DATABASE {0} WITH (FORCE);", database.inner.name);
             let result = self
                 .base_pool
                 .get()

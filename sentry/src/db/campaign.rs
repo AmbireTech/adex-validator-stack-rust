@@ -96,12 +96,7 @@ pub async fn update_campaign(pool: &DbPool, campaign: &Campaign) -> Result<bool,
 
 #[cfg(test)]
 mod test {
-    use primitives::{
-        campaign::{Campaign, CampaignId},
-        channel_v5::Channel,
-        util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN},
-        ChannelId, UnifiedNum,
-    };
+    use primitives::{campaign::Campaign, util::tests::prep_db::DUMMY_CAMPAIGN};
 
     use crate::db::tests_postgres::{setup_test_migrations, DATABASE_POOL};
 
