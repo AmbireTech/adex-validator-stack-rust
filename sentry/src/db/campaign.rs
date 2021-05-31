@@ -49,13 +49,13 @@ pub async fn fetch_campaign(pool: DbPool, campaign: &Campaign) -> Result<Campaig
     Ok(Campaign::from(&row))
 }
 
-pub async fn get_campaigns_for_channel(pool: DbPool, campaign: &Campaign) -> Result<Vec<Campaign>, PoolError> {
+pub async fn get_campaigns_for_channel(pool: &DbPool, campaign: &Campaign) -> Result<Vec<Campaign>, PoolError> {
     let client = pool.get().await?;
     let statement = client.prepare("SELECT id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to FROM campaigns WHERE channel_id = $1").await?;
 
     let row = client.query(&statement, &[&campaign.channel.id()]).await?;
 
-    let campaigns = row.into_iter().for_each(|c| Campaign::from(c)).collect();
+    let campaigns = row.into_iter().map(|c| Campaign::from(c)).collect();
     Ok(campaigns)
 }
 

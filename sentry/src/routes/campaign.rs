@@ -2,7 +2,7 @@ use crate::{
     success_response, Application, Auth, ResponseError, RouteParams, Session,
     db::{
         spendable::fetch_spendable,
-        event_aggregate::latest_new_state,
+        event_aggregate::latest_new_state_v5,
         DbPool
     },
 };
@@ -42,7 +42,7 @@ pub async fn create_campaign<A: Adapter>(
     match insert_or_modify_campaign(&app.pool, &campaign, &app.redis).await {
         Err(error) => {
             // error!(&app.logger, "{}", &error; "module" => "create_channel");
-            Err(ResponseError::Conflict("channel already exists".to_string()))
+            return Err(ResponseError::Conflict("channel already exists".to_string()));
         }
         Ok(false) => Err(error_response),
         _ => Ok(()),
@@ -65,8 +65,9 @@ async fn get_spent_for_campaign(redis: &MultiplexedConnection, id: CampaignId) -
         Some(spent) => UnifiedNum::from(spent),
         // TODO: Double check if this is true
         // If the campaign is just being inserted, there would be no entry therefore no funds would be spent
-        None => 0
+        None => UnifiedNum::from(0)
     };
+    Ok(campaign_spent)
 }
 
 async fn update_remaining_for_campaign(redis: &MultiplexedConnection, id: CampaignId, amount: UnifiedNum) -> Result<bool, PoolError> {
@@ -74,37 +75,41 @@ async fn update_remaining_for_campaign(redis: &MultiplexedConnection, id: Campai
     let key = format!("adexCampaign:remainingSpendable:{}", id);
     redis::cmd("SET")
         .arg(&key)
-        .arg(amount)
+        .arg(amount.to_u64())
         .query_async(&mut redis.clone())
-        .await?
+        .await?;
+    Ok(true)
 }
 
 async fn update_remaining_for_channel(redis: &MultiplexedConnection, id: ChannelId, amount: UnifiedNum) -> Result<bool, PoolError> {
     let key = format!("adexChannel:remaining:{}", id);
     redis::cmd("SET")
         .arg(&key)
-        .arg(amount)
+        .arg(amount.to_u64())
         .query_async(&mut redis.clone())
-        .await?
+        .await?;
+    Ok(true)
 }
 
-async fn get_campaigns_remaining_sum(redis: &MultiplexedConnection, campaign: &Campaign) -> Result<UnifiedNum, PoolError> {
-    let campaigns_for_channel = get_campaigns_for_channel(&campaign).await?;
-        let sum_of_campaigns_remaining = campaigns_for_channel
-        .map(|c| {
+async fn get_campaigns_remaining_sum(redis: &MultiplexedConnection, pool: &DbPool, campaign: &Campaign) -> Result<UnifiedNum, PoolError> {
+    let campaigns_for_channel = get_campaigns_for_channel(&pool, &campaign).await?;
+    let sum_of_campaigns_remaining = campaigns_for_channel
+        .into_iter()
+        .map(async |c| {
             let spent = get_spent_for_campaign(&redis, c.id).await?;
             let remaining = c.budget - spent;
             remaining
         })
         .sum();
+    Ok(sum_of_campaigns_remaining)
 }
 
 pub async fn insert_or_modify_campaign(pool: &DbPool, campaign: &Campaign, redis: &MultiplexedConnection) -> Result<bool, ResponseError> {
     let campaign_spent = get_spent_for_campaign(&redis, campaign.id).await?;
 
     // Check if we haven't exceeded the budget yet
-    if (campaign.budget <= campaign_spent) {
-        ResponseError::FailedValidation("No more budget available for spending".into())
+    if campaign.budget <= campaign_spent {
+        return Err(ResponseError::FailedValidation("No more budget available for spending".into()));
     }
 
     let remaining_spendable_campaign = campaign.budget - campaign_spent;
@@ -112,24 +117,29 @@ pub async fn insert_or_modify_campaign(pool: &DbPool, campaign: &Campaign, redis
 
 
     // Getting the latest new state from Postgres
-    let latest_new_state = latest_new_state(&pool, &campaign.channel, "").await?;
+    let latest_new_state = latest_new_state_v5(&pool, &campaign.channel, "").await?;
     // Gets the latest Spendable for this (spender, channelId) pair
-    let latest_spendable = fetch_spendable(pool.clone(), &campaign.creator, &*campaign.channel.id()).await?;
+    let latest_spendable = fetch_spendable(pool.clone(), &campaign.creator, &campaign.channel.id()).await?;
 
     let total_deposited = latest_spendable.deposit.total;
-    let total_spent = latest_new_state.spenders[campaign.creator];
+    let total_spent = if let Some(lns) = latest_new_state {
+        lns.msg.into_inner().spenders[campaign.creator]
+    } else {
+        0
+    };
+
     let total_remaining = total_deposited - total_spent;
 
     update_remaining_for_channel(&redis, campaign.channel.id(), total_remaining).await?;
 
-    if (campaign_exists(&pool, &campaign)) {
-        let campaigns_remaining_sum = get_campaigns_remaining_sum(&redis, &campaign).await?;
+    if campaign_exists(&pool, &campaign).await? {
+        let campaigns_remaining_sum = get_campaigns_remaining_sum(&redis, &pool, &campaign).await?;
         if campaigns_remaining_sum > total_remaining {
-            ResponseError::Conflict("Remaining for campaigns exceeds total remaining for channel")
+            return Err(ResponseError::Conflict("Remaining for campaigns exceeds total remaining for channel".into()));
         }
-        update_campaign(&pool, &campaign).await?
+        return update_campaign(&pool, &campaign).await?
     }
-    insert_campaign(&pool, &campaign).await?
+    return insert_campaign(&pool, &campaign).await?;
 
     // *NOTE*: When updating campaigns make sure sum(campaigns.map(getRemaining)) <= totalDepoisted - totalspent
     // !WARNING!: totalSpent != sum(campaign.map(c => c.spending)) therefore we must always calculate remaining funds based on total_deposit - lastApprovedNewState.spenders[user]
