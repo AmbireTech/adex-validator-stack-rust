@@ -9,7 +9,7 @@ use primitives::{
 };
 use std::convert::TryFrom;
 use thiserror::Error;
-use tokio_postgres::types::Json;
+use tokio_postgres::{types::Json, NoTls};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -22,11 +22,11 @@ pub enum Error {
 }
 
 pub struct Postgres {
-    client: deadpool_postgres::Client,
+    client: deadpool_postgres::Client<NoTls>,
 }
 
 impl Postgres {
-    pub fn new(client: deadpool_postgres::Client) -> Self {
+    pub fn new(client: deadpool_postgres::Client<NoTls>) -> Self {
         Self { client }
     }
 }
@@ -139,11 +139,11 @@ mod test {
 
     #[tokio::test]
     async fn store_create_insert_and_update() {
-        let test_pool = DATABASE_POOL.get().await.expect("Should get test pool");
+        let database = DATABASE_POOL.get().await.expect("Should get test pool");
 
-        let client = Postgres::new(test_pool.get().await.expect("Should get client"));
+        let client = Postgres::new(database.pool.get().await.expect("Should get client"));
 
-        setup_test_migrations(test_pool.clone())
+        setup_test_migrations(database.pool.clone())
             .await
             .expect("Migrations should succeed");
 
