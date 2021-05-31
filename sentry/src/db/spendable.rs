@@ -60,9 +60,9 @@ mod test {
 
     #[tokio::test]
     async fn it_inserts_and_fetches_spendable() {
-        let db_pool = DATABASE_POOL.get().await.expect("Should get a DB pool");
+        let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
 
-        setup_test_migrations(db_pool.clone())
+        setup_test_migrations(database.get_pool())
             .await
             .expect("Migrations should succeed");
 
@@ -74,16 +74,19 @@ mod test {
                 still_on_create2: UnifiedNum::from(500_000),
             },
         };
-        let is_inserted = insert_spendable(db_pool.clone(), &spendable)
+        let is_inserted = insert_spendable(database.get_pool(), &spendable)
             .await
             .expect("Should succeed");
 
         assert!(is_inserted);
 
-        let fetched_spendable =
-            fetch_spendable(db_pool.clone(), &spendable.spender, &spendable.channel.id())
-                .await
-                .expect("Should fetch successfully");
+        let fetched_spendable = fetch_spendable(
+            database.get_pool(),
+            &spendable.spender,
+            &spendable.channel.id(),
+        )
+        .await
+        .expect("Should fetch successfully");
 
         assert_eq!(spendable, fetched_spendable);
     }
