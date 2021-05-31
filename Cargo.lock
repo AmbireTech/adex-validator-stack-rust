@@ -677,6 +677,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "config"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b1b9d958c2b1368a663f05538fc1b5975adce1e19f435acceae987aceeeb369"
+dependencies = [
+ "lazy_static",
+ "nom",
+ "serde",
+]
+
+[[package]]
 name = "constant_time_eq"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -909,8 +920,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d126179d86aee4556e54f5f3c6bf6d9884e7cc52cef82f77ee6f90a7747616d"
 dependencies = [
  "async-trait",
- "config",
+ "config 0.10.1",
  "crossbeam-queue",
+ "num_cpus",
+ "serde",
+ "tokio 1.3.0",
+]
+
+[[package]]
+name = "deadpool"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2d41e5afb1b1e89cc7204eb9ca99e05ba6fc810962957e7fe285d5024ed5890"
+dependencies = [
+ "async-trait",
+ "config 0.11.0",
  "num_cpus",
  "serde",
  "tokio 1.3.0",
@@ -923,8 +947,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5452506f60a0ceca624c4becc948f9f0ae67f35fc0ae471b9dcb841d110cf70a"
 dependencies = [
  "async-trait",
- "config",
- "deadpool",
+ "config 0.10.1",
+ "deadpool 0.7.0",
+ "futures 0.3.13",
+ "log",
+ "serde",
+ "tokio 1.3.0",
+ "tokio-postgres",
+]
+
+[[package]]
+name = "deadpool-postgres"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6a7a0d594ffdbe16b2d21d45084b1ac9eb8e6da35030c6ccdd4ec7b47a97d39"
+dependencies = [
+ "async-trait",
+ "config 0.11.0",
+ "deadpool 0.8.0",
  "futures 0.3.13",
  "log",
  "serde",
@@ -1689,7 +1729,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project",
- "socket2",
+ "socket2 0.3.19",
  "tokio 0.2.25",
  "tower-service",
  "tracing",
@@ -1713,7 +1753,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project",
- "socket2",
+ "socket2 0.3.19",
  "tokio 1.3.0",
  "tower-service",
  "tracing",
@@ -1986,10 +2026,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "60302e4db3a61da70c0cb7991976248362f30319e88850c487b9b95bbf059e00"
 
 [[package]]
-name = "md5"
-version = "0.7.0"
+name = "md-5"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "490cc448043f947bae3cbee9c203358d62dbee0db12107a74be5c30ccfd09771"
+checksum = "7b5a279bb9607f9f53c22d496eade00d138d1bdcccd07d74650387cf94942a15"
+dependencies = [
+ "block-buffer 0.9.0",
+ "digest 0.9.0",
+ "opaque-debug 0.3.0",
+]
 
 [[package]]
 name = "memchr"
@@ -2146,7 +2191,7 @@ version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a33c1b55807fbed163481b5ba66db4b2fa6cde694a5027be10fb724206c5897"
 dependencies = [
- "socket2",
+ "socket2 0.3.19",
  "winapi 0.3.9",
 ]
 
@@ -2217,7 +2262,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "670361df1bc2399ee1ff50406a0d422587dd3bb0da596e1978fe8e05dabddf4f"
 dependencies = [
  "libc",
- "socket2",
+ "socket2 0.3.19",
 ]
 
 [[package]]
@@ -2696,16 +2741,16 @@ dependencies = [
 
 [[package]]
 name = "postgres-protocol"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70e34ad3dc5c56d036b9418185ee97e14b6766d55c8ccf9dc18302ad4e6371d9"
+checksum = "ff3e0f70d32e20923cabf2df02913be7c1842d4c772db8065c00fcfdd1d1bff3"
 dependencies = [
  "base64 0.13.0",
  "byteorder 1.4.3",
  "bytes 1.0.1",
  "fallible-iterator",
  "hmac 0.10.1",
- "md5",
+ "md-5",
  "memchr",
  "rand 0.8.3",
  "sha2 0.9.3",
@@ -2714,9 +2759,9 @@ dependencies = [
 
 [[package]]
 name = "postgres-types"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5493d9d4613b88b12433aa12890e74e74cd93fdc1e08b7c2aed4768aaae8414c"
+checksum = "430f4131e1b7657b0cd9a2b0c3408d77c9a43a042d300b8c77f981dffcc43a2f"
 dependencies = [
  "bytes 1.0.1",
  "chrono",
@@ -2778,7 +2823,7 @@ dependencies = [
  "bytes 1.0.1",
  "chrono",
  "cid",
- "deadpool-postgres",
+ "deadpool-postgres 0.7.0",
  "ethabi",
  "ethereum-types 0.11.0",
  "fake",
@@ -3441,8 +3486,8 @@ dependencies = [
  "chrono",
  "clap",
  "dashmap",
- "deadpool",
- "deadpool-postgres",
+ "deadpool 0.8.0",
+ "deadpool-postgres 0.8.0",
  "futures 0.3.13",
  "hex",
  "hyper 0.14.4",
@@ -3713,6 +3758,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "122e570113d28d773067fab24266b66753f6ea915758651696b6e35e49f88d6e"
 dependencies = [
  "cfg-if 1.0.0",
+ "libc",
+ "winapi 0.3.9",
+]
+
+[[package]]
+name = "socket2"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e3dfc207c526015c632472a77be09cf1b6e46866581aecae5cc38fb4235dea2"
+dependencies = [
  "libc",
  "winapi 0.3.9",
 ]
@@ -4027,9 +4082,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-postgres"
-version = "0.7.0"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1cc9f82c2bfb06a33dd0dfb44b07ca98fe72df19e681d80c78d05a1bac2138e2"
+checksum = "2d2b1383c7e4fb9a09e292c7c6afb7da54418d53b045f1c1fac7a911411a2b8b"
 dependencies = [
  "async-trait",
  "byteorder 1.4.3",
@@ -4043,7 +4098,7 @@ dependencies = [
  "pin-project-lite 0.2.6",
  "postgres-protocol",
  "postgres-types",
- "socket2",
+ "socket2 0.4.0",
  "tokio 1.3.0",
  "tokio-util 0.6.4",
 ]
@@ -4532,7 +4587,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "860c1b991b29b6bc5096b46bdaaea904417ed12fda814d38ccf1b869c13629c8"
 dependencies = [
  "async-trait",
- "deadpool",
+ "deadpool 0.7.0",
  "futures 0.3.13",
  "futures-timer",
  "http-types",

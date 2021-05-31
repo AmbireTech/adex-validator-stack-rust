@@ -222,13 +222,13 @@ mod test {
     use deadpool::managed::Object;
 
     use crate::{
-        db::redis_pool::{Database, TESTS_POOL},
+        db::redis_pool::{Manager, TESTS_POOL},
         Session,
     };
 
     use super::*;
 
-    async fn setup() -> (Config, Object<Database, crate::db::redis_pool::Error>) {
+    async fn setup() -> (Config, Object<Manager>) {
         let connection = TESTS_POOL.get().await.expect("Should return Object");
         let config = configuration("development", None).expect("Failed to get dev configuration");
 

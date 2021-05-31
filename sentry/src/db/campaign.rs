@@ -51,7 +51,7 @@ pub async fn fetch_campaign(pool: DbPool, campaign: &Campaign) -> Result<Campaig
 
 #[cfg(test)]
 mod test {
-    use primitives::{campaign::Campaign, util::tests::prep_db::DUMMY_CAMPAIGN};
+    use primitives::util::tests::prep_db::DUMMY_CAMPAIGN;
 
     use crate::db::tests_postgres::{setup_test_migrations, DATABASE_POOL};
 
@@ -59,20 +59,20 @@ mod test {
 
     #[tokio::test]
     async fn it_inserts_and_fetches_campaign() {
-        let db_pool = DATABASE_POOL.get().await.expect("Should get a DB pool");
+        let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
 
-        setup_test_migrations(db_pool.clone())
+        setup_test_migrations(database.pool.clone())
             .await
             .expect("Migrations should succeed");
 
         let campaign_for_testing = DUMMY_CAMPAIGN.clone();
-        let is_inserted = insert_campaign(&db_pool.clone(), &campaign_for_testing)
+        let is_inserted = insert_campaign(&database.pool, &campaign_for_testing)
             .await
             .expect("Should succeed");
 
         assert!(is_inserted);
 
-        let fetched_campaign: Campaign = fetch_campaign(db_pool.clone(), &campaign_for_testing)
+        let fetched_campaign = fetch_campaign(database.pool.clone(), &campaign_for_testing)
             .await
             .expect("Should fetch successfully");
 
