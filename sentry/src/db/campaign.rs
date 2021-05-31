@@ -56,7 +56,7 @@ pub async fn get_campaigns_for_channel(pool: DbPool, campaign: &Campaign) -> Res
     let row = client.query(&statement, &[&campaign.channel.id()]).await?;
 
     let campaigns = row.into_iter().for_each(|c| Campaign::from(c)).collect();
-    Ok(campaigns);
+    Ok(campaigns)
 }
 
 pub async fn campaign_exists(pool: &DbPool, campaign: &Campaign) -> Result<bool, PoolError> {

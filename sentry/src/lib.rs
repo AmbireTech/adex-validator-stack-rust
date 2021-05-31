@@ -35,6 +35,7 @@ pub mod routes {
     pub mod analytics;
     pub mod cfg;
     pub mod channel;
+    pub mod campaign;
     pub mod event_aggregate;
     pub mod validator_message;
 }

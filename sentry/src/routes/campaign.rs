@@ -1,10 +1,10 @@
 use crate::{
     success_response, Application, Auth, ResponseError, RouteParams, Session,
-    event_aggregate::latest_new_state,
     db::{
         spendable::fetch_spendable,
-        campaign::{campaign_exists, update_campaign, insert_campaign, get_campaigns_for_channel},
-    }
+        event_aggregate::latest_new_state,
+        DbPool
+    },
 };
 use hyper::{Body, Request, Response};
 use primitives::{
@@ -13,9 +13,13 @@ use primitives::{
         campaign_create::CreateCampaign,
         SuccessResponse
     },
-    Campaign
+    Campaign, CampaignId, UnifiedNum, ChannelId
 };
 use redis::aio::MultiplexedConnection;
+use deadpool_postgres::PoolError;
+use slog::error;
+use tokio_postgres::error::SqlState;
+use crate::db::campaign::{campaign_exists, update_campaign, insert_campaign, get_campaigns_for_channel};
 
 pub async fn create_campaign<A: Adapter>(
     req: Request<Body>,
@@ -37,16 +41,8 @@ pub async fn create_campaign<A: Adapter>(
 
     match insert_or_modify_campaign(&app.pool, &campaign, &app.redis).await {
         Err(error) => {
-            error!(&app.logger, "{}", &error; "module" => "create_channel");
-
-            match error {
-                PoolError::Backend(error) if error.code() == Some(&SqlState::UNIQUE_VIOLATION) => {
-                    Err(ResponseError::Conflict(
-                        "channel already exists".to_string(),
-                    ))
-                }
-                _ => Err(error_response),
-            }
+            // error!(&app.logger, "{}", &error; "module" => "create_channel");
+            Err(ResponseError::Conflict("channel already exists".to_string()))
         }
         Ok(false) => Err(error_response),
         _ => Ok(()),
@@ -59,7 +55,7 @@ pub async fn create_campaign<A: Adapter>(
 
 // TODO: Double check redis calls
 async fn get_spent_for_campaign(redis: &MultiplexedConnection, id: CampaignId) -> Result<UnifiedNum, PoolError> {
-    let key = format!("adexCampaign:campaignSpent:{}", id)
+    let key = format!("adexCampaign:campaignSpent:{}", id);
     // campaignSpent tracks the portion of the budget which has already been spent
     let campaign_spent = match redis::cmd("GET")
     .arg(&key)
@@ -75,7 +71,7 @@ async fn get_spent_for_campaign(redis: &MultiplexedConnection, id: CampaignId) -
 
 async fn update_remaining_for_campaign(redis: &MultiplexedConnection, id: CampaignId, amount: UnifiedNum) -> Result<bool, PoolError> {
     // update a key in Redis for the remaining spendable amount
-    let key = format!("adexCampaign:remainingSpendable:{}", id)
+    let key = format!("adexCampaign:remainingSpendable:{}", id);
     redis::cmd("SET")
         .arg(&key)
         .arg(amount)
@@ -84,7 +80,7 @@ async fn update_remaining_for_campaign(redis: &MultiplexedConnection, id: Campai
 }
 
 async fn update_remaining_for_channel(redis: &MultiplexedConnection, id: ChannelId, amount: UnifiedNum) -> Result<bool, PoolError> {
-    let key = format!("adexChannel:remaining:{}", id)
+    let key = format!("adexChannel:remaining:{}", id);
     redis::cmd("SET")
         .arg(&key)
         .arg(amount)
@@ -104,11 +100,11 @@ async fn get_campaigns_remaining_sum(redis: &MultiplexedConnection, campaign: &C
 }
 
 pub async fn insert_or_modify_campaign(pool: &DbPool, campaign: &Campaign, redis: &MultiplexedConnection) -> Result<bool, ResponseError> {
-    let campaign_spent = get_spent_for_campaign(&redis, campaign.id()).await?;
+    let campaign_spent = get_spent_for_campaign(&redis, campaign.id).await?;
 
     // Check if we haven't exceeded the budget yet
     if (campaign.budget <= campaign_spent) {
-        ResponseError::FailedValidation("No more budget available for spending")
+        ResponseError::FailedValidation("No more budget available for spending".into())
     }
 
     let remaining_spendable_campaign = campaign.budget - campaign_spent;
@@ -118,7 +114,7 @@ pub async fn insert_or_modify_campaign(pool: &DbPool, campaign: &Campaign, redis
     // Getting the latest new state from Postgres
     let latest_new_state = latest_new_state(&pool, &campaign.channel, "").await?;
     // Gets the latest Spendable for this (spender, channelId) pair
-    let latest_spendable = fetch_spendable(pool, campaign.creator, campaign.channel.id()).await?;
+    let latest_spendable = fetch_spendable(pool.clone(), &campaign.creator, &*campaign.channel.id()).await?;
 
     let total_deposited = latest_spendable.deposit.total;
     let total_spent = latest_new_state.spenders[campaign.creator];
