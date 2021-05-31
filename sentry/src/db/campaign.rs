@@ -61,18 +61,18 @@ mod test {
     async fn it_inserts_and_fetches_campaign() {
         let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
 
-        setup_test_migrations(database.get_pool())
+        setup_test_migrations(database.pool.clone())
             .await
             .expect("Migrations should succeed");
 
         let campaign_for_testing = DUMMY_CAMPAIGN.clone();
-        let is_inserted = insert_campaign(&database.get_pool(), &campaign_for_testing)
+        let is_inserted = insert_campaign(&database.pool, &campaign_for_testing)
             .await
             .expect("Should succeed");
 
         assert!(is_inserted);
 
-        let fetched_campaign = fetch_campaign(database.get_pool(), &campaign_for_testing)
+        let fetched_campaign = fetch_campaign(database.pool.clone(), &campaign_for_testing)
             .await
             .expect("Should fetch successfully");
 

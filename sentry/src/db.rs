@@ -185,10 +185,6 @@ pub mod tests_postgres {
         pub fn new(name: String, pool: DbPool) -> Self {
             Self { name, pool }
         }
-
-        pub fn get_pool(&self) -> deadpool_postgres::Pool<NoTls> {
-            self.pool.clone()
-        }
     }
 
     impl Deref for Database {
