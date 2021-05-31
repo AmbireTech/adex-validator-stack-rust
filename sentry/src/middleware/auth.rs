@@ -137,14 +137,12 @@ mod test {
 
     use deadpool::managed::Object;
 
-    use crate::{
-        db::redis_pool::{Database, TESTS_POOL},
-        Session,
-    };
+    use crate::db::redis_pool::Manager;
+    use crate::{db::redis_pool::TESTS_POOL, Session};
 
     use super::*;
 
-    async fn setup() -> (DummyAdapter, Object<Database, crate::db::redis_pool::Error>) {
+    async fn setup() -> (DummyAdapter, Object<Manager>) {
         let connection = TESTS_POOL.get().await.expect("Should return Object");
         let adapter_options = DummyAdapterOptions {
             dummy_identity: IDS["leader"],

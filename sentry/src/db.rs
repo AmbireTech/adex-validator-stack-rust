@@ -21,7 +21,7 @@ pub use deadpool_postgres::PoolError;
 // Re-export the redis RedisError for easier usage
 pub use redis::RedisError;
 
-pub type DbPool = deadpool_postgres::Pool;
+pub type DbPool = deadpool_postgres::Pool<NoTls>;
 
 lazy_static! {
     static ref POSTGRES_USER: String =
@@ -157,7 +157,7 @@ pub mod tests_postgres {
 
     use super::{DbPool, PoolError, POSTGRES_CONFIG};
 
-    pub type Pool = deadpool::managed::Pool<Database, PoolError>;
+    pub type Pool = deadpool::managed::Pool<Manager>;
 
     pub static DATABASE_POOL: Lazy<Pool> = Lazy::new(|| {
         let manager_config = ManagerConfig {
@@ -190,12 +190,13 @@ pub mod tests_postgres {
         /// The database name that will be created by the pool `CREATE DATABASE`
         /// This database will be set on configuration level of the underlying connection Pool for tests
         pub name: String,
-        pub pool: deadpool_postgres::Pool,
+        pub pool: deadpool_postgres::Pool<NoTls>,
     }
 
     impl Deref for Database {
-        type Target = deadpool_postgres::Pool;
-        fn deref(&self) -> &deadpool_postgres::Pool {
+        type Target = deadpool_postgres::Pool<NoTls>;
+
+        fn deref(&self) -> &deadpool_postgres::Pool<NoTls> {
             &self.inner.pool
         }
     }
@@ -204,7 +205,7 @@ pub mod tests_postgres {
     /// create the actual connection to the database with default options set
     pub struct Manager {
         base_config: tokio_postgres::Config,
-        base_pool: deadpool_postgres::Pool,
+        base_pool: deadpool_postgres::Pool<NoTls>,
         manager_config: ManagerConfig,
         index: AtomicUsize,
     }
@@ -223,7 +224,7 @@ pub mod tests_postgres {
         }
 
         pub fn new_with_pool(
-            base_pool: deadpool_postgres::Pool,
+            base_pool: deadpool_postgres::Pool<NoTls>,
             base_config: tokio_postgres::Config,
             manager_config: ManagerConfig,
         ) -> Self {
@@ -237,8 +238,12 @@ pub mod tests_postgres {
     }
 
     #[async_trait]
-    impl ManagerTrait<Database, PoolError> for Manager {
-        async fn create(&self) -> Result<Database, PoolError> {
+    impl ManagerTrait for Manager {
+        type Type = Database;
+
+        type Error = PoolError;
+
+        async fn create(&self) -> Result<Self::Type, Self::Error> {
             let pool_index = self.index.fetch_add(1, Ordering::SeqCst);
             let db_name = format!("test_{}", pool_index);
 
@@ -273,7 +278,7 @@ pub mod tests_postgres {
             Ok(Database::new(db_name, pool))
         }
 
-        async fn recycle(&self, database: &mut Database) -> RecycleResult<PoolError> {
+        async fn recycle(&self, database: &mut Database) -> RecycleResult<Self::Error> {
             let queries = format!("DROP DATABASE {0} WITH (FORCE);", database.inner.name);
             let result = self
                 .base_pool
@@ -329,7 +334,7 @@ pub mod redis_pool {
 
     use super::*;
 
-    pub type Pool = deadpool::managed::Pool<Database, Error>;
+    pub type Pool = deadpool::managed::Pool<Manager>;
 
     pub static TESTS_POOL: Lazy<Pool> =
         Lazy::new(|| Pool::new(Manager::new(), Manager::CONNECTIONS.into()));
@@ -398,8 +403,11 @@ pub mod redis_pool {
     }
 
     #[async_trait]
-    impl ManagerTrait<Database, Error> for Manager {
-        async fn create(&self) -> Result<Database, Error> {
+    impl ManagerTrait for Manager {
+        type Type = Database;
+        type Error = Error;
+
+        async fn create(&self) -> Result<Self::Type, Self::Error> {
             for mut record in self.connections.iter_mut() {
                 let database = record.value_mut().as_mut();
 
@@ -433,7 +441,7 @@ pub mod redis_pool {
             Err(Error::OutOfBound)
         }
 
-        async fn recycle(&self, database: &mut Database) -> RecycleResult<Error> {
+        async fn recycle(&self, database: &mut Database) -> RecycleResult<Self::Error> {
             // run `FLUSHDB` to clean any leftovers of previous tests
             Self::flush_db(&mut database.connection)
                 .await
