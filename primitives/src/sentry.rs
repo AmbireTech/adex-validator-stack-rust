@@ -379,6 +379,18 @@ pub mod campaign_create {
             }
         }
     }
+
+    // All editable fields stored in one place, used for checking when a budget is changed
+    // #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+    // pub struct CampaignState {
+    //     pub budget: UnifiedNum,
+    //     pub validators: Validators,
+    //     pub title: Option<String>,
+    //     pub pricing_bounds: Option<PricingBounds>,
+    //     pub event_submission: Option<EventSubmission>,
+    //     pub ad_units: Vec<AdUnit>,
+    //     pub targeting_rules: Rules,
+    // }
 }
 
 #[cfg(feature = "postgres")]

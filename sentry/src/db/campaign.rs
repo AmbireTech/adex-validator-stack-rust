@@ -2,8 +2,6 @@ use crate::db::{DbPool, PoolError};
 use primitives::Campaign;
 use tokio_postgres::types::Json;
 
-// TODO: Remove once we use this fn
-#[allow(dead_code)]
 pub async fn insert_campaign(pool: &DbPool, campaign: &Campaign) -> Result<bool, PoolError> {
     let client = pool.get().await?;
     let ad_units = Json(campaign.ad_units.clone());
@@ -38,9 +36,7 @@ pub async fn insert_campaign(pool: &DbPool, campaign: &Campaign) -> Result<bool,
 /// SELECT id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to FROM campaigns
 /// WHERE id = $1
 /// ```
-// TODO: Remove once we use this fn
-#[allow(dead_code)]
-pub async fn fetch_campaign(pool: DbPool, campaign: &Campaign) -> Result<Campaign, PoolError> {
+pub async fn fetch_campaign(pool: &DbPool, campaign: &Campaign) -> Result<Campaign, PoolError> {
     let client = pool.get().await?;
     let statement = client.prepare("SELECT id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to FROM campaigns WHERE id = $1").await?;
 
@@ -55,7 +51,7 @@ pub async fn get_campaigns_for_channel(pool: &DbPool, campaign: &Campaign) -> Re
 
     let row = client.query(&statement, &[&campaign.channel.id()]).await?;
 
-    let campaigns = row.into_iter().map(|c| Campaign::from(c)).collect();
+    let campaigns = row.into_iter().map(|c| Campaign::from(&c)).collect();
     Ok(campaigns)
 }
 
@@ -71,7 +67,7 @@ pub async fn campaign_exists(pool: &DbPool, campaign: &Campaign) -> Result<bool,
     Ok(exists)
 }
 
-pub async fn update_campaign(pool: &DbPool, campaign: &Campaign) -> Result<bool, PoolError> {
+pub async fn update_campaign_in_db(pool: &DbPool, campaign: &Campaign) -> Result<bool, PoolError> {
     let client = pool.get().await?;
     let statement = client
         .prepare("UPDATE campaigns SET budget = $1, validators = $2, title = $3, pricing_bounds = $4, event_submission = $5, ad_units = $6, targeting_rules = $7 WHERE id = $8")
@@ -122,7 +118,7 @@ mod test {
             .expect("Should succeed");
         asser!(exists);
 
-        let fetched_campaign: Campaign = fetch_campaign(db_pool.clone(), &campaign_for_testing)
+        let fetched_campaign: Campaign = fetch_campaign(&db_pool, &campaign_for_testing)
             .await
             .expect("Should fetch successfully");
 
