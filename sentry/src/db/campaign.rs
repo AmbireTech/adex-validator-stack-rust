@@ -116,7 +116,7 @@ mod test {
         let exists = campaign_exists(&db_pool.clone(), campaign: &campaign_for_testing)
             .await
             .expect("Should succeed");
-        asser!(exists);
+        assert!(exists);
 
         let fetched_campaign: Campaign = fetch_campaign(&db_pool, &campaign_for_testing)
             .await
