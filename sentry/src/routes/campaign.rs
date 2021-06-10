@@ -12,7 +12,7 @@ use primitives::{
     sentry::{
         campaign_create::CreateCampaign,
         SuccessResponse,
-        MessageResponse
+        MessageResponse,
     },
     spender::Spendable,
     validator::NewState,
@@ -27,6 +27,12 @@ pub async fn create_campaign<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
+    use serde::Serialize;
+    #[derive(Serialize)]
+    struct CreateCampaignResponse<'a> {
+        campaign: &'a Campaign,
+    }
+
     let body = hyper::body::to_bytes(req.into_body()).await?;
 
     let campaign = serde_json::from_slice::<CreateCampaign>(&body)
@@ -64,9 +70,9 @@ pub async fn create_campaign<A: Adapter>(
         _ => Ok(()),
     }?;
 
-    let create_response = SuccessResponse { success: true };
+    let create_response = CreateCampaignResponse { campaign: &campaign };
 
-    Ok(success_response(serde_json::to_string(&campaign)?))
+    Ok(success_response(serde_json::to_string(&create_response)?))
 }
 
 pub async fn update_campaign<A: Adapter>(
