@@ -113,7 +113,7 @@ mod test {
 
         assert!(is_inserted);
 
-        let exists = campaign_exists(&db_pool.clone(), campaign: &campaign_for_testing)
+        let exists = campaign_exists(&db_pool.clone(), &campaign_for_testing)
             .await
             .expect("Should succeed");
         assert!(exists);
