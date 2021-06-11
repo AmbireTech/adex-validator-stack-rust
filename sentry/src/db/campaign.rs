@@ -49,9 +49,9 @@ pub async fn get_campaigns_for_channel(pool: &DbPool, campaign: &Campaign) -> Re
     let client = pool.get().await?;
     let statement = client.prepare("SELECT id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to FROM campaigns WHERE channel_id = $1").await?;
 
-    let row = client.query(&statement, &[&campaign.channel.id()]).await?;
+    let rows = client.query(&statement, &[&campaign.channel.id()]).await?;
 
-    let campaigns = row.into_iter().map(|c| Campaign::from(&c)).collect();
+    let campaigns = rows.iter().map(Campaign::from).collect();
     Ok(campaigns)
 }
 
@@ -67,7 +67,8 @@ pub async fn campaign_exists(pool: &DbPool, campaign: &Campaign) -> Result<bool,
     Ok(exists)
 }
 
-pub async fn update_campaign_in_db(pool: &DbPool, campaign: &Campaign) -> Result<bool, PoolError> {
+// TODO: Test for campaign ad_units
+pub async fn update_campaign(pool: &DbPool, campaign: &Campaign) -> Result<bool, PoolError> {
     let client = pool.get().await?;
     let statement = client
         .prepare("UPDATE campaigns SET budget = $1, validators = $2, title = $3, pricing_bounds = $4, event_submission = $5, ad_units = $6, targeting_rules = $7 WHERE id = $8")
