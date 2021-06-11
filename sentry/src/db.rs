@@ -21,7 +21,7 @@ pub use deadpool_postgres::PoolError;
 // Re-export the redis RedisError for easier usage
 pub use redis::RedisError;
 
-pub type DbPool = deadpool_postgres::Pool;
+pub type DbPool = deadpool_postgres::Pool<NoTls>;
 
 lazy_static! {
     static ref POSTGRES_USER: String =
@@ -141,11 +141,8 @@ pub async fn setup_migrations(environment: &str) {
 #[cfg(test)]
 pub mod tests_postgres {
     use std::{
-        ops::Deref,
-        sync::{
-            atomic::{AtomicUsize, Ordering},
-            Arc,
-        },
+        ops::{Deref, DerefMut},
+        sync::atomic::{AtomicUsize, Ordering},
     };
 
     use deadpool::managed::{Manager as ManagerTrait, RecycleResult};
@@ -157,46 +154,62 @@ pub mod tests_postgres {
 
     use super::{DbPool, PoolError, POSTGRES_CONFIG};
 
-    pub type Pool = deadpool::managed::Pool<Database, PoolError>;
+    pub type Pool = deadpool::managed::Pool<Manager>;
 
-    pub static DATABASE_POOL: Lazy<Pool> = Lazy::new(|| {
-        let manager_config = ManagerConfig {
-            recycling_method: deadpool_postgres::RecyclingMethod::Fast,
-        };
-        let manager = Manager::new(POSTGRES_CONFIG.clone(), manager_config);
-
-        Pool::new(manager, 15)
-    });
+    pub static DATABASE_POOL: Lazy<Pool> = Lazy::new(|| create_pool("test"));
 
     /// we must have a duplication of the migration because of how migrant is handling migrations
     /// we need to separately setup test migrations
     pub static MIGRATIONS: &[&str] = &["20190806011140_initial-tables"];
 
+    fn create_pool(db_prefix: &str) -> Pool {
+        let manager_config = ManagerConfig {
+            recycling_method: deadpool_postgres::RecyclingMethod::Fast,
+        };
+        let manager = Manager::new(POSTGRES_CONFIG.clone(), manager_config, db_prefix);
+
+        Pool::new(manager, 15)
+    }
+
     /// A Database is used to isolate test runs from each other
     /// we need to know the name of the database we've created.
     /// This will allow us the drop the database when we are recycling the connection
     pub struct Database {
-        inner: Arc<DatabaseInner>,
-    }
-    impl Database {
-        pub fn new(name: String, pool: DbPool) -> Self {
-            Self {
-                inner: Arc::new(DatabaseInner { name, pool }),
-            }
-        }
-    }
-
-    struct DatabaseInner {
         /// The database name that will be created by the pool `CREATE DATABASE`
         /// This database will be set on configuration level of the underlying connection Pool for tests
         pub name: String,
-        pub pool: deadpool_postgres::Pool,
+        pub pool: deadpool_postgres::Pool<NoTls>,
+    }
+
+    impl Database {
+        pub fn new(name: String, pool: DbPool) -> Self {
+            Self { name, pool }
+        }
     }
 
     impl Deref for Database {
-        type Target = deadpool_postgres::Pool;
-        fn deref(&self) -> &deadpool_postgres::Pool {
-            &self.inner.pool
+        type Target = deadpool_postgres::Pool<NoTls>;
+
+        fn deref(&self) -> &deadpool_postgres::Pool<NoTls> {
+            &self.pool
+        }
+    }
+
+    impl DerefMut for Database {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.pool
+        }
+    }
+
+    impl AsRef<deadpool_postgres::Pool<NoTls>> for Database {
+        fn as_ref(&self) -> &deadpool_postgres::Pool<NoTls> {
+            &self.pool
+        }
+    }
+
+    impl AsMut<deadpool_postgres::Pool<NoTls>> for Database {
+        fn as_mut(&mut self) -> &mut deadpool_postgres::Pool<NoTls> {
+            &mut self.pool
         }
     }
 
@@ -204,13 +217,18 @@ pub mod tests_postgres {
     /// create the actual connection to the database with default options set
     pub struct Manager {
         base_config: tokio_postgres::Config,
-        base_pool: deadpool_postgres::Pool,
+        base_pool: deadpool_postgres::Pool<NoTls>,
         manager_config: ManagerConfig,
         index: AtomicUsize,
+        db_prefix: String,
     }
 
     impl Manager {
-        pub fn new(base_config: tokio_postgres::Config, manager_config: ManagerConfig) -> Self {
+        pub fn new(
+            base_config: tokio_postgres::Config,
+            manager_config: ManagerConfig,
+            db_prefix: &str,
+        ) -> Self {
             // We need to create the schema with a temporary connection, in order to use it for the real Test Pool
             let base_manager = deadpool_postgres::Manager::from_config(
                 base_config.clone(),
@@ -219,28 +237,36 @@ pub mod tests_postgres {
             );
             let base_pool = deadpool_postgres::Pool::new(base_manager, 15);
 
-            Self::new_with_pool(base_pool, base_config, manager_config)
+            Self::new_with_pool(base_pool, base_config, manager_config, db_prefix)
         }
 
         pub fn new_with_pool(
-            base_pool: deadpool_postgres::Pool,
+            base_pool: deadpool_postgres::Pool<NoTls>,
             base_config: tokio_postgres::Config,
             manager_config: ManagerConfig,
+            db_prefix: &str,
         ) -> Self {
             Self {
                 base_config,
                 base_pool,
                 manager_config,
                 index: AtomicUsize::new(0),
+                db_prefix: db_prefix.into(),
             }
         }
     }
 
     #[async_trait]
-    impl ManagerTrait<Database, PoolError> for Manager {
-        async fn create(&self) -> Result<Database, PoolError> {
+    impl ManagerTrait for Manager {
+        type Type = Database;
+
+        type Error = PoolError;
+
+        async fn create(&self) -> Result<Self::Type, Self::Error> {
             let pool_index = self.index.fetch_add(1, Ordering::SeqCst);
-            let db_name = format!("test_{}", pool_index);
+
+            // e.g. test_0, test_1, test_2
+            let db_name = format!("{}_{}", self.db_prefix, pool_index);
 
             // 1. Drop the database if it exists - if a test failed before, the database wouldn't have been removed
             // 2. Create database
@@ -273,17 +299,19 @@ pub mod tests_postgres {
             Ok(Database::new(db_name, pool))
         }
 
-        async fn recycle(&self, database: &mut Database) -> RecycleResult<PoolError> {
-            let queries = format!("DROP DATABASE {0} WITH (FORCE);", database.inner.name);
-            let result = self
-                .base_pool
+        async fn recycle(&self, database: &mut Database) -> RecycleResult<Self::Error> {
+            // DROP the public schema and create it again for usage after recycling
+            let queries = format!("DROP SCHEMA public CASCADE; CREATE SCHEMA public;");
+            let result = database
+                .pool
                 .get()
                 .await?
                 .simple_query(&queries)
                 .await
                 .map_err(|err| PoolError::Backend(err))?;
-            assert_eq!(1, result.len());
+            assert_eq!(2, result.len());
             assert!(matches!(result[0], SimpleQueryMessage::CommandComplete(..)));
+            assert!(matches!(result[1], SimpleQueryMessage::CommandComplete(..)));
 
             Ok(())
         }
@@ -313,6 +341,59 @@ pub mod tests_postgres {
 
         Ok(client.batch_execute(&full_query).await?)
     }
+
+    #[cfg(test)]
+    mod test {
+        use super::*;
+
+        #[tokio::test]
+        /// Does not use the `DATABASE_POOL` as other tests can interfere with the pool objects!
+        async fn test_postgres_pool() {
+            let pool = create_pool("testing_pool");
+
+            let database_1 = pool.get().await.expect("Should get");
+            let status = pool.status();
+            assert_eq!(status.size, 1);
+            assert_eq!(status.available, 0);
+
+            let database_2 = pool.get().await.expect("Should get");
+            let status = pool.status();
+            assert_eq!(status.size, 2);
+            assert_eq!(status.available, 0);
+
+            drop(database_1);
+            let status = pool.status();
+            assert_eq!(status.size, 2);
+            assert_eq!(status.available, 1);
+
+            drop(database_2);
+            let status = pool.status();
+            assert_eq!(status.size, 2);
+            assert_eq!(status.available, 2);
+
+            let database_3 = pool.get().await.expect("Should get");
+            let status = pool.status();
+            assert_eq!(status.size, 2);
+            assert_eq!(status.available, 1);
+
+            let database_4 = pool.get().await.expect("Should get");
+            let status = pool.status();
+            assert_eq!(status.size, 2);
+            assert_eq!(status.available, 0);
+
+            let database_5 = pool.get().await.expect("Should get");
+            let status = pool.status();
+            assert_eq!(status.size, 3);
+            assert_eq!(status.available, 0);
+
+            drop(database_3);
+            drop(database_4);
+            drop(database_5);
+            let status = pool.status();
+            assert_eq!(status.size, 3);
+            assert_eq!(status.available, 3);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -329,7 +410,7 @@ pub mod redis_pool {
 
     use super::*;
 
-    pub type Pool = deadpool::managed::Pool<Database, Error>;
+    pub type Pool = deadpool::managed::Pool<Manager>;
 
     pub static TESTS_POOL: Lazy<Pool> =
         Lazy::new(|| Pool::new(Manager::new(), Manager::CONNECTIONS.into()));
@@ -398,8 +479,11 @@ pub mod redis_pool {
     }
 
     #[async_trait]
-    impl ManagerTrait<Database, Error> for Manager {
-        async fn create(&self) -> Result<Database, Error> {
+    impl ManagerTrait for Manager {
+        type Type = Database;
+        type Error = Error;
+
+        async fn create(&self) -> Result<Self::Type, Self::Error> {
             for mut record in self.connections.iter_mut() {
                 let database = record.value_mut().as_mut();
 
@@ -433,7 +517,7 @@ pub mod redis_pool {
             Err(Error::OutOfBound)
         }
 
-        async fn recycle(&self, database: &mut Database) -> RecycleResult<Error> {
+        async fn recycle(&self, database: &mut Database) -> RecycleResult<Self::Error> {
             // run `FLUSHDB` to clean any leftovers of previous tests
             Self::flush_db(&mut database.connection)
                 .await
