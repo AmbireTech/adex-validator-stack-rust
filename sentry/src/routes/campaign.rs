@@ -217,17 +217,16 @@ pub async fn modify_campaign(pool: &DbPool, campaign: &Campaign, redis: &Multipl
         return Err(ResponseError::FailedValidation("No more budget available for spending".into()));
     }
 
-    let old_spendable = get_remaining_for_campaign(&redis, campaign.id).await?;
+    let old_remaining = get_remaining_for_campaign(&redis, campaign.id).await?;
+    let old_remaining = UnifiedNum::from_u64(max(0, old_remaining.to_u64()));
 
-    let new_spendable = campaign.budget.checked_sub(&campaign_spent).ok_or_else(|| {
+    let new_remaining = campaign.budget.checked_sub(&campaign_spent).ok_or_else(|| {
         ResponseError::Conflict("Error while subtracting campaign_spent from budget".to_string())
     })?;
 
-    let diff_in_remaining = new_spendable.checked_sub(&old_spendable).ok_or_else(|| {
+    let diff_in_remaining = new_remaining.checked_sub(&old_remaining).ok_or_else(|| {
         ResponseError::Conflict("Error while subtracting campaign_spent from budget".to_string())
     })?;
-
-    let diff_in_remaining = max(UnifiedNum::from_u64(0), diff_in_remaining);
 
     update_remaining_for_campaign(&redis, campaign.id, diff_in_remaining).await?;
 
