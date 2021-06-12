@@ -12,6 +12,7 @@ pub mod event_aggregate;
 pub mod spendable;
 mod validator_message;
 
+pub use self::campaign::*;
 pub use self::channel::*;
 pub use self::event_aggregate::*;
 pub use self::validator_message::*;
