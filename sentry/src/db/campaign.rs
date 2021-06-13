@@ -38,7 +38,10 @@ pub async fn insert_campaign(pool: &DbPool, campaign: &Campaign) -> Result<bool,
 /// SELECT id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to FROM campaigns
 /// WHERE id = $1
 /// ```
-pub async fn fetch_campaign(pool: DbPool, campaign: &CampaignId) -> Result<Option<Campaign>, PoolError> {
+pub async fn fetch_campaign(
+    pool: DbPool,
+    campaign: &CampaignId,
+) -> Result<Option<Campaign>, PoolError> {
     let client = pool.get().await?;
     let statement = client.prepare("SELECT id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to FROM campaigns WHERE id = $1").await?;
 
@@ -64,13 +67,13 @@ mod test {
             .expect("Migrations should succeed");
 
         let campaign_for_testing = DUMMY_CAMPAIGN.clone();
-        
+
         let non_existent_campaign = fetch_campaign(database.pool.clone(), &campaign_for_testing.id)
             .await
             .expect("Should fetch successfully");
-        
+
         assert_eq!(None, non_existent_campaign);
-        
+
         let is_inserted = insert_campaign(&database.pool, &campaign_for_testing)
             .await
             .expect("Should succeed");

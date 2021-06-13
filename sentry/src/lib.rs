@@ -60,8 +60,8 @@ lazy_static! {
     static ref CREATE_EVENTS_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events/?$").expect("The regex should be valid");
 }
 
-#[derive(Debug)]
-pub struct RouteParams(Vec<String>);
+#[derive(Debug, Clone)]
+pub struct RouteParams(pub Vec<String>);
 
 impl RouteParams {
     pub fn get(&self, index: usize) -> Option<String> {
@@ -308,7 +308,7 @@ async fn channels_router<A: Adapter + 'static>(
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ResponseError {
     NotFound,
     BadRequest(String),

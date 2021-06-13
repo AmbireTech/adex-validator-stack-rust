@@ -7,6 +7,7 @@ use primitives::adapter::Adapter;
 use async_trait::async_trait;
 
 pub mod auth;
+pub mod campaign;
 pub mod channel;
 pub mod cors;
 
