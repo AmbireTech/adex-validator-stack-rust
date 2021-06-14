@@ -60,6 +60,8 @@ lazy_static! {
     static ref ADVERTISER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-advertiser/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
     static ref PUBLISHER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-publisher/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
     static ref CREATE_EVENTS_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events/?$").expect("The regex should be valid");
+    static ref CAMPAIGN_UPDATE_BY_ID: Regex =
+        Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
 }
 
 #[derive(Debug)]
@@ -163,21 +165,11 @@ impl<A: Adapter + 'static> Application<A> {
 
                 create_campaign(req, &self).await
             }
-            // For editing campaigns
-            ("/campaign/:id", &Method::POST) => {
-                let req = match AuthRequired.call(req, &self).await {
-                    Ok(req) => req,
-                    Err(error) => {
-                        return map_response_error(error);
-                    }
-                };
-
-                update_campaign(req, &self).await
-            }
             (route, _) if route.starts_with("/analytics") => analytics_router(req, &self).await,
             // This is important becuase it prevents us from doing
             // expensive regex matching for routes without /channel
             (path, _) if path.starts_with("/channel") => channels_router(req, &self).await,
+            (path, _) if path.starts_with("/campaign") => campaigns_router(req, &self).await,
             _ => Err(ResponseError::NotFound),
         }
         .unwrap_or_else(map_response_error);
@@ -327,6 +319,28 @@ async fn channels_router<A: Adapter + 'static>(
         req = ChannelLoad.call(req, app).await?;
 
         list_channel_event_aggregates(req, app).await
+    } else {
+        Err(ResponseError::NotFound)
+    }
+}
+
+async fn campaigns_router<A: Adapter + 'static>(
+    mut req: Request<Body>,
+    app: &Application<A>,
+) -> Result<Response<Body>, ResponseError> {
+    req = AuthRequired.call(req, app).await?;
+
+    let (path, method) = (req.uri().path().to_owned(), req.method());
+
+    // regex matching for routes with params
+    if let (Some(caps), &Method::POST) = (CAMPAIGN_UPDATE_BY_ID.captures(&path), method) {
+        let param = RouteParams(vec![caps
+            .get(1)
+            .map_or("".to_string(), |m| m.as_str().to_string())]);
+
+        req.extensions_mut().insert(param);
+
+        update_campaign(req, app).await
     } else {
         Err(ResponseError::NotFound)
     }
