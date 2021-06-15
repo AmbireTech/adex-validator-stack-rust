@@ -1,9 +1,6 @@
-use std::{
-    convert::TryFrom,
-    marker::PhantomData,
-};
+use std::{convert::TryFrom, marker::PhantomData};
 
-use crate::{balances_map::UnifiedMap, Address, channel_v5::Channel, UnifiedNum};
+use crate::{balances_map::UnifiedMap, channel_v5::Channel, Address, UnifiedNum};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
@@ -130,7 +127,8 @@ mod de {
 
             Ok(Self {
                 channel: de_acc.channel,
-                balances: Balances::<UncheckedState>::try_from(de_acc.balances).map_err(serde::de::Error::custom)?,
+                balances: Balances::<UncheckedState>::try_from(de_acc.balances)
+                    .map_err(serde::de::Error::custom)?,
                 created: de_acc.created,
                 updated: de_acc.updated,
             })
@@ -146,7 +144,10 @@ mod de {
 
             Ok(Self {
                 channel: unchecked_acc.channel,
-                balances: unchecked_acc.balances.check().map_err(serde::de::Error::custom)?,
+                balances: unchecked_acc
+                    .balances
+                    .check()
+                    .map_err(serde::de::Error::custom)?,
                 created: unchecked_acc.created,
                 updated: unchecked_acc.updated,
             })
@@ -204,13 +205,14 @@ mod postgres {
 
     impl TryFrom<&Row> for Accounting<CheckedState> {
         type Error = Error;
-        
+
         fn try_from(row: &Row) -> Result<Self, Self::Error> {
             let balances = Balances::<UncheckedState> {
                 earners: row.get::<_, Json<_>>("earners").0,
                 spenders: row.get::<_, Json<_>>("spenders").0,
                 state: PhantomData::default(),
-            }.check()?;
+            }
+            .check()?;
 
             Ok(Self {
                 channel: row.get("channel"),
