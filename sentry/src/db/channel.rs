@@ -61,6 +61,7 @@ pub async fn insert_channel(pool: &DbPool, channel: &Channel) -> Result<bool, Po
     Ok(inserted)
 }
 
+#[deprecated(note = "AIP#61 now uses the modify Campaign route for updating targeting rules")]
 pub async fn update_targeting_rules(
     pool: &DbPool,
     channel_id: &ChannelId,
