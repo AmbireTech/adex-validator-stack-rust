@@ -106,14 +106,16 @@ async fn get_spent_for_campaign(redis: &MultiplexedConnection, id: CampaignId) -
         .await
         {
             Ok(Some(spent)) => {
-                let res = BigNum::from_str(&spent).unwrap();
-                let res = res.to_u64().unwrap();
-                UnifiedNum::from_u64(res)
+                let res = BigNum::from_str(&spent)?;
+                let res = res.to_u64().ok_or_else(|| {
+                    ResponseError::Conflict("Error while converting BigNum to u64".to_string())
+                })?;
+                Ok(UnifiedNum::from_u64(res))
             },
-            _ => UnifiedNum::from_u64(0)
+            _ => Ok(UnifiedNum::from_u64(0))
         };
 
-    Ok(campaign_spent)
+    campaign_spent
 }
 
 async fn get_remaining_for_campaign(redis: &MultiplexedConnection, id: CampaignId) -> Result<UnifiedNum, ResponseError> {
@@ -124,13 +126,15 @@ async fn get_remaining_for_campaign(redis: &MultiplexedConnection, id: CampaignI
         .await
          {
             Ok(Some(remaining)) => {
-                let res = BigNum::from_str(&remaining).unwrap();
-                let res = res.to_u64().unwrap();
-                UnifiedNum::from_u64(res)
+                let res = BigNum::from_str(&remaining)?;
+                let res = res.to_u64().ok_or_else(|| {
+                    ResponseError::Conflict("Error while calculating the total remaining amount".to_string())
+                })?;
+                Ok(UnifiedNum::from_u64(res))
             },
-            _ => UnifiedNum::from_u64(0)
+            _ => Ok(UnifiedNum::from_u64(0))
         };
-    Ok(remaining)
+    remaining
 }
 
 async fn update_remaining_for_campaign(redis: &MultiplexedConnection, id: CampaignId, amount: UnifiedNum) -> Result<bool, ResponseError> {
