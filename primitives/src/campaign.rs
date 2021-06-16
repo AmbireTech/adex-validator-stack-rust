@@ -8,7 +8,6 @@ use chrono::{
     DateTime, Utc,
 };
 use serde::{Deserialize, Serialize};
-use serde_with::with_prefix;
 
 pub use {
     campaign_id::CampaignId,
@@ -16,7 +15,14 @@ pub use {
     validators::{ValidatorRole, Validators},
 };
 
-with_prefix!(prefix_active "active_");
+// re-export the prefix module!
+pub mod prefix_active {
+    use serde_with::with_prefix;
+
+    pub use prefix_active::*;
+
+    with_prefix!(prefix_active "active_");
+}
 
 mod campaign_id {
     use crate::ToHex;
@@ -235,13 +241,13 @@ pub struct Active {
 }
 
 mod pricing {
-    use crate::BigNum;
+    use crate::UnifiedNum;
     use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
     pub struct Pricing {
-        pub min: BigNum,
-        pub max: BigNum,
+        pub min: UnifiedNum,
+        pub max: UnifiedNum,
     }
 
     #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
@@ -277,7 +283,7 @@ mod pricing {
         }
     }
 }
-// TODO: Double check if we require all the methods and enums, as some parts are now in the `Campaign`
+// TODO AIP#61: Double check if we require all the methods and enums, as some parts are now in the `Campaign`
 // This includes the matching of the Channel leader & follower to the Validators
 pub mod validators {
     use crate::{ValidatorDesc, ValidatorId};
