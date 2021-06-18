@@ -1,3 +1,5 @@
+use self::campaign::FullCampaign;
+
 use super::{Error, Value};
 use crate::{Address, ToETHChecksum, IPFS};
 use chrono::{serde::ts_seconds, DateTime, Utc};
@@ -47,23 +49,15 @@ pub struct Input {
 impl Input {
     /// Sets the Channel Getter
     pub fn with_campaign(mut self, campaign: crate::Campaign) -> Self {
-        self.campaign = Some(Get::Getter(campaign::Getter::from_campaign(
-            &self, campaign,
-        )));
+        self.campaign = Some(Get::Getter(FullCampaign {
+            campaign,
+            event_type: self.global.event_type.clone(),
+        }));
 
         self
     }
 
-    pub fn with_market_channel(
-        mut self,
-        channel: crate::supermarket::units_for_slot::response::Channel,
-    ) -> Self {
-        self.campaign = Some(Get::Getter(campaign::Getter::from_market(channel)));
-
-        self
-    }
-
-    pub fn with_balances(mut self, balances: crate::BalancesMap) -> Self {
+    pub fn with_balances(mut self, balances: crate::UnifiedMap) -> Self {
         self.balances = Some(Get::Getter(balances::Getter {
             balances,
             publisher_id: self.global.publisher_id,
@@ -106,8 +100,8 @@ impl GetField for Input {
         match field {
             Field::AdView(ad_view) => self.ad_view.get(ad_view),
             Field::Global(global) => self.global.get(global),
-            Field::Channel(channel) => self.campaign.get(channel).flatten(),
-            Field::Balances(balances) => self.balances.get(balances),
+            Field::Campaign(channel) => self.campaign.get(channel).flatten(),
+            Field::Balances(balances) => self.balances.get(balances).flatten(),
             Field::AdSlot(ad_slot) => self.ad_slot.get(ad_slot).flatten(),
             Field::AdUnit(ad_unit) => match ad_unit {
                 field::AdUnit::AdUnitId => self
@@ -215,9 +209,9 @@ pub mod campaign {
     use serde::Deserialize;
 
     use super::{field, Get, GetField, Value};
-    use crate::{targeting::get_pricing_bounds, Address, BigNum, CampaignId, ToHex};
+    use crate::{targeting::get_pricing_bounds, Address, CampaignId, ToHex, UnifiedNum};
 
-    pub type GetCampaign = Get<Getter, Values>;
+    pub type GetCampaign = Get<FullCampaign, Values>;
 
     #[derive(Debug, Clone, Deserialize, PartialEq)]
     #[serde(rename_all = "camelCase")]
@@ -226,9 +220,9 @@ pub mod campaign {
         pub campaign_id: CampaignId,
         pub campaign_seconds_active: u64,
         pub campaign_seconds_duration: u64,
-        pub campaign_budget: BigNum,
-        pub event_min_price: Option<BigNum>,
-        pub event_max_price: Option<BigNum>,
+        pub campaign_budget: UnifiedNum,
+        pub event_min_price: Option<UnifiedNum>,
+        pub event_max_price: Option<UnifiedNum>,
     }
 
     #[derive(Debug, Clone, PartialEq)]
@@ -237,70 +231,26 @@ pub mod campaign {
         pub(super) event_type: String,
     }
 
-    #[derive(Debug, Clone, PartialEq)]
-    /// The Getter for a Field that requires Channel can be either:
-    /// - a Full Campaign
-    /// - a Channel coming from the Supermarket
-    /// Since only the Full Campaign can get the pricing bounds,
-    /// we wrap the Campaign as well as the event_type of the Input
-    pub enum Getter {
-        Full(FullCampaign),
-        //
-        // TODO: AIP#61 Change to Campaign
-        //
-        Market(crate::supermarket::units_for_slot::response::Channel),
-    }
-
-    impl Getter {
-        /// Input is used to set the Event Type of the Getter
-        pub fn from_campaign(input: &super::Input, campaign: crate::Campaign) -> Self {
-            Self::Full(FullCampaign {
-                campaign,
-                event_type: input.global.event_type.clone(),
-            })
-        }
-
-        pub fn from_market(channel: crate::supermarket::units_for_slot::response::Channel) -> Self {
-            Self::Market(channel)
-        }
-    }
-
-    impl GetField for Get<Getter, Values> {
+    impl GetField for Get<FullCampaign, Values> {
         type Output = Option<Value>;
-        type Field = field::Channel;
+        type Field = field::Campaign;
 
         fn get(&self, field: &Self::Field) -> Self::Output {
             match field {
-                field::Channel::AdvertiserId => Some(Value::String(match self {
-                    Get::Getter(getter) => match getter {
-                        Getter::Full(FullCampaign { campaign, .. }) => {
-                            campaign.creator.to_hex_prefixed()
-                        }
-                        Getter::Market(s_channel) => s_channel.creator.to_hex_prefixed(),
-                    },
+                field::Campaign::AdvertiserId => Some(Value::String(match self {
+                    Get::Getter(FullCampaign { campaign, .. }) => {
+                        campaign.creator.to_hex_prefixed()
+                    }
                     Get::Value(Values { advertiser_id, .. }) => advertiser_id.to_hex_prefixed(),
                 })),
-                field::Channel::CampaignId => Some(Value::String(match self {
-                    Get::Getter(getter) => match getter {
-                        Getter::Full(FullCampaign { campaign, .. }) => {
-                            campaign.id.to_hex_prefixed()
-                        }
-                        Getter::Market(s_channel) => s_channel.id.to_hex_prefixed(),
-                    },
+                field::Campaign::CampaignId => Some(Value::String(match self {
+                    Get::Getter(FullCampaign { campaign, .. }) => campaign.id.to_hex_prefixed(),
                     Get::Value(Values { campaign_id, .. }) => campaign_id.to_hex_prefixed(),
                 })),
-                field::Channel::CampaignSecondsActive => Some(Value::Number(match self {
-                    Get::Getter(getter) => {
-                        let (active_from, created) = match getter {
-                            Getter::Full(FullCampaign { campaign, .. }) => {
-                                (campaign.active.from, campaign.created)
-                            }
-                            Getter::Market(s_channel) => {
-                                (s_channel.spec.active_from, s_channel.spec.created)
-                            }
-                        };
-
-                        let duration = chrono::Utc::now() - active_from.unwrap_or(created);
+                field::Campaign::CampaignSecondsActive => Some(Value::Number(match self {
+                    Get::Getter(FullCampaign { campaign, .. }) => {
+                        let duration =
+                            chrono::Utc::now() - campaign.active.from.unwrap_or(campaign.created);
 
                         let seconds = duration
                             .to_std()
@@ -314,20 +264,10 @@ pub mod campaign {
                         ..
                     }) => (*campaign_seconds_active).into(),
                 })),
-                field::Channel::CampaignSecondsDuration => Some(Value::Number(match self {
-                    Get::Getter(getter) => {
-                        let (active_to, active_from, created) = match getter {
-                            Getter::Full(FullCampaign { campaign, .. }) => {
-                                (campaign.active.to, campaign.active.from, campaign.created)
-                            }
-                            Getter::Market(s_channel) => (
-                                s_channel.spec.withdraw_period_start,
-                                s_channel.spec.active_from,
-                                s_channel.spec.created,
-                            ),
-                        };
-
-                        let duration = active_to - active_from.unwrap_or(created);
+                field::Campaign::CampaignSecondsDuration => Some(Value::Number(match self {
+                    Get::Getter(FullCampaign { campaign, .. }) => {
+                        let duration =
+                            campaign.active.to - campaign.active.from.unwrap_or(campaign.created);
 
                         let seconds = duration
                             .to_std()
@@ -341,36 +281,33 @@ pub mod campaign {
                         ..
                     }) => (*campaign_seconds_duration).into(),
                 })),
-                field::Channel::CampaignBudget => Some(Value::BigNum(match self {
-                    Get::Getter(getter) => match getter {
-                        Getter::Full(FullCampaign { campaign, .. }) => campaign.budget.to_bignum(),
-                        Getter::Market(s_channel) => s_channel.deposit_amount.clone(),
-                    },
+                field::Campaign::CampaignBudget => Some(Value::UnifiedNum(match self {
+                    Get::Getter(FullCampaign { campaign, .. }) => campaign.budget.clone(),
                     Get::Value(Values {
                         campaign_budget, ..
                     }) => campaign_budget.clone(),
                 })),
-                field::Channel::EventMinPrice => match self {
-                    Get::Getter(Getter::Full(FullCampaign {
+                field::Campaign::EventMinPrice => match self {
+                    Get::Getter(FullCampaign {
                         campaign,
                         event_type,
-                    })) => Some(Value::BigNum(get_pricing_bounds(campaign, event_type).min)),
-                    // The supermarket Channel, does not have enough information to return the event_min_price
-                    Get::Getter(Getter::Market(_)) => None,
+                    }) => Some(Value::UnifiedNum(
+                        get_pricing_bounds(campaign, event_type).min,
+                    )),
                     Get::Value(Values {
                         event_min_price, ..
-                    }) => event_min_price.clone().map(Value::BigNum),
+                    }) => event_min_price.clone().map(Value::UnifiedNum),
                 },
-                field::Channel::EventMaxPrice => match self {
-                    Get::Getter(Getter::Full(FullCampaign {
+                field::Campaign::EventMaxPrice => match self {
+                    Get::Getter(FullCampaign {
                         campaign,
                         event_type,
-                    })) => Some(Value::BigNum(get_pricing_bounds(campaign, event_type).max)),
-                    // The supermarket Channel, does not have enough information to return the event_max_price
-                    Get::Getter(Getter::Market(_)) => None,
+                    }) => Some(Value::UnifiedNum(
+                        get_pricing_bounds(campaign, event_type).max,
+                    )),
                     Get::Value(Values {
                         event_max_price, ..
-                    }) => event_max_price.clone().map(Value::BigNum),
+                    }) => event_max_price.clone().map(Value::UnifiedNum),
                 },
             }
         }
@@ -379,7 +316,7 @@ pub mod campaign {
 
 pub mod balances {
     use super::{field, Get, GetField, Value};
-    use crate::{Address, BalancesMap, BigNum};
+    use crate::{Address, UnifiedMap, UnifiedNum};
     use serde::Deserialize;
 
     pub type GetBalances = Get<Getter, Values>;
@@ -387,39 +324,45 @@ pub mod balances {
     #[derive(Debug, Clone, Deserialize, PartialEq)]
     #[serde(rename_all = "camelCase")]
     pub struct Values {
-        pub campaign_total_spent: BigNum,
-        pub publisher_earned_from_campaign: BigNum,
+        pub campaign_total_spent: UnifiedNum,
+        pub publisher_earned_from_campaign: UnifiedNum,
     }
 
     #[derive(Debug, Clone, PartialEq)]
     pub struct Getter {
-        pub balances: BalancesMap,
+        pub balances: UnifiedMap,
         pub(super) publisher_id: Address,
     }
 
     impl GetField for Get<Getter, Values> {
-        type Output = Value;
+        type Output = Option<Value>;
         type Field = field::Balances;
 
-        fn get(&self, field: &Self::Field) -> Value {
+        fn get(&self, field: &Self::Field) -> Self::Output {
             match field {
-                field::Balances::CampaignTotalSpent => Value::BigNum(match self {
-                    Get::Getter(Getter { balances, .. }) => balances.values().sum(),
+                field::Balances::CampaignTotalSpent => match self {
+                    Get::Getter(Getter { balances, .. }) => balances
+                        .values()
+                        .sum::<Option<UnifiedNum>>()
+                        .map(Value::UnifiedNum),
                     Get::Value(Values {
                         campaign_total_spent,
                         ..
-                    }) => campaign_total_spent.clone(),
-                }),
-                field::Balances::PublisherEarnedFromCampaign => Value::BigNum(match self {
-                    Get::Getter(Getter {
-                        balances,
-                        publisher_id,
-                    }) => balances.get(publisher_id).cloned().unwrap_or_default(),
-                    Get::Value(Values {
-                        publisher_earned_from_campaign,
-                        ..
-                    }) => publisher_earned_from_campaign.clone(),
-                }),
+                    }) => Some(Value::UnifiedNum(*campaign_total_spent)),
+                },
+                // Leave the default of `0` if the publisher is not found in the balances.
+                field::Balances::PublisherEarnedFromCampaign => {
+                    Some(Value::UnifiedNum(match self {
+                        Get::Getter(Getter {
+                            balances,
+                            publisher_id,
+                        }) => balances.get(publisher_id).cloned().unwrap_or_default(),
+                        Get::Value(Values {
+                            publisher_earned_from_campaign,
+                            ..
+                        }) => *publisher_earned_from_campaign,
+                    }))
+                }
             }
         }
     }
@@ -430,7 +373,7 @@ mod test {
     use super::*;
     pub use crate::{
         util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN as CAMPAIGN, DUMMY_IPFS as IPFS},
-        AdUnit, BalancesMap,
+        AdUnit, UnifiedMap,
     };
     use chrono::{TimeZone, Utc};
     use serde_json::json;
@@ -470,7 +413,7 @@ mod test {
 
         let actual_date = Utc.ymd(2020, 6, 6).and_hms(12, 0, 0);
 
-        let balances: BalancesMap = vec![
+        let balances: UnifiedMap = vec![
             (ADDRESSES["publisher"], 30.into()),
             (ADDRESSES["leader"], 10.into()),
         ]
@@ -499,7 +442,7 @@ mod test {
                 campaign_id: CAMPAIGN.id,
                 campaign_seconds_active: 40633521,
                 campaign_seconds_duration: 2509030800,
-                campaign_budget: CAMPAIGN.budget.to_bignum(),
+                campaign_budget: CAMPAIGN.budget,
                 event_min_price: Some(
                     CAMPAIGN
                         .pricing("IMPRESSION")
