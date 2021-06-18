@@ -217,8 +217,8 @@ pub fn get_unit_html_with_events(
         events: vec![Event {
             event_type: event_type.to_string(),
             publisher: options.publisher_addr,
-            ad_unit: ad_unit.id.clone(),
-            ad_slot: options.market_slot.clone(),
+            ad_unit: ad_unit.id,
+            ad_slot: options.market_slot,
             referrer: "document.referrer".to_string(),
         }],
     };
@@ -477,12 +477,12 @@ impl Manager {
                     .units_with_price
                     .iter()
                     .filter(|unit_with_price| {
-                        unit_input.ad_unit_id = Some(unit_with_price.unit.id.clone());
+                        unit_input.ad_unit_id = Some(unit_with_price.unit.id);
 
                         let mut output = targeting::Output {
                             show: true,
                             boost: 1.0,
-                            price: vec![("IMPRESSION".to_string(), unit_with_price.price.clone())]
+                            price: vec![("IMPRESSION".to_string(), unit_with_price.price)]
                                 .into_iter()
                                 .collect(),
                         };
@@ -519,9 +519,9 @@ impl Manager {
 
             let new_entry = HistoryEntry {
                 time: Utc::now(),
-                unit_id: unit_with_price.unit.id.clone(),
+                unit_id: unit_with_price.unit.id,
                 campaign_id: *campaign_id,
-                slot_id: self.options.market_slot.clone(),
+                slot_id: self.options.market_slot,
             };
 
             *self.history.write().await = history
@@ -562,7 +562,7 @@ impl Manager {
 
             Ok(Some(NextAdUnit {
                 unit: unit_with_price.unit.clone(),
-                price: unit_with_price.price.clone(),
+                price: unit_with_price.price,
                 accepted_referrers: units_for_slot.accepted_referrers,
                 html,
             }))

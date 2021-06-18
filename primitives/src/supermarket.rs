@@ -43,10 +43,7 @@ pub enum Finalized {
 pub mod units_for_slot {
     pub mod response {
 
-        use crate::{
-            targeting::Input,
-            UnifiedNum, IPFS,
-        };
+        use crate::{targeting::Input, UnifiedNum, IPFS};
         use serde::{Deserialize, Serialize};
         use url::Url;
 
@@ -88,7 +85,7 @@ pub mod units_for_slot {
         impl From<&crate::AdUnit> for AdUnit {
             fn from(ad_unit: &crate::AdUnit) -> Self {
                 Self {
-                    id: ad_unit.ipfs.clone(),
+                    id: ad_unit.ipfs,
                     media_url: ad_unit.media_url.clone(),
                     media_mime: ad_unit.media_mime.clone(),
                     target_url: ad_unit.target_url.clone(),

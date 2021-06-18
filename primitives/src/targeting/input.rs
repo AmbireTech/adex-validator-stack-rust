@@ -282,10 +282,10 @@ pub mod campaign {
                     }) => (*campaign_seconds_duration).into(),
                 })),
                 field::Campaign::CampaignBudget => Some(Value::UnifiedNum(match self {
-                    Get::Getter(FullCampaign { campaign, .. }) => campaign.budget.clone(),
+                    Get::Getter(FullCampaign { campaign, .. }) => campaign.budget,
                     Get::Value(Values {
                         campaign_budget, ..
-                    }) => campaign_budget.clone(),
+                    }) => *campaign_budget,
                 })),
                 field::Campaign::EventMinPrice => match self {
                     Get::Getter(FullCampaign {
@@ -296,7 +296,7 @@ pub mod campaign {
                     )),
                     Get::Value(Values {
                         event_min_price, ..
-                    }) => event_min_price.clone().map(Value::UnifiedNum),
+                    }) => event_min_price.map(Value::UnifiedNum),
                 },
                 field::Campaign::EventMaxPrice => match self {
                     Get::Getter(FullCampaign {
@@ -307,7 +307,7 @@ pub mod campaign {
                     )),
                     Get::Value(Values {
                         event_max_price, ..
-                    }) => event_max_price.clone().map(Value::UnifiedNum),
+                    }) => event_max_price.map(Value::UnifiedNum),
                 },
             }
         }

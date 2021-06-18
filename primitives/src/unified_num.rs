@@ -28,20 +28,18 @@ use std::{
 /// use primitives::UnifiedNum;
 /// use serde_json::Value;
 ///
-/// fn main() {
-///     let unified_num = UnifiedNum::from(42_999_987_654_321);
-///     
-///     // Printing the unified num will show the value and the decimal point with precision of `UnifiedNum::PRECISION` (i.e. `8`) numbers after the decimal point
-///     assert_eq!("42999987654321", &unified_num.to_string());
+/// let unified_num = UnifiedNum::from(42_999_987_654_321);
 ///
-///     assert_eq!("429999.87654321", &unified_num.to_float_string());
+/// // Printing the unified num will show the value and the decimal point with precision of `UnifiedNum::PRECISION` (i.e. `8`) numbers after the decimal point
+/// assert_eq!("42999987654321", &unified_num.to_string());
 ///
-///     // Printing the Debug of unified num will show the value and the decimal point with precision of `UnifiedNum::PRECISION` (i.e. `8`) numbers after the decimal point
-///     assert_eq!("UnifiedNum(429999.87654321)".to_string(), format!("{:?}", &unified_num));
+/// assert_eq!("429999.87654321", &unified_num.to_float_string());
 ///
-///     // JSON Serializing and Deserializing the `UnifiedNum` yields a string without any decimal points
-///     assert_eq!(Value::String("42999987654321".to_string()), serde_json::to_value(unified_num).unwrap());
-/// }
+/// // Printing the Debug of unified num will show the value and the decimal point with precision of `UnifiedNum::PRECISION` (i.e. `8`) numbers after the decimal point
+/// assert_eq!("UnifiedNum(429999.87654321)".to_string(), format!("{:?}", &unified_num));
+///
+/// // JSON Serializing and Deserializing the `UnifiedNum` yields a string without any decimal points
+/// assert_eq!(Value::String("42999987654321".to_string()), serde_json::to_value(unified_num).unwrap());
 /// ```
 #[derive(
     Clone,
@@ -79,7 +77,6 @@ impl TryFrom<String> for UnifiedNum {
     }
 }
 
-
 impl UnifiedNum {
     pub const PRECISION: u8 = 8;
     pub const DEBUG_DELIMITER: char = '.';
@@ -92,11 +89,11 @@ impl UnifiedNum {
         Self(value)
     }
 
-    pub const fn to_u64(&self) -> u64 {
+    pub const fn to_u64(self) -> u64 {
         self.0
     }
 
-    pub fn to_bignum(&self) -> BigNum {
+    pub fn to_bignum(self) -> BigNum {
         BigNum::from(self.0)
     }
 
@@ -121,7 +118,7 @@ impl UnifiedNum {
     }
 
     /// Transform the UnifiedNum precision 8 to a new precision
-    pub fn to_precision(&self, precision: u8) -> BigNum {
+    pub fn to_precision(self, precision: u8) -> BigNum {
         let inner = BigNum::from(self.0);
         match precision.cmp(&Self::PRECISION) {
             Ordering::Equal => inner,
@@ -130,7 +127,7 @@ impl UnifiedNum {
         }
     }
 
-    pub fn to_float_string(&self) -> String {
+    pub fn to_float_string(self) -> String {
         let mut string_value = self.0.to_string();
         let value_length = string_value.len();
         let precision: usize = Self::PRECISION.into();

@@ -50,7 +50,7 @@ impl Output {
                     .price
                     .get(price_key.trim_start_matches("price."))
                     .ok_or(Error::UnknownVariable)?;
-                Ok(Value::UnifiedNum(price.clone()))
+                Ok(Value::UnifiedNum(*price))
             }
             _ => Err(Error::UnknownVariable),
         }
