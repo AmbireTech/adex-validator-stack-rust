@@ -3,9 +3,11 @@ use num::{
     pow::Pow, traits::CheckedRem, CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Integer, One,
 };
 use num_derive::{FromPrimitive, Num, NumCast, NumOps, ToPrimitive, Zero};
+use parse_display::{Display, FromStr, ParseError};
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
+    convert::TryFrom,
     fmt,
     iter::Sum,
     ops::{Add, AddAssign, Div, Mul, Sub},
@@ -19,6 +21,28 @@ use std::{
 ///
 /// This number is (de)serialized as a Javascript number which is `f64`.
 /// As far as the numbers don't exceed `2**63`, the Javascript number should be sufficient without losing precision
+///
+/// # Examples
+///
+/// ```rust
+/// use primitives::UnifiedNum;
+/// use serde_json::Value;
+///
+/// fn main() {
+///     let unified_num = UnifiedNum::from(42_999_987_654_321);
+///     
+///     // Printing the unified num will show the value and the decimal point with precision of `UnifiedNum::PRECISION` (i.e. `8`) numbers after the decimal point
+///     assert_eq!("42999987654321", &unified_num.to_string());
+///
+///     assert_eq!("429999.87654321", &unified_num.to_float_string());
+///
+///     // Printing the Debug of unified num will show the value and the decimal point with precision of `UnifiedNum::PRECISION` (i.e. `8`) numbers after the decimal point
+///     assert_eq!("UnifiedNum(429999.87654321)".to_string(), format!("{:?}", &unified_num));
+///
+///     // JSON Serializing and Deserializing the `UnifiedNum` yields a string without any decimal points
+///     assert_eq!(Value::String("42999987654321".to_string()), serde_json::to_value(unified_num).unwrap());
+/// }
+/// ```
 #[derive(
     Clone,
     Copy,
@@ -33,14 +57,32 @@ use std::{
     Eq,
     PartialOrd,
     Ord,
+    Display,
+    FromStr,
     Serialize,
     Deserialize,
 )]
-#[serde(transparent)]
+#[serde(into = "String", try_from = "String")]
 pub struct UnifiedNum(u64);
+
+impl From<UnifiedNum> for String {
+    fn from(unified_num: UnifiedNum) -> Self {
+        unified_num.to_string()
+    }
+}
+
+impl TryFrom<String> for UnifiedNum {
+    type Error = ParseError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        value.parse()
+    }
+}
+
 
 impl UnifiedNum {
     pub const PRECISION: u8 = 8;
+    pub const DEBUG_DELIMITER: char = '.';
 
     pub fn div_floor(&self, other: &Self) -> Self {
         Self(self.0.div_floor(&other.0))
@@ -87,6 +129,22 @@ impl UnifiedNum {
             Ordering::Greater => inner.mul(&BigNum::from(10).pow(precision - Self::PRECISION)),
         }
     }
+
+    pub fn to_float_string(&self) -> String {
+        let mut string_value = self.0.to_string();
+        let value_length = string_value.len();
+        let precision: usize = Self::PRECISION.into();
+
+        let value = if value_length > precision {
+            string_value.insert(value_length - precision, Self::DEBUG_DELIMITER);
+
+            string_value
+        } else {
+            format!("0{}{:0>8}", Self::DEBUG_DELIMITER, string_value)
+        };
+
+        value
+    }
 }
 
 impl From<u64> for UnifiedNum {
@@ -95,25 +153,11 @@ impl From<u64> for UnifiedNum {
     }
 }
 
-impl fmt::Display for UnifiedNum {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut string_value = self.0.to_string();
-        let value_length = string_value.len();
-        let precision: usize = Self::PRECISION.into();
-
-        if value_length > precision {
-            string_value.insert(value_length - precision, '.');
-
-            f.write_str(&string_value)
-        } else {
-            write!(f, "0.{:0>8}", string_value)
-        }
-    }
-}
-
 impl fmt::Debug for UnifiedNum {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "UnifiedNum({})", self.to_string())
+        let float_string = self.to_float_string();
+
+        write!(f, "UnifiedNum({})", float_string)
     }
 }
 
@@ -289,21 +333,32 @@ mod test {
     }
 
     #[test]
-    fn unified_num_displays_and_de_serializes_correctly() {
-        let one = UnifiedNum::from(100_000_000);
+    fn unified_num_displays_debug_and_de_serializes_correctly() {
+        let zero = UnifiedNum::zero();
+        let one = {
+            let manual_one = UnifiedNum::from(100_000_000);
+            let impl_one = UnifiedNum::one();
+            assert_eq!(manual_one, impl_one);
+
+            manual_one
+        };
         let zero_point_one = UnifiedNum::from(10_000_000);
         let smallest_value = UnifiedNum::from(1);
         let random_value = UnifiedNum::from(144_903_000_567_000);
 
-        assert_eq!("1.00000000", &one.to_string());
-        assert_eq!("1.00000000", &UnifiedNum::one().to_string());
-        assert_eq!("0.00000000", &UnifiedNum::zero().to_string());
-        assert_eq!("0.10000000", &zero_point_one.to_string());
-        assert_eq!("0.00000001", &smallest_value.to_string());
-        assert_eq!("1449030.00567000", &random_value.to_string());
+        let dbg_format = |unified_num| -> String { format!("{:?}", unified_num) };
 
+        assert_eq!("UnifiedNum(1.00000000)", &dbg_format(&one));
+        assert_eq!("UnifiedNum(0.00000000)", &dbg_format(&zero));
+        assert_eq!("UnifiedNum(0.10000000)", &dbg_format(&zero_point_one));
+        assert_eq!("UnifiedNum(0.00000001)", &dbg_format(&smallest_value));
+        assert_eq!("UnifiedNum(1449030.00567000)", &dbg_format(&random_value));
+
+        let expected_one_string = "100000000".to_string();
+
+        assert_eq!(&expected_one_string, &one.to_string());
         assert_eq!(
-            serde_json::Value::Number(100_000_000.into()),
+            serde_json::Value::String(expected_one_string),
             serde_json::to_value(one).expect("Should serialize")
         )
     }
