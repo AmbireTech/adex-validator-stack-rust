@@ -1,9 +1,10 @@
 use chrono::{DateTime, Utc};
 use futures::pin_mut;
 use primitives::{
+    channel_v5::Channel as ChannelV5,
     sentry::{EventAggregate, MessageResponse},
     validator::{ApproveState, Heartbeat, NewState},
-    Address, BigNum, Channel, ChannelId, ValidatorId, channel_v5::Channel as ChannelV5,
+    Address, BigNum, Channel, ChannelId, ValidatorId,
 };
 use std::{convert::TryFrom, ops::Add};
 use tokio_postgres::{
@@ -67,14 +68,7 @@ pub async fn latest_new_state_v5(
 
     let select = client.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'NewState' AND msg->> 'stateRoot' = $3 ORDER BY received DESC LIMIT 1").await?;
     let rows = client
-        .query(
-            &select,
-            &[
-                &channel.id(),
-                &channel.leader,
-                &state_root,
-            ],
-        )
+        .query(&select, &[&channel.id(), &channel.leader, &state_root])
         .await?;
 
     rows.get(0)

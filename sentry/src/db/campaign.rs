@@ -45,13 +45,17 @@ pub async fn fetch_campaign(pool: &DbPool, campaign: &Campaign) -> Result<Campai
     Ok(Campaign::from(&row))
 }
 
-pub async fn get_campaigns_for_channel(pool: &DbPool, campaign: &Campaign) -> Result<Vec<Campaign>, PoolError> {
+pub async fn get_campaigns_for_channel(
+    pool: &DbPool,
+    campaign: &Campaign,
+) -> Result<Vec<Campaign>, PoolError> {
     let client = pool.get().await?;
     let statement = client.prepare("SELECT id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to FROM campaigns WHERE channel_id = $1").await?;
 
     let rows = client.query(&statement, &[&campaign.channel.id()]).await?;
 
     let campaigns = rows.iter().map(Campaign::from).collect();
+
     Ok(campaigns)
 }
 
@@ -75,16 +79,19 @@ pub async fn update_campaign(pool: &DbPool, campaign: &Campaign) -> Result<bool,
         .await?;
 
     let row = client
-        .execute(&statement, &[
-            &campaign.budget,
-            &campaign.validators,
-            &campaign.title,
-            &campaign.pricing_bounds,
-            &campaign.event_submission,
-            &campaign.ad_units,
-            &campaign.targeting_rules,
-            &campaign.id,
-        ])
+        .execute(
+            &statement,
+            &[
+                &campaign.budget,
+                &campaign.validators,
+                &campaign.title,
+                &campaign.pricing_bounds,
+                &campaign.event_submission,
+                &campaign.ad_units,
+                &campaign.targeting_rules,
+                &campaign.id,
+            ],
+        )
         .await?;
 
     let exists = row == 1;
@@ -114,12 +121,12 @@ mod test {
 
         assert!(is_inserted);
 
-        let exists = campaign_exists(&db_pool.clone(), &campaign_for_testing)
+        let exists = campaign_exists(&database.pool, &campaign_for_testing)
             .await
             .expect("Should succeed");
         assert!(exists);
 
-        let fetched_campaign = fetch_campaign(database.pool.clone(), &campaign_for_testing)
+        let fetched_campaign = fetch_campaign(&database.pool, &campaign_for_testing)
             .await
             .expect("Should fetch successfully");
 

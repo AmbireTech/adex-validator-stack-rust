@@ -33,9 +33,9 @@ use std::collections::HashMap;
 pub mod middleware;
 pub mod routes {
     pub mod analytics;
+    pub mod campaign;
     pub mod cfg;
     pub mod channel;
-    pub mod campaign;
     pub mod event_aggregate;
     pub mod validator_message;
 }
