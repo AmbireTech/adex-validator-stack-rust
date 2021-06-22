@@ -175,34 +175,4 @@ mod test {
         let expected_option = Some((ADDRESSES["leader"], 23.into()));
         assert_eq!(expected_option, payout, "pricingBounds: click event");
     }
-
-    #[test]
-    fn get_event_payouts_pricing_bounds_close_event() {
-        let logger = discard_logger();
-        let mut campaign = DUMMY_CAMPAIGN.clone();
-        campaign.budget = 100.into();
-        campaign.pricing_bounds = Some(PricingBounds {
-            impression: Some(Pricing {
-                min: 8.into(),
-                max: 64.into(),
-            }),
-            click: Some(Pricing {
-                min: 23.into(),
-                max: 100.into(),
-            }),
-        });
-
-        let event = Event::Close;
-
-        let session = Session {
-            ip: None,
-            country: None,
-            referrer_header: None,
-            os: None,
-        };
-
-        let payout = get_payout(&logger, &campaign, &event, &session).expect("Should be OK");
-
-        assert_eq!(None, payout, "pricingBounds: click event");
-    }
 }

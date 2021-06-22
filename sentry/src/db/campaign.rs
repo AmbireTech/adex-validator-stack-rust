@@ -1,5 +1,5 @@
 use crate::db::{DbPool, PoolError};
-use primitives::Campaign;
+use primitives::{Campaign, CampaignId};
 use tokio_postgres::types::Json;
 
 pub async fn insert_campaign(pool: &DbPool, campaign: &Campaign) -> Result<bool, PoolError> {
@@ -36,13 +36,16 @@ pub async fn insert_campaign(pool: &DbPool, campaign: &Campaign) -> Result<bool,
 /// SELECT id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to FROM campaigns
 /// WHERE id = $1
 /// ```
-pub async fn fetch_campaign(pool: &DbPool, campaign: &Campaign) -> Result<Campaign, PoolError> {
+pub async fn fetch_campaign(
+    pool: DbPool,
+    campaign: &CampaignId,
+) -> Result<Option<Campaign>, PoolError> {
     let client = pool.get().await?;
     let statement = client.prepare("SELECT id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to FROM campaigns WHERE id = $1").await?;
 
-    let row = client.query_one(&statement, &[&campaign.id]).await?;
+    let row = client.query_opt(&statement, &[&campaign]).await?;
 
-    Ok(Campaign::from(&row))
+    Ok(row.as_ref().map(Campaign::from))
 }
 
 pub async fn get_campaigns_for_channel(
@@ -115,6 +118,13 @@ mod test {
             .expect("Migrations should succeed");
 
         let campaign_for_testing = DUMMY_CAMPAIGN.clone();
+
+        let non_existent_campaign = fetch_campaign(database.pool.clone(), &campaign_for_testing.id)
+            .await
+            .expect("Should fetch successfully");
+
+        assert_eq!(None, non_existent_campaign);
+
         let is_inserted = insert_campaign(&database.pool, &campaign_for_testing)
             .await
             .expect("Should succeed");
@@ -126,10 +136,10 @@ mod test {
             .expect("Should succeed");
         assert!(exists);
 
-        let fetched_campaign = fetch_campaign(&database.pool, &campaign_for_testing)
+        let fetched_campaign = fetch_campaign(database.pool.clone(), &campaign_for_testing.id)
             .await
             .expect("Should fetch successfully");
 
-        assert_eq!(campaign_for_testing, fetched_campaign);
+        assert_eq!(Some(campaign_for_testing), fetched_campaign);
     }
 }

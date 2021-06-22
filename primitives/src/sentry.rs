@@ -127,19 +127,6 @@ pub enum Event {
         ad_slot: Option<IPFS>,
         referrer: Option<String>,
     },
-    /// only the creator can send this event
-    #[serde(rename_all = "camelCase")]
-    UpdateTargeting { targeting_rules: Rules },
-    /// Closes the `Campaign`
-    /// only the creator can send this event
-    #[serde(rename_all = "camelCase")]
-    Close,
-    /// TODO: AIP#61 Check and explain who can send this event as well as when it can be received
-    /// A map of earners which gets merged in the `spender::Aggregate`
-    /// NOTE: Does **not** contain any fees!
-    /// This even can be used to pay to yourself, but this is irrelevant as it's your funds you are paying yourself.
-    #[serde(rename_all = "camelCase")]
-    Pay { payout: BalancesMap },
 }
 
 impl Event {
@@ -161,9 +148,6 @@ impl AsRef<str> for Event {
         match *self {
             Event::Impression { .. } => "IMPRESSION",
             Event::Click { .. } => "CLICK",
-            Event::UpdateTargeting { .. } => "UPDATE_TARGETING",
-            Event::Close => "CLOSE",
-            Event::Pay { .. } => "PAY",
         }
     }
 }

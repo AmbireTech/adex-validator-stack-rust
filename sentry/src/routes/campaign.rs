@@ -23,6 +23,20 @@ use std::{
     str::FromStr,
 };
 use futures::future::join_all;
+use std::collections::HashMap;
+
+use crate::{
+    access::{self, check_access},
+    success_response, Application, Auth, ResponseError, Session,
+};
+use chrono::Utc;
+use hyper::{Body, Request, Response};
+use primitives::{
+    adapter::Adapter,
+    sentry::{campaign_create::CreateCampaign, Event, SuccessResponse},
+    Campaign,
+};
+use crate::routes::campaign::modify_campaign::{get_remaining_for_campaign_from_redis, get_campaigns_remaining_sum};
 
 pub async fn create_campaign<A: Adapter>(
     req: Request<Body>,
@@ -34,7 +48,6 @@ pub async fn create_campaign<A: Adapter>(
         .map_err(|e| ResponseError::FailedValidation(e.to_string()))?
         // create the actual `Campaign` with random `CampaignId`
         .into_campaign();
-
 
     // TODO AIP#61: Validate Campaign
 
@@ -91,115 +104,14 @@ pub async fn update_campaign<A: Adapter>(
     Ok(success_response(serde_json::to_string(&campaign)?))
 }
 
-// TODO: Double check redis calls
-async fn get_spent_for_campaign(redis: &MultiplexedConnection, id: CampaignId) -> Result<UnifiedNum, ResponseError> {
-    let key = format!("spent:{}", id);
-    // campaignSpent tracks the portion of the budget which has already been spent
-    let campaign_spent = match redis::cmd("GET")
-        .arg(&key)
-        .query_async::<_, Option<String>>(&mut redis.clone())
-        .await
-        {
-            Ok(Some(spent)) => {
-                let res = BigNum::from_str(&spent)?;
-                let res = res.to_u64().ok_or_else(|| {
-                    ResponseError::Conflict("Error while converting BigNum to u64".to_string())
-                })?;
-                Ok(UnifiedNum::from_u64(res))
-            },
-            _ => Ok(UnifiedNum::from_u64(0))
-        };
-
-    campaign_spent
-}
-
-async fn get_remaining_for_campaign_from_redis(redis: &MultiplexedConnection, id: CampaignId) -> Result<UnifiedNum, ResponseError> {
-    let key = format!("remaining:{}", id);
-    let remaining = match redis::cmd("GET")
-        .arg(&key)
-        .query_async::<_, Option<String>>(&mut redis.clone())
-        .await
-         {
-            Ok(Some(remaining)) => {
-                let res = BigNum::from_str(&remaining)?;
-                let res = res.to_u64().ok_or_else(|| {
-                    ResponseError::Conflict("Error while calculating the total remaining amount".to_string())
-                })?;
-                Ok(UnifiedNum::from_u64(res))
-            },
-            _ => Ok(UnifiedNum::from_u64(0))
-        };
-    remaining
-}
-
-// tested
-async fn update_remaining_for_campaign(redis: &MultiplexedConnection, id: CampaignId, amount: UnifiedNum) -> Result<bool, ResponseError> {
-    // update a key in Redis for the remaining spendable amount
-    let key = format!("remaining:{}", id);
-    redis::cmd("INCRBY")
-        .arg(&key)
-        .arg(amount.to_u64())
-        .query_async(&mut redis.clone())
-        .await
-        .map_err(|_| ResponseError::Conflict("Error updating remainingSpendable for current campaign".to_string()))?;
-    Ok(true)
-}
-
-// tested
-fn get_total_remaining_for_channel(accounting_spent: &UnifiedNum, latest_spendable: &Spendable) -> Result<UnifiedNum, ResponseError> {
-    let total_deposited = latest_spendable.deposit.total;
-
-    let total_remaining = total_deposited.checked_sub(&accounting_spent).ok_or_else(|| {
-        ResponseError::Conflict("Error while calculating the total remaining amount".to_string())
-    })?;
-    Ok(total_remaining)
-}
-
-async fn get_remaining_for_multiple_campaigns(redis: &MultiplexedConnection, campaigns: &[Campaign], mutated_campaign_id: CampaignId) -> Result<Vec<UnifiedNum>, ResponseError> {
-    let other_campaigns_remaining = campaigns
-        .into_iter()
-        .filter(|c| c.id != mutated_campaign_id)
-        .map(|c| async move {
-            let spent = get_spent_for_campaign(&redis, c.id).await?;
-            let remaining = c.budget.checked_sub(&spent).ok_or_else(|| {
-                ResponseError::Conflict("Error while calculating remaining for mutated campaign".to_string())
-            })?;
-            Ok(remaining)
-        })
-        .collect::<Vec<_>>();
-    let other_campaigns_remaining = join_all(other_campaigns_remaining).await;
-    let other_campaigns_remaining: Result<Vec<UnifiedNum>, _> = other_campaigns_remaining.into_iter().collect();
-    other_campaigns_remaining
-}
-
-
-async fn get_campaigns_remaining_sum(redis: &MultiplexedConnection, campaigns: &[Campaign], mutated_campaign: &Campaign) -> Result<UnifiedNum, ResponseError> {
-    let other_campaigns_remaining = get_remaining_for_multiple_campaigns(&redis, &campaigns, mutated_campaign.id).await?;
-    let sum_of_campaigns_remaining = other_campaigns_remaining
-        .into_iter()
-        .try_fold(UnifiedNum::from_u64(0), |sum, val| sum.checked_add(&val).ok_or(ResponseError::Conflict("Couldn't sum remaining for campaigns".to_string())))?;
-    // Necessary to do it explicitly for current campaign as its budget is not yet updated in DB
-    let spent_for_mutated_campaign = get_spent_for_campaign(&redis, mutated_campaign.id).await?;
-    let remaining_for_mutated_campaign = mutated_campaign.budget.checked_sub(&spent_for_mutated_campaign).ok_or_else(|| {
-        ResponseError::Conflict("Error while calculating remaining for mutated campaign".to_string())
-    })?;
-    sum_of_campaigns_remaining.checked_add(&remaining_for_mutated_campaign).ok_or_else(|| {
-        ResponseError::Conflict("Error while calculating sum for all campaigns".to_string())
-    })?;
-    Ok(sum_of_campaigns_remaining)
-}
-
 pub async fn modify_campaign(pool: &DbPool, campaign: &Campaign, redis: &MultiplexedConnection) -> Result<bool, ResponseError> {
-    let campaign_spent = get_spent_for_campaign(&redis, campaign.id).await?;
     let accounting_spent = get_accounting_spent(pool.clone(), &campaign.creator, &campaign.channel.id()).await?;
 
     let latest_spendable = fetch_spendable(pool.clone(), &campaign.creator, &campaign.channel.id()).await?;
-    // Check if we have reached the budget
-    if campaign_spent >= campaign.budget {
-        return Err(ResponseError::FailedValidation("No more budget available for spending".into()));
-    }
 
     let old_remaining = get_remaining_for_campaign_from_redis(&redis, campaign.id).await?;
+    let campaign_spent = campaign.budget.checked_sub(&old_remaining)?;
+
     let old_remaining = UnifiedNum::from_u64(max(0, old_remaining.to_u64()));
 
     let new_remaining = campaign.budget.checked_sub(&campaign_spent).ok_or_else(|| {
@@ -227,7 +139,80 @@ pub async fn modify_campaign(pool: &DbPool, campaign: &Campaign, redis: &Multipl
     // *NOTE*: To close a campaign set campaignBudget to campaignSpent so that spendable == 0
 }
 
+// tested
+async fn update_remaining_for_campaign(redis: &MultiplexedConnection, id: CampaignId, amount: UnifiedNum) -> Result<bool, ResponseError> {
+    // update a key in Redis for the remaining spendable amount
+    let key = format!("remaining:{}", id);
+    redis::cmd("INCRBY")
+        .arg(&key)
+        .arg(amount.to_u64())
+        .query_async(&mut redis.clone())
+        .await
+        .map_err(|_| ResponseError::Conflict("Error updating remainingSpendable for current campaign".to_string()))?;
+    Ok(true)
+}
 
+// tested
+fn get_total_remaining_for_channel(accounting_spent: &UnifiedNum, latest_spendable: &Spendable) -> Option<UnifiedNum> {
+    let total_deposited = latest_spendable.deposit.total;
+
+    let total_remaining = total_deposited.checked_sub(&accounting_spent);
+    total_remaining
+}
+
+mod modify_campaign {
+    use super::*;
+    pub async fn get_remaining_for_campaign_from_redis(redis: &MultiplexedConnection, id: CampaignId) -> Result<UnifiedNum, ResponseError> {
+        let key = format!("remaining:{}", id);
+        let remaining = match redis::cmd("GET")
+            .arg(&key)
+            .query_async::<_, Option<String>>(&mut redis.clone())
+            .await
+            {
+                Ok(Some(remaining)) => {
+                    let res = BigNum::from_str(&remaining)?;
+                    let res = res.to_u64().ok_or_else(|| {
+                        ResponseError::Conflict("Error while calculating the total remaining amount".to_string())
+                    })?;
+                    Ok(UnifiedNum::from_u64(res))
+                },
+                _ => Ok(UnifiedNum::from_u64(0))
+            };
+        remaining
+    }
+
+    async fn get_remaining_for_multiple_campaigns(redis: &MultiplexedConnection, campaigns: &[Campaign], mutated_campaign_id: CampaignId) -> Result<Vec<UnifiedNum>, ResponseError> {
+        let other_campaigns_remaining = campaigns
+            .into_iter()
+            .filter(|c| c.id != mutated_campaign_id)
+            .map(|c| async move {
+                let remaining = get_remaining_for_campaign_from_redis(&redis, c.id).await?;
+                Ok(remaining)
+            })
+            .collect::<Vec<_>>();
+        let other_campaigns_remaining = join_all(other_campaigns_remaining).await;
+        let other_campaigns_remaining: Result<Vec<UnifiedNum>, _> = other_campaigns_remaining.into_iter().collect();
+        other_campaigns_remaining
+    }
+
+    pub async fn get_campaigns_remaining_sum(redis: &MultiplexedConnection, campaigns: &[Campaign], mutated_campaign: &Campaign) -> Result<UnifiedNum, ResponseError> {
+        let other_campaigns_remaining = get_remaining_for_multiple_campaigns(&redis, &campaigns, mutated_campaign.id).await?;
+        let sum_of_campaigns_remaining = other_campaigns_remaining
+            .into_iter()
+            .try_fold(UnifiedNum::from_u64(0), |sum, val| sum.checked_add(&val).ok_or(ResponseError::Conflict("Couldn't sum remaining for campaigns".to_string())))?;
+
+        // Necessary to do it explicitly for current campaign as its budget is not yet updated in DB
+        let old_remaining_for_mutated_campaign = get_remaining_for_campaign_from_redis(&redis, mutated_campaign.id);
+        let spent_for_mutated_campaign = mutated_campaign.budget.checked_sub(old_remaining_for_mutated_campaign);
+        let new_remaining_for_mutated_campaign = mutated_campaign.budget.checked_sub(&spent_for_mutated_campaign).ok_or_else(|| {
+            ResponseError::Conflict("Error while calculating remaining for mutated campaign".to_string())
+        })?;
+        sum_of_campaigns_remaining.checked_add(&new_remaining_for_mutated_campaign).ok_or_else(|| {
+            ResponseError::Conflict("Error while calculating sum for all campaigns".to_string())
+        })?;
+        Ok(sum_of_campaigns_remaining)
+    }
+}
 
 #[cfg(test)]
 mod test {
@@ -354,4 +339,76 @@ mod test {
     // test get_remaining_for_campaign_from_redis
 
     // test get_spent_for_campaign
+}
+pub async fn insert_events<A: Adapter + 'static>(
+    req: Request<Body>,
+    app: &Application<A>,
+) -> Result<Response<Body>, ResponseError> {
+    let (req_head, req_body) = req.into_parts();
+
+    let auth = req_head.extensions.get::<Auth>();
+    let session = req_head
+        .extensions
+        .get::<Session>()
+        .expect("request should have session");
+
+    let campaign = req_head
+        .extensions
+        .get::<Campaign>()
+        .expect("request should have a Campaign loaded");
+
+    let body_bytes = hyper::body::to_bytes(req_body).await?;
+    let mut request_body = serde_json::from_slice::<HashMap<String, Vec<Event>>>(&body_bytes)?;
+
+    let events = request_body
+        .remove("events")
+        .ok_or_else(|| ResponseError::BadRequest("invalid request".to_string()))?;
+
+    let processed = process_events(app, auth, session, campaign, events).await?;
+
+    Ok(Response::builder()
+        .header("Content-type", "application/json")
+        .body(serde_json::to_string(&SuccessResponse { success: processed })?.into())
+        .unwrap())
+}
+
+async fn process_events<A: Adapter + 'static>(
+    app: &Application<A>,
+    auth: Option<&Auth>,
+    session: &Session,
+    campaign: &Campaign,
+    events: Vec<Event>,
+) -> Result<bool, ResponseError> {
+    if &Utc::now() > &campaign.active.to {
+        return Err(ResponseError::BadRequest("Campaign is expired".into()));
+    }
+
+    //
+    // TODO #381: AIP#61 Spender Aggregator should be called
+    //
+
+    // handle events - check access
+    // handle events - Update targeting rules
+    // calculate payout
+    // distribute fees
+    // handle spending - Spender Aggregate
+    // handle events - aggregate Events and put into analytics
+
+    check_access(
+        &app.redis,
+        session,
+        auth,
+        &app.config.ip_rate_limit,
+        &campaign,
+        &events,
+    )
+    .await
+    .map_err(|e| match e {
+        access::Error::ForbiddenReferrer => ResponseError::Forbidden(e.to_string()),
+        access::Error::RulesError(error) => ResponseError::TooManyRequests(error),
+        access::Error::UnAuthenticated => ResponseError::Unauthorized,
+        _ => ResponseError::BadRequest(e.to_string()),
+    })?;
+
+    Ok(true)
 }

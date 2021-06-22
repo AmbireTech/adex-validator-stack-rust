@@ -2,7 +2,7 @@
 #![deny(rust_2018_idioms)]
 
 use crate::db::DbPool;
-use crate::event_aggregator::EventAggregator;
+use crate::routes::campaign;
 use crate::routes::channel::channel_status;
 use crate::routes::event_aggregate::list_channel_event_aggregates;
 use crate::routes::validator_message::{extract_params, list_validator_messages};
@@ -14,7 +14,8 @@ use middleware::{
     channel::{ChannelLoad, GetChannelId},
     cors::{cors, Cors},
 };
-use middleware::{Chain, Middleware};
+use middleware::{campaign::CampaignLoad, Chain, Middleware};
+use once_cell::sync::Lazy;
 use primitives::adapter::Adapter;
 use primitives::sentry::ValidationErrorResponse;
 use primitives::{Config, ValidatorId};
@@ -24,8 +25,7 @@ use routes::analytics::{advanced_analytics, advertiser_analytics, analytics, pub
 use routes::campaign::{create_campaign, update_campaign};
 use routes::cfg::config;
 use routes::channel::{
-    channel_list, channel_validate, create_channel, create_validator_messages, insert_events,
-    last_approved,
+    channel_list, channel_validate, create_channel, create_validator_messages, last_approved,
 };
 use slog::Logger;
 use std::collections::HashMap;
@@ -43,8 +43,10 @@ pub mod routes {
 pub mod access;
 pub mod analytics_recorder;
 pub mod db;
-pub mod event_aggregator;
-pub mod event_reducer;
+// TODO AIP#61: remove the even aggregator once we've taken out the logic for AIP#61
+// pub mod event_aggregator;
+// TODO AIP#61: Remove even reducer or alter depending on our needs
+// pub mod event_reducer;
 pub mod payout;
 pub mod spender;
 
@@ -64,8 +66,15 @@ lazy_static! {
         Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
 }
 
-#[derive(Debug)]
-pub struct RouteParams(Vec<String>);
+static INSERT_EVENTS_BY_CAMPAIGN_ID: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^/campaign/0x([a-zA-Z0-9]{32})/events/?$").expect("The regex should be valid")
+});
+static CLOSE_CAMPAIGN_BY_CAMPAIGN_ID: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^/campaign/0x([a-zA-Z0-9]{32})/close/?$").expect("The regex should be valid")
+});
+
+#[derive(Debug, Clone)]
+pub struct RouteParams(pub Vec<String>);
 
 impl RouteParams {
     pub fn get(&self, index: usize) -> Option<String> {
@@ -84,7 +93,6 @@ pub struct Application<A: Adapter> {
     pub redis: MultiplexedConnection,
     pub pool: DbPool,
     pub config: Config,
-    pub event_aggregator: EventAggregator,
 }
 
 impl<A: Adapter + 'static> Application<A> {
@@ -101,7 +109,6 @@ impl<A: Adapter + 'static> Application<A> {
             logger,
             redis,
             pool,
-            event_aggregator: Default::default(),
         }
     }
 
@@ -166,7 +173,7 @@ impl<A: Adapter + 'static> Application<A> {
                 create_campaign(req, &self).await
             }
             (route, _) if route.starts_with("/analytics") => analytics_router(req, &self).await,
-            // This is important becuase it prevents us from doing
+            // This is important because it prevents us from doing
             // expensive regex matching for routes without /channel
             (path, _) if path.starts_with("/channel") => channels_router(req, &self).await,
             (path, _) if path.starts_with("/campaign") => campaigns_router(req, &self).await,
@@ -180,12 +187,61 @@ impl<A: Adapter + 'static> Application<A> {
     }
 }
 
+async fn campaigns_router<A: Adapter + 'static>(
+    mut req: Request<Body>,
+    app: &Application<A>,
+) -> Result<Response<Body>, ResponseError> {
+    let (path, method) = (req.uri().path(), req.method());
+
+    // create events
+    if let (Some(caps), &Method::POST) = (INSERT_EVENTS_BY_CAMPAIGN_ID.captures(&path), method) {
+        let param = RouteParams(vec![caps
+            .get(1)
+            .map_or("".to_string(), |m| m.as_str().to_string())]);
+        req.extensions_mut().insert(param);
+
+        let req = CampaignLoad.call(req, app).await?;
+
+        campaign::insert_events(req, app).await
+    } else if let (Some(_caps), &Method::POST) =
+        (CLOSE_CAMPAIGN_BY_CAMPAIGN_ID.captures(&path), method)
+    {
+        // TODO AIP#61: Close campaign:
+        // - only by creator
+        // - sets redis remaining = 0 (`newBudget = totalSpent`, i.e. `newBudget = oldBudget - remaining`)
+
+        // let (is_creator, auth_uid) = match auth {
+        // Some(auth) => (auth.uid == channel.creator, auth.uid.to_string()),
+        // None => (false, Default::default()),
+        // };
+        // Closing a campaign is allowed only by the creator
+        // if has_close_event && is_creator {
+        //     return Ok(());
+        // }
+
+        Err(ResponseError::NotFound)
+    } else {
+        Err(ResponseError::NotFound)
+    }
+}
+
 async fn analytics_router<A: Adapter + 'static>(
     mut req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
     let (route, method) = (req.uri().path(), req.method());
 
+
+    
+    // TODO AIP#61: Add routes for:
+    // - POST /channel/:id/pay
+    // #[serde(rename_all = "camelCase")]
+    // Pay { payout: BalancesMap },
+    //
+    // - GET /channel/:id/spender/:addr
+    // - GET /channel/:id/spender/all
+    // - POST /channel/:id/spender/:addr
+    // - GET /channel/:id/get-leaf
     match *method {
         Method::GET => {
             if let Some(caps) = ANALYTICS_BY_CHANNEL_ID.captures(route) {
@@ -245,7 +301,7 @@ async fn channels_router<A: Adapter + 'static>(
     let (path, method) = (req.uri().path().to_owned(), req.method());
 
     // regex matching for routes with params
-    if let (Some(caps), &Method::POST) = (CREATE_EVENTS_BY_CHANNEL_ID.captures(&path), method) {
+    /* if let (Some(caps), &Method::POST) = (CREATE_EVENTS_BY_CHANNEL_ID.captures(&path), method) {
         let param = RouteParams(vec![caps
             .get(1)
             .map_or("".to_string(), |m| m.as_str().to_string())]);
@@ -253,7 +309,8 @@ async fn channels_router<A: Adapter + 'static>(
         req.extensions_mut().insert(param);
 
         insert_events(req, app).await
-    } else if let (Some(caps), &Method::GET) = (LAST_APPROVED_BY_CHANNEL_ID.captures(&path), method)
+    } else */ 
+    if let (Some(caps), &Method::GET) = (LAST_APPROVED_BY_CHANNEL_ID.captures(&path), method)
     {
         let param = RouteParams(vec![caps
             .get(1)
@@ -324,29 +381,7 @@ async fn channels_router<A: Adapter + 'static>(
     }
 }
 
-async fn campaigns_router<A: Adapter + 'static>(
-    mut req: Request<Body>,
-    app: &Application<A>,
-) -> Result<Response<Body>, ResponseError> {
-    req = AuthRequired.call(req, app).await?;
-
-    let (path, method) = (req.uri().path().to_owned(), req.method());
-
-    // regex matching for routes with params
-    if let (Some(caps), &Method::POST) = (CAMPAIGN_UPDATE_BY_ID.captures(&path), method) {
-        let param = RouteParams(vec![caps
-            .get(1)
-            .map_or("".to_string(), |m| m.as_str().to_string())]);
-
-        req.extensions_mut().insert(param);
-
-        update_campaign(req, app).await
-    } else {
-        Err(ResponseError::NotFound)
-    }
-}
-
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ResponseError {
     NotFound,
     BadRequest(String),

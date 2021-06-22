@@ -4,9 +4,8 @@
 // use crate::event_reducer;
 // use crate::payout::get_payout;
 use crate::{
-    access::{check_access, Error as AccessError},
     analytics_recorder,
-    db::{event_aggregate::insert_event_aggregate, get_channel_by_id, update_targeting_rules},
+    db::{event_aggregate::insert_event_aggregate, get_channel_by_id},
     Application, Auth, DbPool, ResponseError, Session,
 };
 use async_std::sync::RwLock;
@@ -127,35 +126,35 @@ impl EventAggregator {
             }
         };
 
-        check_access(
-            &app.redis,
-            session,
-            auth,
-            &app.config.ip_rate_limit,
-            &record.channel,
-            &events,
-        )
-        .await
-        .map_err(|e| match e {
-            AccessError::OnlyCreatorCanCloseChannel | AccessError::ForbiddenReferrer => {
-                ResponseError::Forbidden(e.to_string())
-            }
-            AccessError::OnlyCreatorCanUpdateTargetingRules => {
-                ResponseError::Forbidden(e.to_string())
-            }
-            AccessError::RulesError(error) => ResponseError::TooManyRequests(error),
-            AccessError::UnAuthenticated => ResponseError::Unauthorized,
-            _ => ResponseError::BadRequest(e.to_string()),
-        })?;
+        // check_access(
+        //     &app.redis,
+        //     session,
+        //     auth,
+        //     &app.config.ip_rate_limit,
+        //     &record.channel,
+        //     &events,
+        // )
+        // .await
+        // .map_err(|e| match e {
+        //     AccessError::OnlyCreatorCanCloseChannel | AccessError::ForbiddenReferrer => {
+        //         ResponseError::Forbidden(e.to_string())
+        //     }
+        //     AccessError::OnlyCreatorCanUpdateTargetingRules => {
+        //         ResponseError::Forbidden(e.to_string())
+        //     }
+        //     AccessError::RulesError(error) => ResponseError::TooManyRequests(error),
+        //     AccessError::UnAuthenticated => ResponseError::Unauthorized,
+        //     _ => ResponseError::BadRequest(e.to_string()),
+        // })?;
 
-        let new_targeting_rules = events.iter().find_map(|ev| match ev {
-            Event::UpdateTargeting { targeting_rules } => Some(targeting_rules),
-            _ => None,
-        });
+        // let new_targeting_rules = events.iter().find_map(|ev| match ev {
+        //     Event::UpdateTargeting { targeting_rules } => Some(targeting_rules),
+        //     _ => None,
+        // });
 
-        if let Some(new_rules) = new_targeting_rules {
-            update_targeting_rules(&dbpool.clone(), &channel_id, &new_rules).await?;
-        }
+        // if let Some(new_rules) = new_targeting_rules {
+        //     update_targeting_rules(&dbpool.clone(), &channel_id, &new_rules).await?;
+        // }
 
         //
         // TODO: AIP#61 Events & payouts should be separated in to Analytics & Spender Aggregator
