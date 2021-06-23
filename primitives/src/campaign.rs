@@ -8,6 +8,7 @@ use chrono::{
     DateTime, Utc,
 };
 use serde::{Deserialize, Serialize};
+use serde_with::with_prefix;
 
 pub use {
     campaign_id::CampaignId,
@@ -15,14 +16,7 @@ pub use {
     validators::{ValidatorRole, Validators},
 };
 
-// re-export the prefix module!
-pub mod prefix_active {
-    use serde_with::with_prefix;
-
-    pub use prefix_active::*;
-
-    with_prefix!(prefix_active "active_");
-}
+with_prefix!(pub prefix_active "active_");
 
 mod campaign_id {
     use crate::ToHex;

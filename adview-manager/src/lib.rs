@@ -432,7 +432,7 @@ impl Manager {
 
     pub async fn get_next_ad_unit(&self) -> Result<Option<NextAdUnit>, Error> {
         let units_for_slot = self.get_market_demand_resp().await?;
-        let campaigns = &units_for_slot.campaigns;
+        let m_campaigns = &units_for_slot.campaigns;
         let fallback_unit = units_for_slot.fallback_unit;
         let targeting_input = units_for_slot.targeting_input_base;
 
@@ -444,7 +444,7 @@ impl Manager {
 
         // Stickiness is when we keep showing an ad unit for a slot for some time in order to achieve fair impression value
         // see https://github.com/AdExNetwork/adex-adview-manager/issues/65
-        let sticky_result = self.get_sticky_ad_unit(campaigns, &hostname).await;
+        let sticky_result = self.get_sticky_ad_unit(m_campaigns, &hostname).await;
         if let Some(sticky) = sticky_result {
             return Ok(Some(NextAdUnit {
                 unit: sticky.unit,
@@ -461,19 +461,19 @@ impl Manager {
         let seed = BigNum::from(random as u64);
 
         // Apply targeting, now with adView.* variables, and sort the resulting ad units
-        let mut units_with_price = campaigns
+        let mut units_with_price = m_campaigns
             .iter()
-            .map(|campaign| {
+            .map(|m_campaign| {
                 // since we are in a Iterator.map(), we can't use async, so we block
-                if block_on(self.is_campaign_sticky(campaign.campaign.id)) {
+                if block_on(self.is_campaign_sticky(m_campaign.campaign.id)) {
                     return vec![];
                 }
 
-                let campaign_id = campaign.campaign.id;
+                let campaign_id = m_campaign.campaign.id;
 
-                let mut unit_input = targeting_input.clone().with_campaign(campaign.campaign.clone());
+                let mut unit_input = targeting_input.clone().with_campaign(m_campaign.campaign.clone());
 
-                campaign
+                m_campaign
                     .units_with_price
                     .iter()
                     .filter(|unit_with_price| {
@@ -490,7 +490,7 @@ impl Manager {
                         let on_type_error = |error, rule| error!(&self.logger, "Rule evaluation error for {:?}", campaign_id; "error" => ?error, "rule" => ?rule);
 
                         targeting::eval_with_callback(
-                            &campaign.campaign.targeting_rules,
+                            &m_campaign.campaign.targeting_rules,
                             &unit_input,
                             &mut output,
                             Some(on_type_error)
@@ -539,11 +539,11 @@ impl Manager {
 
         // Return the results, with a fallback unit if there is one
         if let Some((unit_with_price, campaign_id)) = auction_winner {
-            let validators = campaigns
+            let validators = m_campaigns
                 .iter()
-                .find_map(|campaign| {
-                    if &campaign.campaign.id == campaign_id {
-                        Some(&campaign.campaign.validators)
+                .find_map(|m_campaign| {
+                    if &m_campaign.campaign.id == campaign_id {
+                        Some(&m_campaign.campaign.validators)
                     } else {
                         None
                     }
