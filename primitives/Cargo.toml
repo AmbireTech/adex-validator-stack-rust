@@ -17,7 +17,7 @@ serde_json = "1.0"
 serde-hex = "0.1.0"
 serde_millis = "0.1.1"
 # Used prefixes on field for targeting::Input, and `campaign::Active`
-serde_with = "1.6"
+serde_with = "1.9"
 # Configuration
 toml = "0.5"
 # Logging
