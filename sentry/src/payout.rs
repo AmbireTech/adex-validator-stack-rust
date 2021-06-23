@@ -4,12 +4,12 @@ use primitives::{
     sentry::Event,
     targeting::Input,
     targeting::{eval_with_callback, get_pricing_bounds, input, Error, Output},
-    Address, BigNum, Campaign,
+    Address, Campaign, UnifiedNum,
 };
 use slog::{error, Logger};
 use std::cmp::{max, min};
 
-pub type Result = std::result::Result<Option<(Address, BigNum)>, Error>;
+pub type Result = std::result::Result<Option<(Address, UnifiedNum)>, Error>;
 
 /// If None is returned this means that the targeting rules evaluation has set `show = false`
 pub fn get_payout(

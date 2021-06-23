@@ -17,7 +17,7 @@ serde_json = "1.0"
 serde-hex = "0.1.0"
 serde_millis = "0.1.1"
 # Used prefixes on field for targeting::Input, and `campaign::Active`
-serde_with = "1.6"
+serde_with = "1.9"
 # Configuration
 toml = "0.5"
 # Logging
@@ -34,7 +34,7 @@ ethabi = "13.0.0"
 # For the nonce U256
 ethereum-types = "0.11"
 # Macro for easier derive of Display & FromStr
-parse-display = "^0.4.1"
+parse-display = "^0.5.0"
 # CID & multihash / multibase
 cid = "0.6"
 hex = "0.4"

@@ -301,17 +301,13 @@ pub mod channel_list {
 pub mod campaign_create {
     use chrono::{serde::ts_milliseconds, DateTime, Utc};
     use serde::{Deserialize, Serialize};
-    use serde_with::with_prefix;
 
     use crate::{
-        campaign::{Active, PricingBounds, Validators},
+        campaign::{prefix_active, Active, PricingBounds, Validators},
         channel_v5::Channel,
         targeting::Rules,
         AdUnit, Address, Campaign, CampaignId, EventSubmission, UnifiedNum,
     };
-
-    // use the same prefix for Active
-    with_prefix!(prefix_active "active_");
 
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     /// All fields are present except the `CampaignId` which is randomly created

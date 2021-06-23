@@ -1,4 +1,4 @@
-use crate::{campaign::Pricing, BigNum, Campaign};
+use crate::{campaign::Pricing, Campaign, UnifiedNum};
 
 pub use eval::*;
 use serde_json::Number;
@@ -34,7 +34,7 @@ pub struct Output {
     /// For example: price.IMPRESSION
     /// The default is the min of the bound of event type:
     /// Default: pricingBounds.IMPRESSION.min
-    pub price: HashMap<String, BigNum>,
+    pub price: HashMap<String, UnifiedNum>,
 }
 
 impl Output {
@@ -50,7 +50,7 @@ impl Output {
                     .price
                     .get(price_key.trim_start_matches("price."))
                     .ok_or(Error::UnknownVariable)?;
-                Ok(Value::BigNum(price.clone()))
+                Ok(Value::UnifiedNum(*price))
             }
             _ => Err(Error::UnknownVariable),
         }
@@ -95,7 +95,10 @@ mod test {
             )),
             output.try_get("boost")
         );
-        assert_eq!(Ok(Value::BigNum(100.into())), output.try_get("price.one"));
+        assert_eq!(
+            Ok(Value::UnifiedNum(100.into())),
+            output.try_get("price.one")
+        );
         assert_eq!(Err(Error::UnknownVariable), output.try_get("price.unknown"));
         assert_eq!(Err(Error::UnknownVariable), output.try_get("unknown"));
     }
@@ -121,7 +124,10 @@ mod test {
 
         assert_eq!(true, output.show);
         assert_eq!(1.0, output.boost);
-        assert_eq!(Some(&BigNum::from(1_000)), output.price.get("IMPRESSION"));
-        assert_eq!(Some(&BigNum::from(3_000)), output.price.get("CLICK"));
+        assert_eq!(
+            Some(&UnifiedNum::from(1_000)),
+            output.price.get("IMPRESSION")
+        );
+        assert_eq!(Some(&UnifiedNum::from(3_000)), output.price.get("CLICK"));
     }
 }

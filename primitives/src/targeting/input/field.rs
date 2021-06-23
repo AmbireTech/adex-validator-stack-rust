@@ -21,14 +21,14 @@ pub const FIELDS: [Field; 24] = [
     // Campaign-dependant - Global scope, accessible everywhere
     // AdUnit
     Field::AdUnit(AdUnit::AdUnitId),
-    // Channel
-    Field::Channel(Channel::AdvertiserId),
-    Field::Channel(Channel::CampaignId),
-    Field::Channel(Channel::CampaignSecondsActive),
-    Field::Channel(Channel::CampaignSecondsDuration),
-    Field::Channel(Channel::CampaignBudget),
-    Field::Channel(Channel::EventMinPrice),
-    Field::Channel(Channel::EventMaxPrice),
+    // Campaign
+    Field::Campaign(Campaign::AdvertiserId),
+    Field::Campaign(Campaign::CampaignId),
+    Field::Campaign(Campaign::CampaignSecondsActive),
+    Field::Campaign(Campaign::CampaignSecondsDuration),
+    Field::Campaign(Campaign::CampaignBudget),
+    Field::Campaign(Campaign::EventMinPrice),
+    Field::Campaign(Campaign::EventMaxPrice),
     // Balances
     Field::Balances(Balances::CampaignTotalSpent),
     Field::Balances(Balances::PublisherEarnedFromCampaign),
@@ -54,7 +54,7 @@ pub enum Field {
     AdUnit(AdUnit),
     /// Global scope, accessible everywhere, campaign-dependant
     #[display("{0}")]
-    Channel(Channel),
+    Campaign(Campaign),
     /// Global scope, accessible everywhere, campaign-dependant
     #[display("{0}")]
     Balances(Balances),
@@ -117,7 +117,7 @@ pub enum AdUnit {
 
 #[derive(Hash, Copy, Clone, Debug, Eq, PartialEq, DeriveFromStr, DeriveDisplay)]
 #[display(style = "camelCase")]
-pub enum Channel {
+pub enum Campaign {
     AdvertiserId,
     CampaignId,
     CampaignSecondsActive,
@@ -127,7 +127,7 @@ pub enum Channel {
     EventMaxPrice,
 }
 
-impl TryFrom<String> for Channel {
+impl TryFrom<String> for Campaign {
     type Error = parse_display::ParseError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
@@ -135,8 +135,8 @@ impl TryFrom<String> for Channel {
     }
 }
 
-impl From<Channel> for String {
-    fn from(channel: Channel) -> Self {
+impl From<Campaign> for String {
+    fn from(channel: Campaign) -> Self {
         channel.to_string()
     }
 }
@@ -318,7 +318,7 @@ mod test {
             SerdeValue::String("adUnitId".into()),
         );
         test_field(
-            Field::Channel(Channel::CampaignBudget),
+            Field::Campaign(Campaign::CampaignBudget),
             SerdeValue::String("campaignBudget".into()),
         );
         test_field(
