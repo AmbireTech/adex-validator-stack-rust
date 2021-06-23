@@ -1,7 +1,6 @@
 use crate::{
-    targeting::Rules,
     validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
-    Address, BalancesMap, BigNum, Channel, ChannelId, ValidatorId, IPFS,
+    Address, BigNum, Channel, ChannelId, ValidatorId, IPFS,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

@@ -3,7 +3,7 @@ use crate::db::{
     get_channel_by_id, insert_channel, insert_validator_messages, list_channels,
     update_exhausted_channel, PoolError,
 };
-use crate::{success_response, Application, Auth, ResponseError, RouteParams, Session};
+use crate::{success_response, Application, Auth, ResponseError, RouteParams};
 use futures::future::try_join_all;
 use hex::FromHex;
 use hyper::{Body, Request, Response};
@@ -11,7 +11,7 @@ use primitives::{
     adapter::Adapter,
     sentry::{
         channel_list::{ChannelListQuery, LastApprovedQuery},
-        Event, LastApproved, LastApprovedResponse, SuccessResponse,
+        LastApproved, LastApprovedResponse, SuccessResponse,
     },
     validator::MessageTypes,
     Channel, ChannelId,
