@@ -2,10 +2,11 @@
 #![deny(clippy::all)]
 
 use adex_primitives::{
+    campaign::Validators,
     supermarket::units_for_slot,
     supermarket::units_for_slot::response::{AdUnit, Campaign},
     targeting::{self, input},
-    BigNum, ChannelId, SpecValidators, ValidatorId, IPFS,
+    Address, BigNum, CampaignId, ToHex, UnifiedNum, IPFS,
 };
 use async_std::{sync::RwLock, task::block_on};
 use chrono::{DateTime, Utc};
@@ -23,7 +24,6 @@ use std::{
     sync::Arc,
 };
 use thiserror::Error;
-use units_for_slot::response::UnitsWithPrice;
 use url::Url;
 
 const IPFS_GATEWAY: &str = "https://ipfs.moonicorn.network/ipfs/";
@@ -48,7 +48,7 @@ pub struct Options {
     #[serde(rename = "marketURL")]
     pub market_url: Url,
     pub market_slot: IPFS,
-    pub publisher_addr: ValidatorId,
+    pub publisher_addr: Address,
     // All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared
     pub whitelisted_tokens: Vec<String>,
     pub width: Option<u64>,
@@ -70,7 +70,7 @@ impl Options {
 pub struct HistoryEntry {
     time: DateTime<Utc>,
     unit_id: IPFS,
-    campaign_id: ChannelId,
+    campaign_id: CampaignId,
     slot_id: IPFS,
 }
 
@@ -79,7 +79,7 @@ pub struct HistoryEntry {
 struct Event {
     #[serde(rename = "type")]
     event_type: String,
-    publisher: ValidatorId,
+    publisher: Address,
     ad_unit: IPFS,
     ad_slot: IPFS,
     #[serde(rename = "ref")]
@@ -209,16 +209,16 @@ pub fn get_unit_html_with_events(
     options: &Options,
     ad_unit: &AdUnit,
     hostname: &str,
-    channel_id: ChannelId,
-    validators: &SpecValidators,
+    campaign_id: CampaignId,
+    validators: &Validators,
     no_impression: impl Into<bool>,
 ) -> String {
     let get_body = |event_type: &str| EventBody {
         events: vec![Event {
             event_type: event_type.to_string(),
             publisher: options.publisher_addr,
-            ad_unit: ad_unit.id.clone(),
-            ad_slot: options.market_slot.clone(),
+            ad_unit: ad_unit.id,
+            ad_slot: options.market_slot,
             referrer: "document.referrer".to_string(),
         }],
     };
@@ -234,7 +234,7 @@ pub fn get_unit_html_with_events(
             .map(|validator| {
                 let fetch_url = format!(
                     "{}/channel/{}/events?pubAddr={}",
-                    validator.url, channel_id, options.publisher_addr
+                    validator.url, campaign_id, options.publisher_addr
                 );
 
                 format!("fetch('{}', fetchOpts)", fetch_url)
@@ -304,7 +304,7 @@ impl Manager {
     pub async fn get_targeting_input(
         &self,
         mut input: input::Input,
-        channel_id: ChannelId,
+        campaign_id: CampaignId,
     ) -> input::Input {
         let seconds_since_campaign_impression = self
             .history
@@ -313,7 +313,7 @@ impl Manager {
             .iter()
             .rev()
             .find_map(|h| {
-                if h.campaign_id == channel_id {
+                if h.campaign_id == campaign_id {
                     let last_impression: chrono::Duration = Utc::now() - h.time;
 
                     u64::try_from(last_impression.num_seconds()).ok()
@@ -352,7 +352,7 @@ impl Manager {
 
         let stick_campaign = campaigns
             .iter()
-            .find(|c| c.channel.id == sticky_entry.campaign_id)?;
+            .find(|c| c.campaign.id == sticky_entry.campaign_id)?;
 
         let unit = stick_campaign
             .units_with_price
@@ -370,8 +370,8 @@ impl Manager {
             &self.options,
             &unit,
             hostname,
-            stick_campaign.channel.id,
-            &stick_campaign.channel.spec.validators,
+            stick_campaign.campaign.id,
+            &stick_campaign.campaign.validators,
             true,
         );
 
@@ -383,7 +383,7 @@ impl Manager {
         })
     }
 
-    async fn is_campaign_sticky(&self, campaign_id: ChannelId) -> bool {
+    async fn is_campaign_sticky(&self, campaign_id: CampaignId) -> bool {
         if self.options.disabled_sticky {
             false
         } else {
@@ -400,7 +400,7 @@ impl Manager {
     pub async fn get_market_demand_resp(
         &self,
     ) -> Result<units_for_slot::response::Response, Error> {
-        let pub_prefix: String = self.options.publisher_addr.to_hex_non_prefix_string();
+        let pub_prefix = self.options.publisher_addr.to_hex();
 
         let deposit_asset = self
             .options
@@ -432,7 +432,7 @@ impl Manager {
 
     pub async fn get_next_ad_unit(&self) -> Result<Option<NextAdUnit>, Error> {
         let units_for_slot = self.get_market_demand_resp().await?;
-        let campaigns = &units_for_slot.campaigns;
+        let m_campaigns = &units_for_slot.campaigns;
         let fallback_unit = units_for_slot.fallback_unit;
         let targeting_input = units_for_slot.targeting_input_base;
 
@@ -444,7 +444,7 @@ impl Manager {
 
         // Stickiness is when we keep showing an ad unit for a slot for some time in order to achieve fair impression value
         // see https://github.com/AdExNetwork/adex-adview-manager/issues/65
-        let sticky_result = self.get_sticky_ad_unit(campaigns, &hostname).await;
+        let sticky_result = self.get_sticky_ad_unit(m_campaigns, &hostname).await;
         if let Some(sticky) = sticky_result {
             return Ok(Some(NextAdUnit {
                 unit: sticky.unit,
@@ -461,28 +461,28 @@ impl Manager {
         let seed = BigNum::from(random as u64);
 
         // Apply targeting, now with adView.* variables, and sort the resulting ad units
-        let mut units_with_price: Vec<(UnitsWithPrice, ChannelId)> = campaigns
+        let mut units_with_price = m_campaigns
             .iter()
-            .map(|campaign| {
+            .map(|m_campaign| {
                 // since we are in a Iterator.map(), we can't use async, so we block
-                if block_on(self.is_campaign_sticky(campaign.channel.id)) {
+                if block_on(self.is_campaign_sticky(m_campaign.campaign.id)) {
                     return vec![];
                 }
 
-                let campaign_id = campaign.channel.id;
+                let campaign_id = m_campaign.campaign.id;
 
-                let mut unit_input = targeting_input.clone().with_market_channel(campaign.channel.clone());
+                let mut unit_input = targeting_input.clone().with_campaign(m_campaign.campaign.clone());
 
-                campaign
+                m_campaign
                     .units_with_price
                     .iter()
                     .filter(|unit_with_price| {
-                        unit_input.ad_unit_id = Some(unit_with_price.unit.id.clone());
+                        unit_input.ad_unit_id = Some(unit_with_price.unit.id);
 
                         let mut output = targeting::Output {
                             show: true,
                             boost: 1.0,
-                            price: vec![("IMPRESSION".to_string(), unit_with_price.price.clone())]
+                            price: vec![("IMPRESSION".to_string(), unit_with_price.price)]
                                 .into_iter()
                                 .collect(),
                         };
@@ -490,7 +490,7 @@ impl Manager {
                         let on_type_error = |error, rule| error!(&self.logger, "Rule evaluation error for {:?}", campaign_id; "error" => ?error, "rule" => ?rule);
 
                         targeting::eval_with_callback(
-                            &campaign.targeting_rules,
+                            &m_campaign.campaign.targeting_rules,
                             &unit_input,
                             &mut output,
                             Some(on_type_error)
@@ -503,7 +503,7 @@ impl Manager {
             })
             .flatten()
             .filter(|x| !(self.options.disabled_video && is_video(&x.0.unit)))
-            .collect();
+            .collect::<Vec<_>>();
 
         units_with_price.sort_by(|b, a| match (&a.0.price).cmp(&b.0.price) {
             Ordering::Equal => randomized_sort_pos(&a.0.unit, seed.clone())
@@ -519,9 +519,9 @@ impl Manager {
 
             let new_entry = HistoryEntry {
                 time: Utc::now(),
-                unit_id: unit_with_price.unit.id.clone(),
+                unit_id: unit_with_price.unit.id,
                 campaign_id: *campaign_id,
-                slot_id: self.options.market_slot.clone(),
+                slot_id: self.options.market_slot,
             };
 
             *self.history.write().await = history
@@ -539,11 +539,11 @@ impl Manager {
 
         // Return the results, with a fallback unit if there is one
         if let Some((unit_with_price, campaign_id)) = auction_winner {
-            let validators = campaigns
+            let validators = m_campaigns
                 .iter()
-                .find_map(|campaign| {
-                    if &campaign.channel.id == campaign_id {
-                        Some(&campaign.channel.spec.validators)
+                .find_map(|m_campaign| {
+                    if &m_campaign.campaign.id == campaign_id {
+                        Some(&m_campaign.campaign.validators)
                     } else {
                         None
                     }
@@ -562,7 +562,7 @@ impl Manager {
 
             Ok(Some(NextAdUnit {
                 unit: unit_with_price.unit.clone(),
-                price: unit_with_price.price.clone(),
+                price: unit_with_price.price,
                 accepted_referrers: units_for_slot.accepted_referrers,
                 html,
             }))
@@ -582,14 +582,14 @@ impl Manager {
 
 pub struct NextAdUnit {
     pub unit: AdUnit,
-    pub price: BigNum,
+    pub price: UnifiedNum,
     pub accepted_referrers: Vec<Url>,
     pub html: String,
 }
 
 pub struct StickyAdUnit {
     pub unit: AdUnit,
-    pub price: BigNum,
+    pub price: UnifiedNum,
     pub html: String,
     pub is_sticky: bool,
 }

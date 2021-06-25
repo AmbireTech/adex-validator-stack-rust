@@ -43,14 +43,7 @@ pub enum Finalized {
 pub mod units_for_slot {
     pub mod response {
 
-        use crate::{
-            targeting::{Input, Rules},
-            BigNum, ChannelId, ChannelSpec, SpecValidators, ValidatorId, IPFS,
-        };
-        use chrono::{
-            serde::{ts_milliseconds, ts_milliseconds_option},
-            DateTime, Utc,
-        };
+        use crate::{targeting::Input, UnifiedNum, IPFS};
         use serde::{Deserialize, Serialize};
         use url::Url;
 
@@ -67,65 +60,16 @@ pub mod units_for_slot {
         #[serde(rename_all = "camelCase")]
         pub struct UnitsWithPrice {
             pub unit: AdUnit,
-            pub price: BigNum,
+            pub price: UnifiedNum,
         }
 
         #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
         #[serde(rename_all = "camelCase")]
         pub struct Campaign {
             #[serde(flatten)]
-            pub channel: Channel,
-            pub targeting_rules: Rules,
+            pub campaign: crate::Campaign,
+            /// Supermarket Specific Campaign field
             pub units_with_price: Vec<UnitsWithPrice>,
-        }
-
-        #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-        #[serde(rename_all = "camelCase")]
-        pub struct Channel {
-            pub id: ChannelId,
-            pub creator: ValidatorId,
-            pub deposit_asset: String,
-            pub deposit_amount: BigNum,
-            pub spec: Spec,
-        }
-
-        impl From<crate::Channel> for Channel {
-            fn from(channel: crate::Channel) -> Self {
-                Self {
-                    id: channel.id,
-                    creator: channel.creator,
-                    deposit_asset: channel.deposit_asset,
-                    deposit_amount: channel.deposit_amount,
-                    spec: channel.spec.into(),
-                }
-            }
-        }
-
-        #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-        #[serde(rename_all = "camelCase")]
-        pub struct Spec {
-            #[serde(with = "ts_milliseconds")]
-            pub withdraw_period_start: DateTime<Utc>,
-            #[serde(
-                default,
-                skip_serializing_if = "Option::is_none",
-                with = "ts_milliseconds_option"
-            )]
-            pub active_from: Option<DateTime<Utc>>,
-            #[serde(with = "ts_milliseconds")]
-            pub created: DateTime<Utc>,
-            pub validators: SpecValidators,
-        }
-
-        impl From<ChannelSpec> for Spec {
-            fn from(channel_spec: ChannelSpec) -> Self {
-                Self {
-                    withdraw_period_start: channel_spec.withdraw_period_start,
-                    active_from: channel_spec.active_from,
-                    created: channel_spec.created,
-                    validators: channel_spec.validators,
-                }
-            }
         }
 
         #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
@@ -141,7 +85,7 @@ pub mod units_for_slot {
         impl From<&crate::AdUnit> for AdUnit {
             fn from(ad_unit: &crate::AdUnit) -> Self {
                 Self {
-                    id: ad_unit.ipfs.clone(),
+                    id: ad_unit.ipfs,
                     media_url: ad_unit.media_url.clone(),
                     media_mime: ad_unit.media_mime.clone(),
                     target_url: ad_unit.target_url.clone(),

@@ -42,7 +42,7 @@ pub struct Nonce(pub U256);
 
 impl Nonce {
     /// In Big-Endian
-    pub fn to_bytes(&self) -> [u8; 32] {
+    pub fn to_bytes(self) -> [u8; 32] {
         // the impl of From<U256> uses BigEndian
         self.0.into()
     }
