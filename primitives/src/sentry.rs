@@ -1,7 +1,6 @@
 use crate::{
-    targeting::Rules,
     validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
-    Address, BalancesMap, BigNum, Channel, ChannelId, ValidatorId, IPFS,
+    Address, BigNum, Channel, ChannelId, ValidatorId, IPFS,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -367,16 +366,30 @@ pub mod campaign_create {
     }
 
     // All editable fields stored in one place, used for checking when a budget is changed
-    // #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-    // pub struct CampaignState {
-    //     pub budget: UnifiedNum,
-    //     pub validators: Validators,
-    //     pub title: Option<String>,
-    //     pub pricing_bounds: Option<PricingBounds>,
-    //     pub event_submission: Option<EventSubmission>,
-    //     pub ad_units: Vec<AdUnit>,
-    //     pub targeting_rules: Rules,
-    // }
+    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+    pub struct ModifyCampaign {
+        pub budget: Option<UnifiedNum>,
+        pub validators: Option<Validators>,
+        pub title: Option<String>,
+        pub pricing_bounds: Option<PricingBounds>,
+        pub event_submission: Option<EventSubmission>,
+        pub ad_units: Option<Vec<AdUnit>>,
+        pub targeting_rules: Option<Rules>,
+    }
+
+    impl ModifyCampaign {
+        pub fn from_campaign(campaign: Campaign) -> Self {
+            ModifyCampaign {
+                budget: Some(campaign.budget),
+                validators: Some(campaign.validators),
+                title: campaign.title,
+                pricing_bounds: campaign.pricing_bounds,
+                event_submission: campaign.event_submission,
+                ad_units: Some(campaign.ad_units),
+                targeting_rules: Some(campaign.targeting_rules),
+            }
+        }
+    }
 }
 
 #[cfg(feature = "postgres")]

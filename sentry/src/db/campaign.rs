@@ -1,5 +1,5 @@
 use crate::db::{DbPool, PoolError};
-use primitives::{Campaign, CampaignId};
+use primitives::{ChannelId, CampaignId, Campaign};
 use tokio_postgres::types::Json;
 
 pub async fn insert_campaign(pool: &DbPool, campaign: &Campaign) -> Result<bool, PoolError> {
@@ -48,30 +48,18 @@ pub async fn fetch_campaign(
     Ok(row.as_ref().map(Campaign::from))
 }
 
-pub async fn get_campaigns_for_channel(
+pub async fn get_campaigns_by_channel(
     pool: &DbPool,
-    campaign: &Campaign,
+    channel_id: &ChannelId,
 ) -> Result<Vec<Campaign>, PoolError> {
     let client = pool.get().await?;
     let statement = client.prepare("SELECT id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to FROM campaigns WHERE channel_id = $1").await?;
 
-    let rows = client.query(&statement, &[&campaign.channel.id()]).await?;
+    let rows = client.query(&statement, &[&channel_id]).await?;
 
     let campaigns = rows.iter().map(Campaign::from).collect();
 
     Ok(campaigns)
-}
-
-pub async fn campaign_exists(pool: &DbPool, campaign: &Campaign) -> Result<bool, PoolError> {
-    let client = pool.get().await?;
-    let statement = client
-        .prepare("SELECT EXISTS(SELECT 1 FROM campaigns WHERE id = $1)")
-        .await?;
-
-    let row = client.execute(&statement, &[&campaign.id]).await?;
-
-    let exists = row == 1;
-    Ok(exists)
 }
 
 // TODO: Test for campaign ad_units
@@ -104,8 +92,12 @@ pub async fn update_campaign(pool: &DbPool, campaign: &Campaign) -> Result<bool,
 #[cfg(test)]
 mod test {
     use primitives::util::tests::prep_db::DUMMY_CAMPAIGN;
+    use tokio_postgres::error::SqlState;
 
-    use crate::db::tests_postgres::{setup_test_migrations, DATABASE_POOL};
+    use crate::{
+        db::tests_postgres::{setup_test_migrations, DATABASE_POOL},
+        ResponseError
+    };
 
     use super::*;
 
@@ -131,10 +123,17 @@ mod test {
 
         assert!(is_inserted);
 
-        let exists = campaign_exists(&database.pool, &campaign_for_testing)
-            .await
-            .expect("Should succeed");
-        assert!(exists);
+        let is_duplicate_inserted = insert_campaign(&database.pool, &campaign_for_testing)
+            .await;
+
+        assert!(is_duplicate_inserted.is_err());
+        let insertion_error = is_duplicate_inserted.err().expect("should get error");
+        match insertion_error {
+            PoolError::Backend(error) if error.code() == Some(&SqlState::UNIQUE_VIOLATION) => {
+                assert!(true);
+            }
+            _ => assert!(false),
+        }
 
         let fetched_campaign = fetch_campaign(database.pool.clone(), &campaign_for_testing.id)
             .await
