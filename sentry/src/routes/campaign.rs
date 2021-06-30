@@ -227,18 +227,20 @@ pub mod update_campaign {
     }
 
     async fn get_remaining_for_multiple_campaigns(redis: &MultiplexedConnection, campaigns: &[Campaign], mutated_campaign_id: CampaignId) -> Result<Vec<UnifiedNum>, CampaignError> {
-        let other_campaigns_remaining = campaigns
+        let keys: Vec<String> = campaigns.into_iter().map(|c| format!("{}:{}", *CAMPAIGN_REMAINING_KEY, c.id)).collect();
+        let remainings = redis::cmd("MGET")
+            .arg(keys)
+            .query_async::<_, Vec<Option<String>>>(&mut redis.clone())
+            .await?;
+
+        let remainings = remainings
             .into_iter()
-            .filter(|c| c.id != mutated_campaign_id)
-            // TODO: Do 1 call with MGET
-            .map(|c| async move {
-                let remaining = get_remaining_for_campaign_from_redis(&redis, c.id).await.ok_or(CampaignError::FailedUpdate("Couldn't get remaining for campaign".to_string()))?;
-                Ok(remaining)
-            })
-            .collect::<Vec<_>>();
-        let other_campaigns_remaining = join_all(other_campaigns_remaining).await;
-        let other_campaigns_remaining: Result<Vec<UnifiedNum>, _> = other_campaigns_remaining.into_iter().collect();
-        other_campaigns_remaining
+            .flat_map(|r| r)
+            .map(|r| get_unified_num_from_string(&r))
+            .flatten()
+            .collect();
+
+        Ok(remainings)
     }
 
     pub async fn get_campaigns_remaining_sum(redis: &MultiplexedConnection, campaigns: &[Campaign], mutated_campaign: &Campaign) -> Result<UnifiedNum, CampaignError> {
