@@ -1,7 +1,7 @@
 #![deny(clippy::all)]
 #![deny(rust_2018_idioms)]
 
-use crate::db::{DbPool, fetch_campaign};
+use crate::db::{fetch_campaign, DbPool};
 use crate::routes::campaign;
 use crate::routes::channel::channel_status;
 use crate::routes::event_aggregate::list_channel_event_aggregates;
@@ -18,7 +18,7 @@ use middleware::{campaign::CampaignLoad, Chain, Middleware};
 use once_cell::sync::Lazy;
 use primitives::adapter::Adapter;
 use primitives::sentry::ValidationErrorResponse;
-use primitives::{Config, ValidatorId, CampaignId};
+use primitives::{CampaignId, Config, ValidatorId};
 use redis::aio::MultiplexedConnection;
 use regex::Regex;
 use routes::analytics::{advanced_analytics, advertiser_analytics, analytics, publisher_analytics};
@@ -201,14 +201,21 @@ async fn campaigns_router<A: Adapter + 'static>(
             .map_or("".to_string(), |m| m.as_str().to_string())]);
 
         // Should be safe to access indice here
-        let campaign_id = param.get(0).ok_or_else(|| ResponseError::BadRequest("No CampaignId".to_string()))?;
-        let campaign_id = CampaignId::from_str(&campaign_id).map_err(|_| ResponseError::BadRequest("Bad CampaignId".to_string()))?;
+        let campaign_id = param
+            .get(0)
+            .ok_or_else(|| ResponseError::BadRequest("No CampaignId".to_string()))?;
+        let campaign_id = CampaignId::from_str(&campaign_id)
+            .map_err(|_| ResponseError::BadRequest("Bad CampaignId".to_string()))?;
 
-        let campaign = fetch_campaign(app.pool.clone(), &campaign_id).await.map_err(|_| ResponseError::NotFound)?;
+        let campaign = fetch_campaign(app.pool.clone(), &campaign_id)
+            .await
+            .map_err(|_| ResponseError::NotFound)?;
 
         req.extensions_mut().insert(campaign);
         handle_route(req, app).await
-    } else if let (Some(caps), &Method::POST) = (INSERT_EVENTS_BY_CAMPAIGN_ID.captures(&path), method) {
+    } else if let (Some(caps), &Method::POST) =
+        (INSERT_EVENTS_BY_CAMPAIGN_ID.captures(&path), method)
+    {
         let param = RouteParams(vec![caps
             .get(1)
             .map_or("".to_string(), |m| m.as_str().to_string())]);
@@ -245,8 +252,6 @@ async fn analytics_router<A: Adapter + 'static>(
 ) -> Result<Response<Body>, ResponseError> {
     let (route, method) = (req.uri().path(), req.method());
 
-
-    
     // TODO AIP#61: Add routes for:
     // - POST /channel/:id/pay
     // #[serde(rename_all = "camelCase")]
@@ -323,9 +328,8 @@ async fn channels_router<A: Adapter + 'static>(
         req.extensions_mut().insert(param);
 
         insert_events(req, app).await
-    } else */ 
-    if let (Some(caps), &Method::GET) = (LAST_APPROVED_BY_CHANNEL_ID.captures(&path), method)
-    {
+    } else */
+    if let (Some(caps), &Method::GET) = (LAST_APPROVED_BY_CHANNEL_ID.captures(&path), method) {
         let param = RouteParams(vec![caps
             .get(1)
             .map_or("".to_string(), |m| m.as_str().to_string())]);

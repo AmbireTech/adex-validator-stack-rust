@@ -1,5 +1,5 @@
 use crate::db::{DbPool, PoolError};
-use primitives::{ChannelId, CampaignId, Campaign};
+use primitives::{Campaign, CampaignId, ChannelId};
 use tokio_postgres::types::Json;
 
 pub async fn insert_campaign(pool: &DbPool, campaign: &Campaign) -> Result<bool, PoolError> {
@@ -96,7 +96,7 @@ mod test {
 
     use crate::{
         db::tests_postgres::{setup_test_migrations, DATABASE_POOL},
-        ResponseError
+        ResponseError,
     };
 
     use super::*;
@@ -123,8 +123,7 @@ mod test {
 
         assert!(is_inserted);
 
-        let is_duplicate_inserted = insert_campaign(&database.pool, &campaign_for_testing)
-            .await;
+        let is_duplicate_inserted = insert_campaign(&database.pool, &campaign_for_testing).await;
 
         assert!(is_duplicate_inserted.is_err());
         let insertion_error = is_duplicate_inserted.err().expect("should get error");

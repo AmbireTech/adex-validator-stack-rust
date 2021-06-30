@@ -21,17 +21,18 @@ use primitives::{
     spender::Spendable,
     Campaign, CampaignId, UnifiedNum, BigNum
 };
-use redis::aio::MultiplexedConnection;
+use redis::{
+    aio::MultiplexedConnection,
+    RedisError,
+};
 use slog::error;
 use std::{
     cmp::max,
     str::FromStr,
+    collections::HashMap,
 };
-use futures::future::join_all;
-use std::collections::HashMap;
 use deadpool_postgres::PoolError;
 use tokio_postgres::error::SqlState;
-use redis::RedisError;
 
 use chrono::Utc;
 
@@ -147,8 +148,6 @@ pub mod update_campaign {
 
         let modified_campaign = ModifyCampaign::from_campaign(campaign.clone());
 
-        let error_response = ResponseError::BadRequest("err occurred; please try again later".to_string());
-
         // modify Campaign
         modify_campaign(&app.pool, &campaign, &modified_campaign, &app.redis).await.map_err(|_| ResponseError::BadRequest("Failed to update campaign".to_string()))?;
 
@@ -159,20 +158,22 @@ pub mod update_campaign {
         // *NOTE*: When updating campaigns make sure sum(campaigns.map(getRemaining)) <= totalDepoisted - totalspent
         // !WARNING!: totalSpent != sum(campaign.map(c => c.spending)) therefore we must always calculate remaining funds based on total_deposit - lastApprovedNewState.spenders[user]
         // *NOTE*: To close a campaign set campaignBudget to campaignSpent so that spendable == 0
+
+        let new_budget = modified_campaign.budget.ok_or(CampaignError::FailedUpdate("Couldn't get new budget".to_string()))?;
         let accounting_spent = get_accounting_spent(pool.clone(), &campaign.creator, &campaign.channel.id()).await?;
 
         let latest_spendable = fetch_spendable(pool.clone(), &campaign.creator, &campaign.channel.id()).await?;
 
         let old_remaining = get_remaining_for_campaign_from_redis(&redis, campaign.id).await.ok_or(CampaignError::FailedUpdate("Couldn't get remaining for campaign".to_string()))?;
 
-        let campaign_spent = campaign.budget.checked_sub(&old_remaining).ok_or(CampaignError::CalculationError)?;
-        if campaign_spent >= campaign.budget {
+        let campaign_spent = new_budget.checked_sub(&old_remaining).ok_or(CampaignError::CalculationError)?;
+        if campaign_spent >= new_budget {
             return Err(CampaignError::BudgetExceeded);
         }
 
         let old_remaining = UnifiedNum::from_u64(max(0, old_remaining.to_u64()));
 
-        let new_remaining = campaign.budget.checked_sub(&campaign_spent).ok_or(CampaignError::CalculationError)?;
+        let new_remaining = new_budget.checked_sub(&campaign_spent).ok_or(CampaignError::CalculationError)?;
 
         if new_remaining >= old_remaining {
             let diff_in_remaining = new_remaining.checked_sub(&old_remaining).ok_or(CampaignError::CalculationError)?;
@@ -186,7 +187,7 @@ pub mod update_campaign {
         // Gets the latest Spendable for this (spender, channelId) pair
         let total_remaining = get_total_remaining_for_channel(&accounting_spent, &latest_spendable).ok_or(CampaignError::FailedUpdate("Could not get total remaining for channel".to_string()))?;
         let campaigns_for_channel = get_campaigns_by_channel(&pool, &campaign.channel.id()).await?;
-        let campaigns_remaining_sum = get_campaigns_remaining_sum(&redis, &campaigns_for_channel, &campaign).await.map_err(|_| CampaignError::CalculationError)?;
+        let campaigns_remaining_sum = get_campaigns_remaining_sum(&redis, &campaigns_for_channel, campaign.id, &new_budget).await.map_err(|_| CampaignError::CalculationError)?;
         if campaigns_remaining_sum > total_remaining {
             return Err(CampaignError::BudgetExceeded);
         }
@@ -226,7 +227,7 @@ pub mod update_campaign {
         remaining
     }
 
-    async fn get_remaining_for_multiple_campaigns(redis: &MultiplexedConnection, campaigns: &[Campaign], mutated_campaign_id: CampaignId) -> Result<Vec<UnifiedNum>, CampaignError> {
+    async fn get_remaining_for_multiple_campaigns(redis: &MultiplexedConnection, campaigns: &[Campaign]) -> Result<Vec<UnifiedNum>, CampaignError> {
         let keys: Vec<String> = campaigns.into_iter().map(|c| format!("{}:{}", *CAMPAIGN_REMAINING_KEY, c.id)).collect();
         let remainings = redis::cmd("MGET")
             .arg(keys)
@@ -243,16 +244,16 @@ pub mod update_campaign {
         Ok(remainings)
     }
 
-    pub async fn get_campaigns_remaining_sum(redis: &MultiplexedConnection, campaigns: &[Campaign], mutated_campaign: &Campaign) -> Result<UnifiedNum, CampaignError> {
-        let other_campaigns_remaining = get_remaining_for_multiple_campaigns(&redis, &campaigns, mutated_campaign.id).await?;
+    pub async fn get_campaigns_remaining_sum(redis: &MultiplexedConnection, campaigns: &[Campaign], mutated_campaign: CampaignId, new_budget: &UnifiedNum) -> Result<UnifiedNum, CampaignError> {
+        let other_campaigns_remaining = get_remaining_for_multiple_campaigns(&redis, &campaigns).await?;
         let sum_of_campaigns_remaining = other_campaigns_remaining
             .into_iter()
             .try_fold(UnifiedNum::from_u64(0), |sum, val| sum.checked_add(&val).ok_or(CampaignError::CalculationError))?;
 
         // Necessary to do it explicitly for current campaign as its budget is not yet updated in DB
-        let old_remaining_for_mutated_campaign = get_remaining_for_campaign_from_redis(&redis, mutated_campaign.id).await.ok_or(CampaignError::CalculationError)?;
-        let spent_for_mutated_campaign = mutated_campaign.budget.checked_sub(&old_remaining_for_mutated_campaign).ok_or(CampaignError::CalculationError)?;
-        let new_remaining_for_mutated_campaign = mutated_campaign.budget.checked_sub(&spent_for_mutated_campaign).ok_or(CampaignError::CalculationError)?;
+        let old_remaining_for_mutated_campaign = get_remaining_for_campaign_from_redis(&redis, mutated_campaign).await.ok_or(CampaignError::CalculationError)?;
+        let spent_for_mutated_campaign = new_budget.checked_sub(&old_remaining_for_mutated_campaign).ok_or(CampaignError::CalculationError)?;
+        let new_remaining_for_mutated_campaign = new_budget.checked_sub(&spent_for_mutated_campaign).ok_or(CampaignError::CalculationError)?;
         sum_of_campaigns_remaining.checked_add(&new_remaining_for_mutated_campaign).ok_or(CampaignError::CalculationError)?;
         Ok(sum_of_campaigns_remaining)
     }
