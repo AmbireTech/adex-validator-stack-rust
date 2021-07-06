@@ -22,7 +22,7 @@ use primitives::{CampaignId, Config, ValidatorId};
 use redis::aio::MultiplexedConnection;
 use regex::Regex;
 use routes::analytics::{advanced_analytics, advertiser_analytics, analytics, publisher_analytics};
-use routes::campaign::{create_campaign, update_campaign::handle_route};
+use routes::campaign::{create_campaign, update_campaign};
 use routes::cfg::config;
 use routes::channel::{
     channel_list, channel_validate, create_channel, create_validator_messages, last_approved,
@@ -63,8 +63,6 @@ lazy_static! {
     static ref ADVERTISER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-advertiser/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
     static ref PUBLISHER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-publisher/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
     static ref CREATE_EVENTS_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events/?$").expect("The regex should be valid");
-    static ref CAMPAIGN_UPDATE_BY_ID: Regex =
-        Regex::new(r"^/campaign/0x([a-zA-Z0-9]{32})/?$").expect("The regex should be valid");
 }
 
 static INSERT_EVENTS_BY_CAMPAIGN_ID: Lazy<Regex> = Lazy::new(|| {
@@ -72,6 +70,9 @@ static INSERT_EVENTS_BY_CAMPAIGN_ID: Lazy<Regex> = Lazy::new(|| {
 });
 static CLOSE_CAMPAIGN_BY_CAMPAIGN_ID: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^/campaign/0x([a-zA-Z0-9]{32})/close/?$").expect("The regex should be valid")
+});
+static CAMPAIGN_UPDATE_BY_ID: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^/campaign/0x([a-zA-Z0-9]{32})/?$").expect("The regex should be valid")
 });
 
 #[derive(Debug, Clone)]
@@ -194,7 +195,6 @@ async fn campaigns_router<A: Adapter + 'static>(
 ) -> Result<Response<Body>, ResponseError> {
     let (path, method) = (req.uri().path(), req.method());
 
-    // create events
     if let (Some(caps), &Method::POST) = (CAMPAIGN_UPDATE_BY_ID.captures(&path), method) {
         let param = RouteParams(vec![caps
             .get(1)
@@ -212,7 +212,7 @@ async fn campaigns_router<A: Adapter + 'static>(
             .map_err(|_| ResponseError::NotFound)?;
 
         req.extensions_mut().insert(campaign);
-        handle_route(req, app).await
+        update_campaign::handle_route(req, app).await
     } else if let (Some(caps), &Method::POST) =
         (INSERT_EVENTS_BY_CAMPAIGN_ID.captures(&path), method)
     {
