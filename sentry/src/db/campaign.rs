@@ -1,5 +1,5 @@
 use crate::db::{DbPool, PoolError};
-use primitives::{sentry::campaign_create::ModifyCampaign, Campaign, CampaignId, ChannelId};
+use primitives::{Campaign, CampaignId, ChannelId};
 use tokio_postgres::types::Json;
 
 pub async fn insert_campaign(pool: &DbPool, campaign: &Campaign) -> Result<bool, PoolError> {
@@ -48,6 +48,7 @@ pub async fn fetch_campaign(
     Ok(row.as_ref().map(Campaign::from))
 }
 
+// TODO: We might need to use LIMIT to implement pagination
 pub async fn get_campaigns_by_channel(
     pool: &DbPool,
     channel_id: &ChannelId,
@@ -65,48 +66,26 @@ pub async fn get_campaigns_by_channel(
 pub async fn update_campaign(
     pool: &DbPool,
     campaign: &Campaign,
-    modified_campaign: &ModifyCampaign,
 ) -> Result<bool, PoolError> {
     let client = pool.get().await?;
     let statement = client
         .prepare("UPDATE campaigns SET budget = $1, validators = $2, title = $3, pricing_bounds = $4, event_submission = $5, ad_units = $6, targeting_rules = $7 WHERE id = $8")
         .await?;
 
-    let ad_units = &modified_campaign
-        .ad_units
-        .as_ref()
-        .unwrap_or(&campaign.ad_units);
-    let ad_units = Json(ad_units);
+
+    let ad_units = Json(&campaign.ad_units);
 
     let updated_rows = client
         .execute(
             &statement,
             &[
-                &modified_campaign.budget.unwrap_or(campaign.budget),
-                &modified_campaign
-                    .validators
-                    .as_ref()
-                    .unwrap_or(&campaign.validators),
-                &modified_campaign
-                    .title
-                    .as_ref()
-                    .ok_or_else(|| &campaign.title)
-                    .unwrap(),
-                &modified_campaign
-                    .pricing_bounds
-                    .as_ref()
-                    .ok_or_else(|| &campaign.title)
-                    .unwrap(),
-                &modified_campaign
-                    .event_submission
-                    .as_ref()
-                    .ok_or_else(|| &campaign.title)
-                    .unwrap(),
+                &campaign.budget,
+                &campaign.validators,
+                &campaign.title,
+                &campaign.pricing_bounds,
+                &campaign.event_submission,
                 &ad_units,
-                &modified_campaign
-                    .targeting_rules
-                    .as_ref()
-                    .unwrap_or(&campaign.targeting_rules),
+                &campaign.targeting_rules,
                 &campaign.id,
             ],
         )
@@ -121,6 +100,7 @@ mod test {
     use primitives::{
         util::tests::prep_db::{DUMMY_CAMPAIGN, DUMMY_AD_UNITS},
         event_submission::{Rule, RateLimit},
+        sentry::campaign_create::ModifyCampaign,
         targeting::Rules,
         UnifiedNum, EventSubmission,
     };
@@ -130,7 +110,6 @@ mod test {
 
     use crate::{
         db::tests_postgres::{setup_test_migrations, DATABASE_POOL},
-        ResponseError,
     };
 
     use super::*;
@@ -209,7 +188,9 @@ mod test {
             targeting_rules: Some(Rules::new()),
         };
 
-        let is_campaign_updated = update_campaign(&database.pool, &campaign_for_testing, &modified_campaign).await.expect("should update");
+        let applied_campaign = modified_campaign.apply(&campaign_for_testing);
+
+        let is_campaign_updated = update_campaign(&database.pool, &applied_campaign).await.expect("should update");
         assert!(is_campaign_updated);
     }
 }

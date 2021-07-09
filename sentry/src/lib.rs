@@ -1,7 +1,7 @@
 #![deny(clippy::all)]
 #![deny(rust_2018_idioms)]
 
-use crate::db::{fetch_campaign, DbPool};
+use crate::db::{DbPool};
 use crate::routes::campaign;
 use crate::routes::channel::channel_status;
 use crate::routes::event_aggregate::list_channel_event_aggregates;
@@ -18,7 +18,7 @@ use middleware::{campaign::CampaignLoad, Chain, Middleware};
 use once_cell::sync::Lazy;
 use primitives::adapter::Adapter;
 use primitives::sentry::ValidationErrorResponse;
-use primitives::{CampaignId, Config, ValidatorId};
+use primitives::{Config, ValidatorId};
 use redis::aio::MultiplexedConnection;
 use regex::Regex;
 use routes::analytics::{advanced_analytics, advertiser_analytics, analytics, publisher_analytics};
@@ -29,7 +29,6 @@ use routes::channel::{
 };
 use slog::Logger;
 use std::collections::HashMap;
-use std::str::FromStr;
 
 pub mod middleware;
 pub mod routes {
@@ -69,10 +68,10 @@ static INSERT_EVENTS_BY_CAMPAIGN_ID: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^/campaign/0x([a-zA-Z0-9]{32})/events/?$").expect("The regex should be valid")
 });
 static CLOSE_CAMPAIGN_BY_CAMPAIGN_ID: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/campaign/0x([a-zA-Z0-9]{32})/close/?$").expect("The regex should be valid")
+    Regex::new(r"^/v5/campaign/0x([a-zA-Z0-9]{32})/close/?$").expect("The regex should be valid")
 });
 static CAMPAIGN_UPDATE_BY_ID: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/campaign/0x([a-zA-Z0-9]{32})/?$").expect("The regex should be valid")
+    Regex::new(r"^/v5/campaign/0x([a-zA-Z0-9]{32})/?$").expect("The regex should be valid")
 });
 
 #[derive(Debug, Clone)]
@@ -164,7 +163,7 @@ impl<A: Adapter + 'static> Application<A> {
                 publisher_analytics(req, &self).await
             }
             // For creating campaigns
-            ("/campaign", &Method::POST) => {
+            ("/v5/campaign", &Method::POST) => {
                 let req = match AuthRequired.call(req, &self).await {
                     Ok(req) => req,
                     Err(error) => {
@@ -195,23 +194,9 @@ async fn campaigns_router<A: Adapter + 'static>(
 ) -> Result<Response<Body>, ResponseError> {
     let (path, method) = (req.uri().path(), req.method());
 
-    if let (Some(caps), &Method::POST) = (CAMPAIGN_UPDATE_BY_ID.captures(&path), method) {
-        let param = RouteParams(vec![caps
-            .get(1)
-            .map_or("".to_string(), |m| m.as_str().to_string())]);
+    if let (Some(_caps), &Method::POST) = (CAMPAIGN_UPDATE_BY_ID.captures(&path), method) {
+        let req = CampaignLoad.call(req, app).await?;
 
-        // Should be safe to access indice here
-        let campaign_id = param
-            .get(0)
-            .ok_or_else(|| ResponseError::BadRequest("No CampaignId".to_string()))?;
-        let campaign_id = CampaignId::from_str(&campaign_id)
-            .map_err(|_| ResponseError::BadRequest("Bad CampaignId".to_string()))?;
-
-        let campaign = fetch_campaign(app.pool.clone(), &campaign_id)
-            .await
-            .map_err(|_| ResponseError::NotFound)?;
-
-        req.extensions_mut().insert(campaign);
         update_campaign::handle_route(req, app).await
     } else if let (Some(caps), &Method::POST) =
         (INSERT_EVENTS_BY_CAMPAIGN_ID.captures(&path), method)

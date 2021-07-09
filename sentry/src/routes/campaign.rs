@@ -19,7 +19,7 @@ use primitives::{
         Event, SuccessResponse,
     },
     campaign_validator::Validator,
-    Address, Campaign, CampaignId, UnifiedNum
+    Campaign, CampaignId, UnifiedNum
 };
 use redis::{
     aio::MultiplexedConnection,
@@ -57,7 +57,7 @@ pub async fn create_campaign<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
-    let session = req
+    let auth = req
         .extensions()
         .get::<Auth>()
         .expect("request should have session")
@@ -72,8 +72,7 @@ pub async fn create_campaign<A: Adapter>(
 
     campaign.validate(&app.config, &app.adapter.whoami()).map_err(|_| ResponseError::FailedValidation("couldn't valdiate campaign".to_string()))?;
 
-    // TODO: Just use session.uid once it's address
-    if Address::from_bytes(session.uid.as_bytes()) != campaign.creator {
+    if auth.uid.to_address() != campaign.creator {
         return Err(ResponseError::Forbidden("Request not sent by campaign creator".to_string()))
     }
 
@@ -85,14 +84,14 @@ pub async fn create_campaign<A: Adapter>(
     let latest_spendable = fetch_spendable(app.pool.clone(), &campaign.creator, &campaign.channel.id()).await?;
     let total_deposited = latest_spendable.deposit.total;
 
-    let remaining_for_channel = total_deposited.checked_sub(&accounting_spent).ok_or(ResponseError::FailedValidation("couldn't calculate remaining for channel".to_string()))?;
+    let remaining_for_channel = total_deposited.checked_sub(&accounting_spent).ok_or(ResponseError::FailedValidation("No more budget remaining".to_string()))?;
 
     if campaign.budget > remaining_for_channel {
-        return Err(ResponseError::BadRequest("Not Enough budget for campaign".to_string()));
+        return Err(ResponseError::BadRequest("Not enough deposit left for the new campaign budget".to_string()));
     }
 
     // If the campaign is being created, the amount spent is 0, therefore remaining = budget
-    set_initial_remaining_for_campaign(&app.redis.clone(), campaign.id, campaign.budget).await.map_err(|_| ResponseError::BadRequest("Couldn't update remaining while creating campaign".to_string()))?;
+    set_initial_remaining_for_campaign(&mut app.redis.clone(), campaign.id, campaign.budget).await.map_err(|_| ResponseError::BadRequest("Couldn't update remaining while creating campaign".to_string()))?;
 
     // insert Campaign
     match insert_campaign(&app.pool, &campaign).await {
@@ -116,16 +115,15 @@ pub async fn create_campaign<A: Adapter>(
 
 pub mod update_campaign {
     use super::*;
-    use crate::fetch_campaign;
 
     pub const CAMPAIGN_REMAINING_KEY: &'static str = "campaignRemaining";
 
-    pub async fn set_initial_remaining_for_campaign(redis: &MultiplexedConnection, id: CampaignId, amount: UnifiedNum) -> Result<bool, Error> {
+    pub async fn set_initial_remaining_for_campaign(redis: &mut MultiplexedConnection, id: CampaignId, amount: UnifiedNum) -> Result<bool, Error> {
         let key = format!("{}:{}", CAMPAIGN_REMAINING_KEY, id);
         redis::cmd("SETNX")
             .arg(&key)
             .arg(amount.to_u64())
-            .query_async(&mut redis.clone())
+            .query_async(redis)
             .await?;
         Ok(true)
     }
@@ -161,16 +159,19 @@ pub mod update_campaign {
         req: Request<Body>,
         app: &Application<A>,
     ) -> Result<Response<Body>, ResponseError> {
-        let campaign = req.extensions().get::<Campaign>().expect("We must have a campaign in extensions");
-        let modified_campaign = ModifyCampaign::from_campaign(campaign.clone());
+        let campaign_being_mutated = req.extensions().get::<Campaign>().expect("We must have a campaign in extensions").to_owned();
 
-        // Getting the campaign as it was before the update operation, should exist
-        let campaign_being_mutated = fetch_campaign(app.pool.clone(), &campaign.id).await?.ok_or(ResponseError::NotFound)?;
+        let body = hyper::body::to_bytes(req.into_body()).await?;
+
+        let modified_campaign = serde_json::from_slice::<Campaign>(&body)
+            .map_err(|e| ResponseError::FailedValidation(e.to_string()))?;
+
+        let modified_campaign = ModifyCampaign::from_campaign(modified_campaign.clone());
 
         // modify Campaign
         modify_campaign(&app.pool, &campaign_being_mutated, &modified_campaign, &app.redis).await.map_err(|_| ResponseError::BadRequest("Failed to update campaign".to_string()))?;
 
-        Ok(success_response(serde_json::to_string(&campaign)?))
+        Ok(success_response(serde_json::to_string(&modified_campaign)?))
     }
 
     pub async fn modify_campaign(pool: &DbPool, campaign: &Campaign, modified_campaign: &ModifyCampaign, redis: &MultiplexedConnection) -> Result<Campaign, Error> {
@@ -190,7 +191,8 @@ pub mod update_campaign {
             let old_budget = campaign.budget;
 
             match new_budget.cmp(&old_budget) {
-                Ordering::Greater | Ordering::Equal => {
+                Ordering::Equal => (),
+                Ordering::Greater => {
                     let new_remaining = old_remaining.checked_add(&new_budget.checked_sub(&old_budget).ok_or(Error::Calculation)?).ok_or(Error::Calculation)?;
                     let amount_to_incr = new_remaining.checked_sub(&old_remaining).ok_or(Error::Calculation)?;
                     increase_remaining_for_campaign(&redis, campaign.id, amount_to_incr).await?;
@@ -216,14 +218,12 @@ pub mod update_campaign {
 
         let total_remaining = total_deposited.checked_sub(&accounting_spent).ok_or(Error::Calculation)?;
         let campaigns_for_channel = get_campaigns_by_channel(&pool, &campaign.channel.id()).await?;
-        // campaign.budget should 100% exist, therefore it should be safe to just unwrap?
-        let current_campaign_budget = modified_campaign.budget.ok_or(campaign.budget).unwrap();
+        let current_campaign_budget = modified_campaign.budget.unwrap_or(campaign.budget);
         let campaigns_remaining_sum = get_campaigns_remaining_sum(&redis, &campaigns_for_channel, campaign.id, &current_campaign_budget).await.map_err(|_| Error::Calculation)?;
-        if campaigns_remaining_sum > total_remaining {
-            return Err(Error::BudgetExceeded);
+        if campaigns_remaining_sum <= total_remaining {
+            let campaign_with_updates = modified_campaign.apply(campaign);
+            update_campaign(&pool, &campaign_with_updates).await?;
         }
-
-        update_campaign(&pool, &campaign, &modified_campaign).await?;
 
         Ok(campaign.clone())
     }
@@ -361,24 +361,22 @@ mod test {
         spender::{Deposit, Spendable},
         Address
     };
-    use deadpool::managed::Object;
     use crate::{
-        db::redis_pool::{Manager, TESTS_POOL},
+        db::redis_pool::TESTS_POOL,
         campaign::update_campaign::{CAMPAIGN_REMAINING_KEY, increase_remaining_for_campaign},
     };
-    use std::convert::TryFrom;
     use super::*;
 
-    fn get_dummy_spendable(spender: Address, campaign: Campaign) -> Spendable {
-        Spendable {
-            spender,
-            channel: campaign.channel.clone(),
-            deposit: Deposit {
-                total: UnifiedNum::from_u64(1_000_000),
-                still_on_create2: UnifiedNum::from_u64(0),
-            },
-        }
-    }
+    // fn get_dummy_spendable(spender: Address, campaign: Campaign) -> Spendable {
+    //     Spendable {
+    //         spender,
+    //         channel: campaign.channel.clone(),
+    //         deposit: Deposit {
+    //             total: UnifiedNum::from_u64(1_000_000),
+    //             still_on_create2: UnifiedNum::from_u64(0),
+    //         },
+    //     }
+    // }
 
     #[tokio::test]
     async fn does_it_increase_remaining() {

@@ -389,6 +389,24 @@ pub mod campaign_create {
                 targeting_rules: Some(campaign.targeting_rules),
             }
         }
+
+        pub fn apply(&self, campaign: &Campaign) -> Campaign {
+            let campaign = campaign.clone();
+            Campaign {
+                id: campaign.id,
+                channel: campaign.channel,
+                creator: campaign.creator,
+                budget: self.budget.unwrap_or(campaign.budget),
+                validators: self.validators.clone().unwrap_or(campaign.validators),
+                title: self.title.clone().or(campaign.title),
+                pricing_bounds: self.pricing_bounds.clone().or(campaign.pricing_bounds),
+                event_submission: self.event_submission.clone().or(campaign.event_submission),
+                ad_units: self.ad_units.clone().unwrap_or(campaign.ad_units),
+                targeting_rules: self.targeting_rules.clone().unwrap_or(campaign.targeting_rules),
+                created: campaign.created,
+                active: campaign.active,
+            }
+        }
     }
 }
 
