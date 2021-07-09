@@ -64,10 +64,10 @@ lazy_static! {
 }
 
 static INSERT_EVENTS_BY_CAMPAIGN_ID: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/campaign/0x([a-zA-Z0-9]{32})/events/?$").expect("The regex should be valid")
+    Regex::new(r"^/v5/campaign/0x([a-zA-Z0-9]{32})/events/?$").expect("The regex should be valid")
 });
 static CLOSE_CAMPAIGN_BY_CAMPAIGN_ID: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/campaign/0x([a-zA-Z0-9]{32})/close/?$").expect("The regex should be valid")
+    Regex::new(r"^/v5/campaign/0x([a-zA-Z0-9]{32})/close/?$").expect("The regex should be valid")
 });
 
 #[derive(Debug, Clone)]
@@ -162,7 +162,7 @@ impl<A: Adapter + 'static> Application<A> {
             // This is important because it prevents us from doing
             // expensive regex matching for routes without /channel
             (path, _) if path.starts_with("/channel") => channels_router(req, &self).await,
-            (path, _) if path.starts_with("/campaign") => campaigns_router(req, &self).await,
+            (path, _) if path.starts_with("/v5/campaign") => campaigns_router(req, &self).await,
             _ => Err(ResponseError::NotFound),
         }
         .unwrap_or_else(map_response_error);
@@ -217,8 +217,6 @@ async fn analytics_router<A: Adapter + 'static>(
 ) -> Result<Response<Body>, ResponseError> {
     let (route, method) = (req.uri().path(), req.method());
 
-
-    
     // TODO AIP#61: Add routes for:
     // - POST /channel/:id/pay
     // #[serde(rename_all = "camelCase")]
@@ -295,9 +293,8 @@ async fn channels_router<A: Adapter + 'static>(
         req.extensions_mut().insert(param);
 
         insert_events(req, app).await
-    } else */ 
-    if let (Some(caps), &Method::GET) = (LAST_APPROVED_BY_CHANNEL_ID.captures(&path), method)
-    {
+    } else */
+    if let (Some(caps), &Method::GET) = (LAST_APPROVED_BY_CHANNEL_ID.captures(&path), method) {
         let param = RouteParams(vec![caps
             .get(1)
             .map_or("".to_string(), |m| m.as_str().to_string())]);
