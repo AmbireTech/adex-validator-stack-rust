@@ -1,8 +1,12 @@
 use chrono::{DateTime, Utc};
 use primitives::{
+    sentry::accounting::{Balances, CheckedState},
     Address, ChannelId, UnifiedNum,
 };
-use tokio_postgres::{IsolationLevel, Row, types::{FromSql, ToSql}};
+use tokio_postgres::{
+    types::{FromSql, ToSql},
+    IsolationLevel, Row,
+};
 
 use super::{DbPool, PoolError};
 use thiserror::Error;
@@ -13,6 +17,12 @@ pub enum Error {
     Balances(#[from] primitives::sentry::accounting::Error),
     #[error("Fetching Accounting from postgres error: {0}")]
     Postgres(#[from] PoolError),
+}
+
+impl From<tokio_postgres::Error> for Error {
+    fn from(error: tokio_postgres::Error) -> Self {
+        Self::Postgres(PoolError::Backend(error))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -83,9 +93,7 @@ pub async fn update_accounting(
     amount: UnifiedNum,
 ) -> Result<Accounting, PoolError> {
     let client = pool.get().await?;
-    let statement = client
-        .prepare(UPDATE_ACCOUNTING_STATEMENT)
-        .await?;
+    let statement = client.prepare(UPDATE_ACCOUNTING_STATEMENT).await?;
 
     let now = Utc::now();
     let updated: Option<DateTime<Utc>> = None;
@@ -100,32 +108,64 @@ pub async fn update_accounting(
     Ok(Accounting::from(&row))
 }
 
-/// Will use `UPDATE_ACCOUNTING_STATEMENT` to create and run the query twice - once for Earner and once for Spender accounting.
-///
-/// It runs both queries in a transaction in order to rollback if one of the queries fails.
-pub async fn spend_accountings(
+/// `delta_balances` defines the Balances that need to be added to the spending or earnings of the `Accounting`s.
+/// It will **not** override the whole `Accounting` value
+/// Returns a tuple of `(Vec<Earners Accounting>, Vec<Spenders Accounting>)`
+pub async fn spend_amount(
     pool: DbPool,
     channel_id: ChannelId,
-    earner: Address,
-    spender: Address,
-    amount: UnifiedNum,
-) -> Result<(Accounting, Accounting), PoolError> {
+    delta_balances: Balances<CheckedState>,
+) -> Result<(Vec<Accounting>, Vec<Accounting>), PoolError> {
     let mut client = pool.get().await?;
 
     // The reads and writes in this transaction must be able to be committed as an atomic “unit” with respect to reads and writes of all other concurrent serializable transactions without interleaving.
-    let transaction = client.build_transaction().isolation_level(IsolationLevel::Serializable).start().await?;
+    let transaction = client
+        .build_transaction()
+        .isolation_level(IsolationLevel::Serializable)
+        .start()
+        .await?;
 
     let statement = transaction.prepare(UPDATE_ACCOUNTING_STATEMENT).await?;
 
     let now = Utc::now();
     let updated: Option<DateTime<Utc>> = None;
 
-    let earner_row = transaction.query_one(&statement, &[&channel_id, &Side::Earner, &earner, &amount, &updated, &now]).await?;
-    let spender_row = transaction.query_one(&statement, &[&channel_id, &Side::Spender, &spender, &amount, &updated, &now]).await?;
+    let (mut earners, mut spenders) = (vec![], vec![]);
+
+    // Earners
+    for (earner, amount) in delta_balances.earners {
+        let row = transaction
+            .query_one(
+                &statement,
+                &[&channel_id, &Side::Earner, &earner, &amount, &updated, &now],
+            )
+            .await?;
+
+        earners.push(Accounting::from(&row))
+    }
+
+    // Spenders
+    for (spender, amount) in delta_balances.spenders {
+        let row = transaction
+            .query_one(
+                &statement,
+                &[
+                    &channel_id,
+                    &Side::Spender,
+                    &spender,
+                    &amount,
+                    &updated,
+                    &now,
+                ],
+            )
+            .await?;
+
+        spenders.push(Accounting::from(&row))
+    }
 
     transaction.commit().await?;
 
-    Ok((Accounting::from(&earner_row), Accounting::from(&spender_row)))
+    Ok((earners, spenders))
 }
 
 #[cfg(test)]
@@ -183,10 +223,14 @@ mod test {
                 "Should add the newly spent amount to the existing one"
             );
 
-            let spent = get_accounting(database.pool.clone(), channel_id, spender, Side::Spender).await.expect("Should query for the updated accounting");
+            let spent = get_accounting(database.pool.clone(), channel_id, spender, Side::Spender)
+                .await
+                .expect("Should query for the updated accounting");
             assert_eq!(Some(updated), spent);
 
-            let earned = get_accounting(database.pool.clone(), channel_id, spender, Side::Earner).await.expect("Should query for accounting");
+            let earned = get_accounting(database.pool.clone(), channel_id, spender, Side::Earner)
+                .await
+                .expect("Should query for accounting");
             assert!(earned.is_none(), "Spender shouldn't have an earned amount");
         }
 
@@ -222,13 +266,16 @@ mod test {
                 "Should add the newly earned amount to the existing one"
             );
 
-            let earned = get_accounting(database.pool.clone(), channel_id, earner, Side::Earner).await.expect("Should query for the updated accounting");
+            let earned = get_accounting(database.pool.clone(), channel_id, earner, Side::Earner)
+                .await
+                .expect("Should query for the updated accounting");
             assert_eq!(Some(updated), earned);
 
-            let spent = get_accounting(database.pool.clone(), channel_id, earner, Side::Spender).await.expect("Should query for accounting");
+            let spent = get_accounting(database.pool.clone(), channel_id, earner, Side::Spender)
+                .await
+                .expect("Should query for accounting");
             assert!(spent.is_none(), "Earner shouldn't have a spent amount");
         }
-
 
         // Spender as Earner & another Spender
         // Will test the previously spent amount as well!
@@ -265,17 +312,64 @@ mod test {
                 "Should add the newly spent amount to the existing one"
             );
 
-            let earned_acc = get_accounting(database.pool.clone(), channel_id, spender_as_earner, Side::Earner).await.expect("Should query for earned accounting").expect("Should have Earned accounting for Spender as Earner");
+            let earned_acc = get_accounting(
+                database.pool.clone(),
+                channel_id,
+                spender_as_earner,
+                Side::Earner,
+            )
+            .await
+            .expect("Should query for earned accounting")
+            .expect("Should have Earned accounting for Spender as Earner");
             assert_eq!(UnifiedNum::from(100_000_999), earned_acc.amount);
-            
-            let spent_acc = get_accounting(database.pool.clone(), channel_id, spender_as_earner, Side::Spender).await.expect("Should query for spent accounting").expect("Should have Spent accounting for Spender as Earner");
+
+            let spent_acc = get_accounting(
+                database.pool.clone(),
+                channel_id,
+                spender_as_earner,
+                Side::Spender,
+            )
+            .await
+            .expect("Should query for spent accounting")
+            .expect("Should have Spent accounting for Spender as Earner");
             assert_eq!(UnifiedNum::from(300_000_000), spent_acc.amount);
-            
         }
     }
-    
+
+    fn assert_accounting(
+        expected: (Address, Side, UnifiedNum),
+        accounting: Accounting,
+        with_set_updated: bool,
+    // ) -> anyhow::Result<()> {
+    ) {
+        assert_eq!(
+            expected.0, accounting.address,
+            "Accounting address is not the same"
+        );
+        assert_eq!(
+            expected.1, accounting.side,
+            "Accounting side is not the same"
+        );
+        assert_eq!(
+            expected.2, accounting.amount,
+            "Accounting amount is not the same"
+        );
+
+        if with_set_updated {
+            assert!(
+                accounting.updated.is_some(),
+                "Accounting should have been updated"
+            )
+        } else {
+            assert!(
+                accounting.updated.is_none(),
+                "Accounting should not have been updated"
+            )
+        }
+    }
+
     #[tokio::test]
-    async fn test_spending_accountings() {
+    async fn test_spend_amount() {
         let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
 
         setup_test_migrations(database.pool.clone())
@@ -285,47 +379,189 @@ mod test {
         let channel_id = DUMMY_CAMPAIGN.channel.id();
         let earner = ADDRESSES["publisher"];
         let spender = ADDRESSES["creator"];
+        let spender_as_earner = spender;
         let other_spender = ADDRESSES["tester"];
 
-        let amount = UnifiedNum::from(100_000_000);
-        let update_amount = UnifiedNum::from(200_000_000);
+        let cases = [
+            // Spender & Earner insert
+            (
+                UnifiedNum::from(100_000_000),
+                earner,
+                spender,
+                [
+                    vec![(earner, Side::Earner, UnifiedNum::from(100_000_000), false)],
+                    vec![(spender, Side::Spender, UnifiedNum::from(100_000_000), false)],
+                ],
+            ),
+            // Spender & Earner update
+            (
+                UnifiedNum::from(200_000_000),
+                earner,
+                spender,
+                [
+                    vec![(earner, Side::Earner, UnifiedNum::from(300_000_000), true)],
+                    vec![(spender, Side::Spender, UnifiedNum::from(300_000_000), true)],
+                ],
+            ),
+            // Spender as an Earner & another spender
+            (
+                UnifiedNum::from(999),
+                spender_as_earner,
+                other_spender,
+                [
+                    vec![(spender, Side::Earner, UnifiedNum::from(999), false)],
+                    vec![(other_spender, Side::Spender, UnifiedNum::from(999), false)],
+                ],
+            ),
+        ];
 
-        // Spender & Earner insert
-        let (inserted_earner, inserted_spender) = spend_accountings(database.pool.clone(), channel_id, earner, spender, amount).await.expect("Should insert Earner and Spender");
-        assert_eq!(earner, inserted_earner.address);
-        assert_eq!(Side::Earner, inserted_earner.side);
-        assert_eq!(UnifiedNum::from(100_000_000), inserted_earner.amount);
-        
-        assert_eq!(spender, inserted_spender.address);
-        assert_eq!(Side::Spender, inserted_spender.side);
-        assert_eq!(UnifiedNum::from(100_000_000), inserted_spender.amount);
+        for (amount_to_spend, earner, spender, [earners, spenders]) in cases {
+            // Spender & Earner insert
+            let mut balances = Balances::<CheckedState>::default();
+            balances
+                .spend(spender, earner, amount_to_spend)
+                .expect("Should spend");
 
-        // Spender & Earner update
-        let (updated_earner, updated_spender) = spend_accountings(database.pool.clone(), channel_id, earner, spender, update_amount).await.expect("Should update Earner and Spender");
+            let (actual_earners, actual_spenders) =
+                spend_amount(database.pool.clone(), channel_id, balances)
+                    .await
+                    .expect("Should insert Earner and Spender");
 
-        assert_eq!(earner, updated_earner.address);
-        assert_eq!(Side::Earner, updated_earner.side);
-        assert_eq!(UnifiedNum::from(300_000_000), updated_earner.amount, "Should add the newly earned amount to the existing one");
-        
-        assert_eq!(spender, updated_spender.address);
-        assert_eq!(Side::Spender, updated_spender.side);
-        assert_eq!(UnifiedNum::from(300_000_000), updated_spender.amount, "Should add the newly spend amount to the existing one");
+            for (actual, expected) in actual_earners.into_iter().zip(earners) {
+                assert_accounting((expected.0, expected.1, expected.2), actual, expected.3)
+            }
 
-        // Spender as an Earner & another spender
-        let (spender_as_earner, inserted_other_spender) = spend_accountings(database.pool.clone(), channel_id, spender, other_spender, UnifiedNum::from(999)).await.expect("Should update Spender as Earner and the Other Spender");
+            for (actual, expected) in actual_spenders.into_iter().zip(spenders) {
+                assert_accounting((expected.0, expected.1, expected.2), actual, expected.3)
+            }
+        }
 
-        assert_eq!(spender, spender_as_earner.address);
-        assert_eq!(Side::Earner, spender_as_earner.side);
-        assert_eq!(UnifiedNum::from(999), spender_as_earner.amount, "Should add earner accounting for the previous Spender");
-
-        assert_eq!(other_spender, inserted_other_spender.address);
-        assert_eq!(Side::Spender, inserted_other_spender.side);
-        assert_eq!(UnifiedNum::from(999), inserted_other_spender.amount);
-
-        let earned = get_accounting(database.pool.clone(), channel_id, spender, Side::Earner).await.expect("Should query for accounting").expect("Should have Earned accounting for Spender as Earner");
+        // Check the final amounts of Spent/Earned for the Spender
+        let earned = get_accounting(database.pool.clone(), channel_id, spender, Side::Earner)
+            .await
+            .expect("Should query for accounting")
+            .expect("Should have Earned accounting for Spender as Earner");
         assert_eq!(UnifiedNum::from(999), earned.amount);
-        
-        let spent = get_accounting(database.pool.clone(), channel_id, spender, Side::Spender).await.expect("Should query for accounting").expect("Should have Spent accounting for Spender as Earner");
+
+        let spent = get_accounting(database.pool.clone(), channel_id, spender, Side::Spender)
+            .await
+            .expect("Should query for accounting")
+            .expect("Should have Spent accounting for Spender as Earner");
         assert_eq!(UnifiedNum::from(300_000_000), spent.amount);
+    }
+
+    #[tokio::test]
+    async fn test_spend_amount_with_multiple_spends() {
+        let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
+
+        setup_test_migrations(database.pool.clone())
+            .await
+            .expect("Migrations should succeed");
+
+        let channel_id = DUMMY_CAMPAIGN.channel.id();
+        let earner = ADDRESSES["publisher"];
+        let other_earner = ADDRESSES["publisher2"];
+        let spender = ADDRESSES["creator"];
+        let spender_as_earner = spender;
+        let other_spender = ADDRESSES["tester"];
+        let third_spender = ADDRESSES["user"];
+
+        // Spenders & Earners insert
+        {
+            let mut balances = Balances::<CheckedState>::default();
+            balances
+                .spend(spender, earner, UnifiedNum::from(400_000))
+                .expect("Should spend");
+            balances
+                .spend(other_spender, other_earner, UnifiedNum::from(500_000))
+                .expect("Should spend");
+
+            let (earners_acc, spenders_acc) =
+                spend_amount(database.pool.clone(), channel_id, balances)
+                    .await
+                    .expect("Should insert Earners and Spenders");
+
+            assert_eq!(2, earners_acc.len());
+            assert_eq!(2, spenders_acc.len());
+
+            // Earners assertions
+            assert_accounting(
+                (earner, Side::Earner, UnifiedNum::from(400_000)),
+            earners_acc.iter().find(|a| a.address == earner).unwrap().clone(),
+                false,
+            );
+            assert_accounting(
+                (other_earner, Side::Earner, UnifiedNum::from(500_000)),
+                earners_acc.iter().find(|a| a.address == other_earner).unwrap().clone(),
+                false,
+            );
+
+            // Spenders assertions
+            assert_accounting(
+                (spender, Side::Spender, UnifiedNum::from(400_000)),
+                spenders_acc.iter().find(|a| a.address == spender).unwrap().clone(),
+                false,
+            );
+            assert_accounting(
+                (other_spender, Side::Spender, UnifiedNum::from(500_000)),
+                spenders_acc.iter().find(|a| a.address == other_spender).unwrap().clone(),
+                false,
+            );
+        }
+        // Spenders & Earners update with 1 insert (third_spender & spender_as_earner)
+        {
+            let mut balances = Balances::<CheckedState>::default();
+            balances
+                .spend(spender, earner, UnifiedNum::from(1_400_000))
+                .expect("Should spend");
+            balances
+                .spend(other_spender, other_earner, UnifiedNum::from(1_500_000))
+                .expect("Should spend");
+            balances
+                .spend(third_spender, spender_as_earner, UnifiedNum::from(600_000))
+                .expect("Should spend");
+
+            let (earners_acc, spenders_acc) =
+                spend_amount(database.pool.clone(), channel_id, balances)
+                    .await
+                    .expect("Should update & insert new Earners and Spenders");
+
+            assert_eq!(3, earners_acc.len());
+            assert_eq!(3, spenders_acc.len());
+
+            // Earners assertions
+            assert_accounting(
+                (earner, Side::Earner, UnifiedNum::from(1_800_000)),
+                earners_acc.iter().find(|a| a.address == earner).unwrap().clone(),
+                true,
+            );
+            assert_accounting(
+                (other_earner, Side::Earner, UnifiedNum::from(2_000_000)),
+                earners_acc.iter().find(|a| a.address == other_earner).unwrap().clone(),
+                true,
+            );
+            assert_accounting(
+                (spender_as_earner, Side::Earner, UnifiedNum::from(600_000)),
+                earners_acc.iter().find(|a| a.address == spender_as_earner).unwrap().clone(),
+                false,
+            );
+
+            // Spenders assertions
+            assert_accounting(
+                (spender, Side::Spender, UnifiedNum::from(1_800_000)),
+                spenders_acc.iter().find(|a| a.address == spender).unwrap().clone(),
+                true,
+            );
+            assert_accounting(
+                (other_spender, Side::Spender, UnifiedNum::from(2_000_000)),
+                spenders_acc.iter().find(|a| a.address == other_spender).unwrap().clone(),
+                true,
+            );
+            assert_accounting(
+                (third_spender, Side::Spender, UnifiedNum::from(600_000)),
+                spenders_acc.iter().find(|a| a.address == third_spender).unwrap().clone(),
+                false,
+            );
+        }
     }
 }

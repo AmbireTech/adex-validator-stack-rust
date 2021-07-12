@@ -195,7 +195,7 @@ impl Campaign {
         }
     }
 
-    /// Matches the Channel.leader to the Campaign.spec.leader
+    /// Matches the Channel.leader to the Campaign.validators.leader
     /// If they match it returns `Some`, otherwise, it returns `None`
     pub fn leader(&self) -> Option<&'_ ValidatorDesc> {
         self.validators.find(&self.channel.leader)
