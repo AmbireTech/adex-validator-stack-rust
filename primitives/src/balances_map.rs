@@ -109,8 +109,8 @@ mod test {
 
         let actual_json = serde_json::to_value(&unified_map).expect("Should serialize it");
         let expected_json = json!({
-            "0xC91763D7F14ac5c5dDfBCD012e0D2A61ab9bDED3":100,
-            "0xce07CbB7e054514D590a0262C93070D838bFBA2e":50
+            "0xC91763D7F14ac5c5dDfBCD012e0D2A61ab9bDED3":"100",
+            "0xce07CbB7e054514D590a0262C93070D838bFBA2e":"50"
         });
 
         assert_eq!(expected_json, actual_json);

@@ -4,11 +4,11 @@ use super::*;
 use crate::{
     targeting::input,
     util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, DUMMY_IPFS},
-    BalancesMap,
+    UnifiedMap,
 };
 
 fn get_default_input() -> Input {
-    let input_balances = BalancesMap::default();
+    let input_balances = UnifiedMap::default();
 
     let init_input = Input {
         ad_view: Some(input::AdView {
@@ -226,13 +226,13 @@ mod dsl_test {
         };
 
         let cases = vec![
-            (Value::new_string("1000"), Value::BigNum(1000.into())),
-            (Value::new_number(2_000), Value::BigNum(2_000.into())),
-            (Value::BigNum(3.into()), Value::BigNum(3.into())),
+            (Value::new_string("1000"), Value::UnifiedNum(1000.into())),
+            (Value::new_number(2_000), Value::UnifiedNum(2_000.into())),
+            (Value::UnifiedNum(3.into()), Value::UnifiedNum(3.into())),
             // rounded floats should work!
             (
                 Value::Number(Number::from_f64(40.0).expect("should create float number")),
-                Value::BigNum(40.into()),
+                Value::UnifiedNum(40.into()),
             ),
         ];
 
@@ -254,7 +254,7 @@ mod dsl_test {
 
         let error_cases = vec![
             Value::new_string("text"),
-            // BigNums can only be positive
+            // UnifiedNums can only be positive
             Value::new_number(-100),
             Value::Bool(true),
             Value::Array(vec![Value::Bool(false)]),
@@ -288,14 +288,17 @@ mod dsl_test {
         let input = get_default_input();
         let mut output = Output::from(&campaign);
 
-        assert_eq!(Some(&BigNum::from(1_000)), output.price.get("IMPRESSION"));
+        assert_eq!(
+            Some(&UnifiedNum::from(1_000)),
+            output.price.get("IMPRESSION")
+        );
 
-        let set_to = Value::BigNum(BigNum::from(20));
+        let set_to = Value::UnifiedNum(UnifiedNum::from(20));
         let rule = Rule::Function(Function::new_set("price.IMPRESSION", set_to));
 
         assert_eq!(Ok(None), rule.eval(&input, &mut output));
 
-        assert_eq!(Some(&BigNum::from(20)), output.price.get("IMPRESSION"));
+        assert_eq!(Some(&UnifiedNum::from(20)), output.price.get("IMPRESSION"));
     }
 
     #[test]
@@ -335,19 +338,19 @@ mod math_functions {
 
         let cases = vec![
             (
-                Value::BigNum(100.into()),
-                Value::BigNum(3.into()),
-                Value::BigNum(33.into()),
+                Value::UnifiedNum(100.into()),
+                Value::UnifiedNum(3.into()),
+                Value::UnifiedNum(33.into()),
             ),
             (
                 Value::new_number(100),
-                Value::BigNum(3.into()),
-                Value::BigNum(33.into()),
+                Value::UnifiedNum(3.into()),
+                Value::UnifiedNum(33.into()),
             ),
             (
-                Value::BigNum(100.into()),
+                Value::UnifiedNum(100.into()),
                 Value::new_number(3),
-                Value::BigNum(33.into()),
+                Value::UnifiedNum(33.into()),
             ),
             (
                 Value::Number(Number::from_f64(100.0).expect("should create float number")),
@@ -380,19 +383,19 @@ mod math_functions {
 
         let cases = vec![
             (
-                Value::BigNum(3.into()),
-                Value::BigNum(1000.into()),
-                Value::BigNum(3000.into()),
+                Value::UnifiedNum(3.into()),
+                Value::UnifiedNum(1000.into()),
+                Value::UnifiedNum(3000.into()),
             ),
             (
                 Value::new_number(3),
-                Value::BigNum(1000.into()),
-                Value::BigNum(3000.into()),
+                Value::UnifiedNum(1000.into()),
+                Value::UnifiedNum(3000.into()),
             ),
             (
-                Value::BigNum(3.into()),
+                Value::UnifiedNum(3.into()),
                 Value::new_number(1000),
-                Value::BigNum(3000.into()),
+                Value::UnifiedNum(3000.into()),
             ),
             (
                 Value::Number(Number::from_f64(0.5).expect("should create float number")),
@@ -423,19 +426,19 @@ mod math_functions {
 
         let cases = vec![
             (
-                Value::BigNum(10.into()),
-                Value::BigNum(5.into()),
-                Value::BigNum(0.into()),
+                Value::UnifiedNum(10.into()),
+                Value::UnifiedNum(5.into()),
+                Value::UnifiedNum(0.into()),
             ),
             (
                 Value::new_number(10),
-                Value::BigNum(3.into()),
-                Value::BigNum(1.into()),
+                Value::UnifiedNum(3.into()),
+                Value::UnifiedNum(1.into()),
             ),
             (
-                Value::BigNum(10.into()),
+                Value::UnifiedNum(10.into()),
                 Value::new_number(4),
-                Value::BigNum(2.into()),
+                Value::UnifiedNum(2.into()),
             ),
             (
                 Value::Number(Number::from_f64(10.0).expect("should create float number")),
@@ -466,19 +469,19 @@ mod math_functions {
 
         let cases = vec![
             (
-                Value::BigNum(2.into()),
-                Value::BigNum(2.into()),
-                Value::BigNum(4.into()),
+                Value::UnifiedNum(2.into()),
+                Value::UnifiedNum(2.into()),
+                Value::UnifiedNum(4.into()),
             ),
             (
                 Value::new_number(2),
-                Value::BigNum(2.into()),
-                Value::BigNum(4.into()),
+                Value::UnifiedNum(2.into()),
+                Value::UnifiedNum(4.into()),
             ),
             (
-                Value::BigNum(2.into()),
+                Value::UnifiedNum(2.into()),
                 Value::new_number(2),
-                Value::BigNum(4.into()),
+                Value::UnifiedNum(4.into()),
             ),
             (
                 Value::Number(Number::from_f64(2.2).expect("should create float number")),
@@ -509,19 +512,19 @@ mod math_functions {
 
         let cases = vec![
             (
-                Value::BigNum(10.into()),
-                Value::BigNum(2.into()),
-                Value::BigNum(8.into()),
+                Value::UnifiedNum(10.into()),
+                Value::UnifiedNum(2.into()),
+                Value::UnifiedNum(8.into()),
             ),
             (
                 Value::new_number(10),
-                Value::BigNum(10.into()),
-                Value::BigNum(0.into()),
+                Value::UnifiedNum(10.into()),
+                Value::UnifiedNum(0.into()),
             ),
             (
-                Value::BigNum(10.into()),
+                Value::UnifiedNum(10.into()),
                 Value::new_number(5),
-                Value::BigNum(5.into()),
+                Value::UnifiedNum(5.into()),
             ),
             (
                 Value::Number(Number::from_f64(8.4).expect("should create float number")),
@@ -552,19 +555,19 @@ mod math_functions {
 
         let cases = vec![
             (
-                Value::BigNum(100.into()),
-                Value::BigNum(10.into()),
-                Value::BigNum(10.into()),
+                Value::UnifiedNum(100.into()),
+                Value::UnifiedNum(10.into()),
+                Value::UnifiedNum(10.into()),
             ),
             (
                 Value::new_number(10),
-                Value::BigNum(100.into()),
-                Value::BigNum(10.into()),
+                Value::UnifiedNum(100.into()),
+                Value::UnifiedNum(10.into()),
             ),
             (
-                Value::BigNum(10.into()),
+                Value::UnifiedNum(10.into()),
                 Value::new_number(10),
-                Value::BigNum(10.into()),
+                Value::UnifiedNum(10.into()),
             ),
             (
                 Value::Number(Number::from_f64(0.1).expect("should create float number")),
@@ -595,19 +598,19 @@ mod math_functions {
 
         let cases = vec![
             (
-                Value::BigNum(100.into()),
-                Value::BigNum(10.into()),
-                Value::BigNum(100.into()),
+                Value::UnifiedNum(100.into()),
+                Value::UnifiedNum(10.into()),
+                Value::UnifiedNum(100.into()),
             ),
             (
                 Value::new_number(10),
-                Value::BigNum(100.into()),
-                Value::BigNum(100.into()),
+                Value::UnifiedNum(100.into()),
+                Value::UnifiedNum(100.into()),
             ),
             (
-                Value::BigNum(10.into()),
+                Value::UnifiedNum(10.into()),
                 Value::new_number(10),
-                Value::BigNum(10.into()),
+                Value::UnifiedNum(10.into()),
             ),
             (
                 Value::Number(Number::from_f64(0.1).expect("should create float number")),
@@ -638,17 +641,17 @@ mod math_functions {
 
         let cases = vec![
             (
-                Value::BigNum(100.into()),
-                Value::BigNum(10.into()),
+                Value::UnifiedNum(100.into()),
+                Value::UnifiedNum(10.into()),
                 Value::Bool(false),
             ),
             (
                 Value::new_number(100),
-                Value::BigNum(100.into()),
+                Value::UnifiedNum(100.into()),
                 Value::Bool(false),
             ),
             (
-                Value::BigNum(10.into()),
+                Value::UnifiedNum(10.into()),
                 Value::new_number(100),
                 Value::Bool(true),
             ),
@@ -681,17 +684,17 @@ mod math_functions {
 
         let cases = vec![
             (
-                Value::BigNum(100.into()),
-                Value::BigNum(10.into()),
+                Value::UnifiedNum(100.into()),
+                Value::UnifiedNum(10.into()),
                 Value::Bool(false),
             ),
             (
                 Value::new_number(100),
-                Value::BigNum(100.into()),
+                Value::UnifiedNum(100.into()),
                 Value::Bool(true),
             ),
             (
-                Value::BigNum(10.into()),
+                Value::UnifiedNum(10.into()),
                 Value::new_number(100),
                 Value::Bool(true),
             ),
@@ -724,17 +727,17 @@ mod math_functions {
 
         let cases = vec![
             (
-                Value::BigNum(100.into()),
-                Value::BigNum(10.into()),
+                Value::UnifiedNum(100.into()),
+                Value::UnifiedNum(10.into()),
                 Value::Bool(true),
             ),
             (
                 Value::new_number(100),
-                Value::BigNum(100.into()),
+                Value::UnifiedNum(100.into()),
                 Value::Bool(false),
             ),
             (
-                Value::BigNum(10.into()),
+                Value::UnifiedNum(10.into()),
                 Value::new_number(100),
                 Value::Bool(false),
             ),
@@ -767,17 +770,17 @@ mod math_functions {
 
         let cases = vec![
             (
-                Value::BigNum(100.into()),
-                Value::BigNum(10.into()),
+                Value::UnifiedNum(100.into()),
+                Value::UnifiedNum(10.into()),
                 Value::Bool(true),
             ),
             (
                 Value::new_number(100),
-                Value::BigNum(100.into()),
+                Value::UnifiedNum(100.into()),
                 Value::Bool(true),
             ),
             (
-                Value::BigNum(10.into()),
+                Value::UnifiedNum(10.into()),
                 Value::new_number(100),
                 Value::Bool(false),
             ),
@@ -810,33 +813,33 @@ mod math_functions {
 
         let cases = vec![
             (
-                Value::BigNum(10.into()),
-                Value::BigNum(100.into()),
-                Value::BigNum(1.into()),
+                Value::UnifiedNum(10.into()),
+                Value::UnifiedNum(100.into()),
+                Value::UnifiedNum(1.into()),
                 Value::Bool(false),
             ),
             (
-                Value::BigNum(10.into()),
-                Value::BigNum(100.into()),
-                Value::BigNum(10.into()),
+                Value::UnifiedNum(10.into()),
+                Value::UnifiedNum(100.into()),
+                Value::UnifiedNum(10.into()),
                 Value::Bool(true),
             ),
             (
-                Value::BigNum(10.into()),
-                Value::BigNum(100.into()),
-                Value::BigNum(50.into()),
+                Value::UnifiedNum(10.into()),
+                Value::UnifiedNum(100.into()),
+                Value::UnifiedNum(50.into()),
                 Value::Bool(true),
             ),
             (
-                Value::BigNum(10.into()),
-                Value::BigNum(100.into()),
-                Value::BigNum(100.into()),
+                Value::UnifiedNum(10.into()),
+                Value::UnifiedNum(100.into()),
+                Value::UnifiedNum(100.into()),
                 Value::Bool(true),
             ),
             (
-                Value::BigNum(10.into()),
-                Value::BigNum(100.into()),
-                Value::BigNum(1000.into()),
+                Value::UnifiedNum(10.into()),
+                Value::UnifiedNum(100.into()),
+                Value::UnifiedNum(1000.into()),
                 Value::Bool(false),
             ),
         ];
@@ -857,12 +860,12 @@ mod math_functions {
         };
 
         let rule = Rule::Function(Function::new_muldiv(
-            Value::BigNum(10.into()),
-            Value::BigNum(10.into()),
-            Value::BigNum(2.into()),
+            Value::UnifiedNum(10.into()),
+            Value::UnifiedNum(10.into()),
+            Value::UnifiedNum(2.into()),
         ));
         assert_eq!(
-            Ok(Some(Value::BigNum(50.into()))),
+            Ok(Some(Value::UnifiedNum(50.into()))),
             rule.eval(&input, &mut output)
         );
     }
@@ -992,8 +995,16 @@ mod control_flow_and_logic {
         };
 
         let cases = [
-            (Value::BigNum(1.into()), Value::BigNum(1.into()), true),
-            (Value::BigNum(1.into()), Value::BigNum(2.into()), false),
+            (
+                Value::UnifiedNum(1.into()),
+                Value::UnifiedNum(1.into()),
+                true,
+            ),
+            (
+                Value::UnifiedNum(1.into()),
+                Value::UnifiedNum(2.into()),
+                false,
+            ),
             (
                 Value::Number(Number::from_f64(3.33).expect("should create float")),
                 Value::Number(Number::from_f64(3.33).expect("should create float")),
@@ -1073,8 +1084,16 @@ mod control_flow_and_logic {
         };
 
         let cases = [
-            (Value::BigNum(1.into()), Value::BigNum(1.into()), false),
-            (Value::BigNum(1.into()), Value::BigNum(2.into()), true),
+            (
+                Value::UnifiedNum(1.into()),
+                Value::UnifiedNum(1.into()),
+                false,
+            ),
+            (
+                Value::UnifiedNum(1.into()),
+                Value::UnifiedNum(2.into()),
+                true,
+            ),
             (Value::Bool(true), Value::Bool(true), false),
             (Value::Bool(true), Value::Bool(false), true),
             (
@@ -1145,10 +1164,10 @@ mod control_flow_and_logic {
             boost: 1.0,
             price: Default::default(),
         };
-        let result = Value::BigNum(200.into());
+        let result = Value::UnifiedNum(200.into());
         let rule = Rule::Function(Function::new_add(
-            Value::BigNum(100.into()),
-            Value::BigNum(100.into()),
+            Value::UnifiedNum(100.into()),
+            Value::UnifiedNum(100.into()),
         ));
         let rule_do = Rule::Function(Function::new_do(rule));
         assert_eq!(Ok(Some(result)), rule_do.eval(&input, &mut output));
@@ -1169,20 +1188,20 @@ mod string_and_array {
         let cases = vec![
             (
                 vec![
-                    Value::BigNum(1.into()),
-                    Value::BigNum(2.into()),
-                    Value::BigNum(3.into()),
+                    Value::UnifiedNum(1.into()),
+                    Value::UnifiedNum(2.into()),
+                    Value::UnifiedNum(3.into()),
                 ],
-                Value::BigNum(1.into()),
+                Value::UnifiedNum(1.into()),
                 true,
             ),
             (
                 vec![
-                    Value::BigNum(1.into()),
-                    Value::BigNum(2.into()),
-                    Value::BigNum(3.into()),
+                    Value::UnifiedNum(1.into()),
+                    Value::UnifiedNum(2.into()),
+                    Value::UnifiedNum(3.into()),
                 ],
-                Value::BigNum(0.into()),
+                Value::UnifiedNum(0.into()),
                 false,
             ),
         ];
@@ -1365,29 +1384,6 @@ mod string_and_array {
             ));
             let expected = Some(Value::Bool(*expected));
             assert_eq!(Ok(expected), rule.eval(&input, &mut output));
-        }
-    }
-
-    #[test]
-    fn test_get_price_in_usd_eval() {
-        let mut output = Output {
-            show: true,
-            boost: 1.0,
-            price: Default::default(),
-        };
-        for (key, value) in &*DEPOSIT_ASSETS_MAP {
-            let mut asset_campaign = DUMMY_CAMPAIGN.clone();
-            asset_campaign.channel.token = *key;
-            let input = get_default_input().with_campaign(asset_campaign);
-
-            let amount_crypto = BigNum::from(100).mul(value);
-            let amount_usd = Some(Value::Number(
-                Number::from_f64(100.0).expect("should create a float"),
-            ));
-            let rule = Rule::Function(Function::new_get_price_in_usd(Rule::Value(Value::BigNum(
-                amount_crypto,
-            ))));
-            assert_eq!(Ok(amount_usd), rule.eval(&input, &mut output));
         }
     }
 }

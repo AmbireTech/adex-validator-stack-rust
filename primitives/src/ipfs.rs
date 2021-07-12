@@ -7,7 +7,7 @@ const URL_PREFIX: &str = "ipfs://";
 
 pub use cid::{Cid, Error};
 
-#[derive(Hash, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Hash, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(try_from = "String", into = "String")]
 #[allow(clippy::upper_case_acronyms)]
 pub struct IPFS(pub cid::Cid);

@@ -1,9 +1,7 @@
-use crate::{Address, BigNum};
-use lazy_static::lazy_static;
+use crate::UnifiedNum;
 use serde::{Deserialize, Serialize};
 use serde_json::{value::Value as SerdeValue, Number};
 use std::{
-    collections::HashMap,
     convert::TryFrom,
     fmt,
     ops::{Add, Div, Mul, Rem, Sub},
@@ -12,10 +10,7 @@ use std::{
 
 pub use rules::Rules;
 
-use super::{
-    input::{campaign::Getter as ChannelGetter, Get},
-    Input, Output,
-};
+use super::{Input, Output};
 
 #[cfg(test)]
 #[path = "eval_test.rs"]
@@ -25,26 +20,6 @@ mod test;
 pub enum Error {
     TypeError,
     UnknownVariable,
-}
-
-lazy_static! {
-    pub static ref DAI_ADDR: Address = "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359"
-        .parse()
-        .expect("Valid Address");
-    pub static ref USDT_ADDR: Address = "0xdac17f958d2ee523a2206206994597c13d831ec7"
-        .parse()
-        .expect("Valid Address");
-    pub static ref USDC_ADDR: Address = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
-        .parse()
-        .expect("Valid Address");
-    pub static ref DEPOSIT_ASSETS_MAP: HashMap<Address, BigNum> = {
-        let mut assets = HashMap::new();
-        assets.insert(*DAI_ADDR, BigNum::from(10u64.pow(18)));
-        assets.insert(*USDT_ADDR, BigNum::from(10u64.pow(6)));
-        assets.insert(*USDC_ADDR, BigNum::from(10u64.pow(18)));
-
-        assets
-    };
 }
 
 trait Eval {
@@ -170,13 +145,13 @@ impl Rule {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(untagged, try_from = "SerdeValue", /* into = "SerdeValue" */)]
+#[serde(untagged, try_from = "SerdeValue")]
 pub enum Value {
     Bool(bool),
     Number(Number),
     String(String),
     Array(Vec<Value>),
-    BigNum(BigNum),
+    UnifiedNum(UnifiedNum),
 }
 
 impl Value {
@@ -196,8 +171,8 @@ impl TryFrom<SerdeValue> for Value {
         match serde_value {
             SerdeValue::Bool(bool) => Ok(Self::Bool(bool)),
             SerdeValue::Number(number) => Ok(Self::Number(number)),
-            // It's impossible to have a BigNumber literal in the rules, since they're JSON based (conform to serde_json::value::Value)
-            // However it is possible to obtain a BigNumber by invoking the Function::Bn
+            // It's impossible to have a UnifiedNum literal in the rules, since they're JSON based (conform to serde_json::value::Value)
+            // However it is possible to obtain a UnifiedNum by invoking the Function::Bn
             SerdeValue::String(string) => Ok(Value::String(string)),
             SerdeValue::Array(serde_array) => {
                 let array = serde_array
@@ -220,7 +195,7 @@ impl From<Value> for SerdeValue {
             Value::Array(array) => {
                 Self::Array(array.into_iter().map(|value| value.into()).collect())
             }
-            Value::BigNum(bignum) => Self::String(bignum.to_string()),
+            Value::UnifiedNum(unified) => Self::String(unified.to_string()),
         }
     }
 }
@@ -272,7 +247,6 @@ pub enum Function {
     StartsWith(Box<Rule>, Box<Rule>),
     EndsWith(Box<Rule>, Box<Rule>),
     OnlyShowIf(Box<Rule>),
-    GetPriceInUsd(Box<Rule>),
     Intersects(Box<Rule>, Box<Rule>),
     /// Evaluates rule
     Do(Box<Rule>),
@@ -444,10 +418,6 @@ impl Function {
     pub fn new_bn(value: impl Into<Value>) -> Self {
         Self::Bn(value.into())
     }
-
-    pub fn new_get_price_in_usd(amount: impl Into<Rule>) -> Self {
-        Self::GetPriceInUsd(Box::new(amount.into()))
-    }
 }
 
 impl Value {
@@ -472,8 +442,8 @@ impl Value {
         }
     }
 
-    pub fn try_bignum(self) -> Result<BigNum, Error> {
-        BigNum::try_from(self)
+    pub fn try_unified(self) -> Result<UnifiedNum, Error> {
+        UnifiedNum::try_from(self)
     }
 
     pub fn try_number(self) -> Result<Number, Error> {
@@ -484,14 +454,15 @@ impl Value {
     }
 }
 
-impl TryFrom<Value> for BigNum {
+/// The UnifiedNum can be extracted from the DSL either String or UnifiedNum
+impl TryFrom<Value> for UnifiedNum {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value {
-            Value::String(string) => BigNum::from_str(&string).map_err(|_| Error::TypeError),
-            Value::BigNum(big_num) => Ok(big_num),
+            Value::String(string) => UnifiedNum::from_str(&string).map_err(|_| Error::TypeError),
+            Value::UnifiedNum(unified) => Ok(unified),
             Value::Number(number) => {
-                BigNum::from_str(&number.to_string()).map_err(|_| Error::TypeError)
+                UnifiedNum::from_str(&number.to_string()).map_err(|_| Error::TypeError)
             }
             _ => Err(Error::TypeError),
         }
@@ -505,7 +476,7 @@ impl TryFrom<Value> for BigNum {
 ///     - Number
 ///     - String
 ///     - Array
-///     - BigNum
+///     - UnifiedNum
 /// - Mutates output
 /// - Throws an error
 fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>, Error> {
@@ -529,15 +500,15 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
             let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
 
             let value = match (first_eval, second_eval) {
-                (Value::BigNum(bignum), second_value) => {
-                    let second_bignum = BigNum::try_from(second_value)?;
+                (Value::UnifiedNum(unified), second_value) => {
+                    let second_unified = UnifiedNum::try_from(second_value)?;
 
-                    Value::BigNum(bignum.div(second_bignum))
+                    Value::UnifiedNum(unified.div(second_unified))
                 }
-                (lhs_value, Value::BigNum(rhs_bignum)) => {
-                    let lhs_bignum = BigNum::try_from(lhs_value)?;
+                (lhs_value, Value::UnifiedNum(rhs_unified)) => {
+                    let lhs_unified = UnifiedNum::try_from(lhs_value)?;
 
-                    Value::BigNum(lhs_bignum.div(rhs_bignum))
+                    Value::UnifiedNum(lhs_unified.div(rhs_unified))
                 }
                 (Value::Number(lhs), Value::Number(rhs)) => {
                     Value::Number(math_operator(lhs, rhs, MathOperator::Division)?)
@@ -552,15 +523,15 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
             let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
 
             let value = match (first_eval, second_eval) {
-                (Value::BigNum(bignum), rhs_value) => {
-                    let rhs_bignum = BigNum::try_from(rhs_value)?;
+                (Value::UnifiedNum(unified), rhs_value) => {
+                    let rhs_unified = UnifiedNum::try_from(rhs_value)?;
 
-                    Value::BigNum(bignum.mul(rhs_bignum))
+                    Value::UnifiedNum(unified.mul(rhs_unified))
                 }
-                (lhs_value, Value::BigNum(rhs_bignum)) => {
-                    let lhs_bignum = BigNum::try_from(lhs_value)?;
+                (lhs_value, Value::UnifiedNum(rhs_unified)) => {
+                    let lhs_unified = UnifiedNum::try_from(lhs_value)?;
 
-                    Value::BigNum(lhs_bignum.mul(rhs_bignum))
+                    Value::UnifiedNum(lhs_unified.mul(rhs_unified))
                 }
                 (Value::Number(lhs), Value::Number(rhs)) => {
                     Value::Number(math_operator(lhs, rhs, MathOperator::Multiplication)?)
@@ -575,15 +546,15 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
             let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
 
             let value = match (first_eval, second_eval) {
-                (Value::BigNum(bignum), rhs_value) => {
-                    let rhs_bignum = BigNum::try_from(rhs_value)?;
+                (Value::UnifiedNum(unified), rhs_value) => {
+                    let rhs_unified = UnifiedNum::try_from(rhs_value)?;
 
-                    Value::BigNum(bignum.rem(rhs_bignum))
+                    Value::UnifiedNum(unified.rem(rhs_unified))
                 }
-                (lhs_value, Value::BigNum(rhs_bignum)) => {
-                    let lhs_bignum = BigNum::try_from(lhs_value)?;
+                (lhs_value, Value::UnifiedNum(rhs_unified)) => {
+                    let lhs_unified = UnifiedNum::try_from(lhs_value)?;
 
-                    Value::BigNum(lhs_bignum.rem(rhs_bignum))
+                    Value::UnifiedNum(lhs_unified.rem(rhs_unified))
                 }
                 (Value::Number(lhs), Value::Number(rhs)) => {
                     Value::Number(math_operator(lhs, rhs, MathOperator::Modulus)?)
@@ -598,15 +569,15 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
             let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
 
             let value = match (first_eval, second_eval) {
-                (Value::BigNum(bignum), rhs_value) => {
-                    let rhs_bignum = BigNum::try_from(rhs_value)?;
+                (Value::UnifiedNum(unified), rhs_value) => {
+                    let rhs_unified = UnifiedNum::try_from(rhs_value)?;
 
-                    Value::BigNum(bignum.add(rhs_bignum))
+                    Value::UnifiedNum(unified.add(rhs_unified))
                 }
-                (lhs_value, Value::BigNum(rhs_bignum)) => {
-                    let lhs_bignum = BigNum::try_from(lhs_value)?;
+                (lhs_value, Value::UnifiedNum(rhs_unified)) => {
+                    let lhs_unified = UnifiedNum::try_from(lhs_value)?;
 
-                    Value::BigNum(lhs_bignum.add(rhs_bignum))
+                    Value::UnifiedNum(lhs_unified.add(rhs_unified))
                 }
                 (Value::Number(lhs), Value::Number(rhs)) => {
                     Value::Number(math_operator(lhs, rhs, MathOperator::Addition)?)
@@ -621,15 +592,15 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
             let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
 
             let value = match (first_eval, second_eval) {
-                (Value::BigNum(bignum), rhs_value) => {
-                    let rhs_bignum = BigNum::try_from(rhs_value)?;
+                (Value::UnifiedNum(unified), rhs_value) => {
+                    let rhs_unified = UnifiedNum::try_from(rhs_value)?;
 
-                    Value::BigNum(bignum.sub(rhs_bignum))
+                    Value::UnifiedNum(unified.sub(rhs_unified))
                 }
-                (lhs_value, Value::BigNum(rhs_bignum)) => {
-                    let lhs_bignum = BigNum::try_from(lhs_value)?;
+                (lhs_value, Value::UnifiedNum(rhs_unified)) => {
+                    let lhs_unified = UnifiedNum::try_from(lhs_value)?;
 
-                    Value::BigNum(lhs_bignum.sub(rhs_bignum))
+                    Value::UnifiedNum(lhs_unified.sub(rhs_unified))
                 }
                 (Value::Number(lhs), Value::Number(rhs)) => {
                     Value::Number(math_operator(lhs, rhs, MathOperator::Subtraction)?)
@@ -644,15 +615,15 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
             let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
 
             let value = match (first_eval, second_eval) {
-                (Value::BigNum(bignum), rhs_value) => {
-                    let rhs_bignum = BigNum::try_from(rhs_value)?;
+                (Value::UnifiedNum(unified), rhs_value) => {
+                    let rhs_unified = UnifiedNum::try_from(rhs_value)?;
 
-                    Value::BigNum(bignum.max(rhs_bignum))
+                    Value::UnifiedNum(unified.max(rhs_unified))
                 }
-                (lhs_value, Value::BigNum(rhs_bignum)) => {
-                    let lhs_bignum = BigNum::try_from(lhs_value)?;
+                (lhs_value, Value::UnifiedNum(rhs_unified)) => {
+                    let lhs_unified = UnifiedNum::try_from(lhs_value)?;
 
-                    Value::BigNum(lhs_bignum.max(rhs_bignum))
+                    Value::UnifiedNum(lhs_unified.max(rhs_unified))
                 }
                 (Value::Number(lhs), Value::Number(rhs)) => {
                     Value::Number(math_operator(lhs, rhs, MathOperator::Max)?)
@@ -667,15 +638,15 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
             let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
 
             let value = match (first_eval, second_eval) {
-                (Value::BigNum(bignum), rhs_value) => {
-                    let rhs_bignum = BigNum::try_from(rhs_value)?;
+                (Value::UnifiedNum(unified), rhs_value) => {
+                    let rhs_unified = UnifiedNum::try_from(rhs_value)?;
 
-                    Value::BigNum(bignum.min(rhs_bignum))
+                    Value::UnifiedNum(unified.min(rhs_unified))
                 }
-                (lhs_value, Value::BigNum(rhs_bignum)) => {
-                    let lhs_bignum = BigNum::try_from(lhs_value)?;
+                (lhs_value, Value::UnifiedNum(rhs_unified)) => {
+                    let lhs_unified = UnifiedNum::try_from(lhs_value)?;
 
-                    Value::BigNum(lhs_bignum.min(rhs_bignum))
+                    Value::UnifiedNum(lhs_unified.min(rhs_unified))
                 }
                 (Value::Number(lhs), Value::Number(rhs)) => {
                     Value::Number(math_operator(lhs, rhs, MathOperator::Min)?)
@@ -760,15 +731,15 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
             let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
 
             let value = match (first_eval, second_eval) {
-                (Value::BigNum(bignum), rhs_value) => {
-                    let rhs_bignum = BigNum::try_from(rhs_value)?;
+                (Value::UnifiedNum(unified), rhs_value) => {
+                    let rhs_unified = UnifiedNum::try_from(rhs_value)?;
 
-                    Value::Bool(bignum.lt(&rhs_bignum))
+                    Value::Bool(unified.lt(&rhs_unified))
                 }
-                (lhs_value, Value::BigNum(rhs_bignum)) => {
-                    let lhs_bignum = BigNum::try_from(lhs_value)?;
+                (lhs_value, Value::UnifiedNum(rhs_unified)) => {
+                    let lhs_unified = UnifiedNum::try_from(lhs_value)?;
 
-                    Value::Bool(lhs_bignum.lt(&rhs_bignum))
+                    Value::Bool(lhs_unified.lt(&rhs_unified))
                 }
                 (Value::Number(lhs), Value::Number(rhs)) => {
                     Value::Bool(compare_numbers(lhs, rhs, ComparisonOperator::Lt)?)
@@ -783,15 +754,15 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
             let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
 
             let value = match (first_eval, second_eval) {
-                (Value::BigNum(bignum), rhs_value) => {
-                    let rhs_bignum = BigNum::try_from(rhs_value)?;
+                (Value::UnifiedNum(unified), rhs_value) => {
+                    let rhs_unified = UnifiedNum::try_from(rhs_value)?;
 
-                    Value::Bool(bignum.le(&rhs_bignum))
+                    Value::Bool(unified.le(&rhs_unified))
                 }
-                (lhs_value, Value::BigNum(rhs_bignum)) => {
-                    let lhs_bignum = BigNum::try_from(lhs_value)?;
+                (lhs_value, Value::UnifiedNum(rhs_unified)) => {
+                    let lhs_unified = UnifiedNum::try_from(lhs_value)?;
 
-                    Value::Bool(lhs_bignum.le(&rhs_bignum))
+                    Value::Bool(lhs_unified.le(&rhs_unified))
                 }
                 (Value::Number(lhs), Value::Number(rhs)) => {
                     Value::Bool(compare_numbers(lhs, rhs, ComparisonOperator::Lte)?)
@@ -806,15 +777,15 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
             let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
 
             let value = match (first_eval, second_eval) {
-                (Value::BigNum(bignum), rhs_value) => {
-                    let rhs_bignum = BigNum::try_from(rhs_value)?;
+                (Value::UnifiedNum(unified), rhs_value) => {
+                    let rhs_unified = UnifiedNum::try_from(rhs_value)?;
 
-                    Value::Bool(bignum.gt(&rhs_bignum))
+                    Value::Bool(unified.gt(&rhs_unified))
                 }
-                (lhs_value, Value::BigNum(rhs_bignum)) => {
-                    let lhs_bignum = BigNum::try_from(lhs_value)?;
+                (lhs_value, Value::UnifiedNum(rhs_unified)) => {
+                    let lhs_unified = UnifiedNum::try_from(lhs_value)?;
 
-                    Value::Bool(lhs_bignum.gt(&rhs_bignum))
+                    Value::Bool(lhs_unified.gt(&rhs_unified))
                 }
                 (Value::Number(lhs), Value::Number(rhs)) => {
                     Value::Bool(compare_numbers(lhs, rhs, ComparisonOperator::Gt)?)
@@ -829,15 +800,15 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
             let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
 
             let value = match (first_eval, second_eval) {
-                (Value::BigNum(bignum), rhs_value) => {
-                    let rhs_bignum = BigNum::try_from(rhs_value)?;
+                (Value::UnifiedNum(unified), rhs_value) => {
+                    let rhs_unified = UnifiedNum::try_from(rhs_value)?;
 
-                    Value::Bool(bignum.ge(&rhs_bignum))
+                    Value::Bool(unified.ge(&rhs_unified))
                 }
-                (lhs_value, Value::BigNum(rhs_bignum)) => {
-                    let lhs_bignum = BigNum::try_from(lhs_value)?;
+                (lhs_value, Value::UnifiedNum(rhs_unified)) => {
+                    let lhs_unified = UnifiedNum::try_from(lhs_value)?;
 
-                    Value::Bool(lhs_bignum.ge(&rhs_bignum))
+                    Value::Bool(lhs_unified.ge(&rhs_unified))
                 }
                 (Value::Number(lhs), Value::Number(rhs)) => {
                     Value::Bool(compare_numbers(lhs, rhs, ComparisonOperator::Gte)?)
@@ -852,15 +823,15 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
             let second_eval = second_rule.eval(input, output)?.ok_or(Error::TypeError)?;
 
             let value = match (first_eval, second_eval) {
-                (Value::BigNum(bignum), rhs_value) => {
-                    let rhs_bignum = BigNum::try_from(rhs_value)?;
+                (Value::UnifiedNum(unified), rhs_value) => {
+                    let rhs_unified = UnifiedNum::try_from(rhs_value)?;
 
-                    Value::Bool(bignum.eq(&rhs_bignum))
+                    Value::Bool(unified.eq(&rhs_unified))
                 }
-                (lhs_value, Value::BigNum(rhs_bignum)) => {
-                    let lhs_bignum = BigNum::try_from(lhs_value)?;
+                (lhs_value, Value::UnifiedNum(rhs_unified)) => {
+                    let lhs_unified = UnifiedNum::try_from(lhs_value)?;
 
-                    Value::Bool(lhs_bignum.eq(&rhs_bignum))
+                    Value::Bool(lhs_unified.eq(&rhs_unified))
                 }
                 (Value::Number(lhs), Value::Number(rhs)) => {
                     Value::Bool(compare_numbers(lhs, rhs, ComparisonOperator::Eq)?)
@@ -994,37 +965,6 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
 
             Function::Set(String::from("show"), new_rule).eval(input, output)?
         }
-        Function::GetPriceInUsd(amount_rule) => {
-            let amount = amount_rule
-                .eval(input, output)?
-                .ok_or(Error::TypeError)?
-                .try_bignum()?;
-
-            // if there is no way to get the deposit_asset, then fail with UnknownVariable
-            // since we can't calculate the price in USD
-            let deposit_asset = match &input.campaign {
-                Some(Get::Getter(ChannelGetter::Full(full_campaign))) => {
-                    Ok(full_campaign.campaign.channel.token)
-                }
-                //
-                // TODO: AIP#61 Replace with Campaign
-                //
-                Some(Get::Getter(ChannelGetter::Market(channel))) => channel
-                    .deposit_asset
-                    .parse::<Address>()
-                    .map_err(|_| Error::TypeError),
-                // In case of a Values - we don't have the deposit_asset on hand so we fail in that case
-                // In case of None we also fail
-                _ => Err(Error::UnknownVariable),
-            }?;
-
-            let divisor = DEPOSIT_ASSETS_MAP
-                .get(&deposit_asset)
-                .ok_or(Error::TypeError)?;
-            let amount_in_usd = amount.div(divisor).to_f64().ok_or(Error::TypeError)?;
-            let amount_as_number = Number::from_f64(amount_in_usd).ok_or(Error::TypeError)?;
-            Some(Value::Number(amount_as_number))
-        }
         Function::Do(first_rule) => eval(input, output, first_rule)?,
         Function::Set(key, rule) => {
             // Output variables can be set any number of times by different rules, except `show`
@@ -1050,7 +990,7 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
                     let price = rule
                         .eval(input, output)?
                         .ok_or(Error::TypeError)?
-                        .try_bignum()?;
+                        .try_unified()?;
 
                     // we do not care about any other old value
                     output.price.insert("IMPRESSION".to_string(), price);
@@ -1059,7 +999,7 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
                     let price = rule
                         .eval(input, output)?
                         .ok_or(Error::TypeError)?
-                        .try_bignum()?;
+                        .try_unified()?;
 
                     // we do not care about any other old value
                     output.price.insert("CLICK".to_string(), price);
@@ -1075,9 +1015,9 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
             Err(e) => return Err(e),
         },
         Function::Bn(value) => {
-            let big_num = value.clone().try_bignum()?;
+            let unified = value.clone().try_unified()?;
 
-            Some(Value::BigNum(big_num))
+            Some(Value::UnifiedNum(unified))
         }
     };
 

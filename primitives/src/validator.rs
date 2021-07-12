@@ -22,26 +22,12 @@ impl ValidatorId {
         self.0.as_bytes()
     }
 
-    pub fn to_address(&self) -> Address {
+    pub fn to_address(self) -> Address {
         self.0
     }
 
     pub fn inner(&self) -> &[u8; 20] {
         &self.0.as_bytes()
-    }
-
-    /// To Hex non-`0x` prefixed string without **Checksum**ing the string
-    /// For backwards compatibility
-    /// TODO: Remove once we change all places this method is used at
-    pub fn to_hex_non_prefix_string(&self) -> String {
-        self.0.to_hex()
-    }
-
-    /// To Hex `0x` prefixed string **without** __Checksum__ing the string
-    /// For backwards compatibility
-    /// TODO: Remove once we change all places this method is used at
-    pub fn to_hex_prefix_string(&self) -> String {
-        self.0.to_hex_prefixed()
     }
 }
 
