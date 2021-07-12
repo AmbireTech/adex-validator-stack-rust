@@ -340,7 +340,6 @@ mod test {
         expected: (Address, Side, UnifiedNum),
         accounting: Accounting,
         with_set_updated: bool,
-    // ) -> anyhow::Result<()> {
     ) {
         assert_eq!(
             expected.0, accounting.address,
@@ -487,24 +486,40 @@ mod test {
             // Earners assertions
             assert_accounting(
                 (earner, Side::Earner, UnifiedNum::from(400_000)),
-            earners_acc.iter().find(|a| a.address == earner).unwrap().clone(),
+                earners_acc
+                    .iter()
+                    .find(|a| a.address == earner)
+                    .unwrap()
+                    .clone(),
                 false,
             );
             assert_accounting(
                 (other_earner, Side::Earner, UnifiedNum::from(500_000)),
-                earners_acc.iter().find(|a| a.address == other_earner).unwrap().clone(),
+                earners_acc
+                    .iter()
+                    .find(|a| a.address == other_earner)
+                    .unwrap()
+                    .clone(),
                 false,
             );
 
             // Spenders assertions
             assert_accounting(
                 (spender, Side::Spender, UnifiedNum::from(400_000)),
-                spenders_acc.iter().find(|a| a.address == spender).unwrap().clone(),
+                spenders_acc
+                    .iter()
+                    .find(|a| a.address == spender)
+                    .unwrap()
+                    .clone(),
                 false,
             );
             assert_accounting(
                 (other_spender, Side::Spender, UnifiedNum::from(500_000)),
-                spenders_acc.iter().find(|a| a.address == other_spender).unwrap().clone(),
+                spenders_acc
+                    .iter()
+                    .find(|a| a.address == other_spender)
+                    .unwrap()
+                    .clone(),
                 false,
             );
         }
@@ -532,34 +547,58 @@ mod test {
             // Earners assertions
             assert_accounting(
                 (earner, Side::Earner, UnifiedNum::from(1_800_000)),
-                earners_acc.iter().find(|a| a.address == earner).unwrap().clone(),
+                earners_acc
+                    .iter()
+                    .find(|a| a.address == earner)
+                    .unwrap()
+                    .clone(),
                 true,
             );
             assert_accounting(
                 (other_earner, Side::Earner, UnifiedNum::from(2_000_000)),
-                earners_acc.iter().find(|a| a.address == other_earner).unwrap().clone(),
+                earners_acc
+                    .iter()
+                    .find(|a| a.address == other_earner)
+                    .unwrap()
+                    .clone(),
                 true,
             );
             assert_accounting(
                 (spender_as_earner, Side::Earner, UnifiedNum::from(600_000)),
-                earners_acc.iter().find(|a| a.address == spender_as_earner).unwrap().clone(),
+                earners_acc
+                    .iter()
+                    .find(|a| a.address == spender_as_earner)
+                    .unwrap()
+                    .clone(),
                 false,
             );
 
             // Spenders assertions
             assert_accounting(
                 (spender, Side::Spender, UnifiedNum::from(1_800_000)),
-                spenders_acc.iter().find(|a| a.address == spender).unwrap().clone(),
+                spenders_acc
+                    .iter()
+                    .find(|a| a.address == spender)
+                    .unwrap()
+                    .clone(),
                 true,
             );
             assert_accounting(
                 (other_spender, Side::Spender, UnifiedNum::from(2_000_000)),
-                spenders_acc.iter().find(|a| a.address == other_spender).unwrap().clone(),
+                spenders_acc
+                    .iter()
+                    .find(|a| a.address == other_spender)
+                    .unwrap()
+                    .clone(),
                 true,
             );
             assert_accounting(
                 (third_spender, Side::Spender, UnifiedNum::from(600_000)),
-                spenders_acc.iter().find(|a| a.address == third_spender).unwrap().clone(),
+                spenders_acc
+                    .iter()
+                    .find(|a| a.address == third_spender)
+                    .unwrap()
+                    .clone(),
                 false,
             );
         }

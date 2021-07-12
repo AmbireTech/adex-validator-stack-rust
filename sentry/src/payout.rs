@@ -66,7 +66,7 @@ pub fn get_payout(
                 let mut output = Output {
                     show: true,
                     boost: 1.0,
-                    price: vec![(event_type.clone(), pricing.min.clone())]
+                    price: vec![(event_type.clone(), pricing.min)]
                         .into_iter()
                         .collect(),
                 };
@@ -78,7 +78,7 @@ pub fn get_payout(
                 if output.show {
                     let price = match output.price.get(&event_type) {
                         Some(output_price) => {
-                            max(pricing.min, min(pricing.max, output_price.clone()))
+                            max(pricing.min, min(pricing.max, *output_price))
                         }
                         None => max(pricing.min, pricing.max),
                     };

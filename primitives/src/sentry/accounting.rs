@@ -59,12 +59,12 @@ impl<S: BalancesState> Balances<S> {
         let spent = self.spenders.entry(spender).or_default();
         *spent = spent
             .checked_add(&amount)
-            .ok_or_else(|| OverflowError::Spender(spender))?;
+            .ok_or(OverflowError::Spender(spender))?;
 
         let earned = self.earners.entry(earner).or_default();
         *earned = earned
             .checked_add(&amount)
-            .ok_or_else(|| OverflowError::Earner(earner))?;
+            .ok_or(OverflowError::Earner(earner))?;
 
         Ok(())
     }

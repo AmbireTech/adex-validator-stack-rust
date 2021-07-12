@@ -102,10 +102,10 @@ impl<A: Adapter + 'static> Application<A> {
     ) -> Self {
         Self {
             adapter,
-            config,
             logger,
             redis,
             pool,
+            config,
         }
     }
 
@@ -188,7 +188,7 @@ async fn campaigns_router<A: Adapter + 'static>(
 
         let req = CampaignLoad.call(req, app).await?;
 
-        campaign::insert_events(req, app).await
+        campaign::insert_events::handle_route(req, app).await
     } else if let (Some(_caps), &Method::POST) =
         (CLOSE_CAMPAIGN_BY_CAMPAIGN_ID.captures(&path), method)
     {
