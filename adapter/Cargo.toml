@@ -17,7 +17,7 @@ serde = { version = "^1.0", features = ['derive'] }
 serde_json = "1.0"
 serde-hex = "0.1.0"
 # Ethereum
-web3 = { version = "0.15", features = ["http-tls", "signing"] }
+web3 = { version = "0.16", features = ["http-tls", "signing"] }
 eth_checksum = "0.1"
 tiny-keccak = "1.5"
 ethstore = { git = "https://github.com/openethereum/openethereum", tag = "v3.1.1-rc.1" }
@@ -26,11 +26,11 @@ create2 = "0.0.2"
 # API client
 reqwest = { version = "0.11", features = ["json"] }
 
-sha2 = "0.8.0"
-base64 = "0.10.1"
+sha2 = "0.9"
+base64 = "0.13"
 lazy_static = "^1.4"
 # Futures
-futures = { version = "0.3", features = ["compat"] }
+futures = "0.3"
 async-trait = "0.1"
 tokio-compat-02 = "0.2"
 
@@ -40,4 +40,4 @@ dashmap = "4.0"
 [dev-dependencies]
 byteorder = "^1.4"
 tokio = { version = "^1", features = ["macros", "rt-multi-thread"] }
-wiremock = "0.4"
+wiremock = "0.5"
