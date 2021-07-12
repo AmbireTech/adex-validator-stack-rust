@@ -6,7 +6,7 @@ pub use self::{
     ad_slot::AdSlot,
     ad_unit::AdUnit,
     address::Address,
-    balances_map::BalancesMap,
+    balances_map::{BalancesMap, UnifiedMap},
     big_num::BigNum,
     campaign::{Campaign, CampaignId},
     channel::{Channel, ChannelId, ChannelSpec, SpecValidator, SpecValidators},

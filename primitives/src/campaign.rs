@@ -16,7 +16,7 @@ pub use {
     validators::{ValidatorRole, Validators},
 };
 
-with_prefix!(prefix_active "active_");
+with_prefix!(pub prefix_active "active_");
 
 mod campaign_id {
     use crate::ToHex;
@@ -235,13 +235,13 @@ pub struct Active {
 }
 
 mod pricing {
-    use crate::BigNum;
+    use crate::UnifiedNum;
     use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
     pub struct Pricing {
-        pub min: BigNum,
-        pub max: BigNum,
+        pub min: UnifiedNum,
+        pub max: UnifiedNum,
     }
 
     #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
@@ -277,7 +277,7 @@ mod pricing {
         }
     }
 }
-// TODO: Double check if we require all the methods and enums, as some parts are now in the `Campaign`
+// TODO AIP#61: Double check if we require all the methods and enums, as some parts are now in the `Campaign`
 // This includes the matching of the Channel leader & follower to the Validators
 pub mod validators {
     use crate::{ValidatorDesc, ValidatorId};
