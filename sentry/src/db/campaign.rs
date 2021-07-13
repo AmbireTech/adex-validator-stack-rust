@@ -67,7 +67,7 @@ pub async fn get_campaigns_by_channel(
 /// UPDATE campaigns SET budget = $1, validators = $2, title = $3, pricing_bounds = $4, event_submission = $5, ad_units = $6, targeting_rules = $7
 /// WHERE id = $8
 /// RETURNING id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to
-///
+/// ```
 pub async fn update_campaign(pool: &DbPool, campaign: &Campaign) -> Result<Campaign, PoolError> {
     let client = pool.get().await?;
     let statement = client
