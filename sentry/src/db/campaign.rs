@@ -63,20 +63,21 @@ pub async fn get_campaigns_by_channel(
     Ok(campaigns)
 }
 
-pub async fn update_campaign(
-    pool: &DbPool,
-    campaign: &Campaign,
-) -> Result<bool, PoolError> {
+/// ```text
+/// UPDATE campaigns SET budget = $1, validators = $2, title = $3, pricing_bounds = $4, event_submission = $5, ad_units = $6, targeting_rules = $7
+/// WHERE id = $8
+/// RETURNING id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to
+///
+pub async fn update_campaign(pool: &DbPool, campaign: &Campaign) -> Result<Campaign, PoolError> {
     let client = pool.get().await?;
     let statement = client
-        .prepare("UPDATE campaigns SET budget = $1, validators = $2, title = $3, pricing_bounds = $4, event_submission = $5, ad_units = $6, targeting_rules = $7 WHERE id = $8")
+        .prepare("UPDATE campaigns SET budget = $1, validators = $2, title = $3, pricing_bounds = $4, event_submission = $5, ad_units = $6, targeting_rules = $7 WHERE id = $8 RETURNING id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to")
         .await?;
-
 
     let ad_units = Json(&campaign.ad_units);
 
-    let updated_rows = client
-        .execute(
+    let updated_row = client
+        .query_one(
             &statement,
             &[
                 &campaign.budget,
@@ -91,106 +92,100 @@ pub async fn update_campaign(
         )
         .await?;
 
-    let exists = updated_rows == 1;
-    Ok(exists)
+    Ok(Campaign::from(&updated_row))
 }
 
 #[cfg(test)]
 mod test {
     use primitives::{
-        util::tests::prep_db::{DUMMY_CAMPAIGN, DUMMY_AD_UNITS},
-        event_submission::{Rule, RateLimit},
+        campaign,
+        event_submission::{RateLimit, Rule},
         sentry::campaign_create::ModifyCampaign,
         targeting::Rules,
-        UnifiedNum, EventSubmission,
+        util::tests::prep_db::{DUMMY_AD_UNITS, DUMMY_CAMPAIGN},
+        EventSubmission, UnifiedNum,
     };
-    use primitives::campaign;
     use std::time::Duration;
     use tokio_postgres::error::SqlState;
 
-    use crate::{
-        db::tests_postgres::{setup_test_migrations, DATABASE_POOL},
-    };
+    use crate::db::tests_postgres::{setup_test_migrations, DATABASE_POOL};
 
     use super::*;
 
     #[tokio::test]
-    async fn it_inserts_and_fetches_campaign() {
+    async fn it_inserts_fetches_and_updates_a_campaign() {
         let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
 
         setup_test_migrations(database.pool.clone())
             .await
             .expect("Migrations should succeed");
 
-        let campaign_for_testing = DUMMY_CAMPAIGN.clone();
+        let campaign = DUMMY_CAMPAIGN.clone();
 
-        let non_existent_campaign = fetch_campaign(database.pool.clone(), &campaign_for_testing.id)
+        let non_existent_campaign = fetch_campaign(database.pool.clone(), &campaign.id)
             .await
             .expect("Should fetch successfully");
 
         assert_eq!(None, non_existent_campaign);
 
-        let is_inserted = insert_campaign(&database.pool, &campaign_for_testing)
+        let is_inserted = insert_campaign(&database.pool, &campaign)
             .await
             .expect("Should succeed");
 
         assert!(is_inserted);
 
-        let is_duplicate_inserted = insert_campaign(&database.pool, &campaign_for_testing).await;
+        let is_duplicate_inserted = insert_campaign(&database.pool, &campaign).await;
 
         assert!(matches!(
             is_duplicate_inserted,
             Err(PoolError::Backend(error)) if error.code() == Some(&SqlState::UNIQUE_VIOLATION)
         ));
 
-        let fetched_campaign = fetch_campaign(database.pool.clone(), &campaign_for_testing.id)
+        let fetched_campaign = fetch_campaign(database.pool.clone(), &campaign.id)
             .await
             .expect("Should fetch successfully");
 
-        assert_eq!(Some(campaign_for_testing), fetched_campaign);
-    }
+        assert_eq!(Some(campaign.clone()), fetched_campaign);
 
-    #[tokio::test]
-    async fn it_updates_campaign() {
-        let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
+        // Update campaign
+        {
+            let rule = Rule {
+                uids: None,
+                rate_limit: Some(RateLimit {
+                    limit_type: "sid".to_string(),
+                    time_frame: Duration::from_millis(20_000),
+                }),
+            };
+            let new_budget = campaign.budget + UnifiedNum::from_u64(1_000_000_000);
+            let modified_campaign = ModifyCampaign {
+                budget: Some(new_budget),
+                validators: None,
+                title: Some("Modified Campaign".to_string()),
+                pricing_bounds: Some(campaign::PricingBounds {
+                    impression: Some(campaign::Pricing {
+                        min: 1.into(),
+                        max: 10.into(),
+                    }),
+                    click: Some(campaign::Pricing {
+                        min: 0.into(),
+                        max: 0.into(),
+                    }),
+                }),
+                event_submission: Some(EventSubmission { allow: vec![rule] }),
+                ad_units: Some(DUMMY_AD_UNITS.to_vec()),
+                targeting_rules: Some(Rules::new()),
+            };
 
-        setup_test_migrations(database.pool.clone())
-            .await
-            .expect("Migrations should succeed");
+            let applied_campaign = modified_campaign.apply(campaign.clone());
 
-        let campaign_for_testing = DUMMY_CAMPAIGN.clone();
+            let updated_campaign = update_campaign(&database.pool, &applied_campaign)
+                .await
+                .expect("should update");
 
-        let is_inserted = insert_campaign(&database.pool, &campaign_for_testing)
-            .await
-            .expect("Should succeed");
-
-        assert!(is_inserted);
-
-        let rule = Rule {
-            uids: None,
-            rate_limit: Some(RateLimit {
-                limit_type: "sid".to_string(),
-                time_frame: Duration::from_millis(20_000),
-            }),
-        };
-        let new_budget = campaign_for_testing.budget + UnifiedNum::from_u64(1_000_000_000);
-        let modified_campaign = ModifyCampaign {
-            // pub budget: Option<UnifiedNum>,
-            budget: Some(new_budget),
-            validators: None,
-            title: Some("Modified Campaign".to_string()),
-            pricing_bounds: Some(campaign::PricingBounds {
-                impression: Some(campaign::Pricing { min: 1.into(), max: 10.into()}),
-                click: Some(campaign::Pricing { min: 0.into(), max: 0.into()})
-            }),
-            event_submission: Some(EventSubmission { allow: vec![rule] }),
-            ad_units: Some(DUMMY_AD_UNITS.to_vec()),
-            targeting_rules: Some(Rules::new()),
-        };
-
-        let applied_campaign = modified_campaign.apply(&campaign_for_testing);
-
-        let is_campaign_updated = update_campaign(&database.pool, &applied_campaign).await.expect("should update");
-        assert!(is_campaign_updated);
+            assert_eq!(
+                applied_campaign, updated_campaign,
+                "Postgres should update all modified fields"
+            );
+        }
     }
 }

@@ -386,22 +386,37 @@ pub mod campaign_create {
             }
         }
 
-        pub fn apply(&self, campaign: &Campaign) -> Campaign {
-            let campaign = campaign.clone();
-            Campaign {
-                id: campaign.id,
-                channel: campaign.channel,
-                creator: campaign.creator,
-                budget: self.budget.unwrap_or(campaign.budget),
-                validators: self.validators.clone().unwrap_or(campaign.validators),
-                title: self.title.clone().or(campaign.title),
-                pricing_bounds: self.pricing_bounds.clone().or(campaign.pricing_bounds),
-                event_submission: self.event_submission.clone().or(campaign.event_submission),
-                ad_units: self.ad_units.clone().unwrap_or(campaign.ad_units),
-                targeting_rules: self.targeting_rules.clone().unwrap_or(campaign.targeting_rules),
-                created: campaign.created,
-                active: campaign.active,
+        pub fn apply(self, mut campaign: Campaign) -> Campaign {
+            if let Some(new_budget) = self.budget {
+                campaign.budget = new_budget;
             }
+
+            if let Some(new_validators) = self.validators {
+                campaign.validators = new_validators;
+            }
+
+            // check if it was passed otherwise not sending a Title will result in clearing of the current one
+            if let Some(new_title) = self.title {
+                campaign.title = Some(new_title);
+            }
+
+            if let Some(new_pricing_bounds) = self.pricing_bounds {
+                campaign.pricing_bounds = Some(new_pricing_bounds);
+            }
+            
+            if let Some(new_event_submission) = self.event_submission {
+                campaign.event_submission = Some(new_event_submission);
+            }
+
+            if let Some(new_ad_units) = self.ad_units {
+                campaign.ad_units = new_ad_units;
+            }
+
+            if let Some(new_targeting_rules) = self.targeting_rules {
+                campaign.targeting_rules = new_targeting_rules;
+            }
+
+            campaign
         }
     }
 }

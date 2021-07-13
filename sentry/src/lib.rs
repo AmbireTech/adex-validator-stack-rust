@@ -1,7 +1,7 @@
 #![deny(clippy::all)]
 #![deny(rust_2018_idioms)]
 
-use crate::db::{DbPool};
+use crate::db::DbPool;
 use crate::routes::campaign;
 use crate::routes::channel::channel_status;
 use crate::routes::event_aggregate::list_channel_event_aggregates;
@@ -437,7 +437,7 @@ pub fn bad_response(response_body: String, status_code: StatusCode) -> Response<
     let mut error_response = HashMap::new();
     error_response.insert("message", response_body);
 
-    let body = Body::from(serde_json::to_string(&error_response).expect("serialise err response"));
+    let body = Body::from(serde_json::to_string(&error_response).expect("serialize err response"));
 
     let mut response = Response::new(body);
     response
