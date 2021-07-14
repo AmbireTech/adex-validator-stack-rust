@@ -23,7 +23,7 @@ pub use deadpool_postgres::PoolError;
 // Re-export the redis RedisError for easier usage
 pub use redis::RedisError;
 
-pub type DbPool = deadpool_postgres::Pool<NoTls>;
+pub type DbPool = deadpool_postgres::Pool;
 
 lazy_static! {
     static ref POSTGRES_USER: String =
@@ -180,7 +180,7 @@ pub mod tests_postgres {
         /// The database name that will be created by the pool `CREATE DATABASE`
         /// This database will be set on configuration level of the underlying connection Pool for tests
         pub name: String,
-        pub pool: deadpool_postgres::Pool<NoTls>,
+        pub pool: deadpool_postgres::Pool,
     }
 
     impl Database {
@@ -190,9 +190,9 @@ pub mod tests_postgres {
     }
 
     impl Deref for Database {
-        type Target = deadpool_postgres::Pool<NoTls>;
+        type Target = deadpool_postgres::Pool;
 
-        fn deref(&self) -> &deadpool_postgres::Pool<NoTls> {
+        fn deref(&self) -> &deadpool_postgres::Pool {
             &self.pool
         }
     }
@@ -203,14 +203,14 @@ pub mod tests_postgres {
         }
     }
 
-    impl AsRef<deadpool_postgres::Pool<NoTls>> for Database {
-        fn as_ref(&self) -> &deadpool_postgres::Pool<NoTls> {
+    impl AsRef<deadpool_postgres::Pool> for Database {
+        fn as_ref(&self) -> &deadpool_postgres::Pool {
             &self.pool
         }
     }
 
-    impl AsMut<deadpool_postgres::Pool<NoTls>> for Database {
-        fn as_mut(&mut self) -> &mut deadpool_postgres::Pool<NoTls> {
+    impl AsMut<deadpool_postgres::Pool> for Database {
+        fn as_mut(&mut self) -> &mut deadpool_postgres::Pool {
             &mut self.pool
         }
     }
@@ -219,7 +219,7 @@ pub mod tests_postgres {
     /// create the actual connection to the database with default options set
     pub struct Manager {
         base_config: tokio_postgres::Config,
-        base_pool: deadpool_postgres::Pool<NoTls>,
+        base_pool: deadpool_postgres::Pool,
         manager_config: ManagerConfig,
         index: AtomicUsize,
         db_prefix: String,
@@ -243,7 +243,7 @@ pub mod tests_postgres {
         }
 
         pub fn new_with_pool(
-            base_pool: deadpool_postgres::Pool<NoTls>,
+            base_pool: deadpool_postgres::Pool,
             base_config: tokio_postgres::Config,
             manager_config: ManagerConfig,
             db_prefix: &str,

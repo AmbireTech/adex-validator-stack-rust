@@ -293,8 +293,8 @@ impl Adapter for EthereumAdapter {
         let sweeper_address = sweeper_contract.address();
         let outpace_address = outpace_contract.address();
 
-        let on_outpace: U256 = tokio_compat_02::FutureExt::compat(async {
-            tokio_compat_02::FutureExt::compat(outpace_contract.query(
+        let on_outpace: U256 = outpace_contract
+            .query(
                 "deposits",
                 (
                     Token::FixedBytes(channel.id().as_bytes().to_vec()),
@@ -303,11 +303,9 @@ impl Adapter for EthereumAdapter {
                 None,
                 Options::default(),
                 None,
-            ))
+            )
             .await
-        })
-        .await
-        .map_err(Error::ContractQuerying)?;
+            .map_err(Error::ContractQuerying)?;
 
         let on_outpace = BigNum::from_str(&on_outpace.to_string())?;
 
@@ -317,18 +315,16 @@ impl Adapter for EthereumAdapter {
             outpace_address,
             depositor_address,
         );
-        let still_on_create2: U256 = tokio_compat_02::FutureExt::compat(async {
-            tokio_compat_02::FutureExt::compat(erc20_contract.query(
+        let still_on_create2: U256 = erc20_contract
+            .query(
                 "balanceOf",
                 counterfactual_address,
                 None,
                 Options::default(),
                 None,
-            ))
+            )
             .await
-        })
-        .await
-        .map_err(Error::ContractQuerying)?;
+            .map_err(Error::ContractQuerying)?;
 
         let still_on_create2: BigNum = still_on_create2.to_string().parse()?;
 
