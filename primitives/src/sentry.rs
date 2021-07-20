@@ -1,6 +1,6 @@
 use crate::{
     validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
-    Address, BigNum, Channel, ChannelId, ValidatorId, IPFS,
+    Address, BigNum, Channel, ChannelId, ValidatorId, IPFS, UnifiedNum
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -195,6 +195,19 @@ pub struct LastApprovedResponse {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SuccessResponse {
     pub success: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SpenderResponse {
+    pub total_deposited: UnifiedNum,
+    pub spender_leaf: SpenderLeaf,
+}
+
+// TODO: Maybe there is a better place for this struct
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SpenderLeaf {
+    pub total_spent: UnifiedNum,
+    // merkle_proof: [u8; 32], // TODO
 }
 
 #[derive(Serialize, Deserialize, Debug)]

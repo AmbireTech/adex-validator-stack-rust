@@ -1,7 +1,8 @@
 use crate::db::{
-    event_aggregate::{latest_approve_state, latest_heartbeats, latest_new_state},
+    event_aggregate::{latest_approve_state, latest_heartbeats, latest_new_state, latest_new_state_v5, latest_approve_state_v5},
+    spendable::{fetch_spendable, insert_spendable},
     get_channel_by_id, insert_channel, insert_validator_messages, list_channels,
-    update_exhausted_channel, PoolError,
+    update_exhausted_channel, PoolError, DbPool
 };
 use crate::{success_response, Application, Auth, ResponseError, RouteParams};
 use futures::future::try_join_all;
@@ -11,13 +12,18 @@ use primitives::{
     adapter::Adapter,
     sentry::{
         channel_list::{ChannelListQuery, LastApprovedQuery},
-        LastApproved, LastApprovedResponse, SuccessResponse,
+        LastApproved, LastApprovedResponse, SuccessResponse, SpenderLeaf, SpenderResponse
     },
+    spender::{Spendable, Deposit},
     validator::MessageTypes,
-    Channel, ChannelId,
+    channel_v5::Channel as ChannelV5,
+    Address, Channel, ChannelId, UnifiedNum
 };
 use slog::error;
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    str::FromStr,
+};
 use tokio_postgres::error::SqlState;
 
 pub async fn channel_status<A: Adapter>(
@@ -226,5 +232,134 @@ pub async fn create_validator_messages<A: Adapter + 'static>(
                 success: true,
             })?))
         }
+    }
+}
+
+// TODO: Maybe use a different error for helper functions like in campaign routes
+async fn create_spendable_document<A: Adapter>(adapter: &A, pool: DbPool, channel: &ChannelV5, spender: &Address) -> Result<Spendable, ResponseError> {
+    let deposit = adapter.get_deposit(&channel, &spender).await?;
+    // TODO: Create Spendable through adapter
+    let spendable = Spendable {
+        channel: channel.clone(),
+        deposit: Deposit {
+            total: UnifiedNum::from_u64(deposit.total.to_u64().expect("Todo")),
+            still_on_create2: UnifiedNum::from_u64(deposit.still_on_create2.to_u64().expect("Todo")),
+        },
+        spender: spender.clone(),
+    };
+
+    // Insert latest spendable in DB
+    insert_spendable(pool, &spendable).await?;
+
+    // TODO: Check and handle the case if an error is encountered after the insertion (ex: During total_spent calculations)
+
+    Ok(spendable)
+}
+
+pub async fn get_total_deposited_and_spender_leaf<A: Adapter + 'static>(
+    req: Request<Body>,
+    app: &Application<A>,
+) -> Result<Response<Body>, ResponseError> {
+    let route_params = req
+        .extensions()
+        .get::<RouteParams>()
+        .expect("request should have route params");
+
+    let channel = req
+        .extensions()
+        .get::<ChannelV5>()
+        .expect("Request should have Channel")
+        .to_owned();
+
+    let spender = Address::from_str(&route_params.index(0))?;
+    let channel_id = ChannelId::from_hex(route_params.index(1))?;
+
+    let default_response = Response::builder()
+        .header("Content-type", "application/json")
+        .body(
+            serde_json::to_string(&LastApprovedResponse {
+                last_approved: None,
+                heartbeats: None,
+            })?
+            .into(),
+        )
+        .expect("should build response");
+
+    let approve_state = match latest_approve_state_v5(&app.pool, &channel).await? {
+        Some(approve_state) => approve_state,
+        None => return Ok(default_response),
+    };
+
+    let state_root = approve_state.msg.state_root.clone();
+
+    let new_state = latest_new_state_v5(&app.pool, &channel, &state_root).await?.ok_or(ResponseError::BadRequest("non-existing NewState".to_string()))?;
+
+    let latest_spendable = fetch_spendable(app.pool.clone(), &spender, &channel_id)
+        .await?;
+    let latest_spendable = match latest_spendable {
+        Some(spendable) => spendable,
+        None => create_spendable_document(&app.adapter, app.pool.clone(), &channel, &spender).await?,
+    };
+    // ?? Ask the adapter to update latest spendable when a campaign is being modified
+
+    let total_deposited = latest_spendable.deposit.total.checked_add(&latest_spendable.deposit.still_on_create2).ok_or_else(|| ResponseError::BadRequest("Total Deposited is too large".to_string()))?;
+
+
+    // Calculate total_spent
+    let spender_balance = new_state.msg.balances.get(&spender).ok_or_else(|| ResponseError::BadRequest("No balance for this spender".to_string()))?;
+
+    let spender_balance = UnifiedNum::from_u64(spender_balance.to_u64().expect("Consider replacing this in a way that uses UnifiedMap"));
+    let total_spent = total_deposited.checked_sub(&spender_balance).ok_or_else(|| ResponseError::BadRequest("Total spent is too large".to_string()))?;
+
+    // Return
+    let res = SpenderResponse {
+        total_deposited,
+        spender_leaf: SpenderLeaf {
+            total_spent,
+            // merkle_proof: [u8; 32], // TODO
+        }
+    };
+    Ok(success_response(serde_json::to_string(&res)?))
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::{
+        db::tests_postgres::{DATABASE_POOL, setup_test_migrations},
+    };
+    use adapter::DummyAdapter;
+    use primitives::adapter::DummyAdapterOptions;
+
+    use primitives::util::tests::prep_db::{AUTH, ADDRESSES, DUMMY_CAMPAIGN, IDS};
+    use primitives::config::configuration;
+    #[tokio::test]
+    async fn create_and_fetch_spendable() {
+        let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
+        let adapter_options = DummyAdapterOptions {
+            dummy_identity: IDS["leader"],
+            dummy_auth: IDS.clone(),
+            dummy_auth_tokens: AUTH.clone(),
+        };
+        let config = configuration("development", None).expect("Dev config should be available");
+        let dummy_adapter = DummyAdapter::init(adapter_options, &config);
+        setup_test_migrations(database.pool.clone())
+            .await
+            .expect("Migrations should succeed");
+        let channel = DUMMY_CAMPAIGN.channel.clone();
+
+        // Make sure spendable does not yet exist
+        let spendable = fetch_spendable(database.pool.clone(), &ADDRESSES["publisher"], &channel.id()).await.expect("should return None");
+        assert!(spendable.is_none());
+        // Call create_spendable
+        let new_spendable = create_spendable_document(&dummy_adapter, database.clone(), &channel, &ADDRESSES["publisher"]).await.expect("should create a new spendable");
+        assert_eq!(new_spendable.channel.id(), channel.id());
+        assert_eq!(new_spendable.deposit.total, UnifiedNum::from_u64(0));
+        assert_eq!(new_spendable.deposit.still_on_create2, UnifiedNum::from_u64(0));
+        assert_eq!(new_spendable.spender, ADDRESSES["publisher"]);
+
+        // Make sure spendable NOW exists
+        let spendable = fetch_spendable(database.pool.clone(), &ADDRESSES["publisher"], &channel.id()).await.expect("should return a spendable");
+        assert!(spendable.is_some());
     }
 }

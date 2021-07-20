@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use futures::pin_mut;
 use primitives::{
+    channel_v5::Channel as ChannelV5,
     sentry::{EventAggregate, MessageResponse},
     validator::{ApproveState, Heartbeat, NewState},
     Address, BigNum, Channel, ChannelId, ValidatorId,
@@ -33,6 +34,26 @@ pub async fn latest_approve_state(
         .map_err(PoolError::Backend)
 }
 
+pub async fn latest_approve_state_v5(
+    pool: &DbPool,
+    channel: &ChannelV5,
+) -> Result<Option<MessageResponse<ApproveState>>, PoolError> {
+    let client = pool.get().await?;
+
+    let select = client.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'ApproveState' ORDER BY received DESC LIMIT 1").await?;
+    let rows = client
+        .query(
+            &select,
+            &[&channel.id(), &channel.follower],
+        )
+        .await?;
+
+    rows.get(0)
+        .map(MessageResponse::<ApproveState>::try_from)
+        .transpose()
+        .map_err(PoolError::Backend)
+}
+
 pub async fn latest_new_state(
     pool: &DbPool,
     channel: &Channel,
@@ -47,6 +68,31 @@ pub async fn latest_new_state(
             &[
                 &channel.id,
                 &channel.spec.validators.leader().id,
+                &state_root,
+            ],
+        )
+        .await?;
+
+    rows.get(0)
+        .map(MessageResponse::<NewState>::try_from)
+        .transpose()
+        .map_err(PoolError::Backend)
+}
+
+pub async fn latest_new_state_v5(
+    pool: &DbPool,
+    channel: &ChannelV5,
+    state_root: &str,
+) -> Result<Option<MessageResponse<NewState>>, PoolError> {
+    let client = pool.get().await?;
+
+    let select = client.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'NewState' AND msg->> 'stateRoot' = $3 ORDER BY received DESC LIMIT 1").await?;
+    let rows = client
+        .query(
+            &select,
+            &[
+                &channel.id(),
+                &channel.leader,
                 &state_root,
             ],
         )
