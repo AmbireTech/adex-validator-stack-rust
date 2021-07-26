@@ -235,7 +235,7 @@ pub async fn create_validator_messages<A: Adapter + 'static>(
     }
 }
 
-// TODO: Maybe use a different error for helper functions like in campaign routes
+// TODO: Maybe use a different error for helper functions like in campaign routes/move this somewhere else?
 async fn create_spendable_document<A: Adapter>(adapter: &A, pool: DbPool, channel: &ChannelV5, spender: &Address) -> Result<Spendable, ResponseError> {
     let deposit = adapter.get_deposit(&channel, &spender).await?;
     let spendable = Spendable {
@@ -299,7 +299,6 @@ pub async fn get_total_deposited_and_spender_leaf<A: Adapter + 'static>(
         Some(spendable) => spendable,
         None => create_spendable_document(&app.adapter, app.pool.clone(), &channel, &spender).await?,
     };
-    // ?? Ask the adapter to update latest spendable when a campaign is being modified
 
     let total_deposited = latest_spendable.deposit.total.checked_add(&latest_spendable.deposit.still_on_create2).ok_or_else(|| ResponseError::BadRequest("Total Deposited is too large".to_string()))?;
 
