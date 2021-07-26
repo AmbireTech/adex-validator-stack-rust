@@ -238,7 +238,6 @@ pub async fn create_validator_messages<A: Adapter + 'static>(
 // TODO: Maybe use a different error for helper functions like in campaign routes
 async fn create_spendable_document<A: Adapter>(adapter: &A, pool: DbPool, channel: &ChannelV5, spender: &Address) -> Result<Spendable, ResponseError> {
     let deposit = adapter.get_deposit(&channel, &spender).await?;
-    // TODO: Create Spendable through adapter
     let spendable = Spendable {
         channel: channel.clone(),
         deposit: Deposit {
@@ -329,10 +328,11 @@ mod test {
         db::tests_postgres::{DATABASE_POOL, setup_test_migrations},
     };
     use adapter::DummyAdapter;
-    use primitives::adapter::DummyAdapterOptions;
-
+    use primitives::adapter::{DummyAdapterOptions, Deposit};
     use primitives::util::tests::prep_db::{AUTH, ADDRESSES, DUMMY_CAMPAIGN, IDS};
     use primitives::config::configuration;
+    use primitives::BigNum;
+
     #[tokio::test]
     async fn create_and_fetch_spendable() {
         let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
@@ -344,18 +344,24 @@ mod test {
         let config = configuration("development", None).expect("Dev config should be available");
         let dummy_adapter = DummyAdapter::init(adapter_options, &config);
         setup_test_migrations(database.pool.clone())
-            .await
-            .expect("Migrations should succeed");
+        .await
+        .expect("Migrations should succeed");
         let channel = DUMMY_CAMPAIGN.channel.clone();
+        let deposit = Deposit {
+            total: BigNum::from(1000000000),
+            still_on_create2: BigNum::from(1000000),
+        };
+        dummy_adapter.add_deposit_call(channel.id(), ADDRESSES["publisher"], deposit.clone());
 
-        // Make sure spendable does not yet exist
+        // Making sure spendable does not yet exist
         let spendable = fetch_spendable(database.pool.clone(), &ADDRESSES["publisher"], &channel.id()).await.expect("should return None");
         assert!(spendable.is_none());
+
         // Call create_spendable
         let new_spendable = create_spendable_document(&dummy_adapter, database.clone(), &channel, &ADDRESSES["publisher"]).await.expect("should create a new spendable");
         assert_eq!(new_spendable.channel.id(), channel.id());
-        assert_eq!(new_spendable.deposit.total, UnifiedNum::from_u64(0));
-        assert_eq!(new_spendable.deposit.still_on_create2, UnifiedNum::from_u64(0));
+        assert_eq!(new_spendable.deposit.total, UnifiedNum::from_u64(deposit.total.to_u64().expect("should convert")));
+        assert_eq!(new_spendable.deposit.still_on_create2, UnifiedNum::from_u64(deposit.still_on_create2.to_u64().expect("should convert")));
         assert_eq!(new_spendable.spender, ADDRESSES["publisher"]);
 
         // Make sure spendable NOW exists
