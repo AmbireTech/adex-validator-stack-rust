@@ -270,8 +270,8 @@ pub async fn get_total_deposited_and_spender_leaf<A: Adapter + 'static>(
         .expect("Request should have Channel")
         .to_owned();
 
-    let spender = Address::from_str(&route_params.index(0))?;
-    let channel_id = ChannelId::from_hex(route_params.index(1))?;
+    let channel_id = ChannelId::from_hex(route_params.index(0))?;
+    let spender = Address::from_str(&route_params.index(1))?;
 
     let default_response = Response::builder()
         .header("Content-type", "application/json")
