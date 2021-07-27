@@ -319,6 +319,36 @@ pub async fn get_total_deposited_and_spender_leaf<A: Adapter + 'static>(
     };
     Ok(success_response(serde_json::to_string(&res)?))
 }
+pub async fn get_all_spender_limits<A: Adapter + 'static>(
+    req: Request<Body>,
+    app: &Application<A>,
+) -> Result<Response<Body>, ResponseError> {
+    let route_params = req
+        .extensions()
+        .get::<RouteParams>()
+        .expect("request should have route params");
+
+    let channel = req
+        .extensions()
+        .get::<ChannelV5>()
+        .expect("Request should have Channel")
+        .to_owned();
+
+    let spender = Address::from_str(&route_params.index(0))?;
+
+    let default_response = Response::builder()
+        .header("Content-type", "application/json")
+        .body(
+            serde_json::to_string(&LastApprovedResponse {
+                last_approved: None,
+                heartbeats: None,
+            })?
+            .into(),
+        )
+        .expect("should build response");
+
+    Ok(success_response(serde_json::to_string(&res)?))
+}
 
 #[cfg(test)]
 mod test {
