@@ -255,7 +255,7 @@ async fn create_spendable_document<A: Adapter>(adapter: &A, pool: DbPool, channe
     Ok(spendable)
 }
 
-pub async fn get_total_deposited_and_spender_leaf<A: Adapter + 'static>(
+pub async fn get_spender_limits<A: Adapter + 'static>(
     req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {

@@ -25,7 +25,8 @@ use routes::analytics::{advanced_analytics, advertiser_analytics, analytics, pub
 use routes::campaign::{create_campaign, update_campaign};
 use routes::cfg::config;
 use routes::channel::{
-    channel_list, channel_validate, create_channel, create_validator_messages, last_approved, get_total_deposited_and_spender_leaf
+    channel_list, channel_validate, create_channel, create_validator_messages, get_spender_limits,
+    last_approved,
 };
 use slog::Logger;
 use std::collections::HashMap;
@@ -380,20 +381,24 @@ async fn channels_router<A: Adapter + 'static>(
         req = ChannelLoad.call(req, app).await?;
 
         list_channel_event_aggregates(req, app).await
-    } else if let(Some(caps), &Method::GET) = (CHANNEL_SPENDER_LEAF_AND_TOTAL_DEPOSITED.captures(&path), method) {
+    } else if let (Some(caps), &Method::GET) = (
+        CHANNEL_SPENDER_LEAF_AND_TOTAL_DEPOSITED.captures(&path),
+        method,
+    ) {
         req = AuthRequired.call(req, app).await?;
 
         let param = RouteParams(vec![
-            caps.get(1).map_or("".to_string(), |m| m.as_str().to_string()), // channel ID
-            caps.get(2).map_or("".to_string(), |m| m.as_str().to_string()), // spender addr
+            caps.get(1)
+                .map_or("".to_string(), |m| m.as_str().to_string()), // channel ID
+            caps.get(2)
+                .map_or("".to_string(), |m| m.as_str().to_string()), // spender addr
         ]);
         req.extensions_mut().insert(param);
 
         req = ChannelLoad.call(req, app).await?;
 
-        get_total_deposited_and_spender_leaf(req, app).await
-    }
-    else {
+        get_spender_limits(req, app).await
+    } else {
         Err(ResponseError::NotFound)
     }
 }

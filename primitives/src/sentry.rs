@@ -1,6 +1,6 @@
 use crate::{
     validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
-    Address, BigNum, Channel, ChannelId, ValidatorId, IPFS, UnifiedNum
+    Address, BigNum, Channel, ChannelId, UnifiedNum, ValidatorId, IPFS,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -416,7 +416,7 @@ pub mod campaign_create {
             if let Some(new_pricing_bounds) = self.pricing_bounds {
                 campaign.pricing_bounds = Some(new_pricing_bounds);
             }
-            
+
             if let Some(new_event_submission) = self.event_submission {
                 campaign.event_submission = Some(new_event_submission);
             }
