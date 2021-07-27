@@ -255,7 +255,7 @@ async fn create_spendable_document<A: Adapter>(adapter: &A, pool: DbPool, channe
     Ok(spendable)
 }
 
-pub async fn get_total_deposited_and_spender_leaf<A: Adapter + 'static>(
+pub async fn get_spender_limits<A: Adapter + 'static>(
     req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
@@ -334,7 +334,11 @@ pub async fn get_all_spender_limits<A: Adapter + 'static>(
         .expect("Request should have Channel")
         .to_owned();
 
-    let spender = Address::from_str(&route_params.index(0))?;
+    // Get all spenders for this channel
+
+    // Calculate spender limits for every spender
+
+    // Format and return output
 
     let default_response = Response::builder()
         .header("Content-type", "application/json")
@@ -347,7 +351,7 @@ pub async fn get_all_spender_limits<A: Adapter + 'static>(
         )
         .expect("should build response");
 
-    Ok(success_response(serde_json::to_string(&res)?))
+    Ok(success_response(serde_json::to_string(&default_response)?))
 }
 
 #[cfg(test)]
