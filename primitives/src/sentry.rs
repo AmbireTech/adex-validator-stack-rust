@@ -199,8 +199,8 @@ pub struct SuccessResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SpenderResponse {
-    pub total_deposited: UnifiedNum,
-    pub spender_leaf: SpenderLeaf,
+    pub total_deposited: Option<UnifiedNum>,
+    pub spender_leaf: Option<SpenderLeaf>,
 }
 
 // TODO: Maybe there is a better place for this struct

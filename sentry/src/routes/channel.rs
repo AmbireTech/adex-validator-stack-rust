@@ -276,9 +276,9 @@ pub async fn get_spender_limits<A: Adapter + 'static>(
     let default_response = Response::builder()
         .header("Content-type", "application/json")
         .body(
-            serde_json::to_string(&LastApprovedResponse {
-                last_approved: None,
-                heartbeats: None,
+            serde_json::to_string(&SpenderResponse {
+                total_deposited: None,
+                spender_leaf: None,
             })?
             .into(),
         )
@@ -309,13 +309,15 @@ pub async fn get_spender_limits<A: Adapter + 'static>(
     let spender_balance = UnifiedNum::from_u64(spender_balance.to_u64().expect("Consider replacing this in a way that uses UnifiedMap"));
     let total_spent = total_deposited.checked_sub(&spender_balance).ok_or_else(|| ResponseError::BadRequest("Total spent is too large".to_string()))?;
 
+    let spender_leaf = SpenderLeaf {
+        total_spent,
+        // merkle_proof: [u8; 32], // TODO
+    };
+
     // Return
     let res = SpenderResponse {
-        total_deposited,
-        spender_leaf: SpenderLeaf {
-            total_spent,
-            // merkle_proof: [u8; 32], // TODO
-        }
+        total_deposited: Some(total_deposited),
+        spender_leaf: Some(spender_leaf),
     };
     Ok(success_response(serde_json::to_string(&res)?))
 }
