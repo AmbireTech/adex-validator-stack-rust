@@ -203,6 +203,11 @@ pub struct SpenderResponse {
     pub spender_leaf: Option<SpenderLeaf>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AllSpendersResponse {
+    pub spenders: Option<HashMap<Address, SpenderResponse>>,
+}
+
 // TODO: Maybe there is a better place for this struct
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SpenderLeaf {

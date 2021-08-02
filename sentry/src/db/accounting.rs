@@ -2,7 +2,6 @@ use std::convert::TryFrom;
 
 use chrono::{DateTime, Utc};
 use primitives::{
-    balances_map::UnifiedMap,
     channel_v5::Channel,
     sentry::accounting::{Accounting, Balances, CheckedState},
     Address, ChannelId, UnifiedNum,
@@ -63,19 +62,6 @@ async fn insert_accounting(
         .map_err(PoolError::Backend)?;
 
     Accounting::try_from(&row).map_err(Error::Balances)
-}
-
-async fn get_spenders_for_channel(pool: DbPool, channel_id: &ChannelId) {
-    let client = pool.get().await?;
-
-    let statement = client
-        .prepare("SELECT spenders FROM accounting WHERE channel_id = $1")
-        .await?;
-
-    let rows = client.query(&statement, &[channel_id]).await?;
-    let spenders: UnifiedMap = serde_json::from_value(rows)?;
-
-    Ok(spenders)
 }
 
 #[cfg(test)]

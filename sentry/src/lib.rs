@@ -25,7 +25,8 @@ use routes::analytics::{advanced_analytics, advertiser_analytics, analytics, pub
 use routes::campaign::{create_campaign, update_campaign};
 use routes::cfg::config;
 use routes::channel::{
-    channel_list, channel_validate, create_channel, create_validator_messages, last_approved, get_spender_limits, get_all_spender_limits
+    channel_list, channel_validate, create_channel, create_validator_messages,
+    get_all_spender_limits, get_spender_limits, last_approved,
 };
 use slog::Logger;
 use std::collections::HashMap;
@@ -398,10 +399,11 @@ async fn channels_router<A: Adapter + 'static>(
         req = ChannelLoad.call(req, app).await?;
 
         get_spender_limits(req, app).await
-    } else if let(Some(caps), &Method::GET) = (CHANNEL_ALL_SPENDER_LIMITS.captures(&path), method) {
+    } else if let (Some(caps), &Method::GET) = (CHANNEL_ALL_SPENDER_LIMITS.captures(&path), method)
+    {
         req = AuthRequired.call(req, app).await?;
 
-        let param = let param = RouteParams(vec![caps
+        let param = RouteParams(vec![caps
             .get(1)
             .map_or("".to_string(), |m| m.as_str().to_string())]);
         req.extensions_mut().insert(param);
