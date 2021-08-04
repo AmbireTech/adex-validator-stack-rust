@@ -39,6 +39,12 @@ impl From<&Address> for ValidatorId {
     }
 }
 
+impl From<Address> for ValidatorId {
+    fn from(address: Address) -> Self {
+        Self(address)
+    }
+}
+
 impl From<&[u8; 20]> for ValidatorId {
     fn from(bytes: &[u8; 20]) -> Self {
         Self(Address::from(bytes))
