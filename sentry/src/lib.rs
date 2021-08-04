@@ -500,3 +500,50 @@ pub struct Auth {
     pub era: i64,
     pub uid: ValidatorId,
 }
+
+#[cfg(test)]
+pub mod test_util {
+    use adapter::DummyAdapter;
+    use primitives::{
+        adapter::DummyAdapterOptions,
+        config::configuration,
+        util::tests::{
+            discard_logger,
+            prep_db::{IDS},
+        },
+    };
+
+    use crate::{Application, db::{
+        redis_pool::TESTS_POOL,
+        tests_postgres::{setup_test_migrations, DATABASE_POOL},
+    }};
+    
+    pub async fn setup_dummy_app() -> Application<DummyAdapter> {
+        let config = configuration("development", None).expect("Should get Config");
+        let adapter = DummyAdapter::init(
+            DummyAdapterOptions {
+                dummy_identity: IDS["leader"],
+                dummy_auth: Default::default(),
+                dummy_auth_tokens: Default::default(),
+            },
+            &config,
+        );
+
+        let redis = TESTS_POOL.get().await.expect("Should return Object");
+        let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
+
+        setup_test_migrations(database.pool.clone())
+            .await
+            .expect("Migrations should succeed");
+
+        let app = Application::new(
+            adapter,
+            config,
+            discard_logger(),
+            redis.connection.clone(),
+            database.pool.clone(),
+        );
+
+        app
+    }
+}
