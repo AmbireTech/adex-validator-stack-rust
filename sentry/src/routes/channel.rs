@@ -352,21 +352,21 @@ mod test {
             total: BigNum::from(1000000000),
             still_on_create2: BigNum::from(1000000),
         };
-        dummy_adapter.add_deposit_call(channel.id(), ADDRESSES["publisher"], deposit.clone());
+        dummy_adapter.add_deposit_call(channel.id(), ADDRESSES["creator"], deposit.clone());
 
         // Making sure spendable does not yet exist
-        let spendable = fetch_spendable(database.pool.clone(), &ADDRESSES["publisher"], &channel.id()).await.expect("should return None");
+        let spendable = fetch_spendable(database.pool.clone(), &ADDRESSES["creator"], &channel.id()).await.expect("should return None");
         assert!(spendable.is_none());
 
         // Call create_spendable
-        let new_spendable = create_spendable_document(&dummy_adapter, database.clone(), &channel, &ADDRESSES["publisher"]).await.expect("should create a new spendable");
+        let new_spendable = create_spendable_document(&dummy_adapter, database.clone(), &channel, &ADDRESSES["creator"]).await.expect("should create a new spendable");
         assert_eq!(new_spendable.channel.id(), channel.id());
         assert_eq!(new_spendable.deposit.total, UnifiedNum::from_u64(deposit.total.to_u64().expect("should convert")));
         assert_eq!(new_spendable.deposit.still_on_create2, UnifiedNum::from_u64(deposit.still_on_create2.to_u64().expect("should convert")));
-        assert_eq!(new_spendable.spender, ADDRESSES["publisher"]);
+        assert_eq!(new_spendable.spender, ADDRESSES["creator"]);
 
         // Make sure spendable NOW exists
-        let spendable = fetch_spendable(database.pool.clone(), &ADDRESSES["publisher"], &channel.id()).await.expect("should return a spendable");
+        let spendable = fetch_spendable(database.pool.clone(), &ADDRESSES["creator"], &channel.id()).await.expect("should return a spendable");
         assert!(spendable.is_some());
     }
 }
