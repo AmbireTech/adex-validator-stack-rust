@@ -7,6 +7,7 @@ use crate::routes::channel::channel_status;
 use crate::routes::event_aggregate::list_channel_event_aggregates;
 use crate::routes::validator_message::{extract_params, list_validator_messages};
 use chrono::Utc;
+use db::CampaignRemaining;
 use hyper::{Body, Method, Request, Response, StatusCode};
 use lazy_static::lazy_static;
 use middleware::{
@@ -90,10 +91,11 @@ impl RouteParams {
 #[derive(Clone)]
 pub struct Application<A: Adapter> {
     pub adapter: A,
+    pub config: Config,
     pub logger: Logger,
     pub redis: MultiplexedConnection,
     pub pool: DbPool,
-    pub config: Config,
+    pub campaign_remaining: CampaignRemaining,
 }
 
 impl<A: Adapter + 'static> Application<A> {
@@ -103,6 +105,7 @@ impl<A: Adapter + 'static> Application<A> {
         logger: Logger,
         redis: MultiplexedConnection,
         pool: DbPool,
+        campaign_remaining: CampaignRemaining
     ) -> Self {
         Self {
             adapter,
@@ -110,6 +113,7 @@ impl<A: Adapter + 'static> Application<A> {
             logger,
             redis,
             pool,
+            campaign_remaining,
         }
     }
 
@@ -499,4 +503,52 @@ pub struct Session {
 pub struct Auth {
     pub era: i64,
     pub uid: ValidatorId,
+}
+
+#[cfg(test)]
+pub mod test_util {
+    use adapter::DummyAdapter;
+    use primitives::{
+        adapter::DummyAdapterOptions,
+        config::configuration,
+        util::tests::{
+            discard_logger,
+            prep_db::{IDS},
+        },
+    };
+
+    use crate::{Application, db::{CampaignRemaining, redis_pool::TESTS_POOL, tests_postgres::{setup_test_migrations, DATABASE_POOL}}};
+    
+    /// Uses production configuration to setup the correct Contract addresses for tokens.
+    pub async fn setup_dummy_app() -> Application<DummyAdapter> {
+        let config = configuration("production", None).expect("Should get Config");
+        let adapter = DummyAdapter::init(
+            DummyAdapterOptions {
+                dummy_identity: IDS["leader"],
+                dummy_auth: Default::default(),
+                dummy_auth_tokens: Default::default(),
+            },
+            &config,
+        );
+
+        let redis = TESTS_POOL.get().await.expect("Should return Object");
+        let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
+
+        setup_test_migrations(database.pool.clone())
+            .await
+            .expect("Migrations should succeed");
+
+        let campaign_remaining = CampaignRemaining::new(redis.connection.clone());
+
+        let app = Application::new(
+            adapter,
+            config,
+            discard_logger(),
+            redis.connection.clone(),
+            database.pool.clone(),
+            campaign_remaining
+        );
+
+        app
+    }
 }

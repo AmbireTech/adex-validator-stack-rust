@@ -361,6 +361,26 @@ pub mod campaign_create {
         }
     }
 
+    /// This implementation helps with test setup
+    /// **NOTE:** It erases the CampaignId, since the creation of the campaign gives it's CampaignId
+    impl From<Campaign> for CreateCampaign {
+        fn from(campaign: Campaign) -> Self {
+            Self {
+                channel: campaign.channel,
+                creator: campaign.creator,
+                budget: campaign.budget,
+                validators: campaign.validators,
+                title: campaign.title,
+                pricing_bounds: campaign.pricing_bounds,
+                event_submission: campaign.event_submission,
+                ad_units: campaign.ad_units,
+                targeting_rules: campaign.targeting_rules,
+                created: campaign.created,
+                active: campaign.active,
+            }
+        }
+    }
+    
     // All editable fields stored in one place, used for checking when a budget is changed
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     pub struct ModifyCampaign {
@@ -403,7 +423,7 @@ pub mod campaign_create {
             if let Some(new_pricing_bounds) = self.pricing_bounds {
                 campaign.pricing_bounds = Some(new_pricing_bounds);
             }
-            
+
             if let Some(new_event_submission) = self.event_submission {
                 campaign.event_submission = Some(new_event_submission);
             }

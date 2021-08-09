@@ -4,9 +4,8 @@ use crate::{
         accounting::get_accounting_spent,
         campaign::{get_campaigns_by_channel, insert_campaign, update_campaign},
         spendable::fetch_spendable,
-        DbPool,
+        CampaignRemaining, DbPool, RedisError,
     },
-    routes::campaign::update_campaign::set_initial_remaining_for_campaign,
     success_response, Application, Auth, ResponseError, Session,
 };
 use chrono::Utc;
@@ -19,9 +18,8 @@ use primitives::{
         campaign_create::{CreateCampaign, ModifyCampaign},
         Event, SuccessResponse,
     },
-    Address, Campaign, CampaignId, UnifiedNum,
+    Address, Campaign, UnifiedNum,
 };
-use redis::{aio::MultiplexedConnection, RedisError};
 use slog::error;
 use std::{
     cmp::{max, Ordering},
@@ -69,7 +67,7 @@ pub async fn create_campaign<A: Adapter>(
 
     campaign
         .validate(&app.config, &app.adapter.whoami())
-        .map_err(|_| ResponseError::FailedValidation("couldn't valdiate campaign".to_string()))?;
+        .map_err(|err| ResponseError::FailedValidation(err.to_string()))?;
 
     if auth.uid.to_address() != campaign.creator {
         return Err(ResponseError::Forbidden(
@@ -80,38 +78,64 @@ pub async fn create_campaign<A: Adapter>(
     let error_response =
         ResponseError::BadRequest("err occurred; please try again later".to_string());
 
-    let accounting_spent =
-        get_accounting_spent(app.pool.clone(), &campaign.creator, &campaign.channel.id()).await?;
+    let total_remaining =
+        {
+            let accounting_spent =
+                get_accounting_spent(app.pool.clone(), &campaign.creator, &campaign.channel.id())
+                    .await?;
 
-    let latest_spendable =
-        fetch_spendable(app.pool.clone(), &campaign.creator, &campaign.channel.id())
-            .await?
-            .ok_or(ResponseError::BadRequest(
-                "No spendable amount found for the Campaign creator".to_string(),
-            ))?;
-    let total_deposited = latest_spendable.deposit.total;
+            let latest_spendable =
+                fetch_spendable(app.pool.clone(), &campaign.creator, &campaign.channel.id())
+                    .await?
+                    .ok_or(ResponseError::BadRequest(
+                        "No spendable amount found for the Campaign creator".to_string(),
+                    ))?;
+            // Gets the latest Spendable for this (spender, channelId) pair
+            let total_deposited = latest_spendable.deposit.total;
 
-    let remaining_for_channel =
-        total_deposited
-            .checked_sub(&accounting_spent)
-            .ok_or(ResponseError::FailedValidation(
-                "No more budget remaining".to_string(),
-            ))?;
+            total_deposited.checked_sub(&accounting_spent).ok_or(
+                ResponseError::FailedValidation("No more budget remaining".to_string()),
+            )?
+        };
 
-    if campaign.budget > remaining_for_channel {
+    let channel_campaigns = get_campaigns_by_channel(&app.pool, &campaign.channel.id())
+        .await?
+        .iter()
+        .map(|c| c.id)
+        .collect::<Vec<_>>();
+
+    let campaigns_remaining_sum = app
+        .campaign_remaining
+        .get_multiple(&channel_campaigns)
+        .await?
+        .iter()
+        .sum::<Option<UnifiedNum>>()
+        .ok_or(Error::Calculation)?
+        // DO NOT FORGET to add the Campaign being created right now!
+        .checked_add(&campaign.budget)
+        .ok_or(Error::Calculation)?;
+
+    if !(campaigns_remaining_sum <= total_remaining) || campaign.budget > total_remaining {
         return Err(ResponseError::BadRequest(
-            "Not enough deposit left for the new campaign budget".to_string(),
+            "Not enough deposit left for the new campaign's budget".to_string(),
         ));
     }
 
     // If the campaign is being created, the amount spent is 0, therefore remaining = budget
-    set_initial_remaining_for_campaign(&app.redis, campaign.id, campaign.budget)
+    let remaining_set = CampaignRemaining::new(app.redis.clone())
+        .set_initial(campaign.id, campaign.budget)
         .await
         .map_err(|_| {
-            ResponseError::BadRequest(
-                "Couldn't update remaining while creating campaign".to_string(),
-            )
+            ResponseError::BadRequest("Couldn't set remaining while creating campaign".to_string())
         })?;
+
+    // If for some reason the randomly generated `CampaignId` exists in Redis
+    // This should **NOT** happen!
+    if !remaining_set {
+        return Err(ResponseError::Conflict(
+            "The generated CampaignId already exists, please repeat the request".to_string(),
+        ));
+    }
 
     // insert Campaign
     match insert_campaign(&app.pool, &campaign).await {
@@ -136,50 +160,9 @@ pub async fn create_campaign<A: Adapter>(
 }
 
 pub mod update_campaign {
+    use crate::db::CampaignRemaining;
+
     use super::*;
-
-    pub const CAMPAIGN_REMAINING_KEY: &'static str = "campaignRemaining";
-
-    pub async fn set_initial_remaining_for_campaign(
-        redis: &MultiplexedConnection,
-        id: CampaignId,
-        amount: UnifiedNum,
-    ) -> Result<bool, Error> {
-        let key = format!("{}:{}", CAMPAIGN_REMAINING_KEY, id);
-        redis::cmd("SETNX")
-            .arg(&key)
-            .arg(amount.to_u64())
-            .query_async(&mut redis.clone())
-            .await?;
-        Ok(true)
-    }
-
-    pub async fn increase_remaining_for_campaign(
-        redis: &MultiplexedConnection,
-        id: CampaignId,
-        amount: UnifiedNum,
-    ) -> Result<UnifiedNum, RedisError> {
-        let key = format!("{}:{}", CAMPAIGN_REMAINING_KEY, id);
-        redis::cmd("INCRBY")
-            .arg(&key)
-            .arg(amount.to_u64())
-            .query_async::<_, u64>(&mut redis.clone())
-            .await
-            .map(UnifiedNum::from)
-    }
-
-    pub async fn decrease_remaining_for_campaign(
-        redis: &MultiplexedConnection,
-        id: CampaignId,
-        amount: UnifiedNum,
-    ) -> Result<i64, RedisError> {
-        let key = format!("{}:{}", CAMPAIGN_REMAINING_KEY, id);
-        redis::cmd("DECRBY")
-            .arg(&key)
-            .arg(amount.to_u64())
-            .query_async::<_, i64>(&mut redis.clone())
-            .await
-    }
 
     pub async fn handle_route<A: Adapter>(
         req: Request<Body>,
@@ -199,7 +182,7 @@ pub mod update_campaign {
         // modify Campaign
         let modified_campaign = modify_campaign(
             &app.pool,
-            &mut app.redis.clone(),
+            &app.campaign_remaining,
             campaign_being_mutated,
             modify_campaign_fields,
         )
@@ -211,7 +194,7 @@ pub mod update_campaign {
 
     pub async fn modify_campaign(
         pool: &DbPool,
-        redis: &MultiplexedConnection,
+        campaign_remaining: &CampaignRemaining,
         campaign: Campaign,
         modify_campaign: ModifyCampaign,
     ) -> Result<Campaign, Error> {
@@ -220,7 +203,7 @@ pub mod update_campaign {
         // *NOTE*: To close a campaign set campaignBudget to campaignSpent so that spendable == 0
 
         let delta_budget = if let Some(new_budget) = modify_campaign.budget {
-            get_delta_budget(redis, &campaign, new_budget).await?
+            get_delta_budget(campaign_remaining, &campaign, new_budget).await?
         } else {
             None
         };
@@ -245,15 +228,19 @@ pub mod update_campaign {
             let total_remaining = total_deposited
                 .checked_sub(&accounting_spent)
                 .ok_or(Error::Calculation)?;
-            let channel_campaigns = get_campaigns_by_channel(&pool, &campaign.channel.id()).await?;
+            let channel_campaigns = get_campaigns_by_channel(&pool, &campaign.channel.id())
+                .await?
+                .iter()
+                .map(|c| c.id)
+                .collect::<Vec<_>>();
 
             // this will include the Campaign we are currently modifying
-            let campaigns_current_remaining_sum =
-                get_remaining_for_multiple_campaigns(&redis, &channel_campaigns)
-                    .await?
-                    .iter()
-                    .sum::<Option<UnifiedNum>>()
-                    .ok_or(Error::Calculation)?;
+            let campaigns_current_remaining_sum = campaign_remaining
+                .get_multiple(&channel_campaigns)
+                .await?
+                .iter()
+                .sum::<Option<UnifiedNum>>()
+                .ok_or(Error::Calculation)?;
 
             // apply the delta_budget to the sum
             let new_campaigns_remaining = match delta_budget {
@@ -267,22 +254,23 @@ pub mod update_campaign {
             .ok_or(Error::Calculation)?;
 
             if !(new_campaigns_remaining <= total_remaining) {
-                return Err(Error::CampaignNotModified);
+                return Err(Error::NewBudget(
+                    "Not enough deposit left for the campaign's new budget".to_string(),
+                ));
             }
 
-            // if the value is not positive it will return an error because of UnifiedNum
+            // there is a chance that the new remaining will be negative even when increasing the budget
+            // We don't currently use this value but can be used to perform additional checks or return messages accordingly
             let _campaign_remaining = match delta_budget {
-                // should always be positive
                 DeltaBudget::Increase(increase_by) => {
-                    increase_remaining_for_campaign(redis, campaign.id, increase_by).await?
+                    campaign_remaining
+                        .increase_by(campaign.id, increase_by)
+                        .await?
                 }
-                // there is a chance that an even lowered the remaining and it's no longer positive
-                // check if positive and create an UnifiedNum, or return an error
                 DeltaBudget::Decrease(decrease_by) => {
-                    match decrease_remaining_for_campaign(redis, campaign.id, decrease_by).await? {
-                        remaining if remaining >= 0 => UnifiedNum::from(remaining.unsigned_abs()),
-                        _ => UnifiedNum::from(0),
-                    }
+                    campaign_remaining
+                        .decrease_by(campaign.id, decrease_by)
+                        .await?
                 }
             };
         }
@@ -303,7 +291,7 @@ pub mod update_campaign {
     }
 
     async fn get_delta_budget(
-        redis: &MultiplexedConnection,
+        campaign_remaining: &CampaignRemaining,
         campaign: &Campaign,
         new_budget: UnifiedNum,
     ) -> Result<Option<DeltaBudget<UnifiedNum>>, Error> {
@@ -316,8 +304,10 @@ pub mod update_campaign {
             Ordering::Less => DeltaBudget::Decrease(()),
         };
 
-        let old_remaining = get_remaining_for_campaign(redis, campaign.id)
+        let old_remaining = campaign_remaining
+            .get_remaining_opt(campaign.id)
             .await?
+            .map(|remaining| UnifiedNum::from(max(0, remaining).unsigned_abs()))
             .ok_or(Error::FailedUpdate(
                 "No remaining entry for campaign".to_string(),
             ))?;
@@ -340,6 +330,7 @@ pub mod update_campaign {
                     .checked_sub(&current_budget)
                     .and_then(|delta_budget| old_remaining.checked_add(&delta_budget))
                     .ok_or(Error::Calculation)?;
+                // new remaining > old remaining
                 let increase_by = new_remaining
                     .checked_sub(&old_remaining)
                     .ok_or(Error::Calculation)?;
@@ -347,13 +338,14 @@ pub mod update_campaign {
                 DeltaBudget::Increase(increase_by)
             }
             DeltaBudget::Decrease(()) => {
-                // delta budget = New budget - Old budget ( the difference between the new and old when New > Old)
+                // delta budget = Old budget - New budget ( the difference between the new and old when New < Old)
                 let new_remaining = &current_budget
                     .checked_sub(&new_budget)
-                    .and_then(|delta_budget| old_remaining.checked_add(&delta_budget))
+                    .and_then(|delta_budget| old_remaining.checked_sub(&delta_budget))
                     .ok_or(Error::Calculation)?;
-                let decrease_by = new_remaining
-                    .checked_sub(&old_remaining)
+                // old remaining > new remaining
+                let decrease_by = old_remaining
+                    .checked_sub(&new_remaining)
                     .ok_or(Error::Calculation)?;
 
                 DeltaBudget::Decrease(decrease_by)
@@ -361,44 +353,6 @@ pub mod update_campaign {
         };
 
         Ok(Some(budget))
-    }
-
-    pub async fn get_remaining_for_campaign(
-        redis: &MultiplexedConnection,
-        id: CampaignId,
-    ) -> Result<Option<UnifiedNum>, RedisError> {
-        let key = format!("{}:{}", CAMPAIGN_REMAINING_KEY, id);
-
-        let remaining = redis::cmd("GET")
-            .arg(&key)
-            .query_async::<_, Option<i64>>(&mut redis.clone())
-            .await?
-            .map(|remaining| UnifiedNum::from(max(0, remaining).unsigned_abs()));
-
-        Ok(remaining)
-    }
-
-    async fn get_remaining_for_multiple_campaigns(
-        redis: &MultiplexedConnection,
-        campaigns: &[Campaign],
-    ) -> Result<Vec<UnifiedNum>, Error> {
-        let keys: Vec<String> = campaigns
-            .iter()
-            .map(|c| format!("{}:{}", CAMPAIGN_REMAINING_KEY, c.id))
-            .collect();
-
-        let remainings = redis::cmd("MGET")
-            .arg(keys)
-            .query_async::<_, Vec<Option<i64>>>(&mut redis.clone())
-            .await?
-            .into_iter()
-            .map(|remaining| match remaining {
-                Some(remaining) => UnifiedNum::from_u64(max(0, remaining).unsigned_abs()),
-                None => UnifiedNum::from_u64(0),
-            })
-            .collect();
-
-        Ok(remainings)
     }
 }
 
@@ -477,69 +431,226 @@ async fn process_events<A: Adapter + 'static>(
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use super::{update_campaign::modify_campaign, *};
     use crate::{
-        campaign::update_campaign::{increase_remaining_for_campaign, CAMPAIGN_REMAINING_KEY},
-        db::redis_pool::TESTS_POOL,
+        db::{accounting::insert_accounting, spendable::insert_spendable},
+        test_util::setup_dummy_app,
     };
-    use primitives::util::tests::prep_db::DUMMY_CAMPAIGN;
+    use hyper::StatusCode;
+    use primitives::{
+        sentry::accounting::{Balances, CheckedState},
+        spender::{Deposit, Spendable},
+        util::tests::prep_db::DUMMY_CAMPAIGN,
+        ValidatorId,
+    };
 
     #[tokio::test]
-    async fn does_it_increase_remaining() {
-        let mut redis = TESTS_POOL.get().await.expect("Should return Object");
-        let campaign = DUMMY_CAMPAIGN.clone();
-        let key = format!("{}:{}", CAMPAIGN_REMAINING_KEY, campaign.id);
+    /// Test single campaign creation and modification
+    // &
+    /// Test with multiple campaigns (because of Budget) a modification of campaign
+    async fn create_and_modify_with_multiple_campaigns() {
+        let app = setup_dummy_app().await;
 
-        // Setting the redis base variable
-        redis::cmd("SET")
-            .arg(&key)
-            .arg(100_u64)
-            .query_async::<_, ()>(&mut redis.connection)
-            .await
-            .expect("should set");
+        let build_request = |create_campaign: CreateCampaign| -> Request<Body> {
+            let auth = Auth {
+                era: 0,
+                uid: ValidatorId::from(create_campaign.creator),
+            };
 
-        // 2 async calls at once, should be 500 after them
-        futures::future::try_join_all([
-            increase_remaining_for_campaign(&redis, campaign.id, UnifiedNum::from_u64(200)),
-            increase_remaining_for_campaign(&redis, campaign.id, UnifiedNum::from_u64(200)),
-        ])
-        .await
-        .expect("Should increase remaining twice");
+            let body =
+                Body::from(serde_json::to_string(&create_campaign).expect("Should serialize"));
 
-        let remaining = redis::cmd("GET")
-            .arg(&key)
-            .query_async::<_, Option<u64>>(&mut redis.connection)
-            .await
-            .expect("should get remaining");
-        assert_eq!(
-            remaining.map(UnifiedNum::from_u64),
-            Some(UnifiedNum::from_u64(500))
-        );
+            Request::builder()
+                .extension(auth)
+                .body(body)
+                .expect("Should build Request")
+        };
 
-        increase_remaining_for_campaign(&redis, campaign.id, campaign.budget)
-            .await
-            .expect("should increase");
+        let campaign: Campaign = {
+            // erases the CampaignId for the CreateCampaign request
+            let mut create = CreateCampaign::from(DUMMY_CAMPAIGN.clone());
+            // 500.00000000
+            create.budget = UnifiedNum::from(50_000_000_000);
 
-        let remaining = redis::cmd("GET")
-            .arg(&key)
-            // Directly parsing to u64 as we know it will be >0
-            .query_async::<_, Option<u64>>(&mut redis.connection)
-            .await
-            .expect("should get remaining");
+            let spendable = Spendable {
+                spender: create.creator,
+                channel: create.channel.clone(),
+                deposit: Deposit {
+                    // a deposit equal to double the Campaign Budget
+                    total: UnifiedNum::from(200_000_000_000),
+                    still_on_create2: UnifiedNum::from(0),
+                },
+            };
+            assert!(insert_spendable(app.pool.clone(), &spendable)
+                .await
+                .expect("Should insert Spendable for Campaign creator"));
 
-        let should_be_remaining = UnifiedNum::from_u64(500) + campaign.budget;
-        assert_eq!(remaining.map(UnifiedNum::from), Some(should_be_remaining));
+            let mut balances = Balances::<CheckedState>::default();
+            balances.add_spender(create.creator);
 
-        increase_remaining_for_campaign(&redis, campaign.id, UnifiedNum::from_u64(0))
-            .await
-            .expect("should increase remaining");
+            // TODO: Replace this once https://github.com/AdExNetwork/adex-validator-stack-rust/pull/413 is merged
+            let _accounting = insert_accounting(app.pool.clone(), create.channel.clone(), balances)
+                .await
+                .expect("Should create Accounting");
 
-        let remaining = redis::cmd("GET")
-            .arg(&key)
-            .query_async::<_, Option<u64>>(&mut redis.connection)
-            .await
-            .expect("should get remaining");
+            let create_response = create_campaign(build_request(create), &app)
+                .await
+                .expect("Should create campaign");
 
-        assert_eq!(remaining.map(UnifiedNum::from), Some(should_be_remaining));
+            assert_eq!(StatusCode::OK, create_response.status());
+            let json = hyper::body::to_bytes(create_response.into_body())
+                .await
+                .expect("Should get json");
+
+            let campaign: Campaign =
+                serde_json::from_slice(&json).expect("Should get new Campaign");
+
+            assert_ne!(DUMMY_CAMPAIGN.id, campaign.id);
+
+            let campaign_remaining = CampaignRemaining::new(app.redis.clone());
+
+            let remaining = campaign_remaining
+                .get_remaining_opt(campaign.id)
+                .await
+                .expect("Should get remaining from redis")
+                .expect("There should be value for the Campaign");
+
+            assert_eq!(
+                UnifiedNum::from(50_000_000_000),
+                UnifiedNum::from(remaining.unsigned_abs())
+            );
+            campaign
+        };
+
+        // modify campaign
+        let modified = {
+            // 1000.00000000
+            let new_budget = UnifiedNum::from(100_000_000_000);
+            let modify = ModifyCampaign {
+                budget: Some(new_budget.clone()),
+                validators: None,
+                title: Some("Updated title".to_string()),
+                pricing_bounds: None,
+                event_submission: None,
+                ad_units: None,
+                targeting_rules: None,
+            };
+
+            let modified_campaign =
+                modify_campaign(&app.pool, &app.campaign_remaining, campaign.clone(), modify)
+                    .await
+                    .expect("Should modify campaign");
+
+            assert_eq!(new_budget, modified_campaign.budget);
+            assert_eq!(Some("Updated title".to_string()), modified_campaign.title);
+
+            modified_campaign
+        };
+
+        // we have 1000 left from our deposit, so we are using half of it
+        let _second_campaign = {
+            // erases the CampaignId for the CreateCampaign request
+            let mut create_second = CreateCampaign::from(DUMMY_CAMPAIGN.clone());
+            // 500.00000000
+            create_second.budget = UnifiedNum::from(50_000_000_000);
+
+            let create_response = create_campaign(build_request(create_second), &app)
+                .await
+                .expect("Should create campaign");
+
+            assert_eq!(StatusCode::OK, create_response.status());
+            let json = hyper::body::to_bytes(create_response.into_body())
+                .await
+                .expect("Should get json");
+
+            let second_campaign: Campaign =
+                serde_json::from_slice(&json).expect("Should get new Campaign");
+
+            second_campaign
+        };
+
+        // No budget left for new campaigns
+        // remaining: 500
+        // new campaign budget: 600
+        {
+            // erases the CampaignId for the CreateCampaign request
+            let mut create = CreateCampaign::from(DUMMY_CAMPAIGN.clone());
+            // 600.00000000
+            create.budget = UnifiedNum::from(60_000_000_000);
+
+            let create_err = create_campaign(build_request(create), &app)
+                .await
+                .expect_err("Should return Error response");
+
+            assert_eq!(ResponseError::BadRequest("Not enough deposit left for the new campaign's budget".to_string()), create_err);
+        }
+
+        // modify first campaign, by lowering the budget from 1000 to 900
+        let modified = {
+            let lower_budget = UnifiedNum::from(90_000_000_000);
+            let modify = ModifyCampaign {
+                budget: Some(lower_budget.clone()),
+                validators: None,
+                title: None,
+                pricing_bounds: None,
+                event_submission: None,
+                ad_units: None,
+                targeting_rules: None,
+            };
+
+            let modified_campaign =
+                modify_campaign(&app.pool, &app.campaign_remaining, modified, modify)
+                    .await
+                    .expect("Should modify campaign");
+
+            assert_eq!(lower_budget, modified_campaign.budget);
+
+            modified_campaign
+        };
+
+        // Just enough budget to create this Campaign
+        // remaining: 600
+        // new campaign budget: 600
+        {
+            // erases the CampaignId for the CreateCampaign request
+            let mut create = CreateCampaign::from(DUMMY_CAMPAIGN.clone());
+            // 600.00000000
+            create.budget = UnifiedNum::from(60_000_000_000);
+
+            let create_response = create_campaign(build_request(create), &app)
+                .await
+                .expect("Should return create campaign");
+
+                let json = hyper::body::to_bytes(create_response.into_body())
+                .await
+                .expect("Should get json");
+
+            let _campaign: Campaign =
+                serde_json::from_slice(&json).expect("Should get new Campaign");
+        }
+
+        // Modify a campaign without enough budget
+        // remaining: 0
+        // new campaign budget: 1100
+        // current campaign budget: 900
+        {
+            let new_budget = UnifiedNum::from(110_000_000_000);
+            let modify = ModifyCampaign {
+                budget: Some(new_budget),
+                validators: None,
+                title: None,
+                pricing_bounds: None,
+                event_submission: None,
+                ad_units: None,
+                targeting_rules: None,
+            };
+
+            let modify_err =
+                modify_campaign(&app.pool, &app.campaign_remaining, modified, modify)
+                    .await
+                    .expect_err("Should return Error response");
+
+            assert!(matches!(modify_err, Error::NewBudget(string) if string == "Not enough deposit left for the campaign's new budget"));
+        }
     }
 }
