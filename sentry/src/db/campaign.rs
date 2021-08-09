@@ -155,6 +155,11 @@ mod campaign_remaining {
             &self,
             campaigns: &[CampaignId],
         ) -> Result<Vec<UnifiedNum>, RedisError> {
+            // `MGET` fails on empty keys
+            if campaigns.is_empty() {
+                return Ok(vec![]);
+            }
+
             let keys: Vec<String> = campaigns
                 .iter()
                 .map(|campaign| Self::get_key(*campaign))
@@ -314,6 +319,17 @@ mod campaign_remaining {
             let redis = TESTS_POOL.get().await.expect("Should return Object");
             let campaign_remaining = CampaignRemaining::new(redis.connection.clone());
 
+            // get multiple with empty campaigns slice
+            // `MGET` throws error on an empty keys argument
+            assert!(
+                campaign_remaining
+                    .get_multiple(&[])
+                    .await
+                    .expect("Should get multiple")
+                    .is_empty(),
+                "Should return an empty result"
+            );
+
             let campaigns = (CampaignId::new(), CampaignId::new(), CampaignId::new());
 
             // set initial amounts
@@ -323,23 +339,39 @@ mod campaign_remaining {
                     .await
                     .expect("Should set value in redis"));
 
-                    assert!(campaign_remaining
-                        .set_initial(campaigns.1, UnifiedNum::from(200))
-                        .await
-                        .expect("Should set value in redis"));
+                assert!(campaign_remaining
+                    .set_initial(campaigns.1, UnifiedNum::from(200))
+                    .await
+                    .expect("Should set value in redis"));
 
-                        assert!(campaign_remaining
-                            .set_initial(campaigns.2, UnifiedNum::from(300))
-                            .await
-                            .expect("Should set value in redis"));
+                assert!(campaign_remaining
+                    .set_initial(campaigns.2, UnifiedNum::from(300))
+                    .await
+                    .expect("Should set value in redis"));
             }
 
             // set campaigns.1 to negative value, should return `0` because of `max(value, 0)`
-            assert_eq!(-300_i64, campaign_remaining.decrease_by(campaigns.1, UnifiedNum::from(500)).await.expect("Should decrease remaining"));
+            assert_eq!(
+                -300_i64,
+                campaign_remaining
+                    .decrease_by(campaigns.1, UnifiedNum::from(500))
+                    .await
+                    .expect("Should decrease remaining")
+            );
 
-            let multiple = campaign_remaining.get_multiple(&[campaigns.0, campaigns.1, campaigns.2]).await.expect("Should get multiple");
+            let multiple = campaign_remaining
+                .get_multiple(&[campaigns.0, campaigns.1, campaigns.2])
+                .await
+                .expect("Should get multiple");
 
-            assert_eq!(vec![UnifiedNum::from(100), UnifiedNum::from(0), UnifiedNum::from(300)], multiple);
+            assert_eq!(
+                vec![
+                    UnifiedNum::from(100),
+                    UnifiedNum::from(0),
+                    UnifiedNum::from(300)
+                ],
+                multiple
+            );
         }
     }
 }
