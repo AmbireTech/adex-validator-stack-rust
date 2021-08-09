@@ -7,7 +7,7 @@ use lazy_static::lazy_static;
 
 pub mod accounting;
 pub mod analytics;
-mod campaign;
+pub mod campaign;
 mod channel;
 pub mod event_aggregate;
 pub mod spendable;
