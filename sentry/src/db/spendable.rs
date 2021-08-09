@@ -46,6 +46,27 @@ pub async fn fetch_spendable(
     Ok(row.map(Spendable::try_from).transpose()?)
 }
 
+/// ```text
+///
+/// ```
+static UPDATE_SPENDABLE_STATEMENT: &str = "INSERT INTO spendable(spender, channel_id, channel, total, still_on_create2) VALUES($1, $2, $3, $4, $5) ON CONFLICT ON CONSTRAINT spendable_pkey DO UPDATE SET total = $4, still_on_create2 = $5 WHERE spendable.spender = $1 AND spendable.channel_id = $2 RETURNING spender, channel_id, channel, total, still_on_create2";
+pub async fn update_spendable(
+    pool: DbPool,
+    spendable: &Spendable,
+) -> Result<Spendable, PoolError> {
+    let client = pool.get().await?;
+    let statement = client.prepare(UPDATE_SPENDABLE_STATEMENT).await?;
+
+    let row = client
+        .query_one(
+            &statement,
+            &[&spendable.spender, &spendable.channel.id(), &spendable.channel, &spendable.deposit.total, &spendable.deposit.still_on_create2],
+        )
+        .await?;
+
+    Ok(Spendable::from(&row))
+}
+
 #[cfg(test)]
 mod test {
     use primitives::{

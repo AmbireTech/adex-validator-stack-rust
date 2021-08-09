@@ -1,6 +1,6 @@
 use crate::db::{
     event_aggregate::{latest_approve_state, latest_heartbeats, latest_new_state, latest_new_state_v5, latest_approve_state_v5},
-    spendable::{fetch_spendable, insert_spendable},
+    spendable::{fetch_spendable, update_spendable},
     get_channel_by_id, insert_channel, insert_validator_messages, list_channels,
     update_exhausted_channel, PoolError, DbPool
 };
@@ -248,7 +248,7 @@ async fn create_spendable_document<A: Adapter>(adapter: &A, pool: DbPool, channe
     };
 
     // Insert latest spendable in DB
-    insert_spendable(pool, &spendable).await?;
+    update_spendable(pool, &spendable).await?;
 
     // TODO: Check and handle the case if an error is encountered after the insertion (ex: During total_spent calculations)
 
@@ -270,28 +270,19 @@ pub async fn get_spender_limits<A: Adapter + 'static>(
         .expect("Request should have Channel")
         .to_owned();
 
-    let channel_id = ChannelId::from_hex(route_params.index(0))?;
+    let channel_id = channel.id();
     let spender = Address::from_str(&route_params.index(1))?;
 
     let default_response = Response::builder()
         .header("Content-type", "application/json")
         .body(
             serde_json::to_string(&SpenderResponse {
-                total_deposited: None,
+                total: UnifiedNum::from_u64(0),
                 spender_leaf: None,
             })?
             .into(),
         )
         .expect("should build response");
-
-    let approve_state = match latest_approve_state_v5(&app.pool, &channel).await? {
-        Some(approve_state) => approve_state,
-        None => return Ok(default_response),
-    };
-
-    let state_root = approve_state.msg.state_root.clone();
-
-    let new_state = latest_new_state_v5(&app.pool, &channel, &state_root).await?.ok_or(ResponseError::BadRequest("non-existing NewState".to_string()))?;
 
     let latest_spendable = fetch_spendable(app.pool.clone(), &spender, &channel_id)
         .await?;
@@ -300,24 +291,41 @@ pub async fn get_spender_limits<A: Adapter + 'static>(
         None => create_spendable_document(&app.adapter, app.pool.clone(), &channel, &spender).await?,
     };
 
-    let total_deposited = latest_spendable.deposit.total.checked_add(&latest_spendable.deposit.still_on_create2).ok_or_else(|| ResponseError::BadRequest("Total Deposited is too large".to_string()))?;
+    let total = latest_spendable.deposit.total.checked_add(&latest_spendable.deposit.still_on_create2).ok_or_else(|| ResponseError::BadRequest("Total Deposited is too large".to_string()))?;
+    let approve_state = match latest_approve_state_v5(&app.pool, &channel).await? {
+        Some(approve_state) => approve_state,
+        None => return Ok(SpenderResponse {
+            total,
+            spender_leaf: None,
+        }),
+    };
 
+    let state_root = approve_state.msg.state_root.clone();
+
+    let new_state = match latest_new_state_v5(&app.pool, &channel, &state_root).await? {
+        Some(new_state) => new_state,
+        None => return Ok(SpenderResponse {
+            total,
+            spenderleaf: None,
+        }),
+    };
 
     // Calculate total_spent
-    let spender_balance = new_state.msg.balances.get(&spender).ok_or_else(|| ResponseError::BadRequest("No balance for this spender".to_string()))?;
+    // TODO: Update NewState & ApproveState with the new Balances::<CheckedState>
+    let total_spent = new_state.msg.balances.get(&spender); // TODO replace balances with balances.spenders once new struct is ready
 
-    let spender_balance = UnifiedNum::from_u64(spender_balance.to_u64().expect("Consider replacing this in a way that uses UnifiedMap"));
-    let total_spent = total_deposited.checked_sub(&spender_balance).ok_or_else(|| ResponseError::BadRequest("Total spent is too large".to_string()))?;
-
-    let spender_leaf = SpenderLeaf {
-        total_spent,
-        // merkle_proof: [u8; 32], // TODO
+    let spender_leaf = match (total_spent) {
+        Some(total_spent) => Some(SpenderLeaf {
+            total_spent,
+            // merkle_proof: [u8; 32], // TODO
+        }),
+        None => None
     };
 
     // Return
     let res = SpenderResponse {
-        total_deposited: Some(total_deposited),
-        spender_leaf: Some(spender_leaf),
+        total,
+        spender_leaf,
     };
     Ok(success_response(serde_json::to_string(&res)?))
 }

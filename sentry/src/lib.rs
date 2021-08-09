@@ -386,7 +386,11 @@ async fn channels_router<A: Adapter + 'static>(
         method,
     ) {
         req = AuthRequired.call(req, app).await?;
-
+        req = Chain::new()
+            .chain(AuthRequired)
+            .chain(ChannelLoad)
+            .apply(req, app)
+            .await?;
         let param = RouteParams(vec![
             caps.get(1)
                 .map_or("".to_string(), |m| m.as_str().to_string()), // channel ID
@@ -394,8 +398,6 @@ async fn channels_router<A: Adapter + 'static>(
                 .map_or("".to_string(), |m| m.as_str().to_string()), // spender addr
         ]);
         req.extensions_mut().insert(param);
-
-        req = ChannelLoad.call(req, app).await?;
 
         get_spender_limits(req, app).await
     } else {
