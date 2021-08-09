@@ -435,7 +435,7 @@ pub mod insert_events {
                 .await;
 
                 assert!(
-                    dbg!(spend_event).is_ok(),
+                    spend_event.is_ok(),
                     "Campaign budget has no remaining funds to spend"
                 );
 

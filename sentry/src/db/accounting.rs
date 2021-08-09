@@ -11,6 +11,8 @@ use tokio_postgres::{
 use super::{DbPool, PoolError};
 use thiserror::Error;
 
+static UPDATE_ACCOUNTING_STATEMENT: &str = "INSERT INTO accounting(channel_id, side, address, amount, updated, created) VALUES($1, $2, $3, $4, $5, $6) ON CONFLICT ON CONSTRAINT accounting_pkey DO UPDATE SET amount = accounting.amount + $4, updated = $6 WHERE accounting.channel_id = $1 AND accounting.side = $2 AND accounting.address = $3 RETURNING channel_id, side, address, amount, updated, created";
+
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("Accounting Balances error: {0}")]
@@ -84,7 +86,6 @@ pub async fn get_accounting(
 /// Will update current Spender/Earner amount or insert a new Accounting record
 ///
 /// See `UPDATE_ACCOUNTING_STATEMENT` static for full query.
-static UPDATE_ACCOUNTING_STATEMENT: &str = "INSERT INTO accounting(channel_id, side, address, amount, updated, created) VALUES($1, $2, $3, $4, $5, $6) ON CONFLICT ON CONSTRAINT accounting_pkey DO UPDATE SET amount = accounting.amount + $4, updated = $6 WHERE accounting.channel_id = $1 AND accounting.side = $2 AND accounting.address = $3 RETURNING channel_id, side, address, amount, updated, created";
 pub async fn update_accounting(
     pool: DbPool,
     channel_id: ChannelId,
@@ -204,7 +205,7 @@ mod test {
             .expect("Should insert");
             assert_eq!(spender, inserted.address);
             assert_eq!(Side::Spender, inserted.side);
-            assert_eq!(UnifiedNum::from(100_000_000), inserted.amount);
+            assert_eq!(amount, inserted.amount);
 
             let updated = update_accounting(
                 database.pool.clone(),
@@ -218,7 +219,7 @@ mod test {
             assert_eq!(spender, updated.address);
             assert_eq!(Side::Spender, updated.side);
             assert_eq!(
-                UnifiedNum::from(300_000_000),
+                amount + update_amount,
                 updated.amount,
                 "Should add the newly spent amount to the existing one"
             );
@@ -247,7 +248,7 @@ mod test {
             .expect("Should insert");
             assert_eq!(earner, inserted.address);
             assert_eq!(Side::Earner, inserted.side);
-            assert_eq!(UnifiedNum::from(100_000_000), inserted.amount);
+            assert_eq!(amount, inserted.amount);
 
             let updated = update_accounting(
                 database.pool.clone(),
@@ -261,7 +262,7 @@ mod test {
             assert_eq!(earner, updated.address);
             assert_eq!(Side::Earner, updated.side);
             assert_eq!(
-                UnifiedNum::from(300_000_000),
+                amount + update_amount,
                 updated.amount,
                 "Should add the newly earned amount to the existing one"
             );
@@ -293,7 +294,7 @@ mod test {
             .expect("Should insert");
             assert_eq!(spender_as_earner, inserted.address);
             assert_eq!(Side::Earner, inserted.side);
-            assert_eq!(UnifiedNum::from(100_000_000), inserted.amount);
+            assert_eq!(amount, inserted.amount);
 
             let updated = update_accounting(
                 database.pool.clone(),
