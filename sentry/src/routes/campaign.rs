@@ -330,6 +330,7 @@ pub mod update_campaign {
                     .checked_sub(&current_budget)
                     .and_then(|delta_budget| old_remaining.checked_add(&delta_budget))
                     .ok_or(Error::Calculation)?;
+                // new remaining > old remaining
                 let increase_by = new_remaining
                     .checked_sub(&old_remaining)
                     .ok_or(Error::Calculation)?;
@@ -337,13 +338,14 @@ pub mod update_campaign {
                 DeltaBudget::Increase(increase_by)
             }
             DeltaBudget::Decrease(()) => {
-                // delta budget = New budget - Old budget ( the difference between the new and old when New > Old)
+                // delta budget = Old budget - New budget ( the difference between the new and old when New < Old)
                 let new_remaining = &current_budget
                     .checked_sub(&new_budget)
-                    .and_then(|delta_budget| old_remaining.checked_add(&delta_budget))
+                    .and_then(|delta_budget| old_remaining.checked_sub(&delta_budget))
                     .ok_or(Error::Calculation)?;
-                let decrease_by = new_remaining
-                    .checked_sub(&old_remaining)
+                // old remaining > new remaining
+                let decrease_by = old_remaining
+                    .checked_sub(&new_remaining)
                     .ok_or(Error::Calculation)?;
 
                 DeltaBudget::Decrease(decrease_by)
