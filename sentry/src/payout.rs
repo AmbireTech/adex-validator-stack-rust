@@ -77,9 +77,7 @@ pub fn get_payout(
 
                 if output.show {
                     let price = match output.price.get(&event_type) {
-                        Some(output_price) => {
-                            max(pricing.min, min(pricing.max, *output_price))
-                        }
+                        Some(output_price) => max(pricing.min, min(pricing.max, *output_price)),
                         None => max(pricing.min, pricing.max),
                     };
 

@@ -105,7 +105,7 @@ impl<A: Adapter + 'static> Application<A> {
         logger: Logger,
         redis: MultiplexedConnection,
         pool: DbPool,
-        campaign_remaining: CampaignRemaining
+        campaign_remaining: CampaignRemaining,
     ) -> Self {
         Self {
             adapter,
@@ -511,14 +511,18 @@ pub mod test_util {
     use primitives::{
         adapter::DummyAdapterOptions,
         config::configuration,
-        util::tests::{
-            discard_logger,
-            prep_db::{IDS},
-        },
+        util::tests::{discard_logger, prep_db::IDS},
     };
 
-    use crate::{Application, db::{CampaignRemaining, redis_pool::TESTS_POOL, tests_postgres::{setup_test_migrations, DATABASE_POOL}}};
-    
+    use crate::{
+        db::{
+            redis_pool::TESTS_POOL,
+            tests_postgres::{setup_test_migrations, DATABASE_POOL},
+            CampaignRemaining,
+        },
+        Application,
+    };
+
     /// Uses production configuration to setup the correct Contract addresses for tokens.
     pub async fn setup_dummy_app() -> Application<DummyAdapter> {
         let config = configuration("production", None).expect("Should get Config");
@@ -546,7 +550,7 @@ pub mod test_util {
             discard_logger(),
             redis.connection.clone(),
             database.pool.clone(),
-            campaign_remaining
+            campaign_remaining,
         );
 
         app

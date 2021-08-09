@@ -1,38 +1,22 @@
-<<<<<<< HEAD
-use crate::{success_response, Application, ResponseError};
-use hyper::{Body, Request, Response};
-use primitives::{
-    adapter::Adapter,
-    sentry::{campaign_create::CreateCampaign, SuccessResponse},
-=======
 use crate::{
-    access::{self, check_access},
     db::{
-        accounting::get_accounting_spent,
+        accounting::{get_accounting, Side},
         campaign::{get_campaigns_by_channel, insert_campaign, update_campaign},
         spendable::fetch_spendable,
         CampaignRemaining, DbPool, RedisError,
     },
-    success_response, Application, Auth, ResponseError, Session,
+    success_response, Application, Auth, ResponseError,
 };
-use chrono::Utc;
 use deadpool_postgres::PoolError;
 use hyper::{Body, Request, Response};
 use primitives::{
     adapter::Adapter,
     campaign_validator::Validator,
-    sentry::{
-        campaign_create::{CreateCampaign, ModifyCampaign},
-        Event, SuccessResponse,
-    },
+    sentry::campaign_create::{CreateCampaign, ModifyCampaign},
     Address, Campaign, UnifiedNum,
 };
 use slog::error;
-use std::{
-    cmp::{max, Ordering},
-    collections::HashMap,
->>>>>>> issue-382-campaign-routes
-};
+use std::cmp::{max, Ordering};
 use thiserror::Error;
 use tokio_postgres::error::SqlState;
 
@@ -88,9 +72,15 @@ pub async fn create_campaign<A: Adapter>(
 
     let total_remaining =
         {
-            let accounting_spent =
-                get_accounting_spent(app.pool.clone(), &campaign.creator, &campaign.channel.id())
-                    .await?;
+            let accounting_spent = get_accounting(
+                app.pool.clone(),
+                campaign.channel.id(),
+                campaign.creator,
+                Side::Spender,
+            )
+            .await?
+            .map(|accounting| accounting.amount)
+            .unwrap_or_default();
 
             let latest_spendable =
                 fetch_spendable(app.pool.clone(), &campaign.creator, &campaign.channel.id())
@@ -168,7 +158,7 @@ pub async fn create_campaign<A: Adapter>(
 }
 
 pub mod update_campaign {
-    use crate::db::CampaignRemaining;
+    use crate::db::{accounting::Side, CampaignRemaining};
 
     use super::*;
 
@@ -221,9 +211,15 @@ pub mod update_campaign {
         // sum(AllChannelCampaigns.map(getRemaining)) + DeltaBudgetForMutatedCampaign <= totalDeposited - totalSpent
         // sum(AllChannelCampaigns.map(getRemaining)) - DeltaBudgetForMutatedCampaign <= totalDeposited - totalSpent
         if let Some(delta_budget) = delta_budget {
-            let accounting_spent =
-                get_accounting_spent(pool.clone(), &campaign.creator, &campaign.channel.id())
-                    .await?;
+            let accounting_spent = get_accounting(
+                pool.clone(),
+                campaign.channel.id(),
+                campaign.creator,
+                Side::Spender,
+            )
+            .await?
+            .map(|accounting| accounting.amount)
+            .unwrap_or_default();
 
             let latest_spendable =
                 fetch_spendable(pool.clone(), &campaign.creator, &campaign.channel.id())
@@ -779,12 +775,11 @@ pub mod insert_events {
 mod test {
     use super::{update_campaign::modify_campaign, *};
     use crate::{
-        db::{accounting::insert_accounting, spendable::insert_spendable},
+        db::{accounting::update_accounting, spendable::insert_spendable},
         test_util::setup_dummy_app,
     };
     use hyper::StatusCode;
     use primitives::{
-        sentry::accounting::{Balances, CheckedState},
         spender::{Deposit, Spendable},
         util::tests::prep_db::DUMMY_CAMPAIGN,
         ValidatorId,
@@ -831,13 +826,15 @@ mod test {
                 .await
                 .expect("Should insert Spendable for Campaign creator"));
 
-            let mut balances = Balances::<CheckedState>::default();
-            balances.add_spender(create.creator);
-
-            // TODO: Replace this once https://github.com/AdExNetwork/adex-validator-stack-rust/pull/413 is merged
-            let _accounting = insert_accounting(app.pool.clone(), create.channel.clone(), balances)
-                .await
-                .expect("Should create Accounting");
+            let _accounting = update_accounting(
+                app.pool.clone(),
+                create.channel.id(),
+                create.creator,
+                Side::Spender,
+                UnifiedNum::default(),
+            )
+            .await
+            .expect("Should create Accounting");
 
             let create_response = create_campaign(build_request(create), &app)
                 .await
@@ -928,7 +925,12 @@ mod test {
                 .await
                 .expect_err("Should return Error response");
 
-            assert_eq!(ResponseError::BadRequest("Not enough deposit left for the new campaign's budget".to_string()), create_err);
+            assert_eq!(
+                ResponseError::BadRequest(
+                    "Not enough deposit left for the new campaign's budget".to_string()
+                ),
+                create_err
+            );
         }
 
         // modify first campaign, by lowering the budget from 1000 to 900
@@ -967,7 +969,7 @@ mod test {
                 .await
                 .expect("Should return create campaign");
 
-                let json = hyper::body::to_bytes(create_response.into_body())
+            let json = hyper::body::to_bytes(create_response.into_body())
                 .await
                 .expect("Should get json");
 
@@ -991,12 +993,13 @@ mod test {
                 targeting_rules: None,
             };
 
-            let modify_err =
-                modify_campaign(&app.pool, &app.campaign_remaining, modified, modify)
-                    .await
-                    .expect_err("Should return Error response");
+            let modify_err = modify_campaign(&app.pool, &app.campaign_remaining, modified, modify)
+                .await
+                .expect_err("Should return Error response");
 
-            assert!(matches!(modify_err, Error::NewBudget(string) if string == "Not enough deposit left for the campaign's new budget"));
+            assert!(
+                matches!(modify_err, Error::NewBudget(string) if string == "Not enough deposit left for the campaign's new budget")
+            );
         }
     }
 }
