@@ -38,9 +38,7 @@ pub async fn get_accounting_spent(
     Ok(row.get("spent"))
 }
 
-// TODO This is still WIP
-#[allow(dead_code)]
-async fn insert_accounting(
+pub async fn insert_accounting(
     pool: DbPool,
     channel: Channel,
     balances: Balances<CheckedState>,
