@@ -87,7 +87,7 @@ impl<A: Adapter + 'static> SentryApi<A> {
             .map_err(Error::BuildingClient)?;
 
         // validate that we are to validate the channel
-        match channel.spec.validators.find(adapter.whoami()) {
+        match channel.spec.validators.find(&adapter.whoami()) {
             Some(ref spec_validator) => {
                 let validator = spec_validator.validator();
                 let validator_url = format!("{}/channel/{}", validator.url, channel.id);
@@ -117,7 +117,7 @@ impl<A: Adapter + 'static> SentryApi<A> {
             None => Err(Error::MissingWhoamiInChannelValidators {
                 channel: channel.id,
                 validators: channel.spec.validators.iter().map(|v| v.id).collect(),
-                whoami: *adapter.whoami(),
+                whoami: adapter.whoami(),
             }),
         }
     }
@@ -129,9 +129,9 @@ impl<A: Adapter + 'static> SentryApi<A> {
         join_all(self.propagate_to.iter().map(|(validator, auth_token)| {
             propagate_to::<A>(
                 &self.channel.id,
-                &auth_token,
+                auth_token,
                 &self.client,
-                &validator,
+                validator,
                 messages,
             )
         }))
@@ -165,7 +165,7 @@ impl<A: Adapter + 'static> SentryApi<A> {
         &self,
         message_types: &[&str],
     ) -> Result<Option<MessageTypes>, Error<A::AdapterError>> {
-        self.get_latest_msg(self.adapter.whoami(), message_types)
+        self.get_latest_msg(&self.adapter.whoami(), message_types)
             .await
     }
 
@@ -196,7 +196,7 @@ impl<A: Adapter + 'static> SentryApi<A> {
     ) -> Result<EventAggregateResponse, Error<A::AdapterError>> {
         let auth_token = self
             .adapter
-            .get_auth(self.adapter.whoami())
+            .get_auth(&self.adapter.whoami())
             .map_err(Error::ValidatorAuthentication)?;
 
         let url = format!(
@@ -250,13 +250,13 @@ pub async fn all_channels(
     whoami: &ValidatorId,
 ) -> Result<Vec<Channel>, reqwest::Error> {
     let url = sentry_url.to_owned();
-    let first_page = fetch_page(url.clone(), 0, &whoami).await?;
+    let first_page = fetch_page(url.clone(), 0, whoami).await?;
 
     if first_page.total_pages < 2 {
         Ok(first_page.channels)
     } else {
         let all: Vec<ChannelListResponse> =
-            try_join_all((1..first_page.total_pages).map(|i| fetch_page(url.clone(), i, &whoami)))
+            try_join_all((1..first_page.total_pages).map(|i| fetch_page(url.clone(), i, whoami)))
                 .await?;
 
         let result_all: Vec<Channel> = std::iter::once(first_page)

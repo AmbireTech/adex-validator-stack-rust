@@ -7,12 +7,13 @@ use lazy_static::lazy_static;
 
 pub mod accounting;
 pub mod analytics;
-mod campaign;
+pub mod campaign;
 mod channel;
 pub mod event_aggregate;
 pub mod spendable;
 mod validator_message;
 
+pub use self::campaign::*;
 pub use self::channel::*;
 pub use self::event_aggregate::*;
 pub use self::validator_message::*;
@@ -76,7 +77,7 @@ pub async fn setup_migrations(environment: &str) {
         .database_password(POSTGRES_PASSWORD.as_str())
         .database_host(POSTGRES_HOST.as_str())
         .database_port(*POSTGRES_PORT)
-        .database_name(&POSTGRES_DB.as_ref().unwrap_or(&POSTGRES_USER))
+        .database_name(POSTGRES_DB.as_ref().unwrap_or(&POSTGRES_USER))
         .build()
         .expect("Should build migration settings");
 

@@ -37,13 +37,13 @@ pub async fn fetch_spendable(
     pool: DbPool,
     spender: &Address,
     channel_id: &ChannelId,
-) -> Result<Spendable, PoolError> {
+) -> Result<Option<Spendable>, PoolError> {
     let client = pool.get().await?;
     let statement = client.prepare("SELECT spender, channel_id, channel, total, still_on_create2 FROM spendable WHERE spender = $1 AND channel_id = $2").await?;
 
-    let row = client.query_one(&statement, &[spender, channel_id]).await?;
+    let row = client.query_opt(&statement, &[spender, channel_id]).await?;
 
-    Ok(Spendable::try_from(row)?)
+    Ok(row.map(Spendable::try_from).transpose()?)
 }
 
 #[cfg(test)]
@@ -88,6 +88,6 @@ mod test {
         .await
         .expect("Should fetch successfully");
 
-        assert_eq!(spendable, fetched_spendable);
+        assert_eq!(Some(spendable), fetched_spendable);
     }
 }

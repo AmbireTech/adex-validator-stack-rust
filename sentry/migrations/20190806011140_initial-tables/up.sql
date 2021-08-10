@@ -68,13 +68,16 @@ CREATE AGGREGATE jsonb_object_agg (jsonb) (
     INITCOND = '{}'
 );
 
+CREATE TYPE AccountingSide AS ENUM ('Earner', 'Spender');
+
 CREATE TABLE accounting (
     channel_id varchar(66) NOT NULL,
-    channel jsonb NOT NULL,
-    earners jsonb DEFAULT '{}' NULL,
-    spenders jsonb DEFAULT '{}' NULL,
+    side AccountingSide NOT NULL,
+    "address" varchar(42) NOT NULL,
+    amount bigint NOT NULL,
     updated timestamp(2) with time zone DEFAULT NULL NULL,
     created timestamp(2) with time zone NOT NULL,
 
-    PRIMARY KEY (channel_id)
-)
+    -- Do not rename the Primary key constraint (`accounting_pkey`)!
+    PRIMARY KEY (channel_id, side, "address")
+);

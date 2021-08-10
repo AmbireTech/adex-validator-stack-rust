@@ -2,11 +2,12 @@
 #![deny(rust_2018_idioms)]
 
 use crate::db::DbPool;
-use crate::event_aggregator::EventAggregator;
+use crate::routes::campaign;
 use crate::routes::channel::channel_status;
 use crate::routes::event_aggregate::list_channel_event_aggregates;
 use crate::routes::validator_message::{extract_params, list_validator_messages};
 use chrono::Utc;
+use db::CampaignRemaining;
 use hyper::{Body, Method, Request, Response, StatusCode};
 use lazy_static::lazy_static;
 use middleware::{
@@ -14,17 +15,18 @@ use middleware::{
     channel::{ChannelLoad, GetChannelId},
     cors::{cors, Cors},
 };
-use middleware::{Chain, Middleware};
+use middleware::{campaign::CampaignLoad, Chain, Middleware};
+use once_cell::sync::Lazy;
 use primitives::adapter::Adapter;
 use primitives::sentry::ValidationErrorResponse;
 use primitives::{Config, ValidatorId};
 use redis::aio::MultiplexedConnection;
 use regex::Regex;
 use routes::analytics::{advanced_analytics, advertiser_analytics, analytics, publisher_analytics};
+use routes::campaign::{create_campaign, update_campaign};
 use routes::cfg::config;
 use routes::channel::{
-    channel_list, channel_validate, create_channel, create_validator_messages, insert_events,
-    last_approved,
+    channel_list, channel_validate, create_channel, create_validator_messages, last_approved,
 };
 use slog::Logger;
 use std::collections::HashMap;
@@ -32,6 +34,7 @@ use std::collections::HashMap;
 pub mod middleware;
 pub mod routes {
     pub mod analytics;
+    pub mod campaign;
     pub mod cfg;
     pub mod channel;
     pub mod event_aggregate;
@@ -41,8 +44,10 @@ pub mod routes {
 pub mod access;
 pub mod analytics_recorder;
 pub mod db;
-pub mod event_aggregator;
-pub mod event_reducer;
+// TODO AIP#61: remove the even aggregator once we've taken out the logic for AIP#61
+// pub mod event_aggregator;
+// TODO AIP#61: Remove even reducer or alter depending on our needs
+// pub mod event_reducer;
 pub mod payout;
 pub mod spender;
 
@@ -60,8 +65,18 @@ lazy_static! {
     static ref CREATE_EVENTS_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events/?$").expect("The regex should be valid");
 }
 
-#[derive(Debug)]
-pub struct RouteParams(Vec<String>);
+static INSERT_EVENTS_BY_CAMPAIGN_ID: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^/v5/campaign/0x([a-zA-Z0-9]{32})/events/?$").expect("The regex should be valid")
+});
+static CLOSE_CAMPAIGN_BY_CAMPAIGN_ID: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^/v5/campaign/0x([a-zA-Z0-9]{32})/close/?$").expect("The regex should be valid")
+});
+static CAMPAIGN_UPDATE_BY_ID: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^/v5/campaign/0x([a-zA-Z0-9]{32})/?$").expect("The regex should be valid")
+});
+
+#[derive(Debug, Clone)]
+pub struct RouteParams(pub Vec<String>);
 
 impl RouteParams {
     pub fn get(&self, index: usize) -> Option<String> {
@@ -76,11 +91,11 @@ impl RouteParams {
 #[derive(Clone)]
 pub struct Application<A: Adapter> {
     pub adapter: A,
+    pub config: Config,
     pub logger: Logger,
     pub redis: MultiplexedConnection,
     pub pool: DbPool,
-    pub config: Config,
-    pub event_aggregator: EventAggregator,
+    pub campaign_remaining: CampaignRemaining,
 }
 
 impl<A: Adapter + 'static> Application<A> {
@@ -90,6 +105,7 @@ impl<A: Adapter + 'static> Application<A> {
         logger: Logger,
         redis: MultiplexedConnection,
         pool: DbPool,
+        campaign_remaining: CampaignRemaining,
     ) -> Self {
         Self {
             adapter,
@@ -97,7 +113,7 @@ impl<A: Adapter + 'static> Application<A> {
             logger,
             redis,
             pool,
-            event_aggregator: Default::default(),
+            campaign_remaining,
         }
     }
 
@@ -109,51 +125,63 @@ impl<A: Adapter + 'static> Application<A> {
             None => Default::default(),
         };
 
-        let req = match Authenticate.call(req, &self).await {
+        let req = match Authenticate.call(req, self).await {
             Ok(req) => req,
             Err(error) => return map_response_error(error),
         };
 
         let mut response = match (req.uri().path(), req.method()) {
-            ("/cfg", &Method::GET) => config(req, &self).await,
-            ("/channel", &Method::POST) => create_channel(req, &self).await,
-            ("/channel/list", &Method::GET) => channel_list(req, &self).await,
-            ("/channel/validate", &Method::POST) => channel_validate(req, &self).await,
+            ("/cfg", &Method::GET) => config(req, self).await,
+            ("/channel", &Method::POST) => create_channel(req, self).await,
+            ("/channel/list", &Method::GET) => channel_list(req, self).await,
+            ("/channel/validate", &Method::POST) => channel_validate(req, self).await,
 
-            ("/analytics", &Method::GET) => analytics(req, &self).await,
+            ("/analytics", &Method::GET) => analytics(req, self).await,
             ("/analytics/advanced", &Method::GET) => {
-                let req = match AuthRequired.call(req, &self).await {
+                let req = match AuthRequired.call(req, self).await {
                     Ok(req) => req,
                     Err(error) => {
                         return map_response_error(error);
                     }
                 };
 
-                advanced_analytics(req, &self).await
+                advanced_analytics(req, self).await
             }
             ("/analytics/for-advertiser", &Method::GET) => {
-                let req = match AuthRequired.call(req, &self).await {
+                let req = match AuthRequired.call(req, self).await {
                     Ok(req) => req,
                     Err(error) => {
                         return map_response_error(error);
                     }
                 };
-                advertiser_analytics(req, &self).await
+                advertiser_analytics(req, self).await
             }
             ("/analytics/for-publisher", &Method::GET) => {
-                let req = match AuthRequired.call(req, &self).await {
+                let req = match AuthRequired.call(req, self).await {
                     Ok(req) => req,
                     Err(error) => {
                         return map_response_error(error);
                     }
                 };
 
-                publisher_analytics(req, &self).await
+                publisher_analytics(req, self).await
             }
-            (route, _) if route.starts_with("/analytics") => analytics_router(req, &self).await,
-            // This is important becuase it prevents us from doing
+            // For creating campaigns
+            ("/v5/campaign", &Method::POST) => {
+                let req = match AuthRequired.call(req, self).await {
+                    Ok(req) => req,
+                    Err(error) => {
+                        return map_response_error(error);
+                    }
+                };
+
+                create_campaign(req, self).await
+            }
+            (route, _) if route.starts_with("/analytics") => analytics_router(req, self).await,
+            // This is important because it prevents us from doing
             // expensive regex matching for routes without /channel
-            (path, _) if path.starts_with("/channel") => channels_router(req, &self).await,
+            (path, _) if path.starts_with("/channel") => channels_router(req, self).await,
+            (path, _) if path.starts_with("/v5/campaign") => campaigns_router(req, self).await,
             _ => Err(ResponseError::NotFound),
         }
         .unwrap_or_else(map_response_error);
@@ -164,12 +192,64 @@ impl<A: Adapter + 'static> Application<A> {
     }
 }
 
+async fn campaigns_router<A: Adapter + 'static>(
+    mut req: Request<Body>,
+    app: &Application<A>,
+) -> Result<Response<Body>, ResponseError> {
+    let (path, method) = (req.uri().path(), req.method());
+
+    if let (Some(_caps), &Method::POST) = (CAMPAIGN_UPDATE_BY_ID.captures(path), method) {
+        let req = CampaignLoad.call(req, app).await?;
+
+        update_campaign::handle_route(req, app).await
+    } else if let (Some(caps), &Method::POST) =
+        (INSERT_EVENTS_BY_CAMPAIGN_ID.captures(path), method)
+    {
+        let param = RouteParams(vec![caps
+            .get(1)
+            .map_or("".to_string(), |m| m.as_str().to_string())]);
+        req.extensions_mut().insert(param);
+
+        let req = CampaignLoad.call(req, app).await?;
+
+        campaign::insert_events::handle_route(req, app).await
+    } else if let (Some(_caps), &Method::POST) =
+        (CLOSE_CAMPAIGN_BY_CAMPAIGN_ID.captures(path), method)
+    {
+        // TODO AIP#61: Close campaign:
+        // - only by creator
+        // - sets redis remaining = 0 (`newBudget = totalSpent`, i.e. `newBudget = oldBudget - remaining`)
+
+        // let (is_creator, auth_uid) = match auth {
+        // Some(auth) => (auth.uid == channel.creator, auth.uid.to_string()),
+        // None => (false, Default::default()),
+        // };
+        // Closing a campaign is allowed only by the creator
+        // if has_close_event && is_creator {
+        //     return Ok(());
+        // }
+
+        Err(ResponseError::NotFound)
+    } else {
+        Err(ResponseError::NotFound)
+    }
+}
+
 async fn analytics_router<A: Adapter + 'static>(
     mut req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
     let (route, method) = (req.uri().path(), req.method());
 
+    // TODO AIP#61: Add routes for:
+    // - POST /channel/:id/pay
+    // #[serde(rename_all = "camelCase")]
+    // Pay { payout: BalancesMap },
+    //
+    // - GET /channel/:id/spender/:addr
+    // - GET /channel/:id/spender/all
+    // - POST /channel/:id/spender/:addr
+    // - GET /channel/:id/get-leaf
     match *method {
         Method::GET => {
             if let Some(caps) = ANALYTICS_BY_CHANNEL_ID.captures(route) {
@@ -228,17 +308,7 @@ async fn channels_router<A: Adapter + 'static>(
 ) -> Result<Response<Body>, ResponseError> {
     let (path, method) = (req.uri().path().to_owned(), req.method());
 
-    // regex matching for routes with params
-    if let (Some(caps), &Method::POST) = (CREATE_EVENTS_BY_CHANNEL_ID.captures(&path), method) {
-        let param = RouteParams(vec![caps
-            .get(1)
-            .map_or("".to_string(), |m| m.as_str().to_string())]);
-
-        req.extensions_mut().insert(param);
-
-        insert_events(req, app).await
-    } else if let (Some(caps), &Method::GET) = (LAST_APPROVED_BY_CHANNEL_ID.captures(&path), method)
-    {
+    if let (Some(caps), &Method::GET) = (LAST_APPROVED_BY_CHANNEL_ID.captures(&path), method) {
         let param = RouteParams(vec![caps
             .get(1)
             .map_or("".to_string(), |m| m.as_str().to_string())]);
@@ -273,7 +343,7 @@ async fn channels_router<A: Adapter + 'static>(
             }
         };
 
-        list_validator_messages(req, &app, &extract_params.0, &extract_params.1).await
+        list_validator_messages(req, app, &extract_params.0, &extract_params.1).await
     } else if let (Some(caps), &Method::POST) = (CHANNEL_VALIDATOR_MESSAGES.captures(&path), method)
     {
         let param = RouteParams(vec![caps
@@ -288,7 +358,7 @@ async fn channels_router<A: Adapter + 'static>(
             .apply(req, app)
             .await?;
 
-        create_validator_messages(req, &app).await
+        create_validator_messages(req, app).await
     } else if let (Some(caps), &Method::GET) = (CHANNEL_EVENTS_AGGREGATES.captures(&path), method) {
         req = AuthRequired.call(req, app).await?;
 
@@ -308,7 +378,7 @@ async fn channels_router<A: Adapter + 'static>(
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ResponseError {
     NotFound,
     BadRequest(String),
@@ -361,7 +431,7 @@ pub fn bad_response(response_body: String, status_code: StatusCode) -> Response<
     let mut error_response = HashMap::new();
     error_response.insert("message", response_body);
 
-    let body = Body::from(serde_json::to_string(&error_response).expect("serialise err response"));
+    let body = Body::from(serde_json::to_string(&error_response).expect("serialize err response"));
 
     let mut response = Response::new(body);
     response
@@ -423,4 +493,56 @@ pub struct Session {
 pub struct Auth {
     pub era: i64,
     pub uid: ValidatorId,
+}
+
+#[cfg(test)]
+pub mod test_util {
+    use adapter::DummyAdapter;
+    use primitives::{
+        adapter::DummyAdapterOptions,
+        config::configuration,
+        util::tests::{discard_logger, prep_db::IDS},
+    };
+
+    use crate::{
+        db::{
+            redis_pool::TESTS_POOL,
+            tests_postgres::{setup_test_migrations, DATABASE_POOL},
+            CampaignRemaining,
+        },
+        Application,
+    };
+
+    /// Uses production configuration to setup the correct Contract addresses for tokens.
+    pub async fn setup_dummy_app() -> Application<DummyAdapter> {
+        let config = configuration("production", None).expect("Should get Config");
+        let adapter = DummyAdapter::init(
+            DummyAdapterOptions {
+                dummy_identity: IDS["leader"],
+                dummy_auth: Default::default(),
+                dummy_auth_tokens: Default::default(),
+            },
+            &config,
+        );
+
+        let redis = TESTS_POOL.get().await.expect("Should return Object");
+        let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
+
+        setup_test_migrations(database.pool.clone())
+            .await
+            .expect("Migrations should succeed");
+
+        let campaign_remaining = CampaignRemaining::new(redis.connection.clone());
+
+        let app = Application::new(
+            adapter,
+            config,
+            discard_logger(),
+            redis.connection.clone(),
+            database.pool.clone(),
+            campaign_remaining,
+        );
+
+        app
+    }
 }

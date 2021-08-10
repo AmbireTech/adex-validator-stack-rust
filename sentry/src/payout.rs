@@ -11,6 +11,7 @@ use std::cmp::{max, min};
 
 pub type Result = std::result::Result<Option<(Address, UnifiedNum)>, Error>;
 
+/// If None is returned this means that the targeting rules evaluation has set `show = false`
 pub fn get_payout(
     logger: &Logger,
     campaign: &Campaign,
@@ -34,7 +35,7 @@ pub fn get_payout(
         } => {
             let targeting_rules = campaign.targeting_rules.clone();
 
-            let pricing = get_pricing_bounds(&campaign, &event_type);
+            let pricing = get_pricing_bounds(campaign, &event_type);
 
             if targeting_rules.is_empty() {
                 Ok(Some((*publisher, pricing.min)))
@@ -65,7 +66,7 @@ pub fn get_payout(
                 let mut output = Output {
                     show: true,
                     boost: 1.0,
-                    price: vec![(event_type.clone(), pricing.min.clone())]
+                    price: vec![(event_type.clone(), pricing.min)]
                         .into_iter()
                         .collect(),
                 };
@@ -76,9 +77,7 @@ pub fn get_payout(
 
                 if output.show {
                     let price = match output.price.get(&event_type) {
-                        Some(output_price) => {
-                            max(pricing.min, min(pricing.max, output_price.clone()))
-                        }
+                        Some(output_price) => max(pricing.min, min(pricing.max, *output_price)),
                         None => max(pricing.min, pricing.max),
                     };
 
@@ -88,7 +87,6 @@ pub fn get_payout(
                 }
             }
         }
-        _ => Ok(None),
     }
 }
 
@@ -174,35 +172,5 @@ mod test {
 
         let expected_option = Some((ADDRESSES["leader"], 23.into()));
         assert_eq!(expected_option, payout, "pricingBounds: click event");
-    }
-
-    #[test]
-    fn get_event_payouts_pricing_bounds_close_event() {
-        let logger = discard_logger();
-        let mut campaign = DUMMY_CAMPAIGN.clone();
-        campaign.budget = 100.into();
-        campaign.pricing_bounds = Some(PricingBounds {
-            impression: Some(Pricing {
-                min: 8.into(),
-                max: 64.into(),
-            }),
-            click: Some(Pricing {
-                min: 23.into(),
-                max: 100.into(),
-            }),
-        });
-
-        let event = Event::Close;
-
-        let session = Session {
-            ip: None,
-            country: None,
-            referrer_header: None,
-            os: None,
-        };
-
-        let payout = get_payout(&logger, &campaign, &event, &session).expect("Should be OK");
-
-        assert_eq!(None, payout, "pricingBounds: click event");
     }
 }

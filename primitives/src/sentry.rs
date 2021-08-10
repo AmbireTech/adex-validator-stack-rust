@@ -1,7 +1,6 @@
 use crate::{
-    targeting::Rules,
     validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
-    Address, BalancesMap, BigNum, Channel, ChannelId, ValidatorId, IPFS,
+    Address, BigNum, Channel, ChannelId, ValidatorId, IPFS,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -127,19 +126,6 @@ pub enum Event {
         ad_slot: Option<IPFS>,
         referrer: Option<String>,
     },
-    /// only the creator can send this event
-    #[serde(rename_all = "camelCase")]
-    UpdateTargeting { targeting_rules: Rules },
-    /// Closes the `Campaign`
-    /// only the creator can send this event
-    #[serde(rename_all = "camelCase")]
-    Close,
-    /// TODO: AIP#61 Check and explain who can send this event as well as when it can be received
-    /// A map of earners which gets merged in the `spender::Aggregate`
-    /// NOTE: Does **not** contain any fees!
-    /// This even can be used to pay to yourself, but this is irrelevant as it's your funds you are paying yourself.
-    #[serde(rename_all = "camelCase")]
-    Pay { payout: BalancesMap },
 }
 
 impl Event {
@@ -161,9 +147,6 @@ impl AsRef<str> for Event {
         match *self {
             Event::Impression { .. } => "IMPRESSION",
             Event::Click { .. } => "CLICK",
-            Event::UpdateTargeting { .. } => "UPDATE_TARGETING",
-            Event::Close => "CLOSE",
-            Event::Pay { .. } => "PAY",
         }
     }
 }
@@ -375,6 +358,85 @@ pub mod campaign_create {
                 created: self.created,
                 active: self.active,
             }
+        }
+    }
+
+    /// This implementation helps with test setup
+    /// **NOTE:** It erases the CampaignId, since the creation of the campaign gives it's CampaignId
+    impl From<Campaign> for CreateCampaign {
+        fn from(campaign: Campaign) -> Self {
+            Self {
+                channel: campaign.channel,
+                creator: campaign.creator,
+                budget: campaign.budget,
+                validators: campaign.validators,
+                title: campaign.title,
+                pricing_bounds: campaign.pricing_bounds,
+                event_submission: campaign.event_submission,
+                ad_units: campaign.ad_units,
+                targeting_rules: campaign.targeting_rules,
+                created: campaign.created,
+                active: campaign.active,
+            }
+        }
+    }
+
+    // All editable fields stored in one place, used for checking when a budget is changed
+    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+    pub struct ModifyCampaign {
+        pub budget: Option<UnifiedNum>,
+        pub validators: Option<Validators>,
+        pub title: Option<String>,
+        pub pricing_bounds: Option<PricingBounds>,
+        pub event_submission: Option<EventSubmission>,
+        pub ad_units: Option<Vec<AdUnit>>,
+        pub targeting_rules: Option<Rules>,
+    }
+
+    impl ModifyCampaign {
+        pub fn from_campaign(campaign: Campaign) -> Self {
+            ModifyCampaign {
+                budget: Some(campaign.budget),
+                validators: Some(campaign.validators),
+                title: campaign.title,
+                pricing_bounds: campaign.pricing_bounds,
+                event_submission: campaign.event_submission,
+                ad_units: Some(campaign.ad_units),
+                targeting_rules: Some(campaign.targeting_rules),
+            }
+        }
+
+        pub fn apply(self, mut campaign: Campaign) -> Campaign {
+            if let Some(new_budget) = self.budget {
+                campaign.budget = new_budget;
+            }
+
+            if let Some(new_validators) = self.validators {
+                campaign.validators = new_validators;
+            }
+
+            // check if it was passed otherwise not sending a Title will result in clearing of the current one
+            if let Some(new_title) = self.title {
+                campaign.title = Some(new_title);
+            }
+
+            if let Some(new_pricing_bounds) = self.pricing_bounds {
+                campaign.pricing_bounds = Some(new_pricing_bounds);
+            }
+
+            if let Some(new_event_submission) = self.event_submission {
+                campaign.event_submission = Some(new_event_submission);
+            }
+
+            if let Some(new_ad_units) = self.ad_units {
+                campaign.ad_units = new_ad_units;
+            }
+
+            if let Some(new_targeting_rules) = self.targeting_rules {
+                campaign.targeting_rules = new_targeting_rules;
+            }
+
+            campaign
         }
     }
 }

@@ -116,10 +116,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     match adapter {
         AdapterTypes::EthereumAdapter(ethadapter) => {
-            run(is_single_tick, &sentry_url, &config, *ethadapter, &logger)
+            run(is_single_tick, sentry_url, &config, *ethadapter, &logger)
         }
         AdapterTypes::DummyAdapter(dummyadapter) => {
-            run(is_single_tick, &sentry_url, &config, *dummyadapter, &logger)
+            run(is_single_tick, sentry_url, &config, *dummyadapter, &logger)
         }
     }
 }
@@ -144,9 +144,9 @@ fn run<A: Adapter + 'static>(
     let rt = Runtime::new()?;
 
     if is_single_tick {
-        rt.block_on(iterate_channels(args, &logger));
+        rt.block_on(iterate_channels(args, logger));
     } else {
-        rt.block_on(infinite(args, &logger));
+        rt.block_on(infinite(args, logger));
     }
 
     Ok(())
@@ -161,7 +161,7 @@ async fn infinite<A: Adapter + 'static>(args: Args<A>, logger: &Logger) {
 }
 
 async fn iterate_channels<A: Adapter + 'static>(args: Args<A>, logger: &Logger) {
-    let result = all_channels(&args.sentry_url, args.adapter.whoami()).await;
+    let result = all_channels(&args.sentry_url, &args.adapter.whoami()).await;
 
     let channels = match result {
         Ok(channels) => channels,
@@ -197,10 +197,10 @@ async fn validator_tick<A: Adapter + 'static>(
     config: &Config,
     logger: &Logger,
 ) -> Result<(ChannelId, Box<dyn Debug>), ValidatorWorkerError<A::AdapterError>> {
-    let whoami = *adapter.whoami();
+    let whoami = adapter.whoami();
 
     // Cloning the `Logger` is cheap, see documentation for more info
-    let sentry = SentryApi::init(adapter, channel.clone(), &config, logger.clone())
+    let sentry = SentryApi::init(adapter, channel.clone(), config, logger.clone())
         .map_err(ValidatorWorkerError::SentryApi)?;
     let duration = Duration::from_millis(config.validator_tick_timeout as u64);
 
