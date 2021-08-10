@@ -26,31 +26,19 @@ impl Aggregator {
 pub mod fee {
     pub const PRO_MILLE: UnifiedNum = UnifiedNum::from_u64(1_000);
 
-    use primitives::{Address, Campaign, DomainError, UnifiedNum, ValidatorId};
+    use primitives::{Address, DomainError, UnifiedNum, ValidatorDesc};
 
     /// Calculates the fee for a specified validator
     /// This function will return None if the provided validator is not part of the Campaign / Channel
     /// In the case of overflow when calculating the payout, an error will be returned
-    pub fn calculate_fees(
+    pub fn calculate_fee(
         (_earner, payout): (Address, UnifiedNum),
-        campaign: &Campaign,
-        for_validator: ValidatorId,
-    ) -> Result<Option<UnifiedNum>, DomainError> {
-        let payout = match campaign.find_validator(&for_validator) {
-            Some(validator_role) => {
-                // should never overflow
-                let fee_payout = payout
-                    .checked_mul(&validator_role.validator().fee)
-                    .ok_or_else(|| {
-                        DomainError::InvalidArgument("payout calculation overflow".to_string())
-                    })?
-                    .div_floor(&PRO_MILLE);
-
-                Some(fee_payout)
-            }
-            None => None,
-        };
-
-        Ok(payout)
+        validator: &ValidatorDesc,
+    ) -> Result<UnifiedNum, DomainError> {
+        // should never overflow
+        payout
+            .checked_mul(&validator.fee)
+            .map(|pro_mille_fee| pro_mille_fee.div_floor(&PRO_MILLE))
+            .ok_or_else(|| DomainError::InvalidArgument("payout calculation overflow".to_string()))
     }
 }

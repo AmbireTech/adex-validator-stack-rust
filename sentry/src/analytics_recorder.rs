@@ -114,7 +114,6 @@ pub async fn record(
                     .ignore();
                 }
             }
-            _ => {}
         });
 
     if let Err(err) = db.query_async::<_, Option<String>>(&mut conn).await {

@@ -172,7 +172,7 @@ fn get_unit_html(
 ) -> String {
     let image_url = normalize_url(&ad_unit.media_url);
 
-    let element_html = if is_video(&ad_unit) {
+    let element_html = if is_video(ad_unit) {
         video_html(on_load, size, &image_url, &ad_unit.media_mime)
     } else {
         image_html(on_load, size, &image_url)

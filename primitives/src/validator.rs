@@ -27,7 +27,7 @@ impl ValidatorId {
     }
 
     pub fn inner(&self) -> &[u8; 20] {
-        &self.0.as_bytes()
+        self.0.as_bytes()
     }
 }
 
@@ -53,7 +53,7 @@ impl From<&[u8; 20]> for ValidatorId {
 
 impl AsRef<[u8]> for ValidatorId {
     fn as_ref(&self) -> &[u8] {
-        &self.0.as_ref()
+        self.0.as_ref()
     }
 }
 

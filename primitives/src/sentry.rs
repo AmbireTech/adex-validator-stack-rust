@@ -380,7 +380,7 @@ pub mod campaign_create {
             }
         }
     }
-    
+
     // All editable fields stored in one place, used for checking when a budget is changed
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     pub struct ModifyCampaign {
