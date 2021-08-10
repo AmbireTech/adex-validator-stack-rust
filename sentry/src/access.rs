@@ -76,16 +76,11 @@ pub async fn check_access(
         return Ok(());
     }
 
-    let apply_all_rules = try_join_all(rules.iter().map(|rule| {
-        apply_rule(
-            redis.clone(),
-            rule,
-            events,
-            campaign,
-            &auth_uid,
-            session,
-        )
-    }));
+    let apply_all_rules = try_join_all(
+        rules
+            .iter()
+            .map(|rule| apply_rule(redis.clone(), rule, events, campaign, &auth_uid, session)),
+    );
 
     apply_all_rules.await.map_err(Error::RulesError).map(|_| ())
 }

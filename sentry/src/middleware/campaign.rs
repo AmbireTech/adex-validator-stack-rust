@@ -37,10 +37,7 @@ impl<A: Adapter + 'static> Middleware<A> for CampaignLoad {
 
 #[cfg(test)]
 mod test {
-    use primitives::{
-        util::tests::prep_db::{DUMMY_CAMPAIGN, IDS},
-        Campaign,
-    };
+    use primitives::{util::tests::prep_db::DUMMY_CAMPAIGN, Campaign};
 
     use crate::{db::insert_campaign, test_util::setup_dummy_app};
 

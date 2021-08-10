@@ -70,31 +70,34 @@ pub async fn create_campaign<A: Adapter>(
     let error_response =
         ResponseError::BadRequest("err occurred; please try again later".to_string());
 
-    let total_remaining =
-        {
-            let accounting_spent = get_accounting(
-                app.pool.clone(),
-                campaign.channel.id(),
-                campaign.creator,
-                Side::Spender,
-            )
-            .await?
-            .map(|accounting| accounting.amount)
-            .unwrap_or_default();
+    let total_remaining = {
+        let accounting_spent = get_accounting(
+            app.pool.clone(),
+            campaign.channel.id(),
+            campaign.creator,
+            Side::Spender,
+        )
+        .await?
+        .map(|accounting| accounting.amount)
+        .unwrap_or_default();
 
-            let latest_spendable =
-                fetch_spendable(app.pool.clone(), &campaign.creator, &campaign.channel.id())
-                    .await?
-                    .ok_or_else(|| ResponseError::BadRequest(
+        let latest_spendable =
+            fetch_spendable(app.pool.clone(), &campaign.creator, &campaign.channel.id())
+                .await?
+                .ok_or_else(|| {
+                    ResponseError::BadRequest(
                         "No spendable amount found for the Campaign creator".to_string(),
-                    ))?;
-            // Gets the latest Spendable for this (spender, channelId) pair
-            let total_deposited = latest_spendable.deposit.total;
+                    )
+                })?;
+        // Gets the latest Spendable for this (spender, channelId) pair
+        let total_deposited = latest_spendable.deposit.total;
 
-            total_deposited.checked_sub(&accounting_spent).ok_or_else(||
-                ResponseError::FailedValidation("No more budget remaining".to_string()),
-            )?
-        };
+        total_deposited
+            .checked_sub(&accounting_spent)
+            .ok_or_else(|| {
+                ResponseError::FailedValidation("No more budget remaining".to_string())
+            })?
+    };
 
     let channel_campaigns = get_campaigns_by_channel(&app.pool, &campaign.channel.id())
         .await?
@@ -315,9 +318,7 @@ pub mod update_campaign {
             .get_remaining_opt(campaign.id)
             .await?
             .map(|remaining| UnifiedNum::from(max(0, remaining).unsigned_abs()))
-            .ok_or_else(|| Error::FailedUpdate(
-                "No remaining entry for campaign".to_string(),
-            ))?;
+            .ok_or_else(|| Error::FailedUpdate("No remaining entry for campaign".to_string()))?;
 
         let campaign_spent = campaign
             .budget
