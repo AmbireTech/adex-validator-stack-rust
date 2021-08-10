@@ -370,7 +370,7 @@ pub mod insert_events {
 
     use crate::{
         access::{self, check_access},
-        db::{accounting::spend_amount, DbPool, PoolError, RedisError},
+        db::{accounting::spend_amount, CampaignRemaining, DbPool, PoolError, RedisError},
         payout::get_payout,
         spender::fee::calculate_fee,
         Application, Auth, ResponseError, Session,
@@ -384,11 +384,7 @@ pub mod insert_events {
         },
         Address, Campaign, CampaignId, DomainError, UnifiedNum, ValidatorDesc,
     };
-    use redis::aio::MultiplexedConnection;
     use thiserror::Error;
-
-    // TODO AIP#61: Use the Campaign Modify const here
-    pub const CAMPAIGN_REMAINING_KEY: &str = "campaignRemaining";
 
     #[derive(Debug, Error)]
     pub enum Error {
@@ -492,7 +488,7 @@ pub mod insert_events {
                 match payout {
                     Some((earner, payout)) => spend_for_event(
                         &app.pool,
-                        app.redis.clone(),
+                        &app.campaign_remaining,
                         campaign,
                         earner,
                         leader,
@@ -515,7 +511,7 @@ pub mod insert_events {
 
     pub async fn spend_for_event(
         pool: &DbPool,
-        mut redis: MultiplexedConnection,
+        campaign_remaining: &CampaignRemaining,
         campaign: &Campaign,
         earner: Address,
         leader: &ValidatorDesc,
@@ -534,14 +530,16 @@ pub mod insert_events {
             .sum::<Option<UnifiedNum>>()
             .ok_or(EventError::EventPayoutOverflow)?;
 
-        if !has_enough_remaining_budget(&mut redis, campaign.id, spending).await? {
+        if !has_enough_remaining_budget(campaign_remaining, campaign.id, spending).await? {
             return Err(Error::Event(
                 EventError::CampaignRemainingNotEnoughForPayout,
             ));
         }
 
         // The event payout decreases the remaining budget for the Campaign
-        let remaining = decrease_remaining_budget(&mut redis, campaign.id, spending).await?;
+        let remaining = campaign_remaining
+            .decrease_by(campaign.id, spending)
+            .await?;
 
         // Update the Accounting records accordingly
         let channel_id = campaign.channel.id();
@@ -563,40 +561,22 @@ pub mod insert_events {
     }
 
     async fn has_enough_remaining_budget(
-        redis: &mut MultiplexedConnection,
+        campaign_remaining: &CampaignRemaining,
         campaign: CampaignId,
         amount: UnifiedNum,
     ) -> Result<bool, RedisError> {
-        let key = format!("{}:{}", CAMPAIGN_REMAINING_KEY, campaign);
-
-        let remaining = redis::cmd("GET")
-            .arg(&key)
-            .query_async::<_, Option<i64>>(redis)
+        let remaining = campaign_remaining
+            .get_remaining_opt(campaign)
             .await?
             .unwrap_or_default();
 
         Ok(remaining > 0 && remaining.unsigned_abs() > amount.to_u64())
     }
 
-    async fn decrease_remaining_budget(
-        redis: &mut MultiplexedConnection,
-        campaign: CampaignId,
-        amount: UnifiedNum,
-    ) -> Result<i64, RedisError> {
-        let key = format!("{}:{}", CAMPAIGN_REMAINING_KEY, campaign);
-
-        let remaining = redis::cmd("DECRBY")
-            .arg(&key)
-            .arg(amount.to_u64())
-            .query_async::<_, i64>(redis)
-            .await?;
-
-        Ok(remaining)
-    }
-
     #[cfg(test)]
     mod test {
         use primitives::util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN};
+        use redis::aio::MultiplexedConnection;
 
         use crate::db::{
             redis_pool::TESTS_POOL,
@@ -605,27 +585,13 @@ pub mod insert_events {
 
         use super::*;
 
-        /// Helper function to get the Campaign Remaining budget in Redis for the tests
-        async fn get_campaign_remaining(
-            redis: &mut MultiplexedConnection,
-            campaign: CampaignId,
-        ) -> Option<i64> {
-            let key = format!("{}:{}", CAMPAIGN_REMAINING_KEY, campaign);
-
-            redis::cmd("GET")
-                .arg(&key)
-                .query_async(redis)
-                .await
-                .expect("Should set Campaign remaining key")
-        }
-
         /// Helper function to set the Campaign Remaining budget in Redis for the tests
         async fn set_campaign_remaining(
             redis: &mut MultiplexedConnection,
             campaign: CampaignId,
             remaining: i64,
         ) {
-            let key = format!("{}:{}", CAMPAIGN_REMAINING_KEY, campaign);
+            let key = CampaignRemaining::get_key(campaign);
 
             redis::cmd("SET")
                 .arg(&key)
@@ -638,12 +604,14 @@ pub mod insert_events {
         #[tokio::test]
         async fn test_has_enough_remaining_budget() {
             let mut redis = TESTS_POOL.get().await.expect("Should get redis connection");
+            let campaign_remaining = CampaignRemaining::new(redis.connection.clone());
             let campaign = DUMMY_CAMPAIGN.id;
             let amount = UnifiedNum::from(10_000);
 
-            let no_remaining_budget_set = has_enough_remaining_budget(&mut redis, campaign, amount)
-                .await
-                .expect("Should check campaign remaining");
+            let no_remaining_budget_set =
+                has_enough_remaining_budget(&campaign_remaining, campaign, amount)
+                    .await
+                    .expect("Should check campaign remaining");
             assert!(
                 !no_remaining_budget_set,
                 "No remaining budget set, should return false"
@@ -652,7 +620,7 @@ pub mod insert_events {
             set_campaign_remaining(&mut redis, campaign, 9_000).await;
 
             let not_enough_remaining_budget =
-                has_enough_remaining_budget(&mut redis, campaign, amount)
+                has_enough_remaining_budget(&campaign_remaining, campaign, amount)
                     .await
                     .expect("Should check campaign remaining");
             assert!(
@@ -663,7 +631,7 @@ pub mod insert_events {
             set_campaign_remaining(&mut redis, campaign, 11_000).await;
 
             let has_enough_remaining_budget =
-                has_enough_remaining_budget(&mut redis, campaign, amount)
+                has_enough_remaining_budget(&campaign_remaining, campaign, amount)
                     .await
                     .expect("Should check campaign remaining");
 
@@ -677,11 +645,13 @@ pub mod insert_events {
         async fn test_decreasing_remaining_budget() {
             let mut redis = TESTS_POOL.get().await.expect("Should get redis connection");
             let campaign = DUMMY_CAMPAIGN.id;
+            let campaign_remaining = CampaignRemaining::new(redis.connection.clone());
             let amount = UnifiedNum::from(5_000);
 
             set_campaign_remaining(&mut redis, campaign, 9_000).await;
 
-            let remaining = decrease_remaining_budget(&mut redis, campaign, amount)
+            let remaining = campaign_remaining
+                .decrease_by(campaign, amount)
                 .await
                 .expect("Should decrease campaign remaining");
             assert_eq!(
@@ -689,7 +659,8 @@ pub mod insert_events {
                 "Should decrease remaining budget with amount and be positive"
             );
 
-            let remaining = decrease_remaining_budget(&mut redis, campaign, amount)
+            let remaining = campaign_remaining
+                .decrease_by(campaign, amount)
                 .await
                 .expect("Should decrease campaign remaining");
             assert_eq!(
@@ -702,6 +673,7 @@ pub mod insert_events {
         async fn test_spending_for_events_with_enough_remaining_budget() {
             let mut redis = TESTS_POOL.get().await.expect("Should get redis connection");
             let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
+            let campaign_remaining = CampaignRemaining::new(redis.connection.clone());
 
             setup_test_migrations(database.pool.clone())
                 .await
@@ -719,7 +691,7 @@ pub mod insert_events {
             {
                 let spend_event = spend_for_event(
                     &database.pool,
-                    redis.connection.clone(),
+                    &campaign_remaining,
                     &campaign,
                     publisher,
                     leader,
@@ -745,7 +717,7 @@ pub mod insert_events {
 
                 let spend_event = spend_for_event(
                     &database.pool,
-                    redis.connection.clone(),
+                    &campaign_remaining,
                     &campaign,
                     publisher,
                     leader,
@@ -765,8 +737,9 @@ pub mod insert_events {
                 // Follower fee: 100
                 // Follower payout: 300 * 100 / 1000 = 30
                 assert_eq!(
-                    10_640_i64,
-                    get_campaign_remaining(&mut redis.connection, campaign.id)
+                    Some(10_640_i64),
+                    campaign_remaining
+                        .get_remaining_opt(campaign.id)
                         .await
                         .expect("Should have key")
                 )
