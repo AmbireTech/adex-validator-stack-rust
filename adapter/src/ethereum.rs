@@ -149,8 +149,8 @@ impl Adapter for EthereumAdapter {
         Ok(())
     }
 
-    fn whoami(&self) -> &ValidatorId {
-        &self.address
+    fn whoami(&self) -> ValidatorId {
+        self.address
     }
 
     fn sign(&self, state_root: &str) -> AdapterResult<String, Self::AdapterError> {
@@ -263,7 +263,7 @@ impl Adapter for EthereumAdapter {
             address: self.whoami().to_checksum(),
         };
 
-        ewt_sign(&wallet, &self.keystore_pwd, &payload)
+        ewt_sign(wallet, &self.keystore_pwd, &payload)
             .map_err(|err| AdapterError::Adapter(Error::SignMessage(err).into()))
     }
 
@@ -401,8 +401,8 @@ fn hash_message(message: &[u8]) -> [u8; 32] {
     let message_length = message.len();
 
     let mut result = Keccak::new_keccak256();
-    result.update(&format!("{}{}", eth, message_length).as_bytes());
-    result.update(&message);
+    result.update(format!("{}{}", eth, message_length).as_bytes());
+    result.update(message);
 
     let mut res: [u8; 32] = [0; 32];
     result.finalize(&mut res);
@@ -453,7 +453,7 @@ pub fn ewt_sign(
         base64::URL_SAFE_NO_PAD,
     );
     let message = Message::from(hash_message(
-        &format!("{}.{}", header_encoded, payload_encoded).as_bytes(),
+        format!("{}.{}", header_encoded, payload_encoded).as_bytes(),
     ));
     let signature: Signature = signer
         .sign(password, &message)
@@ -475,7 +475,7 @@ pub fn ewt_verify(
     token: &str,
 ) -> Result<VerifyPayload, EwtVerifyError> {
     let message = Message::from(hash_message(
-        &format!("{}.{}", header_encoded, payload_encoded).as_bytes(),
+        format!("{}.{}", header_encoded, payload_encoded).as_bytes(),
     ));
 
     let decoded_signature = base64::decode_config(&token, base64::URL_SAFE_NO_PAD)

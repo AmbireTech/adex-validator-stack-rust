@@ -69,14 +69,18 @@ impl<S: BalancesState> Balances<S> {
         Ok(())
     }
 
-    /// Adds the spender to the Balances with `UnifiedNum::from(0)` if he does not exist
+    /// Adds the spender to the Balances with `0` if he does not exist
     pub fn add_spender(&mut self, spender: Address) {
-        self.spenders.entry(spender).or_insert(UnifiedNum::from(0));
+        self.spenders
+            .entry(spender)
+            .or_insert_with(UnifiedNum::default);
     }
 
-    /// Adds the earner to the Balances with `UnifiedNum::from(0)` if he does not exist
+    /// Adds the earner to the Balances with `0` if he does not exist
     pub fn add_earner(&mut self, earner: Address) {
-        self.earners.entry(earner).or_insert(UnifiedNum::from(0));
+        self.earners
+            .entry(earner)
+            .or_insert_with(UnifiedNum::default);
     }
 }
 

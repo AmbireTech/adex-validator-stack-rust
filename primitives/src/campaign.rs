@@ -318,7 +318,7 @@ pub mod validators {
         }
 
         pub fn iter(&self) -> Iter<'_> {
-            Iter::new(&self)
+            Iter::new(self)
         }
     }
 

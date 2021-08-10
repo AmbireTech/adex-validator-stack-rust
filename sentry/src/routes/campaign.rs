@@ -85,13 +85,13 @@ pub async fn create_campaign<A: Adapter>(
             let latest_spendable =
                 fetch_spendable(app.pool.clone(), &campaign.creator, &campaign.channel.id())
                     .await?
-                    .ok_or(ResponseError::BadRequest(
+                    .ok_or_else(|| ResponseError::BadRequest(
                         "No spendable amount found for the Campaign creator".to_string(),
                     ))?;
             // Gets the latest Spendable for this (spender, channelId) pair
             let total_deposited = latest_spendable.deposit.total;
 
-            total_deposited.checked_sub(&accounting_spent).ok_or(
+            total_deposited.checked_sub(&accounting_spent).ok_or_else(||
                 ResponseError::FailedValidation("No more budget remaining".to_string()),
             )?
         };
@@ -113,7 +113,9 @@ pub async fn create_campaign<A: Adapter>(
         .checked_add(&campaign.budget)
         .ok_or(Error::Calculation)?;
 
-    if !(campaigns_remaining_sum <= total_remaining) || campaign.budget > total_remaining {
+    // `new_campaigns_remaining <= total_remaining` should be upheld
+    // `campaign.budget < total_remaining` should also be upheld!
+    if campaigns_remaining_sum > total_remaining || campaign.budget > total_remaining {
         return Err(ResponseError::BadRequest(
             "Not enough deposit left for the new campaign's budget".to_string(),
         ));
@@ -232,7 +234,7 @@ pub mod update_campaign {
             let total_remaining = total_deposited
                 .checked_sub(&accounting_spent)
                 .ok_or(Error::Calculation)?;
-            let channel_campaigns = get_campaigns_by_channel(&pool, &campaign.channel.id())
+            let channel_campaigns = get_campaigns_by_channel(pool, &campaign.channel.id())
                 .await?
                 .iter()
                 .map(|c| c.id)
@@ -257,7 +259,8 @@ pub mod update_campaign {
             }
             .ok_or(Error::Calculation)?;
 
-            if !(new_campaigns_remaining <= total_remaining) {
+            // `new_campaigns_remaining <= total_remaining` should be upheld
+            if new_campaigns_remaining > total_remaining {
                 return Err(Error::NewBudget(
                     "Not enough deposit left for the campaign's new budget".to_string(),
                 ));
@@ -280,7 +283,7 @@ pub mod update_campaign {
         }
 
         let modified_campaign = modify_campaign.apply(campaign);
-        update_campaign(&pool, &modified_campaign).await?;
+        update_campaign(pool, &modified_campaign).await?;
 
         Ok(modified_campaign)
     }
@@ -312,7 +315,7 @@ pub mod update_campaign {
             .get_remaining_opt(campaign.id)
             .await?
             .map(|remaining| UnifiedNum::from(max(0, remaining).unsigned_abs()))
-            .ok_or(Error::FailedUpdate(
+            .ok_or_else(|| Error::FailedUpdate(
                 "No remaining entry for campaign".to_string(),
             ))?;
 
@@ -349,7 +352,7 @@ pub mod update_campaign {
                     .ok_or(Error::Calculation)?;
                 // old remaining > new remaining
                 let decrease_by = old_remaining
-                    .checked_sub(&new_remaining)
+                    .checked_sub(new_remaining)
                     .ok_or(Error::Calculation)?;
 
                 DeltaBudget::Decrease(decrease_by)
@@ -457,7 +460,7 @@ pub mod insert_events {
             session,
             auth,
             &app.config.ip_rate_limit,
-            &campaign,
+            campaign,
             &events,
         )
         .await
@@ -489,7 +492,7 @@ pub mod insert_events {
                     Some((earner, payout)) => spend_for_event(
                         &app.pool,
                         app.redis.clone(),
-                        &campaign,
+                        campaign,
                         earner,
                         leader,
                         follower,
@@ -520,9 +523,9 @@ pub mod insert_events {
     ) -> Result<(), Error> {
         // distribute fees
         let leader_fee =
-            calculate_fee((earner, amount), &leader).map_err(EventError::FeeCalculation)?;
+            calculate_fee((earner, amount), leader).map_err(EventError::FeeCalculation)?;
         let follower_fee =
-            calculate_fee((earner, amount), &follower).map_err(EventError::FeeCalculation)?;
+            calculate_fee((earner, amount), follower).map_err(EventError::FeeCalculation)?;
 
         // First update redis `campaignRemaining:{CampaignId}` key
         let spending = [amount, leader_fee, follower_fee]

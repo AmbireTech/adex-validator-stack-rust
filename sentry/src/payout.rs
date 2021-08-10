@@ -35,7 +35,7 @@ pub fn get_payout(
         } => {
             let targeting_rules = campaign.targeting_rules.clone();
 
-            let pricing = get_pricing_bounds(&campaign, &event_type);
+            let pricing = get_pricing_bounds(campaign, &event_type);
 
             if targeting_rules.is_empty() {
                 Ok(Some((*publisher, pricing.min)))

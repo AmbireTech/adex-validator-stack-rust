@@ -40,7 +40,7 @@ pub async fn check_access(
     let auth_uid = auth.map(|auth| auth.uid.to_string()).unwrap_or_default();
 
     // Rules for events
-    if forbidden_country(&session) || forbidden_referrer(&session) {
+    if forbidden_country(session) || forbidden_referrer(session) {
         return Err(Error::ForbiddenReferrer);
     }
 
@@ -79,11 +79,11 @@ pub async fn check_access(
     let apply_all_rules = try_join_all(rules.iter().map(|rule| {
         apply_rule(
             redis.clone(),
-            &rule,
-            &events,
-            &campaign,
+            rule,
+            events,
+            campaign,
             &auth_uid,
-            &session,
+            session,
         )
     }));
 
