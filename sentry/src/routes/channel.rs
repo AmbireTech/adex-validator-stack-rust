@@ -2,7 +2,7 @@ use crate::db::{
     event_aggregate::{latest_approve_state, latest_heartbeats, latest_new_state, latest_new_state_v5, latest_approve_state_v5},
     spendable::{fetch_spendable, update_spendable},
     get_channel_by_id, insert_channel, insert_validator_messages, list_channels,
-    update_exhausted_channel, PoolError, DbPool
+    update_exhausted_channel, PoolError
 };
 use crate::{success_response, Application, Auth, ResponseError, RouteParams};
 use futures::future::try_join_all;
@@ -17,7 +17,7 @@ use primitives::{
     spender::{Spendable, Deposit},
     validator::MessageTypes,
     channel_v5::Channel as ChannelV5,
-    Address, Channel, ChannelId, UnifiedNum
+    Address, BigNum, Channel, ChannelId, UnifiedNum
 };
 use slog::error;
 use std::{
@@ -235,24 +235,34 @@ pub async fn create_validator_messages<A: Adapter + 'static>(
     }
 }
 
-// TODO: Maybe use a different error for helper functions like in campaign routes/move this somewhere else?
-async fn create_spendable_document<A: Adapter>(adapter: &A, pool: DbPool, channel: &ChannelV5, spender: &Address) -> Result<Spendable, ResponseError> {
-    let deposit = adapter.get_deposit(&channel, &spender).await?;
+async fn create_spendable_document<A: Adapter + 'static>(app: &Application<A>, channel: &ChannelV5, spender: &Address) -> Result<Spendable, ResponseError> {
+    let deposit = app.adapter.get_deposit(&channel, &spender).await?;
+    let token_info = app.config.token_address_whitelist.get(&channel.token).ok_or_else(|| ResponseError::BadRequest("channel has invalid token".to_string()))?; // I don't think this error can happen
+    let divisor = 10u64.pow(token_info.precision.get().into());
+    let total = UnifiedNum::from_u64(deposit.total.div_floor(&BigNum::from(divisor)).to_u64().expect("should convert"));
+    let still_on_create2 = UnifiedNum::from_u64(deposit.still_on_create2.div_floor(&BigNum::from(divisor)).to_u64().expect("should convert"));
+
     let spendable = Spendable {
         channel: channel.clone(),
         deposit: Deposit {
-            total: UnifiedNum::from_u64(deposit.total.to_u64().expect("Todo")),
-            still_on_create2: UnifiedNum::from_u64(deposit.still_on_create2.to_u64().expect("Todo")),
+            total,
+            still_on_create2,
         },
         spender: spender.clone(),
     };
 
     // Insert latest spendable in DB
-    update_spendable(pool, &spendable).await?;
-
-    // TODO: Check and handle the case if an error is encountered after the insertion (ex: During total_spent calculations)
+    update_spendable(app.pool.clone(), &spendable).await?;
 
     Ok(spendable)
+}
+
+fn spender_response_without_leaf(total: UnifiedNum) -> Result<Response<Body>, ResponseError> {
+    let res = SpenderResponse {
+        total,
+        spender_leaf: None,
+    };
+    Ok(success_response(serde_json::to_string(&res)?))
 }
 
 pub async fn get_spender_limits<A: Adapter + 'static>(
@@ -273,50 +283,33 @@ pub async fn get_spender_limits<A: Adapter + 'static>(
     let channel_id = channel.id();
     let spender = Address::from_str(&route_params.index(1))?;
 
-    let default_response = Response::builder()
-        .header("Content-type", "application/json")
-        .body(
-            serde_json::to_string(&SpenderResponse {
-                total: UnifiedNum::from_u64(0),
-                spender_leaf: None,
-            })?
-            .into(),
-        )
-        .expect("should build response");
-
     let latest_spendable = fetch_spendable(app.pool.clone(), &spender, &channel_id)
         .await?;
     let latest_spendable = match latest_spendable {
         Some(spendable) => spendable,
-        None => create_spendable_document(&app.adapter, app.pool.clone(), &channel, &spender).await?,
+        None => create_spendable_document(&app, &channel, &spender).await?,
     };
 
     let total = latest_spendable.deposit.total.checked_add(&latest_spendable.deposit.still_on_create2).ok_or_else(|| ResponseError::BadRequest("Total Deposited is too large".to_string()))?;
     let approve_state = match latest_approve_state_v5(&app.pool, &channel).await? {
         Some(approve_state) => approve_state,
-        None => return Ok(SpenderResponse {
-            total,
-            spender_leaf: None,
-        }),
+        None => return spender_response_without_leaf(total),
     };
 
     let state_root = approve_state.msg.state_root.clone();
 
     let new_state = match latest_new_state_v5(&app.pool, &channel, &state_root).await? {
         Some(new_state) => new_state,
-        None => return Ok(SpenderResponse {
-            total,
-            spenderleaf: None,
-        }),
+        None => return spender_response_without_leaf(total),
     };
 
     // Calculate total_spent
     // TODO: Update NewState & ApproveState with the new Balances::<CheckedState>
     let total_spent = new_state.msg.balances.get(&spender); // TODO replace balances with balances.spenders once new struct is ready
 
-    let spender_leaf = match (total_spent) {
+    let spender_leaf = match total_spent {
         Some(total_spent) => Some(SpenderLeaf {
-            total_spent,
+            total_spent: UnifiedNum::from_u64(total_spent.to_u64().expect("todo: replace")),
             // merkle_proof: [u8; 32], // TODO
         }),
         None => None
