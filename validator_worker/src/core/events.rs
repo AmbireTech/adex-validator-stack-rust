@@ -59,9 +59,9 @@ fn _merge_payouts_into_balances<'a, T: Iterator<Item = &'a AggregateEvents>>(
 
         let new_balance = new_balances.entry(*acc).or_insert_with(|| 0.into());
 
-        *new_balance += &to_add;
+        *new_balance += to_add;
 
-        remaining = remaining.checked_sub(&to_add).ok_or_else(|| {
+        remaining = remaining.checked_sub(to_add).ok_or_else(|| {
             DomainError::RuleViolation("remaining must never be negative".to_string())
         })?;
     }

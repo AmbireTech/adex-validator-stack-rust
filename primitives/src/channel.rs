@@ -238,9 +238,9 @@ impl SpecValidators {
 
     pub fn find(&self, validator_id: &ValidatorId) -> Option<SpecValidator<'_>> {
         if &self.leader().id == validator_id {
-            Some(SpecValidator::Leader(&self.leader()))
+            Some(SpecValidator::Leader(self.leader()))
         } else if &self.follower().id == validator_id {
-            Some(SpecValidator::Follower(&self.follower()))
+            Some(SpecValidator::Follower(self.follower()))
         } else {
             None
         }
@@ -257,7 +257,7 @@ impl SpecValidators {
     }
 
     pub fn iter(&self) -> Iter<'_> {
-        Iter::new(&self)
+        Iter::new(self)
     }
 }
 

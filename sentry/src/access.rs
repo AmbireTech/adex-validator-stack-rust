@@ -13,7 +13,7 @@ use thiserror::Error;
 
 #[derive(Debug, PartialEq, Eq, Error)]
 pub enum Error {
-    #[error("channel is expired")]
+    #[error("Campaign is expired")]
     CampaignIsExpired,
     #[error("event submission restricted")]
     ForbiddenReferrer,
@@ -37,17 +37,10 @@ pub async fn check_access(
     if current_time > campaign.active.to {
         return Err(Error::CampaignIsExpired);
     }
-
-    let (is_creator, auth_uid) = match auth {
-        Some(auth) => (
-            auth.uid.to_address() == campaign.creator,
-            auth.uid.to_string(),
-        ),
-        None => (false, Default::default()),
-    };
+    let auth_uid = auth.map(|auth| auth.uid.to_string()).unwrap_or_default();
 
     // Rules for events
-    if forbidden_country(&session) || forbidden_referrer(&session) {
+    if forbidden_country(session) || forbidden_referrer(session) {
         return Err(Error::ForbiddenReferrer);
     }
 
@@ -83,22 +76,13 @@ pub async fn check_access(
         return Ok(());
     }
 
-    let apply_all_rules = try_join_all(rules.iter().map(|rule| {
-        apply_rule(
-            redis.clone(),
-            &rule,
-            &events,
-            &campaign,
-            &auth_uid,
-            &session,
-        )
-    }));
+    let apply_all_rules = try_join_all(
+        rules
+            .iter()
+            .map(|rule| apply_rule(redis.clone(), rule, events, campaign, &auth_uid, session)),
+    );
 
-    if let Err(rule_error) = apply_all_rules.await {
-        Err(Error::RulesError(rule_error))
-    } else {
-        Ok(())
-    }
+    apply_all_rules.await.map_err(Error::RulesError).map(|_| ())
 }
 
 async fn apply_rule(
@@ -188,9 +172,8 @@ mod test {
         config::configuration,
         event_submission::{RateLimit, Rule},
         sentry::Event,
-        targeting::Rules,
-        util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, DUMMY_CHANNEL, IDS},
-        Channel, Config, EventSubmission,
+        util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, IDS},
+        Config, EventSubmission,
     };
 
     use deadpool::managed::Object;

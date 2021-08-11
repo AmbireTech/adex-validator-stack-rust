@@ -88,7 +88,7 @@ pub async fn channel_list<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
-    let query = serde_urlencoded::from_str::<ChannelListQuery>(&req.uri().query().unwrap_or(""))?;
+    let query = serde_urlencoded::from_str::<ChannelListQuery>(req.uri().query().unwrap_or(""))?;
     let skip = query
         .page
         .checked_mul(app.config.channels_find_limit.into())
@@ -154,7 +154,7 @@ pub async fn last_approved<A: Adapter>(
         return Ok(default_response);
     }
 
-    let query = serde_urlencoded::from_str::<LastApprovedQuery>(&req.uri().query().unwrap_or(""))?;
+    let query = serde_urlencoded::from_str::<LastApprovedQuery>(req.uri().query().unwrap_or(""))?;
     let validators = channel.spec.validators;
     let channel_id = channel.id;
     let heartbeats = if query.with_heartbeat.is_some() {
@@ -218,7 +218,7 @@ pub async fn create_validator_messages<A: Adapter + 'static>(
         None => Err(ResponseError::Unauthorized),
         _ => {
             try_join_all(messages.iter().map(|message| {
-                insert_validator_messages(&app.pool, &channel, &session.uid, &message)
+                insert_validator_messages(&app.pool, &channel, &session.uid, message)
             }))
             .await?;
 

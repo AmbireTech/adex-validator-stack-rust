@@ -27,7 +27,7 @@ impl ValidatorId {
     }
 
     pub fn inner(&self) -> &[u8; 20] {
-        &self.0.as_bytes()
+        self.0.as_bytes()
     }
 }
 
@@ -39,6 +39,12 @@ impl From<&Address> for ValidatorId {
     }
 }
 
+impl From<Address> for ValidatorId {
+    fn from(address: Address) -> Self {
+        Self(address)
+    }
+}
+
 impl From<&[u8; 20]> for ValidatorId {
     fn from(bytes: &[u8; 20]) -> Self {
         Self(Address::from(bytes))
@@ -47,7 +53,7 @@ impl From<&[u8; 20]> for ValidatorId {
 
 impl AsRef<[u8]> for ValidatorId {
     fn as_ref(&self) -> &[u8] {
-        &self.0.as_ref()
+        self.0.as_ref()
     }
 }
 

@@ -57,7 +57,7 @@ impl Validator for Campaign {
             return Err(Validation::UnlistedValidator.into());
         }
 
-        if !creator_listed(&self, &config.creators_whitelist) {
+        if !creator_listed(self, &config.creators_whitelist) {
             return Err(Validation::UnlistedCreator.into());
         }
 
