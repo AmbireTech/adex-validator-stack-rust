@@ -303,19 +303,21 @@ pub async fn get_spender_limits<A: Adapter + 'static>(
         None => return spender_response_without_leaf(total),
     };
 
-    // Calculate total_spent
-    // TODO: Update NewState & ApproveState with the new Balances::<CheckedState>
-    let total_spent = new_state.msg.balances.get(&spender); // TODO replace balances with balances.spenders once new struct is ready
+    // TODO: Temporary until NewState uses Balances<CheckedState>
+    let token_info = app.config.token_address_whitelist.get(&channel.token).ok_or_else(|| ResponseError::BadRequest("channel has invalid token".to_string()))?;
+    let divisor = 10u64.pow(token_info.precision.get().into());
 
-    let spender_leaf = match total_spent {
-        Some(total_spent) => Some(SpenderLeaf {
-            total_spent: UnifiedNum::from_u64(total_spent.to_u64().expect("todo: replace")),
-            // merkle_proof: [u8; 32], // TODO
-        }),
-        None => None
+    let total_spent = match new_state.msg.balances.get(&spender) {
+        Some(amount) => UnifiedNum::from_u64(amount.div_floor(&BigNum::from(divisor)).to_u64().expect("should convert")),
+        None => UnifiedNum::from_u64(0),
     };
 
-    // Return
+    let spender_leaf = Some(SpenderLeaf {
+        total_spent,
+        //merkle_proof: [u8; 32], // TODO
+    });
+
+    // returned output
     let res = SpenderResponse {
         total,
         spender_leaf,
