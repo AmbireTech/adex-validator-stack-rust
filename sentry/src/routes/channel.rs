@@ -17,7 +17,7 @@ use primitives::{
     spender::{Spendable, Deposit},
     validator::MessageTypes,
     channel_v5::Channel as ChannelV5,
-    Address, BigNum, Channel, ChannelId, UnifiedNum
+    Address, Channel, ChannelId, UnifiedNum
 };
 use slog::error;
 use std::{
@@ -238,9 +238,13 @@ pub async fn create_validator_messages<A: Adapter + 'static>(
 async fn create_spendable_document<A: Adapter + 'static>(app: &Application<A>, channel: &ChannelV5, spender: &Address) -> Result<Spendable, ResponseError> {
     let deposit = app.adapter.get_deposit(&channel, &spender).await?;
     let token_info = app.config.token_address_whitelist.get(&channel.token).ok_or_else(|| ResponseError::BadRequest("channel has invalid token".to_string()))?; // I don't think this error can happen
-    let divisor = 10u64.pow(token_info.precision.get().into());
-    let total = UnifiedNum::from_u64(deposit.total.div_floor(&BigNum::from(divisor)).to_u64().expect("should convert"));
-    let still_on_create2 = UnifiedNum::from_u64(deposit.still_on_create2.div_floor(&BigNum::from(divisor)).to_u64().expect("should convert"));
+    let total = UnifiedNum::from_precision(&deposit.total, token_info.precision.get());
+    let still_on_create2 = UnifiedNum::from_precision(&deposit.still_on_create2, token_info.precision.get());
+
+    let (total, still_on_create2) = match (total, still_on_create2) {
+        (Some(total), Some(still_on_create2)) => (total, still_on_create2),
+        _ => return Err(ResponseError::BadRequest("couldn't get deposit from precision".to_string())),
+    };
 
     let spendable = Spendable {
         channel: channel.clone(),
@@ -305,17 +309,20 @@ pub async fn get_spender_limits<A: Adapter + 'static>(
 
     // TODO: Temporary until NewState uses Balances<CheckedState>
     let token_info = app.config.token_address_whitelist.get(&channel.token).ok_or_else(|| ResponseError::BadRequest("channel has invalid token".to_string()))?;
-    let divisor = 10u64.pow(token_info.precision.get().into());
 
     let total_spent = match new_state.msg.balances.get(&spender) {
-        Some(amount) => UnifiedNum::from_u64(amount.div_floor(&BigNum::from(divisor)).to_u64().expect("should convert")),
-        None => UnifiedNum::from_u64(0),
+        Some(amount) => UnifiedNum::from_precision(amount, token_info.precision.get()),
+        None => Some(UnifiedNum::from_u64(0)),
     };
 
-    let spender_leaf = Some(SpenderLeaf {
-        total_spent,
-        //merkle_proof: [u8; 32], // TODO
-    });
+
+    let spender_leaf = match total_spent {
+        Some(total_spent) => Some(SpenderLeaf {
+            total_spent,
+            //merkle_proof: [u8; 32], // TODO
+        }),
+        None => None,
+    };
 
     // returned output
     let res = SpenderResponse {

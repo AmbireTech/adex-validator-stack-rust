@@ -127,6 +127,13 @@ impl UnifiedNum {
         }
     }
 
+    pub fn from_precision(amount: &BigNum, precision: u8) -> Option<Self> {
+        let divisor = 10u64.pow(precision.into());
+        let value = amount.div_floor(&BigNum::from(divisor)).to_u64().map(Self);
+
+        value
+    }
+
     pub fn to_float_string(self) -> String {
         let mut string_value = self.0.to_string();
         let value_length = string_value.len();

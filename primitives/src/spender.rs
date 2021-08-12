@@ -18,19 +18,6 @@ pub struct Spendable {
     pub deposit: Deposit,
 }
 
-impl From<&Row> for Spendable {
-    fn from(row: &Row) -> Self {
-        Self {
-            spender: row.get("spender"),
-            channel: row.get("channel"),
-            deposit: Deposit {
-                total: row.get("total"),
-                still_on_create2: row.get("still_on_create2")
-            },
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Aggregate {
@@ -41,23 +28,19 @@ pub struct Aggregate {
 }
 #[cfg(feature = "postgres")]
 mod postgres {
-    use std::convert::TryFrom;
-    use tokio_postgres::Error;
-
     use super::*;
 
-    impl TryFrom<Row> for Spendable {
-        type Error = Error;
 
-        fn try_from(row: Row) -> Result<Self, Self::Error> {
-            Ok(Spendable {
-                spender: row.try_get("spender")?,
-                channel: row.try_get("channel")?,
+    impl From<Row> for Spendable {
+        fn from(row: Row) -> Self {
+            Self {
+                spender: row.get("spender"),
+                channel: row.get("channel"),
                 deposit: Deposit {
-                    total: row.try_get("total")?,
-                    still_on_create2: row.try_get("still_on_create2")?,
+                    total: row.get("total"),
+                    still_on_create2: row.get("still_on_create2")
                 },
-            })
+            }
         }
     }
 }

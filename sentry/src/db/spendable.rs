@@ -1,5 +1,3 @@
-use std::convert::TryFrom;
-
 use primitives::{spender::Spendable, Address, ChannelId};
 
 use super::{DbPool, PoolError};
@@ -43,13 +41,12 @@ pub async fn fetch_spendable(
 
     let row = client.query_opt(&statement, &[spender, channel_id]).await?;
 
-    Ok(row.map(Spendable::try_from).transpose()?)
+    Ok(row.map(Spendable::from))
 }
 
-/// ```text
-///
-/// ```
 static UPDATE_SPENDABLE_STATEMENT: &str = "INSERT INTO spendable(spender, channel_id, channel, total, still_on_create2) VALUES($1, $2, $3, $4, $5) ON CONFLICT ON CONSTRAINT spendable_pkey DO UPDATE SET total = $4, still_on_create2 = $5 WHERE spendable.spender = $1 AND spendable.channel_id = $2 RETURNING spender, channel_id, channel, total, still_on_create2";
+
+// Updates spendable entry deposit or inserts a new spendable entry if it doesn't exist
 pub async fn update_spendable(
     pool: DbPool,
     spendable: &Spendable,
@@ -64,7 +61,7 @@ pub async fn update_spendable(
         )
         .await?;
 
-    Ok(Spendable::from(&row))
+    Ok(Spendable::from(row))
 }
 
 #[cfg(test)]
