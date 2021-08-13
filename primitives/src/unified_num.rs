@@ -121,7 +121,11 @@ impl UnifiedNum {
     pub fn to_precision(self, precision: u8) -> BigNum {
         let inner = BigNum::from(self.0);
 
-        Self::to_unified_precision(inner, precision)
+        match precision.cmp(&Self::PRECISION) {
+            Ordering::Equal => inner,
+            Ordering::Less => inner.div_floor(&BigNum::from(10).pow(Self::PRECISION - precision)),
+            Ordering::Greater => inner.mul(&BigNum::from(10).pow(precision - Self::PRECISION)),
+        }
     }
 
     /// Transform the BigNum of a given precision to UnifiedNum with precision 8
@@ -129,19 +133,13 @@ impl UnifiedNum {
     pub fn from_precision(amount: BigNum, precision: u8) -> Option<Self> {
         // conversation to the UnifiedNum precision is happening with BigNum
         // only at the end, see if it fits in `u64`
-        Self::to_unified_precision(amount, precision)
-            .to_u64()
-            .map(Self)
-    }
 
-    // converts a given BigNum with precision to a `UnifiedNum::PRECISION`
-    // returning the result in BigNum
-    fn to_unified_precision(amount: BigNum, precision: u8) -> BigNum {
-        match precision.cmp(&Self::PRECISION) {
+        let from_precision = match precision.cmp(&Self::PRECISION) {
             Ordering::Equal => amount,
-            Ordering::Less => amount.div_floor(&BigNum::from(10).pow(Self::PRECISION - precision)),
-            Ordering::Greater => amount.mul(&BigNum::from(10).pow(precision - Self::PRECISION)),
-        }
+            Ordering::Less => amount.mul(&BigNum::from(10).pow(Self::PRECISION - precision)),
+            Ordering::Greater => amount.div_floor(&BigNum::from(10).pow(precision - Self::PRECISION)),
+        };
+        from_precision.to_u64().map(Self)
     }
 
     pub fn to_float_string(self) -> String {
@@ -415,10 +413,10 @@ mod test {
 
         // `u64::MAX + 1` should return `None`
         let larger_bignum = BigNum::from(u64::MAX) + BigNum::from(1);
-        assert!(UnifiedNum::from_precision(larger_bignum.clone(), dai_precision).is_none());
+        assert!(UnifiedNum::from_precision(larger_bignum.clone(), same_precision).is_none());
         assert_eq!(
             Some(UnifiedNum::from(184467440737095516)),
-            UnifiedNum::from_precision(larger_bignum, usdt_precision),
+            UnifiedNum::from_precision(larger_bignum, 10),
             "Should floor the large BigNum"
         );
     }
