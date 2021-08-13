@@ -240,7 +240,6 @@ async fn create_spendable_document<A: Adapter + 'static>(app: &Application<A>, c
     let token_info = app.config.token_address_whitelist.get(&channel.token).ok_or_else(|| ResponseError::BadRequest("channel has invalid token".to_string()))?; // I don't think this error can happen
     let total = UnifiedNum::from_precision(deposit.total, token_info.precision.get());
     let still_on_create2 = UnifiedNum::from_precision(deposit.still_on_create2, token_info.precision.get());
-
     let (total, still_on_create2) = match (total, still_on_create2) {
         (Some(total), Some(still_on_create2)) => (total, still_on_create2),
         _ => return Err(ResponseError::BadRequest("couldn't get deposit from precision".to_string())),
@@ -363,7 +362,10 @@ mod test {
         .await
         .expect("Migrations should succeed");
         let mut channel = DUMMY_CAMPAIGN.channel.clone();
-        channel.token = Address::from_str("0x509ee0d083ddf8ac028f2a56731412edd63223b9").expect("should generate an address");
+        let token_address = Address::from_str("0x509ee0d083ddf8ac028f2a56731412edd63223b9").expect("should generate");
+        let token_info = config.token_address_whitelist.get(&token_address).expect("should retrieve address");
+        let precision: u8 = token_info.precision.into();
+        channel.token = token_address;
         let deposit = Deposit {
             total: BigNum::from(1000000000),
             still_on_create2: BigNum::from(1000000),
@@ -386,8 +388,11 @@ mod test {
         // Call create_spendable
         let new_spendable = create_spendable_document(&app, &channel, &ADDRESSES["creator"]).await.expect("should create a new spendable");
         assert_eq!(new_spendable.channel.id(), channel.id());
-        // assert_eq!(new_spendable.deposit.total, UnifiedNum::from_u64(deposit.total.to_u64().expect("should convert")));
-        assert_eq!(new_spendable.deposit.still_on_create2, UnifiedNum::from_u64(deposit.still_on_create2.to_u64().expect("should convert")));
+
+        let total_as_unified_num = UnifiedNum::from_precision(deposit.total, precision).expect("should convert");
+        let still_on_create2_unified = UnifiedNum::from_precision(deposit.still_on_create2, precision).expect("should convert");
+        assert_eq!(new_spendable.deposit.total, total_as_unified_num);
+        assert_eq!(new_spendable.deposit.still_on_create2, still_on_create2_unified);
         assert_eq!(new_spendable.spender, ADDRESSES["creator"]);
 
         // Make sure spendable NOW exists
