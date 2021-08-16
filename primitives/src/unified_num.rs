@@ -132,13 +132,14 @@ impl UnifiedNum {
     /// If the resulting value is larger that what UnifiedNum can hold, it will return `None`
     pub fn from_precision(amount: BigNum, precision: u8) -> Option<Self> {
         // conversation to the UnifiedNum precision is happening with BigNum
-        // only at the end, see if it fits in `u64`
-
         let from_precision = match precision.cmp(&Self::PRECISION) {
             Ordering::Equal => amount,
             Ordering::Less => amount.mul(&BigNum::from(10).pow(Self::PRECISION - precision)),
-            Ordering::Greater => amount.div_floor(&BigNum::from(10).pow(precision - Self::PRECISION)),
+            Ordering::Greater => {
+                amount.div_floor(&BigNum::from(10).pow(precision - Self::PRECISION))
+            }
         };
+        // only at the end, see if it fits in `u64`
         from_precision.to_u64().map(Self)
     }
 
@@ -413,10 +414,15 @@ mod test {
 
         // `u64::MAX + 1` should return `None`
         let larger_bignum = BigNum::from(u64::MAX) + BigNum::from(1);
-        assert!(UnifiedNum::from_precision(larger_bignum.clone(), same_precision).is_none());
+
+        // USDT - 18446744073709.551616
+        assert!(UnifiedNum::from_precision(larger_bignum.clone(), usdt_precision).is_none());
+
         assert_eq!(
-            Some(UnifiedNum::from(184467440737095516)),
-            UnifiedNum::from_precision(larger_bignum, 10),
+            // DAI - 18.446744073709551616 (MAX + 1)
+            Some(UnifiedNum::from(1844674407)),
+            // UnifiedNum - 18.44674407
+            UnifiedNum::from_precision(larger_bignum, dai_precision),
             "Should floor the large BigNum"
         );
     }

@@ -1,7 +1,6 @@
 use crate::{channel_v5::Channel, Address, BalancesMap, UnifiedNum};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use tokio_postgres::Row;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -29,7 +28,7 @@ pub struct Aggregate {
 #[cfg(feature = "postgres")]
 mod postgres {
     use super::*;
-
+    use tokio_postgres::Row;
 
     impl From<Row> for Spendable {
         fn from(row: Row) -> Self {
@@ -38,7 +37,7 @@ mod postgres {
                 channel: row.get("channel"),
                 deposit: Deposit {
                     total: row.get("total"),
-                    still_on_create2: row.get("still_on_create2")
+                    still_on_create2: row.get("still_on_create2"),
                 },
             }
         }
