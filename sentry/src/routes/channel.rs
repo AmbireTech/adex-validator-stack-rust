@@ -14,7 +14,7 @@ use primitives::{
         channel_list::{ChannelListQuery, LastApprovedQuery},
         LastApproved, LastApprovedResponse, SuccessResponse, SpenderLeaf, SpenderResponse
     },
-    spender::{Spendable, Deposit},
+    spender::{Spendable, Deposit, Spender},
     validator::MessageTypes,
     channel_v5::Channel as ChannelV5,
     Address, Channel, ChannelId, UnifiedNum
@@ -251,7 +251,7 @@ async fn create_spendable_document<A: Adapter + 'static>(app: &Application<A>, c
             total,
             still_on_create2,
         },
-        spender: spender.clone(),
+        spender: *spender,
     };
 
     // Insert latest spendable in DB
@@ -260,10 +260,12 @@ async fn create_spendable_document<A: Adapter + 'static>(app: &Application<A>, c
     Ok(spendable)
 }
 
-fn spender_response_without_leaf(total: UnifiedNum) -> Result<Response<Body>, ResponseError> {
+fn spender_response_without_leaf(total_deposited: UnifiedNum) -> Result<Response<Body>, ResponseError> {
     let res = SpenderResponse {
-        total,
-        spender_leaf: None,
+        spender: Spender {
+            total_deposited,
+            spender_leaf: None,
+        },
     };
     Ok(success_response(serde_json::to_string(&res)?))
 }
@@ -293,17 +295,17 @@ pub async fn get_spender_limits<A: Adapter + 'static>(
         None => create_spendable_document(&app, &channel, &spender).await?,
     };
 
-    let total = latest_spendable.deposit.total.checked_add(&latest_spendable.deposit.still_on_create2).ok_or_else(|| ResponseError::BadRequest("Total Deposited is too large".to_string()))?;
+    let total_deposited = latest_spendable.deposit.total.checked_add(&latest_spendable.deposit.still_on_create2).ok_or_else(|| ResponseError::BadRequest("Total Deposited is too large".to_string()))?;
     let approve_state = match latest_approve_state_v5(&app.pool, &channel).await? {
         Some(approve_state) => approve_state,
-        None => return spender_response_without_leaf(total),
+        None => return spender_response_without_leaf(total_deposited),
     };
 
     let state_root = approve_state.msg.state_root.clone();
 
     let new_state = match latest_new_state_v5(&app.pool, &channel, &state_root).await? {
         Some(new_state) => new_state,
-        None => return spender_response_without_leaf(total),
+        None => return spender_response_without_leaf(total_deposited),
     };
 
     // TODO: Temporary until NewState uses Balances<CheckedState>
@@ -314,19 +316,17 @@ pub async fn get_spender_limits<A: Adapter + 'static>(
         None => Some(UnifiedNum::from_u64(0)),
     };
 
-
-    let spender_leaf = match total_spent {
-        Some(total_spent) => Some(SpenderLeaf {
-            total_spent,
-            //merkle_proof: [u8; 32], // TODO
-        }),
-        None => None,
-    };
+    let spender_leaf = total_spent.map(|total_spent| SpenderLeaf {
+        total_spent,
+        //merkle_proof: [u8; 32], // TODO
+    });
 
     // returned output
     let res = SpenderResponse {
-        total,
-        spender_leaf,
+        spender: Spender {
+            total_deposited,
+            spender_leaf,
+        },
     };
     Ok(success_response(serde_json::to_string(&res)?))
 }

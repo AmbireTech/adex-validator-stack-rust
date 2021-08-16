@@ -1,4 +1,5 @@
 use crate::{
+    spender::Spender,
     validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
     Address, BigNum, Channel, ChannelId, UnifiedNum, ValidatorId, IPFS,
 };
@@ -198,12 +199,13 @@ pub struct SuccessResponse {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct SpenderResponse {
-    pub total: UnifiedNum,
-    pub spender_leaf: Option<SpenderLeaf>,
+    pub spender: Spender,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct SpenderLeaf {
     pub total_spent: UnifiedNum,
     // merkle_proof: [u8; 32], // TODO

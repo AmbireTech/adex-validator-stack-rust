@@ -1,4 +1,4 @@
-use crate::{channel_v5::Channel, Address, BalancesMap, UnifiedNum};
+use crate::{channel_v5::Channel, sentry::SpenderLeaf, Address, BalancesMap, UnifiedNum};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -8,12 +8,16 @@ pub struct Deposit {
     pub total: UnifiedNum,
     pub still_on_create2: UnifiedNum,
 }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Spender {
+    pub total_deposited: UnifiedNum,
+    pub spender_leaf: Option<SpenderLeaf>,
+}
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Spendable {
     pub spender: Address,
     pub channel: Channel,
-    #[serde(flatten)]
     pub deposit: Deposit,
 }
 
