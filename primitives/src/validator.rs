@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::{convert::TryFrom, fmt, str::FromStr};
+use std::{borrow::Borrow, convert::TryFrom, fmt, str::FromStr};
 
 use crate::{
     address::Error, targeting::Value, Address, DomainError, ToETHChecksum, ToHex, UnifiedNum,
@@ -114,7 +114,16 @@ pub enum Validator<T> {
 }
 
 impl<T> Validator<T> {
-    pub fn validator<'a>(&'a self) -> &'a T {
+    pub fn into_inner(self) -> T {
+        match self {
+            Self::Leader(validator) => validator,
+            Self::Follower(validator) => validator,
+        }
+    }
+}
+
+impl<T> Borrow<T> for Validator<T> {
+    fn borrow(&self) -> &T {
         match self {
             Self::Leader(validator) => validator,
             Self::Follower(validator) => validator,
