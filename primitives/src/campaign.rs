@@ -156,6 +156,7 @@ mod campaign_id {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct Campaign {
     pub id: CampaignId,
     pub channel: Channel,
@@ -280,27 +281,16 @@ mod pricing {
 // TODO AIP#61: Double check if we require all the methods and enums, as some parts are now in the `Campaign`
 // This includes the matching of the Channel leader & follower to the Validators
 pub mod validators {
-    use crate::{ValidatorDesc, ValidatorId};
+    use crate::{Validator, ValidatorDesc, ValidatorId};
     use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
     /// Unordered list of the validators representing the leader & follower
     pub struct Validators(ValidatorDesc, ValidatorDesc);
 
-    #[derive(Debug, PartialEq, Eq, Clone)]
-    pub enum ValidatorRole<'a> {
-        Leader(&'a ValidatorDesc),
-        Follower(&'a ValidatorDesc),
-    }
+    pub type ValidatorRole<'a> = Validator<&'a ValidatorDesc>;
 
-    impl<'a> ValidatorRole<'a> {
-        pub fn validator(&self) -> &'a ValidatorDesc {
-            match self {
-                ValidatorRole::Leader(validator) => validator,
-                ValidatorRole::Follower(validator) => validator,
-            }
-        }
-    }
+    
 
     impl Validators {
         pub fn new(validators: (ValidatorDesc, ValidatorDesc)) -> Self {
