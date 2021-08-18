@@ -107,6 +107,21 @@ pub struct ValidatorDesc {
     pub url: String,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum Validator<T> {
+    Leader(T),
+    Follower(T),
+}
+
+impl<T> Validator<T> {
+    pub fn validator<'a>(&'a self) -> &'a T {
+        match self {
+            Self::Leader(validator) => validator,
+            Self::Follower(validator) => validator,
+        }
+    }
+}
+
 /// Validator Message Types
 pub mod messages {
     use std::{any::type_name, convert::TryFrom, fmt, marker::PhantomData};
