@@ -14,7 +14,7 @@ pub use self::{
     event_submission::EventSubmission,
     ipfs::IPFS,
     unified_num::UnifiedNum,
-    validator::{ValidatorDesc, ValidatorId},
+    validator::{Validator, ValidatorDesc, ValidatorId},
 };
 
 mod ad_slot;

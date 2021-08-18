@@ -39,19 +39,17 @@ lazy_static! {
         addresses.insert("publisher2".into(), Address::try_from("0x2054b0c1339309597ad04ba47f4590f8cdb4e305").expect("failed to parse id"));
         addresses.insert("creator".into(), Address::try_from("0x033ed90e0fec3f3ea1c9b005c724d704501e0196").expect("failed to parse id"));
         addresses.insert("tester".into(), Address::try_from("0x2892f6C41E0718eeeDd49D98D648C789668cA67d").expect("failed to parse id"));
-        // These are the real Addresses of these stablecoins, however, they are only used for testing!
-        addresses.insert("DAI".into(), Address::try_from("0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359").expect("failed to parse id"));
-        addresses.insert("USDT".into(), Address::try_from("0xdac17f958d2ee523a2206206994597c13d831ec7").expect("failed to parse id"));
-        addresses.insert("USDC".into(), Address::try_from("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48").expect("failed to parse id"));
 
         addresses
     };
 
+    // These are the real Addresses of these stablecoins, however, they are only used for testing!
     pub static ref TOKENS: HashMap<String, Address> = {
         let mut tokens = HashMap::new();
 
-        tokens.insert("DAI".into(), "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359".parse::<Address>().expect("Should parse"));
-
+        tokens.insert("DAI".into(), "0x6b175474e89094c44da98b954eedeac495271d0f".parse::<Address>().expect("Should parse"));
+        tokens.insert("USDT".into(), "0xdac17f958d2ee523a2206206994597c13d831ec7".parse::<Address>().expect("failed to parse id"));
+        tokens.insert("USDC".into(), "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48".parse::<Address>().expect("failed to parse id"));
         tokens
     };
 
