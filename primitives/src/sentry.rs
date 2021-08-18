@@ -1,7 +1,7 @@
 use crate::{
     spender::Spender,
     validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
-    Address, BigNum, Channel, ChannelId, UnifiedNum, ValidatorId, IPFS,
+    Address, BigNum, Channel, ChannelId, ValidatorId, IPFS,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -202,13 +202,6 @@ pub struct SuccessResponse {
 #[serde(rename_all = "camelCase")]
 pub struct SpenderResponse {
     pub spender: Spender,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct SpenderLeaf {
-    pub total_spent: UnifiedNum,
-    // merkle_proof: [u8; 32], // TODO
 }
 
 #[derive(Serialize, Deserialize, Debug)]
