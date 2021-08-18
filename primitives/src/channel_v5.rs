@@ -2,7 +2,7 @@ use ethereum_types::U256;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use crate::{Address, ChannelId, ValidatorId};
+use crate::{Address, ChannelId, Validator, ValidatorId};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -33,6 +33,14 @@ impl Channel {
         hasher.finalize(&mut channel_id);
 
         ChannelId::from(channel_id)
+    }
+
+    pub fn find_validator(&self, validator: ValidatorId) -> Option<Validator<ValidatorId>> {
+        match (self.leader, self.follower) {
+            (leader, _) if leader == validator => Some(Validator::Leader(leader)),
+            (_, follower) if follower == validator => Some(Validator::Follower(follower)),
+            _ => None,
+        }
     }
 }
 
