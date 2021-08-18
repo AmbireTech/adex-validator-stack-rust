@@ -4062,6 +4062,7 @@ dependencies = [
  "serde",
  "serde_json",
  "slog",
+ "thiserror",
  "tokio 1.8.1",
  "toml",
 ]
