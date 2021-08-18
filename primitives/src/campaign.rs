@@ -1,5 +1,5 @@
 use crate::{
-    channel_v5::Channel, targeting::Rules, AdUnit, Address, EventSubmission, UnifiedNum,
+    channel_v5::Channel, targeting::Rules, AdUnit, Address, EventSubmission, UnifiedNum, Validator,
     ValidatorDesc, ValidatorId,
 };
 
@@ -13,7 +13,7 @@ use serde_with::with_prefix;
 pub use {
     campaign_id::CampaignId,
     pricing::{Pricing, PricingBounds},
-    validators::{ValidatorRole, Validators},
+    validators::Validators,
 };
 
 with_prefix!(pub prefix_active "active_");
@@ -156,6 +156,7 @@ mod campaign_id {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct Campaign {
     pub id: CampaignId,
     pub channel: Channel,
@@ -185,12 +186,10 @@ pub struct Campaign {
 }
 
 impl Campaign {
-    pub fn find_validator(&self, validator: &ValidatorId) -> Option<ValidatorRole<'_>> {
+    pub fn find_validator(&self, validator: &ValidatorId) -> Option<Validator<&ValidatorDesc>> {
         match (self.leader(), self.follower()) {
-            (Some(leader), _) if &leader.id == validator => Some(ValidatorRole::Leader(leader)),
-            (_, Some(follower)) if &follower.id == validator => {
-                Some(ValidatorRole::Follower(follower))
-            }
+            (Some(leader), _) if &leader.id == validator => Some(Validator::Leader(leader)),
+            (_, Some(follower)) if &follower.id == validator => Some(Validator::Follower(follower)),
             _ => None,
         }
     }
@@ -277,8 +276,7 @@ mod pricing {
         }
     }
 }
-// TODO AIP#61: Double check if we require all the methods and enums, as some parts are now in the `Campaign`
-// This includes the matching of the Channel leader & follower to the Validators
+/// Campaign Validators
 pub mod validators {
     use crate::{ValidatorDesc, ValidatorId};
     use serde::{Deserialize, Serialize};
@@ -286,21 +284,6 @@ pub mod validators {
     #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
     /// Unordered list of the validators representing the leader & follower
     pub struct Validators(ValidatorDesc, ValidatorDesc);
-
-    #[derive(Debug, PartialEq, Eq, Clone)]
-    pub enum ValidatorRole<'a> {
-        Leader(&'a ValidatorDesc),
-        Follower(&'a ValidatorDesc),
-    }
-
-    impl<'a> ValidatorRole<'a> {
-        pub fn validator(&self) -> &'a ValidatorDesc {
-            match self {
-                ValidatorRole::Leader(validator) => validator,
-                ValidatorRole::Follower(validator) => validator,
-            }
-        }
-    }
 
     impl Validators {
         pub fn new(validators: (ValidatorDesc, ValidatorDesc)) -> Self {

@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::{convert::TryFrom, fmt, str::FromStr};
+use std::{borrow::Borrow, convert::TryFrom, fmt, str::FromStr};
 
 use crate::{
     address::Error, targeting::Value, Address, DomainError, ToETHChecksum, ToHex, UnifiedNum,
@@ -105,6 +105,30 @@ pub struct ValidatorDesc {
     pub fee_addr: Option<Address>,
     /// The url of the Validator on which is the API
     pub url: String,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum Validator<T> {
+    Leader(T),
+    Follower(T),
+}
+
+impl<T> Validator<T> {
+    pub fn into_inner(self) -> T {
+        match self {
+            Self::Leader(validator) => validator,
+            Self::Follower(validator) => validator,
+        }
+    }
+}
+
+impl<T> Borrow<T> for Validator<T> {
+    fn borrow(&self) -> &T {
+        match self {
+            Self::Leader(validator) => validator,
+            Self::Follower(validator) => validator,
+        }
+    }
 }
 
 /// Validator Message Types
