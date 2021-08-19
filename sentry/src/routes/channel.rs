@@ -360,11 +360,10 @@ mod test {
             .await
             .expect("Migrations should succeed");
 
-        let mut channel = DUMMY_CAMPAIGN.channel.clone();
-        let token_address = Address::from_str("0x509ee0d083ddf8ac028f2a56731412edd63223b9").expect("should generate");
-        let token_info = config.token_address_whitelist.get(&token_address).expect("should retrieve address");
+        let channel = DUMMY_CAMPAIGN.channel.clone();
+
+        let token_info = config.token_address_whitelist.get(&channel.token).expect("should retrieve address");
         let precision: u8 = token_info.precision.into();
-        channel.token = token_address;
         let deposit = Deposit {
             total: BigNum::from(1000000000), // 100 USDT
             still_on_create2: BigNum::from(1000000), // 1 USDT

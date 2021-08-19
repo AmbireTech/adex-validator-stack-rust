@@ -32,7 +32,7 @@ validators_whitelist = []
 
 [[token_address_whitelist]]
 # DAI
-address = '0x73967c6a0904aa032c103b4104747e88c566b1a2'
+address = '0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359'
 # 1 * 10^-10 = 0.0_000_000_001
 min_token_units_for_deposit = '100000000'
 min_validator_fee = '100000000'
