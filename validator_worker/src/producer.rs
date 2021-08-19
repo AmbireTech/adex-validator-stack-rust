@@ -4,7 +4,7 @@ use chrono::{TimeZone, Utc};
 
 use primitives::adapter::{Adapter, AdapterErrorKind};
 use primitives::validator::{Accounting, MessageTypes};
-use primitives::{BalancesMap, ChannelId};
+use primitives::{sentry::accounting::{Balances, CheckedState}, ChannelId};
 
 use crate::core::events::merge_aggrs;
 use crate::sentry_interface::{PropagationResult, SentryApi};
@@ -18,7 +18,7 @@ pub enum TickStatus<AE: AdapterErrorKind> {
         accounting_propagation: Vec<PropagationResult<AE>>,
         event_counts: usize,
     },
-    NoNewEventAggr(BalancesMap),
+    NoNewEventAggr(Balances<CheckedState>),
     EmptyBalances,
 }
 
@@ -52,7 +52,7 @@ pub async fn tick<A: Adapter + 'static>(
     //
     let new_accounting = merge_aggrs(&accounting, &aggrs.events, &iface.channel)?;
 
-    if new_accounting.balances.is_empty() {
+    if new_accounting.balances.earners.is_empty() || new_accounting.balances.spenders.is_empty() {
         info!(
             iface.logger,
             "channel {}: empty Accounting balances, skipping propagation", iface.channel.id

@@ -112,7 +112,7 @@ pub mod messages {
     use std::{any::type_name, convert::TryFrom, fmt, marker::PhantomData};
     use thiserror::Error;
 
-    use crate::BalancesMap;
+    use crate::sentry::accounting::{Balances, CheckedState};
     use chrono::{DateTime, Utc};
     use serde::{Deserialize, Serialize};
 
@@ -258,7 +258,7 @@ pub mod messages {
     #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
     #[serde(rename_all = "camelCase")]
     pub struct Accounting {
-        pub balances: BalancesMap,
+        pub balances: Balances<CheckedState>,
         pub last_aggregate: DateTime<Utc>,
     }
 
@@ -280,7 +280,7 @@ pub mod messages {
     pub struct NewState {
         pub state_root: String,
         pub signature: String,
-        pub balances: BalancesMap,
+        pub balances: Balances<CheckedState>,
         //
         // TODO: AIP#61 Remove exhausted property
         //
@@ -294,7 +294,7 @@ pub mod messages {
         pub reason: String,
         pub state_root: String,
         pub signature: String,
-        pub balances: Option<BalancesMap>,
+        pub balances: Option<Balances<CheckedState>>,
         pub timestamp: Option<DateTime<Utc>>,
     }
 
