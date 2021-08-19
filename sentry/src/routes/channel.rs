@@ -243,7 +243,7 @@ async fn create_spendable_document(
     channel: &ChannelV5,
     spender: Address,
 ) -> Result<Spendable, ResponseError> {
-    let deposit = adapter.get_deposit(&channel, &spender).await?;
+    let deposit = adapter.get_deposit(channel, &spender).await?;
     let total = UnifiedNum::from_precision(deposit.total, token_info.precision.get());
     let still_on_create2 =
         UnifiedNum::from_precision(deposit.still_on_create2, token_info.precision.get());
@@ -313,7 +313,7 @@ pub async fn get_spender_limits<A: Adapter + 'static>(
         None => {
             create_spendable_document(
                 &app.adapter,
-                &token_info,
+                token_info,
                 app.pool.clone(),
                 &channel,
                 spender,
@@ -334,12 +334,7 @@ pub async fn get_spender_limits<A: Adapter + 'static>(
         None => return spender_response_without_leaf(latest_spendable.deposit.total),
     };
 
-    let total_spent = new_state
-        .msg
-        .balances
-        .spenders
-        .get(&spender)
-        .map(|total_spent| total_spent);
+    let total_spent = new_state.msg.balances.spenders.get(&spender);
 
     let spender_leaf = total_spent.map(|total_spent| SpenderLeaf {
         total_spent: *total_spent,
