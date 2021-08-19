@@ -1,6 +1,6 @@
 use num_traits::CheckedSub;
 
-use primitives::sentry::{AggregateEvents, EventAggregate};
+use primitives::sentry::{accounting::{Balances, CheckedState}, AggregateEvents, EventAggregate};
 use primitives::validator::Accounting;
 use primitives::{BalancesMap, BigNum, Channel, DomainError};
 
@@ -27,7 +27,7 @@ pub(crate) fn merge_aggrs(
     //
     // TODO: AIP#61 Sum all Spender Aggregates and use that for the new Accounting
     //
-    let balances = BalancesMap::default();
+    let balances = Balances::<CheckedState>::default();
 
     let new_accounting = Accounting {
         balances,
