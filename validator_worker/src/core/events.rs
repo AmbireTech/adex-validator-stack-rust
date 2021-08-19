@@ -1,6 +1,9 @@
 use num_traits::CheckedSub;
 
-use primitives::sentry::{accounting::{Balances, CheckedState}, AggregateEvents, EventAggregate};
+use primitives::sentry::{
+    accounting::{Balances, CheckedState},
+    AggregateEvents, EventAggregate,
+};
 use primitives::validator::Accounting;
 use primitives::{BalancesMap, BigNum, Channel, DomainError};
 
