@@ -3,7 +3,10 @@ use std::fmt;
 
 use primitives::adapter::{Adapter, AdapterErrorKind};
 use primitives::validator::{ApproveState, MessageTypes, NewState, RejectState};
-use primitives::{sentry::accounting::{Balances, CheckedState}, BalancesMap, BigNum};
+use primitives::{
+    sentry::accounting::{Balances, CheckedState},
+    BalancesMap, BigNum,
+};
 
 use crate::core::follower_rules::{get_health, is_valid_transition};
 use crate::heartbeat::{heartbeat, HeartbeatStatus};
@@ -127,7 +130,11 @@ async fn on_new_state<'a, A: Adapter + 'static>(
         _ => Default::default(),
     };
 
-    if !is_valid_transition(&iface.channel, &BalancesMap::default(), &BalancesMap::default()) {
+    if !is_valid_transition(
+        &iface.channel,
+        &BalancesMap::default(),
+        &BalancesMap::default(),
+    ) {
         return Ok(on_error(iface, new_state, InvalidNewState::Transition).await);
     }
 

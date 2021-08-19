@@ -4,7 +4,10 @@ use chrono::{TimeZone, Utc};
 
 use primitives::adapter::{Adapter, AdapterErrorKind};
 use primitives::validator::{Accounting, MessageTypes};
-use primitives::{sentry::accounting::{Balances, CheckedState}, ChannelId};
+use primitives::{
+    sentry::accounting::{Balances, CheckedState},
+    ChannelId,
+};
 
 use crate::core::events::merge_aggrs;
 use crate::sentry_interface::{PropagationResult, SentryApi};
