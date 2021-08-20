@@ -205,6 +205,12 @@ pub struct SpenderResponse {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AllSpendersResponse {
+    pub spenders: HashMap<Address, Spender>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ValidatorMessage {
     pub from: ValidatorId,
     pub received: DateTime<Utc>,
