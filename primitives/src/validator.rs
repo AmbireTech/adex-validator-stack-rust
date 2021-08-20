@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::{convert::TryFrom, fmt, str::FromStr};
+use std::{borrow::Borrow, convert::TryFrom, fmt, str::FromStr};
 
 use crate::{
     address::Error, targeting::Value, Address, DomainError, ToETHChecksum, ToHex, UnifiedNum,
@@ -27,7 +27,7 @@ impl ValidatorId {
     }
 
     pub fn inner(&self) -> &[u8; 20] {
-        &self.0.as_bytes()
+        self.0.as_bytes()
     }
 }
 
@@ -39,6 +39,12 @@ impl From<&Address> for ValidatorId {
     }
 }
 
+impl From<Address> for ValidatorId {
+    fn from(address: Address) -> Self {
+        Self(address)
+    }
+}
+
 impl From<&[u8; 20]> for ValidatorId {
     fn from(bytes: &[u8; 20]) -> Self {
         Self(Address::from(bytes))
@@ -47,7 +53,7 @@ impl From<&[u8; 20]> for ValidatorId {
 
 impl AsRef<[u8]> for ValidatorId {
     fn as_ref(&self) -> &[u8] {
-        &self.0.as_ref()
+        self.0.as_ref()
     }
 }
 
@@ -101,12 +107,36 @@ pub struct ValidatorDesc {
     pub url: String,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum Validator<T> {
+    Leader(T),
+    Follower(T),
+}
+
+impl<T> Validator<T> {
+    pub fn into_inner(self) -> T {
+        match self {
+            Self::Leader(validator) => validator,
+            Self::Follower(validator) => validator,
+        }
+    }
+}
+
+impl<T> Borrow<T> for Validator<T> {
+    fn borrow(&self) -> &T {
+        match self {
+            Self::Leader(validator) => validator,
+            Self::Follower(validator) => validator,
+        }
+    }
+}
+
 /// Validator Message Types
 pub mod messages {
     use std::{any::type_name, convert::TryFrom, fmt, marker::PhantomData};
     use thiserror::Error;
 
-    use crate::BalancesMap;
+    use crate::sentry::accounting::{Balances, CheckedState};
     use chrono::{DateTime, Utc};
     use serde::{Deserialize, Serialize};
 
@@ -252,7 +282,7 @@ pub mod messages {
     #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
     #[serde(rename_all = "camelCase")]
     pub struct Accounting {
-        pub balances: BalancesMap,
+        pub balances: Balances<CheckedState>,
         pub last_aggregate: DateTime<Utc>,
     }
 
@@ -274,7 +304,7 @@ pub mod messages {
     pub struct NewState {
         pub state_root: String,
         pub signature: String,
-        pub balances: BalancesMap,
+        pub balances: Balances<CheckedState>,
         //
         // TODO: AIP#61 Remove exhausted property
         //
@@ -288,7 +318,7 @@ pub mod messages {
         pub reason: String,
         pub state_root: String,
         pub signature: String,
-        pub balances: Option<BalancesMap>,
+        pub balances: Option<Balances<CheckedState>>,
         pub timestamp: Option<DateTime<Utc>>,
     }
 

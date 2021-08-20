@@ -92,8 +92,8 @@ impl Adapter for DummyAdapter {
         Ok(())
     }
 
-    fn whoami(&self) -> &ValidatorId {
-        &self.identity
+    fn whoami(&self) -> ValidatorId {
+        self.identity
     }
 
     fn sign(&self, state_root: &str) -> AdapterResult<String, Self::AdapterError> {

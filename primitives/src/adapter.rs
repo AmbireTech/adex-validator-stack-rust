@@ -81,7 +81,7 @@ pub trait Adapter: Send + Sync + fmt::Debug + Clone {
     fn unlock(&mut self) -> AdapterResult<(), Self::AdapterError>;
 
     /// Get Adapter whoami
-    fn whoami(&self) -> &ValidatorId;
+    fn whoami(&self) -> ValidatorId;
 
     /// Signs the provided state_root
     fn sign(&self, state_root: &str) -> AdapterResult<String, Self::AdapterError>;

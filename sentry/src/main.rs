@@ -10,7 +10,7 @@ use primitives::adapter::{Adapter, DummyAdapterOptions, KeystoreOptions};
 use primitives::config::configuration;
 use primitives::util::tests::prep_db::{AUTH, IDS};
 use primitives::ValidatorId;
-use sentry::db::{postgres_connection, redis_connection, setup_migrations};
+use sentry::db::{postgres_connection, redis_connection, setup_migrations, CampaignRemaining};
 use sentry::Application;
 use slog::{error, info, Logger};
 use std::{
@@ -115,18 +115,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Check connection and setup migrations before setting up Postgres
     setup_migrations(&environment).await;
     let postgres = postgres_connection(42).await;
+    let campaign_remaining = CampaignRemaining::new(redis.clone());
 
     match adapter {
         AdapterTypes::EthereumAdapter(adapter) => {
             run(
-                Application::new(*adapter, config, logger, redis, postgres),
+                Application::new(
+                    *adapter,
+                    config,
+                    logger,
+                    redis,
+                    postgres,
+                    campaign_remaining,
+                ),
                 socket_addr,
             )
             .await
         }
         AdapterTypes::DummyAdapter(adapter) => {
             run(
-                Application::new(*adapter, config, logger, redis, postgres),
+                Application::new(
+                    *adapter,
+                    config,
+                    logger,
+                    redis,
+                    postgres,
+                    campaign_remaining,
+                ),
                 socket_addr,
             )
             .await

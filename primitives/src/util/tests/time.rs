@@ -25,5 +25,5 @@ pub fn past_datetime(from: Option<&DateTime<Utc>>) -> DateTime<Utc> {
 
     let from = from.unwrap_or(&default_from);
 
-    datetime_between(&from, Some(&to))
+    datetime_between(from, Some(&to))
 }

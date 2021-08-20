@@ -3,7 +3,10 @@ use std::fmt;
 
 use primitives::adapter::{Adapter, AdapterErrorKind};
 use primitives::validator::{ApproveState, MessageTypes, NewState, RejectState};
-use primitives::{BalancesMap, BigNum};
+use primitives::{
+    sentry::accounting::{Balances, CheckedState},
+    BalancesMap, BigNum,
+};
 
 use crate::core::follower_rules::{get_health, is_valid_transition};
 use crate::heartbeat::{heartbeat, HeartbeatStatus};
@@ -77,21 +80,22 @@ pub async fn tick<A: Adapter + 'static>(
         _ => false,
     };
 
-    let producer_tick = producer::tick(&iface).await?;
-    let empty_balances = BalancesMap::default();
-    let balances = match &producer_tick {
+    let producer_tick = producer::tick(iface).await?;
+    let empty_balances = Balances::<CheckedState>::default();
+    let _balances = match &producer_tick {
         producer::TickStatus::Sent { new_accounting, .. } => &new_accounting.balances,
         producer::TickStatus::NoNewEventAggr(balances) => balances,
         producer::TickStatus::EmptyBalances => &empty_balances,
     };
     let approve_state_result = if let (Some(new_state), false) = (new_msg, latest_is_responded_to) {
-        on_new_state(&iface, &balances, &new_state).await?
+        on_new_state(iface, &BalancesMap::default(), &new_state).await?
     } else {
         ApproveStateResult::Sent(None)
     };
 
     Ok(TickStatus {
-        heartbeat: heartbeat(&iface, &balances).await?,
+        heartbeat: Default::default(),
+        // heartbeat: heartbeat(iface, balances).await?,
         approve_state: approve_state_result,
         producer_tick,
     })
@@ -102,10 +106,11 @@ async fn on_new_state<'a, A: Adapter + 'static>(
     balances: &'a BalancesMap,
     new_state: &'a NewState,
 ) -> Result<ApproveStateResult<A::AdapterError>, Box<dyn Error>> {
-    let proposed_balances = new_state.balances.clone();
+    let proposed_balances = BalancesMap::default();
+    // let proposed_balances = new_state.balances.clone();
     let proposed_state_root = new_state.state_root.clone();
-    if proposed_state_root != hex::encode(get_state_root_hash(&iface, &proposed_balances)?) {
-        return Ok(on_error(&iface, &new_state, InvalidNewState::RootHash).await);
+    if proposed_state_root != hex::encode(get_state_root_hash(iface, &proposed_balances)?) {
+        return Ok(on_error(iface, new_state, InvalidNewState::RootHash).await);
     }
 
     if !iface.adapter.verify(
@@ -113,11 +118,11 @@ async fn on_new_state<'a, A: Adapter + 'static>(
         &proposed_state_root,
         &new_state.signature,
     )? {
-        return Ok(on_error(&iface, &new_state, InvalidNewState::Signature).await);
+        return Ok(on_error(iface, new_state, InvalidNewState::Signature).await);
     }
 
     let last_approve_response = iface.get_last_approved().await?;
-    let prev_balances = match last_approve_response
+    let _prev_balances = match last_approve_response
         .last_approved
         .and_then(|last_approved| last_approved.new_state)
     {
@@ -125,13 +130,17 @@ async fn on_new_state<'a, A: Adapter + 'static>(
         _ => Default::default(),
     };
 
-    if !is_valid_transition(&iface.channel, &prev_balances, &proposed_balances) {
-        return Ok(on_error(&iface, &new_state, InvalidNewState::Transition).await);
+    if !is_valid_transition(
+        &iface.channel,
+        &BalancesMap::default(),
+        &BalancesMap::default(),
+    ) {
+        return Ok(on_error(iface, new_state, InvalidNewState::Transition).await);
     }
 
     let health = get_health(&iface.channel, balances, &proposed_balances);
     if health < u64::from(iface.config.health_unsignable_promilles) {
-        return Ok(on_error(&iface, &new_state, InvalidNewState::Health).await);
+        return Ok(on_error(iface, new_state, InvalidNewState::Health).await);
     }
 
     let signature = iface.adapter.sign(&new_state.state_root)?;

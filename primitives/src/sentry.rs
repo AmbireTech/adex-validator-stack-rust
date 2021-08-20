@@ -1,6 +1,7 @@
 use crate::{
+    spender::Spender,
     validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
-    Address, BigNum, Channel, ChannelId, UnifiedNum, ValidatorId, IPFS,
+    Address, BigNum, Channel, ChannelId, ValidatorId, IPFS,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -198,21 +199,9 @@ pub struct SuccessResponse {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct SpenderResponse {
-    pub total_deposited: Option<UnifiedNum>,
-    pub spender_leaf: Option<SpenderLeaf>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct AllSpendersResponse {
-    pub spenders: Option<HashMap<Address, SpenderResponse>>,
-}
-
-// TODO: Maybe there is a better place for this struct
-#[derive(Serialize, Deserialize, Debug)]
-pub struct SpenderLeaf {
-    pub total_spent: UnifiedNum,
-    // merkle_proof: [u8; 32], // TODO
+    pub spender: Spender,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -375,6 +364,26 @@ pub mod campaign_create {
                 targeting_rules: self.targeting_rules,
                 created: self.created,
                 active: self.active,
+            }
+        }
+    }
+
+    /// This implementation helps with test setup
+    /// **NOTE:** It erases the CampaignId, since the creation of the campaign gives it's CampaignId
+    impl From<Campaign> for CreateCampaign {
+        fn from(campaign: Campaign) -> Self {
+            Self {
+                channel: campaign.channel,
+                creator: campaign.creator,
+                budget: campaign.budget,
+                validators: campaign.validators,
+                title: campaign.title,
+                pricing_bounds: campaign.pricing_bounds,
+                event_submission: campaign.event_submission,
+                ad_units: campaign.ad_units,
+                targeting_rules: campaign.targeting_rules,
+                created: campaign.created,
+                active: campaign.active,
             }
         }
     }

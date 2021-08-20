@@ -45,7 +45,7 @@ impl Validator for Campaign {
     fn validate(&self, config: &Config, validator_identity: &ValidatorId) -> Result<(), Error> {
         // check if the channel validators include our adapter identity
         let whoami_validator = match self.find_validator(validator_identity) {
-            Some(role) => role.validator(),
+            Some(role) => role.into_inner(),
             None => return Err(Validation::AdapterNotIncluded.into()),
         };
 
@@ -57,7 +57,7 @@ impl Validator for Campaign {
             return Err(Validation::UnlistedValidator.into());
         }
 
-        if !creator_listed(&self, &config.creators_whitelist) {
+        if !creator_listed(self, &config.creators_whitelist) {
             return Err(Validation::UnlistedCreator.into());
         }
 

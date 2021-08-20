@@ -1,6 +1,9 @@
 use num_traits::CheckedSub;
 
-use primitives::sentry::{AggregateEvents, EventAggregate};
+use primitives::sentry::{
+    accounting::{Balances, CheckedState},
+    AggregateEvents, EventAggregate,
+};
 use primitives::validator::Accounting;
 use primitives::{BalancesMap, BigNum, Channel, DomainError};
 
@@ -27,7 +30,7 @@ pub(crate) fn merge_aggrs(
     //
     // TODO: AIP#61 Sum all Spender Aggregates and use that for the new Accounting
     //
-    let balances = BalancesMap::default();
+    let balances = Balances::<CheckedState>::default();
 
     let new_accounting = Accounting {
         balances,
@@ -59,9 +62,9 @@ fn _merge_payouts_into_balances<'a, T: Iterator<Item = &'a AggregateEvents>>(
 
         let new_balance = new_balances.entry(*acc).or_insert_with(|| 0.into());
 
-        *new_balance += &to_add;
+        *new_balance += to_add;
 
-        remaining = remaining.checked_sub(&to_add).ok_or_else(|| {
+        remaining = remaining.checked_sub(to_add).ok_or_else(|| {
             DomainError::RuleViolation("remaining must never be negative".to_string())
         })?;
     }
