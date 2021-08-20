@@ -84,6 +84,16 @@ impl<S: BalancesState> Balances<S> {
     }
 }
 
+
+impl Balances<CheckedState> {
+    pub fn into_unchecked(self) -> Balances<UncheckedState> {
+        Balances {
+            earners: self.earners,
+            spenders: self.spenders,
+            state: PhantomData::default(),
+        }
+    }
+}
 #[derive(Debug, Error)]
 pub enum OverflowError {
     #[error("Spender {0} amount overflowed")]

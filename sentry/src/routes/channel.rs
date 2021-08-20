@@ -202,12 +202,6 @@ pub async fn create_validator_messages<A: Adapter + 'static>(
         .get("messages")
         .ok_or_else(|| ResponseError::BadRequest("missing messages body".to_string()))?;
 
-    let channel_is_exhausted = messages.iter().any(|message| match message {
-        MessageTypes::ApproveState(approve) => approve.exhausted,
-        MessageTypes::NewState(new_state) => new_state.exhausted,
-        _ => false,
-    });
-
     match channel.spec.validators.find(&session.uid) {
         None => Err(ResponseError::Unauthorized),
         _ => {
@@ -215,12 +209,6 @@ pub async fn create_validator_messages<A: Adapter + 'static>(
                 insert_validator_messages(&app.pool, &channel, &session.uid, message)
             }))
             .await?;
-
-            if channel_is_exhausted {
-                if let Some(validator_index) = channel.spec.validators.find_index(&session.uid) {
-                    update_exhausted_channel(&app.pool, &channel, validator_index).await?;
-                }
-            }
 
             Ok(success_response(serde_json::to_string(&SuccessResponse {
                 success: true,

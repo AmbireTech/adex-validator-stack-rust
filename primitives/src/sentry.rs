@@ -81,8 +81,7 @@ pub mod message {
                     "type":"ApproveState",
                     "stateRoot":"4739522efc1e81499541621759dadb331eaf08829d6a3851b4b654dfaddc9935",
                     "signature":"0x00128a39b715e87475666c3220fc0400bf34a84d24f77571d2b4e1e88b141d52305438156e526ff4fe96b7a13e707ab2f6f3ca00bd928dabc7f516b56cfe6fd61c",
-                    "isHealthy":true,
-                    "exhausted":false
+                    "isHealthy":true
                 },
                 "received":"2021-01-05T14:00:48.549Z"
             });
@@ -96,7 +95,6 @@ pub mod message {
                     state_root: "4739522efc1e81499541621759dadb331eaf08829d6a3851b4b654dfaddc9935".to_string(),
                     signature: "0x00128a39b715e87475666c3220fc0400bf34a84d24f77571d2b4e1e88b141d52305438156e526ff4fe96b7a13e707ab2f6f3ca00bd928dabc7f516b56cfe6fd61c".to_string(),
                     is_healthy: true,
-                    exhausted: false,
                 }),
             };
 

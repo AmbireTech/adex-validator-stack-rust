@@ -14,11 +14,9 @@ pub mod error;
 pub mod follower;
 pub mod heartbeat;
 pub mod leader;
-pub mod producer;
 pub mod sentry_interface;
 
 pub mod core {
-    pub mod events;
     pub mod follower_rules;
 }
 

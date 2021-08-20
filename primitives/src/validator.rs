@@ -136,7 +136,7 @@ pub mod messages {
     use std::{any::type_name, convert::TryFrom, fmt, marker::PhantomData};
     use thiserror::Error;
 
-    use crate::sentry::accounting::{Balances, CheckedState};
+    use crate::sentry::accounting::{Balances, UncheckedState};
     use chrono::{DateTime, Utc};
     use serde::{Deserialize, Serialize};
 
@@ -282,7 +282,7 @@ pub mod messages {
     #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
     #[serde(rename_all = "camelCase")]
     pub struct Accounting {
-        pub balances: Balances<CheckedState>,
+        pub balances: Balances<UncheckedState>,
         pub last_aggregate: DateTime<Utc>,
     }
 
@@ -292,11 +292,6 @@ pub mod messages {
         pub state_root: String,
         pub signature: String,
         pub is_healthy: bool,
-        //
-        // TODO: AIP#61 Remove exhausted property
-        //
-        #[serde(default)]
-        pub exhausted: bool,
     }
 
     #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -304,12 +299,7 @@ pub mod messages {
     pub struct NewState {
         pub state_root: String,
         pub signature: String,
-        pub balances: Balances<CheckedState>,
-        //
-        // TODO: AIP#61 Remove exhausted property
-        //
-        #[serde(default)]
-        pub exhausted: bool,
+        pub balances: Balances<UncheckedState>,
     }
 
     #[derive(Default, Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -318,7 +308,7 @@ pub mod messages {
         pub reason: String,
         pub state_root: String,
         pub signature: String,
-        pub balances: Option<Balances<CheckedState>>,
+        pub balances: Option<Balances<UncheckedState>>,
         pub timestamp: Option<DateTime<Utc>>,
     }
 
