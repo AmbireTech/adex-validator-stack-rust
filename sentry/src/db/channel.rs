@@ -101,6 +101,7 @@ pub async fn insert_validator_messages(
     Ok(inserted)
 }
 
+#[deprecated = "No longer needed for V5"]
 pub async fn update_exhausted_channel(
     pool: &DbPool,
     channel: &Channel,

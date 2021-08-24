@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use futures::future::{join_all, try_join_all, TryFutureExt};
+use primitives::balances::UncheckedState;
 use reqwest::{Client, Response};
 use slog::Logger;
 
@@ -169,23 +170,27 @@ impl<A: Adapter + 'static> SentryApi<A> {
             .await
     }
 
-    pub async fn get_last_approved(&self) -> Result<LastApprovedResponse, Error<A::AdapterError>> {
+    pub async fn get_last_approved(
+        &self,
+    ) -> Result<LastApprovedResponse<UncheckedState>, Error<A::AdapterError>> {
         self.client
             .get(&format!("{}/last-approved", self.validator_url))
             .send()
-            .and_then(|res: Response| res.json::<LastApprovedResponse>())
+            .and_then(|res: Response| res.json::<LastApprovedResponse<UncheckedState>>())
             .map_err(Error::Request)
             .await
     }
 
-    pub async fn get_last_msgs(&self) -> Result<LastApprovedResponse, Error<A::AdapterError>> {
+    pub async fn get_last_msgs(
+        &self,
+    ) -> Result<LastApprovedResponse<UncheckedState>, Error<A::AdapterError>> {
         self.client
             .get(&format!(
                 "{}/last-approved?withHeartbeat=true",
                 self.validator_url
             ))
             .send()
-            .and_then(|res: Response| res.json::<LastApprovedResponse>())
+            .and_then(|res: Response| res.json::<LastApprovedResponse<UncheckedState>>())
             .map_err(Error::Request)
             .await
     }
