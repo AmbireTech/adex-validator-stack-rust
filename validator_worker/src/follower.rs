@@ -4,15 +4,12 @@ use std::fmt;
 use primitives::adapter::{Adapter, AdapterErrorKind};
 use primitives::sentry::accounting::UncheckedState;
 use primitives::validator::{ApproveState, MessageTypes, NewState, RejectState};
-use primitives::{
-    sentry::accounting::{Balances, CheckedState},
-    BalancesMap, BigNum,
-};
+use primitives::{sentry::accounting::Balances, BalancesMap};
 
 use crate::core::follower_rules::{get_health, is_valid_transition};
-use crate::get_state_root_hash;
-use crate::heartbeat::{heartbeat, HeartbeatStatus};
+use crate::heartbeat::HeartbeatStatus;
 use crate::sentry_interface::{PropagationResult, SentryApi};
+use crate::{get_state_root_hash, heartbeat::heartbeat};
 use chrono::Utc;
 
 #[derive(Debug)]
@@ -80,7 +77,7 @@ pub async fn tick<A: Adapter + 'static>(
         _ => false,
     };
 
-    let empty_balances = Balances::<UncheckedState>::default();
+    let _balances = Balances::<UncheckedState>::default();
 
     let approve_state_result = if let (Some(new_state), false) = (new_msg, latest_is_responded_to) {
         on_new_state(iface, &BalancesMap::default(), &new_state).await?
@@ -89,8 +86,7 @@ pub async fn tick<A: Adapter + 'static>(
     };
 
     Ok(TickStatus {
-        heartbeat: Default::default(),
-        // heartbeat: heartbeat(iface, balances).await?,
+        heartbeat: heartbeat(iface).await?,
         approve_state: approve_state_result,
     })
 }
@@ -98,7 +94,7 @@ pub async fn tick<A: Adapter + 'static>(
 async fn on_new_state<'a, A: Adapter + 'static>(
     iface: &'a SentryApi<A>,
     balances: &'a BalancesMap,
-    new_state: &'a NewState,
+    new_state: &'a NewState<UncheckedState>,
 ) -> Result<ApproveStateResult<A::AdapterError>, Box<dyn Error>> {
     let proposed_balances = BalancesMap::default();
     // let proposed_balances = new_state.balances.clone();
@@ -154,7 +150,7 @@ async fn on_new_state<'a, A: Adapter + 'static>(
 
 async fn on_error<'a, A: Adapter + 'static>(
     iface: &'a SentryApi<A>,
-    new_state: &'a NewState,
+    new_state: &'a NewState<UncheckedState>,
     status: InvalidNewState,
 ) -> ApproveStateResult<A::AdapterError> {
     let propagation = iface

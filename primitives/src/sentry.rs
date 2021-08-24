@@ -6,13 +6,16 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt, hash::Hash};
 
+use self::accounting::BalancesState;
+
 pub mod accounting;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct LastApproved {
+pub struct LastApproved<S: BalancesState> {
     /// NewState can be None if the channel is brand new
-    pub new_state: Option<MessageResponse<NewState>>,
+    #[serde(bound = "S: BalancesState")]
+    pub new_state: Option<MessageResponse<NewState<S>>>,
     /// ApproveState can be None if the channel is brand new
     pub approve_state: Option<MessageResponse<ApproveState>>,
 }
@@ -53,7 +56,7 @@ pub mod message {
     }
 
     impl<T: Type> TryFrom<MessageTypes> for Message<T> {
-        type Error = MessageTypeError<T>;
+        type Error = MessageError<T>;
 
         fn try_from(value: MessageTypes) -> Result<Self, Self::Error> {
             <T as TryFrom<MessageTypes>>::try_from(value).map(Self)
@@ -182,8 +185,9 @@ pub struct ChannelListResponse {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct LastApprovedResponse {
-    pub last_approved: Option<LastApproved>,
+pub struct LastApprovedResponse<S: BalancesState> {
+    #[serde(bound = "S: BalancesState")]
+    pub last_approved: Option<LastApproved<S>>,
     /// None -> withHeartbeat=true wasn't passed
     /// Some(vec![]) (empty vec) or Some(heartbeats) - withHeartbeat=true was passed
     #[serde(default, skip_serializing_if = "Option::is_none")]

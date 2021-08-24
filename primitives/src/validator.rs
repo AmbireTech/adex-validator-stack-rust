@@ -136,76 +136,49 @@ pub mod messages {
     use std::{any::type_name, convert::TryFrom, fmt, marker::PhantomData};
     use thiserror::Error;
 
-    use crate::sentry::accounting::{Balances, UncheckedState};
+    use crate::sentry::accounting::{Balances, BalancesState, UncheckedState};
     use chrono::{DateTime, Utc};
     use serde::{Deserialize, Serialize};
 
     #[derive(Error, Debug)]
-    pub struct MessageTypeError<T: Type> {
-        expected: PhantomData<T>,
-        actual: String,
+    pub enum MessageError<T: Type> {
+        #[error(transparent)]
+        Balances(#[from] crate::sentry::accounting::Error),
+        #[error("Expected {} message type but the actual is {actual}", type_name::<T>(), )]
+        Type {
+            expected: PhantomData<T>,
+            actual: String,
+        },
     }
 
-    impl<T: Type> MessageTypeError<T> {
+    impl<T: Type> MessageError<T> {
         pub fn for_actual<A: Type>(_actual: &A) -> Self {
-            Self {
+            Self::Type {
                 expected: PhantomData::default(),
                 actual: type_name::<A>().to_string(),
             }
         }
     }
 
-    impl<T: Type> fmt::Display for MessageTypeError<T> {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            write!(
-                f,
-                "Expected {} message type but the actual is {}",
-                type_name::<T>(),
-                self.actual
-            )
-        }
-    }
-
     pub trait Type:
         fmt::Debug
         + Into<MessageTypes>
-        + TryFrom<MessageTypes, Error = MessageTypeError<Self>>
+        + TryFrom<MessageTypes, Error = MessageError<Self>>
         + Clone
         + PartialEq
         + Eq
     {
     }
 
-    impl Type for Accounting {}
-    impl TryFrom<MessageTypes> for Accounting {
-        type Error = MessageTypeError<Self>;
-
-        fn try_from(value: MessageTypes) -> Result<Self, Self::Error> {
-            match value {
-                MessageTypes::ApproveState(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::NewState(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::RejectState(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::Heartbeat(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::Accounting(accounting) => Ok(accounting),
-            }
-        }
-    }
-    impl From<Accounting> for MessageTypes {
-        fn from(accounting: Accounting) -> Self {
-            MessageTypes::Accounting(accounting)
-        }
-    }
-
     impl Type for ApproveState {}
     impl TryFrom<MessageTypes> for ApproveState {
-        type Error = MessageTypeError<Self>;
+        type Error = MessageError<Self>;
 
         fn try_from(value: MessageTypes) -> Result<Self, Self::Error> {
             match value {
-                MessageTypes::NewState(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::RejectState(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::Heartbeat(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::Accounting(msg) => Err(MessageTypeError::for_actual(&msg)),
+                MessageTypes::NewState(msg) => Err(MessageError::for_actual(&msg)),
+                MessageTypes::RejectState(msg) => Err(MessageError::for_actual(&msg)),
+                MessageTypes::Heartbeat(msg) => Err(MessageError::for_actual(&msg)),
                 MessageTypes::ApproveState(approve_state) => Ok(approve_state),
             }
         }
@@ -216,58 +189,85 @@ pub mod messages {
         }
     }
 
-    impl Type for NewState {}
-    impl TryFrom<MessageTypes> for NewState {
-        type Error = MessageTypeError<Self>;
+    impl<S: BalancesState> Type for NewState<S> {}
+    impl<S: BalancesState> TryFrom<MessageTypes> for NewState<S> {
+        type Error = MessageError<Self>;
 
         fn try_from(value: MessageTypes) -> Result<Self, Self::Error> {
             match value {
-                MessageTypes::ApproveState(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::RejectState(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::Heartbeat(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::Accounting(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::NewState(new_state) => Ok(new_state),
+                MessageTypes::ApproveState(msg) => Err(MessageError::for_actual(&msg)),
+                MessageTypes::RejectState(msg) => Err(MessageError::for_actual(&msg)),
+                MessageTypes::Heartbeat(msg) => Err(MessageError::for_actual(&msg)),
+                MessageTypes::NewState(new_state) => {
+                    let balances = S::validate(new_state.balances)?;
+
+                    Ok(Self {
+                        state_root: new_state.state_root,
+                        signature: new_state.signature,
+                        balances,
+                    })
+                }
             }
         }
     }
 
-    impl From<NewState> for MessageTypes {
-        fn from(new_state: NewState) -> Self {
-            MessageTypes::NewState(new_state)
+    impl<S: BalancesState> From<NewState<S>> for MessageTypes {
+        fn from(new_state: NewState<S>) -> Self {
+            MessageTypes::NewState(NewState {
+                state_root: new_state.state_root,
+                signature: new_state.signature,
+                balances: new_state.balances.into_unchecked(),
+            })
         }
     }
 
-    impl Type for RejectState {}
-    impl TryFrom<MessageTypes> for RejectState {
-        type Error = MessageTypeError<Self>;
+    impl<S: BalancesState> Type for RejectState<S> {}
+    impl<S: BalancesState> TryFrom<MessageTypes> for RejectState<S> {
+        type Error = MessageError<Self>;
 
         fn try_from(value: MessageTypes) -> Result<Self, Self::Error> {
             match value {
-                MessageTypes::ApproveState(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::NewState(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::Heartbeat(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::Accounting(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::RejectState(reject_state) => Ok(reject_state),
+                MessageTypes::ApproveState(msg) => Err(MessageError::for_actual(&msg)),
+                MessageTypes::NewState(msg) => Err(MessageError::for_actual(&msg)),
+                MessageTypes::Heartbeat(msg) => Err(MessageError::for_actual(&msg)),
+                MessageTypes::RejectState(reject_state) => {
+                    let balances = reject_state.balances.map(S::validate).transpose()?;
+
+                    Ok(Self {
+                        reason: reject_state.reason,
+                        state_root: reject_state.state_root,
+                        signature: reject_state.signature,
+                        balances,
+                        timestamp: reject_state.timestamp,
+                    })
+                }
             }
         }
     }
 
-    impl From<RejectState> for MessageTypes {
-        fn from(reject_state: RejectState) -> Self {
-            MessageTypes::RejectState(reject_state)
+    impl<S: BalancesState> From<RejectState<S>> for MessageTypes {
+        fn from(reject_state: RejectState<S>) -> Self {
+            MessageTypes::RejectState(RejectState {
+                reason: reject_state.reason,
+                state_root: reject_state.state_root,
+                signature: reject_state.signature,
+                balances: reject_state
+                    .balances
+                    .map(|balances| balances.into_unchecked()),
+                timestamp: reject_state.timestamp,
+            })
         }
     }
 
     impl Type for Heartbeat {}
     impl TryFrom<MessageTypes> for Heartbeat {
-        type Error = MessageTypeError<Self>;
+        type Error = MessageError<Self>;
 
         fn try_from(value: MessageTypes) -> Result<Self, Self::Error> {
             match value {
-                MessageTypes::ApproveState(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::NewState(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::RejectState(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::Accounting(msg) => Err(MessageTypeError::for_actual(&msg)),
+                MessageTypes::ApproveState(msg) => Err(MessageError::for_actual(&msg)),
+                MessageTypes::NewState(msg) => Err(MessageError::for_actual(&msg)),
+                MessageTypes::RejectState(msg) => Err(MessageError::for_actual(&msg)),
                 MessageTypes::Heartbeat(heartbeat) => Ok(heartbeat),
             }
         }
@@ -281,13 +281,6 @@ pub mod messages {
 
     #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
     #[serde(rename_all = "camelCase")]
-    pub struct Accounting {
-        pub balances: Balances<UncheckedState>,
-        pub last_aggregate: DateTime<Utc>,
-    }
-
-    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-    #[serde(rename_all = "camelCase")]
     pub struct ApproveState {
         pub state_root: String,
         pub signature: String,
@@ -296,19 +289,21 @@ pub mod messages {
 
     #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
     #[serde(rename_all = "camelCase")]
-    pub struct NewState {
+    pub struct NewState<S: BalancesState> {
         pub state_root: String,
         pub signature: String,
-        pub balances: Balances<UncheckedState>,
+        #[serde(bound = "S: BalancesState")]
+        pub balances: Balances<S>,
     }
 
     #[derive(Default, Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
     #[serde(rename_all = "camelCase")]
-    pub struct RejectState {
+    pub struct RejectState<S: BalancesState> {
         pub reason: String,
         pub state_root: String,
         pub signature: String,
-        pub balances: Option<Balances<UncheckedState>>,
+        #[serde(bound = "S: BalancesState")]
+        pub balances: Option<Balances<S>>,
         pub timestamp: Option<DateTime<Utc>>,
     }
 
@@ -334,10 +329,9 @@ pub mod messages {
     #[serde(tag = "type")]
     pub enum MessageTypes {
         ApproveState(ApproveState),
-        NewState(NewState),
-        RejectState(RejectState),
+        NewState(NewState<UncheckedState>),
+        RejectState(RejectState<UncheckedState>),
         Heartbeat(Heartbeat),
-        Accounting(Accounting),
     }
 }
 #[cfg(feature = "postgres")]

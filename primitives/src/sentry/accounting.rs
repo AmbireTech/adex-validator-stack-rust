@@ -2,7 +2,7 @@ use std::{convert::TryFrom, marker::PhantomData};
 
 use crate::{balances_map::UnifiedMap, channel_v5::Channel, Address, UnifiedNum};
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 
 #[derive(Serialize, Debug, Clone, PartialEq, Eq)]
@@ -17,7 +17,7 @@ pub struct Accounting<S: BalancesState> {
 
 #[derive(Serialize, Debug, Clone, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct Balances<S> {
+pub struct Balances<S: BalancesState> {
     pub earners: UnifiedMap,
     pub spenders: UnifiedMap,
     #[serde(skip_serializing, skip_deserializing)]
@@ -82,10 +82,7 @@ impl<S: BalancesState> Balances<S> {
             .entry(earner)
             .or_insert_with(UnifiedNum::default);
     }
-}
 
-
-impl Balances<CheckedState> {
     pub fn into_unchecked(self) -> Balances<UncheckedState> {
         Balances {
             earners: self.earners,
@@ -94,6 +91,7 @@ impl Balances<CheckedState> {
         }
     }
 }
+
 #[derive(Debug, Error)]
 pub enum OverflowError {
     #[error("Spender {0} amount overflowed")]
@@ -113,15 +111,25 @@ pub enum Error {
     },
 }
 
-pub trait BalancesState {}
+pub trait BalancesState: std::fmt::Debug + Eq + Clone + Serialize + DeserializeOwned {
+    fn validate(balances: Balances<UncheckedState>) -> Result<Balances<Self>, Error>;
+}
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct CheckedState;
-impl BalancesState for CheckedState {}
+impl BalancesState for CheckedState {
+    fn validate(balances: Balances<UncheckedState>) -> Result<Balances<Self>, Error> {
+        balances.check()
+    }
+}
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct UncheckedState;
-impl BalancesState for UncheckedState {}
+impl BalancesState for UncheckedState {
+    fn validate(balances: Balances<Self>) -> Result<Balances<Self>, Error> {
+        Ok(balances)
+    }
+}
 
 impl TryFrom<Balances<UncheckedState>> for Balances<CheckedState> {
     type Error = Error;
@@ -186,29 +194,20 @@ mod de {
         pub spenders: UnifiedMap,
     }
 
-    impl<'de> Deserialize<'de> for Balances<CheckedState> {
-        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
-        {
-            let unchecked_balances = Balances::<UncheckedState>::deserialize(deserializer)?;
-
-            unchecked_balances.check().map_err(serde::de::Error::custom)
-        }
-    }
-
-    impl<'de> Deserialize<'de> for Balances<UncheckedState> {
+    impl<'de, S: BalancesState> Deserialize<'de> for Balances<S> {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
             D: Deserializer<'de>,
         {
             let deser_balances = DeserializeBalances::deserialize(deserializer)?;
 
-            Ok(Balances {
+            let unchecked_balances = Balances {
                 earners: deser_balances.earners,
                 spenders: deser_balances.spenders,
                 state: PhantomData::<UncheckedState>::default(),
-            })
+            };
+
+            S::validate(unchecked_balances).map_err(serde::de::Error::custom)
         }
     }
 

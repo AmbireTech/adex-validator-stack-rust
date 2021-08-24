@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 use primitives::{adapter::Adapter, sentry::EventAggregateResponse, Channel};
 
-use crate::{db::list_event_aggregates, success_response, Application, Auth, ResponseError};
+use crate::{success_response, Application, Auth, ResponseError};
 
 #[derive(Deserialize)]
 pub struct EventAggregatesQuery {
@@ -35,14 +35,15 @@ pub async fn list_channel_event_aggregates<A: Adapter>(
         Some(auth.uid)
     };
 
-    let event_aggregates = list_event_aggregates(
-        &app.pool,
-        &channel.id,
-        app.config.events_find_limit,
-        &from,
-        &query.after,
-    )
-    .await?;
+    let event_aggregates = vec![];
+    // let event_aggregates = list_event_aggregates(
+    //     &app.pool,
+    //     &channel.id,
+    //     app.config.events_find_limit,
+    //     &from,
+    //     &query.after,
+    // )
+    // .await?;
 
     let response = EventAggregateResponse {
         channel: channel.clone(),

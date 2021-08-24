@@ -3,9 +3,9 @@ use std::error::Error;
 use primitives::adapter::{Adapter, AdapterErrorKind};
 use primitives::sentry::accounting::UncheckedState;
 use primitives::{
-    sentry::accounting::{Balances, CheckedState},
-    validator::{Accounting, MessageTypes, NewState},
-    BalancesMap, BigNum,
+    sentry::accounting::Accounting,
+    validator::{MessageTypes, NewState},
+    BalancesMap,
 };
 
 use crate::get_state_root_hash;
@@ -22,18 +22,17 @@ pub struct TickStatus<AE: AdapterErrorKind> {
 pub async fn tick<A: Adapter + 'static>(
     iface: &SentryApi<A>,
 ) -> Result<TickStatus<A::AdapterError>, Box<dyn Error>> {
-    let empty_balances = Balances::<UncheckedState>::default();
     let new_state = None;
 
     Ok(TickStatus {
-        heartbeat: heartbeat(iface, &BalancesMap::default()).await?,
+        heartbeat: heartbeat(iface).await?,
         new_state,
     })
 }
 
-async fn on_new_accounting<A: Adapter + 'static>(
+async fn _on_new_accounting<A: Adapter + 'static>(
     iface: &SentryApi<A>,
-    new_accounting: &Accounting,
+    new_accounting: &Accounting<UncheckedState>,
 ) -> Result<Vec<PropagationResult<A::AdapterError>>, Box<dyn Error>> {
     let state_root_raw = get_state_root_hash(iface, &BalancesMap::default())?;
     let state_root = hex::encode(state_root_raw);
