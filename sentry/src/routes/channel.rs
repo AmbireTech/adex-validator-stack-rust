@@ -5,9 +5,7 @@ use crate::db::{
     },
     get_channel_by_id, insert_channel, insert_validator_messages, list_channels,
     spendable::{fetch_spendable, update_spendable},
-    update_exhausted_channel, DbPool, PoolError,
-    event_aggregate::{latest_approve_state, latest_heartbeats, latest_new_state},
-    get_channel_by_id, insert_channel, insert_validator_messages, list_channels, PoolError,
+    DbPool, PoolError
 };
 use crate::{success_response, Application, Auth, ResponseError, RouteParams};
 use futures::future::try_join_all;
@@ -325,7 +323,9 @@ pub async fn get_spender_limits<A: Adapter + 'static>(
         None => return spender_response_without_leaf(latest_spendable.deposit.total),
     };
 
-    let total_spent = new_state.msg.balances.spenders.get(&spender);
+    let new_state_checked = new_state.msg.try_checked()?;
+
+    let total_spent = new_state_checked.balances.spenders.get(&spender);
 
     let spender_leaf = total_spent.map(|total_spent| SpenderLeaf {
         total_spent: *total_spent,

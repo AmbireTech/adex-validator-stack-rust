@@ -81,7 +81,7 @@ pub async fn latest_new_state_v5(
     pool: &DbPool,
     channel: &ChannelV5,
     state_root: &str,
-) -> Result<Option<MessageResponse<NewState>>, PoolError> {
+) -> Result<Option<MessageResponse<NewState<UncheckedState>>>, PoolError> {
     let client = pool.get().await?;
 
     let select = client.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'NewState' AND msg->> 'stateRoot' = $3 ORDER BY received DESC LIMIT 1").await?;
@@ -90,7 +90,7 @@ pub async fn latest_new_state_v5(
         .await?;
 
     rows.get(0)
-        .map(MessageResponse::<NewState>::try_from)
+        .map(MessageResponse::<NewState<UncheckedState>>::try_from)
         .transpose()
         .map_err(PoolError::Backend)
 }

@@ -534,9 +534,9 @@ pub mod test_util {
         Application,
     };
 
-    /// Uses production configuration to setup the correct Contract addresses for tokens.
+    /// Uses development and therefore the goreli testnet addresses of the tokens
     pub async fn setup_dummy_app() -> Application<DummyAdapter> {
-        let config = configuration("production", None).expect("Should get Config");
+        let config = configuration("development", None).expect("Should get Config");
         let adapter = DummyAdapter::init(
             DummyAdapterOptions {
                 dummy_identity: IDS["leader"],
