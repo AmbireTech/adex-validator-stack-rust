@@ -1,7 +1,7 @@
 use crate::{
-    spender::Spender,
     balances::BalancesState,
     channel_v5::Channel as ChannelV5,
+    spender::Spender,
     validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
     Address, Balances, BigNum, Channel, ChannelId, ValidatorId, IPFS,
 };

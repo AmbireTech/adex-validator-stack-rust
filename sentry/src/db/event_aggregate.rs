@@ -1,8 +1,8 @@
 use chrono::{DateTime, Utc};
 use futures::pin_mut;
 use primitives::{
-    channel_v5::Channel as ChannelV5,
     balances::UncheckedState,
+    channel_v5::Channel as ChannelV5,
     sentry::{EventAggregate, MessageResponse},
     validator::{ApproveState, Heartbeat, NewState},
     Address, BigNum, Channel, ChannelId, ValidatorId,

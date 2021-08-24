@@ -323,7 +323,7 @@ pub async fn get_spender_limits<A: Adapter + 'static>(
         None => return spender_response_without_leaf(latest_spendable.deposit.total),
     };
 
-    let new_state_checked = new_state.msg.try_checked()?;
+    let new_state_checked = new_state.msg.into_inner().try_checked()?;
 
     let total_spent = new_state_checked.balances.spenders.get(&spender);
 
