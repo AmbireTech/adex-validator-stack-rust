@@ -136,7 +136,7 @@ pub mod messages {
     use std::{any::type_name, convert::TryFrom, fmt, marker::PhantomData};
     use thiserror::Error;
 
-    use crate::balances::{Balances, BalancesState, UncheckedState};
+    use crate::balances::{Balances, BalancesState, CheckedState, UncheckedState};
     use chrono::{DateTime, Utc};
     use serde::{Deserialize, Serialize};
 
@@ -199,7 +199,7 @@ pub mod messages {
                 MessageTypes::RejectState(msg) => Err(MessageError::for_actual(&msg)),
                 MessageTypes::Heartbeat(msg) => Err(MessageError::for_actual(&msg)),
                 MessageTypes::NewState(new_state) => {
-                    let balances = S::validate(new_state.balances)?;
+                    let balances = S::from_unchecked(new_state.balances)?;
 
                     Ok(Self {
                         state_root: new_state.state_root,
@@ -231,7 +231,7 @@ pub mod messages {
                 MessageTypes::NewState(msg) => Err(MessageError::for_actual(&msg)),
                 MessageTypes::Heartbeat(msg) => Err(MessageError::for_actual(&msg)),
                 MessageTypes::RejectState(reject_state) => {
-                    let balances = reject_state.balances.map(S::validate).transpose()?;
+                    let balances = reject_state.balances.map(S::from_unchecked).transpose()?;
 
                     Ok(Self {
                         reason: reject_state.reason,
@@ -294,6 +294,16 @@ pub mod messages {
         pub signature: String,
         #[serde(flatten, bound = "S: BalancesState")]
         pub balances: Balances<S>,
+    }
+
+    impl NewState<UncheckedState> {
+        pub fn try_checked(self) -> Result<NewState<CheckedState>, crate::balances::Error> {
+            Ok(NewState {
+                state_root: self.state_root,
+                signature: self.signature,
+                balances: self.balances.check()?,
+            })
+        }
     }
 
     #[derive(Default, Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]

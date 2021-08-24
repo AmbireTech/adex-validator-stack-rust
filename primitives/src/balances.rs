@@ -100,13 +100,13 @@ pub enum Error {
 }
 
 pub trait BalancesState: std::fmt::Debug + Eq + Clone + Serialize + DeserializeOwned {
-    fn validate(balances: Balances<UncheckedState>) -> Result<Balances<Self>, Error>;
+    fn from_unchecked(balances: Balances<UncheckedState>) -> Result<Balances<Self>, Error>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct CheckedState;
 impl BalancesState for CheckedState {
-    fn validate(balances: Balances<UncheckedState>) -> Result<Balances<Self>, Error> {
+    fn from_unchecked(balances: Balances<UncheckedState>) -> Result<Balances<Self>, Error> {
         balances.check()
     }
 }
@@ -114,7 +114,7 @@ impl BalancesState for CheckedState {
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct UncheckedState;
 impl BalancesState for UncheckedState {
-    fn validate(balances: Balances<Self>) -> Result<Balances<Self>, Error> {
+    fn from_unchecked(balances: Balances<Self>) -> Result<Balances<Self>, Error> {
         Ok(balances)
     }
 }
@@ -152,7 +152,7 @@ mod de {
                 state: PhantomData::<UncheckedState>::default(),
             };
 
-            S::validate(unchecked_balances).map_err(serde::de::Error::custom)
+            S::from_unchecked(unchecked_balances).map_err(serde::de::Error::custom)
         }
     }
 
