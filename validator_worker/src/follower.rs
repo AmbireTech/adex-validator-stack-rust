@@ -2,9 +2,11 @@ use std::error::Error;
 use std::fmt;
 
 use primitives::adapter::{Adapter, AdapterErrorKind};
-use primitives::sentry::accounting::UncheckedState;
 use primitives::validator::{ApproveState, MessageTypes, NewState, RejectState};
-use primitives::{sentry::accounting::Balances, BalancesMap};
+use primitives::{
+    balances::{Balances, UncheckedState},
+    BalancesMap,
+};
 
 use crate::core::follower_rules::{get_health, is_valid_transition};
 use crate::heartbeat::HeartbeatStatus;

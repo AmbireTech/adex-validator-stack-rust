@@ -1,14 +1,22 @@
 use crate::{
+    balances::BalancesState,
+    channel_v5::Channel as ChannelV5,
     validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
-    Address, BigNum, Channel, ChannelId, ValidatorId, IPFS,
+    Address, Balances, BigNum, Channel, ChannelId, ValidatorId, IPFS,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt, hash::Hash};
 
-use self::accounting::BalancesState;
-
-pub mod accounting;
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct Accounting<S: BalancesState> {
+    pub channel: ChannelV5,
+    #[serde(flatten, bound = "S: BalancesState")]
+    pub balances: Balances<S>,
+    pub updated: Option<DateTime<Utc>>,
+    pub created: DateTime<Utc>,
+}
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]

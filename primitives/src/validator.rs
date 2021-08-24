@@ -136,14 +136,14 @@ pub mod messages {
     use std::{any::type_name, convert::TryFrom, fmt, marker::PhantomData};
     use thiserror::Error;
 
-    use crate::sentry::accounting::{Balances, BalancesState, UncheckedState};
+    use crate::balances::{Balances, BalancesState, UncheckedState};
     use chrono::{DateTime, Utc};
     use serde::{Deserialize, Serialize};
 
     #[derive(Error, Debug)]
     pub enum MessageError<T: Type> {
         #[error(transparent)]
-        Balances(#[from] crate::sentry::accounting::Error),
+        Balances(#[from] crate::balances::Error),
         #[error("Expected {} message type but the actual is {actual}", type_name::<T>(), )]
         Type {
             expected: PhantomData<T>,
@@ -292,7 +292,7 @@ pub mod messages {
     pub struct NewState<S: BalancesState> {
         pub state_root: String,
         pub signature: String,
-        #[serde(bound = "S: BalancesState")]
+        #[serde(flatten, bound = "S: BalancesState")]
         pub balances: Balances<S>,
     }
 
@@ -302,7 +302,7 @@ pub mod messages {
         pub reason: String,
         pub state_root: String,
         pub signature: String,
-        #[serde(bound = "S: BalancesState")]
+        #[serde(flatten, bound = "S: BalancesState")]
         pub balances: Option<Balances<S>>,
         pub timestamp: Option<DateTime<Utc>>,
     }

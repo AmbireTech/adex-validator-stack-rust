@@ -1,9 +1,9 @@
 use std::error::Error;
 
 use primitives::adapter::{Adapter, AdapterErrorKind};
-use primitives::sentry::accounting::UncheckedState;
+use primitives::balances::UncheckedState;
 use primitives::{
-    sentry::accounting::Accounting,
+    sentry::Accounting,
     validator::{MessageTypes, NewState},
     BalancesMap,
 };

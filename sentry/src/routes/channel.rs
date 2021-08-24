@@ -8,8 +8,8 @@ use hex::FromHex;
 use hyper::{Body, Request, Response};
 use primitives::{
     adapter::Adapter,
+    balances::UncheckedState,
     sentry::{
-        accounting::UncheckedState,
         channel_list::{ChannelListQuery, LastApprovedQuery},
         LastApproved, LastApprovedResponse, SuccessResponse,
     },

@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use futures::future::{join_all, try_join_all, TryFutureExt};
-use primitives::sentry::accounting::UncheckedState;
+use primitives::balances::UncheckedState;
 use reqwest::{Client, Response};
 use slog::Logger;
 
