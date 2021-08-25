@@ -379,7 +379,6 @@ async fn channels_router<A: Adapter + 'static>(
         CHANNEL_SPENDER_LEAF_AND_TOTAL_DEPOSITED.captures(&path),
         method,
     ) {
-        req = AuthRequired.call(req, app).await?;
         req = Chain::new()
             .chain(AuthRequired)
             .chain(ChannelLoad)

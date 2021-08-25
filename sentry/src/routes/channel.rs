@@ -5,7 +5,7 @@ use crate::db::{
     },
     get_channel_by_id, insert_channel, insert_validator_messages, list_channels,
     spendable::{fetch_spendable, update_spendable},
-    DbPool, PoolError
+    DbPool, PoolError,
 };
 use crate::{success_response, Application, Auth, ResponseError, RouteParams};
 use futures::future::try_join_all;
@@ -13,9 +13,9 @@ use hex::FromHex;
 use hyper::{Body, Request, Response};
 use primitives::{
     adapter::Adapter,
+    balances::UncheckedState,
     channel_v5::Channel as ChannelV5,
     config::TokenInfo,
-    balances::UncheckedState,
     sentry::{
         channel_list::{ChannelListQuery, LastApprovedQuery},
         LastApproved, LastApprovedResponse, SpenderResponse, SuccessResponse,
@@ -225,7 +225,7 @@ pub async fn create_validator_messages<A: Adapter + 'static>(
     }
 }
 
-async fn create_spendable_document(
+async fn create_or_update_spendable_document(
     adapter: &impl Adapter,
     token_info: &TokenInfo,
     pool: DbPool,
@@ -300,7 +300,7 @@ pub async fn get_spender_limits<A: Adapter + 'static>(
     let latest_spendable = match latest_spendable {
         Some(spendable) => spendable,
         None => {
-            create_spendable_document(
+            create_or_update_spendable_document(
                 &app.adapter,
                 token_info,
                 app.pool.clone(),
@@ -345,54 +345,42 @@ pub async fn get_spender_limits<A: Adapter + 'static>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::db::tests_postgres::{setup_test_migrations, DATABASE_POOL};
-    use adapter::DummyAdapter;
+    use crate::test_util::setup_dummy_app;
     use primitives::{
-        adapter::{Deposit, DummyAdapterOptions},
-        config::configuration,
-        util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, IDS},
+        adapter::Deposit,
+        util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN},
         BigNum,
     };
 
     #[tokio::test]
     async fn create_and_fetch_spendable() {
-        let config = configuration("development", None).expect("Should get Config");
-        let adapter = DummyAdapter::init(
-            DummyAdapterOptions {
-                dummy_identity: IDS["leader"],
-                dummy_auth: Default::default(),
-                dummy_auth_tokens: Default::default(),
-            },
-            &config,
-        );
-        let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
-        setup_test_migrations(database.pool.clone())
-            .await
-            .expect("Migrations should succeed");
+        let app = setup_dummy_app().await;
 
         let channel = DUMMY_CAMPAIGN.channel.clone();
 
-        let token_info = config
+        let token_info = app
+            .config
             .token_address_whitelist
             .get(&channel.token)
             .expect("should retrieve address");
         let precision: u8 = token_info.precision.into();
         let deposit = Deposit {
-            total: BigNum::from(1000000000),         // 100 USDT
-            still_on_create2: BigNum::from(1000000), // 1 USDT
+            total: BigNum::from_str("100000000000000000000").expect("should convert"), // 100 DAI
+            still_on_create2: BigNum::from_str("1000000000000000000").expect("should convert"), // 1 DAI
         };
-        adapter.add_deposit_call(channel.id(), ADDRESSES["creator"], deposit.clone());
+        app.adapter
+            .add_deposit_call(channel.id(), ADDRESSES["creator"], deposit.clone());
         // Making sure spendable does not yet exist
-        let spendable = fetch_spendable(database.clone(), &ADDRESSES["creator"], &channel.id())
+        let spendable = fetch_spendable(app.pool.clone(), &ADDRESSES["creator"], &channel.id())
             .await
             .expect("should return None");
         assert!(spendable.is_none());
 
-        // Call create_spendable
-        let new_spendable = create_spendable_document(
-            &adapter,
-            &token_info,
-            database.clone(),
+        // Call create_or_update_spendable
+        let new_spendable = create_or_update_spendable_document(
+            &app.adapter,
+            token_info,
+            app.pool.clone(),
             &channel,
             ADDRESSES["creator"],
         )
@@ -413,23 +401,23 @@ mod test {
         assert_eq!(new_spendable.spender, ADDRESSES["creator"]);
 
         // Make sure spendable NOW exists
-        let spendable = fetch_spendable(database.clone(), &ADDRESSES["creator"], &channel.id())
+        let spendable = fetch_spendable(app.pool.clone(), &ADDRESSES["creator"], &channel.id())
             .await
             .expect("should return a spendable");
         assert!(spendable.is_some());
 
-        // Updating our deposit by doubling it
         let updated_deposit = Deposit {
-            total: BigNum::from(110000000),          // 101 USDT
-            still_on_create2: BigNum::from(1100000), // 1.1 USDT
+            total: BigNum::from_str("110000000000000000000").expect("should convert"), // 110 DAI
+            still_on_create2: BigNum::from_str("1100000000000000000").expect("should convert"), // 1.1 DAI
         };
 
-        adapter.add_deposit_call(channel.id(), ADDRESSES["creator"], updated_deposit.clone());
+        app.adapter
+            .add_deposit_call(channel.id(), ADDRESSES["creator"], updated_deposit.clone());
 
-        let updated_spendable = create_spendable_document(
-            &adapter,
-            &token_info,
-            database.clone(),
+        let updated_spendable = create_or_update_spendable_document(
+            &app.adapter,
+            token_info,
+            app.pool.clone(),
             &channel,
             ADDRESSES["creator"],
         )
