@@ -26,7 +26,8 @@ use routes::analytics::{advanced_analytics, advertiser_analytics, analytics, pub
 use routes::campaign::{create_campaign, update_campaign};
 use routes::cfg::config;
 use routes::channel::{
-    channel_list, channel_validate, create_channel, create_validator_messages, last_approved,
+    channel_list, channel_validate, create_channel, create_validator_messages, get_spender_limits,
+    last_approved,
 };
 use slog::Logger;
 use std::collections::HashMap;
@@ -63,6 +64,7 @@ lazy_static! {
     static ref ADVERTISER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-advertiser/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
     static ref PUBLISHER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-publisher/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
     static ref CREATE_EVENTS_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events/?$").expect("The regex should be valid");
+    static ref CHANNEL_SPENDER_LEAF_AND_TOTAL_DEPOSITED: Regex = Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/spender/0x([a-zA-Z0-9]{40})/?$").expect("This regex should be valid");
 }
 
 static INSERT_EVENTS_BY_CAMPAIGN_ID: Lazy<Regex> = Lazy::new(|| {
@@ -373,6 +375,24 @@ async fn channels_router<A: Adapter + 'static>(
         req = ChannelLoad.call(req, app).await?;
 
         list_channel_event_aggregates(req, app).await
+    } else if let (Some(caps), &Method::GET) = (
+        CHANNEL_SPENDER_LEAF_AND_TOTAL_DEPOSITED.captures(&path),
+        method,
+    ) {
+        let param = RouteParams(vec![
+            caps.get(1)
+                .map_or("".to_string(), |m| m.as_str().to_string()), // channel ID
+            caps.get(2)
+                .map_or("".to_string(), |m| m.as_str().to_string()), // spender addr
+        ]);
+        req.extensions_mut().insert(param);
+        req = Chain::new()
+            .chain(AuthRequired)
+            .chain(ChannelLoad)
+            .apply(req, app)
+            .await?;
+
+        get_spender_limits(req, app).await
     } else {
         Err(ResponseError::NotFound)
     }
@@ -513,9 +533,9 @@ pub mod test_util {
         Application,
     };
 
-    /// Uses production configuration to setup the correct Contract addresses for tokens.
+    /// Uses development and therefore the goreli testnet addresses of the tokens
     pub async fn setup_dummy_app() -> Application<DummyAdapter> {
-        let config = configuration("production", None).expect("Should get Config");
+        let config = configuration("development", None).expect("Should get Config");
         let adapter = DummyAdapter::init(
             DummyAdapterOptions {
                 dummy_identity: IDS["leader"],

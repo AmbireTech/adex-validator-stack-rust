@@ -1,6 +1,11 @@
 use crate::db::{
-    event_aggregate::{latest_approve_state, latest_heartbeats, latest_new_state},
-    get_channel_by_id, insert_channel, insert_validator_messages, list_channels, PoolError,
+    event_aggregate::{
+        latest_approve_state, latest_approve_state_v5, latest_heartbeats, latest_new_state,
+        latest_new_state_v5,
+    },
+    get_channel_by_id, insert_channel, insert_validator_messages, list_channels,
+    spendable::{fetch_spendable, update_spendable},
+    DbPool, PoolError,
 };
 use crate::{success_response, Application, Auth, ResponseError, RouteParams};
 use futures::future::try_join_all;
@@ -9,15 +14,18 @@ use hyper::{Body, Request, Response};
 use primitives::{
     adapter::Adapter,
     balances::UncheckedState,
+    channel_v5::Channel as ChannelV5,
+    config::TokenInfo,
     sentry::{
         channel_list::{ChannelListQuery, LastApprovedQuery},
-        LastApproved, LastApprovedResponse, SuccessResponse,
+        LastApproved, LastApprovedResponse, SpenderResponse, SuccessResponse,
     },
+    spender::{Deposit, Spendable, Spender, SpenderLeaf},
     validator::MessageTypes,
-    Channel, ChannelId,
+    Address, Channel, ChannelId, UnifiedNum,
 };
 use slog::error;
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 use tokio_postgres::error::SqlState;
 
 pub async fn channel_status<A: Adapter>(
@@ -214,5 +222,217 @@ pub async fn create_validator_messages<A: Adapter + 'static>(
                 success: true,
             })?))
         }
+    }
+}
+
+async fn create_or_update_spendable_document(
+    adapter: &impl Adapter,
+    token_info: &TokenInfo,
+    pool: DbPool,
+    channel: &ChannelV5,
+    spender: Address,
+) -> Result<Spendable, ResponseError> {
+    let deposit = adapter.get_deposit(channel, &spender).await?;
+    let total = UnifiedNum::from_precision(deposit.total, token_info.precision.get());
+    let still_on_create2 =
+        UnifiedNum::from_precision(deposit.still_on_create2, token_info.precision.get());
+    let (total, still_on_create2) = match (total, still_on_create2) {
+        (Some(total), Some(still_on_create2)) => (total, still_on_create2),
+        _ => {
+            return Err(ResponseError::BadRequest(
+                "couldn't get deposit from precision".to_string(),
+            ))
+        }
+    };
+
+    let spendable = Spendable {
+        channel: channel.clone(),
+        deposit: Deposit {
+            total,
+            still_on_create2,
+        },
+        spender,
+    };
+
+    // Insert latest spendable in DB
+    update_spendable(pool, &spendable).await?;
+
+    Ok(spendable)
+}
+
+fn spender_response_without_leaf(
+    total_deposited: UnifiedNum,
+) -> Result<Response<Body>, ResponseError> {
+    let res = SpenderResponse {
+        spender: Spender {
+            total_deposited,
+            spender_leaf: None,
+        },
+    };
+    Ok(success_response(serde_json::to_string(&res)?))
+}
+
+pub async fn get_spender_limits<A: Adapter + 'static>(
+    req: Request<Body>,
+    app: &Application<A>,
+) -> Result<Response<Body>, ResponseError> {
+    let route_params = req
+        .extensions()
+        .get::<RouteParams>()
+        .expect("request should have route params");
+
+    let channel = req
+        .extensions()
+        .get::<ChannelV5>()
+        .expect("Request should have Channel")
+        .to_owned();
+
+    let channel_id = channel.id();
+    let spender = Address::from_str(&route_params.index(1))?;
+
+    let latest_spendable = fetch_spendable(app.pool.clone(), &spender, &channel_id).await?;
+    let token_info = app
+        .config
+        .token_address_whitelist
+        .get(&channel.token)
+        .ok_or_else(|| ResponseError::FailedValidation("Unsupported Channel Token".to_string()))?;
+
+    let latest_spendable = match latest_spendable {
+        Some(spendable) => spendable,
+        None => {
+            create_or_update_spendable_document(
+                &app.adapter,
+                token_info,
+                app.pool.clone(),
+                &channel,
+                spender,
+            )
+            .await?
+        }
+    };
+
+    let approve_state = match latest_approve_state_v5(&app.pool, &channel).await? {
+        Some(approve_state) => approve_state,
+        None => return spender_response_without_leaf(latest_spendable.deposit.total),
+    };
+
+    let state_root = approve_state.msg.state_root.clone();
+
+    let new_state = match latest_new_state_v5(&app.pool, &channel, &state_root).await? {
+        Some(new_state) => new_state,
+        None => return spender_response_without_leaf(latest_spendable.deposit.total),
+    };
+
+    let new_state_checked = new_state.msg.into_inner().try_checked()?;
+
+    let total_spent = new_state_checked.balances.spenders.get(&spender);
+
+    let spender_leaf = total_spent.map(|total_spent| SpenderLeaf {
+        total_spent: *total_spent,
+        //merkle_proof: [u8; 32], // TODO
+    });
+
+    // returned output
+    let res = SpenderResponse {
+        spender: Spender {
+            total_deposited: latest_spendable.deposit.total,
+            spender_leaf,
+        },
+    };
+    Ok(success_response(serde_json::to_string(&res)?))
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::test_util::setup_dummy_app;
+    use primitives::{
+        adapter::Deposit,
+        util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN},
+        BigNum,
+    };
+
+    #[tokio::test]
+    async fn create_and_fetch_spendable() {
+        let app = setup_dummy_app().await;
+
+        let channel = DUMMY_CAMPAIGN.channel.clone();
+
+        let token_info = app
+            .config
+            .token_address_whitelist
+            .get(&channel.token)
+            .expect("should retrieve address");
+        let precision: u8 = token_info.precision.into();
+        let deposit = Deposit {
+            total: BigNum::from_str("100000000000000000000").expect("should convert"), // 100 DAI
+            still_on_create2: BigNum::from_str("1000000000000000000").expect("should convert"), // 1 DAI
+        };
+        app.adapter
+            .add_deposit_call(channel.id(), ADDRESSES["creator"], deposit.clone());
+        // Making sure spendable does not yet exist
+        let spendable = fetch_spendable(app.pool.clone(), &ADDRESSES["creator"], &channel.id())
+            .await
+            .expect("should return None");
+        assert!(spendable.is_none());
+
+        // Call create_or_update_spendable
+        let new_spendable = create_or_update_spendable_document(
+            &app.adapter,
+            token_info,
+            app.pool.clone(),
+            &channel,
+            ADDRESSES["creator"],
+        )
+        .await
+        .expect("should create a new spendable");
+        assert_eq!(new_spendable.channel.id(), channel.id());
+
+        let total_as_unified_num =
+            UnifiedNum::from_precision(deposit.total, precision).expect("should convert");
+        let still_on_create2_unified =
+            UnifiedNum::from_precision(deposit.still_on_create2, precision)
+                .expect("should convert");
+        assert_eq!(new_spendable.deposit.total, total_as_unified_num);
+        assert_eq!(
+            new_spendable.deposit.still_on_create2,
+            still_on_create2_unified
+        );
+        assert_eq!(new_spendable.spender, ADDRESSES["creator"]);
+
+        // Make sure spendable NOW exists
+        let spendable = fetch_spendable(app.pool.clone(), &ADDRESSES["creator"], &channel.id())
+            .await
+            .expect("should return a spendable");
+        assert!(spendable.is_some());
+
+        let updated_deposit = Deposit {
+            total: BigNum::from_str("110000000000000000000").expect("should convert"), // 110 DAI
+            still_on_create2: BigNum::from_str("1100000000000000000").expect("should convert"), // 1.1 DAI
+        };
+
+        app.adapter
+            .add_deposit_call(channel.id(), ADDRESSES["creator"], updated_deposit.clone());
+
+        let updated_spendable = create_or_update_spendable_document(
+            &app.adapter,
+            token_info,
+            app.pool.clone(),
+            &channel,
+            ADDRESSES["creator"],
+        )
+        .await
+        .expect("should update spendable");
+        let total_as_unified_num =
+            UnifiedNum::from_precision(updated_deposit.total, precision).expect("should convert");
+        let still_on_create2_unified =
+            UnifiedNum::from_precision(updated_deposit.still_on_create2, precision)
+                .expect("should convert");
+        assert_eq!(updated_spendable.deposit.total, total_as_unified_num);
+        assert_eq!(
+            updated_spendable.deposit.still_on_create2,
+            still_on_create2_unified
+        );
+        assert_eq!(updated_spendable.spender, ADDRESSES["creator"]);
     }
 }

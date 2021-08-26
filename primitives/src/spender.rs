@@ -9,11 +9,23 @@ pub struct Deposit {
     pub still_on_create2: UnifiedNum,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SpenderLeaf {
+    pub total_spent: UnifiedNum,
+    // merkle_proof: [u8; 32], // TODO
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Spender {
+    pub total_deposited: UnifiedNum,
+    pub spender_leaf: Option<SpenderLeaf>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Spendable {
     pub spender: Address,
     pub channel: Channel,
-    #[serde(flatten)]
     pub deposit: Deposit,
 }
 
@@ -27,23 +39,19 @@ pub struct Aggregate {
 }
 #[cfg(feature = "postgres")]
 mod postgres {
-    use std::convert::TryFrom;
-    use tokio_postgres::{Error, Row};
-
     use super::*;
+    use tokio_postgres::Row;
 
-    impl TryFrom<Row> for Spendable {
-        type Error = Error;
-
-        fn try_from(row: Row) -> Result<Self, Self::Error> {
-            Ok(Spendable {
-                spender: row.try_get("spender")?,
-                channel: row.try_get("channel")?,
+    impl From<Row> for Spendable {
+        fn from(row: Row) -> Self {
+            Self {
+                spender: row.get("spender"),
+                channel: row.get("channel"),
                 deposit: Deposit {
-                    total: row.try_get("total")?,
-                    still_on_create2: row.try_get("still_on_create2")?,
+                    total: row.get("total"),
+                    still_on_create2: row.get("still_on_create2"),
                 },
-            })
+            }
         }
     }
 }

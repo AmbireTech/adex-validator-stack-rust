@@ -1,6 +1,7 @@
 use crate::{
     balances::BalancesState,
     channel_v5::Channel as ChannelV5,
+    spender::Spender,
     validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
     Address, Balances, BigNum, Channel, ChannelId, ValidatorId, IPFS,
 };
@@ -205,6 +206,12 @@ pub struct LastApprovedResponse<S: BalancesState> {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SuccessResponse {
     pub success: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SpenderResponse {
+    pub spender: Spender,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
