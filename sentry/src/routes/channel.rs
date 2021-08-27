@@ -15,7 +15,7 @@ use primitives::{
     adapter::Adapter,
     balances::UncheckedState,
     channel_v5::Channel as ChannelV5,
-    config::{Config, TokenInfo},
+    config::TokenInfo,
     sentry::{
         channel_list::{ChannelListQuery, LastApprovedQuery},
         AllSpendersResponse, LastApproved, LastApprovedResponse, MessageResponse, SpenderResponse,
@@ -290,21 +290,27 @@ pub async fn get_spender_limits<A: Adapter + 'static>(
 
     let spender = Address::from_str(&route_params.index(1))?;
 
-    let latest_spendable = get_latest_spendable(
-        app.pool.clone(),
-        &app.config,
-        &app.adapter,
-        &spender,
-        &channel,
-    )
-    .await?;
+    let latest_spendable = fetch_spendable(app.pool.clone(), &spender, &channel.id()).await?;
 
-    let approve_state = match latest_approve_state_v5(&app.pool, &channel).await? {
-        Some(approve_state) => approve_state,
-        None => return spender_response_without_leaf(latest_spendable.deposit.total),
+    let token_info = app
+        .config
+        .token_address_whitelist
+        .get(&channel.token)
+        .ok_or_else(|| ResponseError::FailedValidation("Unsupported Channel Token".to_string()))?;
+
+    let latest_spendable = match latest_spendable {
+        Some(spendable) => spendable,
+        None => {
+            create_or_update_spendable_document(
+                &app.adapter,
+                token_info,
+                app.pool.clone(),
+                &channel,
+                spender,
+            )
+            .await?
+        }
     };
-
-    let state_root = approve_state.msg.state_root.clone();
 
     let new_state = match get_corresponding_new_state(&app.pool, &channel).await {
         Some(new_state) => new_state,
@@ -330,29 +336,6 @@ pub async fn get_spender_limits<A: Adapter + 'static>(
     Ok(success_response(serde_json::to_string(&res)?))
 }
 
-async fn get_latest_spendable(
-    pool: DbPool,
-    config: &Config,
-    adapter: &impl Adapter,
-    spender: &Address,
-    channel: &ChannelV5,
-) -> Result<Spendable, ResponseError> {
-    let latest_spendable = fetch_spendable(pool.clone(), spender, &channel.id()).await?;
-    let token_info = config
-        .token_address_whitelist
-        .get(&channel.token)
-        .ok_or_else(|| ResponseError::FailedValidation("Unsupported Channel Token".to_string()))?;
-
-    let latest_spendable = match latest_spendable {
-        Some(spendable) => spendable,
-        None => {
-            create_spendable_document(adapter, token_info, pool.clone(), channel, *spender).await?
-        }
-    };
-
-    Ok(latest_spendable)
-}
-
 pub async fn get_all_spender_limits<A: Adapter + 'static>(
     req: Request<Body>,
     app: &Application<A>,
@@ -371,14 +354,11 @@ pub async fn get_all_spender_limits<A: Adapter + 'static>(
 
     // Using for loop to avoid async closures
     for (spender_addr, balance) in new_state.msg.balances.spenders.iter() {
-        let latest_spendable = get_latest_spendable(
-            app.pool.clone(),
-            &app.config,
-            &app.adapter,
-            spender_addr,
-            &channel,
-        )
-        .await?;
+        let latest_spendable =
+            match fetch_spendable(app.pool.clone(), spender_addr, &channel.id()).await? {
+                Some(spendable) => spendable,
+                None => return Err(ResponseError::NotFound),
+            };
 
         let total_deposited = latest_spendable.deposit.total;
         let spender_leaf = get_spender_leaf_for_spender(balance, &total_deposited);
@@ -401,7 +381,7 @@ pub async fn get_all_spender_limits<A: Adapter + 'static>(
 async fn get_corresponding_new_state(
     pool: &DbPool,
     channel: &ChannelV5,
-) -> Option<MessageResponse<NewState>> {
+) -> Option<MessageResponse<NewState<UncheckedState>>> {
     let approve_state = match latest_approve_state_v5(pool, channel).await.ok()? {
         Some(approve_state) => approve_state,
         None => return None,
