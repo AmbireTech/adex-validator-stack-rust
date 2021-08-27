@@ -8,7 +8,6 @@ use byteorder::{BigEndian, ByteOrder};
 use primitives::adapter::Adapter;
 use primitives::merkle_tree::MerkleTree;
 use primitives::validator::{Heartbeat, MessageTypes};
-use primitives::{BalancesMap, BigNum, Channel};
 
 use crate::sentry_interface::{PropagationResult, SentryApi};
 
@@ -40,7 +39,6 @@ async fn send_heartbeat<A: Adapter + 'static>(
 
 pub async fn heartbeat<A: Adapter + 'static>(
     iface: &SentryApi<A>,
-    balances: &BalancesMap,
 ) -> Result<HeartbeatStatus<A::AdapterError>, Box<dyn Error>> {
     let validator_message_response = iface.get_our_latest_msg(&["Heartbeat"]).await?;
     let heartbeat_msg = match validator_message_response {
@@ -51,7 +49,6 @@ pub async fn heartbeat<A: Adapter + 'static>(
     let should_send = heartbeat_msg.map_or(true, |heartbeat| {
         let duration = Utc::now() - heartbeat.timestamp;
         duration > Duration::milliseconds(iface.config.heartbeat_time.into())
-            && !is_channel_exhausted(&iface.channel, balances)
     });
 
     if should_send {
@@ -59,8 +56,4 @@ pub async fn heartbeat<A: Adapter + 'static>(
     } else {
         Ok(None)
     }
-}
-
-fn is_channel_exhausted(channel: &Channel, balances: &BalancesMap) -> bool {
-    balances.values().sum::<BigNum>() == channel.deposit_amount
 }

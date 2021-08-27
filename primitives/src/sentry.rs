@@ -1,19 +1,30 @@
 use crate::{
+    balances::BalancesState,
+    channel_v5::Channel as ChannelV5,
     spender::Spender,
     validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
-    Address, BigNum, Channel, ChannelId, ValidatorId, IPFS,
+    Address, Balances, BigNum, Channel, ChannelId, ValidatorId, IPFS,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt, hash::Hash};
 
-pub mod accounting;
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct Accounting<S: BalancesState> {
+    pub channel: ChannelV5,
+    #[serde(flatten, bound = "S: BalancesState")]
+    pub balances: Balances<S>,
+    pub updated: Option<DateTime<Utc>>,
+    pub created: DateTime<Utc>,
+}
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct LastApproved {
+pub struct LastApproved<S: BalancesState> {
     /// NewState can be None if the channel is brand new
-    pub new_state: Option<MessageResponse<NewState>>,
+    #[serde(bound = "S: BalancesState")]
+    pub new_state: Option<MessageResponse<NewState<S>>>,
     /// ApproveState can be None if the channel is brand new
     pub approve_state: Option<MessageResponse<ApproveState>>,
 }
@@ -54,7 +65,7 @@ pub mod message {
     }
 
     impl<T: Type> TryFrom<MessageTypes> for Message<T> {
-        type Error = MessageTypeError<T>;
+        type Error = MessageError<T>;
 
         fn try_from(value: MessageTypes) -> Result<Self, Self::Error> {
             <T as TryFrom<MessageTypes>>::try_from(value).map(Self)
@@ -82,8 +93,7 @@ pub mod message {
                     "type":"ApproveState",
                     "stateRoot":"4739522efc1e81499541621759dadb331eaf08829d6a3851b4b654dfaddc9935",
                     "signature":"0x00128a39b715e87475666c3220fc0400bf34a84d24f77571d2b4e1e88b141d52305438156e526ff4fe96b7a13e707ab2f6f3ca00bd928dabc7f516b56cfe6fd61c",
-                    "isHealthy":true,
-                    "exhausted":false
+                    "isHealthy":true
                 },
                 "received":"2021-01-05T14:00:48.549Z"
             });
@@ -97,7 +107,6 @@ pub mod message {
                     state_root: "4739522efc1e81499541621759dadb331eaf08829d6a3851b4b654dfaddc9935".to_string(),
                     signature: "0x00128a39b715e87475666c3220fc0400bf34a84d24f77571d2b4e1e88b141d52305438156e526ff4fe96b7a13e707ab2f6f3ca00bd928dabc7f516b56cfe6fd61c".to_string(),
                     is_healthy: true,
-                    exhausted: false,
                 }),
             };
 
@@ -185,8 +194,9 @@ pub struct ChannelListResponse {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct LastApprovedResponse {
-    pub last_approved: Option<LastApproved>,
+pub struct LastApprovedResponse<S: BalancesState> {
+    #[serde(bound = "S: BalancesState")]
+    pub last_approved: Option<LastApproved<S>>,
     /// None -> withHeartbeat=true wasn't passed
     /// Some(vec![]) (empty vec) or Some(heartbeats) - withHeartbeat=true was passed
     #[serde(default, skip_serializing_if = "Option::is_none")]

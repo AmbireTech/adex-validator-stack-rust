@@ -43,13 +43,13 @@ lazy_static! {
         addresses
     };
 
-    // These are the real Addresses of these stablecoins, however, they are only used for testing!
+    // These are the Goerli testnet  Addresses of these stablecoins
     pub static ref TOKENS: HashMap<String, Address> = {
         let mut tokens = HashMap::new();
 
-        tokens.insert("DAI".into(), "0x6b175474e89094c44da98b954eedeac495271d0f".parse::<Address>().expect("Should parse"));
-        tokens.insert("USDT".into(), "0xdac17f958d2ee523a2206206994597c13d831ec7".parse::<Address>().expect("failed to parse id"));
-        tokens.insert("USDC".into(), "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48".parse::<Address>().expect("failed to parse id"));
+        tokens.insert("DAI".into(), "0x73967c6a0904aa032c103b4104747e88c566b1a2".parse::<Address>().expect("Should parse"));
+        tokens.insert("USDT".into(), "0x509ee0d083ddf8ac028f2a56731412edd63223b9".parse::<Address>().expect("failed to parse id"));
+        tokens.insert("USDC".into(), "0x44dcfcead37be45206af6079648988b29284b2c6".parse::<Address>().expect("failed to parse id"));
         tokens
     };
 

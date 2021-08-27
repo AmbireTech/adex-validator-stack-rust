@@ -380,12 +380,6 @@ async fn channels_router<A: Adapter + 'static>(
         CHANNEL_SPENDER_LEAF_AND_TOTAL_DEPOSITED.captures(&path),
         method,
     ) {
-        req = AuthRequired.call(req, app).await?;
-        req = Chain::new()
-            .chain(AuthRequired)
-            .chain(ChannelLoad)
-            .apply(req, app)
-            .await?;
         let param = RouteParams(vec![
             caps.get(1)
                 .map_or("".to_string(), |m| m.as_str().to_string()), // channel ID
@@ -393,6 +387,11 @@ async fn channels_router<A: Adapter + 'static>(
                 .map_or("".to_string(), |m| m.as_str().to_string()), // spender addr
         ]);
         req.extensions_mut().insert(param);
+        req = Chain::new()
+            .chain(AuthRequired)
+            .chain(ChannelLoad)
+            .apply(req, app)
+            .await?;
 
         get_spender_limits(req, app).await
     } else if let (Some(caps), &Method::GET) = (CHANNEL_ALL_SPENDER_LIMITS.captures(&path), method)
@@ -547,9 +546,9 @@ pub mod test_util {
         Application,
     };
 
-    /// Uses production configuration to setup the correct Contract addresses for tokens.
+    /// Uses development and therefore the goreli testnet addresses of the tokens
     pub async fn setup_dummy_app() -> Application<DummyAdapter> {
-        let config = configuration("production", None).expect("Should get Config");
+        let config = configuration("development", None).expect("Should get Config");
         let adapter = DummyAdapter::init(
             DummyAdapterOptions {
                 dummy_identity: IDS["leader"],
