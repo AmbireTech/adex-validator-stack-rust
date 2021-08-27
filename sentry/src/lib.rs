@@ -65,7 +65,6 @@ lazy_static! {
     static ref PUBLISHER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-publisher/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
     static ref CREATE_EVENTS_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events/?$").expect("The regex should be valid");
     static ref CHANNEL_SPENDER_LEAF_AND_TOTAL_DEPOSITED: Regex = Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/spender/0x([a-zA-Z0-9]{40})/?$").expect("This regex should be valid");
-    static ref CHANNEL_ALL_SPENDER_LIMITS: Regex = Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/spender/all/?$").expect("This regex should be valid");
 }
 
 static INSERT_EVENTS_BY_CAMPAIGN_ID: Lazy<Regex> = Lazy::new(|| {
@@ -76,6 +75,9 @@ static CLOSE_CAMPAIGN_BY_CAMPAIGN_ID: Lazy<Regex> = Lazy::new(|| {
 });
 static CAMPAIGN_UPDATE_BY_ID: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^/v5/campaign/0x([a-zA-Z0-9]{32})/?$").expect("The regex should be valid")
+});
+static CHANNEL_ALL_SPENDER_LIMITS: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/spender/all/?$").expect("The regex should be valid")
 });
 
 #[derive(Debug, Clone)]
@@ -396,14 +398,17 @@ async fn channels_router<A: Adapter + 'static>(
         get_spender_limits(req, app).await
     } else if let (Some(caps), &Method::GET) = (CHANNEL_ALL_SPENDER_LIMITS.captures(&path), method)
     {
-        req = AuthRequired.call(req, app).await?;
 
         let param = RouteParams(vec![caps
             .get(1)
             .map_or("".to_string(), |m| m.as_str().to_string())]);
         req.extensions_mut().insert(param);
 
-        req = ChannelLoad.call(req, app).await?;
+        req = Chain::new()
+            .chain(AuthRequired)
+            .chain(ChannelLoad)
+            .apply(req, app)
+            .await?;
 
         get_all_spender_limits(req, app).await
     } else {
