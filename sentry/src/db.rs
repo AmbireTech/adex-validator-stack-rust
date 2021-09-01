@@ -473,9 +473,6 @@ pub mod redis_pool {
 
     #[derive(Debug, Error)]
     pub enum Error {
-        // when we can't create more databases and all are used
-        #[error("No more databases can be created")]
-        OutOfBound,
         #[error("A redis error occurred")]
         Redis(#[from] RedisError),
     }
@@ -486,37 +483,37 @@ pub mod redis_pool {
         type Error = Error;
 
         async fn create(&self) -> Result<Self::Type, Self::Error> {
-            for mut record in self.connections.iter_mut() {
-                let database = record.value_mut().as_mut();
+            loop {
+                for mut record in self.connections.iter_mut() {
+                    let database = record.value_mut().as_mut();
 
-                match database {
-                    Some(database) if database.available => {
-                        database.available = false;
-                        return Ok(database.clone());
-                    }
-                    // if Some but not available, skip it
-                    Some(_) => continue,
-                    None => {
-                        let mut redis_conn =
-                            redis_connection(&format!("{}{}", Self::URL, record.key())).await?;
+                    match database {
+                        Some(database) if database.available => {
+                            database.available = false;
+                            return Ok(database.clone());
+                        }
+                        // if Some but not available, skip it
+                        Some(_) => continue,
+                        None => {
+                            let mut redis_conn =
+                                redis_connection(&format!("{}{}", Self::URL, record.key())).await?;
 
-                        // run `FLUSHDB` to clean any leftovers of previous tests
-                        // even from different test runs as there might be leftovers
-                        Self::flush_db(&mut redis_conn).await?;
+                            // run `FLUSHDB` to clean any leftovers of previous tests
+                            // even from different test runs as there might be leftovers
+                            Self::flush_db(&mut redis_conn).await?;
 
-                        let database = Database {
-                            available: false,
-                            connection: redis_conn,
-                        };
+                            let database = Database {
+                                available: false,
+                                connection: redis_conn,
+                            };
 
-                        *record.value_mut() = Some(database.clone());
+                            *record.value_mut() = Some(database.clone());
 
-                        return Ok(database);
+                            return Ok(database);
+                        }
                     }
                 }
             }
-
-            Err(Error::OutOfBound)
         }
 
         async fn recycle(&self, database: &mut Database) -> RecycleResult<Self::Error> {
