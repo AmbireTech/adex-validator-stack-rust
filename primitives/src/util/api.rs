@@ -4,6 +4,7 @@ use parse_display::Display;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use url::Url;
+pub use url::ParseError;
 
 // `url::Url::scheme()` returns lower-cased ASCII string without `:`
 const SCHEMES: [&str; 2] = ["http", "https"];
@@ -46,12 +47,15 @@ impl ApiUrl {
 
     /// The Endpoint of which we want to get an url to (strips prefixed `/` from the endpoint),
     /// which can can include:
+    ///
     /// - path
     /// - query
     /// - fragments - usually should not be used for requesting API resources from server
+    ///
     /// This method does **not** check if a file is present
+    ///
     /// This method strips the starting `/` of the endpoint, if there is one
-    pub fn join(&self, endpoint: &str) -> Result<Url, url::ParseError> {
+    pub fn join(&self, endpoint: &str) -> Result<Url, ParseError> {
         let stripped = endpoint.strip_prefix('/').unwrap_or(endpoint);
         // this join is safe, since we always prefix the Url with `/`
         self.0.join(stripped)
