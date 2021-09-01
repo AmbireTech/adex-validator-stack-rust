@@ -187,6 +187,15 @@ pub struct AggregateEvents {
 #[serde(rename_all = "camelCase")]
 pub struct ChannelListResponse {
     pub channels: Vec<Channel>,
+    // TODO: Replace with `Pagination`
+    pub total_pages: u64,
+    pub total: u64,
+    pub page: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Pagination {
     pub total_pages: u64,
     pub total: u64,
     pub page: u64,
@@ -314,6 +323,36 @@ pub mod channel_list {
 
     fn default_page() -> u64 {
         0
+    }
+}
+
+pub mod campaign {
+    use crate::{Address, Campaign, ValidatorId};
+    use chrono::{serde::ts_seconds, DateTime, Utc};
+    use serde::{Deserialize, Serialize};
+
+    use super::Pagination;
+
+    #[derive(Debug, Serialize, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct CampaignListResponse {
+        pub campaigns: Vec<Campaign>,
+        #[serde(flatten)]
+        pub pagination: Pagination,
+    }
+
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct CampaignListQuery {
+        #[serde(default)]
+        // default is `u64::default()` = `0`
+        pub page: u64,
+        /// filters the list on `active.to >= active_to_ge`
+        /// It should be the same timestamp format as the `Campaign.active.to`: **seconds**
+        #[serde(with = "ts_seconds", default = "Utc::now", rename = "validUntil")]
+        pub active_to_ge: DateTime<Utc>,
+        pub creator: Option<Address>,
+        /// filters the campaigns containing a specific validator if provided
+        pub validator: Option<ValidatorId>,
     }
 }
 
