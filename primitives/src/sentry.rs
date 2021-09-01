@@ -348,7 +348,7 @@ pub mod campaign {
         pub page: u64,
         /// filters the list on `active.to >= active_to_ge`
         /// It should be the same timestamp format as the `Campaign.active.to`: **seconds**
-        #[serde(with = "ts_seconds", default = "Utc::now", rename = "validUntil")]
+        #[serde(with = "ts_seconds", default = "Utc::now", rename = "activeTo")]
         pub active_to_ge: DateTime<Utc>,
         pub creator: Option<Address>,
         /// filters the campaigns containing a specific validator if provided
