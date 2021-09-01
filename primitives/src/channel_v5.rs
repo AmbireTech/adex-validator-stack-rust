@@ -4,7 +4,7 @@ use std::fmt;
 
 use crate::{Address, ChannelId, Validator, ValidatorId};
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct Channel {
     pub leader: ValidatorId,
