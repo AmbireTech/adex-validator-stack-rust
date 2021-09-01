@@ -1,26 +1,14 @@
 use std::{convert::TryFrom, marker::PhantomData};
 
-use crate::{balances_map::UnifiedMap, channel_v5::Channel, Address, UnifiedNum};
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Deserializer, Serialize};
+use crate::{Address, UnifiedMap, UnifiedNum};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use thiserror::Error;
-
-#[derive(Serialize, Debug, Clone, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct Accounting<S: BalancesState> {
-    pub channel: Channel,
-    #[serde(flatten)]
-    pub balances: Balances<S>,
-    pub updated: Option<DateTime<Utc>>,
-    pub created: DateTime<Utc>,
-}
 
 #[derive(Serialize, Debug, Clone, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct Balances<S> {
+pub struct Balances<S: BalancesState> {
     pub earners: UnifiedMap,
     pub spenders: UnifiedMap,
-    #[serde(skip_serializing, skip_deserializing)]
     state: PhantomData<S>,
 }
 
@@ -82,6 +70,14 @@ impl<S: BalancesState> Balances<S> {
             .entry(earner)
             .or_insert_with(UnifiedNum::default);
     }
+
+    pub fn into_unchecked(self) -> Balances<UncheckedState> {
+        Balances {
+            earners: self.earners,
+            spenders: self.spenders,
+            state: PhantomData::default(),
+        }
+    }
 }
 
 #[derive(Debug, Error)]
@@ -103,15 +99,25 @@ pub enum Error {
     },
 }
 
-pub trait BalancesState {}
+pub trait BalancesState: std::fmt::Debug + Eq + Clone + Serialize + DeserializeOwned {
+    fn from_unchecked(balances: Balances<UncheckedState>) -> Result<Balances<Self>, Error>;
+}
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct CheckedState;
-impl BalancesState for CheckedState {}
+impl BalancesState for CheckedState {
+    fn from_unchecked(balances: Balances<UncheckedState>) -> Result<Balances<Self>, Error> {
+        balances.check()
+    }
+}
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct UncheckedState;
-impl BalancesState for UncheckedState {}
+impl BalancesState for UncheckedState {
+    fn from_unchecked(balances: Balances<Self>) -> Result<Balances<Self>, Error> {
+        Ok(balances)
+    }
+}
 
 impl TryFrom<Balances<UncheckedState>> for Balances<CheckedState> {
     type Error = Error;
@@ -123,52 +129,9 @@ impl TryFrom<Balances<UncheckedState>> for Balances<CheckedState> {
 
 /// This modules implements the needed non-generic structs that help with Deserialization of the `Balances<S>`
 mod de {
+    use serde::Deserializer;
+
     use super::*;
-
-    #[derive(Deserialize)]
-    struct DeserializeAccounting {
-        pub channel: Channel,
-        #[serde(flatten)]
-        pub balances: DeserializeBalances,
-        pub created: DateTime<Utc>,
-        pub updated: Option<DateTime<Utc>>,
-    }
-
-    impl<'de> Deserialize<'de> for Accounting<UncheckedState> {
-        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
-        {
-            let de_acc = DeserializeAccounting::deserialize(deserializer)?;
-
-            Ok(Self {
-                channel: de_acc.channel,
-                balances: Balances::<UncheckedState>::try_from(de_acc.balances)
-                    .map_err(serde::de::Error::custom)?,
-                created: de_acc.created,
-                updated: de_acc.updated,
-            })
-        }
-    }
-
-    impl<'de> Deserialize<'de> for Accounting<CheckedState> {
-        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
-        {
-            let unchecked_acc = Accounting::<UncheckedState>::deserialize(deserializer)?;
-
-            Ok(Self {
-                channel: unchecked_acc.channel,
-                balances: unchecked_acc
-                    .balances
-                    .check()
-                    .map_err(serde::de::Error::custom)?,
-                created: unchecked_acc.created,
-                updated: unchecked_acc.updated,
-            })
-        }
-    }
 
     #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
     struct DeserializeBalances {
@@ -176,29 +139,20 @@ mod de {
         pub spenders: UnifiedMap,
     }
 
-    impl<'de> Deserialize<'de> for Balances<CheckedState> {
-        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
-        {
-            let unchecked_balances = Balances::<UncheckedState>::deserialize(deserializer)?;
-
-            unchecked_balances.check().map_err(serde::de::Error::custom)
-        }
-    }
-
-    impl<'de> Deserialize<'de> for Balances<UncheckedState> {
+    impl<'de, S: BalancesState> Deserialize<'de> for Balances<S> {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
             D: Deserializer<'de>,
         {
             let deser_balances = DeserializeBalances::deserialize(deserializer)?;
 
-            Ok(Balances {
+            let unchecked_balances = Balances {
                 earners: deser_balances.earners,
                 spenders: deser_balances.spenders,
                 state: PhantomData::<UncheckedState>::default(),
-            })
+            };
+
+            S::from_unchecked(unchecked_balances).map_err(serde::de::Error::custom)
         }
     }
 

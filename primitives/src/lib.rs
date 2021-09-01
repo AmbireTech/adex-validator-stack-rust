@@ -6,6 +6,7 @@ pub use self::{
     ad_slot::AdSlot,
     ad_unit::AdUnit,
     address::Address,
+    balances::Balances,
     balances_map::{BalancesMap, UnifiedMap},
     big_num::BigNum,
     campaign::{Campaign, CampaignId},
@@ -22,6 +23,7 @@ mod ad_unit;
 pub mod adapter;
 pub mod address;
 pub mod analytics;
+pub mod balances;
 pub mod balances_map;
 pub mod big_num;
 pub mod campaign;

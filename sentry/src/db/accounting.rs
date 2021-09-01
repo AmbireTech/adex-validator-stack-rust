@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use primitives::{
-    sentry::accounting::{Balances, CheckedState},
+    balances::{Balances, CheckedState},
     Address, ChannelId, UnifiedNum,
 };
 use tokio_postgres::{
@@ -16,7 +16,7 @@ static UPDATE_ACCOUNTING_STATEMENT: &str = "INSERT INTO accounting(channel_id, s
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("Accounting Balances error: {0}")]
-    Balances(#[from] primitives::sentry::accounting::Error),
+    Balances(#[from] primitives::balances::Error),
     #[error("Fetching Accounting from postgres error: {0}")]
     Postgres(#[from] PoolError),
 }

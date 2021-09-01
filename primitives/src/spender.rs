@@ -9,11 +9,23 @@ pub struct Deposit {
     pub still_on_create2: UnifiedNum,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SpenderLeaf {
+    pub total_spent: UnifiedNum,
+    // merkle_proof: [u8; 32], // TODO
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Spender {
+    pub total_deposited: UnifiedNum,
+    pub spender_leaf: Option<SpenderLeaf>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Spendable {
     pub spender: Address,
     pub channel: Channel,
-    #[serde(flatten)]
     pub deposit: Deposit,
 }
 
