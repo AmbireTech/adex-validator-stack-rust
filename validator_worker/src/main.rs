@@ -94,7 +94,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let environment = std::env::var("ENV").unwrap_or_else(|_| "development".into());
     let config_file = cli.value_of("config");
     let config = configuration(&environment, config_file).expect("failed to parse configuration");
-    let sentry_url = cli.value_of("sentryUrl").expect("sentry url missing").parse()?;
+    let sentry_url = cli
+        .value_of("sentryUrl")
+        .expect("sentry url missing")
+        .parse()?;
     let is_single_tick = cli.is_present("singleTick");
 
     let adapter = match cli.value_of("adapter").unwrap() {
@@ -169,70 +172,66 @@ fn run<A: Adapter + 'static>(
 async fn infinite<A: Adapter + 'static>(args: Args<A>, logger: &Logger) {
     loop {
         let arg = args.clone();
-        let delay_future = sleep(Duration::from_millis(arg.config.wait_time as u64));
+        let wait_time_future = sleep(Duration::from_millis(arg.config.wait_time as u64));
 
-        let (channels, validators) = collect_channels(args.adapter, &args.sentry_url, &args.config, logger).await;
+        let (channels, validators) =
+            collect_channels(args.adapter, &args.sentry_url, &args.config, logger).await;
         // TODO: channels tick!
-        // let _result = join(all_channels_tick(arg, logger), delay_future).await;
+        let _result = join(
+            all_channels_tick(arg, logger, (channels, validators)),
+            wait_time_future,
+        )
+        .await;
     }
 }
 
-// async fn all_channels_tick<A: Adapter + 'static>(args: Args<A>, logger: &Logger) {
-//     let result = all_channels(&args.sentry_url, &args.adapter.whoami()).await;
+async fn all_channels_tick<A: Adapter + 'static>(
+    args: Args<A>,
+    logger: &Logger,
+    (channels, validators): (HashSet<Channel>, Validators),
+) {
+    let tick_results = join_all(
+        channels
+            .into_iter()
+            .map(|channel| channel_tick(args.adapter.clone(), &args.config, logger, channel)),
+    )
+    .await;
 
-//     let (channels, channels_size) = match result {
-//         Ok(channels) => (channels, channels.len()),
-//         Err(e) => {
-//             error!(logger, "Failed to get channels"; "error" => ?e, "main" => "iterate_channels");
-//             return;
-//         }
-//     };
+    //     for channel_err in tick_results.into_iter().filter_map(Result::err) {
+    //         error!(logger, "Error processing channel"; "channel_error" => ?channel_err, "main" => "iterate_channels");
+    //     }
 
-//     let tick_results = join_all(
-//         channels
-//             .into_iter()
-//             .map(|channel| validator_tick(args.adapter.clone(), channel, &args.config, logger)),
-//     )
-//     .await;
+    //     info!(logger, "Processed {} channels", channels_size);
 
-//     for channel_err in tick_results.into_iter().filter_map(Result::err) {
-//         error!(logger, "Error processing channel"; "channel_error" => ?channel_err, "main" => "iterate_channels");
-//     }
-
-//     info!(logger, "Processed {} channels", channels_size);
-
-//     if channels_size >= args.config.max_channels as usize {
-//         error!(logger, "WARNING: channel limit cfg.MAX_CHANNELS={} reached", &args.config.max_channels; "main" => "iterate_channels");
-//     }
-// }
-
-struct ChannelTick {
-    channel: ChannelV5,
-    campaigns: Validators,
-    whoami: ValidatorId,
+    //     if channels_size >= args.config.max_channels as usize {
+    //         error!(logger, "WARNING: channel limit cfg.MAX_CHANNELS={} reached", &args.config.max_channels; "main" => "iterate_channels");
+    //     }
 }
 
-impl ChannelTicker {
-    async fn tick(&self) {
-        // `GET /channel/:id/spender/all`
+async fn channel_tick<A: Adapter + 'static>(
+    adapter: A,
+    channel: Channel,
+    config: &Config,
+    logger: &Logger,
+) -> Result<(ChannelId, Box<dyn Debug>), ValidatorWorkerError<A::AdapterError>> {
+    // `GET /channel/:id/spender/all`
 
-        // `GET /channel/:id/accounting`
+    // `GET /channel/:id/accounting`
 
-        // Validation #1:
-        // sum(Accounting.spenders) == sum(Accounting.earners)
-        // spender.spender_leaf.total_deposit >= accounting.balances.spenders[spender.address]
+    // Validation #1:
+    // sum(Accounting.spenders) == sum(Accounting.earners)
+    // spender.spender_leaf.total_deposit >= accounting.balances.spenders[spender.address]
 
-        // `GET Last Approved State`
-        // `GET Last Approved NewState`
+    // `GET Last Approved State`
+    // `GET Last Approved NewState`
 
-        // Validation #3
-        // Accounting.balances != NewState.balances
+    // Validation #3
+    // Accounting.balances != NewState.balances
 
-        // Validation #4
-        // OUTPACE Rules:
-        // sum(accounting.balances.spenders) > sum(new_state.balances.spenders)
-        // sum(accounting.balances.earners) > sum(new_state.balances.earners)
-    }
+    // Validation #4
+    // OUTPACE Rules:
+    // sum(accounting.balances.spenders) > sum(new_state.balances.spenders)
+    // sum(accounting.balances.earners) > sum(new_state.balances.earners)
 }
 
 /// Fetches all `Campaign`s from Sentry and builds the `Channel`s to be processed
