@@ -5,10 +5,7 @@ use futures::future::{join_all, try_join_all, TryFutureExt};
 use reqwest::{Client, Response};
 use slog::Logger;
 
-use primitives::{{ChannelId, Config, ToETHChecksum, ValidatorId}, adapter::{Adapter, AdapterErrorKind, Error as AdapterError}, balances::UncheckedState, channel::Channel as ChannelOld, channel_v5::Channel, sentry::{
-        ChannelListResponse, EventAggregateResponse, LastApprovedResponse, SuccessResponse,
-        ValidatorMessageResponse,
-    }, spender::Spender, util::ApiUrl, validator::MessageTypes};
+use primitives::{{ChannelId, Config, ToETHChecksum, ValidatorId}, Address, adapter::{Adapter, AdapterErrorKind, Error as AdapterError}, balances::{CheckedState, UncheckedState}, channel::Channel as ChannelOld, channel_v5::Channel, sentry::{AccountingResponse, ChannelListResponse, EventAggregateResponse, LastApprovedResponse, SuccessResponse, ValidatorMessageResponse}, spender::Spender, util::ApiUrl, validator::MessageTypes};
 use thiserror::Error;
 
 pub type PropagationResult<AE> = Result<ValidatorId, (ValidatorId, Error<AE>)>;
@@ -139,11 +136,12 @@ impl<A: Adapter + 'static> SentryApi<A> {
 
     pub async fn get_last_approved(
         &self,
+        channel: ChannelId,
     ) -> Result<LastApprovedResponse<UncheckedState>, Error<A::AdapterError>> {
         self.client
             .get(
                 self.whoami.url
-                    .join("last-approved")
+                    .join(&format!("v5/channel/{}/last-approved", channel))
                     .expect("Should not error while creating endpoint"),
             )
             .send()
@@ -168,11 +166,12 @@ impl<A: Adapter + 'static> SentryApi<A> {
             .await
     }
 
-    pub async fn get_all_spenders(&self) -> Result<Vec<Spender>, Error<A::AdapterError>> {
+    // TODO: Pagination & use of `AllSpendersResponse`
+    pub async fn get_all_spenders(&self) -> Result<HashMap<Address, Spender>, Error<A::AdapterError>> {
         let url = self
             .whoami.url
             .join(&format!(
-                "channel/{}/spender/all",
+                "v5/channel/{}/spender/all",
                 self.channel.id()
             ))
             .expect("Should not error when creating endpoint");
@@ -182,11 +181,34 @@ impl<A: Adapter + 'static> SentryApi<A> {
             .bearer_auth(&self.whoami.token)
             .send()
             .await?
+            // TODO: Should be `AllSpendersResponse` and should have pagination!
             .json()
             .map_err(Error::Request)
             .await
     }
 
+    /// Get the accounting from Sentry
+    /// `Balances` should always be in `CheckedState`
+    pub async fn get_accounting(&self, channel: ChannelId) -> Result<AccountingResponse<CheckedState>, Error<A::AdapterError>> {
+        let url = self
+            .whoami.url
+            .join(&format!(
+                "v5/channel/{}/accounting",
+                channel
+            ))
+            .expect("Should not error when creating endpoint");
+
+        self.client
+            .get(url)
+            .bearer_auth(&self.whoami.token)
+            .send()
+            .await?
+            .json::<AccountingResponse<CheckedState>>()
+            .map_err(Error::Request)
+            .await
+    }
+
+    #[deprecated = "V5 no longer needs event aggregates"]
     pub async fn get_event_aggregates(
         &self,
         after: DateTime<Utc>,
@@ -217,7 +239,7 @@ async fn propagate_to<A: Adapter>(
     messages: &[&MessageTypes],
 ) -> PropagationResult<A::AdapterError> {
     let endpoint = validator.url.join(&format!(
-        "channel/{}/validator-messages",
+        "v5/channel/{}/validator-messages",
         channel_id
     )).expect("Should not error when creating endpoint url");
 
