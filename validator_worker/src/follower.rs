@@ -38,7 +38,7 @@ impl fmt::Display for InvalidNewState {
 }
 
 #[derive(Debug)]
-pub enum ApproveStateResult<AE: AdapterErrorKind> {
+pub enum ApproveStateResult<AE: AdapterErrorKind + 'static> {
     /// If None, Conditions for handling the new state haven't been met
     Sent(Option<Vec<PropagationResult<AE>>>),
     RejectedState {
@@ -49,7 +49,7 @@ pub enum ApproveStateResult<AE: AdapterErrorKind> {
 }
 
 #[derive(Debug)]
-pub struct TickStatus<AE: AdapterErrorKind> {
+pub struct TickStatus<AE: AdapterErrorKind + 'static> {
     pub heartbeat: HeartbeatStatus<AE>,
     pub approve_state: ApproveStateResult<AE>,
 }
@@ -57,42 +57,44 @@ pub struct TickStatus<AE: AdapterErrorKind> {
 pub async fn tick<A: Adapter + 'static>(
     iface: &SentryApi<A>,
 ) -> Result<TickStatus<A::AdapterError>, Box<dyn Error>> {
-    let from = &iface.channel.spec.validators.leader().id;
-    let new_msg_response = iface.get_latest_msg(from, &["NewState"]).await?;
-    let new_msg = match new_msg_response {
-        Some(MessageTypes::NewState(new_state)) => Some(new_state),
-        _ => None,
-    };
+    // let from = &iface.channel.spec.validators.leader().id;
+    // let new_msg_response = iface.get_latest_msg(from, &["NewState"]).await?;
+    // let new_msg = match new_msg_response {
+    //     Some(MessageTypes::NewState(new_state)) => Some(new_state),
+    //     _ => None,
+    // };
 
-    let our_latest_msg_response = iface
-        .get_our_latest_msg(&["ApproveState", "RejectState"])
-        .await?;
+    // let our_latest_msg_response = iface
+    //     .get_our_latest_msg(&["ApproveState", "RejectState"])
+    //     .await?;
 
-    let our_latest_msg_state_root = match our_latest_msg_response {
-        Some(MessageTypes::ApproveState(approve_state)) => Some(approve_state.state_root),
-        Some(MessageTypes::RejectState(reject_state)) => Some(reject_state.state_root),
-        _ => None,
-    };
+    // let our_latest_msg_state_root = match our_latest_msg_response {
+    //     Some(MessageTypes::ApproveState(approve_state)) => Some(approve_state.state_root),
+    //     Some(MessageTypes::RejectState(reject_state)) => Some(reject_state.state_root),
+    //     _ => None,
+    // };
 
-    let latest_is_responded_to = match (&new_msg, &our_latest_msg_state_root) {
-        (Some(new_msg), Some(state_root)) => &new_msg.state_root == state_root,
-        _ => false,
-    };
+    // let latest_is_responded_to = match (&new_msg, &our_latest_msg_state_root) {
+    //     (Some(new_msg), Some(state_root)) => &new_msg.state_root == state_root,
+    //     _ => false,
+    // };
 
-    let _balances = Balances::<UncheckedState>::default();
+    // let _balances = Balances::<UncheckedState>::default();
 
-    let approve_state_result = if let (Some(new_state), false) = (new_msg, latest_is_responded_to) {
-        on_new_state(iface, &BalancesMap::default(), &new_state).await?
-    } else {
-        ApproveStateResult::Sent(None)
-    };
+    // let approve_state_result = if let (Some(new_state), false) = (new_msg, latest_is_responded_to) {
+    //     on_new_state(iface, &BalancesMap::default(), &new_state).await?
+    // } else {
+    //     ApproveStateResult::Sent(None)
+    // };
 
-    Ok(TickStatus {
-        heartbeat: heartbeat(iface).await?,
-        approve_state: approve_state_result,
-    })
+    // Ok(TickStatus {
+    //     heartbeat: heartbeat(iface).await?,
+    //     approve_state: approve_state_result,
+    // })
+    todo!()
 }
 
+#[allow(dead_code)]
 async fn on_new_state<'a, A: Adapter + 'static>(
     iface: &'a SentryApi<A>,
     balances: &'a BalancesMap,
@@ -113,7 +115,7 @@ async fn on_new_state<'a, A: Adapter + 'static>(
         return Ok(on_error(iface, new_state, InvalidNewState::Signature).await);
     }
 
-    let last_approve_response = iface.get_last_approved().await?;
+    let last_approve_response = iface.get_last_approved(iface.channel.id).await?;
     let _prev_balances = match last_approve_response
         .last_approved
         .and_then(|last_approved| last_approved.new_state)
@@ -150,6 +152,7 @@ async fn on_new_state<'a, A: Adapter + 'static>(
     Ok(ApproveStateResult::Sent(Some(propagation_result)))
 }
 
+#[allow(dead_code)]
 async fn on_error<'a, A: Adapter + 'static>(
     iface: &'a SentryApi<A>,
     new_state: &'a NewState<UncheckedState>,

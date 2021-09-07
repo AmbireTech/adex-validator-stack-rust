@@ -10,6 +10,7 @@ use primitives::BalancesMap;
 
 pub use self::sentry_interface::{all_channels, SentryApi};
 
+pub mod channel;
 pub mod error;
 pub mod follower;
 pub mod heartbeat;
@@ -32,7 +33,7 @@ pub(crate) fn get_state_root_hash<A: Adapter + 'static>(
 
     let tree = MerkleTree::new(&elems)?;
     // keccak256(channelId, balanceRoot
-    get_signable_state_root(iface.channel.id.as_ref(), &tree.root())
+    get_signable_state_root(iface.channel.id().as_ref(), &tree.root())
 }
 
 #[cfg(test)]
@@ -42,7 +43,7 @@ mod test {
     use adapter::DummyAdapter;
     use primitives::adapter::DummyAdapterOptions;
     use primitives::config::configuration;
-    use primitives::util::tests::prep_db::{ADDRESSES, AUTH, DUMMY_CHANNEL, IDS};
+    use primitives::util::tests::prep_db::{ADDRESSES, AUTH, DUMMY_CAMPAIGN, DUMMY_CHANNEL, IDS};
     use primitives::{BalancesMap, Channel};
     use slog::{o, Discard, Logger};
 
@@ -56,7 +57,13 @@ mod test {
         let dummy_adapter = DummyAdapter::init(adapter_options, &config);
         let logger = Logger::root(Discard, o!());
 
-        SentryApi::init(dummy_adapter, channel.clone(), &config, logger).expect("should succeed")
+        SentryApi::init(
+            dummy_adapter,
+            logger,
+            config,
+            (DUMMY_CAMPAIGN.channel, Default::default()),
+        )
+        .expect("should succeed")
     }
 
     #[test]

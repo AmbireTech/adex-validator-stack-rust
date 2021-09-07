@@ -27,6 +27,7 @@ use primitives::{
 use slog::{error, info, Logger};
 use std::fmt::Debug;
 use validator_worker::{
+    channel::{collect_channels, channel_tick},
     all_channels,
     error::{Error as ValidatorWorkerError, TickError},
     follower, leader, sentry_interface,
@@ -193,7 +194,7 @@ async fn all_channels_tick<A: Adapter + 'static>(
     let tick_results = join_all(
         channels
             .into_iter()
-            .map(|channel| channel_tick(args.adapter.clone(), &args.config, logger, channel)),
+            .map(|channel| channel_tick(args.adapter.clone(), &args.config, logger, channel, validators)),
     )
     .await;
 
@@ -206,82 +207,6 @@ async fn all_channels_tick<A: Adapter + 'static>(
     //     if channels_size >= args.config.max_channels as usize {
     //         error!(logger, "WARNING: channel limit cfg.MAX_CHANNELS={} reached", &args.config.max_channels; "main" => "iterate_channels");
     //     }
-}
-
-async fn channel_tick<A: Adapter + 'static>(
-    adapter: A,
-    channel: Channel,
-    config: &Config,
-    logger: &Logger,
-) -> Result<(ChannelId, Box<dyn Debug>), ValidatorWorkerError<A::AdapterError>> {
-    // `GET /channel/:id/spender/all`
-
-    // `GET /channel/:id/accounting`
-
-    // Validation #1:
-    // sum(Accounting.spenders) == sum(Accounting.earners)
-    // spender.spender_leaf.total_deposit >= accounting.balances.spenders[spender.address]
-
-    // `GET Last Approved State`
-    // `GET Last Approved NewState`
-
-    // Validation #3
-    // Accounting.balances != NewState.balances
-
-    // Validation #4
-    // OUTPACE Rules:
-    // sum(accounting.balances.spenders) > sum(new_state.balances.spenders)
-    // sum(accounting.balances.earners) > sum(new_state.balances.earners)
-}
-
-/// Fetches all `Campaign`s from Sentry and builds the `Channel`s to be processed
-/// along side all the `Validator`s' url & auth token
-async fn collect_channels<A: Adapter + 'static>(
-    adapter: A,
-    sentry_url: &ApiUrl,
-    config: &Config,
-    logger: &Logger,
-) -> (HashSet<Channel>, Validators) {
-    let whoami = adapter.whoami();
-
-    let campaigns = all_campaigns(sentry_url, whoami).await?;
-    let channels = campaigns
-        .iter()
-        .map(|campaign| campaign.channel)
-        .collect::<HashSet<_>>();
-
-    let validators = campaigns
-        .into_iter()
-        .fold(Validators::new(), |mut acc, campaign| {
-            for validator_desc in campaign.validators.iter() {
-                // if Validator is already there, we can just skip it
-                // remember, the campaigns are ordered by `created DESC`
-                // so we will always get the latest Validator url first
-                match acc.entry(campaign.id) {
-                    Entry::Occupied(_) => continue,
-                    Entry::Vacant(entry) => {
-                        // try to parse the url of the Validator Desc
-                        let validator_url = validator_desc.url.parse::<ApiUrl>();
-                        // and also try to find the Auth token in the config
-
-                        // if there was an error with any of the operations, skip this `ValidatorDesc`
-                        let auth_token = adapter.get_auth(&validator_desc.id);
-
-                        // only if `ApiUrl` parsing is `Ok` & Auth Token is found in the `Adapter`
-                        if let (Ok(url), Ok(auth_token)) = (validator_url, auth_token) {
-                            // add an entry for propagation
-                            entry.or_insert((url, auth_token))
-                        }
-                        // otherwise it will try to do the same things on the next encounter of this `ValidatorId`
-                    }
-                }
-
-                acc
-            }
-        })
-        .collect();
-
-    (channels, validators)
 }
 
 // async fn validator_tick<A: Adapter + 'static>(

@@ -26,4 +26,8 @@ pub enum Error<AE: AdapterErrorKind + 'static> {
     LeaderTick(ChannelId, TickError),
     #[error("FollowerTick {0}: {1}")]
     FollowerTick(ChannelId, TickError),
+    #[error("Placeholder for Validation errors")]
+    Validation,
+    #[error("Placeholder for sum overflow error")]
+    Overflow,
 }
