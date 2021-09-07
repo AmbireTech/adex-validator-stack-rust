@@ -77,7 +77,8 @@ static CAMPAIGN_UPDATE_BY_ID: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^/v5/campaign/0x([a-zA-Z0-9]{32})/?$").expect("The regex should be valid")
 });
 static CHANNEL_ALL_SPENDER_LIMITS: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/spender/all/?$").expect("The regex should be valid")
+    Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/spender/all/?$")
+        .expect("The regex should be valid")
 });
 
 #[derive(Debug, Clone)]
@@ -398,7 +399,6 @@ async fn channels_router<A: Adapter + 'static>(
         get_spender_limits(req, app).await
     } else if let (Some(caps), &Method::GET) = (CHANNEL_ALL_SPENDER_LIMITS.captures(&path), method)
     {
-
         let param = RouteParams(vec![caps
             .get(1)
             .map_or("".to_string(), |m| m.as_str().to_string())]);

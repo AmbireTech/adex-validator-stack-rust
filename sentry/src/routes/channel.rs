@@ -312,7 +312,7 @@ pub async fn get_spender_limits<A: Adapter + 'static>(
         }
     };
 
-    let new_state = match get_corresponding_new_state(&app.pool, &channel).await {
+    let new_state = match get_corresponding_new_state(&app.pool, &channel).await? {
         Some(new_state) => new_state,
         None => return spender_response_without_leaf(latest_spendable.deposit.total),
     };
@@ -346,9 +346,10 @@ pub async fn get_all_spender_limits<A: Adapter + 'static>(
         .expect("Request should have Channel")
         .to_owned();
 
-    let new_state = get_corresponding_new_state(&app.pool, &channel)
-        .await
-        .ok_or(ResponseError::NotFound)?;
+    let new_state = match get_corresponding_new_state(&app.pool, &channel).await? {
+        Some(new_state) => new_state,
+        None => return Err(ResponseError::NotFound),
+    };
 
     let mut all_spender_limits: HashMap<Address, Spender> = HashMap::new();
 
@@ -357,15 +358,22 @@ pub async fn get_all_spender_limits<A: Adapter + 'static>(
         let latest_spendable =
             match fetch_spendable(app.pool.clone(), spender_addr, &channel.id()).await? {
                 Some(spendable) => spendable,
-                None => return Err(ResponseError::NotFound),
+                None => continue, // skipping spender if not found
             };
 
         let total_deposited = latest_spendable.deposit.total;
-        let spender_leaf = get_spender_leaf_for_spender(balance, &total_deposited);
+        let total_spent = total_deposited.checked_sub(balance).ok_or_else(|| {
+            ResponseError::FailedValidation("Couldn't calculate total_spent".to_string())
+        })?;
+
+        let spender_leaf = SpenderLeaf {
+            total_spent,
+            // merkle_proof: [u8; 32], // TODO
+        };
 
         let spender_info = Spender {
             total_deposited,
-            spender_leaf,
+            spender_leaf: Some(spender_leaf),
         };
 
         all_spender_limits.insert(*spender_addr, spender_info);
@@ -381,35 +389,17 @@ pub async fn get_all_spender_limits<A: Adapter + 'static>(
 async fn get_corresponding_new_state(
     pool: &DbPool,
     channel: &ChannelV5,
-) -> Option<MessageResponse<NewState<UncheckedState>>> {
-    let approve_state = match latest_approve_state_v5(pool, channel).await.ok()? {
+) -> Result<Option<MessageResponse<NewState<UncheckedState>>>, ResponseError> {
+    let approve_state = match latest_approve_state_v5(pool, channel).await? {
         Some(approve_state) => approve_state,
-        None => return None,
+        None => return Err(ResponseError::NotFound),
     };
 
     let state_root = approve_state.msg.state_root.clone();
 
-    let new_state = latest_new_state_v5(pool, channel, &state_root).await.ok()?;
+    let new_state = latest_new_state_v5(pool, channel, &state_root).await?;
 
-    new_state
-}
-
-fn get_spender_leaf_for_spender(
-    spender_balance: &UnifiedNum,
-    total_deposited: &UnifiedNum,
-) -> Option<SpenderLeaf> {
-    let total_spent = match total_deposited.checked_sub(spender_balance) {
-        Some(spent) => spent,
-        None => return None,
-    };
-
-    // Return
-    let leaf = SpenderLeaf {
-        total_spent,
-        // merkle_proof: [u8; 32], // TODO
-    };
-
-    Some(leaf)
+    Ok(new_state)
 }
 
 #[cfg(test)]
