@@ -1,6 +1,5 @@
 use crate::{
     balances::BalancesState,
-    channel_v5::Channel as ChannelV5,
     spender::Spender,
     validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
     Address, Balances, BigNum, Channel, ChannelId, ValidatorId, IPFS,
@@ -11,12 +10,11 @@ use std::{collections::HashMap, fmt, hash::Hash};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct Accounting<S: BalancesState> {
-    pub channel: ChannelV5,
+/// Channel Accounting response
+/// A collection of all `Accounting`s for a specific `Channel`
+pub struct AccountingResponse<S: BalancesState> {
     #[serde(flatten, bound = "S: BalancesState")]
     pub balances: Balances<S>,
-    pub updated: Option<DateTime<Utc>>,
-    pub created: DateTime<Utc>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
