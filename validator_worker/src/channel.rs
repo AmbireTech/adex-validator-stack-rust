@@ -1,20 +1,21 @@
 use crate::{
     error::Error,
-    follower::TickStatus,
+    // follower::TickStatus,
     sentry_interface::{campaigns::all_campaigns, Validator, Validators},
     SentryApi,
 };
 use primitives::{
     adapter::Adapter, channel_v5::Channel, config::Config, util::ApiUrl, ChannelId, UnifiedNum,
 };
-use slog::{error, info, Logger};
+// use slog::{error, info, Logger};
+use slog::Logger;
 use std::collections::{hash_map::Entry, HashSet};
 
 pub enum TickError {
     Validation,
 }
 
-async fn channel_tick<A: Adapter + 'static>(
+pub async fn channel_tick<A: Adapter + 'static>(
     adapter: A,
     config: &Config,
     logger: &Logger,
@@ -59,7 +60,7 @@ async fn channel_tick<A: Adapter + 'static>(
 
     // Validation #3
     // Accounting.balances != NewState.balances
-    
+
 
     // Validation #4
     // OUTPACE Rules:
@@ -100,11 +101,11 @@ async fn channel_tick<A: Adapter + 'static>(
 
 /// Fetches all `Campaign`s from Sentry and builds the `Channel`s to be processed
 /// along side all the `Validator`s' url & auth token
-async fn collect_channels<A: Adapter + 'static>(
+pub async fn collect_channels<A: Adapter + 'static>(
     adapter: A,
     sentry_url: &ApiUrl,
-    config: &Config,
-    logger: &Logger,
+    _config: &Config,
+    _logger: &Logger,
 ) -> Result<(HashSet<Channel>, Validators), reqwest::Error> {
     let whoami = adapter.whoami();
 

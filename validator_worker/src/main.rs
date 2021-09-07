@@ -1,43 +1,42 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
 
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    convert::TryFrom,
-    error::Error,
-    time::Duration,
-};
+use std::{collections::HashSet, convert::TryFrom, error::Error, time::Duration};
 
 use clap::{crate_version, App, Arg};
 use futures::future::{join, join_all};
 use tokio::{
     runtime::Runtime,
-    time::{sleep, timeout},
+    // time::{sleep, timeout},
+    time::sleep,
 };
 
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
 use primitives::{
     adapter::{Adapter, DummyAdapterOptions, KeystoreOptions},
-    channel_v5::Channel as ChannelV5,
+    // channel_v5::Channel as ChannelV5,
     config::{configuration, Config},
     util::tests::prep_db::{AUTH, IDS},
     util::ApiUrl,
-    Campaign, Channel, ChannelId, SpecValidator, ValidatorId,
+    Channel,
+    ValidatorId,
+    // Campaign,  ChannelId, SpecValidator,
 };
 use slog::{error, info, Logger};
 use std::fmt::Debug;
 use validator_worker::{
-    channel::{collect_channels, channel_tick},
-    all_channels,
-    error::{Error as ValidatorWorkerError, TickError},
-    follower, leader, sentry_interface,
-    sentry_interface::{campaigns::all_campaigns, Validators},
-    SentryApi,
+    channel::{channel_tick, collect_channels},
+    // all_channels,
+    // error::{Error as ValidatorWorkerError, TickError},
+    // follower, leader, sentry_interface,
+    // sentry_interface::{campaigns::all_campaigns, Validators},
+    // SentryApi,
+    sentry_interface::Validators,
 };
 
 #[derive(Debug, Clone)]
 struct Args<A: Adapter> {
-    sentry_url: String,
+    sentry_url: ApiUrl,
     config: Config,
     adapter: A,
 }
@@ -175,38 +174,48 @@ async fn infinite<A: Adapter + 'static>(args: Args<A>, logger: &Logger) {
         let arg = args.clone();
         let wait_time_future = sleep(Duration::from_millis(arg.config.wait_time as u64));
 
-        let (channels, validators) =
-            collect_channels(args.adapter, &args.sentry_url, &args.config, logger).await;
         // TODO: channels tick!
-        let _result = join(
-            all_channels_tick(arg, logger, (channels, validators)),
-            wait_time_future,
-        )
-        .await;
+        let _result = join(all_channels_tick(arg, logger), wait_time_future).await;
     }
 }
 
-async fn all_channels_tick<A: Adapter + 'static>(
-    args: Args<A>,
-    logger: &Logger,
-    (channels, validators): (HashSet<Channel>, Validators),
-) {
-    let tick_results = join_all(
-        channels
-            .into_iter()
-            .map(|channel| channel_tick(args.adapter.clone(), &args.config, logger, channel, validators)),
+async fn all_channels_tick<A: Adapter + 'static>(args: Args<A>, logger: &Logger) {
+    let (channels, validators) = match collect_channels(
+        args.adapter.clone(),
+        &args.sentry_url,
+        &args.config,
+        logger,
     )
+    .await
+    {
+        Ok(res) => res,
+        Err(err) => {
+            error!(logger, "Error collecting all channels for tick"; "collect_channels" => ?err, "main" => "all_channels_tick");
+            return;
+        }
+    };
+    let channels_size = channels.len();
+
+    let tick_results = join_all(channels.into_iter().map(|channel| {
+        channel_tick(
+            args.adapter.clone(),
+            &args.config,
+            logger,
+            channel,
+            validators.clone(),
+        )
+    }))
     .await;
 
-    //     for channel_err in tick_results.into_iter().filter_map(Result::err) {
-    //         error!(logger, "Error processing channel"; "channel_error" => ?channel_err, "main" => "iterate_channels");
-    //     }
+    for channel_err in tick_results.into_iter().filter_map(Result::err) {
+        error!(logger, "Error processing channel"; "channel_error" => ?channel_err, "main" => "iterate_channels");
+    }
 
-    //     info!(logger, "Processed {} channels", channels_size);
+    info!(logger, "Processed {} channels", channels_size);
 
-    //     if channels_size >= args.config.max_channels as usize {
-    //         error!(logger, "WARNING: channel limit cfg.MAX_CHANNELS={} reached", &args.config.max_channels; "main" => "iterate_channels");
-    //     }
+    if channels_size >= args.config.max_channels as usize {
+        error!(logger, "WARNING: channel limit cfg.MAX_CHANNELS={} reached", &args.config.max_channels; "main" => "iterate_channels");
+    }
 }
 
 // async fn validator_tick<A: Adapter + 'static>(

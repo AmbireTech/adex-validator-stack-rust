@@ -4,9 +4,7 @@
 use std::error::Error;
 
 use adapter::{get_balance_leaf, get_signable_state_root};
-use primitives::adapter::Adapter;
-use primitives::merkle_tree::MerkleTree;
-use primitives::BalancesMap;
+use primitives::{adapter::Adapter, merkle_tree::MerkleTree, BalancesMap};
 
 pub use self::sentry_interface::{all_channels, SentryApi};
 
