@@ -12,14 +12,14 @@ pub use self::sentry_interface::{all_channels, SentryApi};
 
 pub mod channel;
 pub mod error;
-pub mod follower;
+// pub mod follower;
 pub mod heartbeat;
-pub mod leader;
+// pub mod leader;
 pub mod sentry_interface;
 
-pub mod core {
-    pub mod follower_rules;
-}
+// pub mod core {
+//     pub mod follower_rules;
+// }
 
 pub(crate) fn get_state_root_hash<A: Adapter + 'static>(
     iface: &SentryApi<A>,

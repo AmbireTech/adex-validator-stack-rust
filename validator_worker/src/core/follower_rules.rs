@@ -1,18 +1,36 @@
-use primitives::{BalancesMap, BigNum, Channel};
+use primitives::{Balances, BalancesMap, BigNum, channel_v5::Channel as ChannelV5, Channel, UnifiedNum, balances::CheckedState};
 
-pub fn is_valid_transition(channel: &Channel, prev: &BalancesMap, next: &BalancesMap) -> bool {
-    let sum_prev: BigNum = prev.values().sum();
-    let sum_next: BigNum = next.values().sum();
+pub fn is_valid_transition(channel: &ChannelV5, prev: &Balances<CheckedState>, next: &Balances<CheckedState>) -> Option<bool> {
+    let (earners_prev, earners_next) = {
+        let sum_prev: Option<UnifiedNum> = prev.earners.values().sum();
+        let sum_next: Option<UnifiedNum> = next.earners.values().sum();
 
-    let deposit = channel.deposit_amount.clone();
+        (sum_prev?, sum_next?)
+    };
 
-    let prev_checks = prev.iter().all(|(acc, bal)| match next.get(acc) {
-        Some(next_bal) => next_bal >= bal,
-        None => false,
-    });
+    let (spenders_prev, spenders_next) = {
+        let sum_prev: Option<UnifiedNum> = prev.spenders.values().sum();
+        let sum_next: Option<UnifiedNum> = next.spenders.values().sum();
+
+        (sum_prev?, sum_next?)
+    };
+
+    let prev_checks = {
+        let prev_spenders = prev.spenders.iter().all(|(acc, bal)| match next.spenders.get(acc) {
+            Some(next_bal) => next_bal >= bal,
+            None => false,
+        });
+
+        let prev_earners = prev.earners.iter().all(|(acc, bal)| match next.earners.get(acc) {
+            Some(next_bal) => next_bal >= bal,
+            None => false,
+        });
+
+        prev_spenders && prev_earners
+    };
 
     // no need to check if there are negative balances as we don't allow them using BigUint
-    sum_next >= sum_prev && sum_next <= deposit && prev_checks
+    Some(earners_next >= earners_prev && spenders_next >= spenders_prev && prev_checks)
 }
 
 pub fn get_health(channel: &Channel, our: &BalancesMap, approved: &BalancesMap) -> u64 {
@@ -52,10 +70,9 @@ mod test {
     fn is_valid_transition_empty_to_empty() {
         assert!(
             is_valid_transition(
-                &get_dummy_channel(100),
-                &BalancesMap::default(),
-                &BalancesMap::default(),
-            ),
+                &Balances::default(),
+                &Balances::default(),
+            ).unwrap(),
             "is valid transition"
         )
     }
@@ -67,7 +84,7 @@ mod test {
             .collect();
 
         assert!(
-            is_valid_transition(&get_dummy_channel(100), &BalancesMap::default(), &next,),
+            is_valid_transition(&BalancesMap::default(), &next).unwrap(),
             "is valid transition"
         )
     }

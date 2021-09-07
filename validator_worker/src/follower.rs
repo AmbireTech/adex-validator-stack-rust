@@ -1,7 +1,9 @@
+use std::convert::TryFrom;
 use std::error::Error;
 use std::fmt;
 
 use primitives::adapter::{Adapter, AdapterErrorKind};
+use primitives::balances::CheckedState;
 use primitives::validator::{ApproveState, MessageTypes, NewState, RejectState};
 use primitives::{
     balances::{Balances, UncheckedState},
@@ -57,65 +59,68 @@ pub struct TickStatus<AE: AdapterErrorKind + 'static> {
 pub async fn tick<A: Adapter + 'static>(
     iface: &SentryApi<A>,
 ) -> Result<TickStatus<A::AdapterError>, Box<dyn Error>> {
-    // let from = &iface.channel.spec.validators.leader().id;
-    // let new_msg_response = iface.get_latest_msg(from, &["NewState"]).await?;
-    // let new_msg = match new_msg_response {
-    //     Some(MessageTypes::NewState(new_state)) => Some(new_state),
-    //     _ => None,
-    // };
+    let from = iface.channel.leader;
 
-    // let our_latest_msg_response = iface
-    //     .get_our_latest_msg(&["ApproveState", "RejectState"])
-    //     .await?;
+    let new_msg_response = iface.get_latest_msg(&from, &["NewState"]).await?;
+    // if we don't have a `NewState` return, just use `None`
+    let new_msg = new_msg_response.and_then(|message_types| NewState::try_from(message_types).ok());
 
-    // let our_latest_msg_state_root = match our_latest_msg_response {
-    //     Some(MessageTypes::ApproveState(approve_state)) => Some(approve_state.state_root),
-    //     Some(MessageTypes::RejectState(reject_state)) => Some(reject_state.state_root),
-    //     _ => None,
-    // };
+    let our_latest_msg_response = iface
+        .get_our_latest_msg(&["ApproveState", "RejectState"])
+        .await?;
 
-    // let latest_is_responded_to = match (&new_msg, &our_latest_msg_state_root) {
-    //     (Some(new_msg), Some(state_root)) => &new_msg.state_root == state_root,
-    //     _ => false,
-    // };
+    let our_latest_msg_state_root = match our_latest_msg_response {
+        Some(MessageTypes::ApproveState(approve_state)) => Some(approve_state.state_root),
+        Some(MessageTypes::RejectState(reject_state)) => Some(reject_state.state_root),
+        _ => None,
+    };
 
-    // let _balances = Balances::<UncheckedState>::default();
+    let latest_is_responded_to = match (&new_msg, &our_latest_msg_state_root) {
+        (Some(new_msg), Some(state_root)) => &new_msg.state_root == state_root,
+        _ => false,
+    };
 
-    // let approve_state_result = if let (Some(new_state), false) = (new_msg, latest_is_responded_to) {
-    //     on_new_state(iface, &BalancesMap::default(), &new_state).await?
-    // } else {
-    //     ApproveStateResult::Sent(None)
-    // };
+    // TODO: Get accounting balances
+    let accounting_balances = Balances::<CheckedState>::default();
 
-    // Ok(TickStatus {
-    //     heartbeat: heartbeat(iface).await?,
-    //     approve_state: approve_state_result,
-    // })
-    todo!()
+    let approve_state_result = if let (Some(new_state), false) = (new_msg, latest_is_responded_to) {
+        on_new_state(iface, accounting_balances, &new_state).await?
+    } else {
+        ApproveStateResult::Sent(None)
+    };
+
+    Ok(TickStatus {
+        heartbeat: heartbeat(iface).await?,
+        approve_state: approve_state_result,
+    })
 }
 
 #[allow(dead_code)]
 async fn on_new_state<'a, A: Adapter + 'static>(
     iface: &'a SentryApi<A>,
-    balances: &'a BalancesMap,
+    accounting_balances: Balances<CheckedState>,
     new_state: &'a NewState<UncheckedState>,
 ) -> Result<ApproveStateResult<A::AdapterError>, Box<dyn Error>> {
+    // todo: Handle balance check error!
+    let proposed_balances = new_state.balances.clone().check()?;
     let proposed_balances = BalancesMap::default();
-    // let proposed_balances = new_state.balances.clone();
+
     let proposed_state_root = new_state.state_root.clone();
+
+
     if proposed_state_root != hex::encode(get_state_root_hash(iface, &proposed_balances)?) {
         return Ok(on_error(iface, new_state, InvalidNewState::RootHash).await);
     }
 
     if !iface.adapter.verify(
-        &iface.channel.spec.validators.leader().id,
+        &iface.channel.leader,
         &proposed_state_root,
         &new_state.signature,
     )? {
         return Ok(on_error(iface, new_state, InvalidNewState::Signature).await);
     }
 
-    let last_approve_response = iface.get_last_approved(iface.channel.id).await?;
+    let last_approve_response = iface.get_last_approved(iface.channel.id()).await?;
     let _prev_balances = match last_approve_response
         .last_approved
         .and_then(|last_approved| last_approved.new_state)
@@ -124,15 +129,16 @@ async fn on_new_state<'a, A: Adapter + 'static>(
         _ => Default::default(),
     };
 
-    if !is_valid_transition(
-        &iface.channel,
-        &BalancesMap::default(),
-        &BalancesMap::default(),
-    ) {
-        return Ok(on_error(iface, new_state, InvalidNewState::Transition).await);
-    }
+    // TODO: Check if transition is valid
+    // if !is_valid_transition(
+    //     &iface.channel,
+    //     &BalancesMap::default(),
+    //     &BalancesMap::default(),
+    // ) {
+    //     return Ok(on_error(iface, new_state, InvalidNewState::Transition).await);
+    // }
 
-    let health = get_health(&iface.channel, balances, &proposed_balances);
+    let health = get_health(&iface.channel, accounting_balances, &proposed_balances);
     if health < u64::from(iface.config.health_unsignable_promilles) {
         return Ok(on_error(iface, new_state, InvalidNewState::Health).await);
     }
