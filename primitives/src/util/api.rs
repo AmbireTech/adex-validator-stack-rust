@@ -3,8 +3,8 @@ use std::{convert::TryFrom, fmt, str::FromStr};
 use parse_display::Display;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use url::Url;
 pub use url::ParseError;
+use url::Url;
 
 // `url::Url::scheme()` returns lower-cased ASCII string without `:`
 const SCHEMES: [&str; 2] = ["http", "https"];

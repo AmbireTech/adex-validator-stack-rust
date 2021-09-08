@@ -1,7 +1,7 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
 
-use std::{collections::HashSet, convert::TryFrom, error::Error, time::Duration};
+use std::{convert::TryFrom, error::Error, time::Duration};
 
 use clap::{crate_version, App, Arg};
 use futures::future::{join, join_all};
@@ -18,21 +18,12 @@ use primitives::{
     config::{configuration, Config},
     util::tests::prep_db::{AUTH, IDS},
     util::ApiUrl,
-    Channel,
     ValidatorId,
-    // Campaign,  ChannelId, SpecValidator,
+    // Campaign, ChannelId, SpecValidator,
 };
 use slog::{error, info, Logger};
 use std::fmt::Debug;
-use validator_worker::{
-    channel::{channel_tick, collect_channels},
-    // all_channels,
-    // error::{Error as ValidatorWorkerError, TickError},
-    // follower, leader, sentry_interface,
-    // sentry_interface::{campaigns::all_campaigns, Validators},
-    // SentryApi,
-    sentry_interface::Validators,
-};
+use validator_worker::channel::{channel_tick, collect_channels};
 
 #[derive(Debug, Clone)]
 struct Args<A: Adapter> {
@@ -152,7 +143,7 @@ fn run<A: Adapter + 'static>(
     adapter.unlock()?;
 
     let args = Args {
-        sentry_url: sentry_url.to_owned(),
+        sentry_url,
         config: config.to_owned(),
         adapter,
     };

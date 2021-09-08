@@ -218,7 +218,7 @@ pub fn is_valid_transition(
     // sum(accounting.balances.spenders) > sum(new_state.balances.spenders)
     // sum(accounting.balances.earners) > sum(new_state.balances.earners)
     let is_valid =
-        !(accounting_spenders > new_state_spenders) || !(accounting_earners > new_state_earners);
+        accounting_spenders <= new_state_spenders || accounting_earners <= new_state_earners;
 
     Ok(is_valid)
 }

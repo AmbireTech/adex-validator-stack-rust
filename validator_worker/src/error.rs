@@ -32,5 +32,5 @@ pub enum Error<AE: AdapterErrorKind + 'static> {
     Overflow,
     #[error("Whoami is neither a Leader or follower in channel")]
     // TODO: Add channel, validatorId, etc.
-    ChannelNotIntendedForUs
+    ChannelNotIntendedForUs,
 }

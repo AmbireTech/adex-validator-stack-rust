@@ -42,7 +42,11 @@ pub fn get_signable_state_root(
     Ok(res)
 }
 
-pub fn get_balance_leaf(is_spender: bool, acc: &Address, amnt: &BigNum) -> Result<[u8; 32], Box<dyn Error>> {
+pub fn get_balance_leaf(
+    is_spender: bool,
+    acc: &Address,
+    amnt: &BigNum,
+) -> Result<[u8; 32], Box<dyn Error>> {
     let address = Token::Address(EthAddress::from_slice(acc.as_bytes()));
     let amount = Token::Uint(
         U256::from_dec_str(&amnt.to_str_radix(10))
@@ -50,7 +54,7 @@ pub fn get_balance_leaf(is_spender: bool, acc: &Address, amnt: &BigNum) -> Resul
     );
 
     let tokens = if is_spender {
-       vec![Token::String("spender".into()), address, amount]
+        vec![Token::String("spender".into()), address, amount]
     } else {
         vec![address, amount]
     };

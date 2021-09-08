@@ -69,7 +69,7 @@ pub fn get_health(
     // TODO: Check if taking the difference between the two sums (earners & spenders) is good enough as a health check!
 
     // Because Accounting should always have >= values than the NewState ones
-    let health_penalty = diff_earners * &UnifiedNum::from(1_000) / &diff_spenders;
+    let health_penalty = diff_earners * UnifiedNum::from(1_000) / diff_spenders;
 
     Some(1_000 - health_penalty.to_u64())
 }

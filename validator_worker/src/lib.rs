@@ -4,10 +4,7 @@
 use std::error::Error;
 
 use adapter::{get_balance_leaf, get_signable_state_root};
-use primitives::{
-    balances::CheckedState, merkle_tree::MerkleTree, Balances,
-    ChannelId,
-};
+use primitives::{balances::CheckedState, merkle_tree::MerkleTree, Balances, ChannelId};
 
 pub use self::sentry_interface::{all_channels, SentryApi};
 
@@ -48,7 +45,7 @@ pub(crate) fn get_state_root_hash(
 mod test {
     use super::*;
 
-    use primitives::{util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, DUMMY_CHANNEL}};
+    use primitives::util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, DUMMY_CHANNEL};
 
     #[test]
     // TODO: Double check this test - encoded value! after introducing `spenders` ("spender", address, amount)
@@ -85,7 +82,6 @@ mod test {
         let actual_hash =
             get_state_root_hash(channel, &balances, 18).expect("should get state root hash");
 
-        
         assert_eq!(
             "4fad5375c3ef5f8a9d23a8276fed0151164dea72a5891cec8b43e1d190ed430e",
             hex::encode(actual_hash)

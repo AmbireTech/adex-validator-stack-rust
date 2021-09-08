@@ -89,12 +89,15 @@ impl<S: BalancesState> Balances<S> {
 
     /// Returns a tuple of the sum of `(earners, spenders)`
     pub fn sum(&self) -> Option<(UnifiedNum, UnifiedNum)> {
-        self.spenders.values().sum::<Option<UnifiedNum>>().map(|spenders| {
-            let earners = self.earners.values().sum::<Option<UnifiedNum>>()?;
+        self.spenders
+            .values()
+            .sum::<Option<UnifiedNum>>()
+            .map(|spenders| {
+                let earners = self.earners.values().sum::<Option<UnifiedNum>>()?;
 
-            Some((earners, spenders))
-        })
-        .flatten()
+                Some((earners, spenders))
+            })
+            .flatten()
     }
 }
 
