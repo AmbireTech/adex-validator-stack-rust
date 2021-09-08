@@ -38,6 +38,14 @@ impl Balances<UncheckedState> {
 }
 
 impl<S: BalancesState> Balances<S> {
+    pub fn new() -> Balances<CheckedState> {
+        Balances {
+            earners: Default::default(),
+            spenders: Default::default(),
+            state: Default::default(),
+        }
+    }
+
     pub fn spend(
         &mut self,
         spender: Address,
@@ -77,6 +85,16 @@ impl<S: BalancesState> Balances<S> {
             spenders: self.spenders,
             state: PhantomData::default(),
         }
+    }
+
+    /// Returns a tuple of the sum of `(earners, spenders)`
+    pub fn sum(&self) -> Option<(UnifiedNum, UnifiedNum)> {
+        self.spenders.values().sum::<Option<UnifiedNum>>().map(|spenders| {
+            let earners = self.earners.values().sum::<Option<UnifiedNum>>()?;
+
+            Some((earners, spenders))
+        })
+        .flatten()
     }
 }
 
