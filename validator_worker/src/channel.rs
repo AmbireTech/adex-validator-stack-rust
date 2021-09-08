@@ -1,6 +1,6 @@
 use crate::{
-    error::Error,
-    // follower::TickStatus,
+    error::{Error, TickError},
+    follower,
     sentry_interface::{campaigns::all_campaigns, Validator, Validators},
     SentryApi,
 };
@@ -11,10 +11,6 @@ use primitives::{
 use slog::Logger;
 use std::collections::{hash_map::Entry, HashSet};
 
-pub enum TickError {
-    Validation,
-}
-
 pub async fn channel_tick<A: Adapter + 'static>(
     adapter: A,
     config: &Config,
@@ -22,6 +18,10 @@ pub async fn channel_tick<A: Adapter + 'static>(
     channel: Channel,
     validators: Validators,
 ) -> Result<ChannelId, Error<A::AdapterError>> {
+    let tick = channel
+        .find_validator(adapter.whoami())
+        .ok_or_else(|| Error::ChannelNotIntendedForUs)?;
+
     let sentry = SentryApi::init(
         adapter,
         logger.clone(),
@@ -50,51 +50,20 @@ pub async fn channel_tick<A: Adapter + 'static>(
         return Err(Error::Validation);
     }
 
-    // Get Last Approved State & Last Approved NewState
-    let last_approve_state = sentry.get_last_approved(channel.id()).await?;
-    let new_state_balances = last_approve_state
-        .last_approved
-        .and_then(|last_approved| last_approved.new_state)
-        .map(|new_state_msg| new_state_msg.msg.into_inner().balances)
-        .unwrap_or_default();
+    // TODO: Add timeout
+    let _tick_result =
+        match tick {
+            primitives::Validator::Leader(_v) => todo!(),
+            primitives::Validator::Follower(_v) => follower::tick(&sentry, channel, accounting.balances)
+                .await
+                .map_err(|err| Error::FollowerTick(channel.id(), TickError::Tick(err)))?,
+        };
 
     // Validation #3
     // Accounting.balances != NewState.balances
 
-
     // Validation #4
     // OUTPACE Rules:
-    let (accounting_spenders, accounting_earners) = (
-        accounting
-            .balances
-            .spenders
-            .values()
-            .sum::<Option<UnifiedNum>>()
-            .ok_or(Error::Overflow)?,
-        accounting
-            .balances
-            .earners
-            .values()
-            .sum::<Option<UnifiedNum>>()
-            .ok_or(Error::Overflow)?,
-    );
-    let (new_state_spenders, new_state_earners) = (
-        new_state_balances
-            .spenders
-            .values()
-            .sum::<Option<UnifiedNum>>()
-            .ok_or(Error::Overflow)?,
-        new_state_balances
-            .earners
-            .values()
-            .sum::<Option<UnifiedNum>>()
-            .ok_or(Error::Overflow)?,
-    );
-    // sum(accounting.balances.spenders) > sum(new_state.balances.spenders)
-    // sum(accounting.balances.earners) > sum(new_state.balances.earners)
-    if !(accounting_spenders > new_state_spenders) || !(accounting_earners > new_state_earners) {
-        return Err(Error::Validation);
-    }
 
     Ok(channel.id())
 }

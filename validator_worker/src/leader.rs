@@ -22,6 +22,9 @@ pub struct TickStatus<AE: AdapterErrorKind + 'static> {
 pub async fn tick<A: Adapter + 'static>(
     iface: &SentryApi<A>,
 ) -> Result<TickStatus<A::AdapterError>, Box<dyn Error>> {
+    // 1. Get Accounting
+    // 2. Check if Accounting != than latest NewState
+    // 3. create a NewState
     let new_state = None;
 
     Ok(TickStatus {

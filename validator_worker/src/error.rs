@@ -30,4 +30,7 @@ pub enum Error<AE: AdapterErrorKind + 'static> {
     Validation,
     #[error("Placeholder for sum overflow error")]
     Overflow,
+    #[error("Whoami is neither a Leader or follower in channel")]
+    // TODO: Add channel, validatorId, etc.
+    ChannelNotIntendedForUs
 }
