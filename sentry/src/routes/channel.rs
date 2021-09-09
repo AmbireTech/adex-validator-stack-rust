@@ -4,7 +4,7 @@ use crate::db::{
         latest_new_state_v5,
     },
     get_channel_by_id, insert_channel, insert_validator_messages, list_channels,
-    spendable::{fetch_spendable, update_spendable},
+    spendable::{fetch_spendable, get_all_spendables_for_channel, update_spendable},
     DbPool, PoolError,
 };
 use crate::{success_response, Application, Auth, ResponseError, RouteParams};
@@ -353,30 +353,32 @@ pub async fn get_all_spender_limits<A: Adapter + 'static>(
 
     let mut all_spender_limits: HashMap<Address, Spender> = HashMap::new();
 
+    let all_spendables = get_all_spendables_for_channel(app.pool.clone(), &channel.id()).await?;
+
     // Using for loop to avoid async closures
-    for (spender_addr, balance) in new_state.msg.balances.spenders.iter() {
-        let latest_spendable =
-            match fetch_spendable(app.pool.clone(), spender_addr, &channel.id()).await? {
-                Some(spendable) => spendable,
-                None => continue, // skipping spender if not found
-            };
+    for spendable in all_spendables {
+        let spender = spendable.spender;
+        let spender_leaf = if new_state.msg.balances.spenders.contains_key(&spender) {
+            let balance = new_state.msg.balances.spenders.get(&spender).unwrap();
 
-        let total_deposited = latest_spendable.deposit.total;
-        let total_spent = total_deposited.checked_sub(balance).ok_or_else(|| {
-            ResponseError::FailedValidation("Couldn't calculate total_spent".to_string())
-        })?;
-
-        let spender_leaf = SpenderLeaf {
-            total_spent,
-            // merkle_proof: [u8; 32], // TODO
+            Some(SpenderLeaf {
+                total_spent: spendable
+                    .deposit
+                    .total
+                    .checked_sub(balance)
+                    .unwrap_or_default(),
+                // merkle_proof: [u8; 32], // TODO
+            })
+        } else {
+            None
         };
 
         let spender_info = Spender {
-            total_deposited,
-            spender_leaf: Some(spender_leaf),
+            total_deposited: spendable.deposit.total,
+            spender_leaf,
         };
 
-        all_spender_limits.insert(*spender_addr, spender_info);
+        all_spender_limits.insert(spender, spender_info);
     }
 
     let res = AllSpendersResponse {
