@@ -1,138 +1,109 @@
-use std::collections::HashMap;
-use std::fmt;
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 use chrono::{DateTime, Utc};
 use futures::future::{join_all, try_join_all, TryFutureExt};
-use primitives::balances::UncheckedState;
 use reqwest::{Client, Response};
 use slog::Logger;
 
-use primitives::adapter::{Adapter, AdapterErrorKind, Error as AdapterError};
-use primitives::sentry::{
-    ChannelListResponse, EventAggregateResponse, LastApprovedResponse, SuccessResponse,
-    ValidatorMessageResponse,
+use primitives::{
+    adapter::{Adapter, AdapterErrorKind, Error as AdapterError},
+    balances::{CheckedState, UncheckedState},
+    channel::Channel as ChannelOld,
+    channel_v5::Channel,
+    sentry::{
+        AccountingResponse, ChannelListResponse, EventAggregateResponse, LastApprovedResponse,
+        SuccessResponse, ValidatorMessageResponse,
+    },
+    spender::Spender,
+    util::ApiUrl,
+    validator::MessageTypes,
+    Address, {ChannelId, Config, ToETHChecksum, ValidatorId},
 };
-use primitives::validator::MessageTypes;
-use primitives::{Channel, ChannelId, Config, ToETHChecksum, ValidatorDesc, ValidatorId};
+use thiserror::Error;
 
 pub type PropagationResult<AE> = Result<ValidatorId, (ValidatorId, Error<AE>)>;
+/// Propagate the Validator messages to these `Validator`s
+pub type Validators = HashMap<ValidatorId, Validator>;
+pub type AuthToken = String;
 
 #[derive(Debug, Clone)]
-pub struct SentryApi<T: Adapter> {
-    pub adapter: T,
-    pub validator_url: String,
+pub struct Validator {
+    /// Sentry API url
+    pub url: ApiUrl,
+    /// Authentication token
+    pub token: AuthToken,
+}
+
+#[derive(Debug, Clone)]
+pub struct SentryApi<A: Adapter> {
+    pub adapter: A,
     pub client: Client,
     pub logger: Logger,
-    pub channel: Channel,
     pub config: Config,
-    pub propagate_to: Vec<(ValidatorDesc, String)>,
+    pub whoami: Validator,
+    pub channel: Channel,
+    pub propagate_to: Validators,
 }
 
-#[derive(Debug)]
-pub enum Error<AE: AdapterErrorKind> {
+#[derive(Debug, Error)]
+pub enum Error<AE: AdapterErrorKind + 'static> {
+    #[error("Building client: {0}")]
     BuildingClient(reqwest::Error),
-    Request(reqwest::Error),
-    ValidatorAuthentication(AdapterError<AE>),
-    MissingWhoamiInChannelValidators {
+    #[error("Making a request: {0}")]
+    Request(#[from] reqwest::Error),
+    #[error("Getting authentication for validator: {0}")]
+    ValidatorAuthentication(#[from] AdapterError<AE>),
+    #[error(
+        "Missing validator URL & Auth token entry for whoami {whoami:#?} in the Channel {channel:#?} propagation list"
+    )]
+    WhoamiMissing {
         channel: ChannelId,
-        validators: Vec<ValidatorId>,
         whoami: ValidatorId,
     },
-}
-
-impl<AE: AdapterErrorKind> std::error::Error for Error<AE> {}
-
-impl<AE: AdapterErrorKind> fmt::Display for Error<AE> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Error::*;
-
-        match self {
-            BuildingClient(err) => write!(f, "Building client: {}", err),
-            Request(err) => write!(f, "Making a request: {}", err),
-            ValidatorAuthentication(err) => {
-                write!(f, "Getting authentication for validator: {}", err)
-            }
-            MissingWhoamiInChannelValidators {
-                channel,
-                validators,
-                whoami,
-            } => {
-                let validator_ids = validators
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                write!(
-                    f,
-                    "We cannot find validator entry for whoami {:#?} in channel {:#?} with validators: {}",
-                    whoami,
-                    channel,
-                    validator_ids
-                )
-            }
-        }
-    }
+    #[error("Failed to parse validator url: {0}")]
+    ValidatorUrl(#[from] primitives::util::api::ParseError),
 }
 
 impl<A: Adapter + 'static> SentryApi<A> {
     pub fn init(
         adapter: A,
-        channel: Channel,
-        config: &Config,
         logger: Logger,
+        config: Config,
+        (channel, propagate_to): (Channel, Validators),
     ) -> Result<Self, Error<A::AdapterError>> {
         let client = Client::builder()
             .timeout(Duration::from_millis(config.fetch_timeout.into()))
             .build()
             .map_err(Error::BuildingClient)?;
 
-        // validate that we are to validate the channel
-        match channel.spec.validators.find(&adapter.whoami()) {
-            Some(ref spec_validator) => {
-                let validator = spec_validator.validator();
-                let validator_url = format!("{}/channel/{}", validator.url, channel.id);
-
-                let propagate_to = channel
-                    .spec
-                    .validators
-                    .iter()
-                    .map(|validator| {
-                        adapter
-                            .get_auth(&validator.id)
-                            .map(|auth| (validator.to_owned(), auth))
-                            .map_err(Error::ValidatorAuthentication)
-                    })
-                    .collect::<Result<Vec<_>, _>>()?;
-
-                Ok(Self {
-                    adapter,
-                    validator_url,
-                    client,
-                    logger,
-                    propagate_to,
-                    channel,
-                    config: config.to_owned(),
-                })
-            }
-            None => Err(Error::MissingWhoamiInChannelValidators {
-                channel: channel.id,
-                validators: channel.spec.validators.iter().map(|v| v.id).collect(),
+        let whoami = propagate_to
+            .get(&adapter.whoami())
+            .cloned()
+            .ok_or_else(|| Error::WhoamiMissing {
+                channel: channel.id(),
                 whoami: adapter.whoami(),
-            }),
-        }
+            })?;
+
+        Ok(Self {
+            adapter,
+            client,
+            logger,
+            config,
+            whoami,
+            channel,
+            propagate_to,
+        })
     }
 
     pub async fn propagate(
         &self,
         messages: &[&MessageTypes],
     ) -> Vec<PropagationResult<A::AdapterError>> {
-        join_all(self.propagate_to.iter().map(|(validator, auth_token)| {
+        join_all(self.propagate_to.iter().map(|(validator_id, validator)| {
             propagate_to::<A>(
-                &self.channel.id,
-                auth_token,
                 &self.client,
-                validator,
+                self.channel.id(),
+                (*validator_id, validator),
                 messages,
             )
         }))
@@ -145,21 +116,26 @@ impl<A: Adapter + 'static> SentryApi<A> {
         message_types: &[&str],
     ) -> Result<Option<MessageTypes>, Error<A::AdapterError>> {
         let message_type = message_types.join("+");
-        let url = format!(
-            "{}/validator-messages/{}/{}?limit=1",
-            self.validator_url,
-            from.to_checksum(),
-            message_type
-        );
+
+        let endpoint = self
+            .whoami
+            .url
+            .join(&format!(
+                "/validator-messages/{}/{}?limit=1",
+                from.to_checksum(),
+                message_type
+            ))
+            .expect("Should parse endpoint");
+
         let result = self
             .client
-            .get(&url)
+            .get(endpoint)
             .send()
-            .and_then(|res: Response| res.json::<ValidatorMessageResponse>())
-            .map_err(Error::Request)
+            .await?
+            .json::<ValidatorMessageResponse>()
             .await?;
 
-        Ok(result.validator_messages.first().map(|m| m.msg.clone()))
+        Ok(result.validator_messages.into_iter().next().map(|m| m.msg))
     }
 
     pub async fn get_our_latest_msg(
@@ -172,49 +148,99 @@ impl<A: Adapter + 'static> SentryApi<A> {
 
     pub async fn get_last_approved(
         &self,
+        channel: ChannelId,
     ) -> Result<LastApprovedResponse<UncheckedState>, Error<A::AdapterError>> {
         self.client
-            .get(&format!("{}/last-approved", self.validator_url))
+            .get(
+                self.whoami
+                    .url
+                    .join(&format!("v5/channel/{}/last-approved", channel))
+                    .expect("Should not error while creating endpoint"),
+            )
             .send()
-            .and_then(|res: Response| res.json::<LastApprovedResponse<UncheckedState>>())
-            .map_err(Error::Request)
+            .await?
+            .json()
             .await
+            .map_err(Error::Request)
     }
 
     pub async fn get_last_msgs(
         &self,
     ) -> Result<LastApprovedResponse<UncheckedState>, Error<A::AdapterError>> {
         self.client
-            .get(&format!(
-                "{}/last-approved?withHeartbeat=true",
-                self.validator_url
-            ))
+            .get(
+                self.whoami
+                    .url
+                    .join("last-approved?withHeartbeat=true")
+                    .expect("Should not error while creating endpoint"),
+            )
             .send()
             .and_then(|res: Response| res.json::<LastApprovedResponse<UncheckedState>>())
             .map_err(Error::Request)
             .await
     }
 
+    // TODO: Pagination & use of `AllSpendersResponse`
+    pub async fn get_all_spenders(
+        &self,
+    ) -> Result<HashMap<Address, Spender>, Error<A::AdapterError>> {
+        let url = self
+            .whoami
+            .url
+            .join(&format!("v5/channel/{}/spender/all", self.channel.id()))
+            .expect("Should not error when creating endpoint");
+
+        self.client
+            .get(url)
+            .bearer_auth(&self.whoami.token)
+            .send()
+            .await?
+            // TODO: Should be `AllSpendersResponse` and should have pagination!
+            .json()
+            .map_err(Error::Request)
+            .await
+    }
+
+    /// Get the accounting from Sentry
+    /// `Balances` should always be in `CheckedState`
+    pub async fn get_accounting(
+        &self,
+        channel: ChannelId,
+    ) -> Result<AccountingResponse<CheckedState>, Error<A::AdapterError>> {
+        let url = self
+            .whoami
+            .url
+            .join(&format!("v5/channel/{}/accounting", channel))
+            .expect("Should not error when creating endpoint");
+
+        self.client
+            .get(url)
+            .bearer_auth(&self.whoami.token)
+            .send()
+            .await?
+            .json::<AccountingResponse<CheckedState>>()
+            .map_err(Error::Request)
+            .await
+    }
+
+    #[deprecated = "V5 no longer needs event aggregates"]
     pub async fn get_event_aggregates(
         &self,
         after: DateTime<Utc>,
     ) -> Result<EventAggregateResponse, Error<A::AdapterError>> {
-        let auth_token = self
-            .adapter
-            .get_auth(&self.adapter.whoami())
-            .map_err(Error::ValidatorAuthentication)?;
-
-        let url = format!(
-            "{}/events-aggregates?after={}",
-            self.validator_url,
-            after.timestamp_millis()
-        );
+        let url = self
+            .whoami
+            .url
+            .join(&format!(
+                "events-aggregates?after={}",
+                after.timestamp_millis()
+            ))
+            .expect("Should not error when creating endpoint");
 
         self.client
-            .get(&url)
-            .bearer_auth(&auth_token)
+            .get(url)
+            .bearer_auth(&self.whoami.token)
             .send()
-            .map_err(Error::Request)
             .await?
             .json()
             .map_err(Error::Request)
@@ -223,37 +249,37 @@ impl<A: Adapter + 'static> SentryApi<A> {
 }
 
 async fn propagate_to<A: Adapter>(
-    channel_id: &ChannelId,
-    auth_token: &str,
     client: &Client,
-    validator: &ValidatorDesc,
+    channel_id: ChannelId,
+    (validator_id, validator): (ValidatorId, &Validator),
     messages: &[&MessageTypes],
 ) -> PropagationResult<A::AdapterError> {
-    let url = format!(
-        "{}/channel/{}/validator-messages",
-        validator.url, channel_id
-    );
+    let endpoint = validator
+        .url
+        .join(&format!("v5/channel/{}/validator-messages", channel_id))
+        .expect("Should not error when creating endpoint url");
+
     let mut body = HashMap::new();
     body.insert("messages", messages);
 
     let _response: SuccessResponse = client
-        .post(&url)
-        .bearer_auth(&auth_token)
+        .post(endpoint)
+        .bearer_auth(&validator.token)
         .json(&body)
         .send()
         .await
-        .map_err(|e| (validator.id, Error::Request(e)))?
+        .map_err(|e| (validator_id, Error::Request(e)))?
         .json()
         .await
-        .map_err(|e| (validator.id, Error::Request(e)))?;
+        .map_err(|e| (validator_id, Error::Request(e)))?;
 
-    Ok(validator.id)
+    Ok(validator_id)
 }
 
 pub async fn all_channels(
     sentry_url: &str,
     whoami: &ValidatorId,
-) -> Result<Vec<Channel>, reqwest::Error> {
+) -> Result<Vec<ChannelOld>, reqwest::Error> {
     let url = sentry_url.to_owned();
     let first_page = fetch_page(url.clone(), 0, whoami).await?;
 
@@ -264,7 +290,7 @@ pub async fn all_channels(
             try_join_all((1..first_page.total_pages).map(|i| fetch_page(url.clone(), i, whoami)))
                 .await?;
 
-        let result_all: Vec<Channel> = std::iter::once(first_page)
+        let result_all: Vec<ChannelOld> = std::iter::once(first_page)
             .chain(all.into_iter())
             .flat_map(|ch| ch.channels.into_iter())
             .collect();
@@ -290,4 +316,61 @@ async fn fetch_page(
         .send()
         .and_then(|res: Response| res.json::<ChannelListResponse>())
         .await
+}
+
+pub mod campaigns {
+    use chrono::Utc;
+    use futures::future::try_join_all;
+    use primitives::{
+        sentry::campaign::{CampaignListQuery, CampaignListResponse},
+        util::ApiUrl,
+        Campaign, ValidatorId,
+    };
+    use reqwest::Client;
+
+    /// Fetches all `Campaign`s from `sentry` by going through all pages and collecting the `Campaign`s into a single `Vec`
+    pub async fn all_campaigns(
+        sentry_url: &ApiUrl,
+        whoami: ValidatorId,
+    ) -> Result<Vec<Campaign>, reqwest::Error> {
+        let first_page = fetch_page(sentry_url, 0, whoami).await?;
+
+        if first_page.pagination.total_pages < 2 {
+            Ok(first_page.campaigns)
+        } else {
+            let all = try_join_all(
+                (1..first_page.pagination.total_pages).map(|i| fetch_page(sentry_url, i, whoami)),
+            )
+            .await?;
+
+            let result_all = std::iter::once(first_page)
+                .chain(all.into_iter())
+                .flat_map(|response| response.campaigns.into_iter())
+                .collect();
+            Ok(result_all)
+        }
+    }
+
+    async fn fetch_page(
+        sentry_url: &ApiUrl,
+        page: u64,
+        validator: ValidatorId,
+    ) -> Result<CampaignListResponse, reqwest::Error> {
+        let client = Client::new();
+        let query = CampaignListQuery {
+            page,
+            active_to_ge: Utc::now(),
+            creator: None,
+            validator: Some(validator),
+        };
+
+        let endpoint = sentry_url
+            .join(&format!(
+                "campaign/list?{}",
+                serde_urlencoded::to_string(query).expect("Should not fail to serialize")
+            ))
+            .expect("Should not fail to create endpoint URL");
+
+        client.get(endpoint).send().await?.json().await
+    }
 }

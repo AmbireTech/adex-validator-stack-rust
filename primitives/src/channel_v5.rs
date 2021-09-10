@@ -4,7 +4,7 @@ use std::fmt;
 
 use crate::{Address, ChannelId, Validator, ValidatorId};
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct Channel {
     pub leader: ValidatorId,
@@ -45,7 +45,7 @@ impl Channel {
 }
 
 /// The nonce is an Unsigned 256 number
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Nonce(pub U256);
 
 impl Nonce {

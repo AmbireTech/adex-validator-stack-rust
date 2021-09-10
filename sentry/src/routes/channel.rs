@@ -247,7 +247,7 @@ async fn create_or_update_spendable_document(
     };
 
     let spendable = Spendable {
-        channel: channel.clone(),
+        channel: *channel,
         deposit: Deposit {
             total,
             still_on_create2,
