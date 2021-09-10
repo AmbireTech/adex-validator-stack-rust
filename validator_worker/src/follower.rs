@@ -1,18 +1,28 @@
-use std::error::Error;
+use std::convert::TryFrom;
 use std::fmt;
 
-use primitives::adapter::{Adapter, AdapterErrorKind};
-use primitives::validator::{ApproveState, MessageTypes, NewState, RejectState};
 use primitives::{
-    balances::{Balances, UncheckedState},
-    BalancesMap,
+    adapter::{Adapter, AdapterErrorKind},
+    balances::{Balances, CheckedState, UncheckedState},
+    channel_v5::Channel,
+    config::TokenInfo,
+    validator::{ApproveState, MessageTypes, NewState, RejectState},
 };
 
-use crate::core::follower_rules::{get_health, is_valid_transition};
-use crate::heartbeat::HeartbeatStatus;
-use crate::sentry_interface::{PropagationResult, SentryApi};
-use crate::{get_state_root_hash, heartbeat::heartbeat};
+// use crate::core::follower_rules::{get_health, is_valid_transition};
+use crate::{
+    get_state_root_hash,
+    heartbeat::{heartbeat, HeartbeatStatus},
+    sentry_interface::{PropagationResult, SentryApi},
+};
 use chrono::Utc;
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("overflow placeholder")]
+    Overflow,
+}
 
 #[derive(Debug)]
 pub enum InvalidNewState {
@@ -38,7 +48,7 @@ impl fmt::Display for InvalidNewState {
 }
 
 #[derive(Debug)]
-pub enum ApproveStateResult<AE: AdapterErrorKind> {
+pub enum ApproveStateResult<AE: AdapterErrorKind + 'static> {
     /// If None, Conditions for handling the new state haven't been met
     Sent(Option<Vec<PropagationResult<AE>>>),
     RejectedState {
@@ -49,20 +59,23 @@ pub enum ApproveStateResult<AE: AdapterErrorKind> {
 }
 
 #[derive(Debug)]
-pub struct TickStatus<AE: AdapterErrorKind> {
+pub struct TickStatus<AE: AdapterErrorKind + 'static> {
     pub heartbeat: HeartbeatStatus<AE>,
     pub approve_state: ApproveStateResult<AE>,
 }
 
 pub async fn tick<A: Adapter + 'static>(
     iface: &SentryApi<A>,
-) -> Result<TickStatus<A::AdapterError>, Box<dyn Error>> {
-    let from = &iface.channel.spec.validators.leader().id;
-    let new_msg_response = iface.get_latest_msg(from, &["NewState"]).await?;
-    let new_msg = match new_msg_response {
-        Some(MessageTypes::NewState(new_state)) => Some(new_state),
-        _ => None,
-    };
+    channel: Channel,
+    accounting_balances: Balances<CheckedState>,
+) -> Result<TickStatus<A::AdapterError>, Box<dyn std::error::Error>> {
+    let from = iface.channel.leader;
+
+    // if we don't have a `NewState` return `None`
+    let new_msg = iface
+        .get_latest_msg(&from, &["NewState"])
+        .await?
+        .and_then(|message_types| NewState::try_from(message_types).ok());
 
     let our_latest_msg_response = iface
         .get_our_latest_msg(&["ApproveState", "RejectState"])
@@ -79,10 +92,15 @@ pub async fn tick<A: Adapter + 'static>(
         _ => false,
     };
 
-    let _balances = Balances::<UncheckedState>::default();
+    // TODO: Use error for "Token not whitelisted for this channel"
+    let token = iface
+        .config
+        .token_address_whitelist
+        .get(&channel.token)
+        .unwrap();
 
     let approve_state_result = if let (Some(new_state), false) = (new_msg, latest_is_responded_to) {
-        on_new_state(iface, &BalancesMap::default(), &new_state).await?
+        on_new_state(iface, accounting_balances, &new_state, token).await?
     } else {
         ApproveStateResult::Sent(None)
     };
@@ -93,27 +111,40 @@ pub async fn tick<A: Adapter + 'static>(
     })
 }
 
+#[allow(dead_code)]
 async fn on_new_state<'a, A: Adapter + 'static>(
     iface: &'a SentryApi<A>,
-    balances: &'a BalancesMap,
+    _accounting_balances: Balances<CheckedState>,
     new_state: &'a NewState<UncheckedState>,
-) -> Result<ApproveStateResult<A::AdapterError>, Box<dyn Error>> {
-    let proposed_balances = BalancesMap::default();
-    // let proposed_balances = new_state.balances.clone();
+    token_info: &TokenInfo,
+) -> Result<ApproveStateResult<A::AdapterError>, Box<dyn std::error::Error>> {
+    let proposed_balances = match new_state.balances.clone().check() {
+        Ok(balances) => balances,
+
+        Err(_err) => return Ok(on_error(iface, new_state, InvalidNewState::Transition).await),
+    };
+
     let proposed_state_root = new_state.state_root.clone();
-    if proposed_state_root != hex::encode(get_state_root_hash(iface, &proposed_balances)?) {
+
+    if proposed_state_root
+        != hex::encode(get_state_root_hash(
+            iface.channel.id(),
+            &proposed_balances,
+            token_info.precision.get(),
+        )?)
+    {
         return Ok(on_error(iface, new_state, InvalidNewState::RootHash).await);
     }
 
     if !iface.adapter.verify(
-        &iface.channel.spec.validators.leader().id,
+        &iface.channel.leader,
         &proposed_state_root,
         &new_state.signature,
     )? {
         return Ok(on_error(iface, new_state, InvalidNewState::Signature).await);
     }
 
-    let last_approve_response = iface.get_last_approved().await?;
+    let last_approve_response = iface.get_last_approved(iface.channel.id()).await?;
     let _prev_balances = match last_approve_response
         .last_approved
         .and_then(|last_approved| last_approved.new_state)
@@ -122,15 +153,17 @@ async fn on_new_state<'a, A: Adapter + 'static>(
         _ => Default::default(),
     };
 
-    if !is_valid_transition(
-        &iface.channel,
-        &BalancesMap::default(),
-        &BalancesMap::default(),
-    ) {
-        return Ok(on_error(iface, new_state, InvalidNewState::Transition).await);
-    }
+    // TODO: Check if transition is valid
+    // if !is_valid_transition(
+    //     &iface.channel,
+    //     &BalancesMap::default(),
+    //     &BalancesMap::default(),
+    // ) {
+    //     return Ok(on_error(iface, new_state, InvalidNewState::Transition).await);
+    // }
 
-    let health = get_health(&iface.channel, balances, &proposed_balances);
+    // let health = get_health(&iface.channel, accounting_balances, &proposed_balances);
+    let health = 950;
     if health < u64::from(iface.config.health_unsignable_promilles) {
         return Ok(on_error(iface, new_state, InvalidNewState::Health).await);
     }
@@ -150,6 +183,7 @@ async fn on_new_state<'a, A: Adapter + 'static>(
     Ok(ApproveStateResult::Sent(Some(propagation_result)))
 }
 
+#[allow(dead_code)]
 async fn on_error<'a, A: Adapter + 'static>(
     iface: &'a SentryApi<A>,
     new_state: &'a NewState<UncheckedState>,
@@ -171,4 +205,20 @@ async fn on_error<'a, A: Adapter + 'static>(
         state_root: new_state.state_root.clone(),
         propagation,
     }
+}
+
+// OUTPACE Rules:
+pub fn is_valid_transition(
+    accounting: Balances<CheckedState>,
+    new_state: Balances<CheckedState>,
+) -> Result<bool, Error> {
+    let (accounting_earners, accounting_spenders) = accounting.sum().ok_or(Error::Overflow)?;
+    let (new_state_earners, new_state_spenders) = new_state.sum().ok_or(Error::Overflow)?;
+
+    // sum(accounting.balances.spenders) > sum(new_state.balances.spenders)
+    // sum(accounting.balances.earners) > sum(new_state.balances.earners)
+    let is_valid =
+        accounting_spenders <= new_state_spenders || accounting_earners <= new_state_earners;
+
+    Ok(is_valid)
 }

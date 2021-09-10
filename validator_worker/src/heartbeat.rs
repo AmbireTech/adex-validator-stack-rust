@@ -23,7 +23,7 @@ async fn send_heartbeat<A: Adapter + 'static>(
 
     let merkle_tree = MerkleTree::new(&[timestamp_buf])?;
 
-    let state_root_raw = get_signable_state_root(iface.channel.id.as_ref(), &merkle_tree.root())?;
+    let state_root_raw = get_signable_state_root(iface.channel.id().as_ref(), &merkle_tree.root())?;
     let state_root = hex::encode(state_root_raw);
 
     let signature = iface.adapter.sign(&state_root)?;

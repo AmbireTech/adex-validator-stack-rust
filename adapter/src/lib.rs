@@ -42,14 +42,22 @@ pub fn get_signable_state_root(
     Ok(res)
 }
 
-pub fn get_balance_leaf(acc: &Address, amnt: &BigNum) -> Result<[u8; 32], Box<dyn Error>> {
-    let tokens = [
-        Token::Address(EthAddress::from_slice(acc.as_bytes())),
-        Token::Uint(
-            U256::from_dec_str(&amnt.to_str_radix(10))
-                .map_err(|_| ChannelError::InvalidArgument("failed to parse amt".into()))?,
-        ),
-    ];
+pub fn get_balance_leaf(
+    is_spender: bool,
+    acc: &Address,
+    amnt: &BigNum,
+) -> Result<[u8; 32], Box<dyn Error>> {
+    let address = Token::Address(EthAddress::from_slice(acc.as_bytes()));
+    let amount = Token::Uint(
+        U256::from_dec_str(&amnt.to_str_radix(10))
+            .map_err(|_| ChannelError::InvalidArgument("failed to parse amt".into()))?,
+    );
+
+    let tokens = if is_spender {
+        vec![Token::String("spender".into()), address, amount]
+    } else {
+        vec![address, amount]
+    };
     let encoded = encode(&tokens).to_vec();
 
     let mut result = Keccak::new_keccak256();
