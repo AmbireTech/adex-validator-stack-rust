@@ -402,7 +402,7 @@ pub mod tests_postgres {
 pub mod redis_pool {
 
     use dashmap::DashMap;
-    use deadpool::managed::{Manager as ManagerTrait, RecycleError, RecycleResult};
+    use deadpool::managed::{Manager as ManagerTrait, RecycleResult};
     use thiserror::Error;
 
     use crate::db::redis_connection;
@@ -420,6 +420,7 @@ pub mod redis_pool {
     #[derive(Clone)]
     pub struct Database {
         available: bool,
+        index: u8,
         pub connection: MultiplexedConnection,
     }
 
@@ -473,11 +474,10 @@ pub mod redis_pool {
 
     #[derive(Debug, Error)]
     pub enum Error {
-        // when we can't create more databases and all are used
-        #[error("No more databases can be created")]
-        OutOfBound,
         #[error("A redis error occurred")]
         Redis(#[from] RedisError),
+        #[error("Creation of new database connection failed")]
+        CreationFailed,
     }
 
     #[async_trait]
@@ -495,17 +495,24 @@ pub mod redis_pool {
                         return Ok(database.clone());
                     }
                     // if Some but not available, skip it
-                    Some(_) => continue,
-                    None => {
+                    Some(database) if !database.available => continue,
+                    // if there is no connection or it's available
+                    // always create a new redis connection because of a known issue in redis
+                    // see https://github.com/mitsuhiko/redis-rs/issues/325
+                    _ => {
                         let mut redis_conn =
-                            redis_connection(&format!("{}{}", Self::URL, record.key())).await?;
+                            redis_connection(&format!("{}{}", Self::URL, record.key()))
+                                .await
+                                .expect("Should connect");
 
                         // run `FLUSHDB` to clean any leftovers of previous tests
                         // even from different test runs as there might be leftovers
-                        Self::flush_db(&mut redis_conn).await?;
+                        // flush never fails as an operation
+                        Self::flush_db(&mut redis_conn).await.expect("Should flush");
 
                         let database = Database {
                             available: false,
+                            index: *record.key(),
                             connection: redis_conn,
                         };
 
@@ -516,15 +523,21 @@ pub mod redis_pool {
                 }
             }
 
-            Err(Error::OutOfBound)
+            Err(Error::CreationFailed)
         }
 
         async fn recycle(&self, database: &mut Database) -> RecycleResult<Self::Error> {
-            // run `FLUSHDB` to clean any leftovers of previous tests
+            // always make a new connection because of know redis crate issue
+            // see https://github.com/mitsuhiko/redis-rs/issues/325
+            let connection = redis_connection(&format!("{}{}", Self::URL, database.index))
+                .await
+                .expect("Should connect");
+            // make the database available
+            database.available = true;
+            database.connection = connection;
             Self::flush_db(&mut database.connection)
                 .await
-                .map_err(RecycleError::Backend)?;
-            database.available = true;
+                .expect("Should flush");
 
             Ok(())
         }

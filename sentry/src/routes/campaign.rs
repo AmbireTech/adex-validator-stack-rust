@@ -792,7 +792,7 @@ mod test {
                 spender: create.creator,
                 channel: create.channel.clone(),
                 deposit: Deposit {
-                    // a deposit equal to double the Campaign Budget
+                    // a deposit 4 times larger than the Campaign Budget
                     total: UnifiedNum::from(200_000_000_000),
                     still_on_create2: UnifiedNum::from(0),
                 },
