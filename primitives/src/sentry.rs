@@ -225,6 +225,8 @@ pub struct SpenderResponse {
 #[serde(rename_all = "camelCase")]
 pub struct AllSpendersResponse {
     pub spenders: HashMap<Address, Spender>,
+    #[serde(flatten)]
+    pub pagination: Pagination,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

@@ -18,8 +18,8 @@ use primitives::{
     config::TokenInfo,
     sentry::{
         channel_list::{ChannelListQuery, LastApprovedQuery},
-        AllSpendersResponse, LastApproved, LastApprovedResponse, MessageResponse, SpenderResponse,
-        SuccessResponse,
+        AllSpendersResponse, LastApproved, LastApprovedResponse, MessageResponse, Pagination,
+        SpenderResponse, SuccessResponse,
     },
     spender::{Deposit, Spendable, Spender, SpenderLeaf},
     validator::{MessageTypes, NewState},
@@ -346,10 +346,7 @@ pub async fn get_all_spender_limits<A: Adapter + 'static>(
         .expect("Request should have Channel")
         .to_owned();
 
-    let new_state = match get_corresponding_new_state(&app.pool, &channel).await? {
-        Some(new_state) => new_state,
-        None => return Err(ResponseError::NotFound),
-    };
+    let new_state = get_corresponding_new_state(&app.pool, &channel).await?;
 
     let mut all_spender_limits: HashMap<Address, Spender> = HashMap::new();
 
@@ -358,19 +355,23 @@ pub async fn get_all_spender_limits<A: Adapter + 'static>(
     // Using for loop to avoid async closures
     for spendable in all_spendables {
         let spender = spendable.spender;
-        let spender_leaf = if new_state.msg.balances.spenders.contains_key(&spender) {
-            let balance = new_state.msg.balances.spenders.get(&spender).unwrap();
-
-            Some(SpenderLeaf {
-                total_spent: spendable
-                    .deposit
-                    .total
-                    .checked_sub(balance)
-                    .unwrap_or_default(),
-                // merkle_proof: [u8; 32], // TODO
-            })
-        } else {
-            None
+        let spender_leaf = match new_state {
+            Some(ref new_state) => new_state
+                .msg
+                .balances
+                .spenders
+                .get(&spender)
+                .map(|balance| {
+                    SpenderLeaf {
+                        total_spent: spendable
+                            .deposit
+                            .total
+                            .checked_sub(balance)
+                            .unwrap_or_default(),
+                        // merkle_proof: [u8; 32], // TODO
+                    }
+                }),
+            None => None,
         };
 
         let spender_info = Spender {
@@ -383,6 +384,12 @@ pub async fn get_all_spender_limits<A: Adapter + 'static>(
 
     let res = AllSpendersResponse {
         spenders: all_spender_limits,
+        pagination: Pagination {
+            // TODO
+            page: 1,
+            total: 1,
+            total_pages: 1,
+        },
     };
 
     Ok(success_response(serde_json::to_string(&res)?))
@@ -394,14 +401,24 @@ async fn get_corresponding_new_state(
 ) -> Result<Option<MessageResponse<NewState<UncheckedState>>>, ResponseError> {
     let approve_state = match latest_approve_state_v5(pool, channel).await? {
         Some(approve_state) => approve_state,
-        None => return Err(ResponseError::NotFound),
+        None => return Ok(None),
     };
 
     let state_root = approve_state.msg.state_root.clone();
 
-    let new_state = latest_new_state_v5(pool, channel, &state_root).await?;
+    let new_state = match latest_new_state_v5(pool, channel, &state_root).await? {
+        // TODO: Since it's an approved NewState, then it's safe to make sure it's in `CheckedState`, or if it's not - log the error that the balances are not aligned with the fact it's an Approved NewState and return ResponseError::BadRequest
+        Some(new_state) => Ok(Some(new_state)),
 
-    Ok(new_state)
+        None => {
+            // TODO: Log the error since this should never happen and its crucial to the Channel
+            return Err(ResponseError::BadRequest(
+                "Fatal error! The NewState for the last ApproveState was not found".to_string(),
+            ));
+        }
+    };
+
+    new_state
 }
 
 #[cfg(test)]
