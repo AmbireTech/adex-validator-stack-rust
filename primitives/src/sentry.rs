@@ -42,7 +42,7 @@ pub mod message {
 
     #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
     #[serde(try_from = "MessageTypes", into = "MessageTypes")]
-    pub struct Message<T: Type>(T);
+    pub struct Message<T: Type>(pub T);
 
     impl<T: Type> Message<T> {
         pub fn new(message: T) -> Self {

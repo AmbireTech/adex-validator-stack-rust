@@ -13,19 +13,19 @@ use hex::FromHex;
 use hyper::{Body, Request, Response};
 use primitives::{
     adapter::Adapter,
-    balances::UncheckedState,
+    balances::{CheckedState, UncheckedState},
     channel_v5::Channel as ChannelV5,
     config::TokenInfo,
     sentry::{
         channel_list::{ChannelListQuery, LastApprovedQuery},
-        AllSpendersResponse, LastApproved, LastApprovedResponse, MessageResponse, Pagination,
-        SpenderResponse, SuccessResponse,
+        AllSpendersResponse, LastApproved, LastApprovedResponse, Pagination, SpenderResponse,
+        SuccessResponse,
     },
     spender::{Deposit, Spendable, Spender, SpenderLeaf},
     validator::{MessageTypes, NewState},
     Address, Channel, ChannelId, UnifiedNum,
 };
-use slog::error;
+use slog::{error, Logger};
 use std::{collections::HashMap, str::FromStr};
 use tokio_postgres::error::SqlState;
 
@@ -312,14 +312,12 @@ pub async fn get_spender_limits<A: Adapter + 'static>(
         }
     };
 
-    let new_state = match get_corresponding_new_state(&app.pool, &channel).await? {
+    let new_state = match get_corresponding_new_state(&app.pool, &app.logger, &channel).await? {
         Some(new_state) => new_state,
         None => return spender_response_without_leaf(latest_spendable.deposit.total),
     };
 
-    let new_state_checked = new_state.msg.into_inner().try_checked()?;
-
-    let total_spent = new_state_checked.balances.spenders.get(&spender);
+    let total_spent = new_state.balances.spenders.get(&spender);
 
     let spender_leaf = total_spent.map(|total_spent| SpenderLeaf {
         total_spent: *total_spent,
@@ -346,7 +344,7 @@ pub async fn get_all_spender_limits<A: Adapter + 'static>(
         .expect("Request should have Channel")
         .to_owned();
 
-    let new_state = get_corresponding_new_state(&app.pool, &channel).await?;
+    let new_state = get_corresponding_new_state(&app.pool, &app.logger, &channel).await?;
 
     let mut all_spender_limits: HashMap<Address, Spender> = HashMap::new();
 
@@ -356,21 +354,16 @@ pub async fn get_all_spender_limits<A: Adapter + 'static>(
     for spendable in all_spendables {
         let spender = spendable.spender;
         let spender_leaf = match new_state {
-            Some(ref new_state) => new_state
-                .msg
-                .balances
-                .spenders
-                .get(&spender)
-                .map(|balance| {
-                    SpenderLeaf {
-                        total_spent: spendable
-                            .deposit
-                            .total
-                            .checked_sub(balance)
-                            .unwrap_or_default(),
-                        // merkle_proof: [u8; 32], // TODO
-                    }
-                }),
+            Some(ref new_state) => new_state.balances.spenders.get(&spender).map(|balance| {
+                SpenderLeaf {
+                    total_spent: spendable
+                        .deposit
+                        .total
+                        .checked_sub(balance)
+                        .unwrap_or_default(),
+                    // merkle_proof: [u8; 32], // TODO
+                }
+            }),
             None => None,
         };
 
@@ -397,8 +390,9 @@ pub async fn get_all_spender_limits<A: Adapter + 'static>(
 
 async fn get_corresponding_new_state(
     pool: &DbPool,
+    logger: &Logger,
     channel: &ChannelV5,
-) -> Result<Option<MessageResponse<NewState<UncheckedState>>>, ResponseError> {
+) -> Result<Option<NewState<CheckedState>>, ResponseError> {
     let approve_state = match latest_approve_state_v5(pool, channel).await? {
         Some(approve_state) => approve_state,
         None => return Ok(None),
@@ -407,11 +401,15 @@ async fn get_corresponding_new_state(
     let state_root = approve_state.msg.state_root.clone();
 
     let new_state = match latest_new_state_v5(pool, channel, &state_root).await? {
-        // TODO: Since it's an approved NewState, then it's safe to make sure it's in `CheckedState`, or if it's not - log the error that the balances are not aligned with the fact it's an Approved NewState and return ResponseError::BadRequest
-        Some(new_state) => Ok(Some(new_state)),
-
+        Some(new_state) => {
+            let new_state = new_state.msg.into_inner().try_checked().map_err(|err| {
+                error!(&logger, "Balances are not aligned in an approved NewState: {}", &err; "module" => "get_spender_limits");
+                ResponseError::BadRequest("Balances are not aligned in an approved NewState".to_string())
+            })?;
+            Ok(Some(new_state))
+        }
         None => {
-            // TODO: Log the error since this should never happen and its crucial to the Channel
+            error!(&logger, "{}", "Fatal error! The NewState for the last ApproveState was not found"; "module" => "get_spender_limits");
             return Err(ResponseError::BadRequest(
                 "Fatal error! The NewState for the last ApproveState was not found".to_string(),
             ));
