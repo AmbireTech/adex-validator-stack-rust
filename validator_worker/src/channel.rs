@@ -5,7 +5,6 @@ use crate::{
     SentryApi,
 };
 use primitives::{adapter::Adapter, channel_v5::Channel, config::Config, util::ApiUrl, ChannelId};
-// use slog::{error, info, Logger};
 use slog::Logger;
 use std::collections::{hash_map::Entry, HashSet};
 
@@ -15,7 +14,7 @@ pub async fn channel_tick<A: Adapter + 'static>(
     logger: &Logger,
     channel: Channel,
     validators: Validators,
-) -> Result<ChannelId, Error<A::AdapterError>> {
+) -> Result<ChannelId, Error> {
     let tick = channel
         .find_validator(adapter.whoami())
         .ok_or(Error::ChannelNotIntendedForUs)?;
@@ -35,7 +34,7 @@ pub async fn channel_tick<A: Adapter + 'static>(
     let accounting = sentry.get_accounting(channel.id()).await?;
 
     // Validation #2:
-    // spender.spender_leaf.total_deposit >= accounting.balances.spenders[spender.address]
+    // spender.total_deposit >= accounting.balances.spenders[spender.address]
     if !all_spenders.iter().all(|(address, spender)| {
         spender.total_deposited
             >= accounting
@@ -52,9 +51,9 @@ pub async fn channel_tick<A: Adapter + 'static>(
     let _tick_result = match tick {
         primitives::Validator::Leader(_v) => todo!(),
         primitives::Validator::Follower(_v) => {
-            follower::tick(&sentry, channel, accounting.balances)
+            follower::tick(&sentry, channel, all_spenders, accounting.balances)
                 .await
-                .map_err(|err| Error::FollowerTick(channel.id(), TickError::Tick(err)))?
+                .map_err(|err| Error::FollowerTick(channel.id(), TickError::Tick(Box::new(err))))?
         }
     };
 
