@@ -7,6 +7,7 @@ use primitives::{
     merkle_tree::{Error as MerkleTreeError, MerkleTree},
     Balances, ChannelId,
 };
+use thiserror::Error;
 
 pub use self::sentry_interface::{all_channels, SentryApi};
 
@@ -16,7 +17,6 @@ pub mod follower;
 pub mod heartbeat;
 pub mod leader;
 pub mod sentry_interface;
-use thiserror::Error;
 
 pub mod core {
     pub mod follower_rules;

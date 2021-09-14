@@ -16,8 +16,8 @@ pub struct TickStatus {
 pub async fn tick<A: Adapter + 'static>(
     sentry: &SentryApi<A>,
     channel: Channel,
-    accounting_balances: Balances<CheckedState>,
-    token_info: &TokenInfo,
+    _accounting_balances: Balances<CheckedState>,
+    _token_info: &TokenInfo,
 ) -> Result<TickStatus, Box<dyn Error>> {
     // 2. Check if Accounting != than latest NewState
     // Accounting.balances != NewState.balances
@@ -25,7 +25,7 @@ pub async fn tick<A: Adapter + 'static>(
     let new_state = None;
 
     Ok(TickStatus {
-        heartbeat: heartbeat(sentry).await?,
+        heartbeat: heartbeat(sentry, channel.id()).await?,
         new_state,
     })
 }

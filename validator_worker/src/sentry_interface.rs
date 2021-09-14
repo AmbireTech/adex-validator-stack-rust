@@ -9,7 +9,6 @@ use primitives::{
     adapter::Adapter,
     balances::{CheckedState, UncheckedState},
     channel::Channel as ChannelOld,
-    channel_v5::Channel,
     sentry::{
         AccountingResponse, ChannelListResponse, EventAggregateResponse, LastApprovedResponse,
         SuccessResponse, ValidatorMessageResponse,

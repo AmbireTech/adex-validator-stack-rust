@@ -8,7 +8,7 @@ use primitives::{
     config::TokenInfo,
     spender::Spender,
     validator::{ApproveState, MessageTypes, NewState, RejectState},
-    Address, UnifiedNum,
+    Address, ChannelId, UnifiedNum,
 };
 
 use crate::core::follower_rules::{get_health, is_valid_transition};
@@ -94,6 +94,8 @@ pub async fn tick<A: Adapter + 'static>(
     token: &TokenInfo,
 ) -> Result<TickStatus, Error<A::AdapterError>> {
     let from = channel.leader;
+    let channel_id = channel.id();
+
     // TODO: Context for All spender sum Error when overflow occurs
     let all_spenders_sum = all_spenders
         .values()
@@ -103,7 +105,7 @@ pub async fn tick<A: Adapter + 'static>(
 
     // if we don't have a `NewState` return `None`
     let new_msg = sentry
-        .get_latest_msg(channel.id(), from, &["NewState"])
+        .get_latest_msg(channel_id, from, &["NewState"])
         .await?
         .map(|message_types| NewState::try_from(message_types))
         .transpose()
@@ -111,7 +113,7 @@ pub async fn tick<A: Adapter + 'static>(
         .expect("Should always return NewState");
 
     let our_latest_msg_response = sentry
-        .get_our_latest_msg(channel.id(), &["ApproveState", "RejectState"])
+        .get_our_latest_msg(channel_id, &["ApproveState", "RejectState"])
         .await?;
 
     let our_latest_msg_state_root = match our_latest_msg_response {
@@ -140,7 +142,7 @@ pub async fn tick<A: Adapter + 'static>(
     };
 
     Ok(TickStatus {
-        heartbeat: heartbeat(sentry).await?,
+        heartbeat: heartbeat(sentry, channel_id).await?,
         approve_state: approve_state_result,
     })
 }
@@ -157,7 +159,7 @@ async fn on_new_state<'a, A: Adapter + 'static>(
         Ok(balances) => balances,
         // TODO: Should we show the Payout Mismatch between Spent & Earned?
         Err(balances::Error::PayoutMismatch { .. }) => {
-            return Ok(on_error(iface, channel, new_state, InvalidNewState::Transition).await)
+            return Ok(on_error(iface, channel.id(), new_state, InvalidNewState::Transition).await)
         }
         // TODO: Add context for `proposed_balances.check()` overflow error
         Err(_) => return Err(Error::Overflow),
@@ -172,15 +174,14 @@ async fn on_new_state<'a, A: Adapter + 'static>(
             token_info.precision.get(),
         )?)
     {
-        return Ok(on_error(iface, channel, new_state, InvalidNewState::RootHash).await);
+        return Ok(on_error(iface, channel.id(), new_state, InvalidNewState::RootHash).await);
     }
 
-    if !iface.adapter.verify(
-        channel.leader,
-        &proposed_state_root,
-        &new_state.signature,
-    )? {
-        return Ok(on_error(iface, channel, new_state, InvalidNewState::Signature).await);
+    if !iface
+        .adapter
+        .verify(channel.leader, &proposed_state_root, &new_state.signature)?
+    {
+        return Ok(on_error(iface, channel.id(), new_state, InvalidNewState::Signature).await);
     }
 
     let last_approve_response = iface.get_last_approved(channel.id()).await?;
@@ -193,7 +194,9 @@ async fn on_new_state<'a, A: Adapter + 'static>(
         Ok(Some(previous_balances)) => previous_balances,
         Ok(None) => Default::default(),
         // TODO: Add Context for Transition error
-        Err(_err) => return Ok(on_error(iface, channel, new_state, InvalidNewState::Transition).await),
+        Err(_err) => {
+            return Ok(on_error(iface, channel.id(), new_state, InvalidNewState::Transition).await)
+        }
     };
 
     // OUTPACE rules:
@@ -209,7 +212,7 @@ async fn on_new_state<'a, A: Adapter + 'static>(
     .ok_or(Error::Overflow)?
     {
         // TODO: Add context for error in Spenders transition
-        return Ok(on_error(iface, channel, new_state, InvalidNewState::Transition).await);
+        return Ok(on_error(iface, channel.id(), new_state, InvalidNewState::Transition).await);
     }
 
     // 2. Check the transition of previous and proposed Earners maps
@@ -225,7 +228,7 @@ async fn on_new_state<'a, A: Adapter + 'static>(
     .ok_or(Error::Overflow)?
     {
         // TODO: Add context for error in Earners transition
-        return Ok(on_error(iface, channel,new_state, InvalidNewState::Transition).await);
+        return Ok(on_error(iface, channel.id(), new_state, InvalidNewState::Transition).await);
     }
 
     let health_earners = get_health(
@@ -237,7 +240,7 @@ async fn on_new_state<'a, A: Adapter + 'static>(
     if health_earners < u64::from(iface.config.health_unsignable_promilles) {
         return Ok(on_error(
             iface,
-            channel,
+            channel.id(),
             new_state,
             InvalidNewState::Health(Health::Earners(health_earners)),
         )
@@ -253,7 +256,7 @@ async fn on_new_state<'a, A: Adapter + 'static>(
     if health_spenders < u64::from(iface.config.health_unsignable_promilles) {
         return Ok(on_error(
             iface,
-            channel,
+            channel.id(),
             new_state,
             InvalidNewState::Health(Health::Spenders(health_spenders)),
         )
@@ -265,11 +268,14 @@ async fn on_new_state<'a, A: Adapter + 'static>(
     let is_healthy = health_spenders >= health_threshold && health_spenders >= health_threshold;
 
     let propagation_result = iface
-        .propagate(channel.id(), &[&MessageTypes::ApproveState(ApproveState {
-            state_root: proposed_state_root,
-            signature,
-            is_healthy,
-        })])
+        .propagate(
+            channel.id(),
+            &[&MessageTypes::ApproveState(ApproveState {
+                state_root: proposed_state_root,
+                signature,
+                is_healthy,
+            })],
+        )
         .await;
 
     Ok(ApproveStateResult::Sent(Some(propagation_result)))
@@ -277,19 +283,22 @@ async fn on_new_state<'a, A: Adapter + 'static>(
 
 async fn on_error<'a, A: Adapter + 'static>(
     iface: &'a SentryApi<A>,
-    channel: Channel,
+    channel: ChannelId,
     new_state: &'a NewState<UncheckedState>,
     status: InvalidNewState,
 ) -> ApproveStateResult {
     let propagation = iface
-        .propagate(channel.id(), &[&MessageTypes::RejectState(RejectState {
-            reason: status.to_string(),
-            state_root: new_state.state_root.clone(),
-            signature: new_state.signature.clone(),
-            balances: Some(new_state.balances.clone()),
-            /// The NewState timestamp that is being rejected
-            timestamp: Some(Utc::now()),
-        })])
+        .propagate(
+            channel,
+            &[&MessageTypes::RejectState(RejectState {
+                reason: status.to_string(),
+                state_root: new_state.state_root.clone(),
+                signature: new_state.signature.clone(),
+                balances: Some(new_state.balances.clone()),
+                /// The timestamp when the NewState is being rejected
+                timestamp: Some(Utc::now()),
+            })],
+        )
         .await;
 
     ApproveStateResult::RejectedState {
