@@ -71,7 +71,7 @@ impl fmt::Display for InvalidNewState {
 
 #[derive(Debug)]
 pub enum ApproveStateResult {
-    /// If None, Conditions for handling the new state haven't been met
+    /// When `None` the conditions for approving the `NewState` (`ApproveState`) haven't been met
     Sent(Option<Vec<PropagationResult>>),
     RejectedState {
         reason: InvalidNewState,
@@ -87,12 +87,13 @@ pub struct TickStatus {
 }
 
 pub async fn tick<A: Adapter + 'static>(
-    iface: &SentryApi<A>,
+    sentry: &SentryApi<A>,
     channel: Channel,
     all_spenders: HashMap<Address, Spender>,
     accounting_balances: Balances<CheckedState>,
+    token: &TokenInfo,
 ) -> Result<TickStatus, Error<A::AdapterError>> {
-    let from = iface.channel.leader;
+    let from = channel.leader;
     // TODO: Context for All spender sum Error when overflow occurs
     let all_spenders_sum = all_spenders
         .values()
@@ -101,13 +102,16 @@ pub async fn tick<A: Adapter + 'static>(
         .ok_or(Error::Overflow)?;
 
     // if we don't have a `NewState` return `None`
-    let new_msg = iface
-        .get_latest_msg(&from, &["NewState"])
+    let new_msg = sentry
+        .get_latest_msg(channel.id(), from, &["NewState"])
         .await?
-        .and_then(|message_types| NewState::try_from(message_types).ok());
+        .map(|message_types| NewState::try_from(message_types))
+        .transpose()
+        // TODO: Maybe handle the error. This should never happen though, since we are requesting only a `NewState`
+        .expect("Should always return NewState");
 
-    let our_latest_msg_response = iface
-        .get_our_latest_msg(&["ApproveState", "RejectState"])
+    let our_latest_msg_response = sentry
+        .get_our_latest_msg(channel.id(), &["ApproveState", "RejectState"])
         .await?;
 
     let our_latest_msg_state_root = match our_latest_msg_response {
@@ -121,15 +125,10 @@ pub async fn tick<A: Adapter + 'static>(
         _ => false,
     };
 
-    let token = iface
-        .config
-        .token_address_whitelist
-        .get(&channel.token)
-        .ok_or(Error::TokenNotWhitelisted)?;
-
     let approve_state_result = if let (Some(new_state), false) = (new_msg, latest_is_responded_to) {
         on_new_state(
-            iface,
+            sentry,
+            channel,
             accounting_balances,
             &new_state,
             token,
@@ -141,13 +140,14 @@ pub async fn tick<A: Adapter + 'static>(
     };
 
     Ok(TickStatus {
-        heartbeat: heartbeat(iface).await?,
+        heartbeat: heartbeat(sentry).await?,
         approve_state: approve_state_result,
     })
 }
 
 async fn on_new_state<'a, A: Adapter + 'static>(
     iface: &'a SentryApi<A>,
+    channel: Channel,
     accounting_balances: Balances<CheckedState>,
     new_state: &'a NewState<UncheckedState>,
     token_info: &TokenInfo,
@@ -157,7 +157,7 @@ async fn on_new_state<'a, A: Adapter + 'static>(
         Ok(balances) => balances,
         // TODO: Should we show the Payout Mismatch between Spent & Earned?
         Err(balances::Error::PayoutMismatch { .. }) => {
-            return Ok(on_error(iface, new_state, InvalidNewState::Transition).await)
+            return Ok(on_error(iface, channel, new_state, InvalidNewState::Transition).await)
         }
         // TODO: Add context for `proposed_balances.check()` overflow error
         Err(_) => return Err(Error::Overflow),
@@ -167,23 +167,23 @@ async fn on_new_state<'a, A: Adapter + 'static>(
 
     if proposed_state_root
         != hex::encode(get_state_root_hash(
-            iface.channel.id(),
+            channel.id(),
             &proposed_balances,
             token_info.precision.get(),
         )?)
     {
-        return Ok(on_error(iface, new_state, InvalidNewState::RootHash).await);
+        return Ok(on_error(iface, channel, new_state, InvalidNewState::RootHash).await);
     }
 
     if !iface.adapter.verify(
-        &iface.channel.leader,
+        channel.leader,
         &proposed_state_root,
         &new_state.signature,
     )? {
-        return Ok(on_error(iface, new_state, InvalidNewState::Signature).await);
+        return Ok(on_error(iface, channel, new_state, InvalidNewState::Signature).await);
     }
 
-    let last_approve_response = iface.get_last_approved(iface.channel.id()).await?;
+    let last_approve_response = iface.get_last_approved(channel.id()).await?;
     let prev_balances = match last_approve_response
         .last_approved
         .and_then(|last_approved| last_approved.new_state)
@@ -193,7 +193,7 @@ async fn on_new_state<'a, A: Adapter + 'static>(
         Ok(Some(previous_balances)) => previous_balances,
         Ok(None) => Default::default(),
         // TODO: Add Context for Transition error
-        Err(_err) => return Ok(on_error(iface, new_state, InvalidNewState::Transition).await),
+        Err(_err) => return Ok(on_error(iface, channel, new_state, InvalidNewState::Transition).await),
     };
 
     // OUTPACE rules:
@@ -209,7 +209,7 @@ async fn on_new_state<'a, A: Adapter + 'static>(
     .ok_or(Error::Overflow)?
     {
         // TODO: Add context for error in Spenders transition
-        return Ok(on_error(iface, new_state, InvalidNewState::Transition).await);
+        return Ok(on_error(iface, channel, new_state, InvalidNewState::Transition).await);
     }
 
     // 2. Check the transition of previous and proposed Earners maps
@@ -225,7 +225,7 @@ async fn on_new_state<'a, A: Adapter + 'static>(
     .ok_or(Error::Overflow)?
     {
         // TODO: Add context for error in Earners transition
-        return Ok(on_error(iface, new_state, InvalidNewState::Transition).await);
+        return Ok(on_error(iface, channel,new_state, InvalidNewState::Transition).await);
     }
 
     let health_earners = get_health(
@@ -237,6 +237,7 @@ async fn on_new_state<'a, A: Adapter + 'static>(
     if health_earners < u64::from(iface.config.health_unsignable_promilles) {
         return Ok(on_error(
             iface,
+            channel,
             new_state,
             InvalidNewState::Health(Health::Earners(health_earners)),
         )
@@ -252,6 +253,7 @@ async fn on_new_state<'a, A: Adapter + 'static>(
     if health_spenders < u64::from(iface.config.health_unsignable_promilles) {
         return Ok(on_error(
             iface,
+            channel,
             new_state,
             InvalidNewState::Health(Health::Spenders(health_spenders)),
         )
@@ -263,7 +265,7 @@ async fn on_new_state<'a, A: Adapter + 'static>(
     let is_healthy = health_spenders >= health_threshold && health_spenders >= health_threshold;
 
     let propagation_result = iface
-        .propagate(&[&MessageTypes::ApproveState(ApproveState {
+        .propagate(channel.id(), &[&MessageTypes::ApproveState(ApproveState {
             state_root: proposed_state_root,
             signature,
             is_healthy,
@@ -275,11 +277,12 @@ async fn on_new_state<'a, A: Adapter + 'static>(
 
 async fn on_error<'a, A: Adapter + 'static>(
     iface: &'a SentryApi<A>,
+    channel: Channel,
     new_state: &'a NewState<UncheckedState>,
     status: InvalidNewState,
 ) -> ApproveStateResult {
     let propagation = iface
-        .propagate(&[&MessageTypes::RejectState(RejectState {
+        .propagate(channel.id(), &[&MessageTypes::RejectState(RejectState {
             reason: status.to_string(),
             state_root: new_state.state_root.clone(),
             signature: new_state.signature.clone(),

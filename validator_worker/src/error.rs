@@ -32,4 +32,6 @@ pub enum Error {
     #[error("Whoami is neither a Leader or follower in channel")]
     // TODO: Add channel, validatorId, etc.
     ChannelNotIntendedForUs,
+    #[error("Channel token is not whitelisted")]
+    ChannelTokenNotWhitelisted,
 }
