@@ -107,10 +107,9 @@ pub async fn tick<A: Adapter + 'static>(
     let new_msg = sentry
         .get_latest_msg(channel_id, from, &["NewState"])
         .await?
-        .map(|message_types| NewState::try_from(message_types))
+        .map(NewState::try_from)
         .transpose()
-        // TODO: Maybe handle the error. This should never happen though, since we are requesting only a `NewState`
-        .expect("Should always return NewState");
+        .expect("Should always return a NewState message");
 
     let our_latest_msg_response = sentry
         .get_our_latest_msg(channel_id, &["ApproveState", "RejectState"])
@@ -132,7 +131,7 @@ pub async fn tick<A: Adapter + 'static>(
             sentry,
             channel,
             accounting_balances,
-            &new_state,
+            new_state,
             token,
             all_spenders_sum,
         )
@@ -151,7 +150,7 @@ async fn on_new_state<'a, A: Adapter + 'static>(
     iface: &'a SentryApi<A>,
     channel: Channel,
     accounting_balances: Balances<CheckedState>,
-    new_state: &'a NewState<UncheckedState>,
+    new_state: NewState<UncheckedState>,
     token_info: &TokenInfo,
     all_spenders_sum: UnifiedNum,
 ) -> Result<ApproveStateResult, Error<A::AdapterError>> {
@@ -265,7 +264,7 @@ async fn on_new_state<'a, A: Adapter + 'static>(
 
     let signature = iface.adapter.sign(&new_state.state_root)?;
     let health_threshold = u64::from(iface.config.health_threshold_promilles);
-    let is_healthy = health_spenders >= health_threshold && health_spenders >= health_threshold;
+    let is_healthy = health_earners >= health_threshold && health_spenders >= health_threshold;
 
     let propagation_result = iface
         .propagate(
@@ -284,7 +283,7 @@ async fn on_new_state<'a, A: Adapter + 'static>(
 async fn on_error<'a, A: Adapter + 'static>(
     iface: &'a SentryApi<A>,
     channel: ChannelId,
-    new_state: &'a NewState<UncheckedState>,
+    new_state: NewState<UncheckedState>,
     status: InvalidNewState,
 ) -> ApproveStateResult {
     let propagation = iface

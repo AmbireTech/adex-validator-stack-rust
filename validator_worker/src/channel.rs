@@ -1,4 +1,9 @@
-use crate::{SentryApi, error::{Error, TickError}, follower, leader, sentry_interface::{campaigns::all_campaigns, Validator, Validators}};
+use crate::{
+    error::{Error, TickError},
+    follower, leader,
+    sentry_interface::{campaigns::all_campaigns, Validator, Validators},
+    SentryApi,
+};
 use primitives::{adapter::Adapter, channel_v5::Channel, config::Config, util::ApiUrl, ChannelId};
 use slog::Logger;
 use std::collections::{hash_map::Entry, HashSet};
@@ -14,12 +19,7 @@ pub async fn channel_tick<A: Adapter + 'static>(
         .find_validator(adapter.whoami())
         .ok_or(Error::ChannelNotIntendedForUs)?;
 
-    let sentry = SentryApi::init(
-        adapter,
-        logger.clone(),
-        config.clone(),
-        validators,
-    )?;
+    let sentry = SentryApi::init(adapter, logger.clone(), config.clone(), validators)?;
     // 1. `GET /channel/:id/spender/all`
     let all_spenders = sentry.get_all_spenders(channel.id()).await?;
 
@@ -42,23 +42,25 @@ pub async fn channel_tick<A: Adapter + 'static>(
         return Err(Error::Validation);
     }
 
-
     let token = config
         .token_address_whitelist
         .get(&channel.token)
         .ok_or(Error::ChannelTokenNotWhitelisted)?;
 
     // TODO: Add timeout
-     match tick {
+    match tick {
         primitives::Validator::Leader(_v) => {
             let _leader_tick_status = leader::tick(&sentry, channel, accounting.balances, token)
                 .await
-                .map_err(|err| Error::LeaderTick(channel.id(), TickError::Tick(err)))?;
-        },
+                .map_err(|err| Error::LeaderTick(channel.id(), TickError::Tick(Box::new(err))))?;
+        }
         primitives::Validator::Follower(_v) => {
-            let _follower_tick_status = follower::tick(&sentry, channel, all_spenders, accounting.balances, token)
-                .await
-                .map_err(|err| Error::FollowerTick(channel.id(), TickError::Tick(Box::new(err))))?;
+            let _follower_tick_status =
+                follower::tick(&sentry, channel, all_spenders, accounting.balances, token)
+                    .await
+                    .map_err(|err| {
+                        Error::FollowerTick(channel.id(), TickError::Tick(Box::new(err)))
+                    })?;
         }
     };
 

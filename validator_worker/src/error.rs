@@ -27,8 +27,6 @@ pub enum Error {
     FollowerTick(ChannelId, TickError),
     #[error("Placeholder for Validation errors")]
     Validation,
-    #[error("Placeholder for sum overflow error")]
-    Overflow,
     #[error("Whoami is neither a Leader or follower in channel")]
     // TODO: Add channel, validatorId, etc.
     ChannelNotIntendedForUs,

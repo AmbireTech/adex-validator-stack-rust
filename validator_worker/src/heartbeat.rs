@@ -4,7 +4,12 @@ use chrono::{Duration, Utc};
 
 use adapter::get_signable_state_root;
 use byteorder::{BigEndian, ByteOrder};
-use primitives::{ChannelId, adapter::{Adapter, AdapterErrorKind, Error as AdapterError}, merkle_tree::MerkleTree, validator::{Heartbeat, MessageTypes}};
+use primitives::{
+    adapter::{Adapter, AdapterErrorKind, Error as AdapterError},
+    merkle_tree::MerkleTree,
+    validator::{Heartbeat, MessageTypes},
+    ChannelId,
+};
 use thiserror::Error;
 
 use crate::sentry_interface::{Error as SentryApiError, PropagationResult, SentryApi};

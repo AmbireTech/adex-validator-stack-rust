@@ -52,9 +52,7 @@ pub enum Error {
     #[error(
         "Missing validator URL & Auth token entry for whoami {whoami:#?} in the propagation list"
     )]
-    WhoamiMissing {
-        whoami: ValidatorId,
-    },
+    WhoamiMissing { whoami: ValidatorId },
     #[error("Failed to parse validator url: {0}")]
     ValidatorUrl(#[from] primitives::util::api::ParseError),
 }
@@ -88,14 +86,13 @@ impl<A: Adapter + 'static> SentryApi<A> {
         })
     }
 
-    pub async fn propagate(&self, channel: ChannelId, messages: &[&MessageTypes]) -> Vec<PropagationResult> {
+    pub async fn propagate(
+        &self,
+        channel: ChannelId,
+        messages: &[&MessageTypes],
+    ) -> Vec<PropagationResult> {
         join_all(self.propagate_to.iter().map(|(validator_id, validator)| {
-            propagate_to::<A>(
-                &self.client,
-                channel,
-                (*validator_id, validator),
-                messages,
-            )
+            propagate_to::<A>(&self.client, channel, (*validator_id, validator), messages)
         }))
         .await
     }
@@ -173,7 +170,10 @@ impl<A: Adapter + 'static> SentryApi<A> {
     }
 
     // TODO: Pagination & use of `AllSpendersResponse`
-    pub async fn get_all_spenders(&self, channel: ChannelId) -> Result<HashMap<Address, Spender>, Error> {
+    pub async fn get_all_spenders(
+        &self,
+        channel: ChannelId,
+    ) -> Result<HashMap<Address, Spender>, Error> {
         let url = self
             .whoami
             .url
