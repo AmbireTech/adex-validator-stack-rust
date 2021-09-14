@@ -42,7 +42,7 @@ pub mod message {
 
     #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
     #[serde(try_from = "MessageTypes", into = "MessageTypes")]
-    pub struct Message<T: Type>(T);
+    pub struct Message<T: Type>(pub T);
 
     impl<T: Type> Message<T> {
         pub fn new(message: T) -> Self {
@@ -219,6 +219,14 @@ pub struct SuccessResponse {
 #[serde(rename_all = "camelCase")]
 pub struct SpenderResponse {
     pub spender: Spender,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AllSpendersResponse {
+    pub spenders: HashMap<Address, Spender>,
+    #[serde(flatten)]
+    pub pagination: Pagination,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

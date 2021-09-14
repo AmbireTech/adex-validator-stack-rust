@@ -44,6 +44,22 @@ pub async fn fetch_spendable(
     Ok(row.map(Spendable::from))
 }
 
+static GET_ALL_SPENDERS_STATEMENT: &str = "SELECT spender, channel_id, channel, total, still_on_create2 FROM spendable WHERE channel_id = $1";
+
+// TODO: Include pagination
+pub async fn get_all_spendables_for_channel(
+    pool: DbPool,
+    channel_id: &ChannelId,
+) -> Result<Vec<Spendable>, PoolError> {
+    let client = pool.get().await?;
+    let statement = client.prepare(GET_ALL_SPENDERS_STATEMENT).await?;
+
+    let rows = client.query(&statement, &[channel_id]).await?;
+    let spendables: Vec<Spendable> = rows.into_iter().map(Spendable::from).collect();
+
+    Ok(spendables)
+}
+
 static UPDATE_SPENDABLE_STATEMENT: &str = "INSERT INTO spendable(spender, channel_id, channel, total, still_on_create2) VALUES($1, $2, $3, $4, $5) ON CONFLICT ON CONSTRAINT spendable_pkey DO UPDATE SET total = $4, still_on_create2 = $5 WHERE spendable.spender = $1 AND spendable.channel_id = $2 RETURNING spender, channel_id, channel, total, still_on_create2";
 
 // Updates spendable entry deposit or inserts a new spendable entry if it doesn't exist
