@@ -41,7 +41,6 @@ pub struct SentryApi<A: Adapter> {
     pub logger: Logger,
     pub config: Config,
     pub whoami: Validator,
-    pub channel: Channel,
     pub propagate_to: Validators,
 }
 
@@ -52,10 +51,9 @@ pub enum Error {
     #[error("Making a request: {0}")]
     Request(#[from] reqwest::Error),
     #[error(
-        "Missing validator URL & Auth token entry for whoami {whoami:#?} in the Channel {channel:#?} propagation list"
+        "Missing validator URL & Auth token entry for whoami {whoami:#?} in the propagation list"
     )]
     WhoamiMissing {
-        channel: ChannelId,
         whoami: ValidatorId,
     },
     #[error("Failed to parse validator url: {0}")]
@@ -67,7 +65,7 @@ impl<A: Adapter + 'static> SentryApi<A> {
         adapter: A,
         logger: Logger,
         config: Config,
-        (channel, propagate_to): (Channel, Validators),
+        propagate_to: Validators,
     ) -> Result<Self, Error> {
         let client = Client::builder()
             .timeout(Duration::from_millis(config.fetch_timeout.into()))
@@ -78,7 +76,6 @@ impl<A: Adapter + 'static> SentryApi<A> {
             .get(&adapter.whoami())
             .cloned()
             .ok_or_else(|| Error::WhoamiMissing {
-                channel: channel.id(),
                 whoami: adapter.whoami(),
             })?;
 
@@ -88,16 +85,15 @@ impl<A: Adapter + 'static> SentryApi<A> {
             logger,
             config,
             whoami,
-            channel,
             propagate_to,
         })
     }
 
-    pub async fn propagate(&self, messages: &[&MessageTypes]) -> Vec<PropagationResult> {
+    pub async fn propagate(&self, channel: ChannelId, messages: &[&MessageTypes]) -> Vec<PropagationResult> {
         join_all(self.propagate_to.iter().map(|(validator_id, validator)| {
             propagate_to::<A>(
                 &self.client,
-                self.channel.id(),
+                channel,
                 (*validator_id, validator),
                 messages,
             )
@@ -107,20 +103,23 @@ impl<A: Adapter + 'static> SentryApi<A> {
 
     pub async fn get_latest_msg(
         &self,
-        from: &ValidatorId,
+        channel: ChannelId,
+        from: ValidatorId,
         message_types: &[&str],
     ) -> Result<Option<MessageTypes>, Error> {
         let message_type = message_types.join("+");
 
+        // TODO: Fix endpoint URL
         let endpoint = self
             .whoami
             .url
             .join(&format!(
-                "/validator-messages/{}/{}?limit=1",
+                "v5/channel/{}/validator-messages/{}/{}?limit=1",
+                channel,
                 from.to_checksum(),
                 message_type
             ))
-            .expect("Should parse endpoint");
+            .expect("Should not error when creating endpoint url");
 
         let result = self
             .client
@@ -135,9 +134,10 @@ impl<A: Adapter + 'static> SentryApi<A> {
 
     pub async fn get_our_latest_msg(
         &self,
+        channel: ChannelId,
         message_types: &[&str],
     ) -> Result<Option<MessageTypes>, Error> {
-        self.get_latest_msg(&self.adapter.whoami(), message_types)
+        self.get_latest_msg(channel, self.adapter.whoami(), message_types)
             .await
     }
 
@@ -174,11 +174,11 @@ impl<A: Adapter + 'static> SentryApi<A> {
     }
 
     // TODO: Pagination & use of `AllSpendersResponse`
-    pub async fn get_all_spenders(&self) -> Result<HashMap<Address, Spender>, Error> {
+    pub async fn get_all_spenders(&self, channel: ChannelId) -> Result<HashMap<Address, Spender>, Error> {
         let url = self
             .whoami
             .url
-            .join(&format!("v5/channel/{}/spender/all", self.channel.id()))
+            .join(&format!("v5/channel/{}/spender/all", channel))
             .expect("Should not error when creating endpoint");
 
         self.client
