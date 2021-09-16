@@ -144,7 +144,7 @@ fn campaign_list_query_params<'a>(
     }
 
     if let (Some(validator), Some(true)) = (validator, is_leader) {
-        where_clauses.push(format!("channel->'leader' = ${}", params.len() + 1));
+        where_clauses.push(format!("channel->'leader' = ${}", params.len() + 1)); // TODO: change after channel is in a different table
         params.push(validator); // TODO: could be redundant?
     }
 
