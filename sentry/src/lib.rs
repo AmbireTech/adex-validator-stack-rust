@@ -23,7 +23,7 @@ use primitives::{Config, ValidatorId};
 use redis::aio::MultiplexedConnection;
 use regex::Regex;
 use routes::analytics::{advanced_analytics, advertiser_analytics, analytics, publisher_analytics};
-use routes::campaign::{create_campaign, update_campaign};
+use routes::campaign::{campaign_list, create_campaign, update_campaign};
 use routes::cfg::config;
 use routes::channel::{
     channel_list, channel_validate, create_channel, create_validator_messages,
@@ -141,7 +141,6 @@ impl<A: Adapter + 'static> Application<A> {
             ("/channel", &Method::POST) => create_channel(req, self).await,
             ("/channel/list", &Method::GET) => channel_list(req, self).await,
             ("/channel/validate", &Method::POST) => channel_validate(req, self).await,
-
             ("/analytics", &Method::GET) => analytics(req, self).await,
             ("/analytics/advanced", &Method::GET) => {
                 let req = match AuthRequired.call(req, self).await {
@@ -182,6 +181,16 @@ impl<A: Adapter + 'static> Application<A> {
                 };
 
                 create_campaign(req, self).await
+            }
+            ("/v5/campaign/list", &Method::GET) => {
+                let req = match AuthRequired.call(req, self).await {
+                    Ok(req) => req,
+                    Err(error) => {
+                        return map_response_error(error);
+                    }
+                };
+
+                campaign_list(req, self).await
             }
             (route, _) if route.starts_with("/analytics") => analytics_router(req, self).await,
             // This is important because it prevents us from doing

@@ -1,7 +1,7 @@
 use crate::{
     db::{
         accounting::{get_accounting, Side},
-        campaign::{get_campaigns_by_channel, insert_campaign, update_campaign},
+        campaign::{get_campaigns_by_channel, insert_campaign, list_campaigns, update_campaign},
         spendable::fetch_spendable,
         CampaignRemaining, DbPool, RedisError,
     },
@@ -12,6 +12,7 @@ use hyper::{Body, Request, Response};
 use primitives::{
     adapter::Adapter,
     campaign_validator::Validator,
+    sentry::campaign::CampaignListQuery,
     sentry::campaign_create::{CreateCampaign, ModifyCampaign},
     Address, Campaign, UnifiedNum,
 };
@@ -160,6 +161,31 @@ pub async fn create_campaign<A: Adapter>(
     }?;
 
     Ok(success_response(serde_json::to_string(&campaign)?))
+}
+
+pub async fn campaign_list<A: Adapter>(
+    req: Request<Body>,
+    app: &Application<A>,
+) -> Result<Response<Body>, ResponseError> {
+    let query = serde_urlencoded::from_str::<CampaignListQuery>(req.uri().query().unwrap_or(""))?;
+
+    let limit = 100; // TODO: Use a value from config
+    let skip = query
+        .page
+        .checked_mul(limit.into())
+        .ok_or_else(|| ResponseError::BadRequest("Page and/or limit is too large".into()))?;
+    let list_response = list_campaigns(
+        &app.pool,
+        skip,
+        limit,
+        &query.creator,
+        &query.validator,
+        &query.is_leader,
+        &query.active_to_ge,
+    )
+    .await?;
+
+    Ok(success_response(serde_json::to_string(&list_response)?))
 }
 
 pub mod update_campaign {
