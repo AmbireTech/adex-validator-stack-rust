@@ -129,7 +129,7 @@ fn campaign_list_query_params<'a>(
     is_leader: &Option<bool>,
     active_to_ge: &'a DateTime<Utc>,
 ) -> (Vec<String>, Vec<&'a (dyn ToSql + Sync)>) {
-    let mut where_clauses = vec!["valid_until >= $1".to_string()];
+    let mut where_clauses = vec!["active_to >= $1".to_string()];
     let mut params: Vec<&(dyn ToSql + Sync)> = vec![active_to_ge];
 
     if let Some(creator) = creator {
@@ -137,21 +137,15 @@ fn campaign_list_query_params<'a>(
         params.push(creator);
     }
 
+    // TODO: if no validator is provided as query param, validator will be the one from Auth, is that ok?
     if let Some(validator) = validator {
-        where_clauses.push(format!("spec->'validators' @> ${}", params.len() + 1));
+        where_clauses.push(format!("validators @> ${}", params.len() + 1));
         params.push(validator);
     }
 
-    match (validator, is_leader) {
-        (Some(validator), Some(true)) => {
-            where_clauses.push(format!("channel->'leader' = ${}", params.len() + 1));
-            params.push(validator); // TODO: maybe this is redundant
-        }
-        (None, Some(true)) => {
-            // where_clauses.push(format!("channel->'leader' = ${}", params.len() + 1));
-            // params.push(authenticated_validator); // TODO
-        }
-        _ => (),
+    if let (Some(validator), Some(true)) = (validator, is_leader) {
+        where_clauses.push(format!("channel->'leader' = ${}", params.len() + 1));
+        params.push(validator); // TODO: could be redundant?
     }
 
     (where_clauses, params)
