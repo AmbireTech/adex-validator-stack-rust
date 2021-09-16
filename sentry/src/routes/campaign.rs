@@ -1,8 +1,9 @@
 use crate::{
     db::{
         accounting::{get_accounting, Side},
-        campaign::{get_campaigns_by_channel, insert_campaign, update_campaign},
-        spendable::fetch_spendable,
+        campaign::{get_campaigns_by_channel, update_campaign},
+        insert_campaign, insert_channel,
+        spendable::{fetch_spendable, update_spendable},
         CampaignRemaining, DbPool, RedisError,
     },
     success_response, Application, Auth, ResponseError,
@@ -10,10 +11,13 @@ use crate::{
 use deadpool_postgres::PoolError;
 use hyper::{Body, Request, Response};
 use primitives::{
-    adapter::Adapter,
+    adapter::{Adapter, AdapterErrorKind, Error as AdapterError},
     campaign_validator::Validator,
+    channel_v5::Channel,
+    config::TokenInfo,
     sentry::campaign_create::{CreateCampaign, ModifyCampaign},
-    Address, Campaign, UnifiedNum,
+    spender::Spendable,
+    Address, Campaign, Deposit, UnifiedNum,
 };
 use slog::error;
 use std::cmp::{max, Ordering};
@@ -38,6 +42,36 @@ pub enum Error {
     Redis(#[from] RedisError),
     #[error("DB Pool error: {0}")]
     Pool(#[from] PoolError),
+}
+
+#[derive(Debug, Error)]
+pub enum LatestSpendableError<AE: AdapterErrorKind + 'static> {
+    #[error("Adapter: {0}")]
+    Adapter(#[from] AdapterError<AE>),
+    #[error("Overflow occurred while converting native token precision to unified precision")]
+    Overflow,
+    #[error("DB Pool error: {0}")]
+    Pool(#[from] PoolError),
+}
+/// Gets the latest Spendable from the Adapter and updates it in the Database
+/// before returning it
+pub async fn update_latest_spendable<A: Adapter>(
+    adapter: &A,
+    pool: &DbPool,
+    channel: Channel,
+    token: &TokenInfo,
+    address: Address,
+) -> Result<Spendable, LatestSpendableError<A::AdapterError>> {
+    let latest_deposit = adapter.get_deposit(&channel, &address).await?;
+
+    let spendable = Spendable {
+        spender: address,
+        channel,
+        deposit: Deposit::<UnifiedNum>::from_precision(latest_deposit, token.precision.get())
+            .ok_or(LatestSpendableError::Overflow)?,
+    };
+
+    Ok(update_spendable(pool.clone(), &spendable).await?)
 }
 
 pub async fn create_campaign<A: Adapter>(
@@ -67,8 +101,24 @@ pub async fn create_campaign<A: Adapter>(
         ));
     }
 
+    let token = app
+        .config
+        .token_address_whitelist
+        .get(&campaign.channel.token)
+        .ok_or_else(|| ResponseError::BadRequest("Channel token is not whitelisted".to_string()))?;
+
     let error_response =
         ResponseError::BadRequest("err occurred; please try again later".to_string());
+
+    // make sure that the Channel is available in the DB
+    // insert Channel
+    insert_channel(&app.pool, campaign.channel)
+        .await
+        .map_err(|error| {
+            error!(&app.logger, "{}", &error; "module" => "create_campaign");
+
+            ResponseError::BadRequest("Failed to fetch/create Channel".to_string())
+        })?;
 
     let total_remaining = {
         let accounting_spent = get_accounting(
@@ -81,14 +131,15 @@ pub async fn create_campaign<A: Adapter>(
         .map(|accounting| accounting.amount)
         .unwrap_or_default();
 
-        let latest_spendable =
-            fetch_spendable(app.pool.clone(), &campaign.creator, &campaign.channel.id())
-                .await?
-                .ok_or_else(|| {
-                    ResponseError::BadRequest(
-                        "No spendable amount found for the Campaign creator".to_string(),
-                    )
-                })?;
+        let latest_spendable = update_latest_spendable(
+            &app.adapter,
+            &app.pool,
+            campaign.channel,
+            token,
+            campaign.creator,
+        )
+        .await
+        .map_err(|err| ResponseError::BadRequest(err.to_string()))?;
         // Gets the latest Spendable for this (spender, channelId) pair
         let total_deposited = latest_spendable.deposit.total;
 
@@ -140,7 +191,8 @@ pub async fn create_campaign<A: Adapter>(
         ));
     }
 
-    // insert Campaign
+    // Channel insertion can never create a `SqlState::UNIQUE_VIOLATION`
+    // Insert the Campaign too
     match insert_campaign(&app.pool, &campaign).await {
         Err(error) => {
             error!(&app.logger, "{}", &error; "module" => "create_campaign");
@@ -749,16 +801,9 @@ pub mod insert_events {
 #[cfg(test)]
 mod test {
     use super::{update_campaign::modify_campaign, *};
-    use crate::{
-        db::{accounting::update_accounting, spendable::insert_spendable},
-        test_util::setup_dummy_app,
-    };
+    use crate::test_util::setup_dummy_app;
     use hyper::StatusCode;
-    use primitives::{
-        spender::{Deposit, Spendable},
-        util::tests::prep_db::DUMMY_CAMPAIGN,
-        ValidatorId,
-    };
+    use primitives::{adapter::Deposit, util::tests::prep_db::DUMMY_CAMPAIGN, BigNum, ValidatorId};
 
     #[tokio::test]
     /// Test single campaign creation and modification
@@ -766,6 +811,24 @@ mod test {
     /// Test with multiple campaigns (because of Budget) a modification of campaign
     async fn create_and_modify_with_multiple_campaigns() {
         let app = setup_dummy_app().await;
+        let dummy_campaign = DUMMY_CAMPAIGN.clone();
+
+        app.adapter.add_deposit_call(
+            dummy_campaign.channel.id(),
+            dummy_campaign.creator,
+            Deposit {
+                // a deposit 4 times larger than the Campaign Budget
+                total: UnifiedNum::from(200_000_000_000).to_precision(
+                    app.config
+                        .token_address_whitelist
+                        .get(&dummy_campaign.channel.token)
+                        .expect("Should get token")
+                        .precision
+                        .get(),
+                ),
+                still_on_create2: BigNum::from(0),
+            },
+        );
 
         let build_request = |create_campaign: CreateCampaign| -> Request<Body> {
             let auth = Auth {
@@ -784,32 +847,9 @@ mod test {
 
         let campaign: Campaign = {
             // erases the CampaignId for the CreateCampaign request
-            let mut create = CreateCampaign::from(DUMMY_CAMPAIGN.clone());
+            let mut create = CreateCampaign::from(dummy_campaign);
             // 500.00000000
             create.budget = UnifiedNum::from(50_000_000_000);
-
-            let spendable = Spendable {
-                spender: create.creator,
-                channel: create.channel.clone(),
-                deposit: Deposit {
-                    // a deposit 4 times larger than the Campaign Budget
-                    total: UnifiedNum::from(200_000_000_000),
-                    still_on_create2: UnifiedNum::from(0),
-                },
-            };
-            assert!(insert_spendable(app.pool.clone(), &spendable)
-                .await
-                .expect("Should insert Spendable for Campaign creator"));
-
-            let _accounting = update_accounting(
-                app.pool.clone(),
-                create.channel.id(),
-                create.creator,
-                Side::Spender,
-                UnifiedNum::default(),
-            )
-            .await
-            .expect("Should create Accounting");
 
             let create_response = create_campaign(build_request(create), &app)
                 .await

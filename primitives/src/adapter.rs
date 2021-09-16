@@ -8,12 +8,8 @@ use std::{collections::HashMap, convert::From, fmt};
 pub type AdapterResult<T, AE> = Result<T, Error<AE>>;
 
 pub trait AdapterErrorKind: fmt::Debug + fmt::Display {}
+pub type Deposit = crate::Deposit<BigNum>;
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct Deposit {
-    pub total: BigNum,
-    pub still_on_create2: BigNum,
-}
 
 #[derive(Debug)]
 pub enum Error<AE: AdapterErrorKind> {

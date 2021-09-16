@@ -1,22 +1,22 @@
 use std::{collections::HashMap, time::Duration};
 
 use chrono::{DateTime, Utc};
-use futures::future::{join_all, try_join_all, TryFutureExt};
+use futures::future::{join_all, TryFutureExt};
 use reqwest::{Client, Response};
 use slog::Logger;
 
 use primitives::{
     adapter::Adapter,
     balances::{CheckedState, UncheckedState},
-    channel::Channel as ChannelOld,
     sentry::{
-        AccountingResponse, ChannelListResponse, EventAggregateResponse, LastApprovedResponse,
+        AccountingResponse, EventAggregateResponse, LastApprovedResponse,
         SuccessResponse, ValidatorMessageResponse,
     },
+    channel_v5::Channel,
     spender::Spender,
     util::ApiUrl,
     validator::MessageTypes,
-    Address, {ChannelId, Config, ToETHChecksum, ValidatorId},
+    Address, Campaign, {ChannelId, Config, ValidatorId},
 };
 use thiserror::Error;
 
@@ -105,15 +105,12 @@ impl<A: Adapter + 'static> SentryApi<A> {
     ) -> Result<Option<MessageTypes>, Error> {
         let message_type = message_types.join("+");
 
-        // TODO: Fix endpoint URL
         let endpoint = self
             .whoami
             .url
             .join(&format!(
                 "v5/channel/{}/validator-messages/{}/{}?limit=1",
-                channel,
-                from.to_checksum(),
-                message_type
+                channel, from, message_type
             ))
             .expect("Should not error when creating endpoint url");
 
@@ -213,6 +210,24 @@ impl<A: Adapter + 'static> SentryApi<A> {
             .await
     }
 
+    /// Fetches all `Campaign`s from `sentry` by going through all pages and collecting the `Campaign`s into a single `Vec`
+    pub async fn all_campaigns(&self) -> Result<Vec<Campaign>, Error> {
+        Ok(
+            campaigns::all_campaigns(self.client.clone(), &self.whoami.url, self.adapter.whoami())
+                .await?,
+        )
+    }
+
+    pub async fn all_channels(
+        &self,
+        whoami: &ValidatorId,
+    ) -> Result<Vec<Channel>, Error> {
+        Ok(
+            channels::all_channels(self.client.clone(), &self.whoami.url, self.adapter.whoami())
+                .await?,
+        )
+    }
+
     #[deprecated = "V5 no longer needs event aggregates"]
     pub async fn get_event_aggregates(
         &self,
@@ -266,48 +281,60 @@ async fn propagate_to<A: Adapter>(
     Ok(validator_id)
 }
 
-pub async fn all_channels(
-    sentry_url: &str,
-    whoami: &ValidatorId,
-) -> Result<Vec<ChannelOld>, reqwest::Error> {
-    let url = sentry_url.to_owned();
-    let first_page = fetch_page(url.clone(), 0, whoami).await?;
+mod channels {
+    use futures::{TryFutureExt, future::try_join_all};
+    use primitives::{ValidatorId, channel_v5::Channel, sentry::channel_list::{ChannelListQuery, ChannelListResponse}, util::ApiUrl};
+    use reqwest::{Client, Response};
+    
+    pub async fn all_channels(
+        client: Client,
+        sentry_url: &ApiUrl,
+        whoami: ValidatorId,
+    ) -> Result<Vec<Channel>, reqwest::Error> {
+        let first_page = fetch_page(&client,sentry_url, 0, whoami).await?;
 
-    if first_page.total_pages < 2 {
-        Ok(first_page.channels)
-    } else {
-        let all: Vec<ChannelListResponse> =
-            try_join_all((1..first_page.total_pages).map(|i| fetch_page(url.clone(), i, whoami)))
-                .await?;
+        if first_page.pagination.total_pages < 2 {
+            Ok(first_page.channels)
+        } else {
+            let all: Vec<ChannelListResponse> = try_join_all(
+                (1..first_page.pagination.total_pages).map(|i| fetch_page(&client, sentry_url, i, whoami)),
+            )
+            .await?;
 
-        let result_all: Vec<ChannelOld> = std::iter::once(first_page)
-            .chain(all.into_iter())
-            .flat_map(|ch| ch.channels.into_iter())
-            .collect();
-        Ok(result_all)
+            let result_all: Vec<Channel> = std::iter::once(first_page)
+                .chain(all.into_iter())
+                .flat_map(|ch| ch.channels.into_iter())
+                .collect();
+            Ok(result_all)
+        }
+    }
+
+    async fn fetch_page(
+        client: &Client,
+        sentry_url: &ApiUrl,
+        page: u64,
+        validator: ValidatorId,
+    ) -> Result<ChannelListResponse, reqwest::Error> {
+        let query = ChannelListQuery {
+            page,
+            creator: None,
+            validator: Some(validator),
+        };
+
+        let endpoint = sentry_url
+            .join(&format!(
+                "v5/channel/list?{}",
+                serde_urlencoded::to_string(query).expect("Should not fail to serialize")
+            ))
+            .expect("Should not fail to create endpoint URL");
+
+        client
+            .get(endpoint)
+            .send()
+            .and_then(|res: Response| res.json::<ChannelListResponse>())
+            .await
     }
 }
-
-async fn fetch_page(
-    sentry_url: String,
-    page: u64,
-    validator: &ValidatorId,
-) -> Result<ChannelListResponse, reqwest::Error> {
-    let client = Client::new();
-
-    let query = [
-        format!("page={}", page),
-        format!("validator={}", validator.to_checksum()),
-    ]
-    .join("&");
-
-    client
-        .get(&format!("{}/channel/list?{}", sentry_url, query))
-        .send()
-        .and_then(|res: Response| res.json::<ChannelListResponse>())
-        .await
-}
-
 pub mod campaigns {
     use chrono::Utc;
     use futures::future::try_join_all;
@@ -320,16 +347,18 @@ pub mod campaigns {
 
     /// Fetches all `Campaign`s from `sentry` by going through all pages and collecting the `Campaign`s into a single `Vec`
     pub async fn all_campaigns(
+        client: Client,
         sentry_url: &ApiUrl,
         whoami: ValidatorId,
     ) -> Result<Vec<Campaign>, reqwest::Error> {
-        let first_page = fetch_page(sentry_url, 0, whoami).await?;
+        let first_page = fetch_page(&client, sentry_url, 0, whoami).await?;
 
         if first_page.pagination.total_pages < 2 {
             Ok(first_page.campaigns)
         } else {
             let all = try_join_all(
-                (1..first_page.pagination.total_pages).map(|i| fetch_page(sentry_url, i, whoami)),
+                (1..first_page.pagination.total_pages)
+                    .map(|i| fetch_page(&client, sentry_url, i, whoami)),
             )
             .await?;
 
@@ -342,11 +371,11 @@ pub mod campaigns {
     }
 
     async fn fetch_page(
+        client: &Client,
         sentry_url: &ApiUrl,
         page: u64,
         validator: ValidatorId,
     ) -> Result<CampaignListResponse, reqwest::Error> {
-        let client = Client::new();
         let query = CampaignListQuery {
             page,
             active_to_ge: Utc::now(),
