@@ -1,11 +1,5 @@
 use chrono::Utc;
-use once_cell::sync::OnceCell;
-use primitives::{
-    channel_v5::Channel, validator::MessageTypes,
-    ChannelId, ValidatorId,
-};
-use tokio_postgres::Statement;
-use std::str::FromStr;
+use primitives::{validator::MessageTypes, Channel, ChannelId, ValidatorId};
 
 pub use list_channels::list_channels;
 
@@ -17,7 +11,9 @@ pub async fn get_channel_by_id(
 ) -> Result<Option<Channel>, PoolError> {
     let client = pool.get().await?;
 
-    let select = client.prepare("SELECT leader, follower, guardian, token FROM channels WHERE id = $1 LIMIT 1").await?;
+    let select = client
+        .prepare("SELECT leader, follower, guardian, token FROM channels WHERE id = $1 LIMIT 1")
+        .await?;
 
     let row = client.query_opt(&select, &[&id]).await?;
 
@@ -27,7 +23,7 @@ pub async fn get_channel_by_id(
 pub async fn get_channel_by_id_and_validator(
     pool: &DbPool,
     id: ChannelId,
-    validator_id: ValidatorId,
+    validator: ValidatorId,
 ) -> Result<Option<Channel>, PoolError> {
     let client = pool.get().await?;
 
@@ -48,32 +44,27 @@ pub async fn get_channel_by_id_and_validator(
 /// VALUES ($1, $2, $3, $4, $5, $6, NOW()) ON CONFLICT DO NOTHING
 /// RETURNING leader, follower, guardian, token, nonce
 /// ```
-static INSERT_CHANNEL_STATEMENT: OnceCell<Statement> = OnceCell::new();
-
 pub async fn insert_channel(pool: &DbPool, channel: Channel) -> Result<Channel, PoolError> {
     let client = pool.get().await?;
 
-    let stmt = match INSERT_CHANNEL_STATEMENT.get() {
-        None => {
-        let stmt = client.prepare("INSERT INTO channels (id, leader, follower, guardian, token, nonce, created) VALUES ($1, $2, $3, $4, $5, $6, NOW()) ON CONFLICT DO NOTHING RETURNING leader, follower, guardian, token, nonce").await?
-        INSERT_CHANNEL_STATEMENT.get_or_init(|| stmt)
-        }
-        Some(stmt) => stmt,
-    };
+    // INSERT INTO channels (id, leader, follower, guardian, token, nonce, created) VALUES ('0x', '0x', '0x', '0x', '0x', '0x', NOW())
+//   ON CONFLICT ON CONSTRAINT channels_pkey DO NOTHING RETURNING SELECT leader, follower, guardian, token, nonce FROM channels WHERE id='0x'
+    let stmt = client.prepare("INSERT INTO channels (id, leader, follower, guardian, token, nonce, created) VALUES ($1, $2, $3, $4, $5, $6, NOW())
+  ON CONFLICT ON CONSTRAINT channels_pkey DO UPDATE SET id=EXCLUDED.id RETURNING leader, follower, guardian, token, nonce").await?;
 
     let row = client
-        .query_one(
-            stmt,
-            &[
-                &channel.id(),
-                &channel.leader,
-                &channel.follower,
-                &channel.guardian,
-                &channel.token,
-                &channel.nonce,
-            ],
-        )
-        .await?;
+            .query_one(
+                &stmt,
+                &[
+                    &channel.id(),
+                    &channel.leader,
+                    &channel.follower,
+                    &channel.guardian,
+                    &channel.token,
+                    &channel.nonce,
+                ],
+            )
+            .await?;
 
     Ok(Channel::from(&row))
 }
@@ -125,6 +116,9 @@ mod list_channels {
         accepts!(VARCHAR, TEXT);
     }
 
+    /// Lists the `Channel`s in `ASC` order.
+    /// This makes sure that if a new `Channel` is added
+    // while we are scrolling through the pages it will not alter the `Channel`s ordering
     pub async fn list_channels(
         pool: &DbPool,
         skip: u64,
@@ -138,14 +132,14 @@ mod list_channels {
             Some(validator) => {
                 let where_clause = "(leader = $1 OR follower = $1)".to_string();
 
-                let statement = format!("SELECT leader, follower, guardian, token, nonce WHERE {} ORDER BY created DESC LIMIT {} OFFSET {}",
+                let statement = format!("SELECT leader, follower, guardian, token, nonce, created FROM channels WHERE {} ORDER BY created ASC LIMIT {} OFFSET {}",
         where_clause, limit, skip);
                 let stmt = client.prepare(&statement).await?;
 
                 client.query(&stmt, &[&validator.to_string()]).await?
             }
             None => {
-                let statement = format!("SELECT leader, follower, guardian, token, nonce ORDER BY created DESC LIMIT {} OFFSET {}",
+                let statement = format!("SELECT id, leader, follower, guardian, token, nonce, created FROM channels ORDER BY created ASC LIMIT {} OFFSET {}",
         limit, skip);
                 let stmt = client.prepare(&statement).await?;
 
@@ -185,7 +179,7 @@ mod list_channels {
                 let where_clause = "(leader = $1 OR follower = $1)".to_string();
 
                 let statement = format!(
-                    "SELECT COUNT(id)::varchar FROM channel WHERE {} ORDER BY created DESC",
+                    "SELECT COUNT(id)::varchar FROM channels WHERE {}",
                     where_clause
                 );
                 let stmt = client.prepare(&statement).await?;
@@ -193,7 +187,7 @@ mod list_channels {
                 client.query_one(&stmt, &[&validator.to_string()]).await?
             }
             None => {
-                let statement = "SELECT COUNT(id)::varchar FROM channel ORDER BY created";
+                let statement = "SELECT COUNT(id)::varchar FROM channels";
                 let stmt = client.prepare(statement).await?;
 
                 client.query_one(&stmt, &[]).await?
@@ -208,7 +202,10 @@ mod list_channels {
 mod test {
     use primitives::util::tests::prep_db::DUMMY_CAMPAIGN;
 
-    use crate::db::{insert_channel, tests_postgres::{setup_test_migrations, DATABASE_POOL}};
+    use crate::db::{
+        insert_channel,
+        tests_postgres::{setup_test_migrations, DATABASE_POOL},
+    };
 
     use super::list_channels::list_channels;
 
@@ -219,16 +216,26 @@ mod test {
             .await
             .expect("Should setup migrations");
 
-        let actual_channel = insert_channel(&database.pool, DUMMY_CAMPAIGN.channel)
-            .await
-            .expect("Should insert channel");
+        let actual_channel = {
+            let insert = insert_channel(&database.pool, DUMMY_CAMPAIGN.channel)
+                .await
+                .expect("Should insert Channel");
+
+            // once inserted, the channel should only be returned by the function
+            let only_select = insert_channel(&database.pool, DUMMY_CAMPAIGN.channel)
+                .await
+                .expect("Should run insert with RETURNING on the Channel");
+
+            assert_eq!(insert, only_select);
+
+            only_select
+        };
 
         let response = list_channels(&database.pool, 0, 10, None)
             .await
-            .expect("Should fetch Channels from Campaigns");
+            .expect("Should list Channels");
 
         assert_eq!(1, response.channels.len());
         assert_eq!(DUMMY_CAMPAIGN.channel, actual_channel);
     }
-
 }

@@ -42,8 +42,8 @@ pub async fn insert_campaign(pool: &DbPool, campaign: &Campaign) -> Result<bool,
 /// SELECT campaign.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaign.created, active_from, active_to,
 /// channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce
 /// FROM campaigns INNER JOIN channels
-/// ON campaigns.channel_id=channels.id WHERE campaign.id = $1
-/// WHERE campaign.id = $1
+/// ON campaigns.channel_id=channels.id
+/// WHERE campaigns.id = $1
 /// ```
 pub async fn fetch_campaign(
     pool: DbPool,
@@ -51,8 +51,8 @@ pub async fn fetch_campaign(
 ) -> Result<Option<Campaign>, PoolError> {
     let client = pool.get().await?;
     // TODO: Check and update
-    let statement = client.prepare("SELECT campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaign.created, active_from, active_to, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM campaigns INNER JOIN channels
-    ON campaigns.channel_id=channels.id WHERE campaign.id = $1").await?;
+    let statement = client.prepare("SELECT campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM campaigns INNER JOIN channels
+    ON campaigns.channel_id=channels.id WHERE campaigns.id = $1").await?;
 
     let row = client.query_opt(&statement, &[&campaign]).await?;
 
@@ -61,18 +61,18 @@ pub async fn fetch_campaign(
 
 // TODO: We might need to use LIMIT to implement pagination
 /// ```text
-/// SELECT campaign.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to,
+/// SELECT campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to,
 /// channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce
 /// FROM campaigns INNER JOIN channels
-/// ON campaigns.channel_id=channels.id WHERE campaign.channel_id = $1
+/// ON campaigns.channel_id=channels.id WHERE campaigns.channel_id = $1
 /// ```
 pub async fn get_campaigns_by_channel(
     pool: &DbPool,
     channel_id: &ChannelId,
 ) -> Result<Vec<Campaign>, PoolError> {
     let client = pool.get().await?;
-    let statement = client.prepare("SELECT id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM campaigns INNER JOIN channels
-    ON campaigns.channel_id=channels.id WHERE campaign.channel_id = $1").await?;
+    let statement = client.prepare("SELECT campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM campaigns INNER JOIN channels
+    ON campaigns.channel_id=channels.id WHERE campaigns.channel_id = $1").await?;
 
     let rows = client.query(&statement, &[&channel_id]).await?;
 
@@ -82,12 +82,12 @@ pub async fn get_campaigns_by_channel(
 }
 
 /// ```text
-/// UPDATE campaigns SET budget = $1, validators = $2, title = $3, pricing_bounds = $4, event_submission = $5, ad_units = $6, targeting_rules = $7 WHERE id = $8 FROM campaigns INNER JOIN channels ON campaigns.channel_id=channels.id RETURNING campaign.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaign.created, active_from, active_to, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce
+/// UPDATE campaigns SET budget = $1, validators = $2, title = $3, pricing_bounds = $4, event_submission = $5, ad_units = $6, targeting_rules = $7 FROM campaigns INNER JOIN channels ON campaigns.channel_id=channels.id WHERE campaigns.id = $8  RETURNING campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaign.created, active_from, active_to, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce
 /// ```
 pub async fn update_campaign(pool: &DbPool, campaign: &Campaign) -> Result<Campaign, PoolError> {
     let client = pool.get().await?;
     let statement = client
-        .prepare("UPDATE campaigns SET budget = $1, validators = $2, title = $3, pricing_bounds = $4, event_submission = $5, ad_units = $6, targeting_rules = $7 WHERE id = $8 FROM campaigns INNER JOIN channels ON campaigns.channel_id=channels.id RETURNING campaign.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaign.created, active_from, active_to, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce")
+        .prepare("UPDATE campaigns SET budget = $1, validators = $2, title = $3, pricing_bounds = $4, event_submission = $5, ad_units = $6, targeting_rules = $7 FROM channels WHERE campaigns.id = $8 AND campaigns.channel_id=channels.id RETURNING campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce")
         .await?;
 
     let ad_units = Json(&campaign.ad_units);

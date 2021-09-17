@@ -1,27 +1,25 @@
 use crate::db::{
     event_aggregate::{latest_approve_state_v5, latest_heartbeats, latest_new_state_v5},
-    get_channel_by_id, insert_channel, insert_validator_messages, list_channels,
+    insert_channel, insert_validator_messages, list_channels,
     spendable::{fetch_spendable, update_spendable},
     DbPool, PoolError,
 };
 use crate::{success_response, Application, Auth, ResponseError, RouteParams};
 use futures::future::try_join_all;
-use hex::FromHex;
 use hyper::{Body, Request, Response};
 use primitives::{
     adapter::Adapter,
     balances::UncheckedState,
-    channel_v5::Channel as ChannelV5,
     channel::Channel as ChannelOld,
+    channel_v5::Channel as ChannelV5,
     config::TokenInfo,
     sentry::{
         channel_list::ChannelListQuery, LastApproved, LastApprovedQuery, LastApprovedResponse,
         SpenderResponse, SuccessResponse,
     },
-    Deposit,
     spender::{Spendable, Spender, SpenderLeaf},
     validator::MessageTypes,
-    Address, Channel, ChannelId, UnifiedNum,
+    Address, Channel, Deposit, UnifiedNum,
 };
 use slog::error;
 use std::{collections::HashMap, str::FromStr};
@@ -121,14 +119,11 @@ pub async fn last_approved<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
-    // get request params
-    let route_params = req
+    // get request Channel
+    let channel = *req
         .extensions()
-        .get::<RouteParams>()
-        .expect("request should have route params");
-
-        let channel = *req.extensions().get::<Channel>().ok_or_else(|| ResponseError::NotFound)?;
-        let channel_id = channel.id();
+        .get::<Channel>()
+        .ok_or_else(|| ResponseError::NotFound)?;
 
     let default_response = Response::builder()
         .header("Content-type", "application/json")
@@ -230,8 +225,8 @@ async fn create_or_update_spendable_document(
     channel: &ChannelV5,
     spender: Address,
 ) -> Result<Spendable, ResponseError> {
-    insert_channel(&pool, channel).await?;
-    
+    insert_channel(&pool, *channel).await?;
+
     let deposit = adapter.get_deposit(channel, &spender).await?;
     let total = UnifiedNum::from_precision(deposit.total, token_info.precision.get());
     let still_on_create2 =
@@ -375,7 +370,6 @@ mod test {
             .await
             .expect("should return None");
         assert!(spendable.is_none());
-
         // Call create_or_update_spendable
         let new_spendable = create_or_update_spendable_document(
             &app.adapter,
@@ -387,7 +381,7 @@ mod test {
         .await
         .expect("should create a new spendable");
         assert_eq!(new_spendable.channel.id(), channel.id());
-
+        
         let total_as_unified_num =
             UnifiedNum::from_precision(deposit.total, precision).expect("should convert");
         let still_on_create2_unified =

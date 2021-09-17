@@ -61,7 +61,7 @@ pub async fn list_validator_messages<A: Adapter>(
         .min(config_limit);
 
     let validator_messages =
-        get_validator_messages(&app.pool, &channel.id, validator_id, message_types, limit).await?;
+        get_validator_messages(&app.pool, &channel.id(), validator_id, message_types, limit).await?;
 
     let response = ValidatorMessageResponse { validator_messages };
 

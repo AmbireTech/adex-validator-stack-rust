@@ -107,9 +107,6 @@ pub async fn create_campaign<A: Adapter>(
         .get(&campaign.channel.token)
         .ok_or_else(|| ResponseError::BadRequest("Channel token is not whitelisted".to_string()))?;
 
-    let error_response =
-        ResponseError::BadRequest("err occurred; please try again later".to_string());
-
     // make sure that the Channel is available in the DB
     // insert Channel
     insert_channel(&app.pool, campaign.channel)
@@ -202,7 +199,10 @@ pub async fn create_campaign<A: Adapter>(
                         "Campaign already exists".to_string(),
                     ))
                 }
-                _ => Err(error_response),
+                _err => Err(ResponseError::BadRequest(
+                    "Error occurred when inserting Campaign in Database; please try again later"
+                        .to_string(),
+                )),
             }
         }
         Ok(false) => Err(ResponseError::BadRequest(
@@ -629,6 +629,7 @@ pub mod insert_events {
         use redis::aio::MultiplexedConnection;
 
         use crate::db::{
+            insert_channel,
             redis_pool::TESTS_POOL,
             tests_postgres::{setup_test_migrations, DATABASE_POOL},
         };
@@ -731,6 +732,11 @@ pub mod insert_events {
 
             let campaign = DUMMY_CAMPAIGN.clone();
 
+            // make sure that the Channel is created in Database for the Accounting to work properly
+            insert_channel(&database.pool, campaign.channel)
+                .await
+                .expect("It should insert Channel");
+
             let publisher = ADDRESSES["publisher"];
 
             let leader = campaign.leader().unwrap();
@@ -778,7 +784,7 @@ pub mod insert_events {
 
                 assert!(
                     spend_event.is_ok(),
-                    "Campaign budget has no remaining funds to spend"
+                    "Campaign budget has no remaining funds to spend or an error occurred"
                 );
 
                 // Payout: 300
@@ -803,7 +809,9 @@ mod test {
     use super::{update_campaign::modify_campaign, *};
     use crate::test_util::setup_dummy_app;
     use hyper::StatusCode;
-    use primitives::{adapter::Deposit, util::tests::prep_db::DUMMY_CAMPAIGN, BigNum, ValidatorId};
+    use primitives::{
+        adapter::Deposit, util::tests::prep_db::DUMMY_CAMPAIGN, BigNum, ChannelId, ValidatorId,
+    };
 
     #[tokio::test]
     /// Test single campaign creation and modification
@@ -813,22 +821,25 @@ mod test {
         let app = setup_dummy_app().await;
         let dummy_campaign = DUMMY_CAMPAIGN.clone();
 
-        app.adapter.add_deposit_call(
-            dummy_campaign.channel.id(),
-            dummy_campaign.creator,
-            Deposit {
-                // a deposit 4 times larger than the Campaign Budget
-                total: UnifiedNum::from(200_000_000_000).to_precision(
-                    app.config
-                        .token_address_whitelist
-                        .get(&dummy_campaign.channel.token)
-                        .expect("Should get token")
-                        .precision
-                        .get(),
-                ),
-                still_on_create2: BigNum::from(0),
-            },
-        );
+        // this function should be called before each creation/modification of a Campaign!
+        let add_deposit_call = |channel: ChannelId, creator: Address, token: Address| {
+            app.adapter.add_deposit_call(
+                channel,
+                creator,
+                Deposit {
+                    // a deposit 4 times larger than the Campaign Budget
+                    total: UnifiedNum::from(200_000_000_000).to_precision(
+                        app.config
+                            .token_address_whitelist
+                            .get(&token)
+                            .expect("Should get token")
+                            .precision
+                            .get(),
+                    ),
+                    still_on_create2: BigNum::from(0),
+                },
+            )
+        };
 
         let build_request = |create_campaign: CreateCampaign| -> Request<Body> {
             let auth = Auth {
@@ -850,6 +861,8 @@ mod test {
             let mut create = CreateCampaign::from(dummy_campaign);
             // 500.00000000
             create.budget = UnifiedNum::from(50_000_000_000);
+            // prepare for Campaign creation
+            add_deposit_call(create.channel.id(), create.creator, create.channel.token);
 
             let create_response = create_campaign(build_request(create), &app)
                 .await
@@ -893,6 +906,12 @@ mod test {
                 ad_units: None,
                 targeting_rules: None,
             };
+            // prepare for Campaign modification
+            add_deposit_call(
+                campaign.channel.id(),
+                campaign.creator,
+                campaign.channel.token,
+            );
 
             let modified_campaign =
                 modify_campaign(&app.pool, &app.campaign_remaining, campaign.clone(), modify)
@@ -911,6 +930,13 @@ mod test {
             let mut create_second = CreateCampaign::from(DUMMY_CAMPAIGN.clone());
             // 500.00000000
             create_second.budget = UnifiedNum::from(50_000_000_000);
+
+            // prepare for Campaign creation
+            add_deposit_call(
+                create_second.channel.id(),
+                create_second.creator,
+                create_second.channel.token,
+            );
 
             let create_response = create_campaign(build_request(create_second), &app)
                 .await
@@ -935,6 +961,9 @@ mod test {
             let mut create = CreateCampaign::from(DUMMY_CAMPAIGN.clone());
             // 600.00000000
             create.budget = UnifiedNum::from(60_000_000_000);
+
+            // prepare for Campaign creation
+            add_deposit_call(create.channel.id(), create.creator, create.channel.token);
 
             let create_err = create_campaign(build_request(create), &app)
                 .await
@@ -961,6 +990,13 @@ mod test {
                 targeting_rules: None,
             };
 
+            // prepare for Campaign modification
+            add_deposit_call(
+                modified.channel.id(),
+                modified.creator,
+                modified.channel.token,
+            );
+
             let modified_campaign =
                 modify_campaign(&app.pool, &app.campaign_remaining, modified, modify)
                     .await
@@ -979,6 +1015,9 @@ mod test {
             let mut create = CreateCampaign::from(DUMMY_CAMPAIGN.clone());
             // 600.00000000
             create.budget = UnifiedNum::from(60_000_000_000);
+
+            // prepare for Campaign creation
+            add_deposit_call(create.channel.id(), create.creator, create.channel.token);
 
             let create_response = create_campaign(build_request(create), &app)
                 .await
@@ -1007,6 +1046,13 @@ mod test {
                 ad_units: None,
                 targeting_rules: None,
             };
+
+            // prepare for Campaign modification
+            add_deposit_call(
+                modified.channel.id(),
+                modified.creator,
+                modified.channel.token,
+            );
 
             let modify_err = modify_campaign(&app.pool, &app.campaign_remaining, modified, modify)
                 .await

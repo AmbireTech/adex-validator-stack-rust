@@ -36,13 +36,13 @@ pub async fn fetch_spendable(
 ) -> Result<Option<Spendable>, PoolError> {
     let client = pool.get().await?;
     let statement = client.prepare("SELECT spender, total, still_on_create2, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM spendable INNER JOIN channels ON channels.id = spendable.channel_id WHERE spender = $1 AND channel_id = $2").await?;
-
+    
     let row = client.query_opt(&statement, &[spender, channel_id]).await?;
 
     Ok(row.as_ref().map(Spendable::from))
 }
 
-static UPDATE_SPENDABLE_STATEMENT: &str = "INSERT INTO spendable(spender, channel_id, total, still_on_create2) VALUES($1, $2, $3, $4) ON CONFLICT ON CONSTRAINT spendable_pkey DO UPDATE SET total = $3, still_on_create2 = $4 WHERE spendable.spender = $1 AND spendable.channel_id = $2 RETURNING spender, channel_id, total, still_on_create2";
+static UPDATE_SPENDABLE_STATEMENT: &str = "WITH inserted_spendable AS (INSERT INTO spendable(spender, channel_id, total, still_on_create2) VALUES($1, $2, $3, $4) ON CONFLICT ON CONSTRAINT spendable_pkey DO UPDATE SET total = $3, still_on_create2 = $4 WHERE spendable.spender = $1 AND spendable.channel_id = $2 RETURNING *) SELECT inserted_spendable.*, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM inserted_spendable INNER JOIN channels ON inserted_spendable.channel_id = channels.id";
 
 // Updates spendable entry deposit or inserts a new spendable entry if it doesn't exist
 pub async fn update_spendable(pool: DbPool, spendable: &Spendable) -> Result<Spendable, PoolError> {
@@ -60,6 +60,7 @@ pub async fn update_spendable(pool: DbPool, spendable: &Spendable) -> Result<Spe
             ],
         )
         .await?;
+
 
     Ok(Spendable::from(&row))
 }

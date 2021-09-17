@@ -2,7 +2,7 @@ use crate::{
     balances::BalancesState,
     spender::Spender,
     validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
-    Address, Balances, BigNum, Channel, ChannelId, ValidatorId, IPFS,
+    Address, Balances, BigNum, channel::Channel as ChannelOld, ChannelId, ValidatorId, IPFS,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -232,7 +232,7 @@ pub struct ValidatorMessageResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct EventAggregateResponse {
-    pub channel: Channel,
+    pub channel: ChannelOld,
     pub events: Vec<EventAggregate>,
 }
 

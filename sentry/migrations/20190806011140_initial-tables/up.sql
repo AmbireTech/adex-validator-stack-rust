@@ -8,8 +8,11 @@ CREATE TABLE channels (
     nonce varchar(78) NOT NULL,
     -- In order to be able to order the channels for the `GET channel` request
     created timestamp(2) with time zone NOT NULL,
+    -- Do not rename the Primary key constraint (`channels_pkey`)!
     PRIMARY KEY (id)
 );
+
+CREATE INDEX idx_channel_created ON channels (created);
 
 CREATE TABLE campaigns (
     id varchar(34) NOT NULL,
@@ -93,4 +96,3 @@ CREATE TABLE accounting (
     PRIMARY KEY (channel_id, side, "address"),
     CONSTRAINT fk_accounting_channel_id FOREIGN KEY (channel_id) REFERENCES channels (id) ON DELETE RESTRICT ON UPDATE RESTRICT
 );
-

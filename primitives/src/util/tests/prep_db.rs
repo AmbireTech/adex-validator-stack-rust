@@ -1,7 +1,7 @@
 use crate::{
     campaign::{self, Active, Validators},
     channel::{Pricing, PricingBounds},
-    channel_v5::{self, Nonce},
+    channel_v5::Nonce,
     targeting::Rules,
     AdUnit, Address, BigNum, Campaign, Channel, ChannelId, ChannelSpec, EventSubmission,
     SpecValidators, UnifiedNum, ValidatorDesc, ValidatorId, IPFS,
