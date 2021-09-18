@@ -2,10 +2,11 @@ use chrono::{DateTime, Utc};
 use futures::pin_mut;
 use primitives::{
     balances::UncheckedState,
+    channel::Channel as ChannelOld,
     channel_v5::Channel as ChannelV5,
     sentry::{EventAggregate, MessageResponse},
     validator::{ApproveState, Heartbeat, NewState},
-    Address, BigNum, channel::Channel as ChannelOld, ChannelId, ValidatorId,
+    Address, BigNum, ChannelId, ValidatorId,
 };
 use std::{convert::TryFrom, ops::Add};
 use tokio_postgres::{

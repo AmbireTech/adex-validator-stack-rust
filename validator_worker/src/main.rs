@@ -23,7 +23,10 @@ use primitives::{
 };
 use slog::{error, info, Logger};
 use std::fmt::Debug;
-use validator_worker::channel::{channel_tick, collect_channels};
+use validator_worker::{
+    channel::{channel_tick, collect_channels},
+    SentryApi,
+};
 
 #[derive(Debug, Clone)]
 struct Args<A: Adapter> {
@@ -172,7 +175,7 @@ async fn infinite<A: Adapter + 'static>(args: Args<A>, logger: &Logger) {
 
 async fn all_channels_tick<A: Adapter + 'static>(args: Args<A>, logger: &Logger) {
     let (channels, validators) = match collect_channels(
-        args.adapter.clone(),
+        &args.adapter,
         &args.sentry_url,
         &args.config,
         logger,
@@ -187,15 +190,25 @@ async fn all_channels_tick<A: Adapter + 'static>(args: Args<A>, logger: &Logger)
     };
     let channels_size = channels.len();
 
-    let tick_results = join_all(channels.into_iter().map(|channel| {
-        channel_tick(
-            args.adapter.clone(),
-            &args.config,
-            logger,
-            channel,
-            validators.clone(),
-        )
-    }))
+    // initialize SentryApi once we have all the Campaign Validators we need to propagate messages to
+    let sentry = match SentryApi::init(
+        args.adapter.clone(),
+        logger.clone(),
+        args.config.clone(),
+        validators.clone(),
+    ) {
+        Ok(sentry) => sentry,
+        Err(err) => {
+            error!(logger, "Failed to initialize SentryApi for all channels"; "SentryApi::init()" => ?err);
+            return;
+        }
+    };
+
+    let tick_results = join_all(
+        channels
+            .into_iter()
+            .map(|channel| channel_tick(&sentry, &args.config, channel)),
+    )
     .await;
 
     for channel_err in tick_results.into_iter().filter_map(Result::err) {

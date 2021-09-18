@@ -4,7 +4,6 @@ use tokio_postgres::types::Json;
 
 pub use campaign_remaining::CampaignRemaining;
 
-
 /// ```text
 /// INSERT INTO campaigns (id, channel_id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to)
 /// VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
@@ -395,7 +394,10 @@ mod test {
     use std::time::Duration;
     use tokio_postgres::error::SqlState;
 
-    use crate::db::{insert_channel, tests_postgres::{setup_test_migrations, DATABASE_POOL}};
+    use crate::db::{
+        insert_channel,
+        tests_postgres::{setup_test_migrations, DATABASE_POOL},
+    };
 
     use super::*;
 

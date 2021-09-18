@@ -123,7 +123,7 @@ pub async fn last_approved<A: Adapter>(
     let channel = *req
         .extensions()
         .get::<Channel>()
-        .ok_or_else(|| ResponseError::NotFound)?;
+        .ok_or(ResponseError::NotFound)?;
 
     let default_response = Response::builder()
         .header("Content-type", "application/json")
@@ -381,7 +381,7 @@ mod test {
         .await
         .expect("should create a new spendable");
         assert_eq!(new_spendable.channel.id(), channel.id());
-        
+
         let total_as_unified_num =
             UnifiedNum::from_precision(deposit.total, precision).expect("should convert");
         let still_on_create2_unified =

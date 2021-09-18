@@ -8,11 +8,11 @@ use slog::Logger;
 use primitives::{
     adapter::Adapter,
     balances::{CheckedState, UncheckedState},
-    sentry::{
-        AccountingResponse, EventAggregateResponse, LastApprovedResponse,
-        SuccessResponse, ValidatorMessageResponse,
-    },
     channel_v5::Channel,
+    sentry::{
+        AccountingResponse, EventAggregateResponse, LastApprovedResponse, SuccessResponse,
+        ValidatorMessageResponse,
+    },
     spender::Spender,
     util::ApiUrl,
     validator::MessageTypes,
@@ -218,10 +218,7 @@ impl<A: Adapter + 'static> SentryApi<A> {
         )
     }
 
-    pub async fn all_channels(
-        &self,
-        whoami: &ValidatorId,
-    ) -> Result<Vec<Channel>, Error> {
+    pub async fn all_channels(&self) -> Result<Vec<Channel>, Error> {
         Ok(
             channels::all_channels(self.client.clone(), &self.whoami.url, self.adapter.whoami())
                 .await?,
@@ -282,22 +279,28 @@ async fn propagate_to<A: Adapter>(
 }
 
 mod channels {
-    use futures::{TryFutureExt, future::try_join_all};
-    use primitives::{ValidatorId, channel_v5::Channel, sentry::channel_list::{ChannelListQuery, ChannelListResponse}, util::ApiUrl};
+    use futures::{future::try_join_all, TryFutureExt};
+    use primitives::{
+        channel_v5::Channel,
+        sentry::channel_list::{ChannelListQuery, ChannelListResponse},
+        util::ApiUrl,
+        ValidatorId,
+    };
     use reqwest::{Client, Response};
-    
+
     pub async fn all_channels(
         client: Client,
         sentry_url: &ApiUrl,
         whoami: ValidatorId,
     ) -> Result<Vec<Channel>, reqwest::Error> {
-        let first_page = fetch_page(&client,sentry_url, 0, whoami).await?;
+        let first_page = fetch_page(&client, sentry_url, 0, whoami).await?;
 
         if first_page.pagination.total_pages < 2 {
             Ok(first_page.channels)
         } else {
             let all: Vec<ChannelListResponse> = try_join_all(
-                (1..first_page.pagination.total_pages).map(|i| fetch_page(&client, sentry_url, i, whoami)),
+                (1..first_page.pagination.total_pages)
+                    .map(|i| fetch_page(&client, sentry_url, i, whoami)),
             )
             .await?;
 

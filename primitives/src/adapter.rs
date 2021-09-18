@@ -10,7 +10,6 @@ pub type AdapterResult<T, AE> = Result<T, Error<AE>>;
 pub trait AdapterErrorKind: fmt::Debug + fmt::Display {}
 pub type Deposit = crate::Deposit<BigNum>;
 
-
 #[derive(Debug)]
 pub enum Error<AE: AdapterErrorKind> {
     Authentication(String),

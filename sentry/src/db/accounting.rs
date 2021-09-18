@@ -472,8 +472,8 @@ mod test {
 
         // insert the channel into the DB
         let channel = insert_channel(&database.pool, DUMMY_CAMPAIGN.channel)
-        .await
-        .expect("Should insert");
+            .await
+            .expect("Should insert");
 
         let channel_id = channel.id();
         let earner = ADDRESSES["publisher"];

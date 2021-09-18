@@ -1,8 +1,9 @@
 use crate::{
     balances::BalancesState,
+    channel::Channel as ChannelOld,
     spender::Spender,
     validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
-    Address, Balances, BigNum, channel::Channel as ChannelOld, ChannelId, ValidatorId, IPFS,
+    Address, Balances, BigNum, ChannelId, ValidatorId, IPFS,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -292,7 +293,7 @@ impl fmt::Display for ChannelReport {
 }
 
 pub mod channel_list {
-    use crate::{ValidatorId, channel_v5::Channel};
+    use crate::{channel_v5::Channel, ValidatorId};
     use serde::{Deserialize, Serialize};
 
     use super::Pagination;

@@ -11,8 +11,8 @@ pub use self::{
     balances_map::{BalancesMap, UnifiedMap},
     big_num::BigNum,
     campaign::{Campaign, CampaignId},
-    channel_v5::Channel,
     channel::{ChannelId, ChannelSpec, SpecValidator, SpecValidators},
+    channel_v5::Channel,
     config::Config,
     deposit::Deposit,
     event_submission::EventSubmission,
@@ -47,8 +47,8 @@ mod unified_num;
 pub mod validator;
 
 mod deposit {
-    use serde::{Serialize, Deserialize};
-    use crate::{UnifiedNum, BigNum};
+    use crate::{BigNum, UnifiedNum};
+    use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
     #[serde(rename_all = "camelCase")]

@@ -9,7 +9,7 @@ use primitives::{
 };
 use thiserror::Error;
 
-pub use self::sentry_interface::{all_channels, SentryApi};
+pub use self::sentry_interface::SentryApi;
 
 pub mod channel;
 pub mod error;

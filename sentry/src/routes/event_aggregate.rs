@@ -2,7 +2,9 @@ use chrono::{serde::ts_milliseconds_option, DateTime, Utc};
 use hyper::{Body, Request, Response};
 use serde::Deserialize;
 
-use primitives::{adapter::Adapter, sentry::EventAggregateResponse, channel::Channel as ChannelOld};
+use primitives::{
+    adapter::Adapter, channel::Channel as ChannelOld, sentry::EventAggregateResponse,
+};
 
 use crate::{success_response, Application, Auth, ResponseError};
 

@@ -41,30 +41,31 @@ pub async fn get_channel_by_id_and_validator(
 ///
 /// ```sql
 /// INSERT INTO channels (id, leader, follower, guardian, token, nonce, created)
-/// VALUES ($1, $2, $3, $4, $5, $6, NOW()) ON CONFLICT DO NOTHING
+/// VALUES ($1, $2, $3, $4, $5, $6, NOW())
+/// ON CONFLICT ON CONSTRAINT channels_pkey DO UPDATE SET created=EXCLUDED.created
 /// RETURNING leader, follower, guardian, token, nonce
 /// ```
 pub async fn insert_channel(pool: &DbPool, channel: Channel) -> Result<Channel, PoolError> {
     let client = pool.get().await?;
 
-    // INSERT INTO channels (id, leader, follower, guardian, token, nonce, created) VALUES ('0x', '0x', '0x', '0x', '0x', '0x', NOW())
-//   ON CONFLICT ON CONSTRAINT channels_pkey DO NOTHING RETURNING SELECT leader, follower, guardian, token, nonce FROM channels WHERE id='0x'
+    // We use `EXCLUDED.created` in order to have to DO UPDATE otherwise it does not return the fields
+    // when there is a CONFLICT
     let stmt = client.prepare("INSERT INTO channels (id, leader, follower, guardian, token, nonce, created) VALUES ($1, $2, $3, $4, $5, $6, NOW())
-  ON CONFLICT ON CONSTRAINT channels_pkey DO UPDATE SET id=EXCLUDED.id RETURNING leader, follower, guardian, token, nonce").await?;
+  ON CONFLICT ON CONSTRAINT channels_pkey DO UPDATE SET created=EXCLUDED.created RETURNING leader, follower, guardian, token, nonce").await?;
 
     let row = client
-            .query_one(
-                &stmt,
-                &[
-                    &channel.id(),
-                    &channel.leader,
-                    &channel.follower,
-                    &channel.guardian,
-                    &channel.token,
-                    &channel.nonce,
-                ],
-            )
-            .await?;
+        .query_one(
+            &stmt,
+            &[
+                &channel.id(),
+                &channel.leader,
+                &channel.follower,
+                &channel.guardian,
+                &channel.token,
+                &channel.nonce,
+            ],
+        )
+        .await?;
 
     Ok(Channel::from(&row))
 }

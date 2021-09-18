@@ -1,7 +1,7 @@
 use crate::{
-    Application, ResponseError, RouteParams,
     db::{get_channel_by_id, get_channel_by_id_and_validator},
     middleware::Middleware,
+    Application, ResponseError, RouteParams,
 };
 use futures::future::{BoxFuture, FutureExt};
 use hex::FromHex;

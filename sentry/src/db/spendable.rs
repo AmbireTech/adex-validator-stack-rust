@@ -36,7 +36,7 @@ pub async fn fetch_spendable(
 ) -> Result<Option<Spendable>, PoolError> {
     let client = pool.get().await?;
     let statement = client.prepare("SELECT spender, total, still_on_create2, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM spendable INNER JOIN channels ON channels.id = spendable.channel_id WHERE spender = $1 AND channel_id = $2").await?;
-    
+
     let row = client.query_opt(&statement, &[spender, channel_id]).await?;
 
     Ok(row.as_ref().map(Spendable::from))
@@ -61,20 +61,21 @@ pub async fn update_spendable(pool: DbPool, spendable: &Spendable) -> Result<Spe
         )
         .await?;
 
-
     Ok(Spendable::from(&row))
 }
 
 #[cfg(test)]
 mod test {
     use primitives::{
-        Deposit,
         spender::Spendable,
         util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN},
-        UnifiedNum,
+        Deposit, UnifiedNum,
     };
 
-    use crate::db::{insert_channel, tests_postgres::{setup_test_migrations, DATABASE_POOL}};
+    use crate::db::{
+        insert_channel,
+        tests_postgres::{setup_test_migrations, DATABASE_POOL},
+    };
 
     use super::*;
 
@@ -95,7 +96,9 @@ mod test {
             },
         };
 
-        insert_channel(&database.pool, spendable.channel).await.expect("Should insert Channel before creating spendable");
+        insert_channel(&database.pool, spendable.channel)
+            .await
+            .expect("Should insert Channel before creating spendable");
 
         let is_inserted = insert_spendable(database.pool.clone(), &spendable)
             .await
