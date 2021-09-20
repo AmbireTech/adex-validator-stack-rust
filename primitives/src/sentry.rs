@@ -359,6 +359,7 @@ pub mod campaign {
         pub creator: Option<Address>,
         /// filters the campaigns containing a specific validator if provided
         pub validator: Option<ValidatorId>,
+        /// filters the campaigns where the provided validator is a leader if true AND if validator is provided
         pub is_leader: Option<bool>,
     }
 }

@@ -124,24 +124,9 @@ mod list_channels {
     use chrono::{DateTime, Utc};
     use primitives::{sentry::ChannelListResponse, Channel, ValidatorId};
     use std::str::FromStr;
-    use tokio_postgres::types::{accepts, FromSql, ToSql, Type};
+    use tokio_postgres::types::ToSql;
 
-    use crate::db::{DbPool, PoolError};
-
-    struct TotalCount(pub u64);
-    impl<'a> FromSql<'a> for TotalCount {
-        fn from_sql(
-            ty: &Type,
-            raw: &'a [u8],
-        ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
-            let str_slice = <&str as FromSql>::from_sql(ty, raw)?;
-
-            Ok(Self(u64::from_str(str_slice)?))
-        }
-
-        // Use a varchar or text, since otherwise `int8` fails deserialization
-        accepts!(VARCHAR, TEXT);
-    }
+    use crate::db::{DbPool, PoolError, TotalCount};
 
     pub async fn list_channels(
         pool: &DbPool,

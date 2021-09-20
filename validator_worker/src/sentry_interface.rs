@@ -333,14 +333,14 @@ pub mod campaigns {
         sentry_url: &ApiUrl,
         whoami: ValidatorId,
     ) -> Result<Vec<Campaign>, reqwest::Error> {
-        let first_page = fetch_page(sentry_url, 0, whoami, false).await?;
+        let first_page = fetch_page(sentry_url, 0, whoami).await?;
 
         if first_page.pagination.total_pages < 2 {
             Ok(first_page.campaigns)
         } else {
             let all = try_join_all(
                 (1..first_page.pagination.total_pages)
-                    .map(|i| fetch_page(sentry_url, i, whoami, false)),
+                    .map(|i| fetch_page(sentry_url, i, whoami)),
             )
             .await?;
 
@@ -356,7 +356,6 @@ pub mod campaigns {
         sentry_url: &ApiUrl,
         page: u64,
         validator: ValidatorId,
-        is_leader: bool,
     ) -> Result<CampaignListResponse, reqwest::Error> {
         let client = Client::new();
         let query = CampaignListQuery {
@@ -364,7 +363,7 @@ pub mod campaigns {
             active_to_ge: Utc::now(),
             creator: None,
             validator: Some(validator),
-            is_leader: Some(is_leader),
+            is_leader: None,
         };
 
         let endpoint = sentry_url

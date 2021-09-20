@@ -1,11 +1,11 @@
-use crate::db::{DbPool, PoolError};
+use crate::db::{DbPool, PoolError, TotalCount};
 use chrono::{DateTime, Utc};
 use primitives::{
     sentry::{campaign::CampaignListResponse, Pagination},
     Address, Campaign, CampaignId, ChannelId, ValidatorId,
 };
 use std::str::FromStr;
-use tokio_postgres::types::{accepts, FromSql, Json, ToSql, Type};
+use tokio_postgres::types::{Json, ToSql};
 
 pub use campaign_remaining::CampaignRemaining;
 
@@ -59,29 +59,13 @@ pub async fn fetch_campaign(
     Ok(row.as_ref().map(Campaign::from))
 }
 
-// TODO: Export this as it's the same as the one in channel list
-struct TotalCount(pub u64);
-impl<'a> FromSql<'a> for TotalCount {
-    fn from_sql(
-        ty: &Type,
-        raw: &'a [u8],
-    ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
-        let str_slice = <&str as FromSql>::from_sql(ty, raw)?;
-
-        Ok(Self(u64::from_str(str_slice)?))
-    }
-
-    // Use a varchar or text, since otherwise `int8` fails deserialization
-    accepts!(VARCHAR, TEXT);
-}
-
 pub async fn list_campaigns(
     pool: &DbPool,
     skip: u64,
     limit: u32,
     creator: &Option<Address>,
-    validator: &Option<ValidatorId>,
-    is_leader: &Option<bool>,
+    validator: Option<ValidatorId>,
+    is_leader: Option<bool>,
     active_to_ge: &DateTime<Utc>,
 ) -> Result<CampaignListResponse, PoolError> {
     let client = pool.get().await?;
@@ -126,7 +110,7 @@ pub async fn list_campaigns(
 fn campaign_list_query_params<'a>(
     creator: &'a Option<Address>,
     validator: Option<&'a serde_json::Value>,
-    is_leader: &Option<bool>,
+    is_leader: Option<bool>,
     active_to_ge: &'a DateTime<Utc>,
 ) -> (Vec<String>, Vec<&'a (dyn ToSql + Sync)>) {
     let mut where_clauses = vec!["active_to >= $1".to_string()];
@@ -137,15 +121,12 @@ fn campaign_list_query_params<'a>(
         params.push(creator);
     }
 
-    // TODO: if no validator is provided as query param, validator will be the one from Auth, is that ok?
     if let Some(validator) = validator {
         where_clauses.push(format!("validators @> ${}", params.len() + 1));
+        if let Some(true) = is_leader {
+            where_clauses.push(format!("channel->'leader' = ${}", params.len() + 1)); // TODO: change after channel is in a different table
+        }
         params.push(validator);
-    }
-
-    if let (Some(validator), Some(true)) = (validator, is_leader) {
-        where_clauses.push(format!("channel->'leader' = ${}", params.len() + 1)); // TODO: change after channel is in a different table
-        params.push(validator); // TODO: could be redundant?
     }
 
     (where_clauses, params)

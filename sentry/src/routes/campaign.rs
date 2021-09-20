@@ -188,8 +188,8 @@ pub async fn campaign_list<A: Adapter>(
         skip,
         limit,
         &query.creator,
-        &query.validator,
-        &query.is_leader,
+        query.validator,
+        query.is_leader,
         &query.active_to_ge,
     )
     .await?;
