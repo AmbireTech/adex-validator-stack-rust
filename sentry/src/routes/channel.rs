@@ -419,6 +419,11 @@ async fn get_corresponding_new_state(
     new_state
 }
 
+pub async fn get_accounting_for_channel<A: Adapter + 'static>(req: Request<Body>, app: &Application<A>) -> Result<Response<Body>, ResponseError> {
+
+    Ok(Default::default()) // TODO
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

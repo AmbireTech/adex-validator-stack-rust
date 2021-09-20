@@ -27,7 +27,7 @@ use routes::campaign::{create_campaign, update_campaign};
 use routes::cfg::config;
 use routes::channel::{
     channel_list, channel_validate, create_channel, create_validator_messages,
-    get_all_spender_limits, get_spender_limits, last_approved,
+    get_all_spender_limits, get_spender_limits, last_approved, get_accounting_for_channel
 };
 use slog::Logger;
 use std::collections::HashMap;
@@ -79,6 +79,9 @@ static CAMPAIGN_UPDATE_BY_ID: Lazy<Regex> = Lazy::new(|| {
 static CHANNEL_ALL_SPENDER_LIMITS: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/spender/all/?$")
         .expect("The regex should be valid")
+});
+static CHANNEL_ACCOUNTING: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/accounting/?$").expect("The regex should be valid")
 });
 
 #[derive(Debug, Clone)]
@@ -411,6 +414,17 @@ async fn channels_router<A: Adapter + 'static>(
             .await?;
 
         get_all_spender_limits(req, app).await
+    } else if let (Some(caps), &Method::GET) = (CHANNEL_ACCOUNTING.captures(&path), method) {
+        let param = RouteParams(vec![caps.get(1).map_or("".to_string(), |m| m.as_str().to_string())]);
+        req.extensions_mut().insert(param);
+
+        req = Chain::new()
+            .chain(AuthRequired)
+            .chain(ChannelLoad)
+            .apply(req, app)
+            .await?;
+
+        get_accounting_for_channel(req, app).await
     } else {
         Err(ResponseError::NotFound)
     }
