@@ -35,8 +35,14 @@ pub struct Config {
     pub health_threshold_promilles: u32,
     pub health_unsignable_promilles: u32,
     pub propagation_timeout: u32,
+
+    /// In Milliseconds
+    /// Timeout duration for fetching resources using [`SentryApi`]
     pub fetch_timeout: u32,
-    pub validator_tick_timeout: u32,
+    /// In Milliseconds
+    pub all_campaigns_timeout: u32,
+    /// In Milliseconds
+    pub channel_tick_timeout: u32,
     pub ip_rate_limit: RateLimit,  // HashMap??
     pub sid_rate_limit: RateLimit, // HashMap ??
     #[serde(with = "SerHex::<StrictPfx>")]
