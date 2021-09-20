@@ -1,7 +1,7 @@
 use crate::db::{
     event_aggregate::{latest_approve_state_v5, latest_heartbeats, latest_new_state_v5},
     insert_channel, insert_validator_messages, list_channels,
-    spendable::{fetch_spendable, update_spendable},
+    spendable::{fetch_spendable, get_all_spendables_for_channel, update_spendable},
     DbPool, PoolError,
 };
 use crate::{success_response, Application, Auth, ResponseError, RouteParams};
@@ -9,19 +9,19 @@ use futures::future::try_join_all;
 use hyper::{Body, Request, Response};
 use primitives::{
     adapter::Adapter,
-    balances::UncheckedState,
+    balances::{CheckedState, UncheckedState},
     channel::Channel as ChannelOld,
     channel_v5::Channel as ChannelV5,
     config::TokenInfo,
     sentry::{
-        channel_list::ChannelListQuery, LastApproved, LastApprovedQuery, LastApprovedResponse,
-        SpenderResponse, SuccessResponse,
+        channel_list::ChannelListQuery, AllSpendersResponse, LastApproved, LastApprovedQuery,
+        LastApprovedResponse, Pagination, SpenderResponse, SuccessResponse,
     },
     spender::{Spendable, Spender, SpenderLeaf},
-    validator::MessageTypes,
+    validator::{MessageTypes, NewState},
     Address, Channel, Deposit, UnifiedNum,
 };
-use slog::error;
+use slog::{error, Logger};
 use std::{collections::HashMap, str::FromStr};
 use tokio_postgres::error::SqlState;
 
@@ -282,10 +282,10 @@ pub async fn get_spender_limits<A: Adapter + 'static>(
         .expect("Request should have Channel")
         .to_owned();
 
-    let channel_id = channel.id();
     let spender = Address::from_str(&route_params.index(1))?;
 
-    let latest_spendable = fetch_spendable(app.pool.clone(), &spender, &channel_id).await?;
+    let latest_spendable = fetch_spendable(app.pool.clone(), &spender, &channel.id()).await?;
+
     let token_info = app
         .config
         .token_address_whitelist
@@ -306,21 +306,12 @@ pub async fn get_spender_limits<A: Adapter + 'static>(
         }
     };
 
-    let approve_state = match latest_approve_state_v5(&app.pool, &channel).await? {
-        Some(approve_state) => approve_state,
-        None => return spender_response_without_leaf(latest_spendable.deposit.total),
-    };
-
-    let state_root = approve_state.msg.state_root.clone();
-
-    let new_state = match latest_new_state_v5(&app.pool, &channel, &state_root).await? {
+    let new_state = match get_corresponding_new_state(&app.pool, &app.logger, &channel).await? {
         Some(new_state) => new_state,
         None => return spender_response_without_leaf(latest_spendable.deposit.total),
     };
 
-    let new_state_checked = new_state.msg.into_inner().try_checked()?;
-
-    let total_spent = new_state_checked.balances.spenders.get(&spender);
+    let total_spent = new_state.balances.spenders.get(&spender);
 
     let spender_leaf = total_spent.map(|total_spent| SpenderLeaf {
         total_spent: *total_spent,
@@ -335,6 +326,91 @@ pub async fn get_spender_limits<A: Adapter + 'static>(
         },
     };
     Ok(success_response(serde_json::to_string(&res)?))
+}
+
+pub async fn get_all_spender_limits<A: Adapter + 'static>(
+    req: Request<Body>,
+    app: &Application<A>,
+) -> Result<Response<Body>, ResponseError> {
+    let channel = req
+        .extensions()
+        .get::<ChannelV5>()
+        .expect("Request should have Channel")
+        .to_owned();
+
+    let new_state = get_corresponding_new_state(&app.pool, &app.logger, &channel).await?;
+
+    let mut all_spender_limits: HashMap<Address, Spender> = HashMap::new();
+
+    let all_spendables = get_all_spendables_for_channel(app.pool.clone(), &channel.id()).await?;
+
+    // Using for loop to avoid async closures
+    for spendable in all_spendables {
+        let spender = spendable.spender;
+        let spender_leaf = match new_state {
+            Some(ref new_state) => new_state.balances.spenders.get(&spender).map(|balance| {
+                SpenderLeaf {
+                    total_spent: spendable
+                        .deposit
+                        .total
+                        .checked_sub(balance)
+                        .unwrap_or_default(),
+                    // merkle_proof: [u8; 32], // TODO
+                }
+            }),
+            None => None,
+        };
+
+        let spender_info = Spender {
+            total_deposited: spendable.deposit.total,
+            spender_leaf,
+        };
+
+        all_spender_limits.insert(spender, spender_info);
+    }
+
+    let res = AllSpendersResponse {
+        spenders: all_spender_limits,
+        pagination: Pagination {
+            // TODO
+            page: 1,
+            total: 1,
+            total_pages: 1,
+        },
+    };
+
+    Ok(success_response(serde_json::to_string(&res)?))
+}
+
+async fn get_corresponding_new_state(
+    pool: &DbPool,
+    logger: &Logger,
+    channel: &ChannelV5,
+) -> Result<Option<NewState<CheckedState>>, ResponseError> {
+    let approve_state = match latest_approve_state_v5(pool, channel).await? {
+        Some(approve_state) => approve_state,
+        None => return Ok(None),
+    };
+
+    let state_root = approve_state.msg.state_root.clone();
+
+    let new_state = match latest_new_state_v5(pool, channel, &state_root).await? {
+        Some(new_state) => {
+            let new_state = new_state.msg.into_inner().try_checked().map_err(|err| {
+                error!(&logger, "Balances are not aligned in an approved NewState: {}", &err; "module" => "get_spender_limits");
+                ResponseError::BadRequest("Balances are not aligned in an approved NewState".to_string())
+            })?;
+            Ok(Some(new_state))
+        }
+        None => {
+            error!(&logger, "{}", "Fatal error! The NewState for the last ApproveState was not found"; "module" => "get_spender_limits");
+            return Err(ResponseError::BadRequest(
+                "Fatal error! The NewState for the last ApproveState was not found".to_string(),
+            ));
+        }
+    };
+
+    new_state
 }
 
 #[cfg(test)]
