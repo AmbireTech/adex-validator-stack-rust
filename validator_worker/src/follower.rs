@@ -13,7 +13,6 @@ use primitives::{
 
 use crate::core::follower_rules::{get_health, is_valid_transition};
 use crate::StateRootHashError;
-// use crate::core::follower_rules::{get_health, is_valid_transition};
 use crate::{
     get_state_root_hash,
     heartbeat::{heartbeat, HeartbeatStatus},

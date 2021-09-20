@@ -2,13 +2,12 @@ use std::{collections::HashMap, time::Duration};
 
 use chrono::{DateTime, Utc};
 use futures::future::{join_all, TryFutureExt};
-use reqwest::{Client, Response};
+use reqwest::Client;
 use slog::Logger;
 
 use primitives::{
     adapter::Adapter,
     balances::{CheckedState, UncheckedState},
-    channel_v5::Channel,
     sentry::{
         AccountingResponse, EventAggregateResponse, LastApprovedResponse, SuccessResponse,
         ValidatorMessageResponse,
@@ -16,7 +15,7 @@ use primitives::{
     spender::Spender,
     util::ApiUrl,
     validator::MessageTypes,
-    Address, Campaign, {ChannelId, Config, ValidatorId},
+    Address, {ChannelId, Config, ValidatorId},
 };
 use thiserror::Error;
 
@@ -134,6 +133,7 @@ impl<A: Adapter + 'static> SentryApi<A> {
             .await
     }
 
+    /// Get's the last approved state and requesting a [`Heartbeat`], see [`LastApprovedResponse`]
     pub async fn get_last_approved(
         &self,
         channel: ChannelId,
@@ -142,7 +142,10 @@ impl<A: Adapter + 'static> SentryApi<A> {
             .get(
                 self.whoami
                     .url
-                    .join(&format!("v5/channel/{}/last-approved", channel))
+                    .join(&format!(
+                        "v5/channel/{}/last-approved?withHeartbeat=true",
+                        channel
+                    ))
                     .expect("Should not error while creating endpoint"),
             )
             .send()
@@ -150,20 +153,6 @@ impl<A: Adapter + 'static> SentryApi<A> {
             .json()
             .await
             .map_err(Error::Request)
-    }
-
-    pub async fn get_last_msgs(&self) -> Result<LastApprovedResponse<UncheckedState>, Error> {
-        self.client
-            .get(
-                self.whoami
-                    .url
-                    .join("last-approved?withHeartbeat=true")
-                    .expect("Should not error while creating endpoint"),
-            )
-            .send()
-            .and_then(|res: Response| res.json::<LastApprovedResponse<UncheckedState>>())
-            .map_err(Error::Request)
-            .await
     }
 
     // TODO: Pagination & use of `AllSpendersResponse`
@@ -208,21 +197,6 @@ impl<A: Adapter + 'static> SentryApi<A> {
             .json::<AccountingResponse<CheckedState>>()
             .map_err(Error::Request)
             .await
-    }
-
-    /// Fetches all `Campaign`s from `sentry` by going through all pages and collecting the `Campaign`s into a single `Vec`
-    pub async fn all_campaigns(&self) -> Result<Vec<Campaign>, Error> {
-        Ok(
-            campaigns::all_campaigns(self.client.clone(), &self.whoami.url, self.adapter.whoami())
-                .await?,
-        )
-    }
-
-    pub async fn all_channels(&self) -> Result<Vec<Channel>, Error> {
-        Ok(
-            channels::all_channels(self.client.clone(), &self.whoami.url, self.adapter.whoami())
-                .await?,
-        )
     }
 
     #[deprecated = "V5 no longer needs event aggregates"]
@@ -278,7 +252,7 @@ async fn propagate_to<A: Adapter>(
     Ok(validator_id)
 }
 
-mod channels {
+pub mod channels {
     use futures::{future::try_join_all, TryFutureExt};
     use primitives::{
         channel_v5::Channel,
@@ -388,7 +362,7 @@ pub mod campaigns {
 
         let endpoint = sentry_url
             .join(&format!(
-                "campaign/list?{}",
+                "v5/campaign/list?{}",
                 serde_urlencoded::to_string(query).expect("Should not fail to serialize")
             ))
             .expect("Should not fail to create endpoint URL");

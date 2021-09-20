@@ -1,5 +1,6 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
+#![allow(deprecated)]
 
 use adapter::{get_balance_leaf, get_signable_state_root, BalanceLeafError};
 use primitives::{

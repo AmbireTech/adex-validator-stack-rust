@@ -166,7 +166,7 @@ mod test {
     #[test]
     fn get_health_the_approved_balance_tree_gte_our_accounting_is_healthy() {
         let all_spenders_sum = UnifiedNum::from(50);
-        let our = vec![(ADDRESSES["publisher"].clone(), 50.into())]
+        let our = vec![(ADDRESSES["publisher"], 50.into())]
             .into_iter()
             .collect();
         assert!(
@@ -178,7 +178,7 @@ mod test {
             get_health(
                 all_spenders_sum,
                 &our,
-                &vec![(ADDRESSES["publisher"].clone(), 60.into())]
+                &vec![(ADDRESSES["publisher"], 60.into())]
                     .into_iter()
                     .collect()
             )
@@ -189,7 +189,7 @@ mod test {
 
     #[test]
     fn get_health_the_approved_balance_tree_is_positive_our_accounting_is_0_and_it_is_healthy() {
-        let approved = vec![(ADDRESSES["publisher"].clone(), 50.into())]
+        let approved = vec![(ADDRESSES["publisher"], 50.into())]
             .into_iter()
             .collect();
 
@@ -207,10 +207,10 @@ mod test {
         assert!(
             get_health(
                 all_spenders_sum,
-                &vec![(ADDRESSES["publisher"].clone(), 80.into())]
+                &vec![(ADDRESSES["publisher"], 80.into())]
                     .into_iter()
                     .collect(),
-                &vec![(ADDRESSES["publisher"].clone(), 79.into())]
+                &vec![(ADDRESSES["publisher"], 79.into())]
                     .into_iter()
                     .collect()
             )
@@ -221,10 +221,10 @@ mod test {
         assert!(
             get_health(
                 all_spenders_sum,
-                &vec![(ADDRESSES["publisher"].clone(), 2.into())]
+                &vec![(ADDRESSES["publisher"], 2.into())]
                     .into_iter()
                     .collect(),
-                &vec![(ADDRESSES["publisher"].clone(), 1.into())]
+                &vec![(ADDRESSES["publisher"], 1.into())]
                     .into_iter()
                     .collect()
             )
@@ -238,10 +238,10 @@ mod test {
         assert!(
             get_health(
                 UnifiedNum::from(80),
-                &vec![(ADDRESSES["publisher"].clone(), 80.into())]
+                &vec![(ADDRESSES["publisher"], 80.into())]
                     .into_iter()
                     .collect(),
-                &vec![(ADDRESSES["publisher"].clone(), 70.into())]
+                &vec![(ADDRESSES["publisher"], 70.into())]
                     .into_iter()
                     .collect()
             )
@@ -257,10 +257,10 @@ mod test {
         assert!(
             get_health(
                 all_spenders_sum,
-                &vec![(ADDRESSES["publisher"].clone(), 80.into())]
+                &vec![(ADDRESSES["publisher"], 80.into())]
                     .into_iter()
                     .collect(),
-                &vec![(ADDRESSES["publisher2"].clone(), 80.into())]
+                &vec![(ADDRESSES["publisher2"], 80.into())]
                     .into_iter()
                     .collect()
             )
@@ -271,12 +271,12 @@ mod test {
         assert!(
             get_health(
                 all_spenders_sum,
-                &vec![(ADDRESSES["publisher"].clone(), 80.into())]
+                &vec![(ADDRESSES["publisher"], 80.into())]
                     .into_iter()
                     .collect(),
                 &vec![
-                    (ADDRESSES["publisher2"].clone(), 40.into()),
-                    (ADDRESSES["publisher"].clone(), 40.into())
+                    (ADDRESSES["publisher2"], 40.into()),
+                    (ADDRESSES["publisher"], 40.into())
                 ]
                 .into_iter()
                 .collect()
@@ -288,12 +288,12 @@ mod test {
         assert!(
             get_health(
                 all_spenders_sum,
-                &vec![(ADDRESSES["publisher"].clone(), 80.into())]
+                &vec![(ADDRESSES["publisher"], 80.into())]
                     .into_iter()
                     .collect(),
                 &vec![
-                    (ADDRESSES["publisher2"].clone(), 20.into()),
-                    (ADDRESSES["publisher"].clone(), 60.into())
+                    (ADDRESSES["publisher2"], 20.into()),
+                    (ADDRESSES["publisher"], 60.into())
                 ]
                 .into_iter()
                 .collect()
@@ -305,12 +305,12 @@ mod test {
         assert!(
             get_health(
                 all_spenders_sum,
-                &vec![(ADDRESSES["publisher"].clone(), 80.into())]
+                &vec![(ADDRESSES["publisher"], 80.into())]
                     .into_iter()
                     .collect(),
                 &vec![
-                    (ADDRESSES["publisher2"].clone(), 2.into()),
-                    (ADDRESSES["publisher"].clone(), 78.into())
+                    (ADDRESSES["publisher2"], 2.into()),
+                    (ADDRESSES["publisher"], 78.into())
                 ]
                 .into_iter()
                 .collect()
@@ -323,12 +323,12 @@ mod test {
             get_health(
                 all_spenders_sum,
                 &vec![
-                    (ADDRESSES["publisher"].clone(), 100.into()),
-                    (ADDRESSES["publisher2"].clone(), 1.into())
+                    (ADDRESSES["publisher"], 100.into()),
+                    (ADDRESSES["publisher2"], 1.into())
                 ]
                 .into_iter()
                 .collect(),
-                &vec![(ADDRESSES["publisher"].clone(), 100.into())]
+                &vec![(ADDRESSES["publisher"], 100.into())]
                     .into_iter()
                     .collect()
             )
