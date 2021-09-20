@@ -89,7 +89,7 @@ pub trait Adapter: Send + Sync + fmt::Debug + Clone {
     /// Verify, based on the signature & state_root, that the signer is the same
     fn verify(
         &self,
-        signer: &ValidatorId,
+        signer: ValidatorId,
         state_root: &str,
         signature: &str,
     ) -> AdapterResult<bool, Self::AdapterError>;

@@ -172,7 +172,7 @@ impl Adapter for EthereumAdapter {
     /// `sig` is hex string which **should be** `0x` prefixed
     fn verify(
         &self,
-        signer: &ValidatorId,
+        signer: ValidatorId,
         state_root: &str,
         sig: &str,
     ) -> AdapterResult<bool, Self::AdapterError> {
@@ -543,7 +543,7 @@ mod test {
             "0x9e07f12958ce7c5eb1362eb9461e4745dd9d74a42b921391393caea700bfbd6e1ad876a7d8f9202ef1fe6110dbfe87840c5676ca5c4fda9f3330694a1ac2a1fc1b";
         let verify = eth_adapter
             .verify(
-                &ValidatorId::try_from("2892f6C41E0718eeeDd49D98D648C789668cA67d")
+                ValidatorId::try_from("2892f6C41E0718eeeDd49D98D648C789668cA67d")
                     .expect("Failed to parse id"),
                 "8bc45d8eb27f4c98cab35d17b0baecc2a263d6831ef0800f4c190cbfac6d20a3",
                 &signature,
@@ -555,7 +555,7 @@ mod test {
 
         let verify2 = eth_adapter
             .verify(
-                &ValidatorId::try_from("ce07CbB7e054514D590a0262C93070D838bFBA2e")
+                ValidatorId::try_from("ce07CbB7e054514D590a0262C93070D838bFBA2e")
                     .expect("Failed to parse id"),
                 message2,
                 &signature2,

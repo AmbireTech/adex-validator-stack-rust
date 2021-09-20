@@ -6,10 +6,9 @@ use reqwest::{Client, Response};
 use slog::Logger;
 
 use primitives::{
-    adapter::{Adapter, AdapterErrorKind, Error as AdapterError},
+    adapter::Adapter,
     balances::{CheckedState, UncheckedState},
     channel::Channel as ChannelOld,
-    channel_v5::Channel,
     sentry::{
         AccountingResponse, ChannelListResponse, EventAggregateResponse, LastApprovedResponse,
         SuccessResponse, ValidatorMessageResponse,
@@ -21,7 +20,7 @@ use primitives::{
 };
 use thiserror::Error;
 
-pub type PropagationResult<AE> = Result<ValidatorId, (ValidatorId, Error<AE>)>;
+pub type PropagationResult = Result<ValidatorId, (ValidatorId, Error)>;
 /// Propagate the Validator messages to these `Validator`s
 pub type Validators = HashMap<ValidatorId, Validator>;
 pub type AuthToken = String;
@@ -41,25 +40,19 @@ pub struct SentryApi<A: Adapter> {
     pub logger: Logger,
     pub config: Config,
     pub whoami: Validator,
-    pub channel: Channel,
     pub propagate_to: Validators,
 }
 
 #[derive(Debug, Error)]
-pub enum Error<AE: AdapterErrorKind + 'static> {
+pub enum Error {
     #[error("Building client: {0}")]
     BuildingClient(reqwest::Error),
     #[error("Making a request: {0}")]
     Request(#[from] reqwest::Error),
-    #[error("Getting authentication for validator: {0}")]
-    ValidatorAuthentication(#[from] AdapterError<AE>),
     #[error(
-        "Missing validator URL & Auth token entry for whoami {whoami:#?} in the Channel {channel:#?} propagation list"
+        "Missing validator URL & Auth token entry for whoami {whoami:#?} in the propagation list"
     )]
-    WhoamiMissing {
-        channel: ChannelId,
-        whoami: ValidatorId,
-    },
+    WhoamiMissing { whoami: ValidatorId },
     #[error("Failed to parse validator url: {0}")]
     ValidatorUrl(#[from] primitives::util::api::ParseError),
 }
@@ -69,8 +62,8 @@ impl<A: Adapter + 'static> SentryApi<A> {
         adapter: A,
         logger: Logger,
         config: Config,
-        (channel, propagate_to): (Channel, Validators),
-    ) -> Result<Self, Error<A::AdapterError>> {
+        propagate_to: Validators,
+    ) -> Result<Self, Error> {
         let client = Client::builder()
             .timeout(Duration::from_millis(config.fetch_timeout.into()))
             .build()
@@ -80,7 +73,6 @@ impl<A: Adapter + 'static> SentryApi<A> {
             .get(&adapter.whoami())
             .cloned()
             .ok_or_else(|| Error::WhoamiMissing {
-                channel: channel.id(),
                 whoami: adapter.whoami(),
             })?;
 
@@ -90,42 +82,40 @@ impl<A: Adapter + 'static> SentryApi<A> {
             logger,
             config,
             whoami,
-            channel,
             propagate_to,
         })
     }
 
     pub async fn propagate(
         &self,
+        channel: ChannelId,
         messages: &[&MessageTypes],
-    ) -> Vec<PropagationResult<A::AdapterError>> {
+    ) -> Vec<PropagationResult> {
         join_all(self.propagate_to.iter().map(|(validator_id, validator)| {
-            propagate_to::<A>(
-                &self.client,
-                self.channel.id(),
-                (*validator_id, validator),
-                messages,
-            )
+            propagate_to::<A>(&self.client, channel, (*validator_id, validator), messages)
         }))
         .await
     }
 
     pub async fn get_latest_msg(
         &self,
-        from: &ValidatorId,
+        channel: ChannelId,
+        from: ValidatorId,
         message_types: &[&str],
-    ) -> Result<Option<MessageTypes>, Error<A::AdapterError>> {
+    ) -> Result<Option<MessageTypes>, Error> {
         let message_type = message_types.join("+");
 
+        // TODO: Fix endpoint URL
         let endpoint = self
             .whoami
             .url
             .join(&format!(
-                "/validator-messages/{}/{}?limit=1",
+                "v5/channel/{}/validator-messages/{}/{}?limit=1",
+                channel,
                 from.to_checksum(),
                 message_type
             ))
-            .expect("Should parse endpoint");
+            .expect("Should not error when creating endpoint url");
 
         let result = self
             .client
@@ -140,16 +130,17 @@ impl<A: Adapter + 'static> SentryApi<A> {
 
     pub async fn get_our_latest_msg(
         &self,
+        channel: ChannelId,
         message_types: &[&str],
-    ) -> Result<Option<MessageTypes>, Error<A::AdapterError>> {
-        self.get_latest_msg(&self.adapter.whoami(), message_types)
+    ) -> Result<Option<MessageTypes>, Error> {
+        self.get_latest_msg(channel, self.adapter.whoami(), message_types)
             .await
     }
 
     pub async fn get_last_approved(
         &self,
         channel: ChannelId,
-    ) -> Result<LastApprovedResponse<UncheckedState>, Error<A::AdapterError>> {
+    ) -> Result<LastApprovedResponse<UncheckedState>, Error> {
         self.client
             .get(
                 self.whoami
@@ -164,9 +155,7 @@ impl<A: Adapter + 'static> SentryApi<A> {
             .map_err(Error::Request)
     }
 
-    pub async fn get_last_msgs(
-        &self,
-    ) -> Result<LastApprovedResponse<UncheckedState>, Error<A::AdapterError>> {
+    pub async fn get_last_msgs(&self) -> Result<LastApprovedResponse<UncheckedState>, Error> {
         self.client
             .get(
                 self.whoami
@@ -183,11 +172,12 @@ impl<A: Adapter + 'static> SentryApi<A> {
     // TODO: Pagination & use of `AllSpendersResponse`
     pub async fn get_all_spenders(
         &self,
-    ) -> Result<HashMap<Address, Spender>, Error<A::AdapterError>> {
+        channel: ChannelId,
+    ) -> Result<HashMap<Address, Spender>, Error> {
         let url = self
             .whoami
             .url
-            .join(&format!("v5/channel/{}/spender/all", self.channel.id()))
+            .join(&format!("v5/channel/{}/spender/all", channel))
             .expect("Should not error when creating endpoint");
 
         self.client
@@ -206,7 +196,7 @@ impl<A: Adapter + 'static> SentryApi<A> {
     pub async fn get_accounting(
         &self,
         channel: ChannelId,
-    ) -> Result<AccountingResponse<CheckedState>, Error<A::AdapterError>> {
+    ) -> Result<AccountingResponse<CheckedState>, Error> {
         let url = self
             .whoami
             .url
@@ -227,7 +217,7 @@ impl<A: Adapter + 'static> SentryApi<A> {
     pub async fn get_event_aggregates(
         &self,
         after: DateTime<Utc>,
-    ) -> Result<EventAggregateResponse, Error<A::AdapterError>> {
+    ) -> Result<EventAggregateResponse, Error> {
         let url = self
             .whoami
             .url
@@ -253,7 +243,7 @@ async fn propagate_to<A: Adapter>(
     channel_id: ChannelId,
     (validator_id, validator): (ValidatorId, &Validator),
     messages: &[&MessageTypes],
-) -> PropagationResult<A::AdapterError> {
+) -> PropagationResult {
     let endpoint = validator
         .url
         .join(&format!("v5/channel/{}/validator-messages", channel_id))

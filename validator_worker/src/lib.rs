@@ -1,10 +1,13 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
 
-use std::error::Error;
-
-use adapter::{get_balance_leaf, get_signable_state_root};
-use primitives::{balances::CheckedState, merkle_tree::MerkleTree, Balances, ChannelId};
+use adapter::{get_balance_leaf, get_signable_state_root, BalanceLeafError};
+use primitives::{
+    balances::CheckedState,
+    merkle_tree::{Error as MerkleTreeError, MerkleTree},
+    Balances, ChannelId,
+};
+use thiserror::Error;
 
 pub use self::sentry_interface::{all_channels, SentryApi};
 
@@ -12,18 +15,26 @@ pub mod channel;
 pub mod error;
 pub mod follower;
 pub mod heartbeat;
-// pub mod leader;
+pub mod leader;
 pub mod sentry_interface;
 
 pub mod core {
     pub mod follower_rules;
 }
 
+#[derive(Debug, Error)]
+pub enum StateRootHashError {
+    #[error("Failed to get balance leaf")]
+    BalanceLeaf(#[from] BalanceLeafError),
+    #[error(transparent)]
+    MerkleTree(#[from] MerkleTreeError),
+}
+
 pub(crate) fn get_state_root_hash(
     channel: ChannelId,
     balances: &Balances<CheckedState>,
     token_precision: u8,
-) -> Result<[u8; 32], Box<dyn Error>> {
+) -> Result<[u8; 32], StateRootHashError> {
     let spenders = balances.spenders.iter().map(|(address, amount)| {
         get_balance_leaf(true, address, &amount.to_precision(token_precision))
     });
@@ -38,7 +49,7 @@ pub(crate) fn get_state_root_hash(
 
     let tree = MerkleTree::new(&elems)?;
     // keccak256(channelId, balanceRoot)
-    get_signable_state_root(channel.as_ref(), &tree.root())
+    Ok(get_signable_state_root(channel.as_ref(), &tree.root()))
 }
 
 #[cfg(test)]

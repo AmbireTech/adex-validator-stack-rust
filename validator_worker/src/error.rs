@@ -1,4 +1,3 @@
-use primitives::adapter::AdapterErrorKind;
 use primitives::ChannelId;
 use std::fmt;
 use thiserror::Error;
@@ -19,18 +18,18 @@ impl fmt::Display for TickError {
 }
 
 #[derive(Error, Debug)]
-pub enum Error<AE: AdapterErrorKind + 'static> {
+pub enum Error {
     #[error("SentryApi: {0}")]
-    SentryApi(#[from] crate::sentry_interface::Error<AE>),
+    SentryApi(#[from] crate::sentry_interface::Error),
     #[error("LeaderTick {0}: {1}")]
     LeaderTick(ChannelId, TickError),
     #[error("FollowerTick {0}: {1}")]
     FollowerTick(ChannelId, TickError),
     #[error("Placeholder for Validation errors")]
     Validation,
-    #[error("Placeholder for sum overflow error")]
-    Overflow,
     #[error("Whoami is neither a Leader or follower in channel")]
     // TODO: Add channel, validatorId, etc.
     ChannelNotIntendedForUs,
+    #[error("Channel token is not whitelisted")]
+    ChannelTokenNotWhitelisted,
 }
