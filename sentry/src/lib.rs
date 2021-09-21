@@ -173,17 +173,6 @@ impl<A: Adapter + 'static> Application<A> {
 
                 publisher_analytics(req, self).await
             }
-            // For creating campaigns
-            ("/v5/campaign", &Method::POST) => {
-                let req = match AuthRequired.call(req, self).await {
-                    Ok(req) => req,
-                    Err(error) => {
-                        return map_response_error(error);
-                    }
-                };
-
-                create_campaign(req, self).await
-            }
             (route, _) if route.starts_with("/analytics") => analytics_router(req, self).await,
             // This is important because it prevents us from doing
             // expensive regex matching for routes without /channel
@@ -205,7 +194,12 @@ async fn campaigns_router<A: Adapter + 'static>(
 ) -> Result<Response<Body>, ResponseError> {
     let (path, method) = (req.uri().path(), req.method());
 
-    if let (Some(_caps), &Method::POST) = (CAMPAIGN_UPDATE_BY_ID.captures(path), method) {
+    // For creating campaigns
+    if (path, method) == ("/v5/campaign", &Method::POST) {
+        let req = AuthRequired.call(req, app).await?;
+
+        create_campaign(req, app).await
+    } else if let (Some(_caps), &Method::POST) = (CAMPAIGN_UPDATE_BY_ID.captures(path), method) {
         let req = CampaignLoad.call(req, app).await?;
 
         update_campaign::handle_route(req, app).await
