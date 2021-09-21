@@ -1,7 +1,7 @@
 use crate::{
     campaign::{self, Active, Validators},
     channel::{Pricing, PricingBounds},
-    channel_v5::{self, Nonce},
+    channel_v5::Nonce,
     targeting::Rules,
     AdUnit, Address, BigNum, Campaign, Channel, ChannelId, ChannelSpec, EventSubmission,
     SpecValidators, UnifiedNum, ValidatorDesc, ValidatorId, IPFS,
@@ -86,7 +86,7 @@ lazy_static! {
     pub static ref DUMMY_CAMPAIGN: Campaign = {
         Campaign {
             id: "0x936da01f9abd4d9d80c702af85c822a8".parse().expect("Should parse"),
-            channel: channel_v5::Channel {
+            channel: Channel {
                 leader: IDS["leader"],
                 follower: IDS["follower"],
                 guardian: IDS["tester"].to_address(),
@@ -110,10 +110,10 @@ lazy_static! {
         }
     };
 
-    pub static ref DUMMY_CHANNEL: Channel = {
+    pub static ref DUMMY_CHANNEL: crate::channel::Channel = {
         let nonce = BigNum::from(<Faker as Number>::between(100_000_000, 999_999_999));
 
-        Channel {
+        crate::channel::Channel {
             id: ChannelId::from_hex("061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088").expect("prep_db: failed to deserialize channel id"),
             creator: ValidatorId::try_from("033ed90e0fec3f3ea1c9b005c724d704501e0196").expect("Should be valid ValidatorId"),
             deposit_asset: "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359".to_string(),

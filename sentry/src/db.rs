@@ -326,7 +326,8 @@ pub mod tests_postgres {
                 .await?
                 .simple_query(&queries)
                 .await
-                .map_err(|err| PoolError::Backend(err))?;
+                .map_err(|err| PoolError::Backend(err))
+                .expect("Should not error");
             assert_eq!(2, result.len());
             assert!(matches!(result[0], SimpleQueryMessage::CommandComplete(..)));
             assert!(matches!(result[1], SimpleQueryMessage::CommandComplete(..)));

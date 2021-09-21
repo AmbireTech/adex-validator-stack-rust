@@ -1,29 +1,25 @@
 use crate::db::{
-    event_aggregate::{
-        latest_approve_state, latest_approve_state_v5, latest_heartbeats, latest_new_state,
-        latest_new_state_v5,
-    },
-    get_channel_by_id, insert_channel, insert_validator_messages, list_channels,
+    event_aggregate::{latest_approve_state_v5, latest_heartbeats, latest_new_state_v5},
+    insert_channel, insert_validator_messages, list_channels,
     spendable::{fetch_spendable, get_all_spendables_for_channel, update_spendable},
     DbPool, PoolError,
 };
 use crate::{success_response, Application, Auth, ResponseError, RouteParams};
 use futures::future::try_join_all;
-use hex::FromHex;
 use hyper::{Body, Request, Response};
 use primitives::{
     adapter::Adapter,
     balances::{CheckedState, UncheckedState},
+    channel::Channel as ChannelOld,
     channel_v5::Channel as ChannelV5,
     config::TokenInfo,
     sentry::{
-        channel_list::{ChannelListQuery, LastApprovedQuery},
-        AllSpendersResponse, LastApproved, LastApprovedResponse, Pagination, SpenderResponse,
-        SuccessResponse,
+        channel_list::ChannelListQuery, AllSpendersResponse, LastApproved, LastApprovedQuery,
+        LastApprovedResponse, Pagination, SpenderResponse, SuccessResponse,
     },
-    spender::{Deposit, Spendable, Spender, SpenderLeaf},
+    spender::{Spendable, Spender, SpenderLeaf},
     validator::{MessageTypes, NewState},
-    Address, Channel, ChannelId, UnifiedNum,
+    Address, Channel, Deposit, UnifiedNum,
 };
 use slog::{error, Logger};
 use std::{collections::HashMap, str::FromStr};
@@ -36,12 +32,12 @@ pub async fn channel_status<A: Adapter>(
     use serde::Serialize;
     #[derive(Serialize)]
     struct ChannelStatusResponse<'a> {
-        channel: &'a Channel,
+        channel: &'a ChannelOld,
     }
 
     let channel = req
         .extensions()
-        .get::<Channel>()
+        .get::<ChannelOld>()
         .expect("Request should have Channel");
 
     let response = ChannelStatusResponse { channel };
@@ -49,13 +45,14 @@ pub async fn channel_status<A: Adapter>(
     Ok(success_response(serde_json::to_string(&response)?))
 }
 
+#[deprecated = "V5 Channel no longer needs creation of channel route"]
 pub async fn create_channel<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
     let body = hyper::body::to_bytes(req.into_body()).await?;
 
-    let channel = serde_json::from_slice::<Channel>(&body)
+    let channel = serde_json::from_slice::<ChannelV5>(&body)
         .map_err(|e| ResponseError::FailedValidation(e.to_string()))?;
 
     // TODO AIP#61: No longer needed, remove!
@@ -65,7 +62,7 @@ pub async fn create_channel<A: Adapter>(
 
     let error_response = ResponseError::BadRequest("err occurred; please try again later".into());
 
-    match insert_channel(&app.pool, &channel).await {
+    match insert_channel(&app.pool, channel).await {
         Err(error) => {
             error!(&app.logger, "{}", &error; "module" => "create_channel");
 
@@ -78,7 +75,6 @@ pub async fn create_channel<A: Adapter>(
                 _ => Err(error_response),
             }
         }
-        Ok(false) => Err(error_response),
         _ => Ok(()),
     }?;
 
@@ -101,9 +97,7 @@ pub async fn channel_list<A: Adapter>(
         &app.pool,
         skip,
         app.config.channels_find_limit,
-        &query.creator,
-        &query.validator,
-        &query.valid_until_ge,
+        query.validator,
     )
     .await?;
 
@@ -125,14 +119,11 @@ pub async fn last_approved<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
-    // get request params
-    let route_params = req
+    // get request Channel
+    let channel = *req
         .extensions()
-        .get::<RouteParams>()
-        .expect("request should have route params");
-
-    let channel_id = ChannelId::from_hex(route_params.index(0))?;
-    let channel = get_channel_by_id(&app.pool, &channel_id).await?.unwrap();
+        .get::<Channel>()
+        .ok_or(ResponseError::NotFound)?;
 
     let default_response = Response::builder()
         .header("Content-type", "application/json")
@@ -145,26 +136,26 @@ pub async fn last_approved<A: Adapter>(
         )
         .expect("should build response");
 
-    let approve_state = match latest_approve_state(&app.pool, &channel).await? {
+    let approve_state = match latest_approve_state_v5(&app.pool, &channel).await? {
         Some(approve_state) => approve_state,
         None => return Ok(default_response),
     };
 
     let state_root = approve_state.msg.state_root.clone();
 
-    let new_state = latest_new_state(&app.pool, &channel, &state_root).await?;
+    let new_state = latest_new_state_v5(&app.pool, &channel, &state_root).await?;
     if new_state.is_none() {
         return Ok(default_response);
     }
 
     let query = serde_urlencoded::from_str::<LastApprovedQuery>(req.uri().query().unwrap_or(""))?;
-    let validators = channel.spec.validators;
-    let channel_id = channel.id;
+    let validators = vec![channel.leader, channel.follower];
+    let channel_id = channel.id();
     let heartbeats = if query.with_heartbeat.is_some() {
         let result = try_join_all(
             validators
                 .iter()
-                .map(|validator| latest_heartbeats(&app.pool, &channel_id, &validator.id)),
+                .map(|validator| latest_heartbeats(&app.pool, &channel_id, validator)),
         )
         .await?;
         Some(result.into_iter().flatten().collect::<Vec<_>>())
@@ -199,7 +190,7 @@ pub async fn create_validator_messages<A: Adapter + 'static>(
 
     let channel = req
         .extensions()
-        .get::<Channel>()
+        .get::<ChannelV5>()
         .expect("Request should have Channel")
         .to_owned();
 
@@ -211,7 +202,7 @@ pub async fn create_validator_messages<A: Adapter + 'static>(
         .get("messages")
         .ok_or_else(|| ResponseError::BadRequest("missing messages body".to_string()))?;
 
-    match channel.spec.validators.find(&session.uid) {
+    match channel.find_validator(session.uid) {
         None => Err(ResponseError::Unauthorized),
         _ => {
             try_join_all(messages.iter().map(|message| {
@@ -226,6 +217,7 @@ pub async fn create_validator_messages<A: Adapter + 'static>(
     }
 }
 
+/// This will make sure to insert/get the `Channel` from DB before attempting to create the `Spendable`
 async fn create_or_update_spendable_document(
     adapter: &impl Adapter,
     token_info: &TokenInfo,
@@ -233,6 +225,8 @@ async fn create_or_update_spendable_document(
     channel: &ChannelV5,
     spender: Address,
 ) -> Result<Spendable, ResponseError> {
+    insert_channel(&pool, *channel).await?;
+
     let deposit = adapter.get_deposit(channel, &spender).await?;
     let total = UnifiedNum::from_precision(deposit.total, token_info.precision.get());
     let still_on_create2 =
@@ -452,7 +446,6 @@ mod test {
             .await
             .expect("should return None");
         assert!(spendable.is_none());
-
         // Call create_or_update_spendable
         let new_spendable = create_or_update_spendable_document(
             &app.adapter,

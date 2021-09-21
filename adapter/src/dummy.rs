@@ -107,7 +107,7 @@ impl Adapter for DummyAdapter {
 
     fn verify(
         &self,
-        signer: &ValidatorId,
+        signer: ValidatorId,
         _state_root: &str,
         signature: &str,
     ) -> AdapterResult<bool, Self::AdapterError> {

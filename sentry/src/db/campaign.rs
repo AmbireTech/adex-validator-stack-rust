@@ -10,20 +10,19 @@ use tokio_postgres::types::{Json, ToSql};
 pub use campaign_remaining::CampaignRemaining;
 
 /// ```text
-/// INSERT INTO campaigns (id, channel_id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to)
-/// VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+/// INSERT INTO campaigns (id, channel_id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to)
+/// VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 /// ```
 pub async fn insert_campaign(pool: &DbPool, campaign: &Campaign) -> Result<bool, PoolError> {
     let client = pool.get().await?;
     let ad_units = Json(campaign.ad_units.clone());
-    let stmt = client.prepare("INSERT INTO campaigns (id, channel_id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)").await?;
+    let stmt = client.prepare("INSERT INTO campaigns (id, channel_id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)").await?;
     let inserted = client
         .execute(
             &stmt,
             &[
                 &campaign.id,
                 &campaign.channel.id(),
-                &campaign.channel,
                 &campaign.creator,
                 &campaign.budget,
                 &campaign.validators,
@@ -44,15 +43,20 @@ pub async fn insert_campaign(pool: &DbPool, campaign: &Campaign) -> Result<bool,
 }
 
 /// ```text
-/// SELECT id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to FROM campaigns
-/// WHERE id = $1
+/// SELECT campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to,
+/// channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce
+/// FROM campaigns INNER JOIN channels
+/// ON campaigns.channel_id=channels.id
+/// WHERE campaigns.id = $1
 /// ```
 pub async fn fetch_campaign(
     pool: DbPool,
     campaign: &CampaignId,
 ) -> Result<Option<Campaign>, PoolError> {
     let client = pool.get().await?;
-    let statement = client.prepare("SELECT id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to FROM campaigns WHERE id = $1").await?;
+    // TODO: Check and update
+    let statement = client.prepare("SELECT campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM campaigns INNER JOIN channels
+    ON campaigns.channel_id=channels.id WHERE campaigns.id = $1").await?;
 
     let row = client.query_opt(&statement, &[&campaign]).await?;
 
@@ -150,15 +154,18 @@ async fn list_campaigns_total_count<'a>(
 
 // TODO: We might need to use LIMIT to implement pagination
 /// ```text
-/// SELECT id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to
-/// FROM campaigns WHERE channel_id = $1
+/// SELECT campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to,
+/// channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce
+/// FROM campaigns INNER JOIN channels
+/// ON campaigns.channel_id=channels.id WHERE campaigns.channel_id = $1
 /// ```
 pub async fn get_campaigns_by_channel(
     pool: &DbPool,
     channel_id: &ChannelId,
 ) -> Result<Vec<Campaign>, PoolError> {
     let client = pool.get().await?;
-    let statement = client.prepare("SELECT id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to FROM campaigns WHERE channel_id = $1").await?;
+    let statement = client.prepare("SELECT campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM campaigns INNER JOIN channels
+    ON campaigns.channel_id=channels.id WHERE campaigns.channel_id = $1").await?;
 
     let rows = client.query(&statement, &[&channel_id]).await?;
 
@@ -169,13 +176,14 @@ pub async fn get_campaigns_by_channel(
 
 /// ```text
 /// UPDATE campaigns SET budget = $1, validators = $2, title = $3, pricing_bounds = $4, event_submission = $5, ad_units = $6, targeting_rules = $7
-/// WHERE id = $8
-/// RETURNING id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to
+/// FROM channels WHERE campaigns.id = $8 AND campaigns.channel_id=channels.id
+/// RETURNING campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to,
+/// channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce
 /// ```
 pub async fn update_campaign(pool: &DbPool, campaign: &Campaign) -> Result<Campaign, PoolError> {
     let client = pool.get().await?;
     let statement = client
-        .prepare("UPDATE campaigns SET budget = $1, validators = $2, title = $3, pricing_bounds = $4, event_submission = $5, ad_units = $6, targeting_rules = $7 WHERE id = $8 RETURNING id, channel, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to")
+        .prepare("UPDATE campaigns SET budget = $1, validators = $2, title = $3, pricing_bounds = $4, event_submission = $5, ad_units = $6, targeting_rules = $7 FROM channels WHERE campaigns.id = $8 AND campaigns.channel_id=channels.id RETURNING campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce")
         .await?;
 
     let ad_units = Json(&campaign.ad_units);
@@ -483,7 +491,10 @@ mod test {
     use std::time::Duration;
     use tokio_postgres::error::SqlState;
 
-    use crate::db::tests_postgres::{setup_test_migrations, DATABASE_POOL};
+    use crate::db::{
+        insert_channel,
+        tests_postgres::{setup_test_migrations, DATABASE_POOL},
+    };
 
     use super::*;
 
@@ -496,6 +507,11 @@ mod test {
             .expect("Migrations should succeed");
 
         let campaign = DUMMY_CAMPAIGN.clone();
+
+        // insert the channel into the DB
+        let _channel = insert_channel(&database.pool, DUMMY_CAMPAIGN.channel)
+            .await
+            .expect("Should insert");
 
         let non_existent_campaign = fetch_campaign(database.pool.clone(), &campaign.id)
             .await

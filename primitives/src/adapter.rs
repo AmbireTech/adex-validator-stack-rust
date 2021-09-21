@@ -8,12 +8,7 @@ use std::{collections::HashMap, convert::From, fmt};
 pub type AdapterResult<T, AE> = Result<T, Error<AE>>;
 
 pub trait AdapterErrorKind: fmt::Debug + fmt::Display {}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct Deposit {
-    pub total: BigNum,
-    pub still_on_create2: BigNum,
-}
+pub type Deposit = crate::Deposit<BigNum>;
 
 #[derive(Debug)]
 pub enum Error<AE: AdapterErrorKind> {
@@ -89,7 +84,7 @@ pub trait Adapter: Send + Sync + fmt::Debug + Clone {
     /// Verify, based on the signature & state_root, that the signer is the same
     fn verify(
         &self,
-        signer: &ValidatorId,
+        signer: ValidatorId,
         state_root: &str,
         signature: &str,
     ) -> AdapterResult<bool, Self::AdapterError>;

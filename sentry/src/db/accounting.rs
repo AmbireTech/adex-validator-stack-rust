@@ -173,7 +173,10 @@ pub async fn spend_amount(
 mod test {
     use primitives::util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN};
 
-    use crate::db::tests_postgres::{setup_test_migrations, DATABASE_POOL};
+    use crate::db::{
+        insert_channel,
+        tests_postgres::{setup_test_migrations, DATABASE_POOL},
+    };
 
     use super::*;
 
@@ -184,8 +187,12 @@ mod test {
         setup_test_migrations(database.pool.clone())
             .await
             .expect("Migrations should succeed");
+        // insert the channel into the DB
+        let channel = insert_channel(&database.pool, DUMMY_CAMPAIGN.channel)
+            .await
+            .expect("Should insert");
 
-        let channel_id = DUMMY_CAMPAIGN.channel.id();
+        let channel_id = channel.id();
         let earner = ADDRESSES["publisher"];
         let spender = ADDRESSES["creator"];
 
@@ -376,7 +383,12 @@ mod test {
             .await
             .expect("Migrations should succeed");
 
-        let channel_id = DUMMY_CAMPAIGN.channel.id();
+        // insert the channel into the DB
+        let channel = insert_channel(&database.pool, DUMMY_CAMPAIGN.channel)
+            .await
+            .expect("Should insert");
+
+        let channel_id = channel.id();
         let earner = ADDRESSES["publisher"];
         let spender = ADDRESSES["creator"];
         let spender_as_earner = spender;
@@ -458,7 +470,12 @@ mod test {
             .await
             .expect("Migrations should succeed");
 
-        let channel_id = DUMMY_CAMPAIGN.channel.id();
+        // insert the channel into the DB
+        let channel = insert_channel(&database.pool, DUMMY_CAMPAIGN.channel)
+            .await
+            .expect("Should insert");
+
+        let channel_id = channel.id();
         let earner = ADDRESSES["publisher"];
         let other_earner = ADDRESSES["publisher2"];
         let spender = ADDRESSES["creator"];
