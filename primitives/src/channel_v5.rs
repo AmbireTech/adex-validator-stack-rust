@@ -127,65 +127,78 @@ mod test {
 
 #[cfg(feature = "postgres")]
 mod postgres {
-    use super::Channel;
+    use super::{Channel, Nonce};
     use bytes::BytesMut;
-    use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
+    use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
     use std::error::Error;
+    use tokio_postgres::Row;
 
-    impl<'a> FromSql<'a> for Channel {
+    impl<'a> FromSql<'a> for Nonce {
         fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
-            let json: Json<Channel> = FromSql::from_sql(ty, raw)?;
+            let nonce_string = String::from_sql(ty, raw)?;
 
-            Ok(json.0)
+            Ok(serde_json::from_value(serde_json::Value::String(
+                nonce_string,
+            ))?)
         }
 
-        accepts!(JSONB);
+        accepts!(VARCHAR);
     }
 
-    impl ToSql for Channel {
+    impl ToSql for Nonce {
         fn to_sql(
             &self,
             ty: &Type,
             w: &mut BytesMut,
         ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-            Json(self).to_sql(ty, w)
+            self.0.to_string().to_sql(ty, w)
         }
 
-        accepts!(JSONB);
+        accepts!(VARCHAR);
         to_sql_checked!();
+    }
+
+    impl From<&Row> for Channel {
+        fn from(row: &Row) -> Self {
+            Self {
+                leader: row.get("leader"),
+                follower: row.get("follower"),
+                guardian: row.get("guardian"),
+                token: row.get("token"),
+                nonce: row.get("nonce"),
+            }
+        }
     }
 
     #[cfg(test)]
     mod test {
-        use crate::util::tests::prep_db::{postgres::POSTGRES_POOL, DUMMY_CAMPAIGN};
+        use crate::{channel_v5::Nonce, util::tests::prep_db::postgres::POSTGRES_POOL};
         #[tokio::test]
-        async fn channel_to_from_sql() {
+        async fn nonce_to_from_sql() {
             let client = POSTGRES_POOL.get().await.unwrap();
 
-            let channel = DUMMY_CAMPAIGN.channel.clone();
-            let sql_type = "JSONB";
+            let nonce = Nonce::from(123_456_789_u64);
+            let sql_type = "VARCHAR";
 
             // from SQL
             {
-                let channel_json = serde_json::to_string(&channel).expect("Should serialize");
-
-                let rows = client
-                    .query(&*format!("SELECT '{}'::{}", channel_json, sql_type), &[])
+                let row_nonce = client
+                    .query_one(&*format!("SELECT '{}'::{}", nonce, sql_type), &[])
                     .await
-                    .unwrap();
-                let result = rows[0].get(0);
+                    .unwrap()
+                    .get(0);
 
-                assert_eq!(&channel, &result);
+                assert_eq!(&nonce, &row_nonce);
             }
 
             // to SQL
             {
-                let rows = client
-                    .query(&*format!("SELECT $1::{}", sql_type), &[&channel])
+                let row_nonce = client
+                    .query_one(&*format!("SELECT $1::{}", sql_type), &[&nonce])
                     .await
-                    .unwrap();
-                let result = rows[0].get(0);
-                assert_eq!(&channel, &result);
+                    .unwrap()
+                    .get(0);
+                assert_eq!(&nonce, &row_nonce);
             }
         }
     }

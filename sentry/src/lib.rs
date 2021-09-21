@@ -1,5 +1,6 @@
 #![deny(clippy::all)]
 #![deny(rust_2018_idioms)]
+#![allow(deprecated)]
 
 use crate::db::DbPool;
 use crate::routes::campaign;
@@ -186,7 +187,7 @@ impl<A: Adapter + 'static> Application<A> {
             (route, _) if route.starts_with("/analytics") => analytics_router(req, self).await,
             // This is important because it prevents us from doing
             // expensive regex matching for routes without /channel
-            (path, _) if path.starts_with("/channel") => channels_router(req, self).await,
+            (path, _) if path.starts_with("/v5/channel") => channels_router(req, self).await,
             (path, _) if path.starts_with("/v5/campaign") => campaigns_router(req, self).await,
             _ => Err(ResponseError::NotFound),
         }
@@ -319,6 +320,8 @@ async fn channels_router<A: Adapter + 'static>(
             .get(1)
             .map_or("".to_string(), |m| m.as_str().to_string())]);
         req.extensions_mut().insert(param);
+
+        req = ChannelLoad.call(req, app).await?;
 
         last_approved(req, app).await
     } else if let (Some(caps), &Method::GET) =

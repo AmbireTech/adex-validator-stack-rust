@@ -2,7 +2,9 @@ use chrono::{serde::ts_milliseconds_option, DateTime, Utc};
 use hyper::{Body, Request, Response};
 use serde::Deserialize;
 
-use primitives::{adapter::Adapter, sentry::EventAggregateResponse, Channel};
+use primitives::{
+    adapter::Adapter, channel::Channel as ChannelOld, sentry::EventAggregateResponse,
+};
 
 use crate::{success_response, Application, Auth, ResponseError};
 
@@ -19,7 +21,7 @@ pub async fn list_channel_event_aggregates<A: Adapter>(
 ) -> Result<Response<Body>, ResponseError> {
     let channel = req
         .extensions()
-        .get::<Channel>()
+        .get::<ChannelOld>()
         .expect("Request should have Channel");
 
     let auth = req

@@ -39,7 +39,10 @@ impl<A: Adapter + 'static> Middleware<A> for CampaignLoad {
 mod test {
     use primitives::{util::tests::prep_db::DUMMY_CAMPAIGN, Campaign};
 
-    use crate::{db::insert_campaign, test_util::setup_dummy_app};
+    use crate::{
+        db::{insert_campaign, insert_channel},
+        test_util::setup_dummy_app,
+    };
 
     use super::*;
 
@@ -86,6 +89,10 @@ mod test {
 
         // existing Campaign
         {
+            // insert Channel
+            insert_channel(&app.pool, campaign.channel)
+                .await
+                .expect("Should insert Channel");
             // insert Campaign
             assert!(insert_campaign(&app.pool, &campaign)
                 .await

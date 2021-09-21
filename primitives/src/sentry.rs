@@ -1,8 +1,9 @@
 use crate::{
     balances::BalancesState,
+    channel::Channel as ChannelOld,
     spender::Spender,
     validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
-    Address, Balances, BigNum, Channel, ChannelId, ValidatorId, IPFS,
+    Address, Balances, BigNum, ChannelId, ValidatorId, IPFS,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -183,16 +184,6 @@ pub struct AggregateEvents {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ChannelListResponse {
-    pub channels: Vec<Channel>,
-    // TODO: Replace with `Pagination`
-    pub total_pages: u64,
-    pub total: u64,
-    pub page: u64,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct Pagination {
     pub total_pages: u64,
     pub total: u64,
@@ -208,6 +199,12 @@ pub struct LastApprovedResponse<S: BalancesState> {
     /// Some(vec![]) (empty vec) or Some(heartbeats) - withHeartbeat=true was passed
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub heartbeats: Option<Vec<MessageResponse<Heartbeat>>>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LastApprovedQuery {
+    pub with_heartbeat: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -244,7 +241,7 @@ pub struct ValidatorMessageResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct EventAggregateResponse {
-    pub channel: Channel,
+    pub channel: ChannelOld,
     pub events: Vec<EventAggregate>,
 }
 
@@ -304,31 +301,27 @@ impl fmt::Display for ChannelReport {
 }
 
 pub mod channel_list {
-    use crate::ValidatorId;
-    use chrono::{serde::ts_seconds, DateTime, Utc};
+    use crate::{channel_v5::Channel, ValidatorId};
     use serde::{Deserialize, Serialize};
+
+    use super::Pagination;
+
+    #[derive(Debug, Serialize, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct ChannelListResponse {
+        pub channels: Vec<Channel>,
+        #[serde(flatten)]
+        pub pagination: Pagination,
+    }
 
     #[derive(Debug, Serialize, Deserialize)]
     pub struct ChannelListQuery {
-        #[serde(default = "default_page")]
+        #[serde(default)]
+        // default is `u64::default()` = `0`
         pub page: u64,
-        /// filters the list on `valid_until >= valid_until_ge`
-        /// It should be the same timestamp format as the `Channel.valid_until`: **seconds**
-        #[serde(with = "ts_seconds", default = "Utc::now", rename = "validUntil")]
-        pub valid_until_ge: DateTime<Utc>,
         pub creator: Option<String>,
         /// filters the channels containing a specific validator if provided
         pub validator: Option<ValidatorId>,
-    }
-
-    #[derive(Debug, Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    pub struct LastApprovedQuery {
-        pub with_heartbeat: Option<String>,
-    }
-
-    fn default_page() -> u64 {
-        0
     }
 }
 

@@ -358,6 +358,8 @@ pub mod validators {
 
 #[cfg(feature = "postgres")]
 mod postgres {
+    use crate::channel_v5::Channel;
+
     use super::{Active, Campaign, CampaignId, PricingBounds, Validators};
     use bytes::BytesMut;
     use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
@@ -368,7 +370,7 @@ mod postgres {
         fn from(row: &Row) -> Self {
             Self {
                 id: row.get("id"),
-                channel: row.get("channel"),
+                channel: Channel::from(row),
                 creator: row.get("creator"),
                 budget: row.get("budget"),
                 validators: row.get("validators"),

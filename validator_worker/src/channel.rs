@@ -9,17 +9,16 @@ use slog::Logger;
 use std::collections::{hash_map::Entry, HashSet};
 
 pub async fn channel_tick<A: Adapter + 'static>(
-    adapter: A,
+    sentry: &SentryApi<A>,
     config: &Config,
-    logger: &Logger,
     channel: Channel,
-    validators: Validators,
+    // validators: &Validators,
 ) -> Result<ChannelId, Error> {
+    let adapter = &sentry.adapter;
     let tick = channel
         .find_validator(adapter.whoami())
         .ok_or(Error::ChannelNotIntendedForUs)?;
 
-    let sentry = SentryApi::init(adapter, logger.clone(), config.clone(), validators)?;
     // 1. `GET /channel/:id/spender/all`
     let all_spenders = sentry.get_all_spenders(channel.id()).await?;
 
@@ -50,13 +49,13 @@ pub async fn channel_tick<A: Adapter + 'static>(
     // TODO: Add timeout
     match tick {
         primitives::Validator::Leader(_v) => {
-            let _leader_tick_status = leader::tick(&sentry, channel, accounting.balances, token)
+            let _leader_tick_status = leader::tick(sentry, channel, accounting.balances, token)
                 .await
                 .map_err(|err| Error::LeaderTick(channel.id(), TickError::Tick(Box::new(err))))?;
         }
         primitives::Validator::Follower(_v) => {
             let _follower_tick_status =
-                follower::tick(&sentry, channel, all_spenders, accounting.balances, token)
+                follower::tick(sentry, channel, all_spenders, accounting.balances, token)
                     .await
                     .map_err(|err| {
                         Error::FollowerTick(channel.id(), TickError::Tick(Box::new(err)))
@@ -70,14 +69,16 @@ pub async fn channel_tick<A: Adapter + 'static>(
 /// Fetches all `Campaign`s from Sentry and builds the `Channel`s to be processed
 /// along side all the `Validator`s' url & auth token
 pub async fn collect_channels<A: Adapter + 'static>(
-    adapter: A,
+    adapter: &A,
     sentry_url: &ApiUrl,
     _config: &Config,
     _logger: &Logger,
 ) -> Result<(HashSet<Channel>, Validators), reqwest::Error> {
     let whoami = adapter.whoami();
 
-    let campaigns = all_campaigns(sentry_url, whoami).await?;
+    // TODO: Move client creation
+    let client = reqwest::Client::new();
+    let campaigns = all_campaigns(client, sentry_url, whoami).await?;
     let channels = campaigns
         .iter()
         .map(|campaign| campaign.channel)

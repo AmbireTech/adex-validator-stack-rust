@@ -3,12 +3,12 @@
 #![deny(clippy::match_bool)]
 
 use primitives::{Address, BigNum};
+use thiserror::Error;
 use tiny_keccak::Keccak;
 use web3::{
     ethabi::{encode, token::Token},
     types::{Address as EthAddress, U256},
 };
-use thiserror::Error;
 
 pub use self::dummy::DummyAdapter;
 pub use self::ethereum::EthereumAdapter;
@@ -25,10 +25,7 @@ pub enum AdapterTypes {
 #[error("{0}")]
 pub struct BalanceLeafError(String);
 
-pub fn get_signable_state_root(
-    channel_id: &[u8],
-    balance_root: &[u8; 32],
-) -> [u8; 32] {
+pub fn get_signable_state_root(channel_id: &[u8], balance_root: &[u8; 32]) -> [u8; 32] {
     let tokens = [
         Token::FixedBytes(channel_id.to_vec()),
         Token::FixedBytes(balance_root.to_vec()),
