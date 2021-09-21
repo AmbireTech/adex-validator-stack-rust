@@ -2,9 +2,7 @@ use crate::{
     db::{
         accounting::{get_accounting, Side},
         campaign::{get_campaigns_by_channel, insert_campaign, list_campaigns, update_campaign},
-        spendable::fetch_spendable,
-        campaign::{get_campaigns_by_channel, update_campaign},
-        insert_campaign, insert_channel,
+        insert_channel,
         spendable::{fetch_spendable, update_spendable},
         CampaignRemaining, DbPool, RedisError,
     },
@@ -17,7 +15,10 @@ use primitives::{
     campaign_validator::Validator,
     channel_v5::Channel,
     sentry::campaign_create::{CreateCampaign, ModifyCampaign},
+    sentry::campaign::CampaignListQuery,
     spender::Spendable,
+    config::TokenInfo,
+    Address, Deposit, UnifiedNum, Campaign,
 };
 use slog::error;
 use std::cmp::{max, Ordering};
@@ -238,7 +239,7 @@ pub async fn campaign_list<A: Adapter>(
         &app.pool,
         skip,
         limit,
-        &query.creator,
+        query.creator,
         query.validator,
         query.is_leader,
         &query.active_to_ge,

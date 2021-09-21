@@ -97,9 +97,6 @@ mod list_channels {
         sentry::{channel_list::ChannelListResponse, Pagination},
         ValidatorId,
     };
-    use std::str::FromStr;
-    use tokio_postgres::types::ToSql;
-    use tokio_postgres::types::{accepts, FromSql, Type};
 
     use crate::db::{DbPool, PoolError, TotalCount};
 
