@@ -1,8 +1,10 @@
 use deadpool_postgres::{Manager, ManagerConfig, RecyclingMethod};
 use redis::aio::MultiplexedConnection;
 use std::{env, str::FromStr};
-use tokio_postgres::{types::{accepts, FromSql, Type}, NoTls};
-
+use tokio_postgres::{
+    types::{accepts, FromSql, Type},
+    NoTls,
+};
 
 use lazy_static::lazy_static;
 

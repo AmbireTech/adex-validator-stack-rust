@@ -14,11 +14,11 @@ use primitives::{
     adapter::{Adapter, AdapterErrorKind, Error as AdapterError},
     campaign_validator::Validator,
     channel_v5::Channel,
-    sentry::campaign_create::{CreateCampaign, ModifyCampaign},
-    sentry::campaign::CampaignListQuery,
-    spender::Spendable,
     config::TokenInfo,
-    Address, Deposit, UnifiedNum, Campaign,
+    sentry::campaign::CampaignListQuery,
+    sentry::campaign_create::{CreateCampaign, ModifyCampaign},
+    spender::Spendable,
+    Address, Campaign, Deposit, UnifiedNum,
 };
 use slog::error;
 use std::cmp::{max, Ordering};
