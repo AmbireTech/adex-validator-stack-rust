@@ -142,7 +142,7 @@ async fn list_campaigns_total_count<'a>(
     let client = pool.get().await?;
 
     let statement = format!(
-        "SELECT COUNT(id)::varchar FROM campaigns WHERE {}",
+        "SELECT COUNT(campaigns.id)::varchar FROM campaigns INNER JOIN channels ON campaigns.channel_id=channels.id WHERE {}",
         where_clauses.join(" AND ")
     );
     let stmt = client.prepare(&statement).await?;
@@ -648,75 +648,75 @@ mod test {
 
         insert_multiple_campaigns_with_different_channels(&database.pool).await;
 
-        // // 2 out of 3 results
-        // let first_page = list_campaigns(
-        //     &database.pool,
-        //     0,
-        //     2,
-        //     Some(ADDRESSES["creator"]),
-        //     None,
-        //     None,
-        //     &Utc::now(),
-        // )
-        // .await
-        // .expect("should fetch");
-        // assert_eq!(first_page.campaigns.len(), 2);
+        // 2 out of 3 results
+        let first_page = list_campaigns(
+            &database.pool,
+            0,
+            2,
+            Some(ADDRESSES["creator"]),
+            None,
+            None,
+            &Utc::now(),
+        )
+        .await
+        .expect("should fetch");
+        assert_eq!(first_page.campaigns.len(), 2);
 
-        // // 3rd result
-        // let second_page = list_campaigns(
-        //     &database.pool,
-        //     2,
-        //     2,
-        //     Some(ADDRESSES["creator"]),
-        //     None,
-        //     None,
-        //     &Utc::now(),
-        // )
-        // .await
-        // .expect("should fetch");
-        // assert_eq!(second_page.campaigns.len(), 1);
+        // 3rd result
+        let second_page = list_campaigns(
+            &database.pool,
+            2,
+            2,
+            Some(ADDRESSES["creator"]),
+            None,
+            None,
+            &Utc::now(),
+        )
+        .await
+        .expect("should fetch");
+        assert_eq!(second_page.campaigns.len(), 1);
 
-        // // No results past limit
-        // let third_page = list_campaigns(
-        //     &database.pool,
-        //     4,
-        //     2,
-        //     Some(ADDRESSES["creator"]),
-        //     None,
-        //     None,
-        //     &Utc::now(),
-        // )
-        // .await
-        // .expect("should fetch");
-        // assert_eq!(third_page.campaigns.len(), 0);
+        // No results past limit
+        let third_page = list_campaigns(
+            &database.pool,
+            4,
+            2,
+            Some(ADDRESSES["creator"]),
+            None,
+            None,
+            &Utc::now(),
+        )
+        .await
+        .expect("should fetch");
+        assert_eq!(third_page.campaigns.len(), 0);
 
-        // // Test with a different creator
-        // let first_page = list_campaigns(
-        //     &database.pool,
-        //     0,
-        //     2,
-        //     Some(ADDRESSES["tester"]),
-        //     None,
-        //     None,
-        //     &Utc::now(),
-        // )
-        // .await
-        // .expect("should fetch");
-        // assert_eq!(first_page.campaigns.len(), 1);
+        // Test with a different creator
+        let first_page = list_campaigns(
+            &database.pool,
+            0,
+            2,
+            Some(ADDRESSES["tester"]),
+            None,
+            None,
+            &Utc::now(),
+        )
+        .await
+        .expect("should fetch");
+        assert_eq!(first_page.campaigns.len(), 1);
 
         // Test with validator
-        // let first_page = list_campaigns(
-        //     &database.pool,
-        //     0,
-        //     5,
-        //     None,
-        //     Some(IDS["follower"]),
-        //     None,
-        //     &Utc::now(),
-        // )
-        // .await
-        // .expect("should fetch");
-        // assert_eq!(first_page.campaigns.len(), 4);
+        let first_page = list_campaigns(
+            &database.pool,
+            0,
+            5,
+            None,
+            Some(IDS["follower"]),
+            None,
+            &Utc::now(),
+        )
+        .await
+        .expect("should fetch");
+        assert_eq!(first_page.campaigns.len(), 4);
 
         // Test with validator and is_leader
         let first_page = list_campaigns(
@@ -732,60 +732,60 @@ mod test {
         .expect("should fetch");
         assert_eq!(first_page.campaigns.len(), 3);
 
-        // // Test with a different validator and is_leader
-        // let first_page = list_campaigns(
-        //     &database.pool,
-        //     0,
-        //     5,
-        //     None,
-        //     Some(IDS["user"]),
-        //     Some(true),
-        //     &Utc::now(),
-        // )
-        // .await
-        // .expect("should fetch");
-        // assert_eq!(first_page.campaigns.len(), 1);
+        // Test with a different validator and is_leader
+        let first_page = list_campaigns(
+            &database.pool,
+            0,
+            5,
+            None,
+            Some(IDS["user"]),
+            Some(true),
+            &Utc::now(),
+        )
+        .await
+        .expect("should fetch");
+        assert_eq!(first_page.campaigns.len(), 1);
 
-        // // Test with validator and is_leader but validator isn't the leader of any campaign
-        // let first_page = list_campaigns(
-        //     &database.pool,
-        //     0,
-        //     5,
-        //     None,
-        //     Some(IDS["follower"]),
-        //     Some(true),
-        //     &Utc::now(),
-        // )
-        // .await
-        // .expect("should fetch");
-        // assert_eq!(first_page.campaigns.len(), 0);
+        // Test with validator and is_leader but validator isn't the leader of any campaign
+        let first_page = list_campaigns(
+            &database.pool,
+            0,
+            5,
+            None,
+            Some(IDS["follower"]),
+            Some(true),
+            &Utc::now(),
+        )
+        .await
+        .expect("should fetch");
+        assert_eq!(first_page.campaigns.len(), 0);
 
-        // // Test with is_leader set to false
-        // let first_page = list_campaigns(
-        //     &database.pool,
-        //     0,
-        //     5,
-        //     None,
-        //     Some(IDS["follower"]),
-        //     Some(false),
-        //     &Utc::now(),
-        // )
-        // .await
-        // .expect("should fetch");
-        // assert_eq!(first_page.campaigns.len(), 4);
+        // Test with is_leader set to false
+        let first_page = list_campaigns(
+            &database.pool,
+            0,
+            5,
+            None,
+            Some(IDS["follower"]),
+            Some(false),
+            &Utc::now(),
+        )
+        .await
+        .expect("should fetch");
+        assert_eq!(first_page.campaigns.len(), 4);
 
-        // // Test with creator, provided validator and is_leader set to true
-        // let first_page = list_campaigns(
-        //     &database.pool,
-        //     0,
-        //     5,
-        //     Some(ADDRESSES["creator"]),
-        //     Some(IDS["leader"]),
-        //     Some(true),
-        //     &Utc::now(),
-        // )
-        // .await
-        // .expect("should fetch");
-        // assert_eq!(first_page.campaigns.len(), 2);
+        // Test with creator, provided validator and is_leader set to true
+        let first_page = list_campaigns(
+            &database.pool,
+            0,
+            5,
+            Some(ADDRESSES["creator"]),
+            Some(IDS["leader"]),
+            Some(true),
+            &Utc::now(),
+        )
+        .await
+        .expect("should fetch");
+        assert_eq!(first_page.campaigns.len(), 2);
     }
 }
