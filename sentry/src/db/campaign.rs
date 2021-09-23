@@ -124,12 +124,16 @@ fn campaign_list_query_params<'a>(
         (Some(validator), Some(true)) => {
             where_clauses.push(format!("channels.leader = ${}", params.len() + 1));
             params.push(validator);
-        },
+        }
         (Some(validator), _) => {
-            where_clauses.push(format!("(channels.leader = ${} OR channels.follower = ${})", params.len() + 1, params.len() + 1));
+            where_clauses.push(format!(
+                "(channels.leader = ${} OR channels.follower = ${})",
+                params.len() + 1,
+                params.len() + 1
+            ));
             params.push(validator);
-        },
-        _ => ()
+        }
+        _ => (),
     }
 
     (where_clauses, params)
@@ -486,12 +490,11 @@ mod test {
         sentry::campaign_create::ModifyCampaign,
         targeting::Rules,
         util::tests::prep_db::{
-            ADDRESSES, DUMMY_AD_UNITS, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_DIFFERENT_LEADER,
-            DUMMY_VALIDATOR_FOLLOWER, IDS,
+            ADDRESSES, DUMMY_AD_UNITS, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER, IDS,
         },
-        EventSubmission, UnifiedNum,
+        EventSubmission, UnifiedNum, ValidatorDesc,
     };
-    use std::time::Duration;
+    use std::{convert::TryFrom, time::Duration};
     use tokio_postgres::error::SqlState;
 
     use crate::db::{
@@ -583,18 +586,15 @@ mod test {
         }
     }
 
-    async fn insert_multiple_campaigns_with_different_channels(pool: &DbPool) {
+    async fn insert_multiple_campaigns_with_different_channels(
+        pool: &DbPool,
+    ) -> Result<(), PoolError> {
         let campaign = DUMMY_CAMPAIGN.clone();
         let mut channel_with_different_leader = DUMMY_CAMPAIGN.channel;
         channel_with_different_leader.leader = IDS["user"];
 
-        let _channel = insert_channel(&pool, DUMMY_CAMPAIGN.channel)
-            .await
-            .expect("Should insert");
-
-        let _channel = insert_channel(&pool, channel_with_different_leader)
-            .await
-            .expect("Should insert");
+        insert_channel(&pool, DUMMY_CAMPAIGN.channel).await?;
+        insert_channel(&pool, channel_with_different_leader).await?;
 
         let mut campaign_2 = DUMMY_CAMPAIGN.clone();
         campaign_2.id = CampaignId::new();
@@ -607,35 +607,23 @@ mod test {
         let mut campaign_4 = DUMMY_CAMPAIGN.clone();
         campaign_4.id = CampaignId::new();
 
+        let different_leader: ValidatorDesc = ValidatorDesc {
+            id: ValidatorId::try_from("0x20754168c00a6e58116ccfd0a5f7d1bb66c5de9d")
+                .expect("Failed to parse DUMMY_VALIDATOR_DIFFERENT_LEADER id"),
+            url: "http://localhost:8005".to_string(),
+            fee: 100.into(),
+            fee_addr: None,
+        };
         campaign_4.channel = channel_with_different_leader;
-        campaign_4.validators = Validators::new((
-            DUMMY_VALIDATOR_DIFFERENT_LEADER.clone(),
-            DUMMY_VALIDATOR_FOLLOWER.clone(),
-        ));
+        campaign_4.validators =
+            Validators::new((different_leader.clone(), DUMMY_VALIDATOR_FOLLOWER.clone()));
 
-        let is_inserted = insert_campaign(&pool, &campaign)
-            .await
-            .expect("Should succeed");
+        insert_campaign(&pool, &campaign).await?;
+        insert_campaign(&pool, &campaign_2).await?;
+        insert_campaign(&pool, &campaign_3).await?;
+        insert_campaign(&pool, &campaign_4).await?;
 
-        assert!(is_inserted);
-
-        let is_inserted = insert_campaign(&pool, &campaign_2)
-            .await
-            .expect("Should succeed");
-
-        assert!(is_inserted);
-
-        let is_inserted = insert_campaign(&pool, &campaign_3)
-            .await
-            .expect("Should succeed");
-
-        assert!(is_inserted);
-
-        let is_inserted = insert_campaign(&pool, &campaign_4)
-            .await
-            .expect("Should succeed");
-
-        assert!(is_inserted);
+        Ok(())
     }
 
     #[tokio::test]
@@ -646,7 +634,9 @@ mod test {
             .await
             .expect("Migrations should succeed");
 
-        insert_multiple_campaigns_with_different_channels(&database.pool).await;
+        insert_multiple_campaigns_with_different_channels(&database.pool)
+            .await
+            .expect("should insert test campaigns and channels");
 
         // 2 out of 3 results
         let first_page = list_campaigns(

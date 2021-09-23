@@ -76,13 +76,6 @@ lazy_static! {
         fee_addr: None,
     };
 
-    pub static ref DUMMY_VALIDATOR_DIFFERENT_LEADER: ValidatorDesc = ValidatorDesc {
-        id: ValidatorId::try_from("0x20754168c00a6e58116ccfd0a5f7d1bb66c5de9d").expect("Failed to parse DUMMY_VALIDATOR_DIFFERENT_LEADER id"),
-        url: "http://localhost:8005".to_string(),
-        fee: 100.into(),
-        fee_addr: None,
-    };
-
     pub static ref DUMMY_VALIDATOR_FOLLOWER: ValidatorDesc = ValidatorDesc {
         id:  ValidatorId::try_from("c91763d7f14ac5c5ddfbcd012e0d2a61ab9bded3").expect("Failed to parse DUMMY_VALIDATOR_FOLLOWER id "),
         url: "http://localhost:8006".to_string(),
