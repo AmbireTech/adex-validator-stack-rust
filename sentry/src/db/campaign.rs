@@ -38,7 +38,7 @@ pub async fn insert_campaign(pool: &DbPool, campaign: &Campaign) -> Result<bool,
 }
 
 /// ```text
-/// SELECT campaign.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaign.created, active_from, active_to,
+/// SELECT campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to,
 /// channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce
 /// FROM campaigns INNER JOIN channels
 /// ON campaigns.channel_id=channels.id
@@ -60,7 +60,7 @@ pub async fn fetch_campaign(
 
 // TODO: We might need to use LIMIT to implement pagination
 /// ```text
-/// SELECT campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, created, active_from, active_to,
+/// SELECT campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to,
 /// channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce
 /// FROM campaigns INNER JOIN channels
 /// ON campaigns.channel_id=channels.id WHERE campaigns.channel_id = $1
@@ -81,7 +81,10 @@ pub async fn get_campaigns_by_channel(
 }
 
 /// ```text
-/// UPDATE campaigns SET budget = $1, validators = $2, title = $3, pricing_bounds = $4, event_submission = $5, ad_units = $6, targeting_rules = $7 FROM campaigns INNER JOIN channels ON campaigns.channel_id=channels.id WHERE campaigns.id = $8  RETURNING campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaign.created, active_from, active_to, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce
+/// UPDATE campaigns SET budget = $1, validators = $2, title = $3, pricing_bounds = $4, event_submission = $5, ad_units = $6, targeting_rules = $7
+/// FROM channels WHERE campaigns.id = $8 AND campaigns.channel_id=channels.id
+/// RETURNING campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to,
+/// channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce
 /// ```
 pub async fn update_campaign(pool: &DbPool, campaign: &Campaign) -> Result<Campaign, PoolError> {
     let client = pool.get().await?;
