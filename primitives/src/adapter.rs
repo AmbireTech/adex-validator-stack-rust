@@ -1,6 +1,4 @@
-use crate::{
-    Channel, Address, BigNum, ValidatorId,
-};
+use crate::{Address, BigNum, Channel, ValidatorId};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::From, fmt};

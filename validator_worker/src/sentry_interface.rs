@@ -8,7 +8,7 @@ use slog::Logger;
 use primitives::{
     adapter::Adapter,
     balances::{CheckedState, UncheckedState},
-    channel_v5::Channel,
+    channel::Channel,
     sentry::{
         AccountingResponse, EventAggregateResponse, LastApprovedResponse, SuccessResponse,
         ValidatorMessageResponse,
@@ -281,7 +281,7 @@ async fn propagate_to<A: Adapter>(
 mod channels {
     use futures::{future::try_join_all, TryFutureExt};
     use primitives::{
-        channel_v5::Channel,
+        channel::Channel,
         sentry::channel_list::{ChannelListQuery, ChannelListResponse},
         util::ApiUrl,
         ValidatorId,

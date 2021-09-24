@@ -22,13 +22,13 @@ fn get_default_input() -> Input {
             publisher_id: ADDRESSES["leader"],
             country: Some("bg".to_string()),
             event_type: "IMPRESSION".to_string(),
-            seconds_since_epoch: Utc.ymd(2020, 11, 06).and_hms(12, 0, 0),
+            seconds_since_epoch: Utc.ymd(2020, 11, 6).and_hms(12, 0, 0),
             user_agent_os: Some("os".to_string()),
             user_agent_browser_family: Some("family".to_string()),
         },
         campaign: None,
         balances: None,
-        ad_unit_id: Some(DUMMY_IPFS[0].clone()),
+        ad_unit_id: Some(DUMMY_IPFS[0]),
         ad_slot: None,
     };
 
@@ -915,11 +915,11 @@ mod control_flow_and_logic {
 
         let rule = Rule::Function(Function::new_if_else(
             Value::Bool(false),
-            if_true.clone(),
+            if_true,
             if_false.clone(),
         ));
 
-        assert_eq!(Ok(Some(if_false.clone())), rule.eval(&input, &mut output));
+        assert_eq!(Ok(Some(if_false)), rule.eval(&input, &mut output));
     }
     #[test]
     fn test_or_eval() {
@@ -1270,7 +1270,7 @@ mod string_and_array {
 
         let rule = Rule::Function(Function::new_at(arr.clone(), index));
         assert_eq!(Ok(Some(at_index)), rule.eval(&input, &mut output));
-        let broken_rule = Rule::Function(Function::new_at(arr.clone(), out_of_range));
+        let broken_rule = Rule::Function(Function::new_at(arr, out_of_range));
         assert_eq!(Err(Error::TypeError), broken_rule.eval(&input, &mut output));
     }
     #[test]

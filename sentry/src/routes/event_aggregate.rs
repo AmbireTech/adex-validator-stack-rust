@@ -3,7 +3,7 @@ use hyper::{Body, Request, Response};
 use serde::Deserialize;
 
 use primitives::{
-    adapter::Adapter, channel_v5::Channel, sentry::EventAggregateResponse,
+    adapter::Adapter, channel::Channel, sentry::EventAggregateResponse,
 };
 
 use crate::{success_response, Application, Auth, ResponseError};

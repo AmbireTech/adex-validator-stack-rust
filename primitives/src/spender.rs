@@ -1,4 +1,4 @@
-use crate::{channel_v5::Channel, Address, Deposit, UnifiedNum};
+use crate::{channel::Channel, Address, Deposit, UnifiedNum};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

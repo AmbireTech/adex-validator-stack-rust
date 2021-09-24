@@ -1,4 +1,9 @@
-use crate::{Address, Balances, BigNum, Channel, ChannelId, IPFS, ValidatorId, balances::BalancesState, spender::Spender, validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType}};
+use crate::{
+    balances::BalancesState,
+    spender::Spender,
+    validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
+    Address, Balances, BigNum, Channel, ChannelId, ValidatorId, IPFS,
+};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt, hash::Hash};
@@ -295,7 +300,7 @@ impl fmt::Display for ChannelReport {
 }
 
 pub mod channel_list {
-    use crate::{channel_v5::Channel, ValidatorId};
+    use crate::{channel::Channel, ValidatorId};
     use serde::{Deserialize, Serialize};
 
     use super::Pagination;
@@ -355,7 +360,7 @@ pub mod campaign_create {
 
     use crate::{
         campaign::{prefix_active, Active, PricingBounds, Validators},
-        channel_v5::Channel,
+        channel::Channel,
         targeting::Rules,
         AdUnit, Address, Campaign, CampaignId, EventSubmission, UnifiedNum,
     };
@@ -564,8 +569,8 @@ mod test {
     pub fn de_serialize_events() {
         let click = Event::Click {
             publisher: ADDRESSES["publisher"],
-            ad_unit: Some(DUMMY_IPFS[0].clone()),
-            ad_slot: Some(DUMMY_IPFS[1].clone()),
+            ad_unit: Some(DUMMY_IPFS[0]),
+            ad_slot: Some(DUMMY_IPFS[1]),
             referrer: Some("some_referrer".to_string()),
         };
 

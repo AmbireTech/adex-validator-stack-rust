@@ -13,7 +13,7 @@ use hyper::{Body, Request, Response};
 use primitives::{
     adapter::{Adapter, AdapterErrorKind, Error as AdapterError},
     campaign_validator::Validator,
-    channel_v5::Channel,
+    channel::Channel,
     config::TokenInfo,
     sentry::campaign_create::{CreateCampaign, ModifyCampaign},
     spender::Spendable,

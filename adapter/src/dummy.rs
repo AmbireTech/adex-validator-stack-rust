@@ -5,7 +5,7 @@ use primitives::{
         Adapter, AdapterErrorKind, AdapterResult, Deposit, DummyAdapterOptions,
         Error as AdapterError, Session,
     },
-    channel_v5::Channel,
+    channel::Channel,
     config::Config,
     Address, ChannelId, ToETHChecksum, ValidatorId,
 };

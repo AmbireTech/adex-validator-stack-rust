@@ -4,7 +4,7 @@ use thiserror::Error;
 use primitives::{
     adapter::{Adapter, AdapterErrorKind, Error as AdapterError},
     balances::CheckedState,
-    channel_v5::Channel,
+    channel::Channel,
     config::TokenInfo,
     validator::{MessageError, MessageTypes, NewState},
     Balances, ChannelId,

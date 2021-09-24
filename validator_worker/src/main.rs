@@ -14,7 +14,7 @@ use tokio::{
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
 use primitives::{
     adapter::{Adapter, DummyAdapterOptions, KeystoreOptions},
-    // channel_v5::Channel as ChannelV5,
+    // channel::Channel as ChannelV5,
     config::{configuration, Config},
     util::tests::prep_db::{AUTH, IDS},
     util::ApiUrl,

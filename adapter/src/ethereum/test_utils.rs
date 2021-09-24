@@ -10,7 +10,7 @@ use web3::{
 
 use primitives::{
     adapter::KeystoreOptions,
-    channel_v5::{Channel, Nonce},
+    channel::{Channel, Nonce},
     config::{configuration, TokenInfo},
     Address, BigNum, ValidatorId,
 };
