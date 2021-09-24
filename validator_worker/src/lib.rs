@@ -24,18 +24,34 @@ pub mod core {
 }
 
 #[derive(Debug, Error)]
-pub enum StateRootHashError {
+pub enum GetStateRootError {
     #[error("Failed to get balance leaf")]
     BalanceLeaf(#[from] BalanceLeafError),
     #[error(transparent)]
     MerkleTree(#[from] MerkleTreeError),
 }
 
-pub(crate) fn get_state_root_hash(
+pub trait GetStateRoot {
+    /// Hashes the struct to produce a StateRoot `[u8; 32]`
+    fn hash(&self, channel: ChannelId, token_precision: u8) -> Result<[u8; 32], GetStateRootError>;
+
+    /// Calls `hash()` and then `hex::encode`s the result ready to be used in a Validator Message
+    fn encode(&self, channel: ChannelId, token_precision: u8) -> Result<String, GetStateRootError> {
+        self.hash(channel, token_precision).map(hex::encode)
+    }
+}
+
+impl GetStateRoot for Balances<CheckedState> {
+    fn hash(&self, channel: ChannelId, token_precision: u8) -> Result<[u8; 32], GetStateRootError> {
+        get_state_root_hash(channel, self, token_precision)
+    }
+}
+
+fn get_state_root_hash(
     channel: ChannelId,
     balances: &Balances<CheckedState>,
     token_precision: u8,
-) -> Result<[u8; 32], StateRootHashError> {
+) -> Result<[u8; 32], GetStateRootError> {
     let spenders = balances.spenders.iter().map(|(address, amount)| {
         get_balance_leaf(true, address, &amount.to_precision(token_precision))
     });

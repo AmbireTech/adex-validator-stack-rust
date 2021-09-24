@@ -10,12 +10,7 @@ use primitives::{
     Balances, ChannelId,
 };
 
-use crate::{
-    get_state_root_hash,
-    heartbeat::{heartbeat, Error as HeartbeatError, HeartbeatStatus},
-    sentry_interface::{Error as SentryApiError, PropagationResult, SentryApi},
-    StateRootHashError,
-};
+use crate::{GetStateRoot, GetStateRootError, heartbeat::{heartbeat, Error as HeartbeatError, HeartbeatStatus}, sentry_interface::{Error as SentryApiError, PropagationResult, SentryApi}};
 
 #[derive(Debug)]
 pub struct TickStatus {
@@ -29,7 +24,7 @@ pub enum Error<AE: AdapterErrorKind + 'static> {
     #[error("SentryApi: {0}")]
     SentryApi(#[from] SentryApiError),
     #[error("StateRootHash: {0}")]
-    StateRootHash(#[from] StateRootHashError),
+    StateRootHash(#[from] GetStateRootError),
     #[error("Adapter: {0}")]
     Adapter(#[from] AdapterError<AE>),
     #[error("Heartbeat: {0}")]
@@ -108,8 +103,7 @@ async fn on_new_accounting<A: Adapter + 'static>(
     accounting_balances: Balances<CheckedState>,
     token: &TokenInfo,
 ) -> Result<Vec<PropagationResult>, Error<A::AdapterError>> {
-    let state_root_raw = get_state_root_hash(channel, &accounting_balances, token.precision.get())?;
-    let state_root = hex::encode(state_root_raw);
+    let state_root = accounting_balances.encode(channel, token.precision.get())?;
 
     let signature = sentry.adapter.sign(&state_root)?;
 
