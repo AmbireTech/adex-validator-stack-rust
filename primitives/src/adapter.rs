@@ -1,5 +1,5 @@
 use crate::{
-    channel::ChannelError, channel_v5::Channel, Address, BigNum, DomainError, ValidatorId,
+    Channel, Address, BigNum, ValidatorId,
 };
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -14,11 +14,9 @@ pub type Deposit = crate::Deposit<BigNum>;
 pub enum Error<AE: AdapterErrorKind> {
     Authentication(String),
     Authorization(String),
-    InvalidChannel(ChannelError),
     /// Adapter specific errors
     // Since we don't know the size of the Adapter Error we use a Box to limit the size of this enum
     Adapter(Box<AE>),
-    Domain(DomainError),
     /// You need to `.unlock()` the wallet first
     LockedWallet,
 }
@@ -36,17 +34,9 @@ impl<AE: AdapterErrorKind> fmt::Display for Error<AE> {
         match self {
             Error::Authentication(error) => write!(f, "Authentication: {}", error),
             Error::Authorization(error) => write!(f, "Authorization: {}", error),
-            Error::InvalidChannel(error) => write!(f, "{}", error),
             Error::Adapter(error) => write!(f, "Adapter: {}", *error),
-            Error::Domain(error) => write!(f, "Domain: {}", error),
             Error::LockedWallet => write!(f, "You must `.unlock()` the wallet first"),
         }
-    }
-}
-
-impl<AE: AdapterErrorKind> From<DomainError> for Error<AE> {
-    fn from(err: DomainError) -> Error<AE> {
-        Error::Domain(err)
     }
 }
 
