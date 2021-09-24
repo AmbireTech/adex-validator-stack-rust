@@ -12,7 +12,9 @@ pub async fn get_channel_by_id(
     let client = pool.get().await?;
 
     let select = client
-        .prepare("SELECT leader, follower, guardian, token, nonce FROM channels WHERE id = $1 LIMIT 1")
+        .prepare(
+            "SELECT leader, follower, guardian, token, nonce FROM channels WHERE id = $1 LIMIT 1",
+        )
         .await?;
 
     let row = client.query_opt(&select, &[&id]).await?;
