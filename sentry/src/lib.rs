@@ -213,7 +213,9 @@ async fn analytics_router<A: Adapter + 'static>(
     mut req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
-    use routes::analytics::{advanced_analytics, advertiser_analytics, analytics, publisher_analytics};
+    use routes::analytics::{
+        advanced_analytics, advertiser_analytics, analytics, publisher_analytics,
+    };
 
     let (route, method) = (req.uri().path(), req.method());
 
@@ -279,8 +281,8 @@ async fn analytics_router<A: Adapter + 'static>(
             } else {
                 Err(ResponseError::NotFound)
             }
-        },
-        _ => Err(ResponseError::NotFound)
+        }
+        _ => Err(ResponseError::NotFound),
     }
 }
 

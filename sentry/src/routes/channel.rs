@@ -2,7 +2,7 @@ use crate::db::{
     event_aggregate::{latest_approve_state_v5, latest_heartbeats, latest_new_state_v5},
     insert_channel, insert_validator_messages, list_channels,
     spendable::{fetch_spendable, get_all_spendables_for_channel, update_spendable},
-    DbPool, PoolError,
+    DbPool,
 };
 use crate::{success_response, Application, Auth, ResponseError, RouteParams};
 use futures::future::try_join_all;
@@ -10,7 +10,6 @@ use hyper::{Body, Request, Response};
 use primitives::{
     adapter::Adapter,
     balances::{CheckedState, UncheckedState},
-    Channel,
     config::TokenInfo,
     sentry::{
         channel_list::ChannelListQuery, AllSpendersResponse, LastApproved, LastApprovedQuery,
@@ -22,7 +21,6 @@ use primitives::{
 };
 use slog::{error, Logger};
 use std::{collections::HashMap, str::FromStr};
-use tokio_postgres::error::SqlState;
 
 pub async fn channel_list<A: Adapter>(
     req: Request<Body>,

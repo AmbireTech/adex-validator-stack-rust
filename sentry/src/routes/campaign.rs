@@ -294,7 +294,7 @@ pub mod update_campaign {
                 .ok_or(Error::ChannelTokenNotWhitelisted)?;
 
             let latest_spendable =
-                update_latest_spendable(&adapter, &pool, campaign.channel, token, campaign.creator)
+                update_latest_spendable(&adapter, pool, campaign.channel, token, campaign.creator)
                     .await?;
 
             // Gets the latest Spendable for this (spender, channelId) pair
