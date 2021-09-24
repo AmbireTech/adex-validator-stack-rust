@@ -1,10 +1,4 @@
-use crate::{
-    balances::BalancesState,
-    channel::Channel as ChannelOld,
-    spender::Spender,
-    validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
-    Address, Balances, BigNum, ChannelId, ValidatorId, IPFS,
-};
+use crate::{Address, Balances, BigNum, Channel, ChannelId, IPFS, ValidatorId, balances::BalancesState, spender::Spender, validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType}};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt, hash::Hash};
@@ -241,7 +235,7 @@ pub struct ValidatorMessageResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct EventAggregateResponse {
-    pub channel: ChannelOld,
+    pub channel: Channel,
     pub events: Vec<EventAggregate>,
 }
 

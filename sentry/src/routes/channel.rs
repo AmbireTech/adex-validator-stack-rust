@@ -10,8 +10,7 @@ use hyper::{Body, Request, Response};
 use primitives::{
     adapter::Adapter,
     balances::{CheckedState, UncheckedState},
-    channel::Channel as ChannelOld,
-    channel_v5::Channel as ChannelV5,
+    Channel,
     config::TokenInfo,
     sentry::{
         channel_list::ChannelListQuery, AllSpendersResponse, LastApproved, LastApprovedQuery,
@@ -24,64 +23,6 @@ use primitives::{
 use slog::{error, Logger};
 use std::{collections::HashMap, str::FromStr};
 use tokio_postgres::error::SqlState;
-
-pub async fn channel_status<A: Adapter>(
-    req: Request<Body>,
-    _: &Application<A>,
-) -> Result<Response<Body>, ResponseError> {
-    use serde::Serialize;
-    #[derive(Serialize)]
-    struct ChannelStatusResponse<'a> {
-        channel: &'a ChannelOld,
-    }
-
-    let channel = req
-        .extensions()
-        .get::<ChannelOld>()
-        .expect("Request should have Channel");
-
-    let response = ChannelStatusResponse { channel };
-
-    Ok(success_response(serde_json::to_string(&response)?))
-}
-
-#[deprecated = "V5 Channel no longer needs creation of channel route"]
-pub async fn create_channel<A: Adapter>(
-    req: Request<Body>,
-    app: &Application<A>,
-) -> Result<Response<Body>, ResponseError> {
-    let body = hyper::body::to_bytes(req.into_body()).await?;
-
-    let channel = serde_json::from_slice::<ChannelV5>(&body)
-        .map_err(|e| ResponseError::FailedValidation(e.to_string()))?;
-
-    // TODO AIP#61: No longer needed, remove!
-    // if let Err(e) = app.adapter.validate_channel(&channel).await {
-    //     return Err(ResponseError::BadRequest(e.to_string()));
-    // }
-
-    let error_response = ResponseError::BadRequest("err occurred; please try again later".into());
-
-    match insert_channel(&app.pool, channel).await {
-        Err(error) => {
-            error!(&app.logger, "{}", &error; "module" => "create_channel");
-
-            match error {
-                PoolError::Backend(error) if error.code() == Some(&SqlState::UNIQUE_VIOLATION) => {
-                    Err(ResponseError::Conflict(
-                        "channel already exists".to_string(),
-                    ))
-                }
-                _ => Err(error_response),
-            }
-        }
-        _ => Ok(()),
-    }?;
-
-    let create_response = SuccessResponse { success: true };
-
-    Ok(success_response(serde_json::to_string(&create_response)?))
-}
 
 pub async fn channel_list<A: Adapter>(
     req: Request<Body>,
@@ -102,17 +43,6 @@ pub async fn channel_list<A: Adapter>(
     .await?;
 
     Ok(success_response(serde_json::to_string(&list_response)?))
-}
-
-pub async fn channel_validate<A: Adapter>(
-    req: Request<Body>,
-    _: &Application<A>,
-) -> Result<Response<Body>, ResponseError> {
-    let body = hyper::body::to_bytes(req.into_body()).await?;
-    let _channel = serde_json::from_slice::<Channel>(&body)
-        .map_err(|e| ResponseError::FailedValidation(e.to_string()))?;
-    let create_response = SuccessResponse { success: true };
-    Ok(success_response(serde_json::to_string(&create_response)?))
 }
 
 pub async fn last_approved<A: Adapter>(
@@ -190,7 +120,7 @@ pub async fn create_validator_messages<A: Adapter + 'static>(
 
     let channel = req
         .extensions()
-        .get::<ChannelV5>()
+        .get::<Channel>()
         .expect("Request should have Channel")
         .to_owned();
 
@@ -222,7 +152,7 @@ async fn create_or_update_spendable_document(
     adapter: &impl Adapter,
     token_info: &TokenInfo,
     pool: DbPool,
-    channel: &ChannelV5,
+    channel: &Channel,
     spender: Address,
 ) -> Result<Spendable, ResponseError> {
     insert_channel(&pool, *channel).await?;
@@ -278,7 +208,7 @@ pub async fn get_spender_limits<A: Adapter + 'static>(
 
     let channel = req
         .extensions()
-        .get::<ChannelV5>()
+        .get::<Channel>()
         .expect("Request should have Channel")
         .to_owned();
 
@@ -334,7 +264,7 @@ pub async fn get_all_spender_limits<A: Adapter + 'static>(
 ) -> Result<Response<Body>, ResponseError> {
     let channel = req
         .extensions()
-        .get::<ChannelV5>()
+        .get::<Channel>()
         .expect("Request should have Channel")
         .to_owned();
 
@@ -385,7 +315,7 @@ pub async fn get_all_spender_limits<A: Adapter + 'static>(
 async fn get_corresponding_new_state(
     pool: &DbPool,
     logger: &Logger,
-    channel: &ChannelV5,
+    channel: &Channel,
 ) -> Result<Option<NewState<CheckedState>>, ResponseError> {
     let approve_state = match latest_approve_state_v5(pool, channel).await? {
         Some(approve_state) => approve_state,

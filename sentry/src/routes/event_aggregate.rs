@@ -3,7 +3,7 @@ use hyper::{Body, Request, Response};
 use serde::Deserialize;
 
 use primitives::{
-    adapter::Adapter, channel::Channel as ChannelOld, sentry::EventAggregateResponse,
+    adapter::Adapter, channel_v5::Channel, sentry::EventAggregateResponse,
 };
 
 use crate::{success_response, Application, Auth, ResponseError};
@@ -14,14 +14,14 @@ pub struct EventAggregatesQuery {
     #[allow(dead_code)]
     after: Option<DateTime<Utc>>,
 }
-
+#[deprecated = "V5 - Double check what is need from the event aggregates from V4"]
 pub async fn list_channel_event_aggregates<A: Adapter>(
     req: Request<Body>,
     _app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
     let channel = req
         .extensions()
-        .get::<ChannelOld>()
+        .get::<Channel>()
         .expect("Request should have Channel");
 
     let auth = req
@@ -32,11 +32,7 @@ pub async fn list_channel_event_aggregates<A: Adapter>(
     let _query =
         serde_urlencoded::from_str::<EventAggregatesQuery>(req.uri().query().unwrap_or(""))?;
 
-    let _from = if channel.spec.validators.find(&auth.uid).is_some() {
-        None
-    } else {
-        Some(auth.uid)
-    };
+    let _from = channel.find_validator(auth.uid);
 
     let event_aggregates = vec![];
     // let event_aggregates = list_event_aggregates(
@@ -49,7 +45,7 @@ pub async fn list_channel_event_aggregates<A: Adapter>(
     // .await?;
 
     let response = EventAggregateResponse {
-        channel: channel.clone(),
+        channel: channel,
         events: event_aggregates,
     };
 

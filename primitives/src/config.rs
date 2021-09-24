@@ -2,9 +2,7 @@ use crate::{event_submission::RateLimit, Address, BigNum, ValidatorId};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_hex::{SerHex, StrictPfx};
-use std::collections::HashMap;
-use std::fs;
-use std::num::NonZeroU8;
+use std::{collections::HashMap, fs, num::NonZeroU8};
 
 lazy_static! {
     static ref DEVELOPMENT_CONFIG: Config =
@@ -29,13 +27,21 @@ pub struct Config {
     pub channels_find_limit: u32,
     pub wait_time: u32,
     pub aggr_throttle: u32,
+    #[deprecated = "For V5 this should probably be part of the Analytics"]
     pub events_find_limit: u32,
     pub msgs_find_limit: u32,
-    pub heartbeat_time: u32, // in milliseconds
+    pub analytics_find_limit_v5: u32,
+    // in milliseconds
+    pub analytics_maxtime: u32,
+    // in milliseconds
+    pub heartbeat_time: u32,
     pub health_threshold_promilles: u32,
     pub health_unsignable_promilles: u32,
-    pub propagation_timeout: u32,
+    /// in milliseconds
+    /// set's the Client timeout for [`SentryApi`]
+    /// This includes requests made for propagating new messages
     pub fetch_timeout: u32,
+    /// in milliseconds
     pub validator_tick_timeout: u32,
     pub ip_rate_limit: RateLimit,  // HashMap??
     pub sid_rate_limit: RateLimit, // HashMap ??
