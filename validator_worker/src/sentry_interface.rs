@@ -255,7 +255,7 @@ async fn propagate_to<A: Adapter>(
 pub mod channels {
     use futures::{future::try_join_all, TryFutureExt};
     use primitives::{
-        channel_v5::Channel,
+        channel::Channel,
         sentry::channel_list::{ChannelListQuery, ChannelListResponse},
         util::ApiUrl,
         ValidatorId,

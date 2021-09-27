@@ -4,7 +4,7 @@ use primitives::{
     adapter::{Adapter, AdapterErrorKind, Error as AdapterError},
     balances,
     balances::{Balances, CheckedState, UncheckedState},
-    channel_v5::Channel,
+    channel::Channel,
     config::TokenInfo,
     spender::Spender,
     validator::{ApproveState, MessageTypes, NewState, RejectState},
