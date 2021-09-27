@@ -26,6 +26,7 @@ pub struct Config {
     pub max_channels: u32,
     pub channels_find_limit: u32,
     pub wait_time: u32,
+    #[deprecated = "redundant V4 value. No aggregates are needed for V5"]
     pub aggr_throttle: u32,
     #[deprecated = "For V5 this should probably be part of the Analytics"]
     pub events_find_limit: u32,
