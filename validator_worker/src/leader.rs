@@ -10,7 +10,11 @@ use primitives::{
     Balances, ChannelId,
 };
 
-use crate::{GetStateRoot, GetStateRootError, heartbeat::{heartbeat, Error as HeartbeatError, HeartbeatStatus}, sentry_interface::{Error as SentryApiError, PropagationResult, SentryApi}};
+use crate::{
+    heartbeat::{heartbeat, Error as HeartbeatError, HeartbeatStatus},
+    sentry_interface::{Error as SentryApiError, PropagationResult, SentryApi},
+    GetStateRoot, GetStateRootError,
+};
 
 #[derive(Debug)]
 pub struct TickStatus {

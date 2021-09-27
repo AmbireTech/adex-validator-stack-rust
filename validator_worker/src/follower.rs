@@ -12,9 +12,10 @@ use primitives::{
 };
 
 use crate::{
-    GetStateRootError, GetStateRoot, core::follower_rules::{get_health, is_valid_transition},
+    core::follower_rules::{get_health, is_valid_transition},
     heartbeat::{heartbeat, HeartbeatStatus},
     sentry_interface::{Error as SentryApiError, PropagationResult, SentryApi},
+    GetStateRoot, GetStateRootError,
 };
 use chrono::Utc;
 use thiserror::Error;
@@ -163,10 +164,7 @@ async fn on_new_state<'a, A: Adapter + 'static>(
 
     let proposed_state_root = new_state.state_root.clone();
 
-
-    if proposed_state_root
-        != proposed_balances.encode(channel.id(), token_info.precision.get())?
-    {
+    if proposed_state_root != proposed_balances.encode(channel.id(), token_info.precision.get())? {
         return Ok(on_error(sentry, channel.id(), new_state, InvalidNewState::RootHash).await);
     }
 

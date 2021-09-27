@@ -2,7 +2,7 @@ use std::{collections::HashMap, time::Duration};
 
 use chrono::{DateTime, Utc};
 use futures::future::{join_all, TryFutureExt};
-use reqwest::Client;
+use reqwest::{Client, Method};
 use slog::Logger;
 
 use primitives::{
@@ -91,7 +91,13 @@ impl<A: Adapter + 'static> SentryApi<A> {
         messages: &[&MessageTypes],
     ) -> Vec<PropagationResult> {
         join_all(self.propagate_to.iter().map(|(validator_id, validator)| {
-            propagate_to::<A>(&self.client, channel, (*validator_id, validator), messages)
+            propagate_to::<A>(
+                &self.client,
+                self.config.propagation_timeout,
+                channel,
+                (*validator_id, validator),
+                messages,
+            )
         }))
         .await
     }
@@ -226,6 +232,7 @@ impl<A: Adapter + 'static> SentryApi<A> {
 
 async fn propagate_to<A: Adapter>(
     client: &Client,
+    timeout: u32,
     channel_id: ChannelId,
     (validator_id, validator): (ValidatorId, &Validator),
     messages: &[&MessageTypes],
@@ -239,7 +246,8 @@ async fn propagate_to<A: Adapter>(
     body.insert("messages", messages);
 
     let _response: SuccessResponse = client
-        .post(endpoint)
+        .request(Method::POST, endpoint)
+        .timeout(Duration::from_millis(timeout.into()))
         .bearer_auth(&validator.token)
         .json(&body)
         .send()
