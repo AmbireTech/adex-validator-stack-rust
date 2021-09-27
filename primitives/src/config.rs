@@ -1,17 +1,17 @@
 use crate::{event_submission::RateLimit, Address, BigNum, ValidatorId};
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 use std::{collections::HashMap, fs, num::NonZeroU8};
 
-lazy_static! {
-    static ref DEVELOPMENT_CONFIG: Config =
-        toml::from_str(include_str!("../../docs/config/dev.toml"))
-            .expect("Failed to parse dev.toml config file");
-    static ref PRODUCTION_CONFIG: Config =
-        toml::from_str(include_str!("../../docs/config/prod.toml"))
-            .expect("Failed to parse prod.toml config file");
-}
+static DEVELOPMENT_CONFIG: Lazy<Config> = Lazy::new(|| {
+    toml::from_str(include_str!("../../docs/config/dev.toml"))
+        .expect("Failed to parse dev.toml config file")
+});
+static PRODUCTION_CONFIG: Lazy<Config> = Lazy::new(|| {
+    toml::from_str(include_str!("../../docs/config/prod.toml"))
+        .expect("Failed to parse prod.toml config file")
+});
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TokenInfo {
@@ -32,7 +32,7 @@ pub struct Config {
     pub msgs_find_limit: u32,
     pub analytics_find_limit_v5: u32,
     // in milliseconds
-    pub analytics_maxtime: u32,
+    pub analytics_maxtime_v5: u32,
     // in milliseconds
     pub heartbeat_time: u32,
     pub health_threshold_promilles: u32,
