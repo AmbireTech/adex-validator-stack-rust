@@ -183,16 +183,6 @@ impl<A: Adapter + 'static> Application<A> {
 
                 create_campaign(req, self).await
             }
-            ("/v5/campaign/list", &Method::GET) => {
-                let req = match AuthRequired.call(req, self).await {
-                    Ok(req) => req,
-                    Err(error) => {
-                        return map_response_error(error);
-                    }
-                };
-
-                campaign_list(req, self).await
-            }
             (route, _) if route.starts_with("/analytics") => analytics_router(req, self).await,
             // This is important because it prevents us from doing
             // expensive regex matching for routes without /channel
@@ -246,6 +236,10 @@ async fn campaigns_router<A: Adapter + 'static>(
         // }
 
         Err(ResponseError::NotFound)
+    } else if method == &Method::POST && path == "/v5/campaign/list" {
+        req = AuthRequired.call(req, app).await?;
+
+        campaign_list(req, app).await
     } else {
         Err(ResponseError::NotFound)
     }

@@ -222,13 +222,11 @@ pub async fn campaign_list<A: Adapter>(
     let mut query =
         serde_urlencoded::from_str::<CampaignListQuery>(req.uri().query().unwrap_or(""))?;
 
-    if query.validator.is_none() {
-        let session = req
-            .extensions()
-            .get::<Auth>()
-            .expect("Auth should exist once we're here");
-        query.validator = Some(session.uid);
-    }
+    query.validator = match (query.validator, req.extensions().get::<Auth>()) {
+        (Some(validator), _) => Some(validator),
+        (None, Some(session)) => Some(session.uid),
+        (None, None) => None,
+    };
 
     let limit = 100; // TODO: Use a value from config
     let skip = query

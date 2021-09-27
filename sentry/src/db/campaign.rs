@@ -127,9 +127,8 @@ fn campaign_list_query_params<'a>(
         }
         (Some(validator), _) => {
             where_clauses.push(format!(
-                "(channels.leader = ${} OR channels.follower = ${})",
-                params.len() + 1,
-                params.len() + 1
+                "(channels.leader = ${x} OR channels.follower = ${x})",
+                x = params.len() + 1,
             ));
             params.push(validator);
         }
@@ -588,7 +587,7 @@ mod test {
 
     async fn insert_multiple_campaigns_with_different_channels(
         pool: &DbPool,
-    ) -> Result<(), PoolError> {
+    ) -> Result<Vec<Campaign>, PoolError> {
         let campaign = DUMMY_CAMPAIGN.clone();
         let mut channel_with_different_leader = DUMMY_CAMPAIGN.channel;
         channel_with_different_leader.leader = IDS["user"];
@@ -596,16 +595,16 @@ mod test {
         insert_channel(&pool, DUMMY_CAMPAIGN.channel).await?;
         insert_channel(&pool, channel_with_different_leader).await?;
 
-        let mut campaign_2 = DUMMY_CAMPAIGN.clone();
-        campaign_2.id = CampaignId::new();
+        let mut campaign_new_id = DUMMY_CAMPAIGN.clone();
+        campaign_new_id.id = CampaignId::new();
 
         // campaign with a different creator
-        let mut campaign_3 = DUMMY_CAMPAIGN.clone();
-        campaign_3.id = CampaignId::new();
-        campaign_3.creator = ADDRESSES["tester"];
+        let mut campaign_new_creator = DUMMY_CAMPAIGN.clone();
+        campaign_new_creator.id = CampaignId::new();
+        campaign_new_creator.creator = ADDRESSES["tester"];
 
-        let mut campaign_4 = DUMMY_CAMPAIGN.clone();
-        campaign_4.id = CampaignId::new();
+        let mut campaign_new_leader = DUMMY_CAMPAIGN.clone();
+        campaign_new_leader.id = CampaignId::new();
 
         let different_leader: ValidatorDesc = ValidatorDesc {
             id: ValidatorId::try_from("0x20754168c00a6e58116ccfd0a5f7d1bb66c5de9d")
@@ -614,16 +613,16 @@ mod test {
             fee: 100.into(),
             fee_addr: None,
         };
-        campaign_4.channel = channel_with_different_leader;
-        campaign_4.validators =
+        campaign_new_leader.channel = channel_with_different_leader;
+        campaign_new_leader.validators =
             Validators::new((different_leader.clone(), DUMMY_VALIDATOR_FOLLOWER.clone()));
 
         insert_campaign(&pool, &campaign).await?;
-        insert_campaign(&pool, &campaign_2).await?;
-        insert_campaign(&pool, &campaign_3).await?;
-        insert_campaign(&pool, &campaign_4).await?;
+        insert_campaign(&pool, &campaign_new_id).await?;
+        insert_campaign(&pool, &campaign_new_creator).await?;
+        insert_campaign(&pool, &campaign_new_leader).await?;
 
-        Ok(())
+        Ok(vec![campaign, campaign_new_id, campaign_new_creator, campaign_new_leader])
     }
 
     #[tokio::test]
@@ -634,7 +633,7 @@ mod test {
             .await
             .expect("Migrations should succeed");
 
-        insert_multiple_campaigns_with_different_channels(&database.pool)
+        let test_campaigns = insert_multiple_campaigns_with_different_channels(&database.pool)
             .await
             .expect("should insert test campaigns and channels");
 
