@@ -83,6 +83,21 @@ pub async fn get_accounting(
     Ok(row.as_ref().map(Accounting::from))
 }
 
+pub async fn get_all_accountings_for_channel(
+    pool: DbPool,
+    channel_id: ChannelId,
+    side: Side,
+) -> Result<Vec<Accounting>, PoolError> {
+    let client = pool.get().await?;
+    let statement = client.prepare("SELECT channel_id, side, address, amount, updated, created FROM accounting WHERE channel_id = $1 AND side = $2").await?;
+
+    let rows = client.query(&statement, &[&channel_id, &side]).await?;
+
+    let accountings = rows.iter().map(Accounting::from).collect();
+
+    Ok(accountings)
+}
+
 /// Will update current Spender/Earner amount or insert a new Accounting record
 ///
 /// See `UPDATE_ACCOUNTING_STATEMENT` static for full query.

@@ -1,5 +1,6 @@
 use crate::db::{
     event_aggregate::{latest_approve_state_v5, latest_heartbeats, latest_new_state_v5},
+    accounting::{get_all_accountings_for_channel, Side},
     insert_channel, insert_validator_messages, list_channels,
     spendable::{fetch_spendable, get_all_spendables_for_channel, update_spendable},
     DbPool, PoolError,
@@ -9,17 +10,17 @@ use futures::future::try_join_all;
 use hyper::{Body, Request, Response};
 use primitives::{
     adapter::Adapter,
-    balances::{CheckedState, UncheckedState},
+    balances::{CheckedState, UncheckedState, Balances},
     channel::Channel as ChannelOld,
     channel_v5::Channel as ChannelV5,
     config::TokenInfo,
     sentry::{
         channel_list::ChannelListQuery, AllSpendersResponse, LastApproved, LastApprovedQuery,
-        LastApprovedResponse, Pagination, SpenderResponse, SuccessResponse,
+        LastApprovedResponse, Pagination, SpenderResponse, SuccessResponse, AccountingResponse
     },
     spender::{Spendable, Spender, SpenderLeaf},
     validator::{MessageTypes, NewState},
-    Address, Channel, Deposit, UnifiedNum,
+    Address, Channel, Deposit, UnifiedNum, UnifiedMap
 };
 use slog::{error, Logger};
 use std::{collections::HashMap, str::FromStr};
@@ -414,8 +415,33 @@ async fn get_corresponding_new_state(
 }
 
 pub async fn get_accounting_for_channel<A: Adapter + 'static>(req: Request<Body>, app: &Application<A>) -> Result<Response<Body>, ResponseError> {
+    let channel = req
+        .extensions()
+        .get::<ChannelV5>()
+        .expect("Request should have Channel")
+        .to_owned();
 
-    Ok(Default::default()) // TODO
+    //  TODO: Pagination
+    let earner_accountings = get_all_accountings_for_channel(app.pool.clone(), channel.id(), Side::Earner).await?;
+    let spender_accountings = get_all_accountings_for_channel(app.pool.clone(), channel.id(), Side::Spender).await?;
+
+    let mut balances = Balances::<UncheckedState>::new();
+    for accounting in earner_accountings {
+        balances.earners.insert(accounting.address, accounting.amount);
+    }
+
+    for accounting in spender_accountings {
+        balances.spenders.insert(accounting.address, accounting.amount);
+    }
+
+
+    // TODO: check sums
+    let balances = balances.check().ok_or(panic!("Fatal error!"));
+
+    let res = AccountingResponse::<CheckedState> {
+        balances,
+    };
+    Ok(success_response(serde_json::to_string(&res)?))
 }
 
 #[cfg(test)]
