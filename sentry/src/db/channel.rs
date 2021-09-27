@@ -1,6 +1,5 @@
 use chrono::Utc;
-use primitives::{targeting::Rules, validator::MessageTypes, Channel, ChannelId, ValidatorId};
-use std::str::FromStr;
+use primitives::{validator::MessageTypes, Channel, ChannelId, ValidatorId};
 
 pub use list_channels::list_channels;
 
@@ -12,72 +11,65 @@ pub async fn get_channel_by_id(
 ) -> Result<Option<Channel>, PoolError> {
     let client = pool.get().await?;
 
-    let select = client.prepare("SELECT id, creator, deposit_asset, deposit_amount, valid_until, targeting_rules, spec, exhausted FROM channels WHERE id = $1 LIMIT 1").await?;
+    let select = client
+        .prepare(
+            "SELECT leader, follower, guardian, token, nonce FROM channels WHERE id = $1 LIMIT 1",
+        )
+        .await?;
 
-    let results = client.query(&select, &[&id]).await?;
+    let row = client.query_opt(&select, &[&id]).await?;
 
-    Ok(results.get(0).map(Channel::from))
+    Ok(row.as_ref().map(Channel::from))
 }
 
 pub async fn get_channel_by_id_and_validator(
     pool: &DbPool,
-    id: &ChannelId,
-    validator_id: &ValidatorId,
+    id: ChannelId,
+    validator: ValidatorId,
 ) -> Result<Option<Channel>, PoolError> {
     let client = pool.get().await?;
 
-    let validator = serde_json::Value::from_str(&format!(r#"[{{"id": "{}"}}]"#, validator_id))
-        .expect("Not a valid json");
-    let query = "SELECT id, creator, deposit_asset, deposit_amount, valid_until, targeting_rules, spec, exhausted FROM channels WHERE id = $1 AND spec->'validators' @> $2 LIMIT 1";
+    let query = "SELECT leader, follower, guardian, token, nonce FROM channels WHERE id = $1 AND (leader = $2 OR follower = $2) LIMIT 1";
     let select = client.prepare(query).await?;
 
-    let results = client.query(&select, &[&id, &validator]).await?;
+    let row = client.query_opt(&select, &[&id, &validator]).await?;
 
-    Ok(results.get(0).map(Channel::from))
+    Ok(row.as_ref().map(Channel::from))
 }
 
-pub async fn insert_channel(pool: &DbPool, channel: &Channel) -> Result<bool, PoolError> {
+/// Used to insert/get Channel when creating a Campaign
+/// If channel already exists it will return it instead.
+/// This call should never trigger a `SqlState::UNIQUE_VIOLATION`
+///
+/// ```sql
+/// INSERT INTO channels (id, leader, follower, guardian, token, nonce, created)
+/// VALUES ($1, $2, $3, $4, $5, $6, NOW())
+/// ON CONFLICT ON CONSTRAINT channels_pkey DO UPDATE SET created=EXCLUDED.created
+/// RETURNING leader, follower, guardian, token, nonce
+/// ```
+pub async fn insert_channel(pool: &DbPool, channel: Channel) -> Result<Channel, PoolError> {
     let client = pool.get().await?;
 
-    let stmt = client.prepare("INSERT INTO channels (id, creator, deposit_asset, deposit_amount, valid_until, targeting_rules, spec, exhausted) values ($1, $2, $3, $4, $5, $6, $7, $8)").await?;
+    // We use `EXCLUDED.created` in order to have to DO UPDATE otherwise it does not return the fields
+    // when there is a CONFLICT
+    let stmt = client.prepare("INSERT INTO channels (id, leader, follower, guardian, token, nonce, created) VALUES ($1, $2, $3, $4, $5, $6, NOW())
+  ON CONFLICT ON CONSTRAINT channels_pkey DO UPDATE SET created=EXCLUDED.created RETURNING leader, follower, guardian, token, nonce").await?;
 
     let row = client
-        .execute(
+        .query_one(
             &stmt,
             &[
-                &channel.id,
-                &channel.creator,
-                &channel.deposit_asset,
-                &channel.deposit_amount,
-                &channel.valid_until,
-                &channel.targeting_rules,
-                &channel.spec,
-                &channel.exhausted,
+                &channel.id(),
+                &channel.leader,
+                &channel.follower,
+                &channel.guardian,
+                &channel.token,
+                &channel.nonce,
             ],
         )
         .await?;
 
-    let inserted = row == 1;
-    Ok(inserted)
-}
-
-#[deprecated(note = "AIP#61 now uses the modify Campaign route for updating targeting rules")]
-pub async fn update_targeting_rules(
-    pool: &DbPool,
-    channel_id: &ChannelId,
-    targeting_rules: &Rules,
-) -> Result<bool, PoolError> {
-    let client = pool.get().await?;
-
-    let stmt = client
-        .prepare("UPDATE channels SET targeting_rules=$1 WHERE id=$2")
-        .await?;
-    let row = client
-        .execute(&stmt, &[&targeting_rules, &channel_id])
-        .await?;
-
-    let updated = row == 1;
-    Ok(updated)
+    Ok(Channel::from(&row))
 }
 
 pub async fn insert_validator_messages(
@@ -93,7 +85,7 @@ pub async fn insert_validator_messages(
     let row = client
         .execute(
             &stmt,
-            &[&channel.id, &from, &validator_message, &Utc::now()],
+            &[&channel.id(), &from, &validator_message, &Utc::now()],
         )
         .await?;
 
@@ -101,30 +93,14 @@ pub async fn insert_validator_messages(
     Ok(inserted)
 }
 
-#[deprecated = "No longer needed for V5"]
-pub async fn update_exhausted_channel(
-    pool: &DbPool,
-    channel: &Channel,
-    index: u32,
-) -> Result<bool, PoolError> {
-    let client = pool.get().await?;
-
-    let stmt = client
-        .prepare("UPDATE channels SET exhausted[$1] = true WHERE id = $2")
-        .await?;
-    // WARNING: By default PostgreSQL uses a one-based numbering convention for arrays, that is, an array of n elements starts with array[1] and ends with array[n].
-    // this is why we add +1 to the index
-    let row = client.execute(&stmt, &[&(index + 1), &channel.id]).await?;
-
-    let updated = row == 1;
-    Ok(updated)
-}
-
 mod list_channels {
-    use chrono::{DateTime, Utc};
-    use primitives::{sentry::ChannelListResponse, Channel, ValidatorId};
+    use primitives::{
+        channel_v5::Channel,
+        sentry::{channel_list::ChannelListResponse, Pagination},
+        ValidatorId,
+    };
     use std::str::FromStr;
-    use tokio_postgres::types::{accepts, FromSql, ToSql, Type};
+    use tokio_postgres::types::{accepts, FromSql, Type};
 
     use crate::db::{DbPool, PoolError};
 
@@ -143,33 +119,40 @@ mod list_channels {
         accepts!(VARCHAR, TEXT);
     }
 
+    /// Lists the `Channel`s in `ASC` order.
+    /// This makes sure that if a new `Channel` is added
+    // while we are scrolling through the pages it will not alter the `Channel`s ordering
     pub async fn list_channels(
         pool: &DbPool,
         skip: u64,
         limit: u32,
-        creator: &Option<String>,
-        validator: &Option<ValidatorId>,
-        valid_until_ge: &DateTime<Utc>,
+        validator: Option<ValidatorId>,
     ) -> Result<ChannelListResponse, PoolError> {
         let client = pool.get().await?;
 
-        let validator = validator.as_ref().map(|validator_id| {
-            serde_json::Value::from_str(&format!(r#"[{{"id": "{}"}}]"#, validator_id))
-                .expect("Not a valid json")
-        });
-        let (where_clauses, params) =
-            channel_list_query_params(creator, validator.as_ref(), valid_until_ge);
-        let total_count_params = (where_clauses.clone(), params.clone());
-
         // To understand why we use Order by, see Postgres Documentation: https://www.postgresql.org/docs/8.1/queries-limit.html
-        let statement = format!("SELECT id, creator, deposit_asset, deposit_amount, valid_until, targeting_rules, spec, exhausted FROM channels WHERE {} ORDER BY spec->>'created' DESC LIMIT {} OFFSET {}", where_clauses.join(" AND "), limit, skip);
-        let stmt = client.prepare(&statement).await?;
+        let rows = match validator {
+            Some(validator) => {
+                let where_clause = "(leader = $1 OR follower = $1)".to_string();
 
-        let rows = client.query(&stmt, params.as_slice()).await?;
+                let statement = format!("SELECT leader, follower, guardian, token, nonce, created FROM channels WHERE {} ORDER BY created ASC LIMIT {} OFFSET {}",
+        where_clause, limit, skip);
+                let stmt = client.prepare(&statement).await?;
+
+                client.query(&stmt, &[&validator.to_string()]).await?
+            }
+            None => {
+                let statement = format!("SELECT id, leader, follower, guardian, token, nonce, created FROM channels ORDER BY created ASC LIMIT {} OFFSET {}",
+        limit, skip);
+                let stmt = client.prepare(&statement).await?;
+
+                client.query(&stmt, &[]).await?
+            }
+        };
+
         let channels = rows.iter().map(Channel::from).collect();
 
-        let total_count =
-            list_channels_total_count(pool, (&total_count_params.0, total_count_params.1)).await?;
+        let total_count = list_channels_total_count(pool, validator).await?;
 
         // fast ceil for total_pages
         let total_pages = if total_count == 0 {
@@ -179,47 +162,83 @@ mod list_channels {
         };
 
         Ok(ChannelListResponse {
-            total_pages,
-            total: total_pages,
-            page: skip / limit as u64,
             channels,
+            pagination: Pagination {
+                total_pages,
+                total: total_pages,
+                page: skip / limit as u64,
+            },
         })
     }
 
     async fn list_channels_total_count<'a>(
         pool: &DbPool,
-        (where_clauses, params): (&'a [String], Vec<&'a (dyn ToSql + Sync)>),
+        validator: Option<ValidatorId>,
     ) -> Result<u64, PoolError> {
         let client = pool.get().await?;
 
-        let statement = format!(
-            "SELECT COUNT(id)::varchar FROM channels WHERE {}",
-            where_clauses.join(" AND ")
-        );
-        let stmt = client.prepare(&statement).await?;
-        let row = client.query_one(&stmt, params.as_slice()).await?;
+        let row = match validator {
+            Some(validator) => {
+                let where_clause = "(leader = $1 OR follower = $1)".to_string();
+
+                let statement = format!(
+                    "SELECT COUNT(id)::varchar FROM channels WHERE {}",
+                    where_clause
+                );
+                let stmt = client.prepare(&statement).await?;
+
+                client.query_one(&stmt, &[&validator.to_string()]).await?
+            }
+            None => {
+                let statement = "SELECT COUNT(id)::varchar FROM channels";
+                let stmt = client.prepare(statement).await?;
+
+                client.query_one(&stmt, &[]).await?
+            }
+        };
 
         Ok(row.get::<_, TotalCount>(0).0)
     }
+}
 
-    fn channel_list_query_params<'a>(
-        creator: &'a Option<String>,
-        validator: Option<&'a serde_json::Value>,
-        valid_until_ge: &'a DateTime<Utc>,
-    ) -> (Vec<String>, Vec<&'a (dyn ToSql + Sync)>) {
-        let mut where_clauses = vec!["valid_until >= $1".to_string()];
-        let mut params: Vec<&(dyn ToSql + Sync)> = vec![valid_until_ge];
+#[cfg(test)]
+mod test {
+    use primitives::util::tests::prep_db::DUMMY_CAMPAIGN;
 
-        if let Some(creator) = creator {
-            where_clauses.push(format!("creator = ${}", params.len() + 1));
-            params.push(creator);
-        }
+    use crate::db::{
+        insert_channel,
+        tests_postgres::{setup_test_migrations, DATABASE_POOL},
+    };
 
-        if let Some(validator) = validator {
-            where_clauses.push(format!("spec->'validators' @> ${}", params.len() + 1));
-            params.push(validator);
-        }
+    use super::list_channels::list_channels;
 
-        (where_clauses, params)
+    #[tokio::test]
+    async fn insert_and_list_channels_return_channels() {
+        let database = DATABASE_POOL.get().await.expect("Should get database");
+        setup_test_migrations(database.pool.clone())
+            .await
+            .expect("Should setup migrations");
+
+        let actual_channel = {
+            let insert = insert_channel(&database.pool, DUMMY_CAMPAIGN.channel)
+                .await
+                .expect("Should insert Channel");
+
+            // once inserted, the channel should only be returned by the function
+            let only_select = insert_channel(&database.pool, DUMMY_CAMPAIGN.channel)
+                .await
+                .expect("Should run insert with RETURNING on the Channel");
+
+            assert_eq!(insert, only_select);
+
+            only_select
+        };
+
+        let response = list_channels(&database.pool, 0, 10, None)
+            .await
+            .expect("Should list Channels");
+
+        assert_eq!(1, response.channels.len());
+        assert_eq!(DUMMY_CAMPAIGN.channel, actual_channel);
     }
 }

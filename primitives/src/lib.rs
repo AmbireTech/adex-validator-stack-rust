@@ -1,5 +1,6 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
+#![allow(deprecated)]
 use std::{error, fmt};
 
 pub use self::{
@@ -10,8 +11,10 @@ pub use self::{
     balances_map::{BalancesMap, UnifiedMap},
     big_num::BigNum,
     campaign::{Campaign, CampaignId},
-    channel::{Channel, ChannelId, ChannelSpec, SpecValidator, SpecValidators},
+    channel::{ChannelId, ChannelSpec, SpecValidator, SpecValidators},
+    channel_v5::Channel,
     config::Config,
+    deposit::Deposit,
     event_submission::EventSubmission,
     ipfs::IPFS,
     unified_num::UnifiedNum,
@@ -42,6 +45,43 @@ pub mod supermarket;
 pub mod targeting;
 mod unified_num;
 pub mod validator;
+
+mod deposit {
+    use crate::{BigNum, UnifiedNum};
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+    #[serde(rename_all = "camelCase")]
+    pub struct Deposit<N> {
+        pub total: N,
+        pub still_on_create2: N,
+    }
+
+    impl Deposit<UnifiedNum> {
+        pub fn to_precision(&self, precision: u8) -> Deposit<BigNum> {
+            Deposit {
+                total: self.total.to_precision(precision),
+                still_on_create2: self.total.to_precision(precision),
+            }
+        }
+
+        pub fn from_precision(
+            deposit: Deposit<BigNum>,
+            precision: u8,
+        ) -> Option<Deposit<UnifiedNum>> {
+            let total = UnifiedNum::from_precision(deposit.total, precision);
+            let still_on_create2 = UnifiedNum::from_precision(deposit.still_on_create2, precision);
+
+            match (total, still_on_create2) {
+                (Some(total), Some(still_on_create2)) => Some(Deposit {
+                    total,
+                    still_on_create2,
+                }),
+                _ => None,
+            }
+        }
+    }
+}
 
 pub mod util {
     pub use api::ApiUrl;

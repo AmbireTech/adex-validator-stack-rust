@@ -94,6 +94,7 @@ impl FromStr for ChannelId {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
+#[deprecated = "This is the old V4 Channel"]
 pub struct Channel {
     pub id: ChannelId,
     pub creator: ValidatorId,
@@ -161,6 +162,7 @@ impl PricingBounds {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
+#[deprecated = "This is the old V4 Channel Spec"]
 pub struct ChannelSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
@@ -206,9 +208,11 @@ pub struct ChannelSpec {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 /// A (leader, follower) tuple
+#[deprecated = "This is the old V4 Channel ValidatorSpecs"]
 pub struct SpecValidators(ValidatorDesc, ValidatorDesc);
 
 #[derive(Debug)]
+#[deprecated = "This is the old V4 Channel ValidatorSpecs"]
 pub enum SpecValidator<'a> {
     Leader(&'a ValidatorDesc),
     Follower(&'a ValidatorDesc),
