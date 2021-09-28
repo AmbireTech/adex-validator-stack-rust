@@ -20,17 +20,19 @@ use crate::EthereumAdapter;
 use super::{EthereumChannel, OUTPACE_ABI, SWEEPER_ABI};
 
 // See `adex-eth-protocol` `contracts/mocks/Token.sol`
-    /// Mocked Token ABI
-pub static MOCK_TOKEN_ABI: Lazy<&'static [u8]> = Lazy::new(||{
-    include_bytes!("../../test/resources/mock_token_abi.json")});
+/// Mocked Token ABI
+pub static MOCK_TOKEN_ABI: Lazy<&'static [u8]> =
+    Lazy::new(|| include_bytes!("../../test/resources/mock_token_abi.json"));
 /// Mocked Token bytecode in JSON
-pub static MOCK_TOKEN_BYTECODE: Lazy<&'static str> = Lazy::new(||{
-    include_str!("../../test/resources/mock_token_bytecode.bin")});
+pub static MOCK_TOKEN_BYTECODE: Lazy<&'static str> =
+    Lazy::new(|| include_str!("../../test/resources/mock_token_bytecode.bin"));
 /// Sweeper bytecode
-pub static SWEEPER_BYTECODE: Lazy<&'static str> = Lazy::new(||{ include_str!("../../../lib/protocol-eth/resources/bytecode/Sweeper.bin")});
+pub static SWEEPER_BYTECODE: Lazy<&'static str> =
+    Lazy::new(|| include_str!("../../../lib/protocol-eth/resources/bytecode/Sweeper.bin"));
 /// Outpace bytecode
-pub static OUTPACE_BYTECODE: Lazy<&'static str> = Lazy::new(||{ include_str!("../../../lib/protocol-eth/resources/bytecode/OUTPACE.bin")});
-pub static GANACHE_ADDRESSES: Lazy<HashMap<String, Address>> = Lazy::new(||{
+pub static OUTPACE_BYTECODE: Lazy<&'static str> =
+    Lazy::new(|| include_str!("../../../lib/protocol-eth/resources/bytecode/OUTPACE.bin"));
+pub static GANACHE_ADDRESSES: Lazy<HashMap<String, Address>> = Lazy::new(|| {
     vec![
         (
             "leader".to_string(),
@@ -61,7 +63,7 @@ pub static GANACHE_ADDRESSES: Lazy<HashMap<String, Address>> = Lazy::new(||{
     .collect()
 });
 
-    pub const GANACHE_URL: &'static str = "http://localhost:8545";
+pub const GANACHE_URL: &'static str = "http://localhost:8545";
 
 pub fn get_test_channel(token_address: Address) -> Channel {
     Channel {

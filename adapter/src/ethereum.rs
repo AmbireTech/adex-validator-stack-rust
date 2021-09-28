@@ -33,19 +33,17 @@ mod error;
 #[cfg(test)]
 mod test_utils;
 
-pub static OUTPACE_ABI: Lazy<&'static [u8]> = Lazy::new(||{
-    include_bytes!("../../lib/protocol-eth/abi/OUTPACE.json")
-});
-pub static ERC20_ABI: Lazy<&'static [u8]> = Lazy::new(||{
+pub static OUTPACE_ABI: Lazy<&'static [u8]> =
+    Lazy::new(|| include_bytes!("../../lib/protocol-eth/abi/OUTPACE.json"));
+pub static ERC20_ABI: Lazy<&'static [u8]> = Lazy::new(|| {
     include_str!("../../lib/protocol-eth/abi/ERC20.json")
-    .trim_end_matches('\n')
-    .as_bytes()
+        .trim_end_matches('\n')
+        .as_bytes()
 });
-pub static SWEEPER_ABI: Lazy<&'static [u8]> = Lazy::new(|| {
-    include_bytes!("../../lib/protocol-eth/abi/Sweeper.json")
-});
+pub static SWEEPER_ABI: Lazy<&'static [u8]> =
+    Lazy::new(|| include_bytes!("../../lib/protocol-eth/abi/Sweeper.json"));
 /// Ready to use init code (i.e. decoded) for calculating the create2 address
-pub static DEPOSITOR_BYTECODE_DECODED: Lazy<Vec<u8>> = Lazy::new(||{
+pub static DEPOSITOR_BYTECODE_DECODED: Lazy<Vec<u8>> = Lazy::new(|| {
     let bytecode = include_str!("../../lib/protocol-eth/resources/bytecode/Depositor.bin");
     hex::decode(bytecode).expect("Decoded properly")
 });
