@@ -26,12 +26,12 @@ use web3::{
     Web3,
 };
 
-#[cfg(test)]
-use test_utils::*;
+#[cfg(any(test, feature = "test-util"))]
+use test_util::*;
 
 mod error;
-#[cfg(test)]
-mod test_utils;
+#[cfg(any(test, feature = "test-util"))]
+pub mod test_util;
 
 pub static OUTPACE_ABI: Lazy<&'static [u8]> =
     Lazy::new(|| include_bytes!("../../lib/protocol-eth/abi/OUTPACE.json"));
