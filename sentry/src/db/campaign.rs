@@ -495,7 +495,7 @@ mod test {
     };
     use std::{convert::TryFrom, time::Duration};
     use tokio_postgres::error::SqlState;
-
+    use chrono::TimeZone;
     use crate::db::{
         insert_channel,
         tests_postgres::{setup_test_migrations, DATABASE_POOL},
@@ -585,26 +585,38 @@ mod test {
         }
     }
 
-    async fn insert_multiple_campaigns_with_different_channels(
-        pool: &DbPool,
-    ) -> Result<Vec<Campaign>, PoolError> {
+    // Campaigns are sorted in ascending order when retrieved
+    // Therefore every campaign in the 
+    #[tokio::test]
+    async fn it_lists_campaigns_properly() {
+        let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
+
+        setup_test_migrations(database.pool.clone())
+            .await
+            .expect("Migrations should succeed");
+
+
         let campaign = DUMMY_CAMPAIGN.clone();
         let mut channel_with_different_leader = DUMMY_CAMPAIGN.channel;
         channel_with_different_leader.leader = IDS["user"];
 
-        insert_channel(&pool, DUMMY_CAMPAIGN.channel).await?;
-        insert_channel(&pool, channel_with_different_leader).await?;
+        insert_channel(&database, DUMMY_CAMPAIGN.channel).await.expect("Should insert");
+        insert_channel(&database, channel_with_different_leader).await.expect("Should insert");
 
         let mut campaign_new_id = DUMMY_CAMPAIGN.clone();
         campaign_new_id.id = CampaignId::new();
+        campaign_new_id.created = Utc.ymd(2020, 2, 1).and_hms(7,0,0); // 1 year before previous
 
         // campaign with a different creator
         let mut campaign_new_creator = DUMMY_CAMPAIGN.clone();
         campaign_new_creator.id = CampaignId::new();
         campaign_new_creator.creator = ADDRESSES["tester"];
+        campaign_new_creator.created = Utc.ymd(2019, 2, 1).and_hms(7,0,0); // 1 year before previous
 
         let mut campaign_new_leader = DUMMY_CAMPAIGN.clone();
         campaign_new_leader.id = CampaignId::new();
+        campaign_new_leader.created = Utc.ymd(2018, 2, 1).and_hms(7,0,0); // 1 year before previous
+
 
         let different_leader: ValidatorDesc = ValidatorDesc {
             id: ValidatorId::try_from("0x20754168c00a6e58116ccfd0a5f7d1bb66c5de9d")
@@ -617,25 +629,10 @@ mod test {
         campaign_new_leader.validators =
             Validators::new((different_leader.clone(), DUMMY_VALIDATOR_FOLLOWER.clone()));
 
-        insert_campaign(&pool, &campaign).await?;
-        insert_campaign(&pool, &campaign_new_id).await?;
-        insert_campaign(&pool, &campaign_new_creator).await?;
-        insert_campaign(&pool, &campaign_new_leader).await?;
-
-        Ok(vec![campaign, campaign_new_id, campaign_new_creator, campaign_new_leader])
-    }
-
-    #[tokio::test]
-    async fn it_lists_campaigns_properly() {
-        let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
-
-        setup_test_migrations(database.pool.clone())
-            .await
-            .expect("Migrations should succeed");
-
-        let test_campaigns = insert_multiple_campaigns_with_different_channels(&database.pool)
-            .await
-            .expect("should insert test campaigns and channels");
+        insert_campaign(&database, &campaign).await.expect("Should insert"); // fourth
+        insert_campaign(&database, &campaign_new_id).await.expect("Should insert"); // third
+        insert_campaign(&database, &campaign_new_creator).await.expect("Should insert"); // second
+        insert_campaign(&database, &campaign_new_leader).await.expect("Should insert"); // first
 
         // 2 out of 3 results
         let first_page = list_campaigns(
@@ -649,7 +646,7 @@ mod test {
         )
         .await
         .expect("should fetch");
-        assert_eq!(first_page.campaigns.len(), 2);
+        assert_eq!(first_page.campaigns, vec![campaign_new_leader.clone(), campaign_new_id.clone()]);
 
         // 3rd result
         let second_page = list_campaigns(
@@ -663,7 +660,7 @@ mod test {
         )
         .await
         .expect("should fetch");
-        assert_eq!(second_page.campaigns.len(), 1);
+        assert_eq!(second_page.campaigns, vec![campaign.clone()]);
 
         // No results past limit
         let third_page = list_campaigns(
@@ -691,7 +688,7 @@ mod test {
         )
         .await
         .expect("should fetch");
-        assert_eq!(first_page.campaigns.len(), 1);
+        assert_eq!(first_page.campaigns, vec![campaign_new_creator.clone()]);
 
         // Test with validator
         let first_page = list_campaigns(
@@ -705,7 +702,7 @@ mod test {
         )
         .await
         .expect("should fetch");
-        assert_eq!(first_page.campaigns.len(), 4);
+        assert_eq!(first_page.campaigns, vec![campaign_new_leader.clone(), campaign_new_creator.clone(), campaign_new_id.clone(), campaign.clone()]);
 
         // Test with validator and is_leader
         let first_page = list_campaigns(
@@ -719,7 +716,7 @@ mod test {
         )
         .await
         .expect("should fetch");
-        assert_eq!(first_page.campaigns.len(), 3);
+        assert_eq!(first_page.campaigns, vec![campaign_new_creator.clone(), campaign_new_id.clone(), campaign.clone()]);
 
         // Test with a different validator and is_leader
         let first_page = list_campaigns(
@@ -733,7 +730,7 @@ mod test {
         )
         .await
         .expect("should fetch");
-        assert_eq!(first_page.campaigns.len(), 1);
+        assert_eq!(first_page.campaigns, vec![campaign_new_leader.clone()]);
 
         // Test with validator and is_leader but validator isn't the leader of any campaign
         let first_page = list_campaigns(
@@ -761,7 +758,7 @@ mod test {
         )
         .await
         .expect("should fetch");
-        assert_eq!(first_page.campaigns.len(), 4);
+        assert_eq!(first_page.campaigns, vec![campaign_new_leader.clone(), campaign_new_creator.clone(), campaign_new_id.clone(), campaign.clone()]);
 
         // Test with creator, provided validator and is_leader set to true
         let first_page = list_campaigns(
@@ -775,6 +772,6 @@ mod test {
         )
         .await
         .expect("should fetch");
-        assert_eq!(first_page.campaigns.len(), 2);
+        assert_eq!(first_page.campaigns, vec![campaign_new_id.clone(), campaign.clone()]);
     }
 }
