@@ -352,30 +352,29 @@ pub async fn get_accounting_for_channel<A: Adapter + 'static>(
         .expect("Request should have Channel")
         .to_owned();
 
-    let earner_accountings =
-        get_all_accountings_for_channel(app.pool.clone(), channel.id(), Side::Earner).await?;
-    let spender_accountings =
-        get_all_accountings_for_channel(app.pool.clone(), channel.id(), Side::Spender).await?;
+    let accountings = get_all_accountings_for_channel(app.pool.clone(), channel.id()).await?;
 
     let mut unchecked_balances: Balances<UncheckedState> = Balances::default();
-    for accounting in earner_accountings {
-        unchecked_balances
-            .earners
-            .insert(accounting.address, accounting.amount);
-    }
 
-    for accounting in spender_accountings {
-        unchecked_balances
-            .spenders
-            .insert(accounting.address, accounting.amount);
+    for accounting in accountings {
+        match accounting.side {
+            Side::Earner => unchecked_balances
+                .earners
+                .insert(accounting.address, accounting.amount),
+            Side::Spender => unchecked_balances
+                .spenders
+                .insert(accounting.address, accounting.amount),
+        };
     }
 
     let balances = match unchecked_balances.check() {
         Ok(balances) => balances,
         Err(error) => {
             error!(&app.logger, "{}", &error; "module" => "channel_accounting");
-            return Err(ResponseError::FailedValidation("Earners sum is not equal to spenders sum for channel".to_string()))
-        },
+            return Err(ResponseError::FailedValidation(
+                "Earners sum is not equal to spenders sum for channel".to_string(),
+            ));
+        }
     };
 
     let res = AccountingResponse::<CheckedState> { balances };
