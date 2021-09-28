@@ -15,7 +15,7 @@ use primitives::{
     spender::Spender,
     util::ApiUrl,
     validator::MessageTypes,
-    Address, Campaign, ChannelId, Config, ValidatorId,
+    Address, ChannelId, Config, ValidatorId,
 };
 use thiserror::Error;
 
