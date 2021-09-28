@@ -9,9 +9,8 @@ use ethstore::{
 use lazy_static::lazy_static;
 use primitives::{
     adapter::{Adapter, AdapterResult, Deposit, Error as AdapterError, KeystoreOptions, Session},
-    channel::Channel,
     config::Config,
-    Address, BigNum, ToETHChecksum, ValidatorId,
+    Address, BigNum, Channel, ToETHChecksum, ValidatorId,
 };
 use reqwest::Client;
 use serde::{Deserialize, Serialize};

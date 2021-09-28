@@ -5,9 +5,8 @@ use primitives::{
         Adapter, AdapterErrorKind, AdapterResult, Deposit, DummyAdapterOptions,
         Error as AdapterError, Session,
     },
-    channel::Channel,
     config::Config,
-    Address, ChannelId, ToETHChecksum, ValidatorId,
+    Address, Channel, ChannelId, ToETHChecksum, ValidatorId,
 };
 use std::{collections::HashMap, fmt, sync::Arc};
 

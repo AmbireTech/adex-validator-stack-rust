@@ -53,7 +53,6 @@ lazy_static! {
 
     // Dummy adapter auth tokens
     // authorization tokens
-    ///
     pub static ref AUTH: HashMap<String, String> = {
         let mut auth = HashMap::new();
 

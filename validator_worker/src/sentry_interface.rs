@@ -15,7 +15,7 @@ use primitives::{
     spender::Spender,
     util::ApiUrl,
     validator::MessageTypes,
-    Address, {ChannelId, Config, ValidatorId},
+    Address, Campaign, ChannelId, Config, ValidatorId,
 };
 use thiserror::Error;
 
@@ -263,10 +263,9 @@ async fn propagate_to<A: Adapter>(
 pub mod channels {
     use futures::{future::try_join_all, TryFutureExt};
     use primitives::{
-        channel::Channel,
         sentry::channel_list::{ChannelListQuery, ChannelListResponse},
         util::ApiUrl,
-        ValidatorId,
+        Channel, ValidatorId,
     };
     use reqwest::{Client, Response};
 

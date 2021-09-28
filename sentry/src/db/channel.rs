@@ -95,9 +95,8 @@ pub async fn insert_validator_messages(
 
 mod list_channels {
     use primitives::{
-        channel::Channel,
         sentry::{channel_list::ChannelListResponse, Pagination},
-        ValidatorId,
+        Channel, ValidatorId,
     };
     use std::str::FromStr;
     use tokio_postgres::types::{accepts, FromSql, Type};

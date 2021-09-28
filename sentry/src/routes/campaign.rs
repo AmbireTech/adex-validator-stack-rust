@@ -13,11 +13,10 @@ use hyper::{Body, Request, Response};
 use primitives::{
     adapter::{Adapter, AdapterErrorKind, Error as AdapterError},
     campaign_validator::Validator,
-    channel::Channel,
     config::TokenInfo,
     sentry::campaign_create::{CreateCampaign, ModifyCampaign},
     spender::Spendable,
-    Address, Campaign, Deposit, UnifiedNum,
+    Address, Campaign, Channel, Deposit, UnifiedNum,
 };
 use slog::error;
 use std::cmp::{max, Ordering};
