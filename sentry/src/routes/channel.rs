@@ -385,11 +385,13 @@ pub async fn get_accounting_for_channel<A: Adapter + 'static>(
 mod test {
     use super::*;
     use crate::test_util::setup_dummy_app;
+    use crate::db::{accounting::update_accounting, insert_channel};
     use primitives::{
         adapter::Deposit,
         util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN},
         BigNum,
     };
+    use hyper::StatusCode;
 
     #[tokio::test]
     async fn create_and_fetch_spendable() {
@@ -472,5 +474,36 @@ mod test {
             still_on_create2_unified
         );
         assert_eq!(updated_spendable.spender, ADDRESSES["creator"]);
+    }
+
+    #[tokio::test]
+    async fn get_accountings_for_channel() {
+        let app = setup_dummy_app().await;
+        let channel = DUMMY_CAMPAIGN.channel.clone();
+        insert_channel(&app.pool, channel).await.expect("should insert channel");
+        let req = Request::builder().extension(channel).body(Body::empty()).expect("Should build Request");
+
+        update_accounting(app.pool.clone(), channel.id(), ADDRESSES["publisher"], Side::Earner, UnifiedNum::from_u64(200)).await.expect("should insert accounting");
+        update_accounting(app.pool.clone(), channel.id(), ADDRESSES["publisher2"], Side::Earner, UnifiedNum::from_u64(100)).await.expect("should insert accounting");
+        update_accounting(app.pool.clone(), channel.id(), ADDRESSES["creator"], Side::Spender, UnifiedNum::from_u64(200)).await.expect("should insert accounting");
+        update_accounting(app.pool.clone(), channel.id(), ADDRESSES["tester"], Side::Spender, UnifiedNum::from_u64(100)).await.expect("should insert accounting");
+
+        let accounting_response = get_accounting_for_channel(req, &app).await.expect("should get response");
+        assert_eq!(StatusCode::OK, accounting_response.status());
+        let json = hyper::body::to_bytes(accounting_response.into_body())
+            .await
+            .expect("Should get json");
+
+        let accounting_response: AccountingResponse<CheckedState> =
+            serde_json::from_slice(&json).expect("Should get AccouuntingResponse");
+        let sum = accounting_response.balances.sum().expect("shouldn't be None");
+        assert_eq!(sum.0, UnifiedNum::from_u64(300));
+        assert_eq!(sum.1, UnifiedNum::from_u64(300));
+
+        update_accounting(app.pool.clone(), channel.id(), ADDRESSES["tester"], Side::Spender, UnifiedNum::from_u64(200)).await.expect("should insert accounting");
+
+        let new_req = Request::builder().extension(channel).body(Body::empty()).expect("Should build Request");
+        let bad_accounting_response = get_accounting_for_channel(new_req, &app).await;
+        assert!(bad_accounting_response.is_err())
     }
 }
