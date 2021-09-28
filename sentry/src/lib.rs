@@ -2,36 +2,36 @@
 #![deny(rust_2018_idioms)]
 #![allow(deprecated)]
 
-use crate::db::DbPool;
-use crate::routes::campaign;
-use crate::routes::channel::channel_status;
-use crate::routes::event_aggregate::list_channel_event_aggregates;
-use crate::routes::validator_message::{extract_params, list_validator_messages};
 use chrono::Utc;
-use db::CampaignRemaining;
 use hyper::{Body, Method, Request, Response, StatusCode};
 use lazy_static::lazy_static;
 use middleware::{
     auth::{AuthRequired, Authenticate},
+    campaign::CampaignLoad,
     channel::{ChannelLoad, GetChannelId},
     cors::{cors, Cors},
+    Chain, Middleware,
 };
-use middleware::{campaign::CampaignLoad, Chain, Middleware};
 use once_cell::sync::Lazy;
-use primitives::adapter::Adapter;
-use primitives::sentry::ValidationErrorResponse;
-use primitives::{Config, ValidatorId};
+use primitives::{adapter::Adapter, sentry::ValidationErrorResponse, Config, ValidatorId};
 use redis::aio::MultiplexedConnection;
 use regex::Regex;
-use routes::analytics::{advanced_analytics, advertiser_analytics, analytics, publisher_analytics};
-use routes::campaign::{campaign_list, create_campaign, update_campaign};
-use routes::cfg::config;
-use routes::channel::{
-    channel_list, channel_validate, create_channel, create_validator_messages,
-    get_all_spender_limits, get_spender_limits, last_approved,
-};
 use slog::Logger;
 use std::collections::HashMap;
+use {
+    db::{CampaignRemaining, DbPool},
+    routes::{
+        campaign,
+        campaign::{create_campaign, update_campaign},
+        cfg::config,
+        channel::{
+            channel_list, create_validator_messages, get_all_spender_limits, get_spender_limits,
+            last_approved,
+        },
+        event_aggregate::list_channel_event_aggregates,
+        validator_message::{extract_params, list_validator_messages},
+    },
+};
 
 pub mod middleware;
 pub mod routes {
@@ -139,39 +139,7 @@ impl<A: Adapter + 'static> Application<A> {
 
         let mut response = match (req.uri().path(), req.method()) {
             ("/cfg", &Method::GET) => config(req, self).await,
-            ("/channel", &Method::POST) => create_channel(req, self).await,
             ("/channel/list", &Method::GET) => channel_list(req, self).await,
-            ("/channel/validate", &Method::POST) => channel_validate(req, self).await,
-            ("/analytics", &Method::GET) => analytics(req, self).await,
-            ("/analytics/advanced", &Method::GET) => {
-                let req = match AuthRequired.call(req, self).await {
-                    Ok(req) => req,
-                    Err(error) => {
-                        return map_response_error(error);
-                    }
-                };
-
-                advanced_analytics(req, self).await
-            }
-            ("/analytics/for-advertiser", &Method::GET) => {
-                let req = match AuthRequired.call(req, self).await {
-                    Ok(req) => req,
-                    Err(error) => {
-                        return map_response_error(error);
-                    }
-                };
-                advertiser_analytics(req, self).await
-            }
-            ("/analytics/for-publisher", &Method::GET) => {
-                let req = match AuthRequired.call(req, self).await {
-                    Ok(req) => req,
-                    Err(error) => {
-                        return map_response_error(error);
-                    }
-                };
-
-                publisher_analytics(req, self).await
-            }
             // For creating campaigns
             ("/v5/campaign", &Method::POST) => {
                 let req = match AuthRequired.call(req, self).await {
@@ -249,19 +217,29 @@ async fn analytics_router<A: Adapter + 'static>(
     mut req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
+    use routes::analytics::{
+        advanced_analytics, advertiser_analytics, analytics, publisher_analytics,
+    };
+
     let (route, method) = (req.uri().path(), req.method());
 
-    // TODO AIP#61: Add routes for:
-    // - POST /channel/:id/pay
-    // #[serde(rename_all = "camelCase")]
-    // Pay { payout: BalancesMap },
-    //
-    // - GET /channel/:id/spender/:addr
-    // - GET /channel/:id/spender/all
-    // - POST /channel/:id/spender/:addr
-    // - GET /channel/:id/get-leaf
-    match *method {
-        Method::GET => {
+    match (route, method) {
+        ("/analytics", &Method::GET) => analytics(req, app).await,
+        ("/analytics/advanced", &Method::GET) => {
+            let req = AuthRequired.call(req, app).await?;
+
+            advanced_analytics(req, app).await
+        }
+        ("/analytics/for-advertiser", &Method::GET) => {
+            let req = AuthRequired.call(req, app).await?;
+            advertiser_analytics(req, app).await
+        }
+        ("/analytics/for-publisher", &Method::GET) => {
+            let req = AuthRequired.call(req, app).await?;
+
+            publisher_analytics(req, app).await
+        }
+        (route, &Method::GET) => {
             if let Some(caps) = ANALYTICS_BY_CHANNEL_ID.captures(route) {
                 let param = RouteParams(vec![caps
                     .get(1)
@@ -318,6 +296,15 @@ async fn channels_router<A: Adapter + 'static>(
 ) -> Result<Response<Body>, ResponseError> {
     let (path, method) = (req.uri().path().to_owned(), req.method());
 
+    // TODO AIP#61: Add routes for:
+    // - POST /channel/:id/pay
+    // #[serde(rename_all = "camelCase")]
+    // Pay { payout: BalancesMap },
+    //
+    // - GET /channel/:id/spender/:addr
+    // - GET /channel/:id/spender/all
+    // - POST /channel/:id/spender/:addr
+    // - GET /channel/:id/get-leaf
     if let (Some(caps), &Method::GET) = (LAST_APPROVED_BY_CHANNEL_ID.captures(&path), method) {
         let param = RouteParams(vec![caps
             .get(1)
@@ -327,16 +314,6 @@ async fn channels_router<A: Adapter + 'static>(
         req = ChannelLoad.call(req, app).await?;
 
         last_approved(req, app).await
-    } else if let (Some(caps), &Method::GET) =
-        (CHANNEL_STATUS_BY_CHANNEL_ID.captures(&path), method)
-    {
-        let param = RouteParams(vec![caps
-            .get(1)
-            .map_or("".to_string(), |m| m.as_str().to_string())]);
-        req.extensions_mut().insert(param);
-
-        req = ChannelLoad.call(req, app).await?;
-        channel_status(req, app).await
     } else if let (Some(caps), &Method::GET) = (CHANNEL_VALIDATOR_MESSAGES.captures(&path), method)
     {
         let param = RouteParams(vec![caps

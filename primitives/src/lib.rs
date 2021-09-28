@@ -11,8 +11,7 @@ pub use self::{
     balances_map::{BalancesMap, UnifiedMap},
     big_num::BigNum,
     campaign::{Campaign, CampaignId},
-    channel::{ChannelId, ChannelSpec, SpecValidator, SpecValidators},
-    channel_v5::Channel,
+    channel::{Channel, ChannelId},
     config::Config,
     deposit::Deposit,
     event_submission::EventSubmission,
@@ -32,7 +31,6 @@ pub mod big_num;
 pub mod campaign;
 pub mod campaign_validator;
 pub mod channel;
-pub mod channel_v5;
 pub mod config;
 mod eth_checksum;
 pub mod event_submission;

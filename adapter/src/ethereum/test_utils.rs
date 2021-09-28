@@ -10,7 +10,7 @@ use web3::{
 
 use primitives::{
     adapter::KeystoreOptions,
-    channel_v5::{Channel, Nonce},
+    channel::{Channel, Nonce},
     config::{configuration, TokenInfo},
     Address, BigNum, ValidatorId,
 };
@@ -113,13 +113,14 @@ pub async fn mock_set_balance(
     address: [u8; 20],
     amount: u64,
 ) -> web3::contract::Result<H256> {
-    tokio_compat_02::FutureExt::compat(token_contract.call(
-        "setBalanceTo",
-        (H160(address), U256::from(amount)),
-        H160(from),
-        Options::default(),
-    ))
-    .await
+    token_contract
+        .call(
+            "setBalanceTo",
+            (H160(address), U256::from(amount)),
+            H160(from),
+            Options::default(),
+        )
+        .await
 }
 
 pub async fn outpace_deposit(
@@ -128,16 +129,17 @@ pub async fn outpace_deposit(
     to: [u8; 20],
     amount: u64,
 ) -> web3::contract::Result<H256> {
-    tokio_compat_02::FutureExt::compat(outpace_contract.call(
-        "deposit",
-        (channel.tokenize(), H160(to), U256::from(amount)),
-        H160(to),
-        Options::with(|opt| {
-            opt.gas_price = Some(1.into());
-            opt.gas = Some(6_721_975.into());
-        }),
-    ))
-    .await
+    outpace_contract
+        .call(
+            "deposit",
+            (channel.tokenize(), H160(to), U256::from(amount)),
+            H160(to),
+            Options::with(|opt| {
+                opt.gas_price = Some(1.into());
+                opt.gas = Some(6_721_975.into());
+            }),
+        )
+        .await
 }
 
 pub async fn sweeper_sweep(
@@ -148,20 +150,21 @@ pub async fn sweeper_sweep(
 ) -> web3::contract::Result<H256> {
     let from_leader_account = H160(*GANACHE_ADDRESSES["leader"].as_bytes());
 
-    tokio_compat_02::FutureExt::compat(sweeper_contract.call(
-        "sweep",
-        (
-            Token::Address(H160(outpace_address)),
-            channel.tokenize(),
-            Token::Array(vec![Token::Address(H160(depositor))]),
-        ),
-        from_leader_account,
-        Options::with(|opt| {
-            opt.gas_price = Some(1.into());
-            opt.gas = Some(6_721_975.into());
-        }),
-    ))
-    .await
+    sweeper_contract
+        .call(
+            "sweep",
+            (
+                Token::Address(H160(outpace_address)),
+                channel.tokenize(),
+                Token::Array(vec![Token::Address(H160(depositor))]),
+            ),
+            from_leader_account,
+            Options::with(|opt| {
+                opt.gas_price = Some(1.into());
+                opt.gas = Some(6_721_975.into());
+            }),
+        )
+        .await
 }
 
 /// Deploys the Sweeper contract from `GANACHE_ADDRESS['leader']`
@@ -170,19 +173,15 @@ pub async fn deploy_sweeper_contract(
 ) -> web3::contract::Result<(H160, Contract<Http>)> {
     let from_leader_account = H160(*GANACHE_ADDRESSES["leader"].as_bytes());
 
-    let feature = tokio_compat_02::FutureExt::compat(async {
-        Contract::deploy(web3.eth(), &SWEEPER_ABI)
-            .expect("Invalid ABI of Sweeper contract")
-            .confirmations(0)
-            .options(Options::with(|opt| {
-                opt.gas_price = Some(1.into());
-                opt.gas = Some(6_721_975.into());
-            }))
-            .execute(*SWEEPER_BYTECODE, (), from_leader_account)
-    })
-    .await;
-
-    let sweeper_contract = tokio_compat_02::FutureExt::compat(feature).await?;
+    let sweeper_contract = Contract::deploy(web3.eth(), &SWEEPER_ABI)
+        .expect("Invalid ABI of Sweeper contract")
+        .confirmations(0)
+        .options(Options::with(|opt| {
+            opt.gas_price = Some(1.into());
+            opt.gas = Some(6_721_975.into());
+        }))
+        .execute(*SWEEPER_BYTECODE, (), from_leader_account)
+        .await?;
 
     Ok((sweeper_contract.address(), sweeper_contract))
 }
@@ -193,19 +192,15 @@ pub async fn deploy_outpace_contract(
 ) -> web3::contract::Result<(H160, Contract<Http>)> {
     let from_leader_account = H160(*GANACHE_ADDRESSES["leader"].as_bytes());
 
-    let feature = tokio_compat_02::FutureExt::compat(async {
-        Contract::deploy(web3.eth(), &OUTPACE_ABI)
-            .expect("Invalid ABI of Sweeper contract")
-            .confirmations(0)
-            .options(Options::with(|opt| {
-                opt.gas_price = Some(1.into());
-                opt.gas = Some(6_721_975.into());
-            }))
-            .execute(*OUTPACE_BYTECODE, (), from_leader_account)
-    })
-    .await;
-
-    let outpace_contract = tokio_compat_02::FutureExt::compat(feature).await?;
+    let outpace_contract = Contract::deploy(web3.eth(), &OUTPACE_ABI)
+        .expect("Invalid ABI of Sweeper contract")
+        .confirmations(0)
+        .options(Options::with(|opt| {
+            opt.gas_price = Some(1.into());
+            opt.gas = Some(6_721_975.into());
+        }))
+        .execute(*OUTPACE_BYTECODE, (), from_leader_account)
+        .await?;
 
     Ok((outpace_contract.address(), outpace_contract))
 }
@@ -217,19 +212,15 @@ pub async fn deploy_token_contract(
 ) -> web3::contract::Result<(TokenInfo, H160, Contract<Http>)> {
     let from_leader_account = H160(*GANACHE_ADDRESSES["leader"].as_bytes());
 
-    let feature = tokio_compat_02::FutureExt::compat(async {
-        Contract::deploy(web3.eth(), &MOCK_TOKEN_ABI)
-            .expect("Invalid ABI of Mock Token contract")
-            .confirmations(0)
-            .options(Options::with(|opt| {
-                opt.gas_price = Some(1.into());
-                opt.gas = Some(6_721_975.into());
-            }))
-            .execute(*MOCK_TOKEN_BYTECODE, (), from_leader_account)
-    })
-    .await;
-
-    let token_contract = tokio_compat_02::FutureExt::compat(feature).await?;
+    let token_contract = Contract::deploy(web3.eth(), &MOCK_TOKEN_ABI)
+        .expect("Invalid ABI of Mock Token contract")
+        .confirmations(0)
+        .options(Options::with(|opt| {
+            opt.gas_price = Some(1.into());
+            opt.gas = Some(6_721_975.into());
+        }))
+        .execute(*MOCK_TOKEN_BYTECODE, (), from_leader_account)
+        .await?;
 
     let token_info = TokenInfo {
         min_token_units_for_deposit: BigNum::from(min_token_units),

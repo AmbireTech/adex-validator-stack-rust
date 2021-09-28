@@ -2,11 +2,9 @@ use chrono::{DateTime, Utc};
 use futures::pin_mut;
 use primitives::{
     balances::UncheckedState,
-    channel::Channel as ChannelOld,
-    channel_v5::Channel as ChannelV5,
     sentry::{EventAggregate, MessageResponse},
     validator::{ApproveState, Heartbeat, NewState},
-    Address, BigNum, ChannelId, ValidatorId,
+    Address, BigNum, Channel, ChannelId, ValidatorId,
 };
 use std::{convert::TryFrom, ops::Add};
 use tokio_postgres::{
@@ -16,29 +14,9 @@ use tokio_postgres::{
 
 use super::{DbPool, PoolError};
 
-pub async fn latest_approve_state(
-    pool: &DbPool,
-    channel: &ChannelOld,
-) -> Result<Option<MessageResponse<ApproveState>>, PoolError> {
-    let client = pool.get().await?;
-
-    let select = client.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'ApproveState' ORDER BY received DESC LIMIT 1").await?;
-    let rows = client
-        .query(
-            &select,
-            &[&channel.id, &channel.spec.validators.follower().id],
-        )
-        .await?;
-
-    rows.get(0)
-        .map(MessageResponse::<ApproveState>::try_from)
-        .transpose()
-        .map_err(PoolError::Backend)
-}
-
 pub async fn latest_approve_state_v5(
     pool: &DbPool,
-    channel: &ChannelV5,
+    channel: &Channel,
 ) -> Result<Option<MessageResponse<ApproveState>>, PoolError> {
     let client = pool.get().await?;
 
@@ -53,34 +31,9 @@ pub async fn latest_approve_state_v5(
         .map_err(PoolError::Backend)
 }
 
-pub async fn latest_new_state(
-    pool: &DbPool,
-    channel: &ChannelOld,
-    state_root: &str,
-) -> Result<Option<MessageResponse<NewState<UncheckedState>>>, PoolError> {
-    let client = pool.get().await?;
-
-    let select = client.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'NewState' AND msg->> 'stateRoot' = $3 ORDER BY received DESC LIMIT 1").await?;
-    let rows = client
-        .query(
-            &select,
-            &[
-                &channel.id,
-                &channel.spec.validators.leader().id,
-                &state_root,
-            ],
-        )
-        .await?;
-
-    rows.get(0)
-        .map(MessageResponse::<NewState<UncheckedState>>::try_from)
-        .transpose()
-        .map_err(PoolError::Backend)
-}
-
 pub async fn latest_new_state_v5(
     pool: &DbPool,
-    channel: &ChannelV5,
+    channel: &Channel,
     state_root: &str,
 ) -> Result<Option<MessageResponse<NewState<UncheckedState>>>, PoolError> {
     let client = pool.get().await?;

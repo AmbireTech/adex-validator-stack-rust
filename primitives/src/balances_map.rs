@@ -101,8 +101,8 @@ mod test {
     #[test]
     fn test_unified_map_de_serialization() {
         let unified_map: UnifiedMap = vec![
-            (ADDRESSES["leader"].clone(), UnifiedNum::from(50_u64)),
-            (ADDRESSES["follower"].clone(), UnifiedNum::from(100_u64)),
+            (ADDRESSES["leader"], UnifiedNum::from(50_u64)),
+            (ADDRESSES["follower"], UnifiedNum::from(100_u64)),
         ]
         .into_iter()
         .collect();
@@ -124,8 +124,8 @@ mod test {
     #[test]
     fn test_balances_map_de_serialization() {
         let balances_map: BalancesMap = vec![
-            (ADDRESSES["leader"].clone(), BigNum::from(50_u64)),
-            (ADDRESSES["follower"].clone(), BigNum::from(100_u64)),
+            (ADDRESSES["leader"], BigNum::from(50_u64)),
+            (ADDRESSES["follower"], BigNum::from(100_u64)),
         ]
         .into_iter()
         .collect();
@@ -157,9 +157,9 @@ mod test {
             serde_json::from_value(json).expect("Should deserialize it");
 
         let expected_deserialized: BalancesMap = vec![
-            (ADDRESSES["leader"].clone(), BigNum::from(50_u64)),
+            (ADDRESSES["leader"], BigNum::from(50_u64)),
             // only the second should be accepted, as it appears second in the string and it's the latest one
-            (ADDRESSES["follower"].clone(), BigNum::from(20_u64)),
+            (ADDRESSES["follower"], BigNum::from(20_u64)),
         ]
         .into_iter()
         .collect();

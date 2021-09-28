@@ -446,13 +446,13 @@ mod test {
                 event_min_price: Some(
                     CAMPAIGN
                         .pricing("IMPRESSION")
-                        .map(|price| price.min.clone())
+                        .map(|price| price.min)
                         .expect("should have price"),
                 ),
                 event_max_price: Some(
                     CAMPAIGN
                         .pricing("IMPRESSION")
-                        .map(|price| price.max.clone())
+                        .map(|price| price.max)
                         .expect("Should have price"),
                 ),
             })),
@@ -460,7 +460,7 @@ mod test {
                 balances,
                 publisher_id: ADDRESSES["publisher"],
             })),
-            ad_unit_id: Some(IPFS[1].clone()),
+            ad_unit_id: Some(IPFS[1]),
             ad_slot: Some(AdSlot {
                 categories: vec!["IAB3".into(), "IAB13-7".into(), "IAB5".into()],
                 hostname: "adex.network".into(),

@@ -1,9 +1,9 @@
 use crate::{
     db::{
         accounting::{get_accounting, Side},
-        campaign::{get_campaigns_by_channel, insert_campaign, list_campaigns, update_campaign},
-        insert_channel,
-        spendable::{fetch_spendable, update_spendable},
+        campaign::{get_campaigns_by_channel, update_campaign},
+        insert_campaign, insert_channel,
+        spendable::update_spendable,
         CampaignRemaining, DbPool, RedisError,
     },
     success_response, Application, Auth, ResponseError,
@@ -13,12 +13,11 @@ use hyper::{Body, Request, Response};
 use primitives::{
     adapter::{Adapter, AdapterErrorKind, Error as AdapterError},
     campaign_validator::Validator,
-    channel_v5::Channel,
     config::TokenInfo,
     sentry::campaign::CampaignListQuery,
     sentry::campaign_create::{CreateCampaign, ModifyCampaign},
     spender::Spendable,
-    Address, Campaign, Deposit, UnifiedNum,
+    Address, Campaign, Channel, Deposit, UnifiedNum,
 };
 use slog::error;
 use std::cmp::{max, Ordering};
@@ -26,7 +25,7 @@ use thiserror::Error;
 use tokio_postgres::error::SqlState;
 
 #[derive(Debug, Error)]
-pub enum Error {
+pub enum Error<AE: AdapterErrorKind + 'static> {
     #[error("Error while updating campaign: {0}")]
     FailedUpdate(String),
     #[error("Error while performing calculations")]
@@ -37,8 +36,12 @@ pub enum Error {
     NewBudget(String),
     #[error("Spendable amount for campaign creator {0} not found")]
     SpenderNotFound(Address),
+    #[error("Channel token is not whitelisted")]
+    ChannelTokenNotWhitelisted,
     #[error("Campaign was not modified because of spending constraints")]
     CampaignNotModified,
+    #[error("Error while updating spendable for creator: {0}")]
+    LatestSpendable(#[from] LatestSpendableError<AE>),
     #[error("Redis error: {0}")]
     Redis(#[from] RedisError),
     #[error("DB Pool error: {0}")]
@@ -160,10 +163,10 @@ pub async fn create_campaign<A: Adapter>(
         .await?
         .iter()
         .sum::<Option<UnifiedNum>>()
-        .ok_or(Error::Calculation)?
+        .ok_or(Error::<A::AdapterError>::Calculation)?
         // DO NOT FORGET to add the Campaign being created right now!
         .checked_add(&campaign.budget)
-        .ok_or(Error::Calculation)?;
+        .ok_or(Error::<A::AdapterError>::Calculation)?;
 
     // `new_campaigns_remaining <= total_remaining` should be upheld
     // `campaign.budget < total_remaining` should also be upheld!
@@ -248,11 +251,13 @@ pub async fn campaign_list<A: Adapter>(
 }
 
 pub mod update_campaign {
+    use primitives::Config;
+
     use crate::db::{accounting::Side, CampaignRemaining};
 
     use super::*;
 
-    pub async fn handle_route<A: Adapter>(
+    pub async fn handle_route<A: Adapter + 'static>(
         req: Request<Body>,
         app: &Application<A>,
     ) -> Result<Response<Body>, ResponseError> {
@@ -269,7 +274,9 @@ pub mod update_campaign {
 
         // modify Campaign
         let modified_campaign = modify_campaign(
+            app.adapter.clone(),
             &app.pool,
+            &app.config,
             &app.campaign_remaining,
             campaign_being_mutated,
             modify_campaign_fields,
@@ -280,18 +287,20 @@ pub mod update_campaign {
         Ok(success_response(serde_json::to_string(&modified_campaign)?))
     }
 
-    pub async fn modify_campaign(
+    pub async fn modify_campaign<A: Adapter + 'static>(
+        adapter: A,
         pool: &DbPool,
+        config: &Config,
         campaign_remaining: &CampaignRemaining,
         campaign: Campaign,
         modify_campaign: ModifyCampaign,
-    ) -> Result<Campaign, Error> {
-        // *NOTE*: When updating campaigns make sure sum(campaigns.map(getRemaining)) <= totalDepoisted - totalspent
+    ) -> Result<Campaign, Error<A::AdapterError>> {
+        // *NOTE*: When updating campaigns make sure sum(campaigns.map(getRemaining)) <= totalDeposited - totalSpent
         // !WARNING!: totalSpent != sum(campaign.map(c => c.spending)) therefore we must always calculate remaining funds based on total_deposit - lastApprovedNewState.spenders[user]
         // *NOTE*: To close a campaign set campaignBudget to campaignSpent so that spendable == 0
 
         let delta_budget = if let Some(new_budget) = modify_campaign.budget {
-            get_delta_budget(campaign_remaining, &campaign, new_budget).await?
+            get_delta_budget::<A>(campaign_remaining, &campaign, new_budget).await?
         } else {
             None
         };
@@ -311,10 +320,14 @@ pub mod update_campaign {
             .map(|accounting| accounting.amount)
             .unwrap_or_default();
 
+            let token = config
+                .token_address_whitelist
+                .get(&campaign.channel.token)
+                .ok_or(Error::ChannelTokenNotWhitelisted)?;
+
             let latest_spendable =
-                fetch_spendable(pool.clone(), &campaign.creator, &campaign.channel.id())
-                    .await?
-                    .ok_or(Error::SpenderNotFound(campaign.creator))?;
+                update_latest_spendable(&adapter, pool, campaign.channel, token, campaign.creator)
+                    .await?;
 
             // Gets the latest Spendable for this (spender, channelId) pair
             let total_deposited = latest_spendable.deposit.total;
@@ -385,11 +398,12 @@ pub mod update_campaign {
         Decrease(T),
     }
 
-    async fn get_delta_budget(
+    // TODO: Figure out a way to simplify Errors and remove the Adapter from here
+    async fn get_delta_budget<A: Adapter + 'static>(
         campaign_remaining: &CampaignRemaining,
         campaign: &Campaign,
         new_budget: UnifiedNum,
-    ) -> Result<Option<DeltaBudget<UnifiedNum>>, Error> {
+    ) -> Result<Option<DeltaBudget<UnifiedNum>>, Error<A::AdapterError>> {
         let current_budget = campaign.budget;
 
         let budget_action = match new_budget.cmp(&current_budget) {
@@ -946,10 +960,16 @@ mod test {
                 campaign.channel.token,
             );
 
-            let modified_campaign =
-                modify_campaign(&app.pool, &app.campaign_remaining, campaign.clone(), modify)
-                    .await
-                    .expect("Should modify campaign");
+            let modified_campaign = modify_campaign(
+                app.adapter.clone(),
+                &app.pool,
+                &app.config,
+                &app.campaign_remaining,
+                campaign.clone(),
+                modify,
+            )
+            .await
+            .expect("Should modify campaign");
 
             assert_eq!(new_budget, modified_campaign.budget);
             assert_eq!(Some("Updated title".to_string()), modified_campaign.title);
@@ -1030,10 +1050,16 @@ mod test {
                 modified.channel.token,
             );
 
-            let modified_campaign =
-                modify_campaign(&app.pool, &app.campaign_remaining, modified, modify)
-                    .await
-                    .expect("Should modify campaign");
+            let modified_campaign = modify_campaign(
+                app.adapter.clone(),
+                &app.pool,
+                &app.config,
+                &app.campaign_remaining,
+                modified,
+                modify,
+            )
+            .await
+            .expect("Should modify campaign");
 
             assert_eq!(lower_budget, modified_campaign.budget);
 
@@ -1087,9 +1113,16 @@ mod test {
                 modified.channel.token,
             );
 
-            let modify_err = modify_campaign(&app.pool, &app.campaign_remaining, modified, modify)
-                .await
-                .expect_err("Should return Error response");
+            let modify_err = modify_campaign(
+                app.adapter.clone(),
+                &app.pool,
+                &app.config,
+                &app.campaign_remaining,
+                modified,
+                modify,
+            )
+            .await
+            .expect_err("Should return Error response");
 
             assert!(
                 matches!(modify_err, Error::NewBudget(string) if string == "Not enough deposit left for the campaign's new budget")

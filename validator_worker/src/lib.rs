@@ -56,7 +56,7 @@ pub(crate) fn get_state_root_hash(
 mod test {
     use super::*;
 
-    use primitives::util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, DUMMY_CHANNEL};
+    use primitives::util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, DUMMY_CHANNEL_ID};
 
     #[test]
     // TODO: Double check this test - encoded value! after introducing `spenders` ("spender", address, amount)
@@ -84,7 +84,7 @@ mod test {
     /// we re-use it in order to double check if we haven't change anything with the `get_state_root_hash()` changes
     /// when we introduced `spenders` `("spender", address, amount)` & `UnifiedNum`
     fn get_state_root_hash_returns_correct_hash_for_added_address_to_spenders() {
-        let channel = DUMMY_CHANNEL.id;
+        let channel = *DUMMY_CHANNEL_ID;
 
         let mut balances = Balances::<CheckedState>::default();
         balances.add_earner(ADDRESSES["publisher"]);

@@ -95,9 +95,8 @@ pub async fn insert_validator_messages(
 
 mod list_channels {
     use primitives::{
-        channel_v5::Channel,
         sentry::{channel_list::ChannelListResponse, Pagination},
-        ValidatorId,
+        Channel, ValidatorId,
     };
 
     use crate::db::{DbPool, PoolError, TotalCount};
