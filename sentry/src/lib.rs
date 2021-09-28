@@ -22,7 +22,7 @@ use {
     db::{CampaignRemaining, DbPool},
     routes::{
         campaign,
-        campaign::{create_campaign, update_campaign},
+        campaign::{campaign_list, create_campaign, update_campaign},
         cfg::config,
         channel::{
             channel_list, create_validator_messages, get_all_spender_limits, get_spender_limits,
@@ -204,7 +204,7 @@ async fn campaigns_router<A: Adapter + 'static>(
         // }
 
         Err(ResponseError::NotFound)
-    } else if method == &Method::POST && path == "/v5/campaign/list" {
+    } else if method == Method::POST && path == "/v5/campaign/list" {
         req = AuthRequired.call(req, app).await?;
 
         campaign_list(req, app).await

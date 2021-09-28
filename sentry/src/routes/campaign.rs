@@ -1,7 +1,7 @@
 use crate::{
     db::{
         accounting::{get_accounting, Side},
-        campaign::{get_campaigns_by_channel, update_campaign},
+        campaign::{get_campaigns_by_channel, list_campaigns, update_campaign},
         insert_campaign, insert_channel,
         spendable::update_spendable,
         CampaignRemaining, DbPool, RedisError,
