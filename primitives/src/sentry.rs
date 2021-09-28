@@ -300,7 +300,7 @@ impl fmt::Display for ChannelReport {
 }
 
 pub mod channel_list {
-    use crate::{channel::Channel, ValidatorId};
+    use crate::{Channel, ValidatorId};
     use serde::{Deserialize, Serialize};
 
     use super::Pagination;
@@ -360,9 +360,8 @@ pub mod campaign_create {
 
     use crate::{
         campaign::{prefix_active, Active, PricingBounds, Validators},
-        channel::Channel,
         targeting::Rules,
-        AdUnit, Address, Campaign, CampaignId, EventSubmission, UnifiedNum,
+        AdUnit, Address, Campaign, CampaignId, Channel, EventSubmission, UnifiedNum,
     };
 
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

@@ -4,7 +4,7 @@ use crate::{
     sentry_interface::{campaigns::all_campaigns, Validator, Validators},
     SentryApi,
 };
-use primitives::{adapter::Adapter, channel::Channel, config::Config, util::ApiUrl, ChannelId};
+use primitives::{adapter::Adapter, config::Config, util::ApiUrl, Channel, ChannelId};
 use slog::Logger;
 use std::collections::{hash_map::Entry, HashSet};
 

@@ -5,21 +5,17 @@ use std::{convert::TryFrom, error::Error, time::Duration};
 
 use clap::{crate_version, App, Arg};
 use futures::future::{join, join_all};
-use tokio::{
-    runtime::Runtime,
-    // time::{sleep, timeout},
-    time::sleep,
-};
+use tokio::{runtime::Runtime, time::sleep};
 
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
 use primitives::{
     adapter::{Adapter, DummyAdapterOptions, KeystoreOptions},
-    // channel::Channel as ChannelV5,
     config::{configuration, Config},
-    util::tests::prep_db::{AUTH, IDS},
-    util::ApiUrl,
+    util::{
+        tests::prep_db::{AUTH, IDS},
+        ApiUrl,
+    },
     ValidatorId,
-    // Campaign, ChannelId, SpecValidator,
 };
 use slog::{error, info, Logger};
 use std::fmt::Debug;

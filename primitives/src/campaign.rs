@@ -1,5 +1,5 @@
 use crate::{
-    channel::Channel, targeting::Rules, AdUnit, Address, EventSubmission, UnifiedNum, Validator,
+    targeting::Rules, AdUnit, Address, Channel, EventSubmission, UnifiedNum, Validator,
     ValidatorDesc, ValidatorId,
 };
 
@@ -358,7 +358,7 @@ pub mod validators {
 
 #[cfg(feature = "postgres")]
 mod postgres {
-    use crate::channel::Channel;
+    use crate::Channel;
 
     use super::{Active, Campaign, CampaignId, PricingBounds, Validators};
     use bytes::BytesMut;

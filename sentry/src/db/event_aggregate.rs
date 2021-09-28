@@ -2,10 +2,9 @@ use chrono::{DateTime, Utc};
 use futures::pin_mut;
 use primitives::{
     balances::UncheckedState,
-    channel::Channel as ChannelV5,
     sentry::{EventAggregate, MessageResponse},
     validator::{ApproveState, Heartbeat, NewState},
-    Address, BigNum, ChannelId, ValidatorId,
+    Address, BigNum, Channel, ChannelId, ValidatorId,
 };
 use std::{convert::TryFrom, ops::Add};
 use tokio_postgres::{
@@ -17,7 +16,7 @@ use super::{DbPool, PoolError};
 
 pub async fn latest_approve_state_v5(
     pool: &DbPool,
-    channel: &ChannelV5,
+    channel: &Channel,
 ) -> Result<Option<MessageResponse<ApproveState>>, PoolError> {
     let client = pool.get().await?;
 
@@ -34,7 +33,7 @@ pub async fn latest_approve_state_v5(
 
 pub async fn latest_new_state_v5(
     pool: &DbPool,
-    channel: &ChannelV5,
+    channel: &Channel,
     state_root: &str,
 ) -> Result<Option<MessageResponse<NewState<UncheckedState>>>, PoolError> {
     let client = pool.get().await?;

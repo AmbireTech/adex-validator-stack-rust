@@ -4,11 +4,10 @@ use primitives::{
     adapter::{Adapter, AdapterErrorKind, Error as AdapterError},
     balances,
     balances::{Balances, CheckedState, UncheckedState},
-    channel::Channel,
     config::TokenInfo,
     spender::Spender,
     validator::{ApproveState, MessageTypes, NewState, RejectState},
-    Address, ChannelId, UnifiedNum,
+    Address, Channel, ChannelId, UnifiedNum,
 };
 
 use crate::core::follower_rules::{get_health, is_valid_transition};
