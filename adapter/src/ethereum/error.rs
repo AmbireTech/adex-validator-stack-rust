@@ -1,16 +1,19 @@
 use primitives::{
     adapter::{AdapterErrorKind, Error as AdapterError},
     address::Error as AddressError,
+    big_num::ParseBigIntError,
     Address, ChannelId,
 };
 use std::fmt;
+
+use super::RelayerError;
 
 #[derive(Debug)]
 pub enum Error {
     Keystore(KeystoreError),
     WalletUnlock(ethstore::Error),
     Web3(web3::Error),
-    RelayerClient(reqwest::Error),
+    RelayerClient(RelayerError),
     /// When the ChannelId that we get from hashing the EthereumChannel with the contract address
     /// does not align with the provided Channel
     InvalidChannelId {
@@ -27,6 +30,7 @@ pub enum Error {
     VerifyAddress(VerifyError),
     TokenNotWhitelisted(Address),
     InvalidDepositAsset(AddressError),
+    BigNumParsing(ParseBigIntError),
 }
 
 impl std::error::Error for Error {}
@@ -51,7 +55,20 @@ impl fmt::Display for Error {
                 VerifyAddress(err) => write!(f, "Verifying address: {}", err),
                 TokenNotWhitelisted(deposit_asset) => write!(f, "Token not whitelisted: {}", deposit_asset),
                 InvalidDepositAsset(err) => write!(f, "Deposit asset {} is invalid", err),
+                BigNumParsing(err) => write!(f, "Parsing BigNum: {}", err),
             }
+    }
+}
+
+impl From<RelayerError> for Error {
+    fn from(relayer_error: RelayerError) -> Self {
+        Error::RelayerClient(relayer_error)
+    }
+}
+
+impl From<RelayerError> for AdapterError<Error> {
+    fn from(relayer_error: RelayerError) -> Self {
+        AdapterError::Adapter(Box::new(Error::RelayerClient(relayer_error)))
     }
 }
 

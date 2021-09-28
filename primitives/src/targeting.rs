@@ -104,6 +104,7 @@ mod test {
     }
 
     #[test]
+    #[allow(clippy::float_cmp)]
     fn test_output_from_channel() {
         use crate::campaign::{Pricing, PricingBounds};
         use crate::util::tests::prep_db::DUMMY_CAMPAIGN;
@@ -122,7 +123,7 @@ mod test {
 
         let output = Output::from(&campaign);
 
-        assert_eq!(true, output.show);
+        assert!(output.show);
         assert_eq!(1.0, output.boost);
         assert_eq!(
             Some(&UnifiedNum::from(1_000)),

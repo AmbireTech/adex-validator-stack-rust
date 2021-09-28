@@ -12,6 +12,8 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::UnifiedNum;
 
+/// Re-export of the [`num::bigint::ParseBigIntError`] when using [`BigNum`]
+pub use num::bigint::ParseBigIntError;
 #[derive(
     Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, NumOps, One, Zero, Num, Default,
 )]
@@ -24,7 +26,7 @@ pub struct BigNum(
 );
 
 impl BigNum {
-    pub fn new(num: BigUint) -> Result<Self, super::DomainError> {
+    pub fn new(num: BigUint) -> Result<Self, ParseBigIntError> {
         Ok(Self(num))
     }
 
@@ -240,18 +242,15 @@ impl Mul<&Ratio<BigNum>> for BigNum {
 }
 
 impl TryFrom<&str> for BigNum {
-    type Error = super::DomainError;
+    type Error = ParseBigIntError;
 
     fn try_from(num: &str) -> Result<Self, Self::Error> {
-        let big_uint = BigUint::from_str(num)
-            .map_err(|err| super::DomainError::InvalidArgument(err.to_string()))?;
-
-        Ok(Self(big_uint))
+        BigUint::from_str(num).map(Self)
     }
 }
 
 impl FromStr for BigNum {
-    type Err = super::DomainError;
+    type Err = ParseBigIntError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         BigNum::try_from(s)

@@ -6,18 +6,17 @@ use ethstore::{
     ethkey::{public_to_address, recover, verify_address, Message, Password, Signature},
     SafeAccount,
 };
-use futures::TryFutureExt;
 use lazy_static::lazy_static;
 use primitives::{
     adapter::{Adapter, AdapterResult, Deposit, Error as AdapterError, KeystoreOptions, Session},
-    channel_v5::Channel,
     config::Config,
-    Address, BigNum, ToETHChecksum, ValidatorId,
+    Address, BigNum, Channel, ToETHChecksum, ValidatorId,
 };
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{convert::TryFrom, fs, str::FromStr};
+use thiserror::Error;
 use tiny_keccak::Keccak;
 use web3::{
     contract::{Contract, Options},
@@ -116,8 +115,7 @@ impl EthereumAdapter {
         let transport =
             web3::transports::Http::new(&config.ethereum_network).map_err(Error::Web3)?;
         let web3 = web3::Web3::new(transport);
-        let relayer =
-            RelayerClient::new(&config.ethereum_adapter_relayer).map_err(Error::RelayerClient)?;
+        let relayer = RelayerClient::new(&config.ethereum_adapter_relayer)?;
 
         Ok(Self {
             address,
@@ -307,7 +305,7 @@ impl Adapter for EthereumAdapter {
             .await
             .map_err(Error::ContractQuerying)?;
 
-        let on_outpace = BigNum::from_str(&on_outpace.to_string())?;
+        let on_outpace = BigNum::from_str(&on_outpace.to_string()).map_err(Error::BigNumParsing)?;
 
         let counterfactual_address = get_counterfactual_address(
             sweeper_address,
@@ -326,7 +324,10 @@ impl Adapter for EthereumAdapter {
             .await
             .map_err(Error::ContractQuerying)?;
 
-        let still_on_create2: BigNum = still_on_create2.to_string().parse()?;
+        let still_on_create2: BigNum = still_on_create2
+            .to_string()
+            .parse()
+            .map_err(Error::BigNumParsing)?;
 
         let token_info = self
             .config
@@ -357,8 +358,12 @@ struct RelayerClient {
     relayer_url: String,
 }
 
+#[derive(Debug, Error)]
+#[error(transparent)]
+pub struct RelayerError(#[from] pub reqwest::Error);
+
 impl RelayerClient {
-    pub fn new(relayer_url: &str) -> Result<Self, reqwest::Error> {
+    pub fn new(relayer_url: &str) -> Result<Self, RelayerError> {
         let client = Client::builder().build()?;
 
         Ok(Self {
@@ -372,8 +377,7 @@ impl RelayerClient {
         &self,
         from: &ValidatorId,
         identity: &ValidatorId,
-    ) -> Result<bool, AdapterError<Error>> {
-        use reqwest::Response;
+    ) -> Result<bool, RelayerError> {
         use std::collections::HashMap;
         let relay_url = format!(
             "{}/identity/by-owner/{}",
@@ -381,13 +385,8 @@ impl RelayerClient {
             from.to_checksum()
         );
 
-        let identities_owned: HashMap<ValidatorId, u8> = self
-            .client
-            .get(&relay_url)
-            .send()
-            .and_then(|res: Response| res.json())
-            .await
-            .map_err(Error::RelayerClient)?;
+        let identities_owned: HashMap<ValidatorId, u8> =
+            self.client.get(&relay_url).send().await?.json().await?;
 
         let has_privileges = identities_owned
             .get(identity)

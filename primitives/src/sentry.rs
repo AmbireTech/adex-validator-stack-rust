@@ -1,9 +1,8 @@
 use crate::{
     balances::BalancesState,
-    channel::Channel as ChannelOld,
     spender::Spender,
     validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
-    Address, Balances, BigNum, ChannelId, ValidatorId, IPFS,
+    Address, Balances, BigNum, Channel, ChannelId, ValidatorId, IPFS,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -241,7 +240,7 @@ pub struct ValidatorMessageResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct EventAggregateResponse {
-    pub channel: ChannelOld,
+    pub channel: Channel,
     pub events: Vec<EventAggregate>,
 }
 
@@ -301,7 +300,7 @@ impl fmt::Display for ChannelReport {
 }
 
 pub mod channel_list {
-    use crate::{channel_v5::Channel, ValidatorId};
+    use crate::{Channel, ValidatorId};
     use serde::{Deserialize, Serialize};
 
     use super::Pagination;
@@ -361,9 +360,8 @@ pub mod campaign_create {
 
     use crate::{
         campaign::{prefix_active, Active, PricingBounds, Validators},
-        channel_v5::Channel,
         targeting::Rules,
-        AdUnit, Address, Campaign, CampaignId, EventSubmission, UnifiedNum,
+        AdUnit, Address, Campaign, CampaignId, Channel, EventSubmission, UnifiedNum,
     };
 
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -570,8 +568,8 @@ mod test {
     pub fn de_serialize_events() {
         let click = Event::Click {
             publisher: ADDRESSES["publisher"],
-            ad_unit: Some(DUMMY_IPFS[0].clone()),
-            ad_slot: Some(DUMMY_IPFS[1].clone()),
+            ad_unit: Some(DUMMY_IPFS[0]),
+            ad_slot: Some(DUMMY_IPFS[1]),
             referrer: Some("some_referrer".to_string()),
         };
 
