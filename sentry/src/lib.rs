@@ -25,8 +25,8 @@ use {
         campaign::{create_campaign, update_campaign},
         cfg::config,
         channel::{
-            channel_list, create_validator_messages, get_all_spender_limits, get_spender_limits,
-            last_approved, get_accounting_for_channel
+            channel_list, create_validator_messages, get_accounting_for_channel,
+            get_all_spender_limits, get_spender_limits, last_approved,
         },
         event_aggregate::list_channel_event_aggregates,
         validator_message::{extract_params, list_validator_messages},
@@ -82,7 +82,8 @@ static CHANNEL_ALL_SPENDER_LIMITS: Lazy<Regex> = Lazy::new(|| {
         .expect("The regex should be valid")
 });
 static CHANNEL_ACCOUNTING: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/accounting/?$").expect("The regex should be valid")
+    Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/accounting/?$")
+        .expect("The regex should be valid")
 });
 
 #[derive(Debug, Clone)]
@@ -394,7 +395,9 @@ async fn channels_router<A: Adapter + 'static>(
 
         get_all_spender_limits(req, app).await
     } else if let (Some(caps), &Method::GET) = (CHANNEL_ACCOUNTING.captures(&path), method) {
-        let param = RouteParams(vec![caps.get(1).map_or("".to_string(), |m| m.as_str().to_string())]);
+        let param = RouteParams(vec![caps
+            .get(1)
+            .map_or("".to_string(), |m| m.as_str().to_string())]);
         req.extensions_mut().insert(param);
 
         req = Chain::new()

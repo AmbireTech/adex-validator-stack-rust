@@ -1,6 +1,6 @@
 use crate::db::{
-    event_aggregate::{latest_approve_state_v5, latest_heartbeats, latest_new_state_v5},
     accounting::{get_all_accountings_for_channel, Side},
+    event_aggregate::{latest_approve_state_v5, latest_heartbeats, latest_new_state_v5},
     insert_channel, insert_validator_messages, list_channels,
     spendable::{fetch_spendable, get_all_spendables_for_channel, update_spendable},
     DbPool,
@@ -10,15 +10,15 @@ use futures::future::try_join_all;
 use hyper::{Body, Request, Response};
 use primitives::{
     adapter::Adapter,
-    balances::{CheckedState, UncheckedState},
+    balances::{Balances, CheckedState, UncheckedState},
     config::TokenInfo,
     sentry::{
-        channel_list::ChannelListQuery, AllSpendersResponse, LastApproved, LastApprovedQuery,
-        LastApprovedResponse, Pagination, SpenderResponse, SuccessResponse, AccountingResponse
+        channel_list::ChannelListQuery, AccountingResponse, AllSpendersResponse, LastApproved,
+        LastApprovedQuery, LastApprovedResponse, Pagination, SpenderResponse, SuccessResponse,
     },
     spender::{Spendable, Spender, SpenderLeaf},
     validator::{MessageTypes, NewState},
-    Address, Channel, Deposit, UnifiedNum, UnifiedMap
+    Address, Channel, Deposit, UnifiedNum,
 };
 use slog::{error, Logger};
 use std::{collections::HashMap, str::FromStr};
@@ -342,33 +342,40 @@ async fn get_corresponding_new_state(
     new_state
 }
 
-pub async fn get_accounting_for_channel<A: Adapter + 'static>(req: Request<Body>, app: &Application<A>) -> Result<Response<Body>, ResponseError> {
+pub async fn get_accounting_for_channel<A: Adapter + 'static>(
+    req: Request<Body>,
+    app: &Application<A>,
+) -> Result<Response<Body>, ResponseError> {
     let channel = req
         .extensions()
         .get::<Channel>()
         .expect("Request should have Channel")
         .to_owned();
 
-    //  TODO: Pagination
-    let earner_accountings = get_all_accountings_for_channel(app.pool.clone(), channel.id(), Side::Earner).await?;
-    let spender_accountings = get_all_accountings_for_channel(app.pool.clone(), channel.id(), Side::Spender).await?;
+    let earner_accountings =
+        get_all_accountings_for_channel(app.pool.clone(), channel.id(), Side::Earner).await?;
+    let spender_accountings =
+        get_all_accountings_for_channel(app.pool.clone(), channel.id(), Side::Spender).await?;
 
-    let mut balances = Balances::<UncheckedState>::new();
+    let mut unchecked_balances: Balances<UncheckedState> = Balances::default();
     for accounting in earner_accountings {
-        balances.earners.insert(accounting.address, accounting.amount);
+        unchecked_balances
+            .earners
+            .insert(accounting.address, accounting.amount);
     }
 
     for accounting in spender_accountings {
-        balances.spenders.insert(accounting.address, accounting.amount);
+        unchecked_balances
+            .spenders
+            .insert(accounting.address, accounting.amount);
     }
 
-
-    // TODO: check sums
-    let balances = balances.check().ok_or(panic!("Fatal error!"));
-
-    let res = AccountingResponse::<CheckedState> {
-        balances,
+    let balances = match unchecked_balances.check() {
+        Ok(balances) => balances,
+        Err(_) => panic!("Fatal error!"),
     };
+
+    let res = AccountingResponse::<CheckedState> { balances };
     Ok(success_response(serde_json::to_string(&res)?))
 }
 
