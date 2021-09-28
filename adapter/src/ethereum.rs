@@ -6,7 +6,7 @@ use ethstore::{
     ethkey::{public_to_address, recover, verify_address, Message, Password, Signature},
     SafeAccount,
 };
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use primitives::{
     adapter::{Adapter, AdapterResult, Deposit, Error as AdapterError, KeystoreOptions, Session},
     config::Config,
@@ -33,20 +33,22 @@ mod error;
 #[cfg(test)]
 mod test_utils;
 
-lazy_static! {
-    static ref OUTPACE_ABI: &'static [u8] =
-        include_bytes!("../../lib/protocol-eth/abi/OUTPACE.json");
-    static ref ERC20_ABI: &'static [u8] = include_str!("../../lib/protocol-eth/abi/ERC20.json")
-        .trim_end_matches('\n')
-        .as_bytes();
-    static ref SWEEPER_ABI: &'static [u8] =
-        include_bytes!("../../lib/protocol-eth/abi/Sweeper.json");
-    /// Ready to use init code (i.e. decoded) for calculating the create2 address
-    static ref DEPOSITOR_BYTECODE_DECODED: Vec<u8> = {
-        let bytecode = include_str!("../../lib/protocol-eth/resources/bytecode/Depositor.bin");
-        hex::decode(bytecode).expect("Decoded properly")
-    };
-}
+pub static OUTPACE_ABI: Lazy<&'static [u8]> = Lazy::new(||{
+    include_bytes!("../../lib/protocol-eth/abi/OUTPACE.json")
+});
+pub static ERC20_ABI: Lazy<&'static [u8]> = Lazy::new(||{
+    include_str!("../../lib/protocol-eth/abi/ERC20.json")
+    .trim_end_matches('\n')
+    .as_bytes()
+});
+pub static SWEEPER_ABI: Lazy<&'static [u8]> = Lazy::new(|| {
+    include_bytes!("../../lib/protocol-eth/abi/Sweeper.json")
+});
+/// Ready to use init code (i.e. decoded) for calculating the create2 address
+pub static DEPOSITOR_BYTECODE_DECODED: Lazy<Vec<u8>> = Lazy::new(||{
+    let bytecode = include_str!("../../lib/protocol-eth/resources/bytecode/Depositor.bin");
+    hex::decode(bytecode).expect("Decoded properly")
+});
 
 trait EthereumChannel {
     fn tokenize(&self) -> Token;

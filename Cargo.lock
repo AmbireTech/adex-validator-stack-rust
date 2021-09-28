@@ -16,7 +16,7 @@ dependencies = [
  "ethstore",
  "futures",
  "hex",
- "lazy_static",
+ "once_cell",
  "primitives",
  "reqwest",
  "serde",

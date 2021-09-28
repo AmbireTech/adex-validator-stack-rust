@@ -1,4 +1,4 @@
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use std::{collections::HashMap, num::NonZeroU8};
 use web3::{
     contract::{Contract, Options},
@@ -20,50 +20,48 @@ use crate::EthereumAdapter;
 use super::{EthereumChannel, OUTPACE_ABI, SWEEPER_ABI};
 
 // See `adex-eth-protocol` `contracts/mocks/Token.sol`
-lazy_static! {
     /// Mocked Token ABI
-    pub static ref MOCK_TOKEN_ABI: &'static [u8] =
-        include_bytes!("../../test/resources/mock_token_abi.json");
-    /// Mocked Token bytecode in JSON
-    pub static ref MOCK_TOKEN_BYTECODE: &'static str =
-        include_str!("../../test/resources/mock_token_bytecode.bin");
-    /// Sweeper bytecode
-    pub static ref SWEEPER_BYTECODE: &'static str = include_str!("../../../lib/protocol-eth/resources/bytecode/Sweeper.bin");
-    /// Outpace bytecode
-    pub static ref OUTPACE_BYTECODE: &'static str = include_str!("../../../lib/protocol-eth/resources/bytecode/OUTPACE.bin");
-    pub static ref GANACHE_ADDRESSES: HashMap<String, Address> = {
-        vec![
-            (
-                "leader".to_string(),
-                "0x5a04A8fB90242fB7E1db7d1F51e268A03b7f93A5"
-                    .parse()
-                    .expect("Valid Address"),
-            ),
-            (
-                "follower".to_string(),
-                "0xe3896ebd3F32092AFC7D27e9ef7b67E26C49fB02"
-                    .parse()
-                    .expect("Valid Address"),
-            ),
-            (
-                "creator".to_string(),
-                "0x0E45891a570Af9e5A962F181C219468A6C9EB4e1"
-                    .parse()
-                    .expect("Valid Address"),
-            ),
-            (
-                "advertiser".to_string(),
-                "0x8c4B95383a46D30F056aCe085D8f453fCF4Ed66d"
-                    .parse()
-                    .expect("Valid Address"),
-            ),
-        ]
-        .into_iter()
-        .collect()
-    };
-}
+pub static MOCK_TOKEN_ABI: Lazy<&'static [u8]> = Lazy::new(||{
+    include_bytes!("../../test/resources/mock_token_abi.json")});
+/// Mocked Token bytecode in JSON
+pub static MOCK_TOKEN_BYTECODE: Lazy<&'static str> = Lazy::new(||{
+    include_str!("../../test/resources/mock_token_bytecode.bin")});
+/// Sweeper bytecode
+pub static SWEEPER_BYTECODE: Lazy<&'static str> = Lazy::new(||{ include_str!("../../../lib/protocol-eth/resources/bytecode/Sweeper.bin")});
+/// Outpace bytecode
+pub static OUTPACE_BYTECODE: Lazy<&'static str> = Lazy::new(||{ include_str!("../../../lib/protocol-eth/resources/bytecode/OUTPACE.bin")});
+pub static GANACHE_ADDRESSES: Lazy<HashMap<String, Address>> = Lazy::new(||{
+    vec![
+        (
+            "leader".to_string(),
+            "0x5a04A8fB90242fB7E1db7d1F51e268A03b7f93A5"
+                .parse()
+                .expect("Valid Address"),
+        ),
+        (
+            "follower".to_string(),
+            "0xe3896ebd3F32092AFC7D27e9ef7b67E26C49fB02"
+                .parse()
+                .expect("Valid Address"),
+        ),
+        (
+            "creator".to_string(),
+            "0x0E45891a570Af9e5A962F181C219468A6C9EB4e1"
+                .parse()
+                .expect("Valid Address"),
+        ),
+        (
+            "advertiser".to_string(),
+            "0x8c4B95383a46D30F056aCe085D8f453fCF4Ed66d"
+                .parse()
+                .expect("Valid Address"),
+        ),
+    ]
+    .into_iter()
+    .collect()
+});
 
-pub const GANACHE_URL: &'static str = "http://localhost:8545";
+    pub const GANACHE_URL: &'static str = "http://localhost:8545";
 
 pub fn get_test_channel(token_address: Address) -> Channel {
     Channel {
