@@ -372,7 +372,10 @@ pub async fn get_accounting_for_channel<A: Adapter + 'static>(
 
     let balances = match unchecked_balances.check() {
         Ok(balances) => balances,
-        Err(_) => panic!("Fatal error!"),
+        Err(error) => {
+            error!(&app.logger, "{}", &error; "module" => "channel_accounting");
+            return Err(ResponseError::FailedValidation("Earners sum is not equal to spenders sum for channel".to_string()))
+        },
     };
 
     let res = AccountingResponse::<CheckedState> { balances };
