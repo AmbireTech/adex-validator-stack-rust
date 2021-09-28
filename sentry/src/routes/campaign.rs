@@ -13,11 +13,10 @@ use hyper::{Body, Request, Response};
 use primitives::{
     adapter::{Adapter, AdapterErrorKind, Error as AdapterError},
     campaign_validator::Validator,
-    channel_v5::Channel,
     config::TokenInfo,
     sentry::campaign_create::{CreateCampaign, ModifyCampaign},
     spender::Spendable,
-    Address, Campaign, Deposit, UnifiedNum,
+    Address, Campaign, Channel, Deposit, UnifiedNum,
 };
 use slog::error;
 use std::cmp::{max, Ordering};
@@ -294,7 +293,7 @@ pub mod update_campaign {
                 .ok_or(Error::ChannelTokenNotWhitelisted)?;
 
             let latest_spendable =
-                update_latest_spendable(&adapter, &pool, campaign.channel, token, campaign.creator)
+                update_latest_spendable(&adapter, pool, campaign.channel, token, campaign.creator)
                     .await?;
 
             // Gets the latest Spendable for this (spender, channelId) pair

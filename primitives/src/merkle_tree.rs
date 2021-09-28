@@ -177,8 +177,8 @@ mod test {
 
         let proof = top.proof(0);
 
-        let verify = top.verify(proof);
-        assert_eq!(verify, true, "should verify proof successfully");
+        let verified = top.verify(proof);
+        assert!(verified, "should verify proof successfully");
     }
 
     #[test]
@@ -203,9 +203,9 @@ mod test {
         );
 
         let proof = top.proof(0);
-        let verify = top.verify(proof);
+        let verified = top.verify(proof);
 
-        assert_eq!(verify, true, "should verify proof successfully");
+        assert!(verified, "should verify proof successfully");
     }
 
     #[test]
@@ -235,8 +235,8 @@ mod test {
         );
 
         let proof = top.proof(0);
-        let verify = top.verify(proof);
+        let verified = top.verify(proof);
 
-        assert_eq!(verify, true, "should verify proof successfully");
+        assert!(verified, "should verify proof successfully");
     }
 }

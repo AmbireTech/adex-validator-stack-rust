@@ -4,10 +4,9 @@ use thiserror::Error;
 use primitives::{
     adapter::{Adapter, AdapterErrorKind, Error as AdapterError},
     balances::CheckedState,
-    channel_v5::Channel,
     config::TokenInfo,
     validator::{MessageError, MessageTypes, NewState},
-    Balances, ChannelId,
+    Balances, Channel, ChannelId,
 };
 
 use crate::{
