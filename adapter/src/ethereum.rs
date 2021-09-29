@@ -66,7 +66,7 @@ impl EthereumChannel for Channel {
     }
 }
 
-fn get_counterfactual_address(
+pub fn get_counterfactual_address(
     sweeper: H160,
     channel: &Channel,
     outpace: H160,
@@ -504,6 +504,7 @@ pub fn ewt_verify(
 mod test {
     use super::*;
     use chrono::Utc;
+    use primitives::{config::DEVELOPMENT_CONFIG, util::tests::prep_db::IDS};
     use std::convert::TryFrom;
     use web3::{transports::Http, Web3};
     use wiremock::{
@@ -513,14 +514,14 @@ mod test {
 
     #[test]
     fn should_init_and_unlock_ethereum_adapter() {
-        let mut eth_adapter = setup_eth_adapter(None, None, None);
+        let mut eth_adapter = setup_eth_adapter(DEVELOPMENT_CONFIG.clone());
         eth_adapter.unlock().expect("should unlock eth adapter");
     }
 
     #[test]
     fn should_get_whoami_sign_and_verify_messages() {
         // whoami
-        let mut eth_adapter = setup_eth_adapter(None, None, None);
+        let mut eth_adapter = setup_eth_adapter(DEVELOPMENT_CONFIG.clone());
         let whoami = eth_adapter.whoami();
         assert_eq!(
             whoami.to_string(),
@@ -554,8 +555,7 @@ mod test {
 
         let verify2 = eth_adapter
             .verify(
-                ValidatorId::try_from("ce07CbB7e054514D590a0262C93070D838bFBA2e")
-                    .expect("Failed to parse id"),
+                IDS["leader"],
                 message2,
                 &signature2,
             )
@@ -567,7 +567,7 @@ mod test {
 
     #[test]
     fn should_generate_correct_ewt_sign_and_verify() {
-        let mut eth_adapter = setup_eth_adapter(None, None, None);
+        let mut eth_adapter = setup_eth_adapter(DEVELOPMENT_CONFIG.clone());
 
         eth_adapter.unlock().expect("should unlock eth adapter");
 
@@ -614,7 +614,7 @@ mod test {
         let mut identities_owned: HashMap<ValidatorId, u8> = HashMap::new();
         identities_owned.insert(identity, 2);
 
-        let mut eth_adapter = setup_eth_adapter(None, None, None);
+        let mut eth_adapter = setup_eth_adapter(DEVELOPMENT_CONFIG.clone());
 
         Mock::given(method("GET"))
             .and(path(format!("/identity/by-owner/{}", eth_adapter.whoami())))
@@ -650,7 +650,7 @@ mod test {
         let token = deploy_token_contract(&web3, 1_000)
             .await
             .expect("Correct parameters are passed to the Token constructor.");
-        let token_address = Address::from_bytes(&token.1.to_fixed_bytes());
+        let token_address = token.1;
 
         let sweeper = deploy_sweeper_contract(&web3)
             .await
@@ -664,11 +664,18 @@ mod test {
 
         let channel = get_test_channel(token_address);
 
-        let mut eth_adapter = setup_eth_adapter(
-            Some(*sweeper.0.as_fixed_bytes()),
-            Some(*outpace.0.as_fixed_bytes()),
-            Some((token_address, token.0)),
+        let mut config = DEVELOPMENT_CONFIG.clone();
+        config.sweeper_address = *sweeper.0.as_fixed_bytes();
+        config.outpace_address = *outpace.0.as_fixed_bytes();
+        // since we deploy a new contract, it's should be different from all the ones found in config.
+        assert!(
+            config
+                .token_address_whitelist
+                .insert(token_address, token.0)
+                .is_none(),
+            "Should not have previous value, we've just deployed the contract."
         );
+        let mut eth_adapter = setup_eth_adapter(config);
         eth_adapter.unlock().expect("should unlock eth adapter");
 
         let counterfactual_address =

@@ -1,5 +1,5 @@
 use once_cell::sync::Lazy;
-use std::{collections::HashMap, num::NonZeroU8};
+use std::{collections::HashMap, convert::TryFrom, num::NonZeroU8};
 use web3::{
     contract::{Contract, Options},
     ethabi::Token,
@@ -11,8 +11,8 @@ use web3::{
 use primitives::{
     adapter::KeystoreOptions,
     channel::{Channel, Nonce},
-    config::{configuration, TokenInfo},
-    Address, BigNum, ValidatorId,
+    config::TokenInfo,
+    Address, BigNum, Config, ValidatorId,
 };
 
 use crate::EthereumAdapter;
@@ -32,6 +32,21 @@ pub static SWEEPER_BYTECODE: Lazy<&'static str> =
 /// Outpace bytecode
 pub static OUTPACE_BYTECODE: Lazy<&'static str> =
     Lazy::new(|| include_str!("../../../lib/protocol-eth/resources/bytecode/OUTPACE.bin"));
+
+pub static KEYSTORE_IDENTITY: Lazy<(Address, KeystoreOptions)> = Lazy::new(|| {
+    (
+        // The address of the keystore file in `adapter/test/resources/keystore.json`
+        Address::try_from("0x2bDeAFAE53940669DaA6F519373f686c1f3d3393")
+            .expect("failed to parse id"),
+        KeystoreOptions {
+            keystore_file: "./test/resources/keystore.json".to_string(),
+            keystore_pwd: "adexvalidator".to_string(),
+        },
+    )
+});
+
+/// Addresses generated on local running `ganache` for testing purposes.
+/// see the `ganache-cli.sh` script in the repository
 pub static GANACHE_ADDRESSES: Lazy<HashMap<String, Address>> = Lazy::new(|| {
     vec![
         (
@@ -62,7 +77,7 @@ pub static GANACHE_ADDRESSES: Lazy<HashMap<String, Address>> = Lazy::new(|| {
     .into_iter()
     .collect()
 });
-
+/// Local `ganache` is running at:
 pub const GANACHE_URL: &'static str = "http://localhost:8545";
 
 pub fn get_test_channel(token_address: Address) -> Channel {
@@ -75,34 +90,11 @@ pub fn get_test_channel(token_address: Address) -> Channel {
     }
 }
 
-pub fn setup_eth_adapter(
-    sweeper_address: Option<[u8; 20]>,
-    outpace_address: Option<[u8; 20]>,
-    token_whitelist: Option<(Address, TokenInfo)>,
-) -> EthereumAdapter {
-    let mut config = configuration("development", None).expect("failed parse config");
+pub fn setup_eth_adapter(config: Config) -> EthereumAdapter {
     let keystore_options = KeystoreOptions {
         keystore_file: "./test/resources/keystore.json".to_string(),
         keystore_pwd: "adexvalidator".to_string(),
     };
-
-    if let Some(address) = sweeper_address {
-        config.sweeper_address = address;
-    }
-
-    if let Some(address) = outpace_address {
-        config.outpace_address = address;
-    }
-
-    if let Some((address, token_info)) = token_whitelist {
-        assert!(
-            config
-                .token_address_whitelist
-                .insert(address, token_info)
-                .is_none(),
-            "It should not contain the generated token prior to this call!"
-        )
-    }
 
     EthereumAdapter::init(keystore_options, &config).expect("should init ethereum adapter")
 }
@@ -209,7 +201,7 @@ pub async fn deploy_outpace_contract(
 pub async fn deploy_token_contract(
     web3: &Web3<Http>,
     min_token_units: u64,
-) -> web3::contract::Result<(TokenInfo, H160, Contract<Http>)> {
+) -> web3::contract::Result<(TokenInfo, Address, Contract<Http>)> {
     let from_leader_account = H160(*GANACHE_ADDRESSES["leader"].as_bytes());
 
     let token_contract = Contract::deploy(web3.eth(), &MOCK_TOKEN_ABI)
@@ -229,5 +221,9 @@ pub async fn deploy_token_contract(
         min_validator_fee: BigNum::from(100_000_000_000_000),
     };
 
-    Ok((token_info, token_contract.address(), token_contract))
+    Ok((
+        token_info,
+        Address::from(token_contract.address().as_fixed_bytes()),
+        token_contract,
+    ))
 }
