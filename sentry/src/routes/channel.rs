@@ -385,10 +385,10 @@ pub async fn get_accounting_for_channel<A: Adapter + 'static>(
 mod test {
     use super::*;
     use crate::test_util::setup_dummy_app;
-    use crate::db::{accounting::update_accounting, insert_channel};
+    use crate::db::{accounting::spend_amount, insert_channel};
     use primitives::{
         adapter::Deposit,
-        util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN},
+        util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, IDS},
         BigNum,
     };
     use hyper::StatusCode;
@@ -476,34 +476,86 @@ mod test {
         assert_eq!(updated_spendable.spender, ADDRESSES["creator"]);
     }
 
-    #[tokio::test]
-    async fn get_accountings_for_channel() {
-        let app = setup_dummy_app().await;
-        let channel = DUMMY_CAMPAIGN.channel.clone();
-        insert_channel(&app.pool, channel).await.expect("should insert channel");
-        let req = Request::builder().extension(channel).body(Body::empty()).expect("Should build Request");
-
-        update_accounting(app.pool.clone(), channel.id(), ADDRESSES["publisher"], Side::Earner, UnifiedNum::from_u64(200)).await.expect("should insert accounting");
-        update_accounting(app.pool.clone(), channel.id(), ADDRESSES["publisher2"], Side::Earner, UnifiedNum::from_u64(100)).await.expect("should insert accounting");
-        update_accounting(app.pool.clone(), channel.id(), ADDRESSES["creator"], Side::Spender, UnifiedNum::from_u64(200)).await.expect("should insert accounting");
-        update_accounting(app.pool.clone(), channel.id(), ADDRESSES["tester"], Side::Spender, UnifiedNum::from_u64(100)).await.expect("should insert accounting");
-
-        let accounting_response = get_accounting_for_channel(req, &app).await.expect("should get response");
-        assert_eq!(StatusCode::OK, accounting_response.status());
-        let json = hyper::body::to_bytes(accounting_response.into_body())
+    async fn res_to_accounting_response(res: Response<Body>) -> AccountingResponse<CheckedState> {
+        let json = hyper::body::to_bytes(res.into_body())
             .await
             .expect("Should get json");
 
         let accounting_response: AccountingResponse<CheckedState> =
             serde_json::from_slice(&json).expect("Should get AccouuntingResponse");
-        let sum = accounting_response.balances.sum().expect("shouldn't be None");
-        assert_eq!(sum.0, UnifiedNum::from_u64(300));
-        assert_eq!(sum.1, UnifiedNum::from_u64(300));
+        accounting_response
+    }
 
-        update_accounting(app.pool.clone(), channel.id(), ADDRESSES["tester"], Side::Spender, UnifiedNum::from_u64(200)).await.expect("should insert accounting");
+    #[tokio::test]
+    async fn get_accountings_for_channel() {
+        let app = setup_dummy_app().await;
+        let channel = DUMMY_CAMPAIGN.channel.clone();
+        insert_channel(&app.pool, channel).await.expect("should insert channel");
+        let build_request = |channel: Channel| {
+            Request::builder()
+                .extension(channel)
+                .body(Body::empty())
+                .expect("Should build Request")
+        };
+        // Testing for no accounting yet
+        {
+            let res = get_accounting_for_channel(build_request(channel.clone()), &app).await.expect("should get response");
+            assert_eq!(StatusCode::OK, res.status());
 
-        let new_req = Request::builder().extension(channel).body(Body::empty()).expect("Should build Request");
-        let bad_accounting_response = get_accounting_for_channel(new_req, &app).await;
-        assert!(bad_accounting_response.is_err())
+            let accounting_response = res_to_accounting_response(res).await;
+            assert_eq!(accounting_response.balances.earners.len(), 0);
+            assert_eq!(accounting_response.balances.spenders.len(), 0);
+        }
+
+        // Testing for 2 accountings - first channel
+        let mut balances = Balances::<CheckedState>::new();
+        balances.earners.insert(ADDRESSES["publisher"], UnifiedNum::from_u64(200));
+        balances.earners.insert(ADDRESSES["publisher2"], UnifiedNum::from_u64(100));
+        balances.spenders.insert(ADDRESSES["creator"], UnifiedNum::from_u64(200));
+        balances.spenders.insert(ADDRESSES["tester"], UnifiedNum::from_u64(100));
+        spend_amount(app.pool.clone(), channel.id(), balances.clone()).await.expect("should spend");
+        {
+            let res = get_accounting_for_channel(build_request(channel.clone()), &app).await.expect("should get response");
+            assert_eq!(StatusCode::OK, res.status());
+
+            let accounting_response = res_to_accounting_response(res).await;
+
+            let sum = accounting_response.balances.sum().expect("shouldn't overflow");
+            assert_eq!(sum.0, UnifiedNum::from_u64(300));
+            assert_eq!(sum.1, UnifiedNum::from_u64(300));
+        }
+
+        // Testing for 2 accountings - second channel (same address is both an earner and a spender)
+        let mut second_channel = DUMMY_CAMPAIGN.channel.clone();
+        second_channel.leader = IDS["user"]; // channel.id() will be different now
+        insert_channel(&app.pool, second_channel).await.expect("should insert channel");
+
+        let mut balances = Balances::<CheckedState>::new();
+        balances.earners.insert(ADDRESSES["publisher"], UnifiedNum::from_u64(300));
+        balances.spenders.insert(ADDRESSES["publisher"], UnifiedNum::from_u64(300));
+        spend_amount(app.pool.clone(), second_channel.id(), balances).await.expect("should spend");
+
+        insert_channel(&app.pool, second_channel).await.expect("should insert channel");
+        {
+            let res = get_accounting_for_channel(build_request(second_channel.clone()), &app).await.expect("should get response");
+            assert_eq!(StatusCode::OK, res.status());
+
+            let accounting_response = res_to_accounting_response(res).await;
+
+            let sum = accounting_response.balances.sum().expect("shouldn't overflow");
+            assert_eq!(sum.0, UnifiedNum::from_u64(300));
+            assert_eq!(sum.1, UnifiedNum::from_u64(300));
+        }
+        // Testing for when sums dont match - Error case
+        let mut balances = Balances::<CheckedState>::new();
+        balances.earners.insert(ADDRESSES["publisher"], UnifiedNum::from_u64(100));
+        balances.spenders.insert(ADDRESSES["creator"], UnifiedNum::from_u64(200));
+        spend_amount(app.pool.clone(), channel.id(), balances).await.expect("should spend");
+        {
+            let res = get_accounting_for_channel(build_request(channel.clone()), &app).await;
+            assert!(res.is_err());
+            assert!(matches!(res, Err(ResponseError::FailedValidation(_))));
+
+        }
     }
 }
