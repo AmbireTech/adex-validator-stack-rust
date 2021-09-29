@@ -586,7 +586,7 @@ mod test {
     }
 
     // Campaigns are sorted in ascending order when retrieved
-    // Therefore every campaign in the
+    // Therefore the last campaign inserted will come up first in results
     #[tokio::test]
     async fn it_lists_campaigns_properly() {
         let database = DATABASE_POOL.get().await.expect("Should get a DB pool");

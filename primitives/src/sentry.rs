@@ -352,7 +352,7 @@ pub mod campaign {
         /// filters the campaigns containing a specific validator if provided
         pub validator: Option<ValidatorId>,
         /// filters the campaigns where the provided validator is a leader if true
-        /// or if a validator isn't provided but an Auth.uid is provided (i.e. there is a auth header with token)
+        /// if no validator is provided, but is_leader is true, it uses Auth to obtain a validator
         pub is_leader: Option<bool>,
     }
 }
