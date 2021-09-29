@@ -26,6 +26,10 @@ pub struct Address(
 );
 
 impl Address {
+    pub fn to_bytes(&self) -> [u8; 20] {
+        self.0
+    }
+
     pub fn as_bytes(&self) -> &[u8; 20] {
         &self.0
     }
