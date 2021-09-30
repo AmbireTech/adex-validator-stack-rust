@@ -1,5 +1,5 @@
 use once_cell::sync::Lazy;
-use std::{collections::HashMap, convert::TryFrom, num::NonZeroU8};
+use std::{collections::HashMap, convert::TryFrom, env::current_dir, num::NonZeroU8};
 use web3::{
     contract::{Contract, Options},
     ethabi::Token,
@@ -33,13 +33,23 @@ pub static SWEEPER_BYTECODE: Lazy<&'static str> =
 pub static OUTPACE_BYTECODE: Lazy<&'static str> =
     Lazy::new(|| include_str!("../../../lib/protocol-eth/resources/bytecode/OUTPACE.bin"));
 
+/// Uses local `keystore.json` file and it's address for testing and working with [`EthereumAdapter`]
 pub static KEYSTORE_IDENTITY: Lazy<(Address, KeystoreOptions)> = Lazy::new(|| {
+    // The address of the keystore file in `adapter/test/resources/keystore.json`
+    let address = Address::try_from("0x2bDeAFAE53940669DaA6F519373f686c1f3d3393")
+        .expect("failed to parse id");
+
+    let full_path = current_dir().unwrap();
+    // it always starts in `adapter` folder because of the crate scope
+    // even when it's in the workspace
+    let mut keystore_file = full_path.parent().unwrap().to_path_buf();
+    // let full_path = parent.join("test/resources/keystore.json");
+    keystore_file.push("adapter/test/resources/keystore.json");
+
     (
-        // The address of the keystore file in `adapter/test/resources/keystore.json`
-        Address::try_from("0x2bDeAFAE53940669DaA6F519373f686c1f3d3393")
-            .expect("failed to parse id"),
+        address,
         KeystoreOptions {
-            keystore_file: "./test/resources/keystore.json".to_string(),
+            keystore_file: keystore_file.display().to_string(),
             keystore_pwd: "adexvalidator".to_string(),
         },
     )
@@ -78,7 +88,7 @@ pub static GANACHE_ADDRESSES: Lazy<HashMap<String, Address>> = Lazy::new(|| {
     .collect()
 });
 /// Local `ganache` is running at:
-pub const GANACHE_URL: &'static str = "http://localhost:8545";
+pub const GANACHE_URL: &str = "http://localhost:8545";
 
 pub fn get_test_channel(token_address: Address) -> Channel {
     Channel {
@@ -91,12 +101,8 @@ pub fn get_test_channel(token_address: Address) -> Channel {
 }
 
 pub fn setup_eth_adapter(config: Config) -> EthereumAdapter {
-    let keystore_options = KeystoreOptions {
-        keystore_file: "./test/resources/keystore.json".to_string(),
-        keystore_pwd: "adexvalidator".to_string(),
-    };
-
-    EthereumAdapter::init(keystore_options, &config).expect("should init ethereum adapter")
+    EthereumAdapter::init(KEYSTORE_IDENTITY.1.clone(), &config)
+        .expect("should init ethereum adapter")
 }
 
 pub async fn mock_set_balance(

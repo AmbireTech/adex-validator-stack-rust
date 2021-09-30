@@ -26,9 +26,6 @@ use web3::{
     Web3,
 };
 
-#[cfg(any(test, feature = "test-util"))]
-use test_util::*;
-
 mod error;
 #[cfg(any(test, feature = "test-util"))]
 pub mod test_util;
@@ -70,7 +67,7 @@ pub fn get_counterfactual_address(
     sweeper: H160,
     channel: &Channel,
     outpace: H160,
-    depositor: &Address,
+    depositor: Address,
 ) -> H160 {
     let salt: [u8; 32] = [0; 32];
     let encoded_params = encode(&[
@@ -311,7 +308,7 @@ impl Adapter for EthereumAdapter {
             sweeper_address,
             channel,
             outpace_address,
-            depositor_address,
+            *depositor_address,
         );
         let still_on_create2: U256 = erc20_contract
             .query(
@@ -502,6 +499,7 @@ pub fn ewt_verify(
 
 #[cfg(test)]
 mod test {
+    use super::test_util::*;
     use super::*;
     use chrono::Utc;
     use primitives::{config::DEVELOPMENT_CONFIG, util::tests::prep_db::IDS};
@@ -554,11 +552,7 @@ mod test {
         let message2 = "1648231285e69677531ffe70719f67a07f3d4393b8425a5a1c84b0c72434c77b";
 
         let verify2 = eth_adapter
-            .verify(
-                IDS["leader"],
-                message2,
-                &signature2,
-            )
+            .verify(IDS["leader"], message2, &signature2)
             .expect("Failed to verify signatures");
 
         assert!(verify, "invalid signature 1 verification");
@@ -679,7 +673,7 @@ mod test {
         eth_adapter.unlock().expect("should unlock eth adapter");
 
         let counterfactual_address =
-            get_counterfactual_address(sweeper.0, &channel, outpace.0, &spender);
+            get_counterfactual_address(sweeper.0, &channel, outpace.0, spender);
 
         // No Regular nor Create2 deposits
         {
