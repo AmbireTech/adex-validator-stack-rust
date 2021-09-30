@@ -384,14 +384,14 @@ pub async fn get_accounting_for_channel<A: Adapter + 'static>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::test_util::setup_dummy_app;
     use crate::db::{accounting::spend_amount, insert_channel};
+    use crate::test_util::setup_dummy_app;
+    use hyper::StatusCode;
     use primitives::{
         adapter::Deposit,
         util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, IDS},
         BigNum,
     };
-    use hyper::StatusCode;
 
     #[tokio::test]
     async fn create_and_fetch_spendable() {
@@ -490,7 +490,9 @@ mod test {
     async fn get_accountings_for_channel() {
         let app = setup_dummy_app().await;
         let channel = DUMMY_CAMPAIGN.channel.clone();
-        insert_channel(&app.pool, channel).await.expect("should insert channel");
+        insert_channel(&app.pool, channel)
+            .await
+            .expect("should insert channel");
         let build_request = |channel: Channel| {
             Request::builder()
                 .extension(channel)
@@ -499,7 +501,9 @@ mod test {
         };
         // Testing for no accounting yet
         {
-            let res = get_accounting_for_channel(build_request(channel.clone()), &app).await.expect("should get response");
+            let res = get_accounting_for_channel(build_request(channel.clone()), &app)
+                .await
+                .expect("should get response");
             assert_eq!(StatusCode::OK, res.status());
 
             let accounting_response = res_to_accounting_response(res).await;
@@ -508,54 +512,85 @@ mod test {
         }
 
         // Testing for 2 accountings - first channel
-        let mut balances = Balances::<CheckedState>::new();
-        balances.earners.insert(ADDRESSES["publisher"], UnifiedNum::from_u64(200));
-        balances.earners.insert(ADDRESSES["publisher2"], UnifiedNum::from_u64(100));
-        balances.spenders.insert(ADDRESSES["creator"], UnifiedNum::from_u64(200));
-        balances.spenders.insert(ADDRESSES["tester"], UnifiedNum::from_u64(100));
-        spend_amount(app.pool.clone(), channel.id(), balances.clone()).await.expect("should spend");
         {
-            let res = get_accounting_for_channel(build_request(channel.clone()), &app).await.expect("should get response");
+            let mut balances = Balances::<CheckedState>::new();
+            balances
+                .spend(
+                    ADDRESSES["creator"],
+                    ADDRESSES["publisher"],
+                    UnifiedNum::from_u64(200),
+                )
+                .expect("should not overflow");
+            balances
+                .spend(
+                    ADDRESSES["tester"],
+                    ADDRESSES["publisher2"],
+                    UnifiedNum::from_u64(100),
+                )
+                .expect("Should not overflow");
+            spend_amount(app.pool.clone(), channel.id(), balances.clone())
+                .await
+                .expect("should spend");
+
+            let res = get_accounting_for_channel(build_request(channel.clone()), &app)
+                .await
+                .expect("should get response");
             assert_eq!(StatusCode::OK, res.status());
 
             let accounting_response = res_to_accounting_response(res).await;
 
-            let sum = accounting_response.balances.sum().expect("shouldn't overflow");
-            assert_eq!(sum.0, UnifiedNum::from_u64(300));
-            assert_eq!(sum.1, UnifiedNum::from_u64(300));
+            assert_eq!(balances, accounting_response.balances);
         }
 
         // Testing for 2 accountings - second channel (same address is both an earner and a spender)
-        let mut second_channel = DUMMY_CAMPAIGN.channel.clone();
-        second_channel.leader = IDS["user"]; // channel.id() will be different now
-        insert_channel(&app.pool, second_channel).await.expect("should insert channel");
-
-        let mut balances = Balances::<CheckedState>::new();
-        balances.earners.insert(ADDRESSES["publisher"], UnifiedNum::from_u64(300));
-        balances.spenders.insert(ADDRESSES["publisher"], UnifiedNum::from_u64(300));
-        spend_amount(app.pool.clone(), second_channel.id(), balances).await.expect("should spend");
-
-        insert_channel(&app.pool, second_channel).await.expect("should insert channel");
         {
-            let res = get_accounting_for_channel(build_request(second_channel.clone()), &app).await.expect("should get response");
+            let mut second_channel = DUMMY_CAMPAIGN.channel.clone();
+            second_channel.leader = IDS["user"]; // channel.id() will be different now
+            insert_channel(&app.pool, second_channel)
+                .await
+                .expect("should insert channel");
+
+            let mut balances = Balances::<CheckedState>::new();
+            balances
+                .spend(ADDRESSES["tester"], ADDRESSES["publisher"], 300.into())
+                .expect("Should not overflow");
+
+            balances
+                .spend(ADDRESSES["publisher"], ADDRESSES["user"], 300.into())
+                .expect("Should not overflow");
+
+            spend_amount(app.pool.clone(), second_channel.id(), balances.clone())
+                .await
+                .expect("should spend");
+
+            let res = get_accounting_for_channel(build_request(second_channel.clone()), &app)
+                .await
+                .expect("should get response");
             assert_eq!(StatusCode::OK, res.status());
 
             let accounting_response = res_to_accounting_response(res).await;
 
-            let sum = accounting_response.balances.sum().expect("shouldn't overflow");
-            assert_eq!(sum.0, UnifiedNum::from_u64(300));
-            assert_eq!(sum.1, UnifiedNum::from_u64(300));
+            assert_eq!(balances, accounting_response.balances)
         }
-        // Testing for when sums dont match - Error case
-        let mut balances = Balances::<CheckedState>::new();
-        balances.earners.insert(ADDRESSES["publisher"], UnifiedNum::from_u64(100));
-        balances.spenders.insert(ADDRESSES["creator"], UnifiedNum::from_u64(200));
-        spend_amount(app.pool.clone(), channel.id(), balances).await.expect("should spend");
-        {
-            let res = get_accounting_for_channel(build_request(channel.clone()), &app).await;
-            assert!(res.is_err());
-            assert!(matches!(res, Err(ResponseError::FailedValidation(_))));
 
+        // Testing for when sums don't match on first channel - Error case
+        {
+            let mut balances = Balances::<CheckedState>::new();
+            balances
+                .earners
+                .insert(ADDRESSES["publisher"], UnifiedNum::from_u64(100));
+            balances
+                .spenders
+                .insert(ADDRESSES["creator"], UnifiedNum::from_u64(200));
+            spend_amount(app.pool.clone(), channel.id(), balances)
+                .await
+                .expect("should spend");
+
+            let res = get_accounting_for_channel(build_request(channel.clone()), &app).await;
+            let expected = ResponseError::FailedValidation(
+                "Earners sum is not equal to spenders sum for channel".to_string(),
+            );
+            assert_eq!(expected, res.expect_err("Should return an error"));
         }
     }
 }
