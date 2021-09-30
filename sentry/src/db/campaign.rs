@@ -1,6 +1,10 @@
-use crate::db::{DbPool, PoolError};
-use primitives::{Campaign, CampaignId, ChannelId};
-use tokio_postgres::types::Json;
+use crate::db::{DbPool, PoolError, TotalCount};
+use chrono::{DateTime, Utc};
+use primitives::{
+    sentry::{campaign::CampaignListResponse, Pagination},
+    Address, Campaign, CampaignId, ChannelId, ValidatorId,
+};
+use tokio_postgres::types::{Json, ToSql};
 
 pub use campaign_remaining::CampaignRemaining;
 
@@ -56,6 +60,98 @@ pub async fn fetch_campaign(
     let row = client.query_opt(&statement, &[&campaign]).await?;
 
     Ok(row.as_ref().map(Campaign::from))
+}
+
+pub async fn list_campaigns(
+    pool: &DbPool,
+    skip: u64,
+    limit: u32,
+    creator: Option<Address>,
+    validator: Option<ValidatorId>,
+    is_leader: Option<bool>,
+    active_to_ge: &DateTime<Utc>,
+) -> Result<CampaignListResponse, PoolError> {
+    let client = pool.get().await?;
+
+    let (where_clauses, params) =
+        campaign_list_query_params(&creator, &validator, is_leader, active_to_ge);
+    let total_count_params = (where_clauses.clone(), params.clone());
+
+    // To understand why we use Order by, see Postgres Documentation: https://www.postgresql.org/docs/8.1/queries-limit.html
+    let statement = format!("SELECT campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM campaigns INNER JOIN channels ON campaigns.channel_id=channels.id WHERE {} ORDER BY campaigns.created ASC LIMIT {} OFFSET {}", where_clauses.join(" AND "), limit, skip);
+    let stmt = client.prepare(&statement).await?;
+    let rows = client.query(&stmt, params.as_slice()).await?;
+    let campaigns = rows.iter().map(Campaign::from).collect();
+
+    let total_count =
+        list_campaigns_total_count(pool, (&total_count_params.0, total_count_params.1)).await?;
+
+    // fast ceil for total_pages
+    let total_pages = if total_count == 0 {
+        1
+    } else {
+        1 + ((total_count - 1) / limit as u64)
+    };
+
+    let pagination = Pagination {
+        total_pages,
+        total: total_pages,
+        page: skip / limit as u64,
+    };
+
+    Ok(CampaignListResponse {
+        pagination,
+        campaigns,
+    })
+}
+
+fn campaign_list_query_params<'a>(
+    creator: &'a Option<Address>,
+    validator: &'a Option<ValidatorId>,
+    is_leader: Option<bool>,
+    active_to_ge: &'a DateTime<Utc>,
+) -> (Vec<String>, Vec<&'a (dyn ToSql + Sync)>) {
+    let mut where_clauses = vec!["active_to >= $1".to_string()];
+    let mut params: Vec<&(dyn ToSql + Sync)> = vec![active_to_ge];
+
+    if let Some(creator) = creator {
+        where_clauses.push(format!("creator = ${}", params.len() + 1));
+        params.push(creator);
+    }
+
+    // if clause for is_leader is true, the other clause is also always true
+    match (validator, is_leader) {
+        (Some(validator), Some(true)) => {
+            where_clauses.push(format!("channels.leader = ${}", params.len() + 1));
+            params.push(validator);
+        }
+        (Some(validator), _) => {
+            where_clauses.push(format!(
+                "(channels.leader = ${x} OR channels.follower = ${x})",
+                x = params.len() + 1,
+            ));
+            params.push(validator);
+        }
+        _ => (),
+    }
+
+    (where_clauses, params)
+}
+
+async fn list_campaigns_total_count<'a>(
+    pool: &DbPool,
+    (where_clauses, params): (&'a [String], Vec<&'a (dyn ToSql + Sync)>),
+) -> Result<u64, PoolError> {
+    let client = pool.get().await?;
+
+    let statement = format!(
+        "SELECT COUNT(campaigns.id)::varchar FROM campaigns INNER JOIN channels ON campaigns.channel_id=channels.id WHERE {}",
+        where_clauses.join(" AND ")
+    );
+    let stmt = client.prepare(&statement).await?;
+    let row = client.query_one(&stmt, params.as_slice()).await?;
+
+    Ok(row.get::<_, TotalCount>(0).0)
 }
 
 // TODO: We might need to use LIMIT to implement pagination
@@ -386,21 +482,24 @@ mod campaign_remaining {
 
 #[cfg(test)]
 mod test {
-    use primitives::{
-        campaign,
-        event_submission::{RateLimit, Rule},
-        sentry::campaign_create::ModifyCampaign,
-        targeting::Rules,
-        util::tests::prep_db::{DUMMY_AD_UNITS, DUMMY_CAMPAIGN},
-        EventSubmission, UnifiedNum,
-    };
-    use std::time::Duration;
-    use tokio_postgres::error::SqlState;
-
     use crate::db::{
         insert_channel,
         tests_postgres::{setup_test_migrations, DATABASE_POOL},
     };
+    use chrono::TimeZone;
+    use primitives::{
+        campaign,
+        campaign::Validators,
+        event_submission::{RateLimit, Rule},
+        sentry::campaign_create::ModifyCampaign,
+        targeting::Rules,
+        util::tests::prep_db::{
+            ADDRESSES, DUMMY_AD_UNITS, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER, IDS,
+        },
+        EventSubmission, UnifiedNum, ValidatorDesc,
+    };
+    use std::{convert::TryFrom, time::Duration};
+    use tokio_postgres::error::SqlState;
 
     use super::*;
 
@@ -484,5 +583,234 @@ mod test {
                 "Postgres should update all modified fields"
             );
         }
+    }
+
+    // Campaigns are sorted in ascending order when retrieved
+    // Therefore the last campaign inserted will come up first in results
+    #[tokio::test]
+    async fn it_lists_campaigns_properly() {
+        let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
+
+        setup_test_migrations(database.pool.clone())
+            .await
+            .expect("Migrations should succeed");
+
+        let campaign = DUMMY_CAMPAIGN.clone();
+        let mut channel_with_different_leader = DUMMY_CAMPAIGN.channel;
+        channel_with_different_leader.leader = IDS["user"];
+
+        insert_channel(&database, DUMMY_CAMPAIGN.channel)
+            .await
+            .expect("Should insert");
+        insert_channel(&database, channel_with_different_leader)
+            .await
+            .expect("Should insert");
+
+        let mut campaign_new_id = DUMMY_CAMPAIGN.clone();
+        campaign_new_id.id = CampaignId::new();
+        campaign_new_id.created = Utc.ymd(2020, 2, 1).and_hms(7, 0, 0); // 1 year before previous
+
+        // campaign with a different creator
+        let mut campaign_new_creator = DUMMY_CAMPAIGN.clone();
+        campaign_new_creator.id = CampaignId::new();
+        campaign_new_creator.creator = ADDRESSES["tester"];
+        campaign_new_creator.created = Utc.ymd(2019, 2, 1).and_hms(7, 0, 0); // 1 year before previous
+
+        let mut campaign_new_leader = DUMMY_CAMPAIGN.clone();
+        campaign_new_leader.id = CampaignId::new();
+        campaign_new_leader.created = Utc.ymd(2018, 2, 1).and_hms(7, 0, 0); // 1 year before previous
+
+        let different_leader: ValidatorDesc = ValidatorDesc {
+            id: ValidatorId::try_from("0x20754168c00a6e58116ccfd0a5f7d1bb66c5de9d")
+                .expect("Failed to parse DUMMY_VALIDATOR_DIFFERENT_LEADER id"),
+            url: "http://localhost:8005".to_string(),
+            fee: 100.into(),
+            fee_addr: None,
+        };
+        campaign_new_leader.channel = channel_with_different_leader;
+        campaign_new_leader.validators =
+            Validators::new((different_leader.clone(), DUMMY_VALIDATOR_FOLLOWER.clone()));
+
+        insert_campaign(&database, &campaign)
+            .await
+            .expect("Should insert"); // fourth
+        insert_campaign(&database, &campaign_new_id)
+            .await
+            .expect("Should insert"); // third
+        insert_campaign(&database, &campaign_new_creator)
+            .await
+            .expect("Should insert"); // second
+        insert_campaign(&database, &campaign_new_leader)
+            .await
+            .expect("Should insert"); // first
+
+        // 2 out of 3 results
+        let first_page = list_campaigns(
+            &database.pool,
+            0,
+            2,
+            Some(ADDRESSES["creator"]),
+            None,
+            None,
+            &Utc::now(),
+        )
+        .await
+        .expect("should fetch");
+        assert_eq!(
+            first_page.campaigns,
+            vec![campaign_new_leader.clone(), campaign_new_id.clone()]
+        );
+
+        // 3rd result
+        let second_page = list_campaigns(
+            &database.pool,
+            2,
+            2,
+            Some(ADDRESSES["creator"]),
+            None,
+            None,
+            &Utc::now(),
+        )
+        .await
+        .expect("should fetch");
+        assert_eq!(second_page.campaigns, vec![campaign.clone()]);
+
+        // No results past limit
+        let third_page = list_campaigns(
+            &database.pool,
+            4,
+            2,
+            Some(ADDRESSES["creator"]),
+            None,
+            None,
+            &Utc::now(),
+        )
+        .await
+        .expect("should fetch");
+        assert_eq!(third_page.campaigns.len(), 0);
+
+        // Test with a different creator
+        let first_page = list_campaigns(
+            &database.pool,
+            0,
+            2,
+            Some(ADDRESSES["tester"]),
+            None,
+            None,
+            &Utc::now(),
+        )
+        .await
+        .expect("should fetch");
+        assert_eq!(first_page.campaigns, vec![campaign_new_creator.clone()]);
+
+        // Test with validator
+        let first_page = list_campaigns(
+            &database.pool,
+            0,
+            5,
+            None,
+            Some(IDS["follower"]),
+            None,
+            &Utc::now(),
+        )
+        .await
+        .expect("should fetch");
+        assert_eq!(
+            first_page.campaigns,
+            vec![
+                campaign_new_leader.clone(),
+                campaign_new_creator.clone(),
+                campaign_new_id.clone(),
+                campaign.clone()
+            ]
+        );
+
+        // Test with validator and is_leader
+        let first_page = list_campaigns(
+            &database.pool,
+            0,
+            5,
+            None,
+            Some(IDS["leader"]),
+            Some(true),
+            &Utc::now(),
+        )
+        .await
+        .expect("should fetch");
+        assert_eq!(
+            first_page.campaigns,
+            vec![
+                campaign_new_creator.clone(),
+                campaign_new_id.clone(),
+                campaign.clone()
+            ]
+        );
+
+        // Test with a different validator and is_leader
+        let first_page = list_campaigns(
+            &database.pool,
+            0,
+            5,
+            None,
+            Some(IDS["user"]),
+            Some(true),
+            &Utc::now(),
+        )
+        .await
+        .expect("should fetch");
+        assert_eq!(first_page.campaigns, vec![campaign_new_leader.clone()]);
+
+        // Test with validator and is_leader but validator isn't the leader of any campaign
+        let first_page = list_campaigns(
+            &database.pool,
+            0,
+            5,
+            None,
+            Some(IDS["follower"]),
+            Some(true),
+            &Utc::now(),
+        )
+        .await
+        .expect("should fetch");
+        assert_eq!(first_page.campaigns.len(), 0);
+
+        // Test with is_leader set to false
+        let first_page = list_campaigns(
+            &database.pool,
+            0,
+            5,
+            None,
+            Some(IDS["follower"]),
+            Some(false),
+            &Utc::now(),
+        )
+        .await
+        .expect("should fetch");
+        assert_eq!(
+            first_page.campaigns,
+            vec![
+                campaign_new_leader.clone(),
+                campaign_new_creator.clone(),
+                campaign_new_id.clone(),
+                campaign.clone()
+            ]
+        );
+
+        // Test with creator, provided validator and is_leader set to true
+        let first_page = list_campaigns(
+            &database.pool,
+            0,
+            5,
+            Some(ADDRESSES["creator"]),
+            Some(IDS["leader"]),
+            Some(true),
+            &Utc::now(),
+        )
+        .await
+        .expect("should fetch");
+        assert_eq!(
+            first_page.campaigns,
+            vec![campaign_new_id.clone(), campaign.clone()]
+        );
     }
 }

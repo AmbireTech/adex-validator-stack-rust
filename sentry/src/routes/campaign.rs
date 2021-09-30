@@ -1,7 +1,7 @@
 use crate::{
     db::{
         accounting::{get_accounting, Side},
-        campaign::{get_campaigns_by_channel, update_campaign},
+        campaign::{get_campaigns_by_channel, list_campaigns, update_campaign},
         insert_campaign, insert_channel,
         spendable::update_spendable,
         CampaignRemaining, DbPool, RedisError,
@@ -14,6 +14,7 @@ use primitives::{
     adapter::{Adapter, AdapterErrorKind, Error as AdapterError},
     campaign_validator::Validator,
     config::TokenInfo,
+    sentry::campaign::CampaignListQuery,
     sentry::campaign_create::{CreateCampaign, ModifyCampaign},
     spender::Spendable,
     Address, Campaign, Channel, Deposit, UnifiedNum,
@@ -215,6 +216,38 @@ pub async fn create_campaign<A: Adapter>(
     }?;
 
     Ok(success_response(serde_json::to_string(&campaign)?))
+}
+
+pub async fn campaign_list<A: Adapter>(
+    req: Request<Body>,
+    app: &Application<A>,
+) -> Result<Response<Body>, ResponseError> {
+    let mut query =
+        serde_urlencoded::from_str::<CampaignListQuery>(req.uri().query().unwrap_or(""))?;
+
+    query.validator = match (query.validator, query.is_leader, req.extensions().get::<Auth>()) {
+        (None, Some(true), Some(session)) => Some(session.uid), // only case where session.uid is used
+        (Some(validator), _, _) => Some(validator), // for all cases with a validator passed
+        _ => None, // default, no filtration by validator
+    };
+
+    let limit = app.config.campaigns_find_limit;
+    let skip = query
+        .page
+        .checked_mul(limit.into())
+        .ok_or_else(|| ResponseError::BadRequest("Page and/or limit is too large".into()))?;
+    let list_response = list_campaigns(
+        &app.pool,
+        skip,
+        limit,
+        query.creator,
+        query.validator,
+        query.is_leader,
+        &query.active_to_ge,
+    )
+    .await?;
+
+    Ok(success_response(serde_json::to_string(&list_response)?))
 }
 
 pub mod update_campaign {
