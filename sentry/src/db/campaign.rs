@@ -95,7 +95,6 @@ pub async fn list_campaigns(
 
     let pagination = Pagination {
         total_pages,
-        total: total_pages,
         page: skip / limit as u64,
     };
 

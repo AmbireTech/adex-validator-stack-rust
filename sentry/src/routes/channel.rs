@@ -13,8 +13,8 @@ use primitives::{
     balances::{Balances, CheckedState, UncheckedState},
     config::TokenInfo,
     sentry::{
-        channel_list::ChannelListQuery, AccountingResponse, AllSpendersResponse, LastApproved,
-        LastApprovedQuery, LastApprovedResponse, Pagination, SpenderResponse, SuccessResponse,
+        channel_list::ChannelListQuery, AccountingResponse, AllSpendersResponse, AllSpendersQuery, LastApproved,
+        LastApprovedQuery, LastApprovedResponse, SpenderResponse, SuccessResponse,
     },
     spender::{Spendable, Spender, SpenderLeaf},
     validator::{MessageTypes, NewState},
@@ -267,11 +267,18 @@ pub async fn get_all_spender_limits<A: Adapter + 'static>(
         .expect("Request should have Channel")
         .to_owned();
 
+    let query = serde_urlencoded::from_str::<AllSpendersQuery>(req.uri().query().unwrap_or(""))?;
+    let limit = app.config.spendable_find_limit;
+    let skip = query
+        .page
+        .checked_mul(limit.into())
+        .ok_or_else(|| ResponseError::BadRequest("Page and/or limit is too large".into()))?;
+
     let new_state = get_corresponding_new_state(&app.pool, &app.logger, &channel).await?;
 
     let mut all_spender_limits: HashMap<Address, Spender> = HashMap::new();
 
-    let all_spendables = get_all_spendables_for_channel(app.pool.clone(), &channel.id()).await?;
+    let (all_spendables, pagination) = get_all_spendables_for_channel(app.pool.clone(), &channel.id(), skip, limit.into()).await?;
 
     // Using for loop to avoid async closures
     for spendable in all_spendables {
@@ -300,12 +307,7 @@ pub async fn get_all_spender_limits<A: Adapter + 'static>(
 
     let res = AllSpendersResponse {
         spenders: all_spender_limits,
-        pagination: Pagination {
-            // TODO
-            page: 1,
-            total: 1,
-            total_pages: 1,
-        },
+        pagination,
     };
 
     Ok(success_response(serde_json::to_string(&res)?))
