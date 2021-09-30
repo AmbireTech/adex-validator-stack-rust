@@ -1,6 +1,6 @@
-use primitives::{spender::Spendable, sentry::Pagination, Address, ChannelId};
 use crate::db::TotalCount;
 use chrono::Utc;
+use primitives::{sentry::Pagination, spender::Spendable, Address, ChannelId};
 
 use super::{DbPool, PoolError};
 
@@ -56,7 +56,12 @@ pub async fn get_all_spendables_for_channel(
     let client = pool.get().await?;
     let statement = client.prepare(GET_ALL_SPENDERS_STATEMENT).await?;
 
-    let rows = client.query(&statement, &[channel_id, &limit.to_string(), &skip.to_string()]).await?;
+    let rows = client
+        .query(
+            &statement,
+            &[channel_id, &limit.to_string(), &skip.to_string()],
+        )
+        .await?;
     let spendables = rows.iter().map(Spendable::from).collect();
 
     let total_count = list_spendable_total_count(&pool, channel_id).await?;
@@ -101,13 +106,13 @@ pub async fn update_spendable(pool: DbPool, spendable: &Spendable) -> Result<Spe
 
 async fn list_spendable_total_count<'a>(
     pool: &DbPool,
-    channel_id: &ChannelId
+    channel_id: &ChannelId,
 ) -> Result<u64, PoolError> {
     let client = pool.get().await?;
 
     let statement =
         "SELECT COUNT(spendable.id)::varchar FROM spendable INNER JOIN channels ON spendable.channel_id=channels.id WHERE spendable.channel_id = $1";
-    let stmt = client.prepare(&statement).await?;
+    let stmt = client.prepare(statement).await?;
     let row = client.query_one(&stmt, &[&channel_id]).await?;
 
     Ok(row.get::<_, TotalCount>(0).0)

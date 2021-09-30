@@ -225,10 +225,14 @@ pub async fn campaign_list<A: Adapter>(
     let mut query =
         serde_urlencoded::from_str::<CampaignListQuery>(req.uri().query().unwrap_or(""))?;
 
-    query.validator = match (query.validator, query.is_leader, req.extensions().get::<Auth>()) {
+    query.validator = match (
+        query.validator,
+        query.is_leader,
+        req.extensions().get::<Auth>(),
+    ) {
         (None, Some(true), Some(session)) => Some(session.uid), // only case where session.uid is used
         (Some(validator), _, _) => Some(validator), // for all cases with a validator passed
-        _ => None, // default, no filtration by validator
+        _ => None,                                  // default, no filtration by validator
     };
 
     let limit = app.config.campaigns_find_limit;

@@ -13,8 +13,8 @@ use primitives::{
     balances::{Balances, CheckedState, UncheckedState},
     config::TokenInfo,
     sentry::{
-        channel_list::ChannelListQuery, AccountingResponse, AllSpendersResponse, AllSpendersQuery, LastApproved,
-        LastApprovedQuery, LastApprovedResponse, SpenderResponse, SuccessResponse,
+        channel_list::ChannelListQuery, AccountingResponse, AllSpendersQuery, AllSpendersResponse,
+        LastApproved, LastApprovedQuery, LastApprovedResponse, SpenderResponse, SuccessResponse,
     },
     spender::{Spendable, Spender, SpenderLeaf},
     validator::{MessageTypes, NewState},
@@ -278,7 +278,8 @@ pub async fn get_all_spender_limits<A: Adapter + 'static>(
 
     let mut all_spender_limits: HashMap<Address, Spender> = HashMap::new();
 
-    let (all_spendables, pagination) = get_all_spendables_for_channel(app.pool.clone(), &channel.id(), skip, limit.into()).await?;
+    let (all_spendables, pagination) =
+        get_all_spendables_for_channel(app.pool.clone(), &channel.id(), skip, limit.into()).await?;
 
     // Using for loop to avoid async closures
     for spendable in all_spendables {
