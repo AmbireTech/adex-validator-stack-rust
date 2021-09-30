@@ -166,7 +166,8 @@ pub mod tests_postgres {
 
     fn create_pool(db_prefix: &str) -> Pool {
         let manager_config = ManagerConfig {
-            recycling_method: deadpool_postgres::RecyclingMethod::Fast,
+            // to guarantee that `is_closed()` & test query will be ran to determine bad connections
+            recycling_method: deadpool_postgres::RecyclingMethod::Verified,
         };
         let manager = Manager::new(POSTGRES_CONFIG.clone(), manager_config, db_prefix);
 
@@ -304,6 +305,7 @@ pub mod tests_postgres {
         async fn recycle(&self, database: &mut Database) -> RecycleResult<Self::Error> {
             // DROP the public schema and create it again for usage after recycling
             let queries = format!("DROP SCHEMA public CASCADE; CREATE SCHEMA public;");
+
             let result = database
                 .pool
                 .get()
