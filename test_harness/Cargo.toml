@@ -1,0 +1,18 @@
+[package]
+edition = "2018"
+name = "test_harness"
+version = "0.1.0"
+
+[dependencies]
+primitives = {path = "../primitives"}
+adapter = {version = "0.1", path = "../adapter", features = ["test-util"]}
+# ethereum
+web3 = { version = "0.17", features = ["http-tls", "signing"] }
+
+
+subprocess = "0.2"
+
+anyhow = {version = "1"}
+tokio = {version = "1", features = ["rt-multi-thread", "macros"]}
+# probably needed for Relayer calls
+# wiremock = "0.5"

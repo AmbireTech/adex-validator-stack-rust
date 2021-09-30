@@ -3618,6 +3618,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "subprocess"
+version = "0.2.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "055cf3ebc2981ad8f0a5a17ef6652f652d87831f79fddcba2ac57bcb9a0aa407"
+dependencies = [
+ "libc",
+ "winapi 0.3.9",
+]
+
+[[package]]
 name = "subtle"
 version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3691,6 +3701,18 @@ dependencies = [
  "dirs-next",
  "rustversion",
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "test_harness"
+version = "0.1.0"
+dependencies = [
+ "adapter",
+ "anyhow",
+ "primitives",
+ "subprocess",
+ "tokio",
+ "web3",
 ]
 
 [[package]]
