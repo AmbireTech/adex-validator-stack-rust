@@ -2,6 +2,7 @@
 max_channels = 512
 
 channels_find_limit = 200
+campaigns_find_limit = 200
 wait_time = 500
 
 # V4 Deprecated

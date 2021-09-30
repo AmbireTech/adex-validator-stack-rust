@@ -98,25 +98,8 @@ mod list_channels {
         sentry::{channel_list::ChannelListResponse, Pagination},
         Channel, ValidatorId,
     };
-    use std::str::FromStr;
-    use tokio_postgres::types::{accepts, FromSql, Type};
 
-    use crate::db::{DbPool, PoolError};
-
-    struct TotalCount(pub u64);
-    impl<'a> FromSql<'a> for TotalCount {
-        fn from_sql(
-            ty: &Type,
-            raw: &'a [u8],
-        ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
-            let str_slice = <&str as FromSql>::from_sql(ty, raw)?;
-
-            Ok(Self(u64::from_str(str_slice)?))
-        }
-
-        // Use a varchar or text, since otherwise `int8` fails deserialization
-        accepts!(VARCHAR, TEXT);
-    }
+    use crate::db::{DbPool, PoolError, TotalCount};
 
     /// Lists the `Channel`s in `ASC` order.
     /// This makes sure that if a new `Channel` is added
