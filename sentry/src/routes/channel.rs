@@ -272,7 +272,7 @@ pub async fn get_all_spender_limits<A: Adapter + 'static>(
     let skip = query
         .page
         .checked_mul(limit.into())
-        .ok_or_else(|| ResponseError::BadRequest("Page and/or limit is too large".into()))?;
+        .ok_or_else(|| ResponseError::FailedValidation("Page and/or limit is too large".into()))?;
 
     let new_state = get_corresponding_new_state(&app.pool, &app.logger, &channel).await?;
 
