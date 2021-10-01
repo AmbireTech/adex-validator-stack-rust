@@ -185,7 +185,6 @@ pub struct AggregateEvents {
 #[serde(rename_all = "camelCase")]
 pub struct Pagination {
     pub total_pages: u64,
-    pub total: u64,
     pub page: u64,
 }
 
@@ -223,6 +222,12 @@ pub struct AllSpendersResponse {
     pub spenders: HashMap<Address, Spender>,
     #[serde(flatten)]
     pub pagination: Pagination,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AllSpendersQuery {
+    // default is `u64::default()` = `0`
+    pub page: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
