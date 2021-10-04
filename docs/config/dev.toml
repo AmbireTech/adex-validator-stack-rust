@@ -21,7 +21,8 @@ health_unsignable_promilles = 750
 propagation_timeout = 1000
 
 fetch_timeout = 5000
-validator_tick_timeout = 5000
+all_campaigns_timeout = 5000
+channel_tick_timeout = 5000
 
 ip_rate_limit = { type = 'ip', timeframe = 20000 }
 sid_rate_limit = { type = 'sid', timeframe = 20000 }

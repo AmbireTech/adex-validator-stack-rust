@@ -34,18 +34,24 @@ pub struct Config {
     pub events_find_limit: u32,
     pub msgs_find_limit: u32,
     pub analytics_find_limit_v5: u32,
-    // in milliseconds
+    /// In milliseconds
     pub analytics_maxtime_v5: u32,
-    // in milliseconds
+    /// In milliseconds
     pub heartbeat_time: u32,
     pub health_threshold_promilles: u32,
     pub health_unsignable_promilles: u32,
+    /// Sets the timeout for propagating a Validator message to a validator
+    /// In Milliseconds
+    pub propagation_timeout: u32,
     /// in milliseconds
-    /// set's the Client timeout for [`SentryApi`]
-    /// This includes requests made for propagating new messages
+    /// Set's the Client timeout for [`SentryApi`]
+    /// This includes all requests made to sentry except propagating messages.
+    /// When propagating messages we make requests to foreign Sentry instances as well.
     pub fetch_timeout: u32,
-    /// in milliseconds
-    pub validator_tick_timeout: u32,
+    /// In Milliseconds
+    pub all_campaigns_timeout: u32,
+    /// In Milliseconds
+    pub channel_tick_timeout: u32,
     pub ip_rate_limit: RateLimit,  // HashMap??
     pub sid_rate_limit: RateLimit, // HashMap ??
     #[serde(with = "SerHex::<StrictPfx>")]

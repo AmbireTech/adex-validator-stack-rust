@@ -5,15 +5,20 @@ use crate::{
     SentryApi,
 };
 use primitives::{adapter::Adapter, config::Config, util::ApiUrl, Channel, ChannelId};
-use slog::Logger;
-use std::collections::{hash_map::Entry, HashSet};
+use slog::{info, Logger};
+use std::{
+    collections::{hash_map::Entry, HashSet},
+    time::Duration,
+};
+use tokio::time::timeout;
 
 pub async fn channel_tick<A: Adapter + 'static>(
     sentry: &SentryApi<A>,
     config: &Config,
     channel: Channel,
-    // validators: &Validators,
-) -> Result<ChannelId, Error> {
+) -> Result<(ChannelId, Box<dyn std::fmt::Debug>), Error> {
+    let logger = sentry.logger.clone();
+
     let adapter = &sentry.adapter;
     let tick = channel
         .find_validator(adapter.whoami())
@@ -46,24 +51,47 @@ pub async fn channel_tick<A: Adapter + 'static>(
         .get(&channel.token)
         .ok_or(Error::ChannelTokenNotWhitelisted)?;
 
-    // TODO: Add timeout
-    match tick {
-        primitives::Validator::Leader(_v) => {
-            let _leader_tick_status = leader::tick(sentry, channel, accounting.balances, token)
-                .await
-                .map_err(|err| Error::LeaderTick(channel.id(), TickError::Tick(Box::new(err))))?;
-        }
-        primitives::Validator::Follower(_v) => {
-            let _follower_tick_status =
-                follower::tick(sentry, channel, all_spenders, accounting.balances, token)
-                    .await
-                    .map_err(|err| {
-                        Error::FollowerTick(channel.id(), TickError::Tick(Box::new(err)))
-                    })?;
-        }
-    };
+    let duration = Duration::from_millis(config.channel_tick_timeout as u64);
 
-    Ok(channel.id())
+    match tick {
+        primitives::Validator::Leader(_v) => match timeout(
+            duration,
+            leader::tick(sentry, channel, accounting.balances, token),
+        )
+        .await
+        {
+            Err(timeout_e) => Err(Error::LeaderTick(
+                channel.id(),
+                TickError::TimedOut(timeout_e),
+            )),
+            Ok(Err(tick_e)) => Err(Error::LeaderTick(
+                channel.id(),
+                TickError::Tick(Box::new(tick_e)),
+            )),
+            Ok(Ok(tick_status)) => {
+                info!(&logger, "Leader tick"; "status" => ?tick_status);
+                Ok((channel.id(), Box::new(tick_status)))
+            }
+        },
+        primitives::Validator::Follower(_v) => {
+            let follower_fut =
+                follower::tick(sentry, channel, all_spenders, accounting.balances, token);
+            match timeout(duration, follower_fut).await {
+                Err(timeout_e) => Err(Error::FollowerTick(
+                    channel.id(),
+                    TickError::TimedOut(timeout_e),
+                )),
+                Ok(Err(tick_e)) => Err(Error::FollowerTick(
+                    channel.id(),
+                    TickError::Tick(Box::new(tick_e)),
+                )),
+                Ok(Ok(tick_status)) => {
+                    info!(&logger, "Follower tick"; "status" => ?tick_status);
+                    Ok((channel.id(), Box::new(tick_status)))
+                }
+            }
+        }
+    }
 }
 
 /// Fetches all `Campaign`s from Sentry and builds the `Channel`s to be processed
@@ -71,13 +99,15 @@ pub async fn channel_tick<A: Adapter + 'static>(
 pub async fn collect_channels<A: Adapter + 'static>(
     adapter: &A,
     sentry_url: &ApiUrl,
-    _config: &Config,
+    config: &Config,
     _logger: &Logger,
 ) -> Result<(HashSet<Channel>, Validators), reqwest::Error> {
     let whoami = adapter.whoami();
 
-    // TODO: Move client creation
-    let client = reqwest::Client::new();
+    let all_campaigns_timeout = Duration::from_millis(config.all_campaigns_timeout as u64);
+    let client = reqwest::Client::builder()
+        .timeout(all_campaigns_timeout)
+        .build()?;
     let campaigns = all_campaigns(client, sentry_url, whoami).await?;
     let channels = campaigns
         .iter()

@@ -2,7 +2,7 @@ use std::{collections::HashMap, time::Duration};
 
 use chrono::{DateTime, Utc};
 use futures::future::{join_all, TryFutureExt};
-use reqwest::{Client, Response};
+use reqwest::{Client, Method};
 use slog::Logger;
 
 use primitives::{
@@ -15,7 +15,7 @@ use primitives::{
     spender::Spender,
     util::ApiUrl,
     validator::MessageTypes,
-    Address, Campaign, Channel, {ChannelId, Config, ValidatorId},
+    Address, ChannelId, Config, ValidatorId,
 };
 use thiserror::Error;
 
@@ -91,7 +91,13 @@ impl<A: Adapter + 'static> SentryApi<A> {
         messages: &[&MessageTypes],
     ) -> Vec<PropagationResult> {
         join_all(self.propagate_to.iter().map(|(validator_id, validator)| {
-            propagate_to::<A>(&self.client, channel, (*validator_id, validator), messages)
+            propagate_to::<A>(
+                &self.client,
+                self.config.propagation_timeout,
+                channel,
+                (*validator_id, validator),
+                messages,
+            )
         }))
         .await
     }
@@ -133,6 +139,7 @@ impl<A: Adapter + 'static> SentryApi<A> {
             .await
     }
 
+    /// Get's the last approved state and requesting a [`Heartbeat`], see [`LastApprovedResponse`]
     pub async fn get_last_approved(
         &self,
         channel: ChannelId,
@@ -141,7 +148,10 @@ impl<A: Adapter + 'static> SentryApi<A> {
             .get(
                 self.whoami
                     .url
-                    .join(&format!("v5/channel/{}/last-approved", channel))
+                    .join(&format!(
+                        "v5/channel/{}/last-approved?withHeartbeat=true",
+                        channel
+                    ))
                     .expect("Should not error while creating endpoint"),
             )
             .send()
@@ -149,20 +159,6 @@ impl<A: Adapter + 'static> SentryApi<A> {
             .json()
             .await
             .map_err(Error::Request)
-    }
-
-    pub async fn get_last_msgs(&self) -> Result<LastApprovedResponse<UncheckedState>, Error> {
-        self.client
-            .get(
-                self.whoami
-                    .url
-                    .join("last-approved?withHeartbeat=true")
-                    .expect("Should not error while creating endpoint"),
-            )
-            .send()
-            .and_then(|res: Response| res.json::<LastApprovedResponse<UncheckedState>>())
-            .map_err(Error::Request)
-            .await
     }
 
     // TODO: Pagination & use of `AllSpendersResponse`
@@ -209,21 +205,6 @@ impl<A: Adapter + 'static> SentryApi<A> {
             .await
     }
 
-    /// Fetches all `Campaign`s from `sentry` by going through all pages and collecting the `Campaign`s into a single `Vec`
-    pub async fn all_campaigns(&self) -> Result<Vec<Campaign>, Error> {
-        Ok(
-            campaigns::all_campaigns(self.client.clone(), &self.whoami.url, self.adapter.whoami())
-                .await?,
-        )
-    }
-
-    pub async fn all_channels(&self) -> Result<Vec<Channel>, Error> {
-        Ok(
-            channels::all_channels(self.client.clone(), &self.whoami.url, self.adapter.whoami())
-                .await?,
-        )
-    }
-
     #[deprecated = "V5 no longer needs event aggregates"]
     pub async fn get_event_aggregates(
         &self,
@@ -251,6 +232,7 @@ impl<A: Adapter + 'static> SentryApi<A> {
 
 async fn propagate_to<A: Adapter>(
     client: &Client,
+    timeout: u32,
     channel_id: ChannelId,
     (validator_id, validator): (ValidatorId, &Validator),
     messages: &[&MessageTypes],
@@ -264,7 +246,8 @@ async fn propagate_to<A: Adapter>(
     body.insert("messages", messages);
 
     let _response: SuccessResponse = client
-        .post(endpoint)
+        .request(Method::POST, endpoint)
+        .timeout(Duration::from_millis(timeout.into()))
         .bearer_auth(&validator.token)
         .json(&body)
         .send()
@@ -277,7 +260,7 @@ async fn propagate_to<A: Adapter>(
     Ok(validator_id)
 }
 
-mod channels {
+pub mod channels {
     use futures::{future::try_join_all, TryFutureExt};
     use primitives::{
         sentry::channel_list::{ChannelListQuery, ChannelListResponse},
@@ -387,7 +370,7 @@ pub mod campaigns {
 
         let endpoint = sentry_url
             .join(&format!(
-                "campaign/list?{}",
+                "v5/campaign/list?{}",
                 serde_urlencoded::to_string(query).expect("Should not fail to serialize")
             ))
             .expect("Should not fail to create endpoint URL");

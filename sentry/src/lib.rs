@@ -176,7 +176,12 @@ async fn campaigns_router<A: Adapter + 'static>(
 ) -> Result<Response<Body>, ResponseError> {
     let (path, method) = (req.uri().path(), req.method());
 
-    if let (Some(_caps), &Method::POST) = (CAMPAIGN_UPDATE_BY_ID.captures(path), method) {
+    // For creating campaigns
+    if (path, method) == ("/v5/campaign", &Method::POST) {
+        let req = AuthRequired.call(req, app).await?;
+
+        create_campaign(req, app).await
+    } else if let (Some(_caps), &Method::POST) = (CAMPAIGN_UPDATE_BY_ID.captures(path), method) {
         let req = CampaignLoad.call(req, app).await?;
 
         update_campaign::handle_route(req, app).await
