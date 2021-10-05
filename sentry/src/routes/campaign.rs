@@ -912,15 +912,18 @@ pub mod insert_events {
 
 #[cfg(test)]
 mod test {
-    use super::{update_campaign::{modify_campaign, get_delta_budget}, *};
-    use crate::test_util::setup_dummy_app;
+    use super::{
+        update_campaign::{get_delta_budget, modify_campaign},
+        *,
+    };
     use crate::db::redis_pool::TESTS_POOL;
+    use crate::test_util::setup_dummy_app;
     use crate::update_campaign::DeltaBudget;
+    use adapter::DummyAdapter;
     use hyper::StatusCode;
     use primitives::{
         adapter::Deposit, util::tests::prep_db::DUMMY_CAMPAIGN, BigNum, ChannelId, ValidatorId,
     };
-    use adapter::DummyAdapter;
 
     #[tokio::test]
     /// Test single campaign creation and modification
@@ -1201,47 +1204,67 @@ mod test {
 
         // Equal budget
         {
-            let delta_budget = get_delta_budget::<DummyAdapter>(&campaign_remaining, &campaign, campaign.budget).await.expect("should get delta budget");
+            let delta_budget =
+                get_delta_budget::<DummyAdapter>(&campaign_remaining, &campaign, campaign.budget)
+                    .await
+                    .expect("should get delta budget");
             assert!(delta_budget.is_none());
         }
         // Spent cant be higher than the new budget
         {
-            campaign_remaining.set_initial(campaign.id, UnifiedNum::from_u64(60_000_000_000)).await.expect("should set"); // 600.00
+            campaign_remaining
+                .set_initial(campaign.id, UnifiedNum::from_u64(60_000_000_000))
+                .await
+                .expect("should set"); // 600.00
 
             // campaign_spent > new_budget
             let new_budget = UnifiedNum::from_u64(30_000_000_000); // 300.00
-            let delta_budget = get_delta_budget::<DummyAdapter>(&campaign_remaining, &campaign, new_budget).await;
+            let delta_budget =
+                get_delta_budget::<DummyAdapter>(&campaign_remaining, &campaign, new_budget).await;
 
             assert!(delta_budget.is_err());
             assert!(matches!(delta_budget, Err(Error::NewBudget(_))));
 
             // campaign_spent == new_budget
             let new_budget = UnifiedNum::from_u64(40_000_000_000); // 400.00
-            let delta_budget = get_delta_budget::<DummyAdapter>(&campaign_remaining, &campaign, new_budget).await;
+            let delta_budget =
+                get_delta_budget::<DummyAdapter>(&campaign_remaining, &campaign, new_budget).await;
 
             assert!(delta_budget.is_err());
             assert!(matches!(delta_budget, Err(Error::NewBudget(_))));
         }
         // Increasing budget
         {
-            campaign_remaining.set_initial(campaign.id, UnifiedNum::from_u64(90_000_000_000)).await.expect("should set"); // 900.00
+            campaign_remaining
+                .set_initial(campaign.id, UnifiedNum::from_u64(90_000_000_000))
+                .await
+                .expect("should set"); // 900.00
             let new_budget = UnifiedNum::from_u64(110_000_000_000); // 1100.00
-            let delta_budget = get_delta_budget::<DummyAdapter>(&campaign_remaining, &campaign, new_budget).await.expect("should get delta budget");
+            let delta_budget =
+                get_delta_budget::<DummyAdapter>(&campaign_remaining, &campaign, new_budget)
+                    .await
+                    .expect("should get delta budget");
             assert!(delta_budget.is_some());
             let increase_by = UnifiedNum::from_u64(10_000_000_000); // 100.00
-            // should always enter if statement
+                                                                    // should always enter if statement
             if let Some(DeltaBudget::Increase(amount)) = delta_budget {
                 assert_eq!(amount, increase_by);
             }
         }
         // Decreasing budget
         {
-            campaign_remaining.set_initial(campaign.id, UnifiedNum::from_u64(90_000_000_000)).await.expect("should set"); // 900.00
+            campaign_remaining
+                .set_initial(campaign.id, UnifiedNum::from_u64(90_000_000_000))
+                .await
+                .expect("should set"); // 900.00
             let new_budget = UnifiedNum::from_u64(80_000_000_000); // 800.00
-            let delta_budget = get_delta_budget::<DummyAdapter>(&campaign_remaining, &campaign, new_budget).await.expect("should get delta budget");
+            let delta_budget =
+                get_delta_budget::<DummyAdapter>(&campaign_remaining, &campaign, new_budget)
+                    .await
+                    .expect("should get delta budget");
             assert!(delta_budget.is_some());
             let decrease_by = UnifiedNum::from_u64(20_000_000_000); // 200.00
-            // should always enter if statement
+                                                                    // should always enter if statement
             if let Some(DeltaBudget::Decrease(amount)) = delta_budget {
                 assert_eq!(amount, decrease_by);
             }

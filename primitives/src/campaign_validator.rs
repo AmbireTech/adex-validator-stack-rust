@@ -135,16 +135,21 @@ pub fn asset_listed(campaign: &Campaign, whitelist: &HashMap<Address, TokenInfo>
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::util::tests::prep_db::{ADDRESSES, IDS, DUMMY_VALIDATOR_LEADER, DUMMY_VALIDATOR_FOLLOWER, DUMMY_CAMPAIGN, TOKENS};
-    use crate::BigNum;
     use crate::config::configuration;
+    use crate::util::tests::prep_db::{
+        ADDRESSES, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, IDS, TOKENS,
+    };
+    use crate::BigNum;
+    use chrono::{TimeZone, Utc};
     use std::num::NonZeroU8;
     use std::str::FromStr;
-    use chrono::{Utc, TimeZone};
 
     #[test]
     fn are_validators_listed() {
-        let validators = Validators::new((DUMMY_VALIDATOR_LEADER.clone(), DUMMY_VALIDATOR_FOLLOWER.clone()));
+        let validators = Validators::new((
+            DUMMY_VALIDATOR_LEADER.clone(),
+            DUMMY_VALIDATOR_FOLLOWER.clone(),
+        ));
 
         // empty whitelist
         let are_listed = all_validators_listed(&validators, &[]);
@@ -153,10 +158,14 @@ mod test {
         let are_listed = all_validators_listed(&validators, &[IDS["user"], IDS["tester"]]);
         assert!(!are_listed);
         // one validator listed
-        let are_listed = all_validators_listed(&validators, &[IDS["user"], IDS["tester"], IDS["leader"]]);
+        let are_listed =
+            all_validators_listed(&validators, &[IDS["user"], IDS["tester"], IDS["leader"]]);
         assert!(!are_listed);
         // both validators lister
-        let are_listed = all_validators_listed(&validators, &[IDS["user"], IDS["tester"], IDS["leader"], IDS["follower"]]);
+        let are_listed = all_validators_listed(
+            &validators,
+            &[IDS["user"], IDS["tester"], IDS["leader"], IDS["follower"]],
+        );
         assert!(are_listed);
     }
 
@@ -188,20 +197,26 @@ mod test {
 
         // not listed
 
-        assets.insert(TOKENS["USDC"], TokenInfo {
-            min_token_units_for_deposit: BigNum::from(0),
-            min_validator_fee: BigNum::from(0),
-            precision: NonZeroU8::new(6).expect("should create NonZeroU8"),
-        });
+        assets.insert(
+            TOKENS["USDC"],
+            TokenInfo {
+                min_token_units_for_deposit: BigNum::from(0),
+                min_validator_fee: BigNum::from(0),
+                precision: NonZeroU8::new(6).expect("should create NonZeroU8"),
+            },
+        );
         let is_listed = asset_listed(&campaign, &assets);
         assert!(!is_listed);
 
         // listed
-        assets.insert(TOKENS["DAI"], TokenInfo {
-            min_token_units_for_deposit: BigNum::from(0),
-            min_validator_fee: BigNum::from(0),
-            precision: NonZeroU8::new(18).expect("should create NonZeroU8"),
-        });
+        assets.insert(
+            TOKENS["DAI"],
+            TokenInfo {
+                min_token_units_for_deposit: BigNum::from(0),
+                min_validator_fee: BigNum::from(0),
+                precision: NonZeroU8::new(18).expect("should create NonZeroU8"),
+            },
+        );
         let is_listed = asset_listed(&campaign, &assets);
         assert!(is_listed);
     }
@@ -210,20 +225,25 @@ mod test {
     fn are_campaigns_validated() {
         let config = configuration("development", None).expect("Should get Config");
 
-
         // Validator not in campaign
         {
             let campaign = DUMMY_CAMPAIGN.clone();
             let is_validated = campaign.validate(&config, &IDS["tester"]);
-            assert!(matches!(is_validated, Err(Error::Validation(Validation::AdapterNotIncluded))));
+            assert!(matches!(
+                is_validated,
+                Err(Error::Validation(Validation::AdapterNotIncluded))
+            ));
         }
 
         // active.to has passed
         {
             let mut campaign = DUMMY_CAMPAIGN.clone();
-            campaign.active.to = Utc.ymd(2019, 1, 30).and_hms(0,0,0);
+            campaign.active.to = Utc.ymd(2019, 1, 30).and_hms(0, 0, 0);
             let is_validated = campaign.validate(&config, &IDS["leader"]);
-            assert!(matches!(is_validated, Err(Error::Validation(Validation::InvalidActiveTo))));
+            assert!(matches!(
+                is_validated,
+                Err(Error::Validation(Validation::InvalidActiveTo))
+            ));
         }
 
         // all_validators not listed
@@ -233,7 +253,10 @@ mod test {
             config.validators_whitelist = vec![IDS["leader"], IDS["tester"]];
 
             let is_validated = campaign.validate(&config, &IDS["leader"]);
-            assert!(matches!(is_validated, Err(Error::Validation(Validation::UnlistedValidator))));
+            assert!(matches!(
+                is_validated,
+                Err(Error::Validation(Validation::UnlistedValidator))
+            ));
         }
 
         // creator not listed
@@ -243,16 +266,24 @@ mod test {
             config.creators_whitelist = vec![ADDRESSES["tester"]];
 
             let is_validated = campaign.validate(&config, &IDS["leader"]);
-            assert!(matches!(is_validated, Err(Error::Validation(Validation::UnlistedCreator))));
+            assert!(matches!(
+                is_validated,
+                Err(Error::Validation(Validation::UnlistedCreator))
+            ));
         }
 
         // token not listed
         {
             let mut campaign = DUMMY_CAMPAIGN.clone();
-            campaign.channel.token = "0x0000000000000000000000000000000000000000".parse::<Address>().expect("Should parse");
+            campaign.channel.token = "0x0000000000000000000000000000000000000000"
+                .parse::<Address>()
+                .expect("Should parse");
 
             let is_validated = campaign.validate(&config, &IDS["leader"]);
-            assert!(matches!(is_validated, Err(Error::Validation(Validation::UnlistedAsset))));
+            assert!(matches!(
+                is_validated,
+                Err(Error::Validation(Validation::UnlistedAsset))
+            ));
         }
 
         // budget < min_deposit
@@ -261,7 +292,10 @@ mod test {
             campaign.budget = UnifiedNum::from_u64(0);
 
             let is_validated = campaign.validate(&config, &IDS["leader"]);
-            assert!(matches!(is_validated, Err(Error::Validation(Validation::MinimumDepositNotMet))));
+            assert!(matches!(
+                is_validated,
+                Err(Error::Validation(Validation::MinimumDepositNotMet))
+            ));
         }
 
         // validator_fee < min_fee
@@ -269,14 +303,21 @@ mod test {
             let campaign = DUMMY_CAMPAIGN.clone();
             let mut config = configuration("development", None).expect("Should get Config");
 
-            config.token_address_whitelist.insert(TOKENS["DAI"], TokenInfo {
-                min_token_units_for_deposit: BigNum::from(0),
-                min_validator_fee: BigNum::from_str("999999999999999999999999999999999999").expect("should get BigNum"),
-                precision: NonZeroU8::new(18).expect("should create NonZeroU8"),
-            });
+            config.token_address_whitelist.insert(
+                TOKENS["DAI"],
+                TokenInfo {
+                    min_token_units_for_deposit: BigNum::from(0),
+                    min_validator_fee: BigNum::from_str("999999999999999999999999999999999999")
+                        .expect("should get BigNum"),
+                    precision: NonZeroU8::new(18).expect("should create NonZeroU8"),
+                },
+            );
 
             let is_validated = campaign.validate(&config, &IDS["leader"]);
-            assert!(matches!(is_validated, Err(Error::Validation(Validation::MinimumValidatorFeeNotMet))));
+            assert!(matches!(
+                is_validated,
+                Err(Error::Validation(Validation::MinimumValidatorFeeNotMet))
+            ));
         }
 
         // total_fee > budget
@@ -285,7 +326,10 @@ mod test {
             campaign.budget = UnifiedNum::from_u64(150); // both fees are 100, so this won't cover them
 
             let is_validated = campaign.validate(&config, &IDS["leader"]);
-            assert!(matches!(is_validated, Err(Error::Validation(Validation::FeeConstraintViolated))));
+            assert!(matches!(
+                is_validated,
+                Err(Error::Validation(Validation::FeeConstraintViolated))
+            ));
         }
 
         // total_fee = budget
@@ -294,7 +338,10 @@ mod test {
             campaign.budget = UnifiedNum::from_u64(200);
 
             let is_validated = campaign.validate(&config, &IDS["leader"]);
-            assert!(matches!(is_validated, Err(Error::Validation(Validation::FeeConstraintViolated))));
+            assert!(matches!(
+                is_validated,
+                Err(Error::Validation(Validation::FeeConstraintViolated))
+            ));
         }
         // should validate
         {
