@@ -65,6 +65,7 @@ pub async fn latest_heartbeats(
         .map_err(PoolError::Backend)
 }
 
+#[deprecated = "V4 Double check what we will need for analytics and remove this function"]
 pub async fn list_event_aggregates(
     pool: &DbPool,
     channel_id: &ChannelId,
@@ -140,6 +141,7 @@ struct EventData {
     event_payout: BigNum,
 }
 
+#[deprecated = "V4 No longer needed for V5, use analytics instead"]
 pub async fn insert_event_aggregate(
     pool: &DbPool,
     channel_id: &ChannelId,

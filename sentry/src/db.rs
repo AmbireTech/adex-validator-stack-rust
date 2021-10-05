@@ -184,7 +184,8 @@ pub mod tests_postgres {
 
     fn create_pool(db_prefix: &str) -> Pool {
         let manager_config = ManagerConfig {
-            recycling_method: deadpool_postgres::RecyclingMethod::Fast,
+            // to guarantee that `is_closed()` & test query will be ran to determine bad connections
+            recycling_method: deadpool_postgres::RecyclingMethod::Verified,
         };
         let manager = Manager::new(POSTGRES_CONFIG.clone(), manager_config, db_prefix);
 
@@ -292,7 +293,19 @@ pub mod tests_postgres {
             // 2. Create database
             let drop_db = format!("DROP DATABASE IF EXISTS {0} WITH (FORCE);", db_name);
             let created_db = format!("CREATE DATABASE {0};", db_name);
-            let temp_client = self.base_pool.get().await?;
+
+            let temp_client = self.base_pool.get().await.map_err(|err| {
+                match &err {
+                    PoolError::Backend(backend_err) if backend_err.is_closed() => {
+                        panic!("Closed PG Client connection of the base Pool!");
+                    },
+                    _ => {},
+                }
+                err
+            })?;
+
+            assert!(!self.base_pool.is_closed(), "Base Pool should never close");
+            assert!(!self.base_pool.get().await.expect("Should get connection").is_closed(), "a base pool connection should never be closed");
 
             let drop_db_result = temp_client.simple_query(drop_db.as_str()).await?;
             assert_eq!(1, drop_db_result.len());
@@ -316,12 +329,17 @@ pub mod tests_postgres {
                 deadpool_postgres::Manager::from_config(config, NoTls, self.manager_config.clone());
             let pool = deadpool_postgres::Pool::new(manager, 15);
 
+            // this will make sure the connection succeeds
+            // Instead of making a connection the Pool returns directly.
+            let _ = pool.get().await?;
+
             Ok(Database::new(db_name, pool))
         }
 
         async fn recycle(&self, database: &mut Database) -> RecycleResult<Self::Error> {
             // DROP the public schema and create it again for usage after recycling
             let queries = format!("DROP SCHEMA public CASCADE; CREATE SCHEMA public;");
+
             let result = database
                 .pool
                 .get()
