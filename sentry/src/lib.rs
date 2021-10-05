@@ -7,7 +7,7 @@ use hyper::{Body, Method, Request, Response, StatusCode};
 use lazy_static::lazy_static;
 use middleware::{
     auth::{AuthRequired, Authenticate},
-    campaign::CampaignLoad,
+    campaign::{CalledByCreator, CampaignLoad},
     channel::{ChannelLoad, GetChannelId},
     cors::{cors, Cors},
     Chain, Middleware,
@@ -177,7 +177,12 @@ async fn campaigns_router<A: Adapter + 'static>(
     let (path, method) = (req.uri().path(), req.method());
 
     if let (Some(_caps), &Method::POST) = (CAMPAIGN_UPDATE_BY_ID.captures(path), method) {
-        let req = CampaignLoad.call(req, app).await?;
+        let req = Chain::new()
+            .chain(AuthRequired)
+            .chain(CampaignLoad)
+            .chain(CalledByCreator)
+            .apply(req, app)
+            .await?;
 
         update_campaign::handle_route(req, app).await
     } else if let (Some(caps), &Method::POST) =

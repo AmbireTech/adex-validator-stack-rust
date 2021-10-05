@@ -138,7 +138,7 @@ fn campaign_list_query_params<'a>(
     (where_clauses, params)
 }
 
-async fn list_campaigns_total_count<'a>(
+pub async fn list_campaigns_total_count<'a>(
     pool: &DbPool,
     (where_clauses, params): (&'a [String], Vec<&'a (dyn ToSql + Sync)>),
 ) -> Result<u64, PoolError> {
@@ -164,13 +164,19 @@ async fn list_campaigns_total_count<'a>(
 pub async fn get_campaigns_by_channel(
     pool: &DbPool,
     channel_id: &ChannelId,
+    limit: u64,
+    skip: u64,
 ) -> Result<Vec<Campaign>, PoolError> {
     let client = pool.get().await?;
     let statement = client.prepare("SELECT campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM campaigns INNER JOIN channels
-    ON campaigns.channel_id=channels.id WHERE campaigns.channel_id = $1").await?;
+    ON campaigns.channel_id=channels.id WHERE campaigns.channel_id = $1 ORDER BY campaigns.created ASC LIMIT $2 OFFSET $3").await?;
 
-    let rows = client.query(&statement, &[&channel_id]).await?;
-
+    let rows = client
+        .query(
+            &statement,
+            &[&channel_id, &limit.to_string(), &skip.to_string()],
+        )
+        .await?;
     let campaigns = rows.iter().map(Campaign::from).collect();
 
     Ok(campaigns)
