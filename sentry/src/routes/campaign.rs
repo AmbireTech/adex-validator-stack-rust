@@ -281,8 +281,8 @@ pub async fn campaign_list<A: Adapter>(
         req.extensions().get::<Auth>(),
     ) {
         (None, Some(true), Some(auth)) => Some(auth.uid), // only case where Auth.uid is used
-        (Some(validator), _, _) => Some(validator), // for all cases with a validator passed
-        _ => None,                                  // default, no filtration by validator
+        (Some(validator), _, _) => Some(validator),       // for all cases with a validator passed
+        _ => None,                                        // default, no filtration by validator
     };
 
     let limit = app.config.campaigns_find_limit;
