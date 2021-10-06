@@ -43,6 +43,7 @@ CREATE TABLE spendable (
     channel_id varchar(66) NOT NULL,
     total bigint NOT NULL,
     still_on_create2 bigint NOT NULL,
+    created timestamp(2) with time zone NOT NULL,
     PRIMARY KEY (spender, channel_id),
     CONSTRAINT fk_spendable_channel_id FOREIGN KEY (channel_id) REFERENCES channels (id) ON DELETE RESTRICT ON UPDATE RESTRICT
 );

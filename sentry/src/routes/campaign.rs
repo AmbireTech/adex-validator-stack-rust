@@ -280,7 +280,7 @@ pub async fn campaign_list<A: Adapter>(
         query.is_leader,
         req.extensions().get::<Auth>(),
     ) {
-        (None, Some(true), Some(session)) => Some(session.uid), // only case where session.uid is used
+        (None, Some(true), Some(auth)) => Some(auth.uid), // only case where Auth.uid is used
         (Some(validator), _, _) => Some(validator), // for all cases with a validator passed
         _ => None,                                  // default, no filtration by validator
     };

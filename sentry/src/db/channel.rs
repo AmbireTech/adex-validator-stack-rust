@@ -147,7 +147,6 @@ mod list_channels {
             channels,
             pagination: Pagination {
                 total_pages,
-                total: total_pages,
                 page: skip / limit as u64,
             },
         })

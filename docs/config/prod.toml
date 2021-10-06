@@ -3,6 +3,7 @@ max_channels = 512
 
 channels_find_limit = 512
 campaigns_find_limit = 512
+spendable_find_limit = 512
 
 wait_time = 40000
 
@@ -21,7 +22,8 @@ health_unsignable_promilles = 770
 propagation_timeout = 3000
 
 fetch_timeout = 10000
-validator_tick_timeout = 10000
+all_campaigns_timeout = 10000
+channel_tick_timeout = 10000
 
 ip_rate_limit = { type = 'ip', timeframe = 1200000 }
 sid_rate_limit = { type = 'sid', timeframe = 0 }
