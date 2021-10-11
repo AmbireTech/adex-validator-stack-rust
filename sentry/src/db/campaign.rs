@@ -1,8 +1,11 @@
 use crate::db::{DbPool, PoolError, TotalCount};
 use chrono::{DateTime, Utc};
 use primitives::{
-    sentry::{campaign::CampaignListResponse, Pagination},
-    Address, Campaign, CampaignId, ChannelId, ValidatorId,
+    sentry::{
+        campaign::{CampaignListResponse, ValidatorParam},
+        Pagination,
+    },
+    Address, Campaign, CampaignId, ChannelId,
 };
 use tokio_postgres::types::{Json, ToSql};
 
@@ -67,14 +70,12 @@ pub async fn list_campaigns(
     skip: u64,
     limit: u32,
     creator: Option<Address>,
-    validator: Option<ValidatorId>,
-    is_leader: Option<bool>,
+    validator: Option<ValidatorParam>,
     active_to_ge: &DateTime<Utc>,
 ) -> Result<CampaignListResponse, PoolError> {
     let client = pool.get().await?;
 
-    let (where_clauses, params) =
-        campaign_list_query_params(&creator, &validator, is_leader, active_to_ge);
+    let (where_clauses, params) = campaign_list_query_params(&creator, &validator, active_to_ge);
     let total_count_params = (where_clauses.clone(), params.clone());
 
     // To understand why we use Order by, see Postgres Documentation: https://www.postgresql.org/docs/8.1/queries-limit.html
@@ -106,8 +107,7 @@ pub async fn list_campaigns(
 
 fn campaign_list_query_params<'a>(
     creator: &'a Option<Address>,
-    validator: &'a Option<ValidatorId>,
-    is_leader: Option<bool>,
+    validator: &'a Option<ValidatorParam>,
     active_to_ge: &'a DateTime<Utc>,
 ) -> (Vec<String>, Vec<&'a (dyn ToSql + Sync)>) {
     let mut where_clauses = vec!["active_to >= $1".to_string()];
@@ -119,17 +119,17 @@ fn campaign_list_query_params<'a>(
     }
 
     // if clause for is_leader is true, the other clause is also always true
-    match (validator, is_leader) {
-        (Some(validator), Some(true)) => {
+    match validator {
+        Some(ValidatorParam::Leader(validator_id)) => {
             where_clauses.push(format!("channels.leader = ${}", params.len() + 1));
-            params.push(validator);
+            params.push(validator_id);
         }
-        (Some(validator), _) => {
+        Some(ValidatorParam::Validator(validator_id)) => {
             where_clauses.push(format!(
                 "(channels.leader = ${x} OR channels.follower = ${x})",
                 x = params.len() + 1,
             ));
-            params.push(validator);
+            params.push(validator_id);
         }
         _ => (),
     }

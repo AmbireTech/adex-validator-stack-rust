@@ -355,10 +355,16 @@ pub mod campaign {
         pub active_to_ge: DateTime<Utc>,
         pub creator: Option<Address>,
         /// filters the campaigns containing a specific validator if provided
-        pub validator: Option<ValidatorId>,
-        /// filters the campaigns where the provided validator is a leader if true
-        /// if no validator is provided, but is_leader is true, it uses Auth to obtain a validator
-        pub is_leader: Option<bool>,
+        #[serde(flatten)]
+        pub validator: Option<ValidatorParam>,
+    }
+
+    #[derive(Serialize, Deserialize, Debug)]
+    pub enum ValidatorParam {
+        /// Results will include all campaigns that have the provided address as a leader
+        Leader(ValidatorId),
+        /// Results will include all campaigns that have either a leader or follower with the provided address
+        Validator(ValidatorId),
     }
 }
 

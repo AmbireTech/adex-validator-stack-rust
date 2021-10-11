@@ -323,7 +323,7 @@ pub mod campaigns {
     use chrono::Utc;
     use futures::future::try_join_all;
     use primitives::{
-        sentry::campaign::{CampaignListQuery, CampaignListResponse},
+        sentry::campaign::{CampaignListQuery, CampaignListResponse, ValidatorParam},
         util::ApiUrl,
         Campaign, ValidatorId,
     };
@@ -364,8 +364,7 @@ pub mod campaigns {
             page,
             active_to_ge: Utc::now(),
             creator: None,
-            validator: Some(validator),
-            is_leader: None,
+            validator: Some(ValidatorParam::Validator(validator)),
         };
 
         let endpoint = sentry_url
