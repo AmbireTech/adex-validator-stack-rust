@@ -43,16 +43,88 @@ pub static KEYSTORE_IDENTITY: Lazy<(Address, KeystoreOptions)> = Lazy::new(|| {
     // it always starts in `adapter` folder because of the crate scope
     // even when it's in the workspace
     let mut keystore_file = full_path.parent().unwrap().to_path_buf();
-    // let full_path = parent.join("test/resources/keystore.json");
     keystore_file.push("adapter/test/resources/keystore.json");
 
-    (
-        address,
-        KeystoreOptions {
-            keystore_file: keystore_file.display().to_string(),
-            keystore_pwd: "adexvalidator".to_string(),
-        },
-    )
+    (address, keystore_options("keystore.json", "adexvalidator"))
+});
+
+pub static GANACHE_KEYSTORES: Lazy<HashMap<String, (Address, KeystoreOptions)>> = Lazy::new(|| {
+    vec![
+        (
+            "address0".to_string(),
+            (
+                "0xDf08F82De32B8d460adbE8D72043E3a7e25A3B39"
+                    .parse()
+                    .expect("Valid Address"),
+                keystore_options(
+                    "Df08F82De32B8d460adbE8D72043E3a7e25A3B39_keystore.json",
+                    "address0",
+                ),
+            ),
+        ),
+        (
+            "leader".to_string(),
+            (
+                "0x5a04A8fB90242fB7E1db7d1F51e268A03b7f93A5"
+                    .parse()
+                    .expect("Valid Address"),
+                keystore_options(
+                    "5a04A8fB90242fB7E1db7d1F51e268A03b7f93A5_keystore.json",
+                    "address1",
+                ),
+            ),
+        ),
+        (
+            "follower".to_string(),
+            (
+                "0xe3896ebd3F32092AFC7D27e9ef7b67E26C49fB02"
+                    .parse()
+                    .expect("Valid Address"),
+                keystore_options(
+                    "e3896ebd3F32092AFC7D27e9ef7b67E26C49fB02_keystore.json",
+                    "address2",
+                ),
+            ),
+        ),
+        (
+            "creator".to_string(),
+            (
+                "0x0E45891a570Af9e5A962F181C219468A6C9EB4e1"
+                    .parse()
+                    .expect("Valid Address"),
+                keystore_options(
+                    "0E45891a570Af9e5A962F181C219468A6C9EB4e1_keystore.json",
+                    "address3",
+                ),
+            ),
+        ),
+        (
+            "advertiser".to_string(),
+            (
+                "0x8c4B95383a46D30F056aCe085D8f453fCF4Ed66d"
+                    .parse()
+                    .expect("Valid Address"),
+                keystore_options(
+                    "8c4B95383a46D30F056aCe085D8f453fCF4Ed66d_keystore.json",
+                    "address4",
+                ),
+            ),
+        ),
+        (
+            "address5".to_string(),
+            (
+                "0x1059B025E3F8b8f76A8120D6D6Fd9fBa172c80b8"
+                    .parse()
+                    .expect("Valid Address"),
+                keystore_options(
+                    "1059B025E3F8b8f76A8120D6D6Fd9fBa172c80b8_keystore.json",
+                    "address5",
+                ),
+            ),
+        ),
+    ]
+    .into_iter()
+    .collect()
 });
 
 /// Addresses generated on local running `ganache` for testing purposes.
@@ -89,6 +161,23 @@ pub static GANACHE_ADDRESSES: Lazy<HashMap<String, Address>> = Lazy::new(|| {
 });
 /// Local `ganache` is running at:
 pub const GANACHE_URL: &str = "http://localhost:8545";
+
+/// This helper function generates the correct path to the keystore file from this file.
+///
+/// The `file_name` located at `adapter/test/resources`
+/// The `password` for the keystore file
+fn keystore_options(file_name: &str, password: &str) -> KeystoreOptions {
+    let full_path = current_dir().unwrap();
+    // it always starts in `adapter` folder because of the crate scope
+    // even when it's in the workspace
+    let mut keystore_file = full_path.parent().unwrap().to_path_buf();
+    keystore_file.push(format!("adapter/test/resources/{}", file_name));
+
+    KeystoreOptions {
+        keystore_file: keystore_file.display().to_string(),
+        keystore_pwd: password.to_string(),
+    }
+}
 
 pub fn get_test_channel(token_address: Address) -> Channel {
     Channel {
