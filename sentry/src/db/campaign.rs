@@ -495,7 +495,7 @@ mod test {
         util::tests::prep_db::{
             ADDRESSES, DUMMY_AD_UNITS, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER, IDS,
         },
-        EventSubmission, UnifiedNum, ValidatorDesc,
+        EventSubmission, UnifiedNum, ValidatorDesc, ValidatorId
     };
     use std::{convert::TryFrom, time::Duration};
     use tokio_postgres::error::SqlState;
@@ -650,7 +650,6 @@ mod test {
             2,
             Some(ADDRESSES["creator"]),
             None,
-            None,
             &Utc::now(),
         )
         .await
@@ -667,7 +666,6 @@ mod test {
             2,
             Some(ADDRESSES["creator"]),
             None,
-            None,
             &Utc::now(),
         )
         .await
@@ -680,7 +678,6 @@ mod test {
             4,
             2,
             Some(ADDRESSES["creator"]),
-            None,
             None,
             &Utc::now(),
         )
@@ -695,7 +692,6 @@ mod test {
             2,
             Some(ADDRESSES["tester"]),
             None,
-            None,
             &Utc::now(),
         )
         .await
@@ -708,8 +704,7 @@ mod test {
             0,
             5,
             None,
-            Some(IDS["follower"]),
-            None,
+            Some(ValidatorParam::Validator(IDS["follower"])),
             &Utc::now(),
         )
         .await
@@ -724,14 +719,13 @@ mod test {
             ]
         );
 
-        // Test with validator and is_leader
+        // Test with leader validator
         let first_page = list_campaigns(
             &database.pool,
             0,
             5,
             None,
-            Some(IDS["leader"]),
-            Some(true),
+            Some(ValidatorParam::Leader(IDS["leader"])),
             &Utc::now(),
         )
         .await
@@ -745,64 +739,39 @@ mod test {
             ]
         );
 
-        // Test with a different validator and is_leader
+        // Test with a different leader validator
         let first_page = list_campaigns(
             &database.pool,
             0,
             5,
             None,
-            Some(IDS["user"]),
-            Some(true),
+            Some(ValidatorParam::Leader(IDS["user"])),
             &Utc::now(),
         )
         .await
         .expect("should fetch");
         assert_eq!(first_page.campaigns, vec![campaign_new_leader.clone()]);
 
-        // Test with validator and is_leader but validator isn't the leader of any campaign
+        // Test with leader validator but validator isn't the leader of any campaign
         let first_page = list_campaigns(
             &database.pool,
             0,
             5,
             None,
-            Some(IDS["follower"]),
-            Some(true),
+            Some(ValidatorParam::Leader(IDS["follower"])),
             &Utc::now(),
         )
         .await
         .expect("should fetch");
         assert_eq!(first_page.campaigns.len(), 0);
 
-        // Test with is_leader set to false
-        let first_page = list_campaigns(
-            &database.pool,
-            0,
-            5,
-            None,
-            Some(IDS["follower"]),
-            Some(false),
-            &Utc::now(),
-        )
-        .await
-        .expect("should fetch");
-        assert_eq!(
-            first_page.campaigns,
-            vec![
-                campaign_new_leader.clone(),
-                campaign_new_creator.clone(),
-                campaign_new_id.clone(),
-                campaign.clone()
-            ]
-        );
-
-        // Test with creator, provided validator and is_leader set to true
+        // Test with creator and provided leader validator
         let first_page = list_campaigns(
             &database.pool,
             0,
             5,
             Some(ADDRESSES["creator"]),
-            Some(IDS["leader"]),
-            Some(true),
+            Some(ValidatorParam::Leader(IDS["leader"])),
             &Utc::now(),
         )
         .await
