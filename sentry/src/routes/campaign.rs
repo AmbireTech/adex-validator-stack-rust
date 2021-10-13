@@ -84,14 +84,12 @@ pub async fn update_latest_spendable<A: Adapter>(
     Ok(update_spendable(pool.clone(), &spendable).await?)
 }
 
-pub async fn fetch_campaigns_for_channel(
+pub async fn fetch_campaign_ids_for_channel(
     pool: &DbPool,
     channel_id: &ChannelId,
     limit: u32,
-    skip: u32,
 ) -> Result<Vec<CampaignId>, ResponseError> {
-    let campaign_ids =
-        get_campaign_ids_by_channel(pool, channel_id, limit.into(), skip.into()).await?;
+    let campaign_ids = get_campaign_ids_by_channel(pool, channel_id, limit.into(), 0).await?;
 
     let total_count = list_campaigns_total_count(
         pool,
@@ -201,11 +199,10 @@ pub async fn create_campaign<A: Adapter>(
             })?
     };
 
-    let channel_campaigns = fetch_campaigns_for_channel(
+    let channel_campaigns = fetch_campaign_ids_for_channel(
         &app.pool,
         &campaign.channel.id(),
         app.config.campaigns_find_limit,
-        0,
     )
     .await?;
 
@@ -395,11 +392,10 @@ pub mod update_campaign {
                 .checked_sub(&accounting_spent)
                 .ok_or(Error::Calculation)?;
 
-            let channel_campaigns = fetch_campaigns_for_channel(
+            let channel_campaigns = fetch_campaign_ids_for_channel(
                 pool,
                 &campaign.channel.id(),
                 config.campaigns_find_limit,
-                0,
             )
             .await
             .map_err(|_| Error::FailedUpdate("couldn't fetch campaigns for channel".to_string()))?;
@@ -1223,7 +1219,6 @@ mod test {
             let delta_budget =
                 get_delta_budget::<DummyAdapter>(&campaign_remaining, &campaign, new_budget).await;
 
-            assert!(delta_budget.is_err());
             assert!(matches!(delta_budget, Err(Error::NewBudget(_))));
 
             // campaign_spent == new_budget
@@ -1231,7 +1226,6 @@ mod test {
             let delta_budget =
                 get_delta_budget::<DummyAdapter>(&campaign_remaining, &campaign, new_budget).await;
 
-            assert!(delta_budget.is_err());
             assert!(matches!(delta_budget, Err(Error::NewBudget(_))));
         }
         // Increasing budget

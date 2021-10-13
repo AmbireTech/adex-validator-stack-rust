@@ -153,12 +153,8 @@ pub async fn list_campaigns_total_count<'a>(
     Ok(row.get::<_, TotalCount>(0).0)
 }
 
-// TODO: We might need to use LIMIT to implement pagination
 /// ```text
-/// SELECT campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to,
-/// channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce
-/// FROM campaigns INNER JOIN channels
-/// ON campaigns.channel_id=channels.id WHERE campaigns.channel_id = $1
+/// SELECT id FROM campaigns WHERE channel_id = $1 ORDER BY created ASC LIMIT {} OFFSET {}
 /// ```
 pub async fn get_campaign_ids_by_channel(
     pool: &DbPool,
@@ -168,8 +164,10 @@ pub async fn get_campaign_ids_by_channel(
 ) -> Result<Vec<CampaignId>, PoolError> {
     let client = pool.get().await?;
 
-    let query = format!("SELECT campaigns.id FROM campaigns INNER JOIN channels
-    ON campaigns.channel_id=channels.id WHERE campaigns.channel_id = $1 ORDER BY campaigns.created ASC LIMIT {} OFFSET {}", limit, skip);
+    let query = format!(
+        "SELECT id FROM campaigns WHERE channel_id = $1 ORDER BY created ASC LIMIT {} OFFSET {}",
+        limit, skip
+    );
 
     let statement = client.prepare(&query).await?;
 
