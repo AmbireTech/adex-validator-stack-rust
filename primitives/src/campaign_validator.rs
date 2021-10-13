@@ -135,14 +135,16 @@ pub fn asset_listed(campaign: &Campaign, whitelist: &HashMap<Address, TokenInfo>
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::config::configuration;
-    use crate::util::tests::prep_db::{
-        ADDRESSES, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, IDS, TOKENS,
+    use crate::{
+        config,
+        util::tests::prep_db::{
+            ADDRESSES, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, IDS,
+            TOKENS,
+        },
+        BigNum,
     };
-    use crate::BigNum;
     use chrono::{TimeZone, Utc};
-    use std::num::NonZeroU8;
-    use std::str::FromStr;
+    use std::{num::NonZeroU8, str::FromStr};
 
     #[test]
     fn are_validators_listed() {
@@ -223,7 +225,7 @@ mod test {
 
     #[test]
     fn are_campaigns_validated() {
-        let config = configuration("development", None).expect("Should get Config");
+        let config = config::DEVELOPMENT_CONFIG.clone();
 
         // Validator not in campaign
         {
@@ -249,7 +251,7 @@ mod test {
         // all_validators not listed
         {
             let campaign = DUMMY_CAMPAIGN.clone();
-            let mut config = configuration("development", None).expect("Should get Config");
+            let mut config = config::DEVELOPMENT_CONFIG.clone();
             config.validators_whitelist = vec![IDS["leader"], IDS["tester"]];
 
             let is_validated = campaign.validate(&config, &IDS["leader"]);
@@ -262,7 +264,7 @@ mod test {
         // creator not listed
         {
             let campaign = DUMMY_CAMPAIGN.clone();
-            let mut config = configuration("development", None).expect("Should get Config");
+            let mut config = config::DEVELOPMENT_CONFIG.clone();
             config.creators_whitelist = vec![ADDRESSES["tester"]];
 
             let is_validated = campaign.validate(&config, &IDS["leader"]);
@@ -301,7 +303,7 @@ mod test {
         // validator_fee < min_fee
         {
             let campaign = DUMMY_CAMPAIGN.clone();
-            let mut config = configuration("development", None).expect("Should get Config");
+            let mut config = config::DEVELOPMENT_CONFIG.clone();
 
             config.token_address_whitelist.insert(
                 TOKENS["DAI"],

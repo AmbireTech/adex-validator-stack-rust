@@ -2,7 +2,8 @@ use crate::{
     db::{
         accounting::{get_accounting, Side},
         campaign::{
-            get_campaigns_by_channel, list_campaigns, list_campaigns_total_count, update_campaign,
+            get_campaign_ids_by_channel, list_campaigns, list_campaigns_total_count,
+            update_campaign,
         },
         insert_campaign, insert_channel,
         spendable::update_spendable,
@@ -22,7 +23,7 @@ use primitives::{
         campaign_create::{CreateCampaign, ModifyCampaign},
     },
     spender::Spendable,
-    Address, Campaign, Channel, ChannelId, Deposit, UnifiedNum,
+    Address, Campaign, CampaignId, Channel, ChannelId, Deposit, UnifiedNum,
 };
 use slog::error;
 use std::cmp::{max, Ordering};
@@ -87,14 +88,16 @@ pub async fn fetch_campaigns_for_channel(
     pool: &DbPool,
     channel_id: &ChannelId,
     limit: u32,
-) -> Result<Vec<Campaign>, ResponseError> {
-    let first_page = get_campaigns_by_channel(pool, channel_id, limit.into(), 0).await?;
+    skip: u32,
+) -> Result<Vec<CampaignId>, ResponseError> {
+    let campaign_ids =
+        get_campaign_ids_by_channel(pool, channel_id, limit.into(), skip.into()).await?;
+
     let total_count = list_campaigns_total_count(
         pool,
         (&["campaigns.channel_id = $1".to_string()], vec![channel_id]),
     )
     .await?;
-    let campaigns: Vec<Campaign> = first_page.into_iter().map(Campaign::from).collect();
 
     // fast ceil for total_pages
     let total_pages = if total_count == 0 {
@@ -104,10 +107,10 @@ pub async fn fetch_campaigns_for_channel(
     };
 
     if total_pages < 2 {
-        Ok(campaigns)
+        Ok(campaign_ids)
     } else {
-        let other_pages: Vec<Vec<Campaign>> = try_join_all((1..total_pages).map(|i| {
-            get_campaigns_by_channel(
+        let other_pages: Vec<Vec<CampaignId>> = try_join_all((1..total_pages).map(|i| {
+            get_campaign_ids_by_channel(
                 pool,
                 channel_id,
                 limit.into(),
@@ -116,9 +119,9 @@ pub async fn fetch_campaigns_for_channel(
         }))
         .await?;
 
-        let all_campaigns: Vec<Campaign> = std::iter::once(campaigns)
+        let all_campaigns: Vec<CampaignId> = std::iter::once(campaign_ids)
             .chain(other_pages.into_iter())
-            .flat_map(|campaigns| campaigns.into_iter())
+            .flat_map(|campaign_ids| campaign_ids.into_iter())
             .collect();
 
         Ok(all_campaigns)
@@ -202,10 +205,9 @@ pub async fn create_campaign<A: Adapter>(
         &app.pool,
         &campaign.channel.id(),
         app.config.campaigns_find_limit,
+        0,
     )
     .await?;
-
-    let channel_campaigns = channel_campaigns.iter().map(|c| c.id).collect::<Vec<_>>();
 
     let campaigns_remaining_sum = app
         .campaign_remaining
@@ -280,9 +282,12 @@ pub async fn campaign_list<A: Adapter>(
         query.is_leader,
         req.extensions().get::<Auth>(),
     ) {
-        (None, Some(true), Some(auth)) => Some(auth.uid), // only case where Auth.uid is used
-        (Some(validator), _, _) => Some(validator),       // for all cases with a validator passed
-        _ => None,                                        // default, no filtration by validator
+        // only case where Auth.uid is used
+        (None, Some(true), Some(auth)) => Some(auth.uid),
+        // for all cases with a validator passed
+        (Some(validator), _, _) => Some(validator),
+        // default, no filtration by validator
+        _ => None,
     };
 
     let limit = app.config.campaigns_find_limit;
@@ -394,11 +399,10 @@ pub mod update_campaign {
                 pool,
                 &campaign.channel.id(),
                 config.campaigns_find_limit,
+                0,
             )
             .await
             .map_err(|_| Error::FailedUpdate("couldn't fetch campaigns for channel".to_string()))?;
-
-            let channel_campaigns = channel_campaigns.iter().map(|c| c.id).collect::<Vec<_>>();
 
             // this will include the Campaign we are currently modifying
             let campaigns_current_remaining_sum = campaign_remaining
@@ -452,13 +456,13 @@ pub mod update_campaign {
     /// It is used to decrease or increase the remaining budget instead of setting it up directly
     /// This way if a new event alters the remaining budget in Redis while the modification of campaign hasn't finished
     /// it will correctly update the remaining using an atomic redis operation with `INCRBY` or `DECRBY` instead of using `SET`
-    pub enum DeltaBudget<T> {
+    pub(super) enum DeltaBudget<T> {
         Increase(T),
         Decrease(T),
     }
 
     // TODO: Figure out a way to simplify Errors and remove the Adapter from here
-    pub async fn get_delta_budget<A: Adapter + 'static>(
+    pub(super) async fn get_delta_budget<A: Adapter + 'static>(
         campaign_remaining: &CampaignRemaining,
         campaign: &Campaign,
         new_budget: UnifiedNum,
@@ -1199,6 +1203,7 @@ mod test {
     async fn delta_budgets_are_calculated_correctly() {
         let redis = TESTS_POOL.get().await.expect("Should return Object");
         let campaign_remaining = CampaignRemaining::new(redis.connection.clone());
+        let multiplier = 10_u64.pow(UnifiedNum::PRECISION.into());
 
         let campaign = DUMMY_CAMPAIGN.clone();
 
@@ -1213,12 +1218,12 @@ mod test {
         // Spent cant be higher than the new budget
         {
             campaign_remaining
-                .set_initial(campaign.id, UnifiedNum::from_u64(60_000_000_000))
+                .set_initial(campaign.id, UnifiedNum::from_u64(600 * multiplier))
                 .await
-                .expect("should set"); // 600.00
+                .expect("should set");
 
             // campaign_spent > new_budget
-            let new_budget = UnifiedNum::from_u64(30_000_000_000); // 300.00
+            let new_budget = UnifiedNum::from_u64(300 * multiplier);
             let delta_budget =
                 get_delta_budget::<DummyAdapter>(&campaign_remaining, &campaign, new_budget).await;
 
@@ -1226,7 +1231,7 @@ mod test {
             assert!(matches!(delta_budget, Err(Error::NewBudget(_))));
 
             // campaign_spent == new_budget
-            let new_budget = UnifiedNum::from_u64(40_000_000_000); // 400.00
+            let new_budget = UnifiedNum::from_u64(400 * multiplier);
             let delta_budget =
                 get_delta_budget::<DummyAdapter>(&campaign_remaining, &campaign, new_budget).await;
 
@@ -1236,17 +1241,17 @@ mod test {
         // Increasing budget
         {
             campaign_remaining
-                .set_initial(campaign.id, UnifiedNum::from_u64(90_000_000_000))
+                .set_initial(campaign.id, UnifiedNum::from_u64(900 * multiplier))
                 .await
-                .expect("should set"); // 900.00
-            let new_budget = UnifiedNum::from_u64(110_000_000_000); // 1100.00
+                .expect("should set");
+            let new_budget = UnifiedNum::from_u64(1100 * multiplier);
             let delta_budget =
                 get_delta_budget::<DummyAdapter>(&campaign_remaining, &campaign, new_budget)
                     .await
                     .expect("should get delta budget");
             assert!(delta_budget.is_some());
-            let increase_by = UnifiedNum::from_u64(10_000_000_000); // 100.00
-                                                                    // should always enter if statement
+            let increase_by = UnifiedNum::from_u64(100 * multiplier);
+            // should always enter if statement
             if let Some(DeltaBudget::Increase(amount)) = delta_budget {
                 assert_eq!(amount, increase_by);
             }
@@ -1254,17 +1259,17 @@ mod test {
         // Decreasing budget
         {
             campaign_remaining
-                .set_initial(campaign.id, UnifiedNum::from_u64(90_000_000_000))
+                .set_initial(campaign.id, UnifiedNum::from_u64(900 * multiplier))
                 .await
-                .expect("should set"); // 900.00
-            let new_budget = UnifiedNum::from_u64(80_000_000_000); // 800.00
+                .expect("should set");
+            let new_budget = UnifiedNum::from_u64(800 * multiplier);
             let delta_budget =
                 get_delta_budget::<DummyAdapter>(&campaign_remaining, &campaign, new_budget)
                     .await
                     .expect("should get delta budget");
             assert!(delta_budget.is_some());
-            let decrease_by = UnifiedNum::from_u64(20_000_000_000); // 200.00
-                                                                    // should always enter if statement
+            let decrease_by = UnifiedNum::from_u64(200 * multiplier);
+            // should always enter if statement
             if let Some(DeltaBudget::Decrease(amount)) = delta_budget {
                 assert_eq!(amount, decrease_by);
             }
