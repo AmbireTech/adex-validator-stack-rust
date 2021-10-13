@@ -936,6 +936,7 @@ mod test {
     async fn create_and_modify_with_multiple_campaigns() {
         let app = setup_dummy_app().await;
         let dummy_campaign = DUMMY_CAMPAIGN.clone();
+        let multiplier = 10_u64.pow(UnifiedNum::PRECISION.into());
 
         // this function should be called before each creation/modification of a Campaign!
         let add_deposit_call = |channel: ChannelId, creator: Address, token: Address| {
@@ -975,8 +976,7 @@ mod test {
         let campaign: Campaign = {
             // erases the CampaignId for the CreateCampaign request
             let mut create = CreateCampaign::from(dummy_campaign);
-            // 500.00000000
-            create.budget = UnifiedNum::from(50_000_000_000);
+            create.budget = UnifiedNum::from(500 * multiplier);
             // prepare for Campaign creation
             add_deposit_call(create.channel.id(), create.creator, create.channel.token);
 
@@ -1011,8 +1011,7 @@ mod test {
 
         // modify campaign
         let modified = {
-            // 1000.00000000
-            let new_budget = UnifiedNum::from(100_000_000_000);
+            let new_budget = UnifiedNum::from(1000 * multiplier);
             let modify = ModifyCampaign {
                 budget: Some(new_budget),
                 validators: None,
@@ -1050,8 +1049,7 @@ mod test {
         let _second_campaign = {
             // erases the CampaignId for the CreateCampaign request
             let mut create_second = CreateCampaign::from(DUMMY_CAMPAIGN.clone());
-            // 500.00000000
-            create_second.budget = UnifiedNum::from(50_000_000_000);
+            create_second.budget = UnifiedNum::from(500 * multiplier);
 
             // prepare for Campaign creation
             add_deposit_call(
@@ -1081,8 +1079,7 @@ mod test {
         {
             // erases the CampaignId for the CreateCampaign request
             let mut create = CreateCampaign::from(DUMMY_CAMPAIGN.clone());
-            // 600.00000000
-            create.budget = UnifiedNum::from(60_000_000_000);
+            create.budget = UnifiedNum::from(600 * multiplier);
 
             // prepare for Campaign creation
             add_deposit_call(create.channel.id(), create.creator, create.channel.token);
@@ -1141,8 +1138,7 @@ mod test {
         {
             // erases the CampaignId for the CreateCampaign request
             let mut create = CreateCampaign::from(DUMMY_CAMPAIGN.clone());
-            // 600.00000000
-            create.budget = UnifiedNum::from(60_000_000_000);
+            create.budget = UnifiedNum::from(600 * multiplier);
 
             // prepare for Campaign creation
             add_deposit_call(create.channel.id(), create.creator, create.channel.token);

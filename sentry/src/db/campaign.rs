@@ -167,15 +167,13 @@ pub async fn get_campaign_ids_by_channel(
     skip: u64,
 ) -> Result<Vec<CampaignId>, PoolError> {
     let client = pool.get().await?;
-    let statement = client.prepare("SELECT campaigns.id FROM campaigns INNER JOIN channels
-    ON campaigns.channel_id=channels.id WHERE campaigns.channel_id = $1 ORDER BY campaigns.created ASC LIMIT $2 OFFSET $3").await?;
 
-    let rows = client
-        .query(
-            &statement,
-            &[&channel_id, &limit.to_string(), &skip.to_string()],
-        )
-        .await?;
+    let query = format!("SELECT campaigns.id FROM campaigns INNER JOIN channels
+    ON campaigns.channel_id=channels.id WHERE campaigns.channel_id = $1 ORDER BY campaigns.created ASC LIMIT {} OFFSET {}", limit, skip);
+
+    let statement = client.prepare(&query).await?;
+
+    let rows = client.query(&statement, &[&channel_id]).await?;
     let campaign_ids = rows.iter().map(CampaignId::from).collect();
 
     Ok(campaign_ids)
