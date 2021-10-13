@@ -42,7 +42,7 @@ pub struct Config {
     /// In Milliseconds
     pub propagation_timeout: u32,
     /// in milliseconds
-    /// Set's the Client timeout for [`SentryApi`]
+    /// Set's the Client timeout for `SentryApi`
     /// This includes all requests made to sentry except propagating messages.
     /// When propagating messages we make requests to foreign Sentry instances as well.
     pub fetch_timeout: u32,

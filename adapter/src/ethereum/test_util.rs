@@ -257,9 +257,7 @@ pub async fn sweeper_sweep(
 /// Deploys the Sweeper contract from `GANACHE_ADDRESS['leader']`
 pub async fn deploy_sweeper_contract(
     web3: &Web3<Http>,
-) -> web3::contract::Result<(H160, Contract<Http>)> {
-    let from_leader_account = H160(*GANACHE_ADDRESSES["leader"].as_bytes());
-
+) -> web3::contract::Result<(Address, Contract<Http>)> {
     let sweeper_contract = Contract::deploy(web3.eth(), &SWEEPER_ABI)
         .expect("Invalid ABI of Sweeper contract")
         .confirmations(0)
@@ -267,18 +265,22 @@ pub async fn deploy_sweeper_contract(
             opt.gas_price = Some(1.into());
             opt.gas = Some(6_721_975.into());
         }))
-        .execute(*SWEEPER_BYTECODE, (), from_leader_account)
+        .execute(
+            *SWEEPER_BYTECODE,
+            (),
+            H160(GANACHE_ADDRESSES["leader"].to_bytes()),
+        )
         .await?;
 
-    Ok((sweeper_contract.address(), sweeper_contract))
+    let sweeper_address = Address::from(sweeper_contract.address().to_fixed_bytes());
+
+    Ok((sweeper_address, sweeper_contract))
 }
 
 /// Deploys the Outpace contract from `GANACHE_ADDRESS['leader']`
 pub async fn deploy_outpace_contract(
     web3: &Web3<Http>,
-) -> web3::contract::Result<(H160, Contract<Http>)> {
-    let from_leader_account = H160(*GANACHE_ADDRESSES["leader"].as_bytes());
-
+) -> web3::contract::Result<(Address, Contract<Http>)> {
     let outpace_contract = Contract::deploy(web3.eth(), &OUTPACE_ABI)
         .expect("Invalid ABI of Sweeper contract")
         .confirmations(0)
@@ -286,10 +288,15 @@ pub async fn deploy_outpace_contract(
             opt.gas_price = Some(1.into());
             opt.gas = Some(6_721_975.into());
         }))
-        .execute(*OUTPACE_BYTECODE, (), from_leader_account)
+        .execute(
+            *OUTPACE_BYTECODE,
+            (),
+            H160(GANACHE_ADDRESSES["leader"].to_bytes()),
+        )
         .await?;
+    let outpace_address = Address::from(outpace_contract.address().to_fixed_bytes());
 
-    Ok((outpace_contract.address(), outpace_contract))
+    Ok((outpace_address, outpace_contract))
 }
 
 /// Deploys the Mock Token contract from `GANACHE_ADDRESS['leader']`
@@ -297,8 +304,6 @@ pub async fn deploy_token_contract(
     web3: &Web3<Http>,
     min_token_units: u64,
 ) -> web3::contract::Result<(TokenInfo, Address, Contract<Http>)> {
-    let from_leader_account = H160(*GANACHE_ADDRESSES["leader"].as_bytes());
-
     let token_contract = Contract::deploy(web3.eth(), &MOCK_TOKEN_ABI)
         .expect("Invalid ABI of Mock Token contract")
         .confirmations(0)
@@ -306,7 +311,11 @@ pub async fn deploy_token_contract(
             opt.gas_price = Some(1.into());
             opt.gas = Some(6_721_975.into());
         }))
-        .execute(*MOCK_TOKEN_BYTECODE, (), from_leader_account)
+        .execute(
+            *MOCK_TOKEN_BYTECODE,
+            (),
+            H160(GANACHE_ADDRESSES["leader"].to_bytes()),
+        )
         .await?;
 
     let token_info = TokenInfo {
@@ -316,9 +325,7 @@ pub async fn deploy_token_contract(
         min_validator_fee: BigNum::from(100_000_000_000_000),
     };
 
-    Ok((
-        token_info,
-        Address::from(token_contract.address().as_fixed_bytes()),
-        token_contract,
-    ))
+    let token_address = Address::from(token_contract.address().to_fixed_bytes());
+
+    Ok((token_info, token_address, token_contract))
 }

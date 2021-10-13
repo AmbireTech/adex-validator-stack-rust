@@ -69,8 +69,20 @@ impl From<&[u8; 20]> for Address {
     }
 }
 
+impl From<[u8; 20]> for Address {
+    fn from(bytes: [u8; 20]) -> Self {
+        Self(bytes)
+    }
+}
+
 impl AsRef<[u8]> for Address {
     fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl AsRef<[u8; 20]> for Address {
+    fn as_ref(&self) -> &[u8; 20] {
         &self.0
     }
 }

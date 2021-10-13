@@ -64,24 +64,24 @@ impl EthereumChannel for Channel {
 }
 
 pub fn get_counterfactual_address(
-    sweeper: H160,
+    sweeper: Address,
     channel: &Channel,
-    outpace: H160,
+    outpace: Address,
     depositor: Address,
-) -> H160 {
+) -> Address {
     let salt: [u8; 32] = [0; 32];
     let encoded_params = encode(&[
-        Token::Address(outpace),
+        Token::Address(outpace.as_bytes().into()),
         channel.tokenize(),
-        Token::Address(H160(*depositor.as_bytes())),
+        Token::Address(depositor.as_bytes().into()),
     ]);
 
     let mut init_code = DEPOSITOR_BYTECODE_DECODED.clone();
     init_code.extend(&encoded_params);
 
-    let address = calc_addr(sweeper.as_fixed_bytes(), &salt, &init_code);
+    let address_bytes = calc_addr(sweeper.as_bytes(), &salt, &init_code);
 
-    H160(address)
+    Address::from(address_bytes)
 }
 
 #[derive(Debug, Clone)]
@@ -285,8 +285,8 @@ impl Adapter for EthereumAdapter {
         )
         .map_err(Error::ContractInitialization)?;
 
-        let sweeper_address = sweeper_contract.address();
-        let outpace_address = outpace_contract.address();
+        let sweeper_address = Address::from(sweeper_contract.address().to_fixed_bytes());
+        let outpace_address = Address::from(outpace_contract.address().to_fixed_bytes());
 
         let on_outpace: U256 = outpace_contract
             .query(
@@ -313,7 +313,7 @@ impl Adapter for EthereumAdapter {
         let still_on_create2: U256 = erc20_contract
             .query(
                 "balanceOf",
-                counterfactual_address,
+                H160(counterfactual_address.to_bytes()),
                 None,
                 Options::default(),
                 None,
@@ -638,7 +638,7 @@ mod test {
     async fn get_deposit_and_count_create2_when_min_tokens_received() {
         let web3 = Web3::new(Http::new(&GANACHE_URL).expect("failed to init transport"));
 
-        let leader_account = H160(*GANACHE_ADDRESSES["leader"].as_bytes());
+        let leader_account = GANACHE_ADDRESSES["leader"];
 
         // deploy contracts
         let token = deploy_token_contract(&web3, 1_000)
@@ -659,8 +659,8 @@ mod test {
         let channel = get_test_channel(token_address);
 
         let mut config = DEVELOPMENT_CONFIG.clone();
-        config.sweeper_address = *sweeper.0.as_fixed_bytes();
-        config.outpace_address = *outpace.0.as_fixed_bytes();
+        config.sweeper_address = sweeper.0.to_bytes();
+        config.outpace_address = outpace.0.to_bytes();
         // since we deploy a new contract, it's should be different from all the ones found in config.
         assert!(
             config
@@ -725,8 +725,8 @@ mod test {
             // Set balance < minimal token units, i.e. `1_000`
             mock_set_balance(
                 &token.2,
-                leader_account.to_fixed_bytes(),
-                counterfactual_address.to_fixed_bytes(),
+                leader_account.to_bytes(),
+                counterfactual_address.to_bytes(),
                 999_u64,
             )
             .await
@@ -752,8 +752,8 @@ mod test {
             // Set balance > minimal token units
             mock_set_balance(
                 &token.2,
-                leader_account.to_fixed_bytes(),
-                counterfactual_address.to_fixed_bytes(),
+                leader_account.to_bytes(),
+                counterfactual_address.to_bytes(),
                 1_999_u64,
             )
             .await
@@ -778,9 +778,9 @@ mod test {
         {
             sweeper_sweep(
                 &sweeper.1,
-                outpace.0.to_fixed_bytes(),
+                outpace.0.to_bytes(),
                 &channel,
-                *spender.as_bytes(),
+                spender.to_bytes(),
             )
             .await
             .expect("Should sweep the Spender account");
