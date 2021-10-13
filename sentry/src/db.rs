@@ -298,14 +298,22 @@ pub mod tests_postgres {
                 match &err {
                     PoolError::Backend(backend_err) if backend_err.is_closed() => {
                         panic!("Closed PG Client connection of the base Pool!");
-                    },
-                    _ => {},
+                    }
+                    _ => {}
                 }
                 err
             })?;
 
             assert!(!self.base_pool.is_closed(), "Base Pool should never close");
-            assert!(!self.base_pool.get().await.expect("Should get connection").is_closed(), "a base pool connection should never be closed");
+            assert!(
+                !self
+                    .base_pool
+                    .get()
+                    .await
+                    .expect("Should get connection")
+                    .is_closed(),
+                "a base pool connection should never be closed"
+            );
 
             let drop_db_result = temp_client.simple_query(drop_db.as_str()).await?;
             assert_eq!(1, drop_db_result.len());

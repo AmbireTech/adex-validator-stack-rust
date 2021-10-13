@@ -45,8 +45,6 @@ pub async fn fetch_spendable(
     Ok(row.as_ref().map(Spendable::from))
 }
 
-static GET_ALL_SPENDERS_STATEMENT: &str = "SELECT spender, total, still_on_create2, spendable.created, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM spendable INNER JOIN channels ON channels.id = spendable.channel_id WHERE channel_id = $1 ORDER BY spendable.created ASC LIMIT $2 OFFSET $3";
-
 pub async fn get_all_spendables_for_channel(
     pool: DbPool,
     channel_id: &ChannelId,
@@ -54,14 +52,11 @@ pub async fn get_all_spendables_for_channel(
     limit: u64,
 ) -> Result<(Vec<Spendable>, Pagination), PoolError> {
     let client = pool.get().await?;
-    let statement = client.prepare(GET_ALL_SPENDERS_STATEMENT).await?;
+    let query = format!("SELECT spender, total, still_on_create2, spendable.created, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM spendable INNER JOIN channels ON channels.id = spendable.channel_id WHERE channel_id = $1 ORDER BY spendable.created ASC LIMIT {} OFFSET {}", limit, skip);
 
-    let rows = client
-        .query(
-            &statement,
-            &[channel_id, &limit.to_string(), &skip.to_string()],
-        )
-        .await?;
+    let statement = client.prepare(&query).await?;
+
+    let rows = client.query(&statement, &[channel_id]).await?;
     let spendables = rows.iter().map(Spendable::from).collect();
 
     let total_count = list_spendable_total_count(&pool, channel_id).await?;

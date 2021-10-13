@@ -4,11 +4,11 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 use std::{collections::HashMap, fs, num::NonZeroU8};
 
-static DEVELOPMENT_CONFIG: Lazy<Config> = Lazy::new(|| {
+pub static DEVELOPMENT_CONFIG: Lazy<Config> = Lazy::new(|| {
     toml::from_str(include_str!("../../docs/config/dev.toml"))
         .expect("Failed to parse dev.toml config file")
 });
-static PRODUCTION_CONFIG: Lazy<Config> = Lazy::new(|| {
+pub static PRODUCTION_CONFIG: Lazy<Config> = Lazy::new(|| {
     toml::from_str(include_str!("../../docs/config/prod.toml"))
         .expect("Failed to parse prod.toml config file")
 });
