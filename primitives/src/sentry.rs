@@ -360,12 +360,81 @@ pub mod campaign {
     }
 
     #[derive(Serialize, Deserialize, Debug)]
+    #[serde(rename_all = "camelCase")]
     pub enum ValidatorParam {
         /// Results will include all campaigns that have the provided address as a leader
         Leader(ValidatorId),
         /// Results will include all campaigns that have either a leader or follower with the provided address
         Validator(ValidatorId),
     }
+
+    #[cfg(test)]
+    mod test {
+        use super::*;
+        use crate::util::tests::prep_db::{ADDRESSES, IDS};
+        use serde_json::json;
+        use chrono::TimeZone;
+
+        #[test]
+        pub fn deserialize_campaign_list_query() {
+            let query_leader = CampaignListQuery {
+                page: 0,
+                active_to_ge: Utc.ymd(2021, 2, 1).and_hms(7,0,0),
+                creator: Some(ADDRESSES["publisher"]),
+                validator: Some(ValidatorParam::Leader(IDS["leader"])),
+            };
+
+            let query_leader_json = json!({
+                "page": 0,
+                "activeTo": 1612162800,
+                "creator": "0xB7d3F81E857692d13e9D63b232A90F4A1793189E",
+                "leader": "0xce07CbB7e054514D590a0262C93070D838bFBA2e",
+            });
+
+            pretty_assertions::assert_eq!(
+                query_leader_json,
+                serde_json::to_value(query_leader).expect("should serialize")
+            );
+
+            let query_validator = CampaignListQuery {
+                page: 0,
+                active_to_ge: Utc.ymd(2021, 2, 1).and_hms(7,0,0),
+                creator: Some(ADDRESSES["publisher"]),
+                validator: Some(ValidatorParam::Validator(IDS["follower"])),
+            };
+
+            let query_validator_json = json!({
+                "page": 0,
+                "activeTo": 1612162800,
+                "creator": "0xB7d3F81E857692d13e9D63b232A90F4A1793189E",
+                "validator": "0xC91763D7F14ac5c5dDfBCD012e0D2A61ab9bDED3",
+            });
+
+            pretty_assertions::assert_eq!(
+                query_validator_json,
+                serde_json::to_value(query_validator).expect("should serialize")
+            );
+
+            let query_no_validator = CampaignListQuery {
+                page: 0,
+                active_to_ge: Utc.ymd(2021, 2, 1).and_hms(7,0,0),
+                creator: Some(ADDRESSES["publisher"]),
+                validator: None,
+            };
+
+            let query_no_validator_json = json!({
+                "page": 0,
+                "activeTo": 1612162800,
+                "creator": "0xB7d3F81E857692d13e9D63b232A90F4A1793189E",
+            });
+
+            pretty_assertions::assert_eq!(
+                query_no_validator_json,
+                serde_json::to_value(query_no_validator).expect("should serialize")
+            );
+        }
+}
+
 }
 
 pub mod campaign_create {
