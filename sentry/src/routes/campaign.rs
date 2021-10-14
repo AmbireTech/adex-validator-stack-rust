@@ -452,7 +452,7 @@ pub mod update_campaign {
     /// It is used to decrease or increase the remaining budget instead of setting it up directly
     /// This way if a new event alters the remaining budget in Redis while the modification of campaign hasn't finished
     /// it will correctly update the remaining using an atomic redis operation with `INCRBY` or `DECRBY` instead of using `SET`
-    #[derive(Debug, Copy, Clone, PartialEq)]
+    #[derive(Debug, Clone, PartialEq)]
     pub(super) enum DeltaBudget<T> {
         Increase(T),
         Decrease(T),
