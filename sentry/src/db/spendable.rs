@@ -106,7 +106,7 @@ async fn list_spendable_total_count<'a>(
     let client = pool.get().await?;
 
     let statement =
-        "SELECT COUNT(spendable.id)::varchar FROM spendable INNER JOIN channels ON spendable.channel_id=channels.id WHERE spendable.channel_id = $1";
+        "SELECT COUNT(spendable)::varchar FROM spendable INNER JOIN channels ON spendable.channel_id=channels.id WHERE spendable.channel_id = $1";
     let stmt = client.prepare(statement).await?;
     let row = client.query_one(&stmt, &[&channel_id]).await?;
 
@@ -166,5 +166,101 @@ mod test {
         assert_eq!(Some(spendable), fetched_spendable);
 
         // TODO: Update spendable
+    }
+
+    #[tokio::test]
+    async fn gets_all_spendables_for_channel() {
+        let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
+
+        setup_test_migrations(database.pool.clone())
+            .await
+            .expect("Migrations should succeed");
+
+        let channel = DUMMY_CAMPAIGN.channel.clone();
+
+        insert_channel(&database, DUMMY_CAMPAIGN.channel)
+            .await
+            .expect("Should insert");
+
+        // Test for 0 records
+        let (spendables, pagination) = get_all_spendables_for_channel(database.clone(), &channel.id(), 0, 2).await.expect("should get result");
+        assert!(spendables.is_empty());
+        assert_eq!(pagination.total_pages, 1);
+
+        // Test for 1 pages
+        let spendable_user = Spendable {
+            spender: ADDRESSES["user"],
+            channel: DUMMY_CAMPAIGN.channel.clone(),
+            deposit: Deposit {
+                total: UnifiedNum::from(100_000_000),
+                still_on_create2: UnifiedNum::from(500_000),
+            },
+        };
+
+        insert_spendable(database.pool.clone(), &spendable_user).await.expect("should insert spendable");
+        let (spendables, pagination) = get_all_spendables_for_channel(database.clone(), &channel.id(), 0, 2).await.expect("should get result");
+        assert_eq!(spendables.len(), 1);
+        assert_eq!(pagination.page, 0);
+        assert_eq!(pagination.total_pages, 1);
+
+
+        // Test for multiple pages
+        let spendable_publisher = Spendable {
+            spender: ADDRESSES["publisher"],
+            channel: DUMMY_CAMPAIGN.channel.clone(),
+            deposit: Deposit {
+                total: UnifiedNum::from(100_000_000),
+                still_on_create2: UnifiedNum::from(500_000),
+            },
+        };
+        insert_spendable(database.pool.clone(), &spendable_publisher).await.expect("should insert spendable");
+
+
+        let spendable_publisher2 = Spendable {
+            spender: ADDRESSES["publisher2"],
+            channel: DUMMY_CAMPAIGN.channel.clone(),
+            deposit: Deposit {
+                total: UnifiedNum::from(100_000_000),
+                still_on_create2: UnifiedNum::from(500_000),
+            },
+        };
+        insert_spendable(database.pool.clone(), &spendable_publisher2).await.expect("should insert spendable");
+
+        let spendable_creator = Spendable {
+            spender: ADDRESSES["creator"],
+            channel: DUMMY_CAMPAIGN.channel.clone(),
+            deposit: Deposit {
+                total: UnifiedNum::from(100_000_000),
+                still_on_create2: UnifiedNum::from(500_000),
+            },
+        };
+        insert_spendable(database.pool.clone(), &spendable_creator).await.expect("should insert spendable");
+
+
+        let spendable_tester = Spendable {
+            spender: ADDRESSES["tester"],
+            channel: DUMMY_CAMPAIGN.channel.clone(),
+            deposit: Deposit {
+                total: UnifiedNum::from(100_000_000),
+                still_on_create2: UnifiedNum::from(500_000),
+            },
+        };
+        insert_spendable(database.pool.clone(), &spendable_tester).await.expect("should insert spendable");
+
+        let (spendables, pagination) = get_all_spendables_for_channel(database.clone(), &channel.id(), 0, 2).await.expect("should get result");
+        assert_eq!(spendables.len(), 2);
+        assert_eq!(pagination.page, 0);
+        assert_eq!(pagination.total_pages, 3);
+
+        let (spendables, pagination) = get_all_spendables_for_channel(database.clone(), &channel.id(), 2, 2).await.expect("should get result");
+        assert_eq!(spendables.len(), 2);
+        assert_eq!(pagination.page, 1);
+        assert_eq!(pagination.total_pages, 3);
+
+        let (spendables, pagination) = get_all_spendables_for_channel(database.clone(), &channel.id(), 4, 2).await.expect("should get result");
+
+        assert_eq!(spendables.len(), 1);
+        assert_eq!(pagination.page, 2);
+        assert_eq!(pagination.total_pages, 3);
     }
 }
