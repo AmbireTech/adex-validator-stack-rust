@@ -366,6 +366,7 @@ pub mod campaigns {
             active_to_ge: Utc::now(),
             creator: None,
             validator: Some(validator),
+            is_leader: None,
         };
 
         let endpoint = sentry_url

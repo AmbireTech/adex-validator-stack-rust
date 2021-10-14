@@ -25,6 +25,8 @@ pub struct TokenInfo {
 pub struct Config {
     pub max_channels: u32,
     pub channels_find_limit: u32,
+    pub campaigns_find_limit: u32,
+    pub spendable_find_limit: u32,
     pub wait_time: u32,
     #[deprecated = "redundant V4 value. No aggregates are needed for V5"]
     pub aggr_throttle: u32,

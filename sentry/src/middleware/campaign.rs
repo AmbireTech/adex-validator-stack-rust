@@ -1,12 +1,14 @@
 use crate::{db::fetch_campaign, middleware::Middleware};
-use crate::{Application, ResponseError, RouteParams};
+use crate::{Application, Auth, ResponseError, RouteParams};
 use hyper::{Body, Request};
-use primitives::adapter::Adapter;
+use primitives::{adapter::Adapter, campaign::Campaign};
 
 use async_trait::async_trait;
 
 #[derive(Debug)]
 pub struct CampaignLoad;
+#[derive(Debug)]
+pub struct CalledByCreator;
 
 #[async_trait]
 impl<A: Adapter + 'static> Middleware<A> for CampaignLoad {
@@ -30,6 +32,35 @@ impl<A: Adapter + 'static> Middleware<A> for CampaignLoad {
             .ok_or(ResponseError::NotFound)?;
 
         request.extensions_mut().insert(campaign);
+
+        Ok(request)
+    }
+}
+
+#[async_trait]
+impl<A: Adapter + 'static> Middleware<A> for CalledByCreator {
+    async fn call<'a>(
+        &self,
+        request: Request<Body>,
+        _application: &'a Application<A>,
+    ) -> Result<Request<Body>, ResponseError> {
+        let campaign = request
+            .extensions()
+            .get::<Campaign>()
+            .expect("We must have a campaign in extensions")
+            .to_owned();
+
+        let auth = request
+            .extensions()
+            .get::<Auth>()
+            .expect("request should have session")
+            .to_owned();
+
+        if auth.uid.to_address() != campaign.creator {
+            return Err(ResponseError::Forbidden(
+                "Request not sent by campaign creator".to_string(),
+            ));
+        }
 
         Ok(request)
     }

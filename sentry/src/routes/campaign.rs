@@ -1,7 +1,10 @@
 use crate::{
     db::{
         accounting::{get_accounting, Side},
-        campaign::{get_campaigns_by_channel, update_campaign},
+        campaign::{
+            get_campaign_ids_by_channel, list_campaigns, list_campaigns_total_count,
+            update_campaign,
+        },
         insert_campaign, insert_channel,
         spendable::update_spendable,
         CampaignRemaining, DbPool, RedisError,
@@ -9,14 +12,18 @@ use crate::{
     success_response, Application, Auth, ResponseError,
 };
 use deadpool_postgres::PoolError;
+use futures::future::try_join_all;
 use hyper::{Body, Request, Response};
 use primitives::{
     adapter::{Adapter, AdapterErrorKind, Error as AdapterError},
     campaign_validator::Validator,
     config::TokenInfo,
-    sentry::campaign_create::{CreateCampaign, ModifyCampaign},
+    sentry::{
+        campaign::CampaignListQuery,
+        campaign_create::{CreateCampaign, ModifyCampaign},
+    },
     spender::Spendable,
-    Address, Campaign, Channel, Deposit, UnifiedNum,
+    Address, Campaign, CampaignId, Channel, ChannelId, Deposit, UnifiedNum,
 };
 use slog::error;
 use std::cmp::{max, Ordering};
@@ -75,6 +82,48 @@ pub async fn update_latest_spendable<A: Adapter>(
     };
 
     Ok(update_spendable(pool.clone(), &spendable).await?)
+}
+
+pub async fn fetch_campaign_ids_for_channel(
+    pool: &DbPool,
+    channel_id: &ChannelId,
+    limit: u32,
+) -> Result<Vec<CampaignId>, ResponseError> {
+    let campaign_ids = get_campaign_ids_by_channel(pool, channel_id, limit.into(), 0).await?;
+
+    let total_count = list_campaigns_total_count(
+        pool,
+        (&["campaigns.channel_id = $1".to_string()], vec![channel_id]),
+    )
+    .await?;
+
+    // fast ceil for total_pages
+    let total_pages = if total_count == 0 {
+        1
+    } else {
+        1 + ((total_count - 1) / limit as u64)
+    };
+
+    if total_pages < 2 {
+        Ok(campaign_ids)
+    } else {
+        let other_pages: Vec<Vec<CampaignId>> = try_join_all((1..total_pages).map(|i| {
+            get_campaign_ids_by_channel(
+                pool,
+                channel_id,
+                limit.into(),
+                i.checked_mul(limit.into()).expect("TODO"),
+            )
+        }))
+        .await?;
+
+        let all_campaigns: Vec<CampaignId> = std::iter::once(campaign_ids)
+            .chain(other_pages.into_iter())
+            .flat_map(|campaign_ids| campaign_ids.into_iter())
+            .collect();
+
+        Ok(all_campaigns)
+    }
 }
 
 pub async fn create_campaign<A: Adapter>(
@@ -150,15 +199,16 @@ pub async fn create_campaign<A: Adapter>(
             })?
     };
 
-    let channel_campaigns = get_campaigns_by_channel(&app.pool, &campaign.channel.id())
-        .await?
-        .iter()
-        .map(|c| c.id)
-        .collect::<Vec<_>>();
+    let channel_campaigns = fetch_campaign_ids_for_channel(
+        &app.pool,
+        &campaign.channel.id(),
+        app.config.campaigns_find_limit,
+    )
+    .await?;
 
     let campaigns_remaining_sum = app
         .campaign_remaining
-        .get_multiple(&channel_campaigns)
+        .get_multiple(channel_campaigns.as_slice())
         .await?
         .iter()
         .sum::<Option<UnifiedNum>>()
@@ -215,6 +265,45 @@ pub async fn create_campaign<A: Adapter>(
     }?;
 
     Ok(success_response(serde_json::to_string(&campaign)?))
+}
+
+pub async fn campaign_list<A: Adapter>(
+    req: Request<Body>,
+    app: &Application<A>,
+) -> Result<Response<Body>, ResponseError> {
+    let mut query =
+        serde_urlencoded::from_str::<CampaignListQuery>(req.uri().query().unwrap_or(""))?;
+
+    query.validator = match (
+        query.validator,
+        query.is_leader,
+        req.extensions().get::<Auth>(),
+    ) {
+        // only case where Auth.uid is used
+        (None, Some(true), Some(auth)) => Some(auth.uid),
+        // for all cases with a validator passed
+        (Some(validator), _, _) => Some(validator),
+        // default, no filtration by validator
+        _ => None,
+    };
+
+    let limit = app.config.campaigns_find_limit;
+    let skip = query
+        .page
+        .checked_mul(limit.into())
+        .ok_or_else(|| ResponseError::BadRequest("Page and/or limit is too large".into()))?;
+    let list_response = list_campaigns(
+        &app.pool,
+        skip,
+        limit,
+        query.creator,
+        query.validator,
+        query.is_leader,
+        &query.active_to_ge,
+    )
+    .await?;
+
+    Ok(success_response(serde_json::to_string(&list_response)?))
 }
 
 pub mod update_campaign {
@@ -302,15 +391,18 @@ pub mod update_campaign {
             let total_remaining = total_deposited
                 .checked_sub(&accounting_spent)
                 .ok_or(Error::Calculation)?;
-            let channel_campaigns = get_campaigns_by_channel(pool, &campaign.channel.id())
-                .await?
-                .iter()
-                .map(|c| c.id)
-                .collect::<Vec<_>>();
+
+            let channel_campaigns = fetch_campaign_ids_for_channel(
+                pool,
+                &campaign.channel.id(),
+                config.campaigns_find_limit,
+            )
+            .await
+            .map_err(|_| Error::FailedUpdate("couldn't fetch campaigns for channel".to_string()))?;
 
             // this will include the Campaign we are currently modifying
             let campaigns_current_remaining_sum = campaign_remaining
-                .get_multiple(&channel_campaigns)
+                .get_multiple(channel_campaigns.as_slice())
                 .await?
                 .iter()
                 .sum::<Option<UnifiedNum>>()
@@ -360,13 +452,14 @@ pub mod update_campaign {
     /// It is used to decrease or increase the remaining budget instead of setting it up directly
     /// This way if a new event alters the remaining budget in Redis while the modification of campaign hasn't finished
     /// it will correctly update the remaining using an atomic redis operation with `INCRBY` or `DECRBY` instead of using `SET`
-    enum DeltaBudget<T> {
+    #[derive(Debug, Clone, PartialEq)]
+    pub(super) enum DeltaBudget<T> {
         Increase(T),
         Decrease(T),
     }
 
     // TODO: Figure out a way to simplify Errors and remove the Adapter from here
-    async fn get_delta_budget<A: Adapter + 'static>(
+    pub(super) async fn get_delta_budget<A: Adapter + 'static>(
         campaign_remaining: &CampaignRemaining,
         campaign: &Campaign,
         new_budget: UnifiedNum,
@@ -820,8 +913,14 @@ pub mod insert_events {
 
 #[cfg(test)]
 mod test {
-    use super::{update_campaign::modify_campaign, *};
+    use super::{
+        update_campaign::{get_delta_budget, modify_campaign},
+        *,
+    };
+    use crate::db::redis_pool::TESTS_POOL;
     use crate::test_util::setup_dummy_app;
+    use crate::update_campaign::DeltaBudget;
+    use adapter::DummyAdapter;
     use hyper::StatusCode;
     use primitives::{
         adapter::Deposit, util::tests::prep_db::DUMMY_CAMPAIGN, BigNum, ChannelId, ValidatorId,
@@ -834,6 +933,7 @@ mod test {
     async fn create_and_modify_with_multiple_campaigns() {
         let app = setup_dummy_app().await;
         let dummy_campaign = DUMMY_CAMPAIGN.clone();
+        let multiplier = 10_u64.pow(UnifiedNum::PRECISION.into());
 
         // this function should be called before each creation/modification of a Campaign!
         let add_deposit_call = |channel: ChannelId, creator: Address, token: Address| {
@@ -873,8 +973,7 @@ mod test {
         let campaign: Campaign = {
             // erases the CampaignId for the CreateCampaign request
             let mut create = CreateCampaign::from(dummy_campaign);
-            // 500.00000000
-            create.budget = UnifiedNum::from(50_000_000_000);
+            create.budget = UnifiedNum::from(500 * multiplier);
             // prepare for Campaign creation
             add_deposit_call(create.channel.id(), create.creator, create.channel.token);
 
@@ -909,10 +1008,9 @@ mod test {
 
         // modify campaign
         let modified = {
-            // 1000.00000000
-            let new_budget = UnifiedNum::from(100_000_000_000);
+            let new_budget = UnifiedNum::from(1000 * multiplier);
             let modify = ModifyCampaign {
-                budget: Some(new_budget.clone()),
+                budget: Some(new_budget),
                 validators: None,
                 title: Some("Updated title".to_string()),
                 pricing_bounds: None,
@@ -948,8 +1046,7 @@ mod test {
         let _second_campaign = {
             // erases the CampaignId for the CreateCampaign request
             let mut create_second = CreateCampaign::from(DUMMY_CAMPAIGN.clone());
-            // 500.00000000
-            create_second.budget = UnifiedNum::from(50_000_000_000);
+            create_second.budget = UnifiedNum::from(500 * multiplier);
 
             // prepare for Campaign creation
             add_deposit_call(
@@ -979,8 +1076,7 @@ mod test {
         {
             // erases the CampaignId for the CreateCampaign request
             let mut create = CreateCampaign::from(DUMMY_CAMPAIGN.clone());
-            // 600.00000000
-            create.budget = UnifiedNum::from(60_000_000_000);
+            create.budget = UnifiedNum::from(600 * multiplier);
 
             // prepare for Campaign creation
             add_deposit_call(create.channel.id(), create.creator, create.channel.token);
@@ -1001,7 +1097,7 @@ mod test {
         let modified = {
             let lower_budget = UnifiedNum::from(90_000_000_000);
             let modify = ModifyCampaign {
-                budget: Some(lower_budget.clone()),
+                budget: Some(lower_budget),
                 validators: None,
                 title: None,
                 pricing_bounds: None,
@@ -1039,8 +1135,7 @@ mod test {
         {
             // erases the CampaignId for the CreateCampaign request
             let mut create = CreateCampaign::from(DUMMY_CAMPAIGN.clone());
-            // 600.00000000
-            create.budget = UnifiedNum::from(60_000_000_000);
+            create.budget = UnifiedNum::from(600 * multiplier);
 
             // prepare for Campaign creation
             add_deposit_call(create.channel.id(), create.creator, create.channel.token);
@@ -1094,6 +1189,77 @@ mod test {
             assert!(
                 matches!(modify_err, Error::NewBudget(string) if string == "Not enough deposit left for the campaign's new budget")
             );
+        }
+    }
+
+    #[tokio::test]
+    async fn delta_budgets_are_calculated_correctly() {
+        let redis = TESTS_POOL.get().await.expect("Should return Object");
+        let campaign_remaining = CampaignRemaining::new(redis.connection.clone());
+        let multiplier = 10_u64.pow(UnifiedNum::PRECISION.into());
+
+        let campaign = DUMMY_CAMPAIGN.clone();
+
+        // Equal budget
+        {
+            let delta_budget =
+                get_delta_budget::<DummyAdapter>(&campaign_remaining, &campaign, campaign.budget)
+                    .await
+                    .expect("should get delta budget");
+            assert!(delta_budget.is_none());
+        }
+        // Spent cant be higher than the new budget
+        {
+            campaign_remaining
+                .set_initial(campaign.id, UnifiedNum::from_u64(600 * multiplier))
+                .await
+                .expect("should set");
+
+            // campaign_spent > new_budget
+            let new_budget = UnifiedNum::from_u64(300 * multiplier);
+            let delta_budget =
+                get_delta_budget::<DummyAdapter>(&campaign_remaining, &campaign, new_budget).await;
+
+            assert!(matches!(delta_budget, Err(Error::NewBudget(_))));
+
+            // campaign_spent == new_budget
+            let new_budget = UnifiedNum::from_u64(400 * multiplier);
+            let delta_budget =
+                get_delta_budget::<DummyAdapter>(&campaign_remaining, &campaign, new_budget).await;
+
+            assert!(matches!(delta_budget, Err(Error::NewBudget(_))));
+        }
+        // Increasing budget
+        {
+            campaign_remaining
+                .set_initial(campaign.id, UnifiedNum::from_u64(900 * multiplier))
+                .await
+                .expect("should set");
+            let new_budget = UnifiedNum::from_u64(1100 * multiplier);
+            let delta_budget =
+                get_delta_budget::<DummyAdapter>(&campaign_remaining, &campaign, new_budget)
+                    .await
+                    .expect("should get delta budget");
+            assert!(delta_budget.is_some());
+            let increase_by = UnifiedNum::from_u64(100 * multiplier);
+
+            assert_eq!(delta_budget, Some(DeltaBudget::Increase(increase_by)));
+        }
+        // Decreasing budget
+        {
+            campaign_remaining
+                .set_initial(campaign.id, UnifiedNum::from_u64(900 * multiplier))
+                .await
+                .expect("should set");
+            let new_budget = UnifiedNum::from_u64(800 * multiplier);
+            let delta_budget =
+                get_delta_budget::<DummyAdapter>(&campaign_remaining, &campaign, new_budget)
+                    .await
+                    .expect("should get delta budget");
+            assert!(delta_budget.is_some());
+            let decrease_by = UnifiedNum::from_u64(200 * multiplier);
+
+            assert_eq!(delta_budget, Some(DeltaBudget::Decrease(decrease_by)));
         }
     }
 }
