@@ -106,7 +106,7 @@ async fn list_spendable_total_count<'a>(
     let client = pool.get().await?;
 
     let statement =
-        "SELECT COUNT(spendable)::varchar FROM spendable INNER JOIN channels ON spendable.channel_id=channels.id WHERE spendable.channel_id = $1";
+        "SELECT COUNT(spendable)::varchar FROM spendable WHERE channel_id = $1";
     let stmt = client.prepare(statement).await?;
     let row = client.query_one(&stmt, &[&channel_id]).await?;
 
