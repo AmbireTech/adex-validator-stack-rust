@@ -495,7 +495,7 @@ mod test {
         util::tests::prep_db::{
             ADDRESSES, DUMMY_AD_UNITS, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER, IDS,
         },
-        EventSubmission, UnifiedNum, ValidatorDesc, ValidatorId
+        EventSubmission, UnifiedNum, ValidatorDesc, ValidatorId,
     };
     use std::{convert::TryFrom, time::Duration};
     use tokio_postgres::error::SqlState;

@@ -16,6 +16,7 @@ serde = { version = "^1.0", features = ['derive'] }
 serde_json = "1.0"
 serde-hex = "0.1.0"
 serde_millis = "0.1.1"
+serde_urlencoded = "^0.7"
 # Used prefixes on field for targeting::Input, and `campaign::Active`
 serde_with = "1.9"
 # Configuration

@@ -344,7 +344,7 @@ pub mod campaign {
         pub pagination: Pagination,
     }
 
-    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
     pub struct CampaignListQuery {
         #[serde(default)]
         // default is `u64::default()` = `0`
@@ -359,7 +359,7 @@ pub mod campaign {
         pub validator: Option<ValidatorParam>,
     }
 
-    #[derive(Serialize, Deserialize, Debug)]
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
     #[serde(rename_all = "camelCase")]
     pub enum ValidatorParam {
         /// Results will include all campaigns that have the provided address as a leader
@@ -372,69 +372,61 @@ pub mod campaign {
     mod test {
         use super::*;
         use crate::util::tests::prep_db::{ADDRESSES, IDS};
-        use serde_json::json;
         use chrono::TimeZone;
 
         #[test]
         pub fn deserialize_campaign_list_query() {
             let query_leader = CampaignListQuery {
                 page: 0,
-                active_to_ge: Utc.ymd(2021, 2, 1).and_hms(7,0,0),
-                creator: Some(ADDRESSES["publisher"]),
+                active_to_ge: Utc.ymd(2021, 2, 1).and_hms(7, 0, 0),
+                creator: Some(ADDRESSES["creator"]),
                 validator: Some(ValidatorParam::Leader(IDS["leader"])),
             };
 
-            let query_leader_json = json!({
-                "page": 0,
-                "activeTo": 1612162800,
-                "creator": "0xB7d3F81E857692d13e9D63b232A90F4A1793189E",
-                "leader": "0xce07CbB7e054514D590a0262C93070D838bFBA2e",
-            });
-
-            pretty_assertions::assert_eq!(
-                query_leader_json,
-                serde_json::to_value(query_leader).expect("should serialize")
+            let query_leader_string = format!(
+                "page=0&activeTo=1612162800&creator={}&leader={}",
+                ADDRESSES["creator"], ADDRESSES["leader"]
             );
+            let query_leader_encoded =
+                serde_urlencoded::from_str::<CampaignListQuery>(&query_leader_string)
+                    .expect("should encode");
+
+            pretty_assertions::assert_eq!(query_leader_encoded, query_leader);
 
             let query_validator = CampaignListQuery {
                 page: 0,
-                active_to_ge: Utc.ymd(2021, 2, 1).and_hms(7,0,0),
-                creator: Some(ADDRESSES["publisher"]),
+                active_to_ge: Utc.ymd(2021, 2, 1).and_hms(7, 0, 0),
+                creator: Some(ADDRESSES["creator"]),
                 validator: Some(ValidatorParam::Validator(IDS["follower"])),
             };
-
-            let query_validator_json = json!({
-                "page": 0,
-                "activeTo": 1612162800,
-                "creator": "0xB7d3F81E857692d13e9D63b232A90F4A1793189E",
-                "validator": "0xC91763D7F14ac5c5dDfBCD012e0D2A61ab9bDED3",
-            });
-
-            pretty_assertions::assert_eq!(
-                query_validator_json,
-                serde_json::to_value(query_validator).expect("should serialize")
+            let query_validator_string = format!(
+                "page=0&activeTo=1612162800&creator={}&validator={}",
+                ADDRESSES["creator"], ADDRESSES["follower"]
             );
+            let query_validator_encoded =
+                serde_urlencoded::from_str::<CampaignListQuery>(&query_validator_string)
+                    .expect("should encode");
+
+            pretty_assertions::assert_eq!(query_validator_encoded, query_validator,);
 
             let query_no_validator = CampaignListQuery {
                 page: 0,
-                active_to_ge: Utc.ymd(2021, 2, 1).and_hms(7,0,0),
-                creator: Some(ADDRESSES["publisher"]),
+                active_to_ge: Utc.ymd(2021, 2, 1).and_hms(7, 0, 0),
+                creator: Some(ADDRESSES["creator"]),
                 validator: None,
             };
 
-            let query_no_validator_json = json!({
-                "page": 0,
-                "activeTo": 1612162800,
-                "creator": "0xB7d3F81E857692d13e9D63b232A90F4A1793189E",
-            });
-
-            pretty_assertions::assert_eq!(
-                query_no_validator_json,
-                serde_json::to_value(query_no_validator).expect("should serialize")
+            let query_no_validator_string = format!(
+                "page=0&activeTo=1612162800&creator={}",
+                ADDRESSES["creator"]
             );
-        }
-}
+            let query_no_validator_encoded =
+                serde_urlencoded::from_str::<CampaignListQuery>(&query_no_validator_string)
+                    .expect("should encode");
 
+            pretty_assertions::assert_eq!(query_no_validator_encoded, query_no_validator,);
+        }
+    }
 }
 
 pub mod campaign_create {
