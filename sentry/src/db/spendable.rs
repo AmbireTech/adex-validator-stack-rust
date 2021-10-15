@@ -199,9 +199,13 @@ mod test {
 
         insert_spendable(database.pool.clone(), &spendable_user).await.expect("should insert spendable");
         let (spendables, pagination) = get_all_spendables_for_channel(database.clone(), &channel.id(), 0, 2).await.expect("should get result");
-        assert_eq!(spendables.len(), 1);
-        assert_eq!(pagination.page, 0);
-        assert_eq!(pagination.total_pages, 1);
+        let expected_spendables = vec![spendable_user.clone()];
+        let expected_pagination = Pagination {
+            page: 0,
+            total_pages: 1,
+        };
+        assert_eq!(spendables, expected_spendables);
+        assert_eq!(pagination, expected_pagination);
 
 
         // Test for multiple pages
@@ -248,19 +252,30 @@ mod test {
         insert_spendable(database.pool.clone(), &spendable_tester).await.expect("should insert spendable");
 
         let (spendables, pagination) = get_all_spendables_for_channel(database.clone(), &channel.id(), 0, 2).await.expect("should get result");
-        assert_eq!(spendables.len(), 2);
-        assert_eq!(pagination.page, 0);
-        assert_eq!(pagination.total_pages, 3);
+        let expected_spendables = vec![spendable_user, spendable_publisher];
+        let expected_pagination = Pagination {
+            page: 0,
+            total_pages: 3,
+        };
+        assert_eq!(spendables, expected_spendables);
+        assert_eq!(pagination, expected_pagination);
 
         let (spendables, pagination) = get_all_spendables_for_channel(database.clone(), &channel.id(), 2, 2).await.expect("should get result");
-        assert_eq!(spendables.len(), 2);
-        assert_eq!(pagination.page, 1);
-        assert_eq!(pagination.total_pages, 3);
+        let expected_spendables = vec![spendable_publisher2, spendable_creator];
+        let expected_pagination = Pagination {
+            page: 1,
+            total_pages: 3,
+        };
+        assert_eq!(spendables, expected_spendables);
+        assert_eq!(pagination, expected_pagination);
 
         let (spendables, pagination) = get_all_spendables_for_channel(database.clone(), &channel.id(), 4, 2).await.expect("should get result");
-
-        assert_eq!(spendables.len(), 1);
-        assert_eq!(pagination.page, 2);
-        assert_eq!(pagination.total_pages, 3);
+        let expected_spendables = vec![spendable_tester];
+        let expected_pagination = Pagination {
+            page: 2,
+            total_pages: 3,
+        };
+        assert_eq!(spendables, expected_spendables);
+        assert_eq!(pagination, expected_pagination);
     }
 }
