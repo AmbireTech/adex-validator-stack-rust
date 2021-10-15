@@ -105,8 +105,7 @@ async fn list_spendable_total_count<'a>(
 ) -> Result<u64, PoolError> {
     let client = pool.get().await?;
 
-    let statement =
-        "SELECT COUNT(spendable)::varchar FROM spendable WHERE channel_id = $1";
+    let statement = "SELECT COUNT(spendable)::varchar FROM spendable WHERE channel_id = $1";
     let stmt = client.prepare(statement).await?;
     let row = client.query_one(&stmt, &[&channel_id]).await?;
 
@@ -183,7 +182,10 @@ mod test {
             .expect("Should insert");
 
         // Test for 0 records
-        let (spendables, pagination) = get_all_spendables_for_channel(database.clone(), &channel.id(), 0, 2).await.expect("should get result");
+        let (spendables, pagination) =
+            get_all_spendables_for_channel(database.clone(), &channel.id(), 0, 2)
+                .await
+                .expect("should get result");
         assert!(spendables.is_empty());
         assert_eq!(pagination.total_pages, 1);
 
@@ -197,8 +199,13 @@ mod test {
             },
         };
 
-        insert_spendable(database.pool.clone(), &spendable_user).await.expect("should insert spendable");
-        let (spendables, pagination) = get_all_spendables_for_channel(database.clone(), &channel.id(), 0, 2).await.expect("should get result");
+        insert_spendable(database.pool.clone(), &spendable_user)
+            .await
+            .expect("should insert spendable");
+        let (spendables, pagination) =
+            get_all_spendables_for_channel(database.clone(), &channel.id(), 0, 2)
+                .await
+                .expect("should get result");
         let expected_spendables = vec![spendable_user.clone()];
         let expected_pagination = Pagination {
             page: 0,
@@ -206,7 +213,6 @@ mod test {
         };
         assert_eq!(spendables, expected_spendables);
         assert_eq!(pagination, expected_pagination);
-
 
         // Test for multiple pages
         let spendable_publisher = Spendable {
@@ -217,8 +223,9 @@ mod test {
                 still_on_create2: UnifiedNum::from(500_000),
             },
         };
-        insert_spendable(database.pool.clone(), &spendable_publisher).await.expect("should insert spendable");
-
+        insert_spendable(database.pool.clone(), &spendable_publisher)
+            .await
+            .expect("should insert spendable");
 
         let spendable_publisher2 = Spendable {
             spender: ADDRESSES["publisher2"],
@@ -228,7 +235,9 @@ mod test {
                 still_on_create2: UnifiedNum::from(500_000),
             },
         };
-        insert_spendable(database.pool.clone(), &spendable_publisher2).await.expect("should insert spendable");
+        insert_spendable(database.pool.clone(), &spendable_publisher2)
+            .await
+            .expect("should insert spendable");
 
         let spendable_creator = Spendable {
             spender: ADDRESSES["creator"],
@@ -238,8 +247,9 @@ mod test {
                 still_on_create2: UnifiedNum::from(500_000),
             },
         };
-        insert_spendable(database.pool.clone(), &spendable_creator).await.expect("should insert spendable");
-
+        insert_spendable(database.pool.clone(), &spendable_creator)
+            .await
+            .expect("should insert spendable");
 
         let spendable_tester = Spendable {
             spender: ADDRESSES["tester"],
@@ -249,9 +259,14 @@ mod test {
                 still_on_create2: UnifiedNum::from(500_000),
             },
         };
-        insert_spendable(database.pool.clone(), &spendable_tester).await.expect("should insert spendable");
+        insert_spendable(database.pool.clone(), &spendable_tester)
+            .await
+            .expect("should insert spendable");
 
-        let (spendables, pagination) = get_all_spendables_for_channel(database.clone(), &channel.id(), 0, 2).await.expect("should get result");
+        let (spendables, pagination) =
+            get_all_spendables_for_channel(database.clone(), &channel.id(), 0, 2)
+                .await
+                .expect("should get result");
         let expected_spendables = vec![spendable_user, spendable_publisher];
         let expected_pagination = Pagination {
             page: 0,
@@ -260,7 +275,10 @@ mod test {
         assert_eq!(spendables, expected_spendables);
         assert_eq!(pagination, expected_pagination);
 
-        let (spendables, pagination) = get_all_spendables_for_channel(database.clone(), &channel.id(), 2, 2).await.expect("should get result");
+        let (spendables, pagination) =
+            get_all_spendables_for_channel(database.clone(), &channel.id(), 2, 2)
+                .await
+                .expect("should get result");
         let expected_spendables = vec![spendable_publisher2, spendable_creator];
         let expected_pagination = Pagination {
             page: 1,
@@ -269,7 +287,10 @@ mod test {
         assert_eq!(spendables, expected_spendables);
         assert_eq!(pagination, expected_pagination);
 
-        let (spendables, pagination) = get_all_spendables_for_channel(database.clone(), &channel.id(), 4, 2).await.expect("should get result");
+        let (spendables, pagination) =
+            get_all_spendables_for_channel(database.clone(), &channel.id(), 4, 2)
+                .await
+                .expect("should get result");
         let expected_spendables = vec![spendable_tester];
         let expected_pagination = Pagination {
             page: 2,
