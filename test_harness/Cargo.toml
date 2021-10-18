@@ -8,6 +8,7 @@ primitives = {path = "../primitives"}
 adapter = {version = "0.1", path = "../adapter", features = ["test-util"]}
 # ethereum
 web3 = { version = "0.17", features = ["http-tls", "signing"] }
+once_cell = "^1.8"
 
 
 subprocess = "0.2"
