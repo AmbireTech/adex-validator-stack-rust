@@ -33,6 +33,7 @@ use {
     },
 };
 
+pub mod analytics;
 pub mod middleware;
 pub mod routes {
     pub mod analytics;
