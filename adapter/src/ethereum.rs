@@ -2,10 +2,7 @@ use async_trait::async_trait;
 use chrono::Utc;
 use create2::calc_addr;
 use error::*;
-use ethstore::{
-    ethkey::{public_to_address, recover, verify_address, Message, Password, Signature},
-    SafeAccount,
-};
+use ethstore::{SafeAccount, ethkey::{public_to_address, recover, verify_address, Message, Password, Signature}};
 use once_cell::sync::Lazy;
 use primitives::{
     adapter::{Adapter, AdapterResult, Deposit, Error as AdapterError, KeystoreOptions, Session},
@@ -102,8 +99,8 @@ impl EthereumAdapter {
         let keystore_json: Value =
             serde_json::from_str(&keystore_contents).map_err(KeystoreError::Deserialization)?;
 
-        let address = keystore_json["address"]
-            .as_str()
+        let address = keystore_json.get("address")
+            .and_then(|value| value.as_str())
             .map(eth_checksum::checksum)
             .ok_or(KeystoreError::AddressMissing)?;
 
@@ -131,9 +128,11 @@ impl Adapter for EthereumAdapter {
     type AdapterError = Error;
 
     fn unlock(&mut self) -> AdapterResult<(), Self::AdapterError> {
+        let json = serde_json::from_value(self.keystore_json.clone())
+        .map_err(KeystoreError::Deserialization)?;
+
         let account = SafeAccount::from_file(
-            serde_json::from_value(self.keystore_json.clone())
-                .map_err(KeystoreError::Deserialization)?,
+            json,
             None,
             &Some(self.keystore_pwd.clone()),
         )
@@ -267,6 +266,12 @@ impl Adapter for EthereumAdapter {
         channel: &Channel,
         depositor_address: &Address,
     ) -> AdapterResult<Deposit, Self::AdapterError> {
+        let token_info = self
+            .config
+            .token_address_whitelist
+            .get(&channel.token)
+            .ok_or(Error::TokenNotWhitelisted(channel.token))?;
+
         let outpace_contract = Contract::from_json(
             self.web3.eth(),
             self.config.outpace_address.into(),
@@ -293,7 +298,7 @@ impl Adapter for EthereumAdapter {
                 "deposits",
                 (
                     Token::FixedBytes(channel.id().as_bytes().to_vec()),
-                    Token::Address(depositor_address.as_bytes().into()),
+                    Token::Address(H160(depositor_address.to_bytes())),
                 ),
                 None,
                 Options::default(),
@@ -325,12 +330,6 @@ impl Adapter for EthereumAdapter {
             .to_string()
             .parse()
             .map_err(Error::BigNumParsing)?;
-
-        let token_info = self
-            .config
-            .token_address_whitelist
-            .get(&channel.token)
-            .ok_or(Error::TokenNotWhitelisted(channel.token))?;
 
         // Count the create2 deposit only if it's > minimum token units configured
         let deposit = if still_on_create2 > token_info.min_token_units_for_deposit {
