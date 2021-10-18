@@ -51,7 +51,7 @@ pub static KEYSTORE_IDENTITY: Lazy<(Address, KeystoreOptions)> = Lazy::new(|| {
 pub static GANACHE_KEYSTORES: Lazy<HashMap<String, (Address, KeystoreOptions)>> = Lazy::new(|| {
     vec![
         (
-            "address0".to_string(),
+            "guardian".to_string(),
             (
                 "0xDf08F82De32B8d460adbE8D72043E3a7e25A3B39"
                     .parse()
@@ -131,6 +131,12 @@ pub static GANACHE_KEYSTORES: Lazy<HashMap<String, (Address, KeystoreOptions)>> 
 /// see the `ganache-cli.sh` script in the repository
 pub static GANACHE_ADDRESSES: Lazy<HashMap<String, Address>> = Lazy::new(|| {
     vec![
+        (
+            "guardian".to_string(),
+            "0xDf08F82De32B8d460adbE8D72043E3a7e25A3B39"
+                .parse()
+                .expect("Valid Address"),
+        ),
         (
             "leader".to_string(),
             "0x5a04A8fB90242fB7E1db7d1F51e268A03b7f93A5"
@@ -282,7 +288,7 @@ pub async fn deploy_outpace_contract(
     web3: &Web3<Http>,
 ) -> web3::contract::Result<(Address, Contract<Http>)> {
     let outpace_contract = Contract::deploy(web3.eth(), &OUTPACE_ABI)
-        .expect("Invalid ABI of Sweeper contract")
+        .expect("Invalid ABI of Outpace contract")
         .confirmations(0)
         .options(Options::with(|opt| {
             opt.gas_price = Some(1.into());
