@@ -10,6 +10,9 @@
 # Address 4: 0x8c4B95383a46D30F056aCe085D8f453fCF4Ed66d
 # Address 5: 0x1059B025E3F8b8f76A8120D6D6Fd9fBa172c80b8
 node /app/ganache-core.docker.cli.js --gasLimit 0xfffffffffffff \
+  --db="./snapshot" \
+  --deterministic \
+  --mnemonic="diary west sketch curious expose decade symptom height minor layer carry man" \
   --account="0x2bdd21761a483f71054e14f5b827213567971c676928d9a1808cbfa4b7501200,9000000000000000000000000000" \
   --account="0xd66ecc35fe42ae2063888bfd11c4573db08bdbd5c2b9b835deef05beb43b407f,9000000000000000000000000000" \
   --account="0x1d00a65debb6143cebc3b48b11db2ddfa81411c1f7c443f706d4f2bd8145ee4a,9000000000000000000000000000" \

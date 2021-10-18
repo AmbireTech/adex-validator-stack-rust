@@ -6,6 +6,7 @@ LABEL maintainer="dev@adex.network"
 WORKDIR /scripts
 
 COPY ganache-cli.sh .
+COPY snapshot_contracts snapshot
 
 EXPOSE 8545
 
