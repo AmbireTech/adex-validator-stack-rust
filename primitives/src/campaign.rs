@@ -398,6 +398,12 @@ mod postgres {
         accepts!(TEXT, VARCHAR);
     }
 
+    impl From<&Row> for CampaignId {
+        fn from(row: &Row) -> Self {
+            row.get("id")
+        }
+    }
+
     impl ToSql for CampaignId {
         fn to_sql(
             &self,

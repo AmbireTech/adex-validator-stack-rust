@@ -181,7 +181,7 @@ pub struct AggregateEvents {
     pub event_payouts: HashMap<Address, BigNum>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Pagination {
     pub total_pages: u64,
