@@ -124,6 +124,7 @@ mod test {
         insert_channel,
         tests_postgres::{setup_test_migrations, DATABASE_POOL},
     };
+    use tokio::time::{sleep, Duration};
 
     use super::*;
 
@@ -151,6 +152,7 @@ mod test {
         let is_inserted = insert_spendable(database.pool.clone(), &spendable)
             .await
             .expect("Should succeed");
+        sleep(Duration::from_millis(100)).await;
 
         assert!(is_inserted);
 
@@ -202,6 +204,8 @@ mod test {
         insert_spendable(database.pool.clone(), &spendable_user)
             .await
             .expect("should insert spendable");
+        sleep(Duration::from_millis(100)).await;
+
         let (spendables, pagination) =
             get_all_spendables_for_channel(database.clone(), &channel.id(), 0, 2)
                 .await
@@ -226,6 +230,7 @@ mod test {
         insert_spendable(database.pool.clone(), &spendable_publisher)
             .await
             .expect("should insert spendable");
+        sleep(Duration::from_millis(100)).await;
 
         let spendable_publisher2 = Spendable {
             spender: ADDRESSES["publisher2"],
@@ -238,6 +243,7 @@ mod test {
         insert_spendable(database.pool.clone(), &spendable_publisher2)
             .await
             .expect("should insert spendable");
+        sleep(Duration::from_millis(100)).await;
 
         let spendable_creator = Spendable {
             spender: ADDRESSES["creator"],
@@ -250,6 +256,7 @@ mod test {
         insert_spendable(database.pool.clone(), &spendable_creator)
             .await
             .expect("should insert spendable");
+        sleep(Duration::from_millis(100)).await;
 
         let spendable_tester = Spendable {
             spender: ADDRESSES["tester"],
@@ -262,6 +269,7 @@ mod test {
         insert_spendable(database.pool.clone(), &spendable_tester)
             .await
             .expect("should insert spendable");
+        sleep(Duration::from_millis(100)).await;
 
         let (spendables, pagination) =
             get_all_spendables_for_channel(database.clone(), &channel.id(), 0, 2)

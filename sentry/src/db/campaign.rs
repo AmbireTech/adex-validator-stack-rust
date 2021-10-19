@@ -652,7 +652,7 @@ mod test {
             2,
             Some(ADDRESSES["creator"]),
             None,
-            &Utc::now(),
+            &DUMMY_CAMPAIGN.created,
         )
         .await
         .expect("should fetch");
@@ -668,7 +668,7 @@ mod test {
             2,
             Some(ADDRESSES["creator"]),
             None,
-            &Utc::now(),
+            &DUMMY_CAMPAIGN.created,
         )
         .await
         .expect("should fetch");
@@ -681,7 +681,7 @@ mod test {
             2,
             Some(ADDRESSES["creator"]),
             None,
-            &Utc::now(),
+            &DUMMY_CAMPAIGN.created,
         )
         .await
         .expect("should fetch");
@@ -694,7 +694,7 @@ mod test {
             2,
             Some(ADDRESSES["tester"]),
             None,
-            &Utc::now(),
+            &DUMMY_CAMPAIGN.created,
         )
         .await
         .expect("should fetch");
@@ -707,7 +707,7 @@ mod test {
             5,
             None,
             Some(ValidatorParam::Validator(IDS["follower"])),
-            &Utc::now(),
+            &DUMMY_CAMPAIGN.created,
         )
         .await
         .expect("should fetch");
@@ -728,7 +728,7 @@ mod test {
             5,
             None,
             Some(ValidatorParam::Leader(IDS["leader"])),
-            &Utc::now(),
+            &DUMMY_CAMPAIGN.created,
         )
         .await
         .expect("should fetch");
@@ -748,7 +748,7 @@ mod test {
             5,
             None,
             Some(ValidatorParam::Leader(IDS["user"])),
-            &Utc::now(),
+            &DUMMY_CAMPAIGN.created,
         )
         .await
         .expect("should fetch");
@@ -761,7 +761,7 @@ mod test {
             5,
             None,
             Some(ValidatorParam::Leader(IDS["follower"])),
-            &Utc::now(),
+            &DUMMY_CAMPAIGN.created,
         )
         .await
         .expect("should fetch");
@@ -774,7 +774,7 @@ mod test {
             5,
             Some(ADDRESSES["creator"]),
             Some(ValidatorParam::Leader(IDS["leader"])),
-            &Utc::now(),
+            &DUMMY_CAMPAIGN.created,
         )
         .await
         .expect("should fetch");
