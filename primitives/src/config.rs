@@ -4,10 +4,13 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 use std::{collections::HashMap, fs, num::NonZeroU8};
 
+pub use toml::de::Error as TomlError;
+
 pub static DEVELOPMENT_CONFIG: Lazy<Config> = Lazy::new(|| {
     toml::from_str(include_str!("../../docs/config/dev.toml"))
         .expect("Failed to parse dev.toml config file")
 });
+
 pub static PRODUCTION_CONFIG: Lazy<Config> = Lazy::new(|| {
     toml::from_str(include_str!("../../docs/config/prod.toml"))
         .expect("Failed to parse prod.toml config file")
@@ -64,6 +67,15 @@ pub struct Config {
     pub validators_whitelist: Vec<ValidatorId>,
     #[serde(deserialize_with = "deserialize_token_whitelist")]
     pub token_address_whitelist: HashMap<Address, TokenInfo>,
+}
+
+impl Config {
+    /// Utility method that will deserialize a Toml file content into a `Config`.
+    ///
+    /// Instead of relying on the `toml` crate directly, use this method instead.
+    pub fn try_toml(toml: &str) -> Result<Self, TomlError> {
+        toml::from_str(toml)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
