@@ -111,7 +111,7 @@ pub static GANACHE_KEYSTORES: Lazy<HashMap<String, (Address, KeystoreOptions)>> 
             ),
         ),
         (
-            "address5".to_string(),
+            "guardian2".to_string(),
             (
                 "0x1059B025E3F8b8f76A8120D6D6Fd9fBa172c80b8"
                     .parse()
@@ -161,6 +161,12 @@ pub static GANACHE_ADDRESSES: Lazy<HashMap<String, Address>> = Lazy::new(|| {
                 .parse()
                 .expect("Valid Address"),
         ),
+        (
+            "guardian2".to_string(),
+            "0x1059B025E3F8b8f76A8120D6D6Fd9fBa172c80b8"
+                .parse()
+                .expect("Valid Address"),
+        )
     ]
     .into_iter()
     .collect()
