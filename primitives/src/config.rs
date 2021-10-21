@@ -2,7 +2,8 @@ use crate::{event_submission::RateLimit, Address, BigNum, ValidatorId};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_hex::{SerHex, StrictPfx};
-use std::{collections::HashMap, fs, num::NonZeroU8};
+use std::{collections::HashMap, fs, io::Read, num::NonZeroU8};
+use thiserror::Error;
 
 pub use toml::de::Error as TomlError;
 
@@ -111,22 +112,24 @@ where
     Ok(tokens_whitelist)
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Debug, Error)]
 pub enum ConfigError {
-    InvalidFile(String),
+    #[error("Toml parsing: {0}")]
+    Toml(#[from] toml::de::Error),
+    #[error("File reading: {0}")]
+    InvalidFile(#[from] std::io::Error),
 }
 
 pub fn configuration(environment: &str, config_file: Option<&str>) -> Result<Config, ConfigError> {
     match config_file {
-        Some(config_file) => match fs::read_to_string(config_file) {
-            Ok(config) => match toml::from_str(&config) {
-                Ok(data) => data,
-                Err(e) => Err(ConfigError::InvalidFile(e.to_string())),
-            },
-            Err(e) => Err(ConfigError::InvalidFile(format!(
-                "Unable to read provided config file {} {}",
-                config_file, e
-            ))),
+        Some(config_file) => {
+            let mut buf = Vec::new();
+            let mut file =
+                fs::File::open(config_file)?;
+
+            file.read_to_end(&mut buf)?;
+            
+            Ok(toml::from_slice(&buf)?)
         },
         None => match environment {
             "production" => Ok(PRODUCTION_CONFIG.clone()),
