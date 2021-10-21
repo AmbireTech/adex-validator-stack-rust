@@ -696,12 +696,12 @@ mod test {
                 &token.2,
                 *GANACHE_ADDRESSES["leader"].as_bytes(),
                 *spender.as_bytes(),
-                10_000_u64,
+                &BigNum::from(10_000),
             )
             .await
             .expect("Failed to set balance");
 
-            outpace_deposit(&outpace.1, &channel, *spender.as_bytes(), 10_000)
+            outpace_deposit(&outpace.1, &channel, *spender.as_bytes(), &BigNum::from(10_000))
                 .await
                 .expect("Should deposit funds");
 
@@ -726,7 +726,7 @@ mod test {
                 &token.2,
                 leader_account.to_bytes(),
                 counterfactual_address.to_bytes(),
-                999_u64,
+                &BigNum::from(999),
             )
             .await
             .expect("Failed to set balance");
@@ -753,7 +753,7 @@ mod test {
                 &token.2,
                 leader_account.to_bytes(),
                 counterfactual_address.to_bytes(),
-                1_999_u64,
+                &BigNum::from(1_999)
             )
             .await
             .expect("Failed to set balance");

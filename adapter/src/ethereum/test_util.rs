@@ -210,12 +210,14 @@ pub async fn mock_set_balance(
     token_contract: &Contract<Http>,
     from: [u8; 20],
     address: [u8; 20],
-    amount: u64,
+    amount: &BigNum,
 ) -> web3::contract::Result<H256> {
+    let amount = U256::from_dec_str(&amount.to_string()).expect("Should create U256");
+
     token_contract
         .call(
             "setBalanceTo",
-            (H160(address), U256::from(amount)),
+            (H160(address), amount),
             H160(from),
             Options::default(),
         )
@@ -226,12 +228,14 @@ pub async fn outpace_deposit(
     outpace_contract: &Contract<Http>,
     channel: &Channel,
     to: [u8; 20],
-    amount: u64,
+    amount: &BigNum,
 ) -> web3::contract::Result<H256> {
+    let amount = U256::from_dec_str(&amount.to_string()).expect("Should create U256");
+
     outpace_contract
         .call(
             "deposit",
-            (channel.tokenize(), H160(to), U256::from(amount)),
+            (channel.tokenize(), H160(to), amount),
             H160(to),
             Options::with(|opt| {
                 opt.gas_price = Some(1.into());
