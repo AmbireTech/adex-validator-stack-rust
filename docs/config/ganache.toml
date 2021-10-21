@@ -48,7 +48,7 @@ address = '0x9db7bff788522dbe8fa2e8cbd568a58c471ccd5e'
 # 1 * 10^18 = 1.0000 TOKEN
 min_token_units_for_deposit = '1000000000000000000'
 # multiplier = 10^14 - 10^18 (token precision) = 10^-4
-# min_validator_fee = 1' * 10^-4 = 0.000_1
+# min_validator_fee = 1 * 10^-4 = 0.000_1
 min_validator_fee = '100000000000000'
 precision = 18
 
