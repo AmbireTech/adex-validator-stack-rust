@@ -3711,6 +3711,7 @@ dependencies = [
  "anyhow",
  "once_cell",
  "primitives",
+ "reqwest",
  "subprocess",
  "tokio",
  "web3",
