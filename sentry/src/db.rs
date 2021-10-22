@@ -346,7 +346,7 @@ pub mod tests_postgres {
 
         async fn recycle(&self, database: &mut Database) -> RecycleResult<Self::Error> {
             // DROP the public schema and create it again for usage after recycling
-            let queries = format!("DROP SCHEMA public CASCADE; CREATE SCHEMA public;");
+            let queries = "DROP SCHEMA public CASCADE; CREATE SCHEMA public;";
 
             let result = database
                 .pool
@@ -354,7 +354,7 @@ pub mod tests_postgres {
                 .await?
                 .simple_query(&queries)
                 .await
-                .map_err(|err| PoolError::Backend(err))
+                .map_err(PoolError::Backend)
                 .expect("Should not error");
             assert_eq!(2, result.len());
             assert!(matches!(result[0], SimpleQueryMessage::CommandComplete(..)));
