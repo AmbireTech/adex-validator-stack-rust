@@ -2,18 +2,14 @@ use adapter::ethereum::{
     get_counterfactual_address,
     test_util::{
         deploy_outpace_contract, deploy_sweeper_contract, deploy_token_contract, mock_set_balance,
-        outpace_deposit, GANACHE_KEYSTORES, GANACHE_URL, MOCK_TOKEN_ABI,
+        outpace_deposit, GANACHE_URL, MOCK_TOKEN_ABI,
     },
-    EthereumAdapter, OUTPACE_ABI, SWEEPER_ABI,
+    OUTPACE_ABI, SWEEPER_ABI,
 };
 use deposits::Deposit;
 use once_cell::sync::Lazy;
-use primitives::{
-    config::{TokenInfo, DEVELOPMENT_CONFIG},
-    Address, Config,
-};
+use primitives::{config::TokenInfo, Address, Config};
 use web3::{contract::Contract, transports::Http, types::H160, Web3};
-// use validator_worker::{sentry_interface::SentryApi};
 
 pub mod deposits;
 
@@ -27,7 +23,7 @@ pub static SNAPSHOT_CONTRACTS: Lazy<Contracts> = Lazy::new(|| {
     use primitives::BigNum;
     use std::num::NonZeroU8;
 
-    let web3 = Web3::new(Http::new(&GANACHE_URL).expect("failed to init transport"));
+    let web3 = Web3::new(Http::new(GANACHE_URL).expect("failed to init transport"));
 
     let token_address = "0x9db7bff788522dbe8fa2e8cbd568a58c471ccd5e"
         .parse::<Address>()
@@ -104,30 +100,6 @@ impl Setup {
         }
     }
 
-    /// Initializes the Ethereum Adapter and `unlock()`s it ready to be used.
-    #[deprecated = "We now use GANACHE config directly."]
-    pub fn adapter(&self, contracts: &Contracts) -> EthereumAdapter {
-        // Development uses a locally running ganache-cli
-        let mut config = DEVELOPMENT_CONFIG.clone();
-        config.sweeper_address = contracts.sweeper.0.to_bytes();
-        config.outpace_address = contracts.outpace.0.to_bytes();
-
-        assert!(
-            config
-                .token_address_whitelist
-                .insert(contracts.token.1, contracts.token.0.clone())
-                .is_none(),
-            "The Address of the just deployed token should not be present in Config"
-        );
-
-        let eth_adapter = EthereumAdapter::init(GANACHE_KEYSTORES["leader"].1.clone(), &config)
-            .expect("Should Sentry::init");
-
-        // eth_adapter.unlock().expect("should unlock eth adapter");
-
-        eth_adapter
-    }
-
     pub async fn deposit(&self, contracts: &Contracts, deposit: &Deposit) {
         let counterfactual_address = get_counterfactual_address(
             contracts.sweeper.0,
@@ -170,19 +142,24 @@ impl Setup {
 
 #[cfg(test)]
 mod tests {
-    use crate::run::run_sentry;
+    use crate::run::run_sentry_app;
 
     use super::*;
-    use adapter::ethereum::test_util::{GANACHE_ADDRESSES, GANACHE_URL};
-    use primitives::{
-        adapter::Adapter,
-        sentry::AllSpendersResponse,
-        util::{tests::prep_db::DUMMY_VALIDATOR_LEADER, ApiUrl},
-        BigNum, Channel,
+    use adapter::ethereum::{
+        test_util::{GANACHE_ADDRESSES, GANACHE_KEYSTORES, GANACHE_URL},
+        EthereumAdapter,
     };
-    use reqwest::StatusCode;
+    use futures::FutureExt;
+    use primitives::{ 
+        adapter::Adapter,
+        sentry::campaign_create::CreateCampaign,
+        util::{tests::prep_db::DUMMY_VALIDATOR_LEADER, ApiUrl},
+        BigNum, Channel, ChannelId,
+    };
+    use reqwest::{Client, StatusCode};
 
     #[tokio::test]
+    #[ignore = "We use a snapshot, however, we have left this test for convenience"]
     async fn deploy_contracts() {
         let web3 = Web3::new(Http::new(&GANACHE_URL).expect("failed to init transport"));
         let setup = Setup { web3 };
@@ -190,8 +167,8 @@ mod tests {
         let _contracts = setup.deploy_contracts().await;
     }
 
-    #[tokio::test]
-    async fn my_test() {
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn run_full_test() {
         let web3 = Web3::new(Http::new(&GANACHE_URL).expect("failed to init transport"));
         let setup = Setup { web3 };
         // Use snapshot contracts
@@ -218,10 +195,19 @@ mod tests {
 
         // setup relayer
         // setup Adapter
-        let adapter = EthereumAdapter::init(GANACHE_KEYSTORES["leader"].1.clone(), &GANACHE_CONFIG)
-            .expect("Should Sentry::init");
-        let mut sentry_leader =
-            run_sentry(&GANACHE_KEYSTORES["leader"].1).expect("Should run Sentry Leader");
+        let mut adapter =
+            EthereumAdapter::init(GANACHE_KEYSTORES["leader"].1.clone(), &GANACHE_CONFIG)
+                .expect("Should Sentry::init");
+        adapter.unlock().expect("Ok");
+        {
+            let adapter = adapter.clone();
+
+            run_sentry_app(adapter)
+                .map(|result| result.expect("OK"))
+                .await;
+
+            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        }
 
         // Creator deposit
         {
@@ -297,27 +283,25 @@ mod tests {
         }
         // Use `adapter.get_auth` for authentication!
 
-        // TODO: call `spender/all`
-
         let api_client = reqwest::Client::new();
         let leader_url = DUMMY_VALIDATOR_LEADER
             .url
             .parse::<ApiUrl>()
             .expect("Valid url");
+        let token = adapter
+            .get_auth(&GANACHE_ADDRESSES["leader"].into())
+            .expect("Get authentication");
         // No Channel 1 - 404
         // /v5/channel/{}/spender/all
         {
-            let url = leader_url
-                .join(&format!("v5/channel/{}/spender/all", channel_1.id()))
-                .expect("valid endpoint");
-
-            let response = api_client.get(url).send().await.expect("Valid response");
+            let response = get_spender_all(&api_client, &leader_url, &token, channel_1.id())
+                .await
+                .expect("Should return Response");
 
             assert_eq!(StatusCode::NOT_FOUND, response.status());
-            //.json::<AllSpendersResponse>().await.expect("Valid JSON response");
         }
 
-        // Creator 1 - Channel 1 only
+        // Creator 1 - Campaign 1 - Channel 1 only
         {
             // create Campaign - 400 - not enough budget
             // TODO: Try to create campaign
@@ -344,51 +328,116 @@ mod tests {
 
         // run sentry
         // run worker single-tick
-        sentry_leader.kill().expect("Killed Sentry");
+        // sentry_leader.kill().expect("Killed Sentry");
+    }
+
+    async fn get_spender_all(
+        api_client: &Client,
+        url: &ApiUrl,
+        token: &str,
+        channel: ChannelId,
+    ) -> anyhow::Result<reqwest::Response> {
+        let endpoint_url = url
+            .join(&format!("v5/channel/{}/spender/all", channel))
+            .expect("valid endpoint");
+
+        Ok(api_client
+            .get(endpoint_url)
+            .bearer_auth(&token)
+            .send()
+            .await?)
+    }
+
+    async fn create_campaign(
+        api_client: &Client,
+        url: &ApiUrl,
+        token: &str,
+        create_campaign: &CreateCampaign,
+    ) -> anyhow::Result<reqwest::Response> {
+        let endpoint_url = url.join("v5/campaign").expect("valid endpoint");
+
+        Ok(api_client
+            .post(endpoint_url)
+            .json(create_campaign)
+            .bearer_auth(&token)
+            .send()
+            .await?)
     }
 }
-
 pub mod run {
-    use std::{env::current_dir, path::PathBuf};
+    use std::{
+        env::current_dir,
+        net::{IpAddr, Ipv4Addr, SocketAddr},
+        path::PathBuf,
+    };
 
-    use primitives::adapter::KeystoreOptions;
+    use adapter::EthereumAdapter;
+    use primitives::{ToETHChecksum, ValidatorId};
+    use sentry::{
+        application::{logger, run},
+        db::{
+            postgres_connection, redis_connection, tests_postgres::setup_test_migrations,
+            CampaignRemaining,
+        },
+        Application,
+    };
+    use slog::info;
     use subprocess::{Popen, PopenConfig, Redirection};
 
-    /// This helper function generates the correct path to the keystore file from this file.
-    ///
-    /// The `file_name` located at `adapter/test/resources`
-    fn keystore_file_path(file_name: &str) -> PathBuf {
-        let full_path = current_dir().unwrap();
-        // it always starts in `adapter` folder because of the crate scope
-        // even when it's in the workspace
-        let mut keystore_file = full_path.parent().unwrap().to_path_buf();
-        keystore_file.push(format!("adapter/test/resources/{}", file_name));
+    use crate::GANACHE_CONFIG;
 
-        keystore_file
+    pub async fn run_sentry_app(adapter: EthereumAdapter) -> anyhow::Result<()> {
+        let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8005);
+        let postgres = postgres_connection(42).await;
+        let redis = redis_connection("redis://127.0.0.1:6379/1").await?;
+        let campaign_remaining = CampaignRemaining::new(redis.clone());
+
+        setup_test_migrations(postgres.clone())
+            .await
+            .expect("Should run migrations");
+
+        let app = Application::new(
+            adapter,
+            GANACHE_CONFIG.clone(),
+            logger(),
+            redis,
+            postgres,
+            campaign_remaining,
+        );
+
+        info!(&app.logger, "Spawn sentry Hyper server");
+        tokio::spawn(run(app, socket_addr));
+
+        Ok(())
     }
-    fn project_file_path(file: &str) -> PathBuf {
+    /// This helper function generates the correct file path to a project file from the current one.
+    ///
+    /// The `file_path` starts from the Cargo workspace directory.
+    fn project_file_path(file_path: &str) -> PathBuf {
         let full_path = current_dir().unwrap();
         let project_path = full_path.parent().unwrap().to_path_buf();
 
-        project_path.join(file)
+        project_path.join(file_path)
     }
 
-
-    // POSTGRES_DB=sentry_leader PORT=8005 KEYSTORE_PWD=address1 \
-    // cargo run -p sentry -- --adapter ethereum --keystoreFile ./adapter/test/resources/5a04A8fB90242fB7E1db7d1F51e268A03b7f93A5_keystore.json \
-    // ./docs/config/ganache.toml
-    ///
     /// ```bash
     /// POSTGRES_DB=sentry_leader PORT=8005 KEYSTORE_PWD=address1 \
-    /// cargo run -p sentry -- --adapter ethereum --keystoreFile ./adapter/test/resources/5a04A8fB90242fB7E1db7d1F51e268A03b7f93A5_keystore.json \
+    /// cargo run -p sentry -- --adapter ethereum --keystoreFile ./adapter/test/resources/0x5a04A8fB90242fB7E1db7d1F51e268A03b7f93A5_keystore.json \
     /// ./docs/config/ganache.toml
     /// ```
-    pub fn run_sentry(keystore_options: &KeystoreOptions) -> anyhow::Result<Popen> {
+    ///
+    /// The identity is used to get the correct Keystore file
+    /// While the password is passed to `sentry` with environmental variable
+    pub fn run_sentry(keystore_password: &str, identity: ValidatorId) -> anyhow::Result<Popen> {
+        let keystore_file_name = format!(
+            "adapter/test/resources/{}_keystore.json",
+            identity.to_checksum()
+        );
+        let keystore_path = project_file_path(&keystore_file_name);
+        let ganache_config_path = project_file_path("docs/config/ganache.toml");
+
         let sentry_leader = Popen::create(
             &[
-                "POSTGRES_DB=sentry_leader",
-                "PORT=8005",
-                &format!("KEYSTORE_PWD={}", keystore_options.keystore_pwd),
                 "cargo",
                 "run",
                 "-p",
@@ -397,14 +446,22 @@ pub mod run {
                 "--adapter",
                 "ethereum",
                 "--keystoreFile",
-                &dbg!(
-                    keystore_file_path("5a04A8fB90242fB7E1db7d1F51e268A03b7f93A5_keystore.json")
-                        .to_string_lossy()
-                ),
-                &dbg!(project_file_path("docs/config/ganache.toml").to_string_lossy()),
+                &keystore_path.to_string_lossy(),
+                &ganache_config_path.to_string_lossy(),
             ],
             PopenConfig {
                 stdout: Redirection::Pipe,
+                env: Some(vec![
+                    ("PORT".parse().unwrap(), "8005".parse().unwrap()),
+                    (
+                        "POSTGRES_DB".parse().unwrap(),
+                        "sentry_leader".parse().unwrap(),
+                    ),
+                    (
+                        "KEYSTORE_PWD".parse().unwrap(),
+                        keystore_password.parse().unwrap(),
+                    ),
+                ]),
                 ..Default::default()
             },
         )?;
