@@ -352,7 +352,7 @@ pub mod tests_postgres {
                 .pool
                 .get()
                 .await?
-                .simple_query(&queries)
+                .simple_query(queries)
                 .await
                 .map_err(PoolError::Backend)
                 .expect("Should not error");
