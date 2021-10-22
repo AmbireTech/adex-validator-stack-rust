@@ -55,16 +55,17 @@ impl BigNum {
     }
 
     /// With this method you can easily create a [`BigNum`] from a whole number
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```
+    /// # use crate::BigNum;
     /// let dai_precision = 18;
     /// let whole_number = 15;
-    /// 
+    ///
     /// let bignum = BigNum::with_precision(whole_number, dai_precision);
     /// let expected = "15000000000000000000";
-    /// 
+    ///
     /// assert_eq!(expected, &bignum.to_string());
     /// ```
     pub fn with_precision(whole_number: u64, with_precision: u8) -> Self {

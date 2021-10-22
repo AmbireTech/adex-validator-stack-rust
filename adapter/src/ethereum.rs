@@ -2,7 +2,10 @@ use async_trait::async_trait;
 use chrono::Utc;
 use create2::calc_addr;
 use error::*;
-use ethstore::{SafeAccount, ethkey::{public_to_address, recover, verify_address, Message, Password, Signature}};
+use ethstore::{
+    ethkey::{public_to_address, recover, verify_address, Message, Password, Signature},
+    SafeAccount,
+};
 use once_cell::sync::Lazy;
 use primitives::{
     adapter::{Adapter, AdapterResult, Deposit, Error as AdapterError, KeystoreOptions, Session},
@@ -99,7 +102,8 @@ impl EthereumAdapter {
         let keystore_json: Value =
             serde_json::from_str(&keystore_contents).map_err(KeystoreError::Deserialization)?;
 
-        let address = keystore_json.get("address")
+        let address = keystore_json
+            .get("address")
             .and_then(|value| value.as_str())
             .map(eth_checksum::checksum)
             .ok_or(KeystoreError::AddressMissing)?;
@@ -129,14 +133,10 @@ impl Adapter for EthereumAdapter {
 
     fn unlock(&mut self) -> AdapterResult<(), Self::AdapterError> {
         let json = serde_json::from_value(self.keystore_json.clone())
-        .map_err(KeystoreError::Deserialization)?;
+            .map_err(KeystoreError::Deserialization)?;
 
-        let account = SafeAccount::from_file(
-            json,
-            None,
-            &Some(self.keystore_pwd.clone()),
-        )
-        .map_err(Error::WalletUnlock)?;
+        let account = SafeAccount::from_file(json, None, &Some(self.keystore_pwd.clone()))
+            .map_err(Error::WalletUnlock)?;
 
         self.wallet = Some(account);
 
@@ -701,9 +701,14 @@ mod test {
             .await
             .expect("Failed to set balance");
 
-            outpace_deposit(&outpace.1, &channel, *spender.as_bytes(), &BigNum::from(10_000))
-                .await
-                .expect("Should deposit funds");
+            outpace_deposit(
+                &outpace.1,
+                &channel,
+                *spender.as_bytes(),
+                &BigNum::from(10_000),
+            )
+            .await
+            .expect("Should deposit funds");
 
             let regular_deposit = eth_adapter
                 .get_deposit(&channel, &spender)
@@ -753,7 +758,7 @@ mod test {
                 &token.2,
                 leader_account.to_bytes(),
                 counterfactual_address.to_bytes(),
-                &BigNum::from(1_999)
+                &BigNum::from(1_999),
             )
             .await
             .expect("Failed to set balance");
