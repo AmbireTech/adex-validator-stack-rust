@@ -2,7 +2,7 @@ use crate::{event_submission::RateLimit, Address, BigNum, ValidatorId};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_hex::{SerHex, StrictPfx};
-use std::{collections::HashMap, fs, io::Read, num::NonZeroU8};
+use std::{collections::HashMap, num::NonZeroU8};
 use thiserror::Error;
 
 pub use toml::de::Error as TomlError;
@@ -123,14 +123,10 @@ pub enum ConfigError {
 pub fn configuration(environment: &str, config_file: Option<&str>) -> Result<Config, ConfigError> {
     match config_file {
         Some(config_file) => {
-            let mut buf = Vec::new();
-            let mut file =
-                fs::File::open(config_file)?;
+            let content = std::fs::read(config_file)?;
 
-            file.read_to_end(&mut buf)?;
-            
-            Ok(toml::from_slice(&buf)?)
-        },
+            Ok(toml::from_slice(&content)?)
+        }
         None => match environment {
             "production" => Ok(PRODUCTION_CONFIG.clone()),
             _ => Ok(DEVELOPMENT_CONFIG.clone()),
