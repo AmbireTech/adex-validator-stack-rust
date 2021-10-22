@@ -57,7 +57,7 @@ pub static GANACHE_KEYSTORES: Lazy<HashMap<String, (Address, KeystoreOptions)>> 
                     .parse()
                     .expect("Valid Address"),
                 keystore_options(
-                    "Df08F82De32B8d460adbE8D72043E3a7e25A3B39_keystore.json",
+                    "0xDf08F82De32B8d460adbE8D72043E3a7e25A3B39_keystore.json",
                     "address0",
                 ),
             ),
@@ -69,7 +69,7 @@ pub static GANACHE_KEYSTORES: Lazy<HashMap<String, (Address, KeystoreOptions)>> 
                     .parse()
                     .expect("Valid Address"),
                 keystore_options(
-                    "5a04A8fB90242fB7E1db7d1F51e268A03b7f93A5_keystore.json",
+                    "0x5a04A8fB90242fB7E1db7d1F51e268A03b7f93A5_keystore.json",
                     "address1",
                 ),
             ),
@@ -81,7 +81,7 @@ pub static GANACHE_KEYSTORES: Lazy<HashMap<String, (Address, KeystoreOptions)>> 
                     .parse()
                     .expect("Valid Address"),
                 keystore_options(
-                    "e3896ebd3F32092AFC7D27e9ef7b67E26C49fB02_keystore.json",
+                    "0xe3896ebd3F32092AFC7D27e9ef7b67E26C49fB02_keystore.json",
                     "address2",
                 ),
             ),
@@ -93,7 +93,7 @@ pub static GANACHE_KEYSTORES: Lazy<HashMap<String, (Address, KeystoreOptions)>> 
                     .parse()
                     .expect("Valid Address"),
                 keystore_options(
-                    "0E45891a570Af9e5A962F181C219468A6C9EB4e1_keystore.json",
+                    "0x0E45891a570Af9e5A962F181C219468A6C9EB4e1_keystore.json",
                     "address3",
                 ),
             ),
@@ -105,7 +105,7 @@ pub static GANACHE_KEYSTORES: Lazy<HashMap<String, (Address, KeystoreOptions)>> 
                     .parse()
                     .expect("Valid Address"),
                 keystore_options(
-                    "8c4B95383a46D30F056aCe085D8f453fCF4Ed66d_keystore.json",
+                    "0x8c4B95383a46D30F056aCe085D8f453fCF4Ed66d_keystore.json",
                     "address4",
                 ),
             ),
@@ -117,7 +117,7 @@ pub static GANACHE_KEYSTORES: Lazy<HashMap<String, (Address, KeystoreOptions)>> 
                     .parse()
                     .expect("Valid Address"),
                 keystore_options(
-                    "1059B025E3F8b8f76A8120D6D6Fd9fBa172c80b8_keystore.json",
+                    "0x1059B025E3F8b8f76A8120D6D6Fd9fBa172c80b8_keystore.json",
                     "address5",
                 ),
             ),
