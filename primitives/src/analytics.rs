@@ -1,6 +1,7 @@
 use crate::ChannelId;
 use crate::DomainError;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 pub const ANALYTICS_QUERY_LIMIT: u32 = 200;
 
@@ -47,6 +48,87 @@ pub struct AnalyticsQuery {
     #[serde(default = "default_timeframe")]
     pub timeframe: String,
     pub segment_by_channel: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+pub enum OperatingSystem {
+    Linux,
+    Whitelisted(String),
+    Other,
+}
+
+impl OperatingSystem {
+    pub const LINUX_DISTROS: [&'static str; 17] = [
+        "Arch",
+        "CentOS",
+        "Slackware",
+        "Fedora",
+        "Debian",
+        "Deepin",
+        "elementary OS",
+        "Gentoo",
+        "Mandriva",
+        "Manjaro",
+        "Mint",
+        "PCLinuxOS",
+        "Raspbian",
+        "Sabayon",
+        "SUSE",
+        "Ubuntu",
+        "RedHat",
+    ];
+    pub const WHITELISTED: [&'static str; 18] = [
+        "Android",
+        "Android-x86",
+        "iOS",
+        "BlackBerry",
+        "Chromium OS",
+        "Fuchsia",
+        "Mac OS",
+        "Windows",
+        "Windows Phone",
+        "Windows Mobile",
+        "Linux",
+        "NetBSD",
+        "Nintendo",
+        "OpenBSD",
+        "PlayStation",
+        "Tizen",
+        "Symbian",
+        "KAIOS",
+    ];
+}
+
+pub fn map_os(os_name: &str) -> OperatingSystem {
+    if OperatingSystem::LINUX_DISTROS
+        .iter()
+        .any(|distro| os_name.eq(*distro))
+    {
+        OperatingSystem::Linux
+    } else if OperatingSystem::WHITELISTED
+        .iter()
+        .any(|whitelisted| os_name.eq(*whitelisted))
+    {
+        OperatingSystem::Whitelisted(os_name.into())
+    } else {
+        OperatingSystem::Other
+    }
+}
+
+impl fmt::Display for OperatingSystem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            OperatingSystem::Linux => {
+                write!(f, "Linux")
+            }
+            OperatingSystem::Whitelisted(os) => {
+                write!(f, "{}", os)
+            }
+            OperatingSystem::Other => {
+                write!(f, "Other")
+            }
+        }
+    }
 }
 
 impl AnalyticsQuery {

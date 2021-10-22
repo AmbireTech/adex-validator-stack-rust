@@ -2,12 +2,14 @@ use crate::{epoch, Auth};
 use chrono::Utc;
 use primitives::{
     analytics::{AnalyticsData, AnalyticsQuery, ANALYTICS_QUERY_LIMIT},
-    sentry::{AdvancedAnalyticsResponse, ChannelReport, PublisherReport},
+    sentry::{
+        AdvancedAnalyticsResponse, ChannelReport, EventAnalytics, EventPayoutData, PublisherReport,
+    },
     ChannelId, ValidatorId,
 };
 use redis::{aio::MultiplexedConnection, cmd};
 use std::collections::HashMap;
-use tokio_postgres::types::ToSql;
+use tokio_postgres::types::{Json, ToSql};
 
 use super::{DbPool, PoolError};
 
@@ -221,4 +223,46 @@ pub async fn get_advanced_reports(
         by_channel_stats,
         publisher_stats,
     })
+}
+
+pub async fn insert_analytics(
+    pool: &DbPool,
+    event: EventAnalytics,
+    payout: EventPayoutData,
+) -> Result<EventAnalytics, PoolError> {
+    let client = pool.get().await?;
+
+    let ad_unit = Json(&event.ad_unit);
+
+    let stmt = client.prepare("INSERT INTO events 
+    (campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os, click_paid, click_count, impression_paid, impression_count) 
+    VALUES 
+    ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+    ON CONFLICT ON CONSTRAINT channels_pkey DO UPDATE 
+    SET (click_paid = click_paid + $11, click_count = click_count + $12, impression_paid = impression_paid + $13, impression_count = impression_count + $14)
+    RETURNING ").await?;
+
+    let row = client
+        .query_one(
+            &stmt,
+            &[
+                &event.campaign_id,
+                &event.time,
+                &ad_unit,
+                &event.ad_slot,
+                &event.ad_slot_type,
+                &event.advertiser,
+                &event.publisher,
+                &event.hostname,
+                &event.country,
+                &event.os_name.to_string(),
+                &payout.click_paid,
+                &payout.click_count,
+                &payout.impression_paid,
+                &payout.impression_count,
+            ],
+        )
+        .await?;
+
+    Ok(EventAnalytics::from(&row))
 }
