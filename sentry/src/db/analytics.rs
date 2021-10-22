@@ -240,7 +240,7 @@ pub async fn insert_analytics(
     ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
     ON CONFLICT ON CONSTRAINT channels_pkey DO UPDATE 
     SET (click_paid = click_paid + $11, click_count = click_count + $12, impression_paid = impression_paid + $13, impression_count = impression_count + $14)
-    RETURNING ").await?;
+    RETURNING *").await?;
 
     let row = client
         .query_one(
