@@ -158,7 +158,7 @@ pub async fn setup_migrations(environment: &str) {
         .expect("Reloading config for migration failed");
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-util"))]
 pub mod tests_postgres {
     use std::{
         ops::{Deref, DerefMut},
@@ -370,19 +370,15 @@ pub mod tests_postgres {
         let full_query: String = MIGRATIONS
             .iter()
             .map(|migration| {
-                use std::{
-                    fs::File,
-                    io::{BufReader, Read},
-                };
-                let file = File::open(format!("migrations/{}/up.sql", migration))
-                    .expect("File migration couldn't be opened");
-                let mut buf_reader = BufReader::new(file);
-                let mut contents = String::new();
+                use std::{env::current_dir, fs::read_to_string};
 
-                buf_reader
-                    .read_to_string(&mut contents)
-                    .expect("File migration couldn't be read");
-                contents
+                let full_path = current_dir().unwrap();
+                // it always starts in `sentry` folder because of the crate scope
+                // even when it's in the workspace
+                let mut file = full_path.parent().unwrap().to_path_buf();
+                file.push(format!("sentry/migrations/{}/up.sql", migration));
+
+                read_to_string(file).expect("File migration couldn't be read")
             })
             .collect();
 

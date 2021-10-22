@@ -7,6 +7,10 @@ authors = [
 ]
 edition = "2018"
 
+[features]
+
+test-util = []
+
 [dependencies]
 # Futures
 futures = "^0.3"
