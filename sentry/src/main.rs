@@ -4,15 +4,18 @@
 use clap::{crate_version, App, Arg};
 
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
-use hyper::service::{make_service_fn, service_fn};
-use hyper::{Error, Server};
-use primitives::adapter::{Adapter, DummyAdapterOptions, KeystoreOptions};
-use primitives::config::configuration;
-use primitives::util::tests::prep_db::{AUTH, IDS};
-use primitives::ValidatorId;
-use sentry::db::{postgres_connection, redis_connection, setup_migrations, CampaignRemaining};
-use sentry::Application;
-use slog::{error, info, Logger};
+use primitives::{
+    adapter::{DummyAdapterOptions, KeystoreOptions},
+    config::configuration,
+    util::tests::prep_db::{AUTH, IDS},
+    ValidatorId,
+};
+use sentry::{
+    db::{postgres_connection, redis_connection, setup_migrations, CampaignRemaining},
+    server::{logger, run},
+    Application,
+};
+use slog::info;
 use std::{
     convert::TryFrom,
     env,
@@ -149,37 +152,4 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     Ok(())
-}
-
-/// Starts the `hyper` `Server`.
-async fn run<A: Adapter + 'static>(app: Application<A>, socket_addr: SocketAddr) {
-    let logger = app.logger.clone();
-    info!(&logger, "Listening on socket address: {}!", socket_addr);
-
-    let make_service = make_service_fn(|_| {
-        let server = app.clone();
-        async move {
-            Ok::<_, Error>(service_fn(move |req| {
-                let server = server.clone();
-                async move { Ok::<_, Error>(server.handle_routing(req).await) }
-            }))
-        }
-    });
-
-    let server = Server::bind(&socket_addr).serve(make_service);
-
-    if let Err(e) = server.await {
-        error!(&logger, "server error: {}", e; "main" => "run");
-    }
-}
-
-fn logger() -> Logger {
-    use primitives::util::logging::{Async, PrefixedCompactFormat, TermDecorator};
-    use slog::{o, Drain};
-
-    let decorator = TermDecorator::new().build();
-    let drain = PrefixedCompactFormat::new("sentry", decorator).fuse();
-    let drain = Async::new(drain).build().fuse();
-
-    Logger::root(drain, o!())
 }

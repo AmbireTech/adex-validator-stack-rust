@@ -44,6 +44,7 @@ pub mod routes {
 }
 
 pub mod access;
+pub mod application;
 pub mod analytics_recorder;
 pub mod db;
 // TODO AIP#61: remove the even aggregator once we've taken out the logic for AIP#61
