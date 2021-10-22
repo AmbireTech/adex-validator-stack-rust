@@ -3710,9 +3710,12 @@ version = "0.1.0"
 dependencies = [
  "adapter",
  "anyhow",
+ "futures",
  "once_cell",
  "primitives",
  "reqwest",
+ "sentry",
+ "slog",
  "subprocess",
  "tokio",
  "web3",
