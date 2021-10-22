@@ -1,12 +1,11 @@
 use deadpool_postgres::{Manager, ManagerConfig, RecyclingMethod};
+use once_cell::sync::Lazy;
 use redis::aio::MultiplexedConnection;
 use std::{env, str::FromStr};
 use tokio_postgres::{
     types::{accepts, FromSql, Type},
     NoTls,
 };
-
-use lazy_static::lazy_static;
 
 pub mod accounting;
 pub mod analytics;
@@ -28,33 +27,49 @@ pub use redis::RedisError;
 
 pub type DbPool = deadpool_postgres::Pool;
 
-lazy_static! {
-    static ref POSTGRES_USER: String =
-        env::var("POSTGRES_USER").unwrap_or_else(|_| String::from("postgres"));
-    static ref POSTGRES_PASSWORD: String =
-        env::var("POSTGRES_PASSWORD").unwrap_or_else(|_| String::from("postgres"));
-    static ref POSTGRES_HOST: String =
-        env::var("POSTGRES_HOST").unwrap_or_else(|_| String::from("localhost"));
-    static ref POSTGRES_PORT: u16 = env::var("POSTGRES_PORT")
+/// `POSTGRES_USER` environment variable - default: `postgres`
+pub static POSTGRES_USER: Lazy<String> =
+    Lazy::new(|| env::var("POSTGRES_USER").unwrap_or_else(|_| String::from("postgres")));
+
+/// `POSTGRES_PASSWORD` environment variable - default: `postgres`
+pub static POSTGRES_PASSWORD: Lazy<String> =
+    Lazy::new(|| env::var("POSTGRES_PASSWORD").unwrap_or_else(|_| String::from("postgres")));
+
+/// `POSTGRES_HOST` environment variable - default: `localhost`
+pub static POSTGRES_HOST: Lazy<String> =
+    Lazy::new(|| env::var("POSTGRES_HOST").unwrap_or_else(|_| String::from("localhost")));
+
+/// `POSTGRES_PORT` environment variable - default: `5432`
+pub static POSTGRES_PORT: Lazy<u16> = Lazy::new(|| {
+    env::var("POSTGRES_PORT")
         .unwrap_or_else(|_| String::from("5432"))
         .parse()
-        .unwrap();
-    static ref POSTGRES_DB: Option<String> = env::var("POSTGRES_DB").ok();
-    static ref POSTGRES_CONFIG: tokio_postgres::Config = {
-        let mut config = tokio_postgres::Config::new();
+        .unwrap()
+});
 
-        config
-            .user(POSTGRES_USER.as_str())
-            .password(POSTGRES_PASSWORD.as_str())
-            .host(POSTGRES_HOST.as_str())
-            .port(*POSTGRES_PORT);
-        if let Some(db) = POSTGRES_DB.as_ref() {
-            config.dbname(db);
-        }
+/// `POSTGRES_DB` environment variable - default: `POSTGRES_USER`
+pub static POSTGRES_DB: Lazy<Option<String>> = Lazy::new(|| env::var("POSTGRES_DB").ok());
 
-        config
-    };
-}
+/// Postgres configuration derived from the environment variables:
+/// - POSTGRES_USER
+/// - POSTGRES_PASSWORD
+/// - POSTGRES_HOST
+/// - POSTGRES_PORT
+/// - POSTGRES_DB
+pub static POSTGRES_CONFIG: Lazy<tokio_postgres::Config> = Lazy::new(|| {
+    let mut config = tokio_postgres::Config::new();
+
+    config
+        .user(POSTGRES_USER.as_str())
+        .password(POSTGRES_PASSWORD.as_str())
+        .host(POSTGRES_HOST.as_str())
+        .port(*POSTGRES_PORT);
+    if let Some(db) = POSTGRES_DB.as_ref() {
+        config.dbname(db);
+    }
+
+    config
+});
 
 pub struct TotalCount(pub u64);
 impl<'a> FromSql<'a> for TotalCount {
@@ -77,16 +92,17 @@ pub async fn redis_connection(url: &str) -> Result<MultiplexedConnection, RedisE
     client.get_multiplexed_async_connection().await
 }
 
-pub async fn postgres_connection(max_size: usize) -> DbPool {
+pub async fn postgres_connection(max_size: usize, config: tokio_postgres::Config) -> DbPool {
     let mgr_config = ManagerConfig {
         recycling_method: RecyclingMethod::Verified,
     };
 
-    let manager = Manager::from_config(POSTGRES_CONFIG.clone(), NoTls, mgr_config);
+    let manager = Manager::from_config(config, NoTls, mgr_config);
 
     DbPool::new(manager, max_size)
 }
 
+/// Sets the migrations using the `POSTGRES_*` environment variables
 pub async fn setup_migrations(environment: &str) {
     use migrant_lib::{Config, Direction, Migrator, Settings};
 

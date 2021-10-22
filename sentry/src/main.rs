@@ -4,6 +4,7 @@
 use clap::{crate_version, App, Arg};
 
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
+use once_cell::sync::Lazy;
 use primitives::{
     adapter::{DummyAdapterOptions, KeystoreOptions},
     config::configuration,
@@ -11,8 +12,10 @@ use primitives::{
     ValidatorId,
 };
 use sentry::{
-    db::{postgres_connection, redis_connection, setup_migrations, CampaignRemaining},
-    server::{logger, run},
+    application::{logger, run},
+    db::{
+        postgres_connection, redis_connection, setup_migrations, CampaignRemaining, POSTGRES_CONFIG,
+    },
     Application,
 };
 use slog::info;
@@ -24,6 +27,10 @@ use std::{
 
 const DEFAULT_PORT: u16 = 8005;
 const DEFAULT_IP_ADDR: IpAddr = IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0));
+
+/// `REDIS_URL` environment variable - default: `redis://127.0.0.1:6379`
+static REDIS_URL: Lazy<String> =
+    Lazy::new(|| env::var("REDIS_URL").unwrap_or_else(|_| String::from("redis://127.0.0.1:6379")));
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -112,12 +119,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let logger = logger();
-    let url = env::var("REDIS_URL").unwrap_or_else(|_| String::from("redis://127.0.0.1:6379"));
-    let redis = redis_connection(url.as_str()).await?;
+    let redis = redis_connection(&REDIS_URL).await?;
     info!(&logger, "Checking connection and applying migrations...");
     // Check connection and setup migrations before setting up Postgres
     setup_migrations(&environment).await;
-    let postgres = postgres_connection(42).await;
+
+    let postgres = postgres_connection(42, POSTGRES_CONFIG.clone()).await;
     let campaign_remaining = CampaignRemaining::new(redis.clone());
 
     match adapter {
