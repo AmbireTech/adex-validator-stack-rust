@@ -234,13 +234,14 @@ pub async fn insert_analytics(
 
     let ad_unit = Json(&event.ad_unit);
 
-    let stmt = client.prepare("INSERT INTO events 
+    let query = "INSERT INTO events 
     (campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os, click_paid, click_count, impression_paid, impression_count) 
-    VALUES 
-    ($1, date_trunc('hour', $2), $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+    VALUES ($1, date_trunc('hour', $2), $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
     ON CONFLICT ON CONSTRAINT channels_pkey DO UPDATE 
     SET (click_paid = click_paid + $11, click_count = click_count + $12, impression_paid = impression_paid + $13, impression_count = impression_count + $14)
-    RETURNING *").await?;
+    RETURNING *";
+
+    let stmt = client.prepare(query).await?;
 
     let row = client
         .query_one(
