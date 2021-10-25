@@ -24,4 +24,4 @@ docker-compose -f ../docker-compose.harness.yml up --renew-anon-volumes -d ganac
 '''
 
 [tasks.services-down]
-script = "docker-compose -f ../docker-compose.ci.yml down"
+script = "docker-compose -f ../docker-compose.harness.yml down"
