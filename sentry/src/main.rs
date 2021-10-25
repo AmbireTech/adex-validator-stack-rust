@@ -96,7 +96,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         _ => panic!("You can only use `ethereum` & `dummy` adapters!"),
     };
 
-    let logger = logger();
+    let logger = logger("sentry");
     let redis = redis_connection(env_config.redis_url).await?;
     info!(&logger, "Checking connection and applying migrations...");
     // Check connection and setup migrations before setting up Postgres

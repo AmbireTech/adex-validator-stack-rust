@@ -90,12 +90,12 @@ pub async fn run<A: Adapter + 'static>(app: Application<A>, socket_addr: SocketA
     }
 }
 
-pub fn logger() -> Logger {
+pub fn logger(prefix: &str) -> Logger {
     use primitives::util::logging::{Async, PrefixedCompactFormat, TermDecorator};
     use slog::{o, Drain};
 
     let decorator = TermDecorator::new().build();
-    let drain = PrefixedCompactFormat::new("sentry", decorator).fuse();
+    let drain = PrefixedCompactFormat::new(prefix, decorator).fuse();
     let drain = Async::new(drain).build().fuse();
 
     Logger::root(drain, o!())
