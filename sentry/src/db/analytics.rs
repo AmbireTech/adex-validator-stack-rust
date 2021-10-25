@@ -2,10 +2,8 @@ use crate::{epoch, Auth};
 use chrono::Utc;
 use primitives::{
     analytics::{AnalyticsData, AnalyticsQuery, ANALYTICS_QUERY_LIMIT},
-    sentry::{
-        AdvancedAnalyticsResponse, ChannelReport, EventAnalytics, EventPayoutData, PublisherReport,
-    },
-    ChannelId, ValidatorId,
+    sentry::{AdvancedAnalyticsResponse, ChannelReport, EventAnalytics, PublisherReport},
+    ChannelId, UnifiedNum, ValidatorId,
 };
 use redis::{aio::MultiplexedConnection, cmd};
 use std::collections::HashMap;
@@ -228,17 +226,17 @@ pub async fn get_advanced_reports(
 pub async fn insert_analytics(
     pool: &DbPool,
     event: EventAnalytics,
-    payout: EventPayoutData,
+    payout_amount: UnifiedNum,
 ) -> Result<EventAnalytics, PoolError> {
     let client = pool.get().await?;
 
     let ad_unit = Json(&event.ad_unit);
 
     let query = "INSERT INTO events 
-    (campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os, click_paid, click_count, impression_paid, impression_count) 
-    VALUES ($1, date_trunc('hour', $2), $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+    (campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os, payout_amount, payout_count)
+    VALUES ($1, date_trunc('hour', $2), $3, $4, $5, $6, $7, $8, $9, $10, $11, 1)
     ON CONFLICT ON CONSTRAINT channels_pkey DO UPDATE 
-    SET (click_paid = click_paid + $11, click_count = click_count + $12, impression_paid = impression_paid + $13, impression_count = impression_count + $14)
+    SET (payout_amount = payout_amount + $11, payout_count = payout_count + 1)
     RETURNING *";
 
     let stmt = client.prepare(query).await?;
@@ -257,10 +255,7 @@ pub async fn insert_analytics(
                 &event.hostname,
                 &event.country,
                 &event.os_name.to_string(),
-                &payout.click_paid,
-                &payout.click_count,
-                &payout.impression_paid,
-                &payout.impression_count,
+                &payout_amount,
             ],
         )
         .await?;

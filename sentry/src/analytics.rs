@@ -7,7 +7,7 @@ use crate::{
 use chrono::Utc;
 use primitives::{
     analytics::map_os,
-    sentry::{Event, EventAnalytics, EventPayoutData},
+    sentry::{Event, EventAnalytics},
     Address, Campaign, UnifiedNum,
 };
 
@@ -20,9 +20,9 @@ pub async fn record(
 ) -> Result<(), PoolError> {
     let os_name = map_os(&session.os.unwrap_or_default());
     let time = Utc::now();
+    let country = session.country;
 
     for (event, event_payout) in events_with_payouts {
-        let mut payout_data = EventPayoutData::default();
         let (publisher, ad_unit, referrer, ad_slot, ad_slot_type) = {
             let (publisher, event_ad_unit, referrer, ad_slot) = match event {
                 Event::Impression {
@@ -30,23 +30,13 @@ pub async fn record(
                     ad_unit,
                     referrer,
                     ad_slot,
-                } => {
-                    payout_data.impression_paid =
-                        event_payout.values().sum::<Option<UnifiedNum>>().unwrap(); // TODO: Remove unwrap
-                    payout_data.impression_count = 1;
-                    (publisher, ad_unit, referrer, ad_slot)
-                }
+                } => (publisher, ad_unit, referrer, ad_slot),
                 Event::Click {
                     publisher,
                     ad_unit,
                     referrer,
                     ad_slot,
-                } => {
-                    payout_data.click_paid =
-                        event_payout.values().sum::<Option<UnifiedNum>>().unwrap(); // TODO: Remove unwrap
-                    payout_data.click_count = 1;
-                    (publisher, ad_unit, referrer, ad_slot)
-                }
+                } => (publisher, ad_unit, referrer, ad_slot),
             };
 
             let ad_unit = event_ad_unit.and_then(|ipfs| {
@@ -80,11 +70,12 @@ pub async fn record(
             advertiser: campaign.creator,
             publisher,
             hostname,
-            country: session.country.clone(), // TODO: Remove clone
-            os_name: os_name.clone(),
+            country: country.to_owned(),
+            os_name: os_name.to_owned(),
         };
+        let payout_amount = event_payout.values().sum::<Option<UnifiedNum>>().unwrap(); // TODO: Remove
 
-        insert_analytics(pool, event_for_db, payout_data).await?;
+        insert_analytics(pool, event_for_db, payout_amount).await?;
     }
 
     Ok(())

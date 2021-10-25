@@ -1,15 +1,13 @@
 use crate::{
-    analytics::{map_os, OperatingSystem},
+    analytics::OperatingSystem,
     balances::BalancesState,
     spender::Spender,
     validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
-    AdUnit, Address, Balances, BigNum, CampaignId, Channel, ChannelId, UnifiedNum, ValidatorId,
-    IPFS,
+    AdUnit, Address, Balances, BigNum, CampaignId, Channel, ChannelId, ValidatorId, IPFS,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt, hash::Hash};
-use tokio_postgres::Row;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -152,24 +150,6 @@ pub struct EventAnalytics {
     pub hostname: Option<String>,
     pub country: Option<String>,
     pub os_name: OperatingSystem,
-}
-
-pub struct EventPayoutData {
-    pub click_paid: UnifiedNum,
-    pub click_count: i64,
-    pub impression_paid: UnifiedNum,
-    pub impression_count: i64,
-}
-
-impl Default for EventPayoutData {
-    fn default() -> Self {
-        Self {
-            click_paid: UnifiedNum::from_u64(0),
-            click_count: 0,
-            impression_paid: UnifiedNum::from_u64(0),
-            impression_count: 0,
-        }
-    }
 }
 
 impl From<&Row> for EventAnalytics {
@@ -557,8 +537,9 @@ pub mod campaign_create {
 
 #[cfg(feature = "postgres")]
 mod postgres {
-    use super::{MessageResponse, ValidatorMessage};
+    use super::{EventAnalytics, MessageResponse, ValidatorMessage};
     use crate::{
+        analytics::map_os,
         sentry::EventAggregate,
         validator::{messages::Type as MessageType, MessageTypes},
     };
@@ -616,6 +597,23 @@ mod postgres {
 
         accepts!(JSONB);
         to_sql_checked!();
+    }
+
+    impl From<&Row> for EventAnalytics {
+        fn from(row: &Row) -> Self {
+            Self {
+                campaign_id: row.get("campaign_id"),
+                time: row.get("time"),
+                ad_unit: row.get("ad_unit"),
+                ad_slot: row.get("ad_slot"),
+                ad_slot_type: row.get("ad_slot_type"),
+                advertiser: row.get("advertiser"),
+                publisher: row.get("publisher"),
+                hostname: row.get("hostname"),
+                country: row.get("country"),
+                os_name: map_os(row.get("os")),
+            }
+        }
     }
 }
 

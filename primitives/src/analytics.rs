@@ -1,7 +1,7 @@
 use crate::ChannelId;
 use crate::DomainError;
+use parse_display::{Display as DeriveDisplay, FromStr as DeriveFromStr};
 use serde::{Deserialize, Serialize};
-use std::fmt;
 
 pub const ANALYTICS_QUERY_LIMIT: u32 = 200;
 
@@ -50,10 +50,13 @@ pub struct AnalyticsQuery {
     pub segment_by_channel: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, DeriveFromStr, DeriveDisplay)]
 pub enum OperatingSystem {
+    #[display("Linux")]
     Linux,
+    #[display("{0}")]
     Whitelisted(String),
+    #[display("Other")]
     Other,
 }
 
@@ -112,22 +115,6 @@ pub fn map_os(os_name: &str) -> OperatingSystem {
         OperatingSystem::Whitelisted(os_name.into())
     } else {
         OperatingSystem::Other
-    }
-}
-
-impl fmt::Display for OperatingSystem {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            OperatingSystem::Linux => {
-                write!(f, "Linux")
-            }
-            OperatingSystem::Whitelisted(os) => {
-                write!(f, "{}", os)
-            }
-            OperatingSystem::Other => {
-                write!(f, "Other")
-            }
-        }
     }
 }
 

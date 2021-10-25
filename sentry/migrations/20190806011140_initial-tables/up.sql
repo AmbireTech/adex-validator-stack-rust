@@ -98,9 +98,14 @@ CREATE TABLE accounting (
     CONSTRAINT fk_accounting_channel_id FOREIGN KEY (channel_id) REFERENCES channels (id) ON DELETE RESTRICT ON UPDATE RESTRICT
 );
 
+CREATE TYPE EventType AS ENUM (
+    'Click',
+    'Impression'
+);
+
 CREATE TABLE analytics (
     campaign_id varchar(34) NOT NULL,
-    "time" TIMESTAMP NOT NULL,
+    "time" timestamp(2) with time zone NOT NULL,
     ad_unit jsonb,
     ad_slot jsonb,
     ad_slot_type varchar(255),
@@ -109,11 +114,10 @@ CREATE TABLE analytics (
     hostname varchar(255),
     country varchar(255),
     os varchar(255) NOT NULL,
-    click_paid bigint NOT NULL DEFAULT 0,
-    click_count integer NOT NULL DEFAULT 0,
-    impression_paid bigint NOT NULL DEFAULT 0,
-    impression_coount integer NOT NULL DEFAULT 0,
+    event_type EventType NOT NULL,
+    payout_amount bigint NOT NULL DEFAULT 0,
+    payout_count integer NOT NULL DEFAULT 0,
     -- Do not rename the Primary key constraint (`analytics_pkey`)!
-    PRIMARY KEY (campaign_id, "time", ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os),
+    PRIMARY KEY (campaign_id, "time", ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os, event_type),
     CONSTRAINT fk_analytics_campaign_id FOREIGN KEY (campaign_id) REFERENCES campaigns (id) ON DELETE RESTRICT ON UPDATE RESTRICT
 );
