@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  adex-postgres:
+    image: postgres
+    container_name: adex-postgres
+    restart: always
+    volumes:
+      - ./scripts/postgres:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_HOST: 'localhost'
+      POSTGRES_USER: 'postgres'
+      POSTGRES_PASSWORD: 'postgres'
+      POSTGRES_MULTIPLE_DATABASES: sentry_leader,sentry_follower
+    networks:
+      - adex-external
+
+  adex-redis:
+    image: redis
+    container_name: adex-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - adex-external
+  ganache:
+    build: ./scripts/ethereum
+    image: adex-ganache
+    container_name: adex-ganache-cli
+    restart: always
+    ports:
+      - "8545:8545"
+    networks:
+      - adex-external
+
+networks:
+  adex-external:

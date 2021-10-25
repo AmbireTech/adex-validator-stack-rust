@@ -19,8 +19,8 @@ dependencies = ["services-up", "test-flow", "services-down"]
 # it's used primarily for `ganache-cli`.
 # This forces the snapshot from previous unsuccessful test runs to get destroyed.
 script = '''
-docker-compose -f ../docker-compose.ci.yml up --renew-anon-volumes -d ganache redis-leader postgres-leader \
-&& sleep 10
+docker-compose -f ../docker-compose.harness.yml up --renew-anon-volumes -d ganache adex-redis adex-postgres \
+&& sleep 9
 '''
 
 [tasks.services-down]
