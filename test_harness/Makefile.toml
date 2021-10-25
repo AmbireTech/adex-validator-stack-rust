@@ -7,15 +7,11 @@ dependencies = [
   "pre-build",
   "build",
   "post-build",
-  "local-test-flow"
+  "local-test-flow",
 ]
 
 [tasks.local-test-flow]
-dependencies = [
-  "services-up",
-  "test-flow",
-  "services-down",
-]
+dependencies = ["services-up", "test-flow", "services-down"]
 
 
 [tasks.services-up]

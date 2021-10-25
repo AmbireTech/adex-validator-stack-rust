@@ -23,7 +23,7 @@ pub static DEFAULT_REDIS_URL: Lazy<ConnectionInfo> = Lazy::new(|| {
         .parse::<ConnectionInfo>()
         .expect("Valid URL")
 });
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Config {
     /// Defaults to `Development`: [`Environment::default()`]
     pub env: Environment,

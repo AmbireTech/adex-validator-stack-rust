@@ -172,7 +172,7 @@ impl Adapter for DummyAdapter {
 #[cfg(test)]
 mod test {
     use primitives::{
-        config::{configuration, DEVELOPMENT_CONFIG},
+        config::DEVELOPMENT_CONFIG,
         util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, IDS},
         BigNum,
     };
