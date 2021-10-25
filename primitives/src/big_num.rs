@@ -59,7 +59,7 @@ impl BigNum {
     /// # Example
     ///
     /// ```
-    /// # use crate::BigNum;
+    /// # use primitives::BigNum;
     /// let dai_precision = 18;
     /// let whole_number = 15;
     ///

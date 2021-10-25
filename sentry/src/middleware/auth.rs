@@ -129,11 +129,11 @@ fn get_request_ip(req: &Request<Body>) -> Option<String> {
 mod test {
     use adapter::DummyAdapter;
     use hyper::Request;
-    use primitives::adapter::DummyAdapterOptions;
-
-    use primitives::util::tests::prep_db::{AUTH, IDS};
-
-    use primitives::config::configuration;
+    use primitives::{
+        adapter::DummyAdapterOptions,
+        config::DEVELOPMENT_CONFIG,
+        util::tests::prep_db::{AUTH, IDS},
+    };
 
     use deadpool::managed::Object;
 
@@ -149,7 +149,7 @@ mod test {
             dummy_auth: IDS.clone(),
             dummy_auth_tokens: AUTH.clone(),
         };
-        let config = configuration("development", None).expect("Dev config should be available");
+        let config = DEVELOPMENT_CONFIG.clone();
 
         (DummyAdapter::init(adapter_options, &config), connection)
     }

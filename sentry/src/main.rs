@@ -4,7 +4,6 @@
 use clap::{crate_version, App, Arg};
 
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
-use once_cell::sync::Lazy;
 use primitives::{
     adapter::{DummyAdapterOptions, KeystoreOptions},
     config::configuration,
@@ -19,18 +18,7 @@ use sentry::{
     Application,
 };
 use slog::info;
-use std::{
-    convert::TryFrom,
-    env,
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-};
-
-const DEFAULT_PORT: u16 = 8005;
-const DEFAULT_IP_ADDR: IpAddr = IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0));
-
-/// `REDIS_URL` environment variable - default: `redis://127.0.0.1:6379`
-static REDIS_URL: Lazy<String> =
-    Lazy::new(|| env::var("REDIS_URL").unwrap_or_else(|_| String::from("redis://127.0.0.1:6379")));
+use std::{convert::TryFrom, env, net::SocketAddr};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -67,22 +55,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .get_matches();
 
-    let environment = std::env::var("ENV").unwrap_or_else(|_| "development".into());
-    let port = std::env::var("PORT")
-        .map(|s| s.parse::<u16>().expect("Invalid port(u16) was provided"))
-        .unwrap_or_else(|_| DEFAULT_PORT);
+    let env_config = sentry::application::Config::from_env()?;
 
-    let ip_addr = std::env::var("IP_ADDR")
-        .map(|s| {
-            s.parse::<IpAddr>()
-                .expect("Invalid Ip address was provided")
-        })
-        .unwrap_or_else(|_| DEFAULT_IP_ADDR);
-
-    let socket_addr: SocketAddr = (ip_addr, port).into();
+    let socket_addr: SocketAddr = (env_config.ip_addr, env_config.port).into();
 
     let config_file = cli.value_of("config");
-    let config = configuration(&environment, config_file).unwrap();
+    let config = configuration(env_config.env, config_file).unwrap();
 
     let adapter = match cli.value_of("adapter").unwrap() {
         "ethereum" => {
@@ -119,10 +97,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let logger = logger();
-    let redis = redis_connection(&REDIS_URL).await?;
+    let redis = redis_connection(env_config.redis_url).await?;
     info!(&logger, "Checking connection and applying migrations...");
     // Check connection and setup migrations before setting up Postgres
-    setup_migrations(&environment).await;
+    setup_migrations(env_config.env).await;
 
     // use the environmental variables to setup the Postgres connection
     let postgres = postgres_connection(42, POSTGRES_CONFIG.clone()).await;

@@ -13,7 +13,7 @@ use tokio::{runtime::Runtime, time::sleep};
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
 use primitives::{
     adapter::{Adapter, DummyAdapterOptions, KeystoreOptions},
-    config::{configuration, Config},
+    config::{configuration, Config, Environment},
     util::{
         tests::prep_db::{AUTH, IDS},
         ApiUrl,
@@ -84,9 +84,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         )
         .get_matches();
 
-    let environment = std::env::var("ENV").unwrap_or_else(|_| "development".into());
+    let environment: Environment = serde_json::from_value(serde_json::Value::String(
+        std::env::var("ENV").expect("Valid environment variable"),
+    ))
+    .expect("Valid Environment - development or production");
+
     let config_file = cli.value_of("config");
-    let config = configuration(&environment, config_file).expect("failed to parse configuration");
+    let config = configuration(environment, config_file).expect("failed to parse configuration");
     let sentry_url = cli
         .value_of("sentryUrl")
         .expect("sentry url missing")
