@@ -17,6 +17,21 @@ pub static PRODUCTION_CONFIG: Lazy<Config> = Lazy::new(|| {
         .expect("Failed to parse prod.toml config file")
 });
 
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+/// The environment in which the application is running
+/// Defaults to [`Environment::Development`]
+pub enum Environment {
+    Development,
+    Production,
+}
+
+impl Default for Environment {
+    fn default() -> Self {
+        Self::Development
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TokenInfo {
     pub min_token_units_for_deposit: BigNum,
@@ -120,7 +135,10 @@ pub enum ConfigError {
     InvalidFile(#[from] std::io::Error),
 }
 
-pub fn configuration(environment: &str, config_file: Option<&str>) -> Result<Config, ConfigError> {
+pub fn configuration(
+    environment: Environment,
+    config_file: Option<&str>,
+) -> Result<Config, ConfigError> {
     match config_file {
         Some(config_file) => {
             let content = std::fs::read(config_file)?;
@@ -128,8 +146,8 @@ pub fn configuration(environment: &str, config_file: Option<&str>) -> Result<Con
             Ok(toml::from_slice(&content)?)
         }
         None => match environment {
-            "production" => Ok(PRODUCTION_CONFIG.clone()),
-            _ => Ok(DEVELOPMENT_CONFIG.clone()),
+            Environment::Production => Ok(PRODUCTION_CONFIG.clone()),
+            Environment::Development => Ok(DEVELOPMENT_CONFIG.clone()),
         },
     }
 }

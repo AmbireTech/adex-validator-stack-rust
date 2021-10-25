@@ -1,6 +1,7 @@
 use deadpool_postgres::{Manager, ManagerConfig, RecyclingMethod};
 use once_cell::sync::Lazy;
-use redis::aio::MultiplexedConnection;
+use primitives::config::Environment;
+use redis::{aio::MultiplexedConnection, IntoConnectionInfo};
 use std::{env, str::FromStr};
 use tokio_postgres::{
     types::{accepts, FromSql, Type},
@@ -89,7 +90,9 @@ impl<'a> FromSql<'a> for TotalCount {
     accepts!(VARCHAR, TEXT);
 }
 
-pub async fn redis_connection(url: &str) -> Result<MultiplexedConnection, RedisError> {
+pub async fn redis_connection(
+    url: impl IntoConnectionInfo,
+) -> Result<MultiplexedConnection, RedisError> {
     let client = redis::Client::open(url)?;
 
     client.get_multiplexed_async_connection().await
@@ -106,7 +109,7 @@ pub async fn postgres_connection(max_size: usize, config: tokio_postgres::Config
 }
 
 /// Sets the migrations using the `POSTGRES_*` environment variables
-pub async fn setup_migrations(environment: &str) {
+pub async fn setup_migrations(environment: Environment) {
     use migrant_lib::{Config, Direction, Migrator, Settings};
 
     let settings = Settings::configure_postgres()
@@ -137,7 +140,7 @@ pub async fn setup_migrations(environment: &str) {
     // `tests_postgres::MIGRATIONS`
     let mut migrations = vec![make_migration!("20190806011140_initial-tables")];
 
-    if environment == "development" {
+    if let Environment::Development = environment {
         // seeds database tables for testing
         migrations.push(make_migration!("20190806011140_initial-tables/seed"));
     }
@@ -150,7 +153,7 @@ pub async fn setup_migrations(environment: &str) {
     // Reload config, ping the database for applied migrations
     let config = config.reload().expect("Should reload applied migrations");
 
-    if environment == "development" {
+    if let Environment::Development = environment {
         // delete all existing data to make tests reproducible
         Migrator::with_config(&config)
             .all(true)
@@ -561,7 +564,7 @@ pub mod redis_pool {
                     // see https://github.com/mitsuhiko/redis-rs/issues/325
                     _ => {
                         let mut redis_conn =
-                            redis_connection(&format!("{}{}", Self::URL, record.key()))
+                            redis_connection(format!("{}{}", Self::URL, record.key()))
                                 .await
                                 .expect("Should connect");
 
@@ -589,7 +592,7 @@ pub mod redis_pool {
         async fn recycle(&self, database: &mut Database) -> RecycleResult<Self::Error> {
             // always make a new connection because of know redis crate issue
             // see https://github.com/mitsuhiko/redis-rs/issues/325
-            let connection = redis_connection(&format!("{}{}", Self::URL, database.index))
+            let connection = redis_connection(format!("{}{}", Self::URL, database.index))
                 .await
                 .expect("Should connect");
             // make the database available
