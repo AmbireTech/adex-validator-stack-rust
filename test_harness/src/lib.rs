@@ -150,7 +150,7 @@ mod tests {
         EthereumAdapter,
     };
     use futures::FutureExt;
-    use primitives::{ 
+    use primitives::{
         adapter::Adapter,
         sentry::campaign_create::CreateCampaign,
         util::{tests::prep_db::DUMMY_VALIDATOR_LEADER, ApiUrl},
@@ -377,7 +377,7 @@ pub mod run {
         application::{logger, run},
         db::{
             postgres_connection, redis_connection, tests_postgres::setup_test_migrations,
-            CampaignRemaining,
+            CampaignRemaining, POSTGRES_HOST, POSTGRES_PASSWORD, POSTGRES_PORT, POSTGRES_USER,
         },
         Application,
     };
@@ -388,7 +388,15 @@ pub mod run {
 
     pub async fn run_sentry_app(adapter: EthereumAdapter) -> anyhow::Result<()> {
         let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8005);
-        let postgres = postgres_connection(42).await;
+
+        let postgres_config = sentry::db::PostgresConfig::new()
+            .user(POSTGRES_USER.as_str())
+            .password(POSTGRES_PASSWORD.as_str())
+            .host(POSTGRES_HOST.as_str())
+            .port(*POSTGRES_PORT)
+            .dbname("sentry_leader");
+
+        let postgres = postgres_connection(42, postgres_config).await;
         let redis = redis_connection("redis://127.0.0.1:6379/1").await?;
         let campaign_remaining = CampaignRemaining::new(redis.clone());
 

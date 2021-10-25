@@ -20,6 +20,9 @@ pub use self::channel::*;
 pub use self::event_aggregate::*;
 pub use self::validator_message::*;
 
+// Re-export the Postgres Config
+pub use tokio_postgres::Config as PostgresConfig;
+
 // Re-export the Postgres PoolError for easier usages
 pub use deadpool_postgres::PoolError;
 // Re-export the redis RedisError for easier usage

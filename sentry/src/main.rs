@@ -124,6 +124,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Check connection and setup migrations before setting up Postgres
     setup_migrations(&environment).await;
 
+    // use the environmental variables to setup the Postgres connection
     let postgres = postgres_connection(42, POSTGRES_CONFIG.clone()).await;
     let campaign_remaining = CampaignRemaining::new(redis.clone());
 
