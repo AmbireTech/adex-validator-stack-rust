@@ -152,23 +152,6 @@ pub struct EventAnalytics {
     pub os_name: OperatingSystem,
 }
 
-impl From<&Row> for EventAnalytics {
-    fn from(row: &Row) -> Self {
-        Self {
-            campaign_id: row.get("campaign_id"),
-            time: row.get("time"),
-            ad_unit: row.get("ad_unit"),
-            ad_slot: row.get("ad_slot"),
-            ad_slot_type: row.get("ad_slot_type"),
-            advertiser: row.get("advertiser"),
-            publisher: row.get("publisher"),
-            hostname: row.get("hostname"),
-            country: row.get("country"),
-            os_name: map_os(row.get("os")),
-        }
-    }
-}
-
 impl Event {
     pub fn is_click_event(&self) -> bool {
         matches!(self, Event::Click { .. })
