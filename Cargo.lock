@@ -4047,7 +4047,6 @@ dependencies = [
  "clap",
  "futures",
  "hex",
- "lazy_static",
  "num",
  "num-traits",
  "primitives",
