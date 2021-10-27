@@ -2,9 +2,10 @@
 edition = "2018"
 name = "test_harness"
 version = "0.1.0"
+authors = ["Lachezar Lechev <lachezar@ambire.com>"]
 
 [dependencies]
-primitives = { path = "../primitives" }
+primitives = { path = "../primitives", features = ["postgres"] }
 adapter = { version = "0.1", path = "../adapter", features = ["test-util"] }
 sentry = { version = "0.1", path = "../sentry", features = ["test-util"] }
 # ethereum

@@ -330,6 +330,10 @@ mod tests {
             .url
             .parse::<ApiUrl>()
             .expect("Valid url");
+        let _follower_url = DUMMY_VALIDATOR_FOLLOWER
+            .url
+            .parse::<ApiUrl>()
+            .expect("Valid url");
 
         // TODO: We should use a third adapter, e.g. "guardian", Instead of getting auth from leader for leader.
         let token = leader_adapter
@@ -338,16 +342,23 @@ mod tests {
         // No Channel 1 - 404
         // /v5/channel/{}/spender/all
         {
-            let response = get_spender_all(&api_client, &leader_url, &token, channel_1.id())
+            let leader_response = get_spender_all(&api_client, &leader_url, &token, channel_1.id())
                 .await
                 .expect("Should return Response");
 
-            assert_eq!(StatusCode::NOT_FOUND, response.status());
+            assert_eq!(StatusCode::NOT_FOUND, leader_response.status());
         }
 
         // Creator 1 - Campaign 1 - Channel 1 only
         {
+            let create_campaign = CreateCampaign {};
             // create Campaign - 400 - not enough budget
+            let leader_response = create_campaign(&api_client, &leader_url, &token, channel_1.id())
+                .await
+                .expect("Should return Response");
+
+            assert_eq!(StatusCode::NOT_FOUND, leader_response.status());
+
             // TODO: Try to create campaign
 
             // create Campaign - 200
@@ -430,12 +441,15 @@ pub mod run {
     use std::{env::current_dir, net::SocketAddr, path::PathBuf};
 
     use adapter::EthereumAdapter;
-    use primitives::{ToETHChecksum, ValidatorId};
+    use primitives::{
+        postgres::{POSTGRES_HOST, POSTGRES_PASSWORD, POSTGRES_PORT, POSTGRES_USER},
+        ToETHChecksum, ValidatorId,
+    };
     use sentry::{
         application::{logger, run},
         db::{
             postgres_connection, redis_connection, tests_postgres::setup_test_migrations,
-            CampaignRemaining, POSTGRES_HOST, POSTGRES_PASSWORD, POSTGRES_PORT, POSTGRES_USER,
+            CampaignRemaining,
         },
         Application,
     };
