@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::{
     db::{analytics::insert_analytics, DbPool, PoolError},
     Session,
@@ -14,15 +12,15 @@ use primitives::{
 /// Validator fees will not be included in analytics
 pub async fn record(
     pool: &DbPool,
-    campaign: Campaign,
-    session: Session,
-    events_with_payouts: Vec<(Event, HashMap<Address, UnifiedNum>)>,
+    campaign: &Campaign,
+    session: &Session,
+    events_with_payouts: Vec<(Event, Address, UnifiedNum)>,
 ) -> Result<(), PoolError> {
-    let os_name = map_os(&session.os.unwrap_or_default());
+    let os_name = map_os(session.os.as_ref().unwrap_or(&"".to_string()));
     let time = Utc::now();
-    let country = session.country;
 
-    for (event, event_payout) in events_with_payouts {
+    for (event, _payout_addr, payout_amount) in events_with_payouts {
+        let event_type = event.to_string();
         let (publisher, ad_unit, referrer, ad_slot, ad_slot_type) = {
             let (publisher, event_ad_unit, referrer, ad_slot) = match event {
                 Event::Impression {
@@ -41,10 +39,10 @@ pub async fn record(
 
             let ad_unit = event_ad_unit.and_then(|ipfs| {
                 campaign
-                    .clone() // TODO: Remove clone
                     .ad_units
-                    .into_iter()
+                    .iter()
                     .find(|ad_unit| ad_unit.ipfs == ipfs)
+                    .map(|x| x.to_owned())
             });
             let ad_slot_type = ad_unit.as_ref().map(|unit| unit.ad_type.clone());
             (publisher, ad_unit, referrer, ad_slot, ad_slot_type)
@@ -70,12 +68,13 @@ pub async fn record(
             advertiser: campaign.creator,
             publisher,
             hostname,
-            country: country.to_owned(),
+            country: session.country.to_owned(),
             os_name: os_name.to_owned(),
+            event_type,
+            payout_amount,
         };
-        let payout_amount = event_payout.values().sum::<Option<UnifiedNum>>().unwrap(); // TODO: Remove
 
-        insert_analytics(pool, event_for_db, payout_amount).await?;
+        insert_analytics(pool, event_for_db).await?;
     }
 
     Ok(())

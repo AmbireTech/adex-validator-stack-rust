@@ -22,7 +22,10 @@ pub struct AnalyticsResponse {
 
 #[cfg(feature = "postgres")]
 pub mod postgres {
-    use super::AnalyticsData;
+    use super::{map_os, AnalyticsData, OperatingSystem};
+    use bytes::BytesMut;
+    use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
+    use std::error::Error;
     use tokio_postgres::Row;
 
     impl From<&Row> for AnalyticsData {
@@ -33,6 +36,29 @@ pub mod postgres {
                 channel_id: row.try_get("channel_id").ok(),
             }
         }
+    }
+
+    impl<'a> FromSql<'a> for OperatingSystem {
+        fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+            let str_slice = <&str as FromSql>::from_sql(ty, raw)?;
+            let os = map_os(str_slice);
+            Ok(os)
+        }
+
+        accepts!(TEXT, VARCHAR);
+    }
+
+    impl ToSql for OperatingSystem {
+        fn to_sql(
+            &self,
+            ty: &Type,
+            w: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+            self.to_string().to_sql(ty, w)
+        }
+
+        accepts!(TEXT, VARCHAR);
+        to_sql_checked!();
     }
 }
 
@@ -51,6 +77,7 @@ pub struct AnalyticsQuery {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, DeriveFromStr, DeriveDisplay)]
+#[serde(untagged)]
 pub enum OperatingSystem {
     #[display("Linux")]
     Linux,
@@ -164,4 +191,25 @@ fn default_metric() -> String {
 
 fn default_timeframe() -> String {
     "hour".into()
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn os_serialize_deserialize() {
+        let windows = OperatingSystem::Whitelisted("Windows".to_string());
+
+        let actual_json = serde_json::to_value(&windows).expect("Should serialize it");
+        let expected_json = json!("Windows");
+
+        assert_eq!(expected_json, actual_json);
+
+        let os_from_json: OperatingSystem =
+            serde_json::from_value(actual_json).expect("Should deserialize it");
+
+        assert_eq!(windows, os_from_json);
+    }
 }

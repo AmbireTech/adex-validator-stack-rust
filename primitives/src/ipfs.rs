@@ -91,6 +91,7 @@ impl Url {
     }
 }
 
+#[cfg(feature = "postgres")]
 mod postgres {
     use super::IPFS;
     use bytes::BytesMut;

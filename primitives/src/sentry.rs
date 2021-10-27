@@ -3,7 +3,8 @@ use crate::{
     balances::BalancesState,
     spender::Spender,
     validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
-    AdUnit, Address, Balances, BigNum, CampaignId, Channel, ChannelId, ValidatorId, IPFS,
+    AdUnit, Address, Balances, BigNum, CampaignId, Channel, ChannelId, UnifiedNum, ValidatorId,
+    IPFS,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -150,6 +151,8 @@ pub struct EventAnalytics {
     pub hostname: Option<String>,
     pub country: Option<String>,
     pub os_name: OperatingSystem,
+    pub event_type: String,
+    pub payout_amount: UnifiedNum,
 }
 
 impl Event {
@@ -595,6 +598,8 @@ mod postgres {
                 hostname: row.get("hostname"),
                 country: row.get("country"),
                 os_name: map_os(row.get("os")),
+                event_type: row.get("event_type"),
+                payout_amount: row.get("payout_amount"),
             }
         }
     }

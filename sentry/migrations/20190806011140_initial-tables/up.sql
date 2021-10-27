@@ -98,10 +98,6 @@ CREATE TABLE accounting (
     CONSTRAINT fk_accounting_channel_id FOREIGN KEY (channel_id) REFERENCES channels (id) ON DELETE RESTRICT ON UPDATE RESTRICT
 );
 
-CREATE TYPE EventType AS ENUM (
-    'Click',
-    'Impression'
-);
 
 CREATE TABLE analytics (
     campaign_id varchar(34) NOT NULL,
@@ -114,7 +110,7 @@ CREATE TABLE analytics (
     hostname varchar(255),
     country varchar(255),
     os varchar(255) NOT NULL,
-    event_type EventType NOT NULL,
+    event_type varchar(255) NOT NULL,
     payout_amount bigint NOT NULL DEFAULT 0,
     payout_count integer NOT NULL DEFAULT 0,
     -- Do not rename the Primary key constraint (`analytics_pkey`)!
