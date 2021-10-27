@@ -29,7 +29,7 @@ jobs:
           cargo make ci-flow
         # set environment variables for `primitives` postgres tests
         env:
+          POSTGRES_HOST: localhost
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_HOST: localhost
           POSTGRES_DB: sentry_leader

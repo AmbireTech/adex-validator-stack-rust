@@ -1,10 +1,5 @@
 version: '3.8'
 
-x-postgres-configuration: &postgres
-  POSTGRES_USER: 'adex'
-  POSTGRES_HOST: 'postgres'
-  POSTGRES_PASSWORD: 'postgres'
-
 services:
   # Service: Postgres
   postgres-leader:
@@ -15,8 +10,8 @@ services:
       - "5432:5432"
     # volumes: $HOME/docker/volumes/postgres:/var/lib/postgresql/data
     environment:
-      POSTGRES_USER: 'adex'
-      POSTGRES_HOST: 'postgres'
+      POSTGRES_HOST: 'localhost'
+      POSTGRES_USER: 'postgres'
       POSTGRES_PASSWORD: 'postgres'
       POSTGRES_DB: 'sentry_leader'
     networks:
