@@ -1,15 +1,17 @@
-use slog::{Drain, OwnedKVList, Record, KV, Logger, o};
+use slog::{o, Drain, Logger, OwnedKVList, Record, KV};
 use slog_term::{
     timestamp_local, CompactFormatSerializer, CountingWriter, Decorator, RecordDecorator,
     Serializer, ThreadSafeTimestampFn,
 };
-use std::{cell::RefCell, io::{Error, Result, Write}};
+use std::{
+    cell::RefCell,
+    io::{Error, Result, Write},
+};
 
 pub use slog_async::Async;
 pub use slog_term::TermDecorator;
 
 pub fn new_logger(prefix: &str) -> Logger {
-
     let decorator = TermDecorator::new().build();
     let drain = PrefixedCompactFormat::new(prefix, decorator).fuse();
     let drain = Async::new(drain).build().fuse();

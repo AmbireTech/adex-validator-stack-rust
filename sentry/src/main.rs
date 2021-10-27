@@ -7,14 +7,13 @@ use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
 use primitives::{
     adapter::{DummyAdapterOptions, KeystoreOptions},
     config::configuration,
+    postgres::POSTGRES_CONFIG,
     util::tests::prep_db::{AUTH, IDS},
     ValidatorId,
 };
 use sentry::{
     application::{logger, run},
-    db::{
-        postgres_connection, redis_connection, setup_migrations, CampaignRemaining, POSTGRES_CONFIG,
-    },
+    db::{postgres_connection, redis_connection, setup_migrations, CampaignRemaining},
     Application,
 };
 use slog::info;
