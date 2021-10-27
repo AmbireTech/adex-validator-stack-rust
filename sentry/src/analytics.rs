@@ -36,16 +36,14 @@ pub async fn record(
                     ad_slot,
                 } => (publisher, ad_unit, referrer, ad_slot),
             };
-
             let ad_unit = event_ad_unit.and_then(|ipfs| {
                 campaign
                     .ad_units
                     .iter()
                     .find(|ad_unit| ad_unit.ipfs == ipfs)
-                    .map(|x| x.to_owned())
             });
             let ad_slot_type = ad_unit.as_ref().map(|unit| unit.ad_type.clone());
-            (publisher, ad_unit, referrer, ad_slot, ad_slot_type)
+            (publisher, event_ad_unit, referrer, ad_slot, ad_slot_type)
         };
 
         let hostname = match (&referrer, session.referrer_header.as_ref()) {

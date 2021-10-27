@@ -3,8 +3,7 @@ use crate::{
     balances::BalancesState,
     spender::Spender,
     validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
-    AdUnit, Address, Balances, BigNum, CampaignId, Channel, ChannelId, UnifiedNum, ValidatorId,
-    IPFS,
+    Address, Balances, BigNum, CampaignId, Channel, ChannelId, UnifiedNum, ValidatorId, IPFS,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -143,7 +142,7 @@ pub enum Event {
 pub struct EventAnalytics {
     pub time: DateTime<Utc>,
     pub campaign_id: CampaignId,
-    pub ad_unit: Option<AdUnit>,
+    pub ad_unit: Option<IPFS>,
     pub ad_slot: Option<IPFS>,
     pub ad_slot_type: Option<String>,
     pub advertiser: Address,
