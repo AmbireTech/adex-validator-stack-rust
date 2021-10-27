@@ -1,38 +1,21 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
 
-use std::{convert::TryFrom, error::Error, time::Duration};
+use std::{convert::TryFrom, error::Error};
 
 use clap::{crate_version, App, Arg};
-use futures::{
-    future::{join, join_all},
-    TryFutureExt,
-};
-use tokio::{runtime::Runtime, time::sleep};
 
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
 use primitives::{
-    adapter::{Adapter, DummyAdapterOptions, KeystoreOptions},
-    config::{configuration, Config, Environment},
+    adapter::{DummyAdapterOptions, KeystoreOptions},
+    config::{configuration, Environment},
     util::{
+        logging::new_logger,
         tests::prep_db::{AUTH, IDS},
-        ApiUrl,
     },
     ValidatorId,
 };
-use slog::{error, info, Logger};
-use std::fmt::Debug;
-use validator_worker::{
-    channel::{channel_tick, collect_channels},
-    SentryApi,
-};
-
-#[derive(Debug, Clone)]
-struct Args<A: Adapter> {
-    sentry_url: ApiUrl,
-    config: Config,
-    adapter: A,
-}
+use validator_worker::worker::run;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let cli = App::new("Validator worker")
@@ -126,7 +109,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         _ => panic!("We don't have any other adapters implemented yet!"),
     };
 
-    let logger = logger();
+    let logger = new_logger("validator_worker");
 
     match adapter {
         AdapterTypes::EthereumAdapter(ethadapter) => {
@@ -136,99 +119,4 @@ fn main() -> Result<(), Box<dyn Error>> {
             run(is_single_tick, sentry_url, &config, *dummyadapter, &logger)
         }
     }
-}
-
-fn run<A: Adapter + 'static>(
-    is_single_tick: bool,
-    sentry_url: ApiUrl,
-    config: &Config,
-    mut adapter: A,
-    logger: &Logger,
-) -> Result<(), Box<dyn Error>> {
-    // unlock adapter
-    adapter.unlock()?;
-
-    let args = Args {
-        sentry_url,
-        config: config.to_owned(),
-        adapter,
-    };
-
-    // Create the runtime
-    let rt = Runtime::new()?;
-
-    if is_single_tick {
-        rt.block_on(all_channels_tick(args, logger));
-    } else {
-        rt.block_on(infinite(args, logger));
-    }
-
-    Ok(())
-}
-
-async fn infinite<A: Adapter + 'static>(args: Args<A>, logger: &Logger) {
-    loop {
-        let arg = args.clone();
-        let wait_time_future = sleep(Duration::from_millis(arg.config.wait_time as u64));
-
-        let _result = join(all_channels_tick(arg, logger), wait_time_future).await;
-    }
-}
-
-async fn all_channels_tick<A: Adapter + 'static>(args: Args<A>, logger: &Logger) {
-    let (channels, validators) = match collect_channels(
-        &args.adapter,
-        &args.sentry_url,
-        &args.config,
-        logger,
-    )
-    .await
-    {
-        Ok(res) => res,
-        Err(err) => {
-            error!(logger, "Error collecting all channels for tick"; "collect_channels" => ?err, "main" => "all_channels_tick");
-            return;
-        }
-    };
-    let channels_size = channels.len();
-
-    // initialize SentryApi once we have all the Campaign Validators we need to propagate messages to
-    let sentry = match SentryApi::init(
-        args.adapter.clone(),
-        logger.clone(),
-        args.config.clone(),
-        validators.clone(),
-    ) {
-        Ok(sentry) => sentry,
-        Err(err) => {
-            error!(logger, "Failed to initialize SentryApi for all channels"; "SentryApi::init()" => ?err, "main" => "all_channels_tick");
-            return;
-        }
-    };
-
-    let tick_results = join_all(channels.into_iter().map(|channel| {
-        channel_tick(&sentry, &args.config, channel).map_err(move |err| (channel, err))
-    }))
-    .await;
-
-    for (channel, channel_err) in tick_results.into_iter().filter_map(Result::err) {
-        error!(logger, "Error processing Channel"; "channel" => ?channel, "error" => ?channel_err, "main" => "all_channels_tick");
-    }
-
-    info!(logger, "Processed {} channels", channels_size);
-
-    if channels_size >= args.config.max_channels as usize {
-        error!(logger, "WARNING: channel limit cfg.MAX_CHANNELS={} reached", &args.config.max_channels; "main" => "all_channels_tick");
-    }
-}
-
-fn logger() -> Logger {
-    use primitives::util::logging::{Async, PrefixedCompactFormat, TermDecorator};
-    use slog::{o, Drain};
-
-    let decorator = TermDecorator::new().build();
-    let drain = PrefixedCompactFormat::new("validator_worker", decorator).fuse();
-    let drain = Async::new(drain).build().fuse();
-
-    Logger::root(drain, o!())
 }
