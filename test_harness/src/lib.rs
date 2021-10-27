@@ -75,8 +75,8 @@ pub struct TestValidator {
     pub sentry_config: sentry::application::Config,
     /// Prefix for the loggers
     pub logger_prefix: String,
-    /// Postgres DB name & password
-    /// See
+    /// Postgres DB name
+    /// The rest of the Postgres values are taken from env. variables
     pub db_name: String,
 }
 

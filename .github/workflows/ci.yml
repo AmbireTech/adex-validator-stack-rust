@@ -15,7 +15,7 @@ jobs:
         uses: sudo-bot/action-docker-compose@latest
         with:
           # https://docs.docker.com/compose/reference/overview/
-          cli-args: "-f docker-compose.ci.yml up -d"
+          cli-args: "-f docker-compose.harness.yml up -d"
       - uses: actions-rs/toolchain@v1
         with:
           # No need to add `toolchain`, it will use `rust-toolchain` file instead
