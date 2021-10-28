@@ -199,7 +199,10 @@ mod tests {
     use primitives::{
         adapter::Adapter,
         sentry::campaign_create::CreateCampaign,
-        util::{tests::prep_db::DUMMY_VALIDATOR_LEADER, ApiUrl},
+        util::{
+            tests::prep_db::{DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER},
+            ApiUrl,
+        },
         BigNum, Channel, ChannelId,
     };
     use reqwest::{Client, StatusCode};
