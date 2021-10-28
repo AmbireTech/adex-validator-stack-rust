@@ -524,7 +524,6 @@ pub mod campaign_create {
 mod postgres {
     use super::{EventAnalytics, MessageResponse, ValidatorMessage};
     use crate::{
-        analytics::map_os,
         sentry::EventAggregate,
         validator::{messages::Type as MessageType, MessageTypes},
     };
@@ -596,7 +595,7 @@ mod postgres {
                 publisher: row.get("publisher"),
                 hostname: row.get("hostname"),
                 country: row.get("country"),
-                os_name: map_os(row.get("os")),
+                os_name: row.get("os"),
                 event_type: row.get("event_type"),
                 payout_amount: row.get("payout_amount"),
             }
