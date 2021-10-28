@@ -1,6 +1,5 @@
-use crate::ChannelId;
-use crate::DomainError;
-use parse_display::{Display as DeriveDisplay, FromStr as DeriveFromStr};
+use crate::{ChannelId, DomainError};
+use parse_display::Display;
 use serde::{Deserialize, Serialize};
 
 pub const ANALYTICS_QUERY_LIMIT: u32 = 200;
@@ -22,7 +21,7 @@ pub struct AnalyticsResponse {
 
 #[cfg(feature = "postgres")]
 pub mod postgres {
-    use super::{map_os, AnalyticsData, OperatingSystem};
+    use super::{AnalyticsData, OperatingSystem};
     use bytes::BytesMut;
     use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
     use std::error::Error;
@@ -41,7 +40,7 @@ pub mod postgres {
     impl<'a> FromSql<'a> for OperatingSystem {
         fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
             let str_slice = <&str as FromSql>::from_sql(ty, raw)?;
-            let os = map_os(str_slice);
+            let os = Self::map_os(str_slice);
             Ok(os)
         }
 
@@ -76,15 +75,47 @@ pub struct AnalyticsQuery {
     pub segment_by_channel: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, DeriveFromStr, DeriveDisplay)]
-#[serde(untagged)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Display)]
+#[serde(untagged, into = "String", from = "String")]
 pub enum OperatingSystem {
-    #[display("Linux")]
     Linux,
     #[display("{0}")]
     Whitelisted(String),
-    #[display("Other")]
     Other,
+}
+
+impl From<String> for OperatingSystem {
+    fn from(operating_system: String) -> Self {
+        match operating_system.as_str() {
+            "Linux" => OperatingSystem::Linux,
+            "Other" => OperatingSystem::Other,
+            _ => OperatingSystem::Whitelisted(operating_system),
+        }
+    }
+}
+
+impl OperatingSystem {
+    pub fn map_os(os_name: &str) -> OperatingSystem {
+        if OperatingSystem::LINUX_DISTROS
+            .iter()
+            .any(|distro| os_name.eq(*distro))
+        {
+            OperatingSystem::Linux
+        } else if OperatingSystem::WHITELISTED
+            .iter()
+            .any(|whitelisted| os_name.eq(*whitelisted))
+        {
+            OperatingSystem::Whitelisted(os_name.into())
+        } else {
+            OperatingSystem::Other
+        }
+    }
+}
+
+impl From<OperatingSystem> for String {
+    fn from(os: OperatingSystem) -> String {
+        os.to_string()
+    }
 }
 
 impl OperatingSystem {
@@ -127,22 +158,6 @@ impl OperatingSystem {
         "Symbian",
         "KAIOS",
     ];
-}
-
-pub fn map_os(os_name: &str) -> OperatingSystem {
-    if OperatingSystem::LINUX_DISTROS
-        .iter()
-        .any(|distro| os_name.eq(*distro))
-    {
-        OperatingSystem::Linux
-    } else if OperatingSystem::WHITELISTED
-        .iter()
-        .any(|whitelisted| os_name.eq(*whitelisted))
-    {
-        OperatingSystem::Whitelisted(os_name.into())
-    } else {
-        OperatingSystem::Other
-    }
 }
 
 impl AnalyticsQuery {
@@ -195,21 +210,63 @@ fn default_timeframe() -> String {
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashMap;
+
+    use once_cell::sync::Lazy;
+    use serde_json::{from_value, to_value, Value};
+
     use super::*;
-    use serde_json::json;
+
+    static TEST_CASES: Lazy<HashMap<String, (OperatingSystem, Value)>> = Lazy::new(|| {
+        vec![
+            // Whitelisted - Android
+            (
+                OperatingSystem::WHITELISTED[0].to_string(),
+                (
+                    OperatingSystem::Whitelisted("Android".into()),
+                    Value::String("Android".into()),
+                ),
+            ),
+            // Linux - Arch
+            (
+                OperatingSystem::LINUX_DISTROS[0].to_string(),
+                (OperatingSystem::Linux, Value::String("Linux".into())),
+            ),
+            // Other - OS xxxxx
+            (
+                "OS xxxxx".into(),
+                (OperatingSystem::Other, Value::String("Other".into())),
+            ),
+        ]
+        .into_iter()
+        .collect()
+    });
+
+    #[cfg(feature = "postgres")]
+    fn test_from_to_sql() {
+        todo!("Simo writes test")
+    }
 
     #[test]
-    fn os_serialize_deserialize() {
-        let windows = OperatingSystem::Whitelisted("Windows".to_string());
+    fn test_operating_system() {
+        for (input, (expect_os, expect_json)) in TEST_CASES.iter() {
+            let actual_os = OperatingSystem::map_os(input);
 
-        let actual_json = serde_json::to_value(&windows).expect("Should serialize it");
-        let expected_json = json!("Windows");
+            // let input_json = Value::String(input.clone());
+            assert_eq!(
+                expect_os, &actual_os,
+                "expected and actual differ for {}",
+                input
+            );
 
-        assert_eq!(expected_json, actual_json);
+            let actual_json = to_value(&actual_os).expect("Should serialize it");
 
-        let os_from_json: OperatingSystem =
-            serde_json::from_value(actual_json).expect("Should deserialize it");
+            assert_eq!(expect_json, &actual_json);
 
-        assert_eq!(windows, os_from_json);
+            let from_json: OperatingSystem =
+                from_value(actual_json).expect("Should deserialize it");
+
+            assert_eq!(expect_os, &from_json, "error processing {}", input);
+        }
     }
 }
