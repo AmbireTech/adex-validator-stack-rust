@@ -40,7 +40,12 @@ pub mod postgres {
     impl<'a> FromSql<'a> for OperatingSystem {
         fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
             let str_slice = <&str as FromSql>::from_sql(ty, raw)?;
-            let os = Self::map_os(str_slice);
+            let os = match str_slice {
+                "Other" => OperatingSystem::Other,
+                "Linux" => OperatingSystem::Linux,
+                _ => OperatingSystem::Whitelisted(str_slice.to_string()),
+            };
+
             Ok(os)
         }
 
@@ -54,6 +59,7 @@ pub mod postgres {
             w: &mut BytesMut,
         ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
             self.to_string().to_sql(ty, w)
+
         }
 
         accepts!(TEXT, VARCHAR);
@@ -210,12 +216,11 @@ fn default_timeframe() -> String {
 
 #[cfg(test)]
 mod test {
+    use super::*;
+    use crate::util::tests::prep_db::postgres::POSTGRES_POOL;
     use std::collections::HashMap;
-
     use once_cell::sync::Lazy;
     use serde_json::{from_value, to_value, Value};
-
-    use super::*;
 
     static TEST_CASES: Lazy<HashMap<String, (OperatingSystem, Value)>> = Lazy::new(|| {
         vec![
@@ -243,8 +248,36 @@ mod test {
     });
 
     #[cfg(feature = "postgres")]
-    fn test_from_to_sql() {
-        todo!("Simo writes test")
+    #[tokio::test]
+    async fn os_to_from_sql() {
+        let client = POSTGRES_POOL.get().await.unwrap();
+        let sql_type = "VARCHAR";
+
+        for (input, _) in TEST_CASES.iter() {
+            let actual_os = OperatingSystem::map_os(input);
+
+            // from SQL
+            {
+                let row_os: OperatingSystem = client
+                    .query_one(&*format!("SELECT '{}'::{}", actual_os, sql_type), &[])
+                    .await
+                    .unwrap()
+                    .get(0);
+
+                assert_eq!(&actual_os, &row_os);
+            }
+
+            // to SQL
+            {
+                let row_os: OperatingSystem = client
+                    .query_one(&*format!("SELECT $1::{}", sql_type), &[&actual_os])
+                    .await
+                    .unwrap()
+                    .get(0);
+                assert_eq!(&actual_os, &row_os);
+            }
+        }
+
     }
 
     #[test]

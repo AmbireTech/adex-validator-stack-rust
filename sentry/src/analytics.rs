@@ -4,7 +4,7 @@ use crate::{
 };
 use chrono::Utc;
 use primitives::{
-    analytics::map_os,
+    analytics::OperatingSystem,
     sentry::{Event, EventAnalytics},
     Address, Campaign, UnifiedNum,
 };
@@ -16,7 +16,7 @@ pub async fn record(
     session: &Session,
     events_with_payouts: Vec<(Event, Address, UnifiedNum)>,
 ) -> Result<(), PoolError> {
-    let os_name = map_os(session.os.as_ref().unwrap_or(&"".to_string()));
+    let os_name = OperatingSystem::map_os(session.os.as_ref().unwrap_or(&"".to_string()));
     let time = Utc::now();
 
     for (event, _payout_addr, payout_amount) in events_with_payouts {

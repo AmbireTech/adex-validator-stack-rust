@@ -231,13 +231,13 @@ pub async fn insert_analytics(
     let client = pool.get().await?;
     let initial_count = 1;
 
-    let query = format!("INSERT INTO analytics(campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os, event_type, payout_amount, payout_count)
-    VALUES ($1, date_trunc('hour', $2), $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, {})
+    let query = "INSERT INTO analytics(campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os, event_type, payout_amount, payout_count)
+    VALUES ($1, date_trunc('hour', $2), $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
     ON CONFLICT ON CONSTRAINT analytics_pkey DO UPDATE 
     SET (payout_amount = payout_amount + $12, payout_count = payout_count + 1)
-    RETURNING (campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os, event_type, payout_amount, payout_count)", initial_count);
+    RETURNING (campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os, event_type, payout_amount, payout_count)";
 
-    let stmt = client.prepare(&query).await?;
+    let stmt = client.prepare(query).await?;
 
     let row = client
         .query_one(
@@ -255,6 +255,7 @@ pub async fn insert_analytics(
                 &event.os_name.to_string(),
                 &event.event_type,
                 &event.payout_amount,
+                &initial_count
             ],
         )
         .await?;
