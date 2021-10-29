@@ -1,7 +1,7 @@
 use std::{collections::HashMap, time::Duration};
 
 use chrono::{DateTime, Utc};
-use futures::future::{join_all, TryFutureExt};
+use futures::future::{join_all, try_join_all, TryFutureExt};
 use reqwest::{Client, Method};
 use slog::Logger;
 
@@ -9,8 +9,8 @@ use primitives::{
     adapter::Adapter,
     balances::{CheckedState, UncheckedState},
     sentry::{
-        AccountingResponse, EventAggregateResponse, LastApprovedResponse, SuccessResponse,
-        ValidatorMessageResponse,
+        AccountingResponse, AllSpendersResponse, EventAggregateResponse, LastApprovedResponse,
+        SuccessResponse, ValidatorMessageResponse,
     },
     spender::Spender,
     util::ApiUrl,
@@ -161,26 +161,51 @@ impl<A: Adapter + 'static> SentryApi<A> {
             .map_err(Error::Request)
     }
 
-    // TODO: Pagination & use of `AllSpendersResponse`
-    pub async fn get_all_spenders(
+    pub async fn get_spenders_page(
         &self,
-        channel: ChannelId,
-    ) -> Result<HashMap<Address, Spender>, Error> {
+        channel: &ChannelId,
+        page: u64,
+    ) -> Result<AllSpendersResponse, Error> {
         let url = self
             .whoami
             .url
-            .join(&format!("v5/channel/{}/spender/all", channel))
+            .join(&format!("v5/channel/{}/spender/all?page={}", channel, page))
             .expect("Should not error when creating endpoint");
 
-        self.client
+        let first_page: AllSpendersResponse = self
+            .client
             .get(url)
             .bearer_auth(&self.whoami.token)
             .send()
             .await?
-            // TODO: Should be `AllSpendersResponse` and should have pagination!
             .json()
             .map_err(Error::Request)
-            .await
+            .await?;
+
+        Ok(first_page)
+    }
+
+    pub async fn get_all_spenders(
+        &self,
+        channel: ChannelId,
+    ) -> Result<HashMap<Address, Spender>, Error> {
+        let first_page = self.get_spenders_page(&channel, 0).await?;
+
+        if first_page.pagination.total_pages < 2 {
+            Ok(first_page.spenders)
+        } else {
+            let all: Vec<AllSpendersResponse> = try_join_all(
+                (1..first_page.pagination.total_pages).map(|i| self.get_spenders_page(&channel, i)),
+            )
+            .await?;
+
+            let result_all: HashMap<Address, Spender> = std::iter::once(first_page)
+                .chain(all.into_iter())
+                .flat_map(|p| p.spenders)
+                .collect();
+
+            Ok(result_all)
+        }
     }
 
     /// Get the accounting from Sentry
