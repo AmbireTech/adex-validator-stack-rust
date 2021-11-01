@@ -36,6 +36,7 @@ sweeper_address = '0xdd41b0069256a28972458199a3c9cf036384c156'
 
 ethereum_network = 'http://localhost:8545'
 # Mocked relayer
+# TODO: Remove #452 
 ethereum_adapter_relayer = 'http://localhost:8888'
 
 creators_whitelist = []

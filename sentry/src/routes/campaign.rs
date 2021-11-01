@@ -14,17 +14,7 @@ use crate::{
 use deadpool_postgres::PoolError;
 use futures::future::try_join_all;
 use hyper::{Body, Request, Response};
-use primitives::{
-    adapter::{Adapter, AdapterErrorKind, Error as AdapterError},
-    campaign_validator::Validator,
-    config::TokenInfo,
-    sentry::{
-        campaign::CampaignListQuery,
-        campaign_create::{CreateCampaign, ModifyCampaign},
-    },
-    spender::Spendable,
-    Address, Campaign, CampaignId, Channel, ChannelId, Deposit, UnifiedNum,
-};
+use primitives::{Address, Campaign, CampaignId, Channel, ChannelId, Deposit, UnifiedNum, adapter::{Adapter, AdapterErrorKind, Error as AdapterError}, campaign_validator::Validator, config::TokenInfo, sentry::{campaign::CampaignListQuery, campaign_create::{CreateCampaign, ModifyCampaign}}, spender::Spendable};
 use slog::error;
 use std::cmp::{max, Ordering};
 use thiserror::Error;
@@ -140,9 +130,10 @@ pub async fn create_campaign<A: Adapter>(
 
     let campaign = serde_json::from_slice::<CreateCampaign>(&body)
         .map_err(|e| ResponseError::FailedValidation(e.to_string()))?
-        // create the actual `Campaign` with random `CampaignId`
+        // create the actual `Campaign` with a randomly generated `CampaignId` or the set `CampaignId`
         .into_campaign();
 
+    // Validate the campaign as soon as a valid JSON was passed.
     campaign
         .validate(&app.config, &app.adapter.whoami())
         .map_err(|err| ResponseError::FailedValidation(err.to_string()))?;
@@ -957,7 +948,7 @@ mod test {
 
         let campaign: Campaign = {
             // erases the CampaignId for the CreateCampaign request
-            let mut create = CreateCampaign::from(dummy_campaign);
+            let mut create = CreateCampaign::from_campaign_erased(dummy_campaign, None);
             create.budget = UnifiedNum::from(500 * multiplier);
             // prepare for Campaign creation
             add_deposit_call(create.channel.id(), create.creator, create.channel.token);
@@ -1030,7 +1021,7 @@ mod test {
         // we have 1000 left from our deposit, so we are using half of it
         let _second_campaign = {
             // erases the CampaignId for the CreateCampaign request
-            let mut create_second = CreateCampaign::from(DUMMY_CAMPAIGN.clone());
+            let mut create_second = CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
             create_second.budget = UnifiedNum::from(500 * multiplier);
 
             // prepare for Campaign creation
@@ -1060,7 +1051,7 @@ mod test {
         // new campaign budget: 600
         {
             // erases the CampaignId for the CreateCampaign request
-            let mut create = CreateCampaign::from(DUMMY_CAMPAIGN.clone());
+            let mut create = CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
             create.budget = UnifiedNum::from(600 * multiplier);
 
             // prepare for Campaign creation
@@ -1119,7 +1110,7 @@ mod test {
         // new campaign budget: 600
         {
             // erases the CampaignId for the CreateCampaign request
-            let mut create = CreateCampaign::from(DUMMY_CAMPAIGN.clone());
+            let mut create = CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
             create.budget = UnifiedNum::from(600 * multiplier);
 
             // prepare for Campaign creation
