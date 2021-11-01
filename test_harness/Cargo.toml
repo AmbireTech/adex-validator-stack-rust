@@ -8,10 +8,15 @@ authors = ["Lachezar Lechev <lachezar@ambire.com>"]
 primitives = { path = "../primitives", features = ["postgres"] }
 adapter = { version = "0.1", path = "../adapter", features = ["test-util"] }
 sentry = { version = "0.1", path = "../sentry", features = ["test-util"] }
+
+chrono = { version = "0.4", features = ["serde"] }
+
 # ethereum
 web3 = { version = "0.17", features = ["http-tls", "signing"] }
 once_cell = "^1.8"
 reqwest = { version = "0.11", features = ["json"] }
+
+serde_json = { version = "1" }
 
 slog = { version = "^2.2.3", features = ["max_level_trace"] }
 futures = "0.3"

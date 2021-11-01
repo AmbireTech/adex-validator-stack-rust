@@ -3719,11 +3719,13 @@ version = "0.1.0"
 dependencies = [
  "adapter",
  "anyhow",
+ "chrono",
  "futures",
  "once_cell",
  "primitives",
  "reqwest",
  "sentry",
+ "serde_json",
  "slog",
  "subprocess",
  "tokio",
