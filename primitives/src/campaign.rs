@@ -278,6 +278,8 @@ mod pricing {
 }
 /// Campaign Validators
 pub mod validators {
+    use std::ops::Index;
+
     use crate::{ValidatorDesc, ValidatorId};
     use serde::{Deserialize, Serialize};
 
@@ -308,6 +310,17 @@ pub mod validators {
     impl From<(ValidatorDesc, ValidatorDesc)> for Validators {
         fn from(validators: (ValidatorDesc, ValidatorDesc)) -> Self {
             Self(validators.0, validators.1)
+        }
+    }
+
+    impl Index<usize> for Validators {
+        type Output = ValidatorDesc;
+        fn index(&self, index: usize) -> &Self::Output {
+            match index {
+                0 => &self.0,
+                1 => &self.1,
+                _ => panic!("Validators index is out of bound")
+            }
         }
     }
 
