@@ -9,8 +9,8 @@ use primitives::{
     adapter::Adapter,
     balances::{CheckedState, UncheckedState},
     sentry::{
-        AccountingResponse, AllSpendersResponse, EventAggregateResponse, LastApprovedResponse,
-        SuccessResponse, ValidatorMessageResponse,
+        AccountingResponse, AllSpendersResponse, EventAggregateResponse, LastApprovedResponse, SuccessResponse,
+        ValidatorMessageResponse,
     },
     spender::Spender,
     util::ApiUrl,
@@ -161,19 +161,14 @@ impl<A: Adapter + 'static> SentryApi<A> {
             .map_err(Error::Request)
     }
 
-    pub async fn get_spenders_page(
-        &self,
-        channel: &ChannelId,
-        page: u64,
-    ) -> Result<AllSpendersResponse, Error> {
+    pub async fn get_spenders_page(&self, channel: &ChannelId, page: u64) -> Result<AllSpendersResponse, Error> {
         let url = self
             .whoami
             .url
             .join(&format!("v5/channel/{}/spender/all?page={}", channel, page))
             .expect("Should not error when creating endpoint");
 
-        let first_page: AllSpendersResponse = self
-            .client
+        let first_page: AllSpendersResponse = self.client
             .get(url)
             .bearer_auth(&self.whoami.token)
             .send()
@@ -195,7 +190,8 @@ impl<A: Adapter + 'static> SentryApi<A> {
             Ok(first_page.spenders)
         } else {
             let all: Vec<AllSpendersResponse> = try_join_all(
-                (1..first_page.pagination.total_pages).map(|i| self.get_spenders_page(&channel, i)),
+                (1..first_page.pagination.total_pages)
+                    .map(|i| self.get_spenders_page(&channel, i)),
             )
             .await?;
 
@@ -400,5 +396,132 @@ pub mod campaigns {
             .expect("Should not fail to create endpoint URL");
 
         client.get(endpoint).send().await?.json().await
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use wiremock::{
+        matchers::{method, path},
+        Mock, MockServer, ResponseTemplate,
+    };
+    use adapter::DummyAdapter;
+    use primitives::{
+        adapter::DummyAdapterOptions,
+        config::configuration,
+        spender::Spendable,
+        util::tests::{
+            discard_logger,
+            prep_db::{ADDRESSES, DUMMY_VALIDATOR_LEADER, DUMMY_VALIDATOR_FOLLOWER, DUMMY_CAMPAIGN, IDS}
+        },
+        Deposit, UnifiedNum
+    };
+    use serde_json::json;
+    use std::str::FromStr;
+
+    #[tokio::test]
+    async fn test_get_all_spenders() {
+        let server = MockServer::start().await;
+
+        let mut validators = Validators::new();
+        validators.insert(DUMMY_VALIDATOR_LEADER.id, Validator {
+            url: ApiUrl::from_str(&DUMMY_VALIDATOR_LEADER.url).expect("Should parse"),
+            token: AuthToken::default(),
+        });
+        validators.insert(DUMMY_VALIDATOR_FOLLOWER.id, Validator {
+            url: ApiUrl::from_str(&DUMMY_VALIDATOR_FOLLOWER.url).expect("Should parse"),
+            token: AuthToken::default(),
+        });
+
+        let mut config = configuration("development", None).expect("Should get Config");
+        config.spendable_find_limit = 2;
+
+        let adapter = DummyAdapter::init(
+            DummyAdapterOptions {
+                dummy_identity: IDS["leader"],
+                dummy_auth: Default::default(),
+                dummy_auth_tokens: Default::default(),
+            },
+            &config,
+        );
+        let logger = discard_logger();
+
+        let sentry = SentryApi::init(adapter, logger, config, validators).expect("Should build sentry");
+
+        let mut first_page_response = HashMap::new();
+        first_page_response.insert(ADDRESSES["user"], Spender {
+            total_deposited: UnifiedNum::from(100_000_000),
+            spender_leaf: None,
+        });
+        first_page_response.insert(ADDRESSES["publisher"], Spender {
+            total_deposited: UnifiedNum::from(100_000_000),
+            spender_leaf: None,
+        });
+
+        let mut second_page_response = HashMap::new();
+        second_page_response.insert(ADDRESSES["publisher2"], Spender {
+            total_deposited: UnifiedNum::from(100_000_000),
+            spender_leaf: None,
+        });
+        second_page_response.insert(ADDRESSES["creator"], Spender {
+            total_deposited: UnifiedNum::from(100_000_000),
+            spender_leaf: None,
+        });
+
+        let mut third_page_response = HashMap::new();
+        third_page_response.insert(ADDRESSES["tester"], Spender {
+            total_deposited: UnifiedNum::from(100_000_000),
+            spender_leaf: None,
+        });
+
+        let first_page_response = json!(first_page_response);
+        let second_page_response = json!(second_page_response);
+        let third_page_response = json!(third_page_response);
+
+        Mock::given(method("GET"))
+            .and(path(format!("/v5/channel/{}/spender/all?page=0", DUMMY_CAMPAIGN.channel.id())))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&first_page_response))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path(format!("/v5/channel/{}/spender/all?page=1", DUMMY_CAMPAIGN.channel.id())))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&second_page_response))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path(format!("/v5/channel/{}/spender/all?page=2", DUMMY_CAMPAIGN.channel.id())))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&third_page_response))
+            .mount(&server)
+            .await;
+
+        // let expected_response = json!(vec![spendable_user, spendable_publisher, spendable_publisher2, spendable_creator, spendable_tester]);
+        let mut expected_response = HashMap::new();
+        expected_response.insert(ADDRESSES["user"], Spender {
+            total_deposited: UnifiedNum::from(100_000_000),
+            spender_leaf: None,
+        });
+        expected_response.insert(ADDRESSES["publisher"], Spender {
+            total_deposited: UnifiedNum::from(100_000_000),
+            spender_leaf: None,
+        });
+        expected_response.insert(ADDRESSES["publisher2"], Spender {
+            total_deposited: UnifiedNum::from(100_000_000),
+            spender_leaf: None,
+        });
+        expected_response.insert(ADDRESSES["creator"], Spender {
+            total_deposited: UnifiedNum::from(100_000_000),
+            spender_leaf: None,
+        });
+        expected_response.insert(ADDRESSES["tester"], Spender {
+            total_deposited: UnifiedNum::from(100_000_000),
+            spender_leaf: None,
+        });
+
+        let res = sentry.get_all_spenders(DUMMY_CAMPAIGN.channel.id()).await.expect("should get response");
+
+        assert!(expected_response.len() == res.len() && expected_response.keys().all(|k| res.contains_key(k)))
     }
 }
