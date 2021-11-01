@@ -1,9 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::{borrow::Borrow, convert::TryFrom, fmt, str::FromStr};
 
-use crate::{
-    address::Error, targeting::Value, Address, DomainError, ToETHChecksum, ToHex, UnifiedNum,
-};
+use crate::{Address, DomainError, ToETHChecksum, ToHex, UnifiedNum, address::Error, targeting::Value, util::{ApiUrl, api::Error as ApiUrlError}};
 
 pub use messages::*;
 
@@ -96,15 +94,24 @@ impl TryFrom<Value> for ValidatorId {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
+/// A Validator description which includes the identity, fee (pro milles) and the Sentry URL.
 pub struct ValidatorDesc {
     pub id: ValidatorId,
     /// The validator fee in pro milles (per 1000)
+    /// Used to calculate the validator fee on each payout.
     pub fee: UnifiedNum,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     /// The address which will receive the fees
     pub fee_addr: Option<Address>,
-    /// The url of the Validator on which is the API
+    /// The url of the Validator where Sentry API is running
     pub url: String,
+}
+
+impl ValidatorDesc {
+    /// Tries to create an [`ApiUrl`] from the `url` field.
+    pub fn try_api_url(&self) -> Result<ApiUrl, ApiUrlError> {
+        self.url.parse()
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
