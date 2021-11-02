@@ -329,10 +329,17 @@ pub mod tests_postgres {
             // DROP the public schema and create it again for usage after recycling
             let queries = "DROP SCHEMA public CASCADE; CREATE SCHEMA public;";
 
-            let result = database
-                .pool
-                .get()
-                .await?
+            let database_client = database.pool.get().await.map_err(|err| {
+                match &err {
+                    PoolError::Backend(backend_err) if backend_err.is_closed() => {
+                        panic!("Closed PG Client connection of the database {} Pool!", database.name);
+                    }
+                    _ => {}
+                }
+                err
+            })?;
+
+            let result = database_client
                 .simple_query(queries)
                 .await
                 .map_err(PoolError::Backend)
