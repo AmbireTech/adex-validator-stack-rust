@@ -2,8 +2,9 @@
 name = "sentry"
 version = "0.1.0"
 authors = [
-  "Lachezar Lechev <lachezar@adex.network>",
-  "Omidiora Samuel <sam@adex.network>",
+  "Ambire <dev@ambire.com>",
+  "Lachezar Lechev <lachezar@ambire.com>",
+  "Omidiora Samuel <sam@ambire.com>",
 ]
 edition = "2018"
 

@@ -1,7 +1,7 @@
 # Builder
 FROM trufflesuite/ganache-cli:latest
 
-LABEL maintainer="dev@adex.network"
+LABEL maintainer="dev@ambire.com"
 
 WORKDIR /scripts
 
