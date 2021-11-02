@@ -1,7 +1,12 @@
 use serde::{Deserialize, Serialize};
 use std::{borrow::Borrow, convert::TryFrom, fmt, str::FromStr};
 
-use crate::{Address, DomainError, ToETHChecksum, ToHex, UnifiedNum, address::Error, targeting::Value, util::{ApiUrl, api::Error as ApiUrlError}};
+use crate::{
+    address::Error,
+    targeting::Value,
+    util::{api::Error as ApiUrlError, ApiUrl},
+    Address, DomainError, ToETHChecksum, ToHex, UnifiedNum,
+};
 
 pub use messages::*;
 

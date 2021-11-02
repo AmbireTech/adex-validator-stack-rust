@@ -319,7 +319,7 @@ pub mod validators {
             match index {
                 0 => &self.0,
                 1 => &self.1,
-                _ => panic!("Validators index is out of bound")
+                _ => panic!("Validators index is out of bound"),
             }
         }
     }

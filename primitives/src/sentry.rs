@@ -440,7 +440,6 @@ pub mod campaign_create {
         AdUnit, Address, Campaign, CampaignId, Channel, EventSubmission, UnifiedNum,
     };
 
-
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     #[serde(rename_all = "camelCase")]
     /// All fields are present except the `CampaignId` which is randomly created

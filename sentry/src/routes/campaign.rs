@@ -14,7 +14,17 @@ use crate::{
 use deadpool_postgres::PoolError;
 use futures::future::try_join_all;
 use hyper::{Body, Request, Response};
-use primitives::{Address, Campaign, CampaignId, Channel, ChannelId, Deposit, UnifiedNum, adapter::{Adapter, AdapterErrorKind, Error as AdapterError}, campaign_validator::Validator, config::TokenInfo, sentry::{campaign::CampaignListQuery, campaign_create::{CreateCampaign, ModifyCampaign}}, spender::Spendable};
+use primitives::{
+    adapter::{Adapter, AdapterErrorKind, Error as AdapterError},
+    campaign_validator::Validator,
+    config::TokenInfo,
+    sentry::{
+        campaign::CampaignListQuery,
+        campaign_create::{CreateCampaign, ModifyCampaign},
+    },
+    spender::Spendable,
+    Address, Campaign, CampaignId, Channel, ChannelId, Deposit, UnifiedNum,
+};
 use slog::error;
 use std::cmp::{max, Ordering};
 use thiserror::Error;
@@ -1021,7 +1031,8 @@ mod test {
         // we have 1000 left from our deposit, so we are using half of it
         let _second_campaign = {
             // erases the CampaignId for the CreateCampaign request
-            let mut create_second = CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
+            let mut create_second =
+                CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
             create_second.budget = UnifiedNum::from(500 * multiplier);
 
             // prepare for Campaign creation

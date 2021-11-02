@@ -47,7 +47,7 @@ pub mod validator;
 /// This module is available with the `postgres` feature
 /// Other places where you'd find `mod postgres` implementations is for many of the structs in the crate
 /// all of which implement [`tokio_postres::FromSql`], [`tokio_postres::ToSql`] or [`From<&tokio_postgres::Row>`]
-#[cfg(any(test, feature = "postgres"))]
+#[cfg(feature = "postgres")]
 pub mod postgres {
     use std::env::{self, VarError};
 
