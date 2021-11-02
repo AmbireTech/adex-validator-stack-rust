@@ -102,18 +102,17 @@ CREATE TABLE accounting (
 CREATE TABLE analytics (
     campaign_id varchar(34) NOT NULL,
     "time" timestamp(2) with time zone NOT NULL,
-    ad_unit jsonb,
-    ad_slot jsonb,
-    ad_slot_type varchar(255),
+    ad_unit varchar(255) NOT NULL,
+    ad_slot varchar(255) NOT NULL,
+    ad_slot_type varchar(255) NOT NULL,
     advertiser varchar(42) NOT NULL,
     publisher varchar(42) NOT NULL,
-    hostname varchar(255),
-    country varchar(255),
+    hostname varchar(255) NOT NULL,
+    country varchar(255) NOT NULL,
     os varchar(255) NOT NULL,
     event_type varchar(255) NOT NULL,
     payout_amount bigint NOT NULL DEFAULT 0,
     payout_count integer NOT NULL DEFAULT 0,
     -- Do not rename the Primary key constraint (`analytics_pkey`)!
-    PRIMARY KEY (campaign_id, "time", ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os, event_type),
-    CONSTRAINT fk_analytics_campaign_id FOREIGN KEY (campaign_id) REFERENCES campaigns (id) ON DELETE RESTRICT ON UPDATE RESTRICT
+    PRIMARY KEY (campaign_id, "time", ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os, event_type)
 );

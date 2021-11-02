@@ -59,7 +59,6 @@ pub mod postgres {
             w: &mut BytesMut,
         ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
             self.to_string().to_sql(ty, w)
-
         }
 
         accepts!(TEXT, VARCHAR);
@@ -218,9 +217,9 @@ fn default_timeframe() -> String {
 mod test {
     use super::*;
     use crate::util::tests::prep_db::postgres::POSTGRES_POOL;
-    use std::collections::HashMap;
     use once_cell::sync::Lazy;
     use serde_json::{from_value, to_value, Value};
+    use std::collections::HashMap;
 
     static TEST_CASES: Lazy<HashMap<String, (OperatingSystem, Value)>> = Lazy::new(|| {
         vec![
@@ -277,7 +276,6 @@ mod test {
                 assert_eq!(&actual_os, &row_os);
             }
         }
-
     }
 
     #[test]

@@ -72,8 +72,144 @@ pub async fn record(
             payout_amount,
         };
 
-        insert_analytics(pool, event_for_db).await?;
+        insert_analytics(pool, &event_for_db).await?;
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use primitives::{
+        analytics::OperatingSystem,
+        util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN},
+        UnifiedNum,
+    };
+
+    use crate::db::{
+        analytics::find_analytics,
+        tests_postgres::{setup_test_migrations, DATABASE_POOL},
+    };
+
+    // NOTE: The test could fail if it's ran at --:59:59
+    #[tokio::test]
+    async fn test_analytics_recording() {
+        let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
+
+        setup_test_migrations(database.pool.clone())
+            .await
+            .expect("Migrations should succeed");
+
+        let campaign = DUMMY_CAMPAIGN.clone();
+        let session = Session {
+            ip: None,
+            country: None,
+            referrer_header: None,
+            os: None,
+        };
+
+        let click_event = Event::Click {
+            publisher: ADDRESSES["leader"],
+            ad_unit: None,
+            ad_slot: None,
+            referrer: None,
+        };
+
+        let impression_event = Event::Impression {
+            publisher: ADDRESSES["leader"],
+            ad_unit: None,
+            ad_slot: None,
+            referrer: None,
+        };
+
+        let input_events = vec![
+            (
+                click_event,
+                ADDRESSES["creator"],
+                UnifiedNum::from_u64(1_000_000),
+            ),
+            (
+                impression_event,
+                ADDRESSES["creator"],
+                UnifiedNum::from_u64(1_000_000),
+            ),
+        ];
+
+        record(&database.clone(), &campaign, &session, input_events.clone())
+            .await
+            .expect("should recorc");
+
+        let query_click_event = EventAnalytics {
+            time: Utc::now(),
+            campaign_id: DUMMY_CAMPAIGN.id,
+            ad_unit: None,
+            ad_slot: None,
+            ad_slot_type: None,
+            advertiser: campaign.creator,
+            publisher: ADDRESSES["leader"],
+            hostname: None,
+            country: None,
+            os_name: OperatingSystem::Other,
+            event_type: "Click".to_string(),
+            payout_amount: Default::default(),
+        };
+
+        let query_impression_event = EventAnalytics {
+            time: Utc::now(),
+            campaign_id: DUMMY_CAMPAIGN.id,
+            ad_unit: None,
+            ad_slot: None,
+            ad_slot_type: None,
+            advertiser: campaign.creator,
+            publisher: ADDRESSES["leader"],
+            hostname: None,
+            country: None,
+            os_name: OperatingSystem::Other,
+            event_type: "Click".to_string(),
+            payout_amount: Default::default(),
+        };
+
+        let click_analytics = find_analytics(&database.pool, &query_click_event)
+            .await
+            .expect("should find analytics");
+        let impression_analytics = find_analytics(&database.pool, &query_impression_event)
+            .await
+            .expect("should find analytics");
+        assert_eq!(click_analytics.event_type, "Click".to_string());
+        assert_eq!(
+            click_analytics.payout_amount,
+            UnifiedNum::from_u64(1_000_000)
+        );
+        // assert_eq!(click_analytics.payout_count, 1);
+
+        assert_eq!(impression_analytics.event_type, "Impression".to_string());
+        assert_eq!(
+            impression_analytics.payout_amount,
+            UnifiedNum::from_u64(1_000_000)
+        );
+        // assert_eq!(impression_analytics.payout_count, 1);
+
+        record(&database.clone(), &campaign, &session, input_events)
+            .await
+            .expect("should record");
+
+        let click_analytics = find_analytics(&database.pool, &query_click_event)
+            .await
+            .expect("should find analytics");
+        let impression_analytics = find_analytics(&database.pool, &query_impression_event)
+            .await
+            .expect("should find analytics");
+        assert_eq!(
+            click_analytics.payout_amount,
+            UnifiedNum::from_u64(2_000_000)
+        );
+        // assert_eq!(click_analytics.payout_count, 2);
+
+        assert_eq!(
+            impression_analytics.payout_amount,
+            UnifiedNum::from_u64(2_000_000)
+        );
+        // assert_eq!(impression_analytics.payout_count, 2);
+    }
 }
