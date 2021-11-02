@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [tasks.services-up]
-script = "docker-compose -f ../docker-compose.ci.yml up -d redis-leader postgres-leader && sleep 3"
+script = "docker-compose -f ../docker-compose.harness.yml up -d adex-redis adex-postgres && sleep 3"
 
 [tasks.services-down]
-script = "docker-compose -f ../docker-compose.ci.yml down"
+script = "docker-compose -f ../docker-compose.harness.yml down"
