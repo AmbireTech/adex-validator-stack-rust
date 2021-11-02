@@ -2,7 +2,7 @@
 name = "adapter"
 version = "0.1.0"
 authors = [
-  "Ambire <dev@ambire.com>"
+  "Ambire <dev@ambire.com>",
   "Lachezar Lechev <lachezar@ambire.com>",
   "Omidiora Samuel <sam@ambire.com>",
 ]
