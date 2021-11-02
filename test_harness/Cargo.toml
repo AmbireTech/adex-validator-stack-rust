@@ -2,7 +2,7 @@
 edition = "2018"
 name = "test_harness"
 version = "0.1.0"
-authors = ["Lachezar Lechev <lachezar@ambire.com>"]
+authors = ["Ambire <dev@ambire.com>", "Lachezar Lechev <lachezar@ambire.com>"]
 
 [dependencies]
 primitives = { path = "../primitives", features = ["postgres"] }
