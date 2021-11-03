@@ -562,7 +562,7 @@ pub mod test_util {
     use adapter::DummyAdapter;
     use primitives::{
         adapter::DummyAdapterOptions,
-        config::{configuration, DEVELOPMENT_CONFIG},
+        config::DEVELOPMENT_CONFIG,
         util::tests::{discard_logger, prep_db::IDS},
     };
 
@@ -575,7 +575,8 @@ pub mod test_util {
         Application,
     };
 
-    /// Uses development and therefore the goreli testnet addresses of the tokens
+    /// Uses development and therefore the goerli testnet addresses of the tokens
+    /// It still uses DummyAdapter.
     pub async fn setup_dummy_app() -> Application<DummyAdapter> {
         let config = DEVELOPMENT_CONFIG.clone();
         let adapter = DummyAdapter::init(

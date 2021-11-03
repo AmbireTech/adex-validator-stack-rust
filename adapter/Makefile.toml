@@ -14,7 +14,7 @@ dependencies = [
 
 [tasks.ganache-up]
 script = '''
-docker-compose -f ../docker-compose.harness.yml up -d ganache \
+docker-compose -f ../docker-compose.harness.yml up --renew-anon-volumes -d ganache \
 && sleep 10
 '''
 

@@ -29,7 +29,7 @@ pub use tokio_postgres::Config as PostgresConfig;
 // Re-export the Postgres PoolError for easier usages
 pub use deadpool_postgres::PoolError;
 // Re-export the redis RedisError for easier usage
-pub use redis::RedisError;
+pub use redis::{RedisError, cmd as redis_cmd};
 
 pub type DbPool = deadpool_postgres::Pool;
 

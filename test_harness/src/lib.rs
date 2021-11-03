@@ -100,7 +100,7 @@ pub static VALIDATORS: Lazy<HashMap<&'static str, TestValidator>> = Lazy::new(||
                     redis_url: "redis://127.0.0.1:6379/1".parse().unwrap(),
                 },
                 logger_prefix: "sentry-leader".into(),
-                db_name: "sentry_leader".into(),
+                db_name: "harness_leader".into(),
             },
         ),
         (
@@ -115,7 +115,7 @@ pub static VALIDATORS: Lazy<HashMap<&'static str, TestValidator>> = Lazy::new(||
                     redis_url: "redis://127.0.0.1:6379/2".parse().unwrap(),
                 },
                 logger_prefix: "sentry-follower".into(),
-                db_name: "sentry_follower".into(),
+                db_name: "harness_follower".into(),
             },
         ),
     ]
@@ -728,7 +728,10 @@ pub mod run {
         };
 
         let postgres = postgres_connection(42, postgres_config).await;
-        let redis = redis_connection(app_config.redis_url).await?;
+        let mut redis = redis_connection(app_config.redis_url).await?;
+        sentry::db::redis_cmd("FLUSHDB")
+                .query_async::<_, String>(&mut redis)
+                .await.unwrap();
         let campaign_remaining = CampaignRemaining::new(redis.clone());
 
         setup_test_migrations(postgres.clone())

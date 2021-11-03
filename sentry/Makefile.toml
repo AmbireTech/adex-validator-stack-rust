@@ -1,6 +1,3 @@
-[tasks.test]
-env = { "POSTGRES_DB" = "sentry_leader" }
-
 [tasks.dev-test-flow]
 description = "Development testing flow will first format the code, and than run cargo build and test"
 category = "Development"
@@ -14,6 +11,9 @@ dependencies = [
   "test-flow",
   "services-down",
 ]
+
+[tasks.test]
+env = { "POSTGRES_DB" = "sentry_leader" }
 
 [tasks.services-up]
 script = "docker-compose -f ../docker-compose.harness.yml up -d adex-redis adex-postgres && sleep 3"

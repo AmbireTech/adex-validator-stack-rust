@@ -10,6 +10,10 @@ dependencies = [
   "local-test-flow",
 ]
 
+[tasks.test]
+# run tests in release because of slow unlock time of Ethereum adapter (i.e. keystore decryption)
+args = ["test", "--release"]
+
 [tasks.local-test-flow]
 dependencies = ["services-up", "test-flow", "services-down"]
 
@@ -20,7 +24,7 @@ dependencies = ["services-up", "test-flow", "services-down"]
 # This forces the snapshot from previous unsuccessful test runs to get destroyed.
 script = '''
 docker-compose -f ../docker-compose.harness.yml up --renew-anon-volumes -d ganache adex-redis adex-postgres \
-&& sleep 9
+&& sleep 6
 '''
 
 [tasks.services-down]
