@@ -29,7 +29,7 @@ pub use tokio_postgres::Config as PostgresConfig;
 // Re-export the Postgres PoolError for easier usages
 pub use deadpool_postgres::PoolError;
 // Re-export the redis RedisError for easier usage
-pub use redis::{RedisError, cmd as redis_cmd};
+pub use redis::RedisError;
 
 pub type DbPool = deadpool_postgres::Pool;
 
@@ -138,7 +138,7 @@ pub async fn setup_migrations(environment: Environment) {
         .expect("Reloading config for migration failed");
 }
 
-#[cfg(any(test, feature = "test-util"))]
+#[cfg(feature = "test-util")]
 pub mod tests_postgres {
     use std::{
         ops::{Deref, DerefMut},
@@ -428,7 +428,7 @@ pub mod tests_postgres {
     }
 }
 
-#[cfg(test)]
+#[cfg(feature = "test-util")]
 pub mod redis_pool {
 
     use dashmap::DashMap;
@@ -441,6 +441,9 @@ pub mod redis_pool {
     use once_cell::sync::Lazy;
 
     use super::*;
+
+    /// Re-export [`redis::cmd`] for testing purposes
+    pub use redis::cmd;
 
     pub type Pool = deadpool::managed::Pool<Manager>;
 

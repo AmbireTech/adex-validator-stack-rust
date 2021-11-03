@@ -696,8 +696,8 @@ pub mod run {
     use sentry::{
         application::{logger, run},
         db::{
-            postgres_connection, redis_connection, tests_postgres::setup_test_migrations,
-            CampaignRemaining,
+            postgres_connection, redis_connection, redis_pool::Manager,
+            tests_postgres::setup_test_migrations, CampaignRemaining,
         },
         Application,
     };
@@ -729,9 +729,9 @@ pub mod run {
 
         let postgres = postgres_connection(42, postgres_config).await;
         let mut redis = redis_connection(app_config.redis_url).await?;
-        sentry::db::redis_cmd("FLUSHDB")
-                .query_async::<_, String>(&mut redis)
-                .await.unwrap();
+
+        Manager::flush_db(&mut redis).await.expect("Should flush redis database");
+
         let campaign_remaining = CampaignRemaining::new(redis.clone());
 
         setup_test_migrations(postgres.clone())
