@@ -3,11 +3,9 @@ version: '3.8'
 services:
   adex-postgres:
     build: ./scripts/postgres
-    # image: adex-postges
+    image: adex-postgres
     container_name: adex-postgres
     restart: always
-    # volumes:
-      # - ./scripts/postgres:/docker-entrypoint-initdb.d
     ports:
       - "5432:5432"
     environment:

@@ -329,17 +329,18 @@ pub mod tests_postgres {
             // DROP the public schema and create it again for usage after recycling
             let queries = "DROP SCHEMA public CASCADE; CREATE SCHEMA public;";
 
-            let database_client = database.pool.get().await.map_err(|err| {
-                match &err {
-                    PoolError::Backend(backend_err) if backend_err.is_closed() => {
-                        panic!("Closed PG Client connection of the database {} Pool!", database.name);
-                    }
-                    _ => {}
-                }
-                err
-            })?;
+            database.pool = {
+                let mut config = self.base_config.clone();
+                // set the database in the configuration of the inside Pool (used for tests)
+                config.dbname(&database.name);
 
-            let result = database_client
+                let manager =
+                    deadpool_postgres::Manager::from_config(config, NoTls, self.manager_config.clone());
+                
+                deadpool_postgres::Pool::new(manager, 15)
+            };
+
+            let result = database.pool.get().await?
                 .simple_query(queries)
                 .await
                 .map_err(PoolError::Backend)
