@@ -2,8 +2,9 @@
 name = "validator_worker"
 version = "0.2.0"
 authors = [
-  "Lachezar Lechev <lachezar@adex.network>",
-  "Samparsky <sam@adex.network>",
+  "Ambire <dev@ambire.com>",
+  "Lachezar Lechev <lachezar@ambire.com>",
+  "Samparsky <sam@ambire.com>",
 ]
 edition = "2018"
 
