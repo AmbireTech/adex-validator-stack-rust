@@ -13,7 +13,7 @@ use adapter::ethereum::{
 };
 use deposits::Deposit;
 use once_cell::sync::Lazy;
-use primitives::{adapter::KeystoreOptions, config::TokenInfo, Address, Config};
+use primitives::{adapter::KeystoreOptions, config::TokenInfo, util::ApiUrl, Address, Config};
 use web3::{contract::Contract, transports::Http, types::H160, Web3};
 
 pub mod deposits;
@@ -76,8 +76,14 @@ pub struct TestValidator {
     pub address: Address,
     pub keystore: KeystoreOptions,
     pub sentry_config: sentry::application::Config,
-    /// Prefix for the loggers
-    pub logger_prefix: String,
+    /// Sentry REST API url
+    pub sentry_url: ApiUrl,
+    /// Used for the _Sentry REST API_ [`sentry::Application`] as well as the _Validator worker_ [`validator_worker::worker::Args`]
+    pub config: Config,
+    /// Prefix for sentry logger
+    pub sentry_logger_prefix: String,
+    /// Prefix for validator worker logger
+    pub worker_logger_prefix: String,
     /// Postgres DB name
     /// The rest of the Postgres values are taken from env. variables
     pub db_name: String,
@@ -99,7 +105,10 @@ pub static VALIDATORS: Lazy<HashMap<&'static str, TestValidator>> = Lazy::new(||
                     ip_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                     redis_url: "redis://127.0.0.1:6379/1".parse().unwrap(),
                 },
-                logger_prefix: "sentry-leader".into(),
+                config: GANACHE_CONFIG.clone(),
+                sentry_url: "http://localhost:8005".parse().expect("Valid Sentry URL"),
+                sentry_logger_prefix: "sentry-leader".into(),
+                worker_logger_prefix: "worker-leader".into(),
                 db_name: "harness_leader".into(),
             },
         ),
@@ -114,7 +123,10 @@ pub static VALIDATORS: Lazy<HashMap<&'static str, TestValidator>> = Lazy::new(||
                     ip_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                     redis_url: "redis://127.0.0.1:6379/2".parse().unwrap(),
                 },
-                logger_prefix: "sentry-follower".into(),
+                config: GANACHE_CONFIG.clone(),
+                sentry_url: "http://localhost:8006".parse().expect("Valid Sentry URL"),
+                sentry_logger_prefix: "sentry-follower".into(),
+                worker_logger_prefix: "worker-follower".into(),
                 db_name: "harness_follower".into(),
             },
         ),
@@ -208,10 +220,14 @@ mod tests {
         EthereumAdapter,
     };
     use primitives::{
-        adapter::Adapter, sentry::campaign_create::CreateCampaign, util::ApiUrl, BigNum, Campaign,
-        Channel, ChannelId, UnifiedNum,
+        adapter::Adapter,
+        balances::CheckedState,
+        sentry::{campaign_create::CreateCampaign, AccountingResponse},
+        util::{logging::new_logger, ApiUrl},
+        Balances, BigNum, Campaign, Channel, ChannelId, UnifiedNum,
     };
     use reqwest::{Client, StatusCode};
+    use validator_worker::{worker::Worker, SentryApi};
 
     #[tokio::test]
     #[ignore = "We use a snapshot, however, we have left this test for convenience"]
@@ -241,7 +257,7 @@ mod tests {
 
         let leader_desc = ValidatorDesc {
             id: VALIDATORS["leader"].address.into(),
-            url: "http://localhost:8005".to_string(),
+            url: VALIDATORS["leader"].sentry_url.to_string(),
             // fee per 1000 (pro mille) = 0.03000000 (UnifiedNum)
             fee: 3_000_000.into(),
             fee_addr: None,
@@ -249,7 +265,7 @@ mod tests {
 
         let follower_desc = ValidatorDesc {
             id: VALIDATORS["follower"].address.into(),
-            url: "http://localhost:8006".to_string(),
+            url: VALIDATORS["follower"].sentry_url.to_string(),
             // fee per 1000 (pro mille) = 0.02000000 (UnifiedNum)
             fee: 2_000_000.into(),
             fee_addr: None,
@@ -322,7 +338,7 @@ mod tests {
         // switches the URL as well
         let leader_desc = ValidatorDesc {
             id: VALIDATORS["follower"].address.into(),
-            url: "http://localhost:8006".to_string(),
+            url: VALIDATORS["follower"].sentry_url.to_string(),
             // fee per 1000 (pro mille) = 0.10000000 (UnifiedNum)
             fee: 10_000_000.into(),
             fee_addr: None,
@@ -332,7 +348,7 @@ mod tests {
         // switches the URL as well
         let follower_desc = ValidatorDesc {
             id: VALIDATORS["leader"].address.into(),
-            url: "http://localhost:8005".to_string(),
+            url: VALIDATORS["leader"].sentry_url.to_string(),
             // fee per 1000 (pro mille) = 0.05000000 (UnifiedNum)
             fee: 5_000_000.into(),
             fee_addr: None,
@@ -389,22 +405,6 @@ mod tests {
         let leader = VALIDATORS["leader"].clone();
         let follower = VALIDATORS["follower"].clone();
 
-        // let channel_1 = Channel {
-        //     leader: leader.address.into(),
-        //     follower: follower.address.into(),
-        //     guardian: GANACHE_ADDRESSES["guardian"].into(),
-        //     token: contracts.token.1,
-        //     nonce: 0_u64.into(),
-        // };
-
-        // // switch the roles of the 2 validators & use a new guardian
-        // let channel_2 = Channel {
-        //     leader: follower.address.into(),
-        //     follower: leader.address.into(),
-        //     guardian: GANACHE_ADDRESSES["guardian2"].into(),
-        //     token: contracts.token.1,
-        //     nonce: 1_u64.into(),
-        // };
         let token_precision = contracts.token.0.precision.get();
 
         // We use the Advertiser's `EthereumAdapter::get_auth` for authentication!
@@ -417,8 +417,8 @@ mod tests {
         let advertiser_adapter = advertiser_adapter;
 
         // setup Sentry & returns Adapter
-        let leader_adapter = setup_sentry(leader).await;
-        let follower_adapter = setup_sentry(follower).await;
+        let leader_adapter = setup_sentry(&leader).await;
+        let follower_adapter = setup_sentry(&follower).await;
 
         // Advertiser deposits
         //
@@ -629,25 +629,70 @@ mod tests {
             }
         }
 
-        // setup worker
+        let leader_worker = Worker {
+            sentry_url: leader.sentry_url.clone(),
+            config: leader.config.clone(),
+            adapter: leader_adapter.clone(),
+            logger: new_logger(&leader.worker_logger_prefix),
+        };
 
-        // run worker single-tick
+        let follower_worker = Worker {
+            sentry_url: follower.sentry_url.clone(),
+            config: follower.config.clone(),
+            adapter: follower_adapter.clone(),
+            logger: new_logger(&leader.worker_logger_prefix),
+        };
+        // leader single worker tick
+        leader_worker.all_channels_tick().await;
+        // follower single worker tick
+        follower_worker.all_channels_tick().await;
+
+        // TODO: There should not be propagation needed for each SentryApi.
+        // TODO: Improve usage by returning SentryApi from Worker maybe?!
+        let sentry_leader = SentryApi::init(
+            leader_adapter.clone(),
+            leader_worker.logger.clone(),
+            leader_worker.config.clone(),
+            Default::default(),
+        )
+        .expect("Sentry::init");
+
+        // Channel 1 expected Accounting
+        {
+            let expected_accounting = AccountingResponse {
+                balances: Balances::<CheckedState>::new(),
+            };
+            let actual_accounting = sentry_leader
+                .get_accounting(CAMPAIGN_1.channel.id())
+                .await
+                .expect("Should get Channel Accounting");
+            assert_eq!(expected_accounting, actual_accounting);
+        }
     }
 
-    async fn setup_sentry(validator: TestValidator) -> EthereumAdapter {
-        let mut adapter = EthereumAdapter::init(validator.keystore, &GANACHE_CONFIG)
+    // async fn get_accounting(api_client: &Client, url: &ApiUrl, token: &str, channel: ChannelId) -> anyhow::Result<AccountingResponse<CheckedState>> {
+    //     let endpoint_url = url
+    //         .join(&format!("v5/channel/{}/accounting", channel))
+    //         .expect("valid endpoint");
+
+    //     Ok(api_client
+    //         .get(endpoint_url)
+    //         .bearer_auth(&token)
+    //         .send()
+    //         .await?
+    //     .json()
+    //     .await?)
+    // }
+
+    async fn setup_sentry(validator: &TestValidator) -> EthereumAdapter {
+        let mut adapter = EthereumAdapter::init(validator.keystore.clone(), &GANACHE_CONFIG)
             .expect("EthereumAdapter::init");
 
         adapter.unlock().expect("Unlock successfully adapter");
 
-        run_sentry_app(
-            adapter.clone(),
-            &validator.logger_prefix,
-            validator.sentry_config,
-            &validator.db_name,
-        )
-        .await
-        .expect("To run Sentry API server");
+        run_sentry_app(adapter.clone(), &validator)
+            .await
+            .expect("To run Sentry API server");
 
         adapter
     }
@@ -691,10 +736,10 @@ pub mod run {
     use adapter::EthereumAdapter;
     use primitives::{
         postgres::{POSTGRES_HOST, POSTGRES_PASSWORD, POSTGRES_PORT, POSTGRES_USER},
+        util::logging::new_logger,
         ToETHChecksum, ValidatorId,
     };
     use sentry::{
-        application::{logger, run},
         db::{
             postgres_connection, redis_connection, redis_pool::Manager,
             tests_postgres::setup_test_migrations, CampaignRemaining,
@@ -704,15 +749,16 @@ pub mod run {
     use slog::info;
     use subprocess::{Popen, PopenConfig, Redirection};
 
-    use crate::GANACHE_CONFIG;
+    use crate::{TestValidator, GANACHE_CONFIG};
 
     pub async fn run_sentry_app(
         adapter: EthereumAdapter,
-        logger_prefix: &str,
-        app_config: sentry::application::Config,
-        db_name: &str,
+        validator: &TestValidator,
     ) -> anyhow::Result<()> {
-        let socket_addr = SocketAddr::new(app_config.ip_addr, app_config.port);
+        let socket_addr = SocketAddr::new(
+            validator.sentry_config.ip_addr,
+            validator.sentry_config.port,
+        );
 
         let postgres_config = {
             let mut config = sentry::db::PostgresConfig::new();
@@ -722,33 +768,36 @@ pub mod run {
                 .password(POSTGRES_PASSWORD.as_str())
                 .host(POSTGRES_HOST.as_str())
                 .port(*POSTGRES_PORT)
-                .dbname(db_name);
+                .dbname(&validator.db_name);
 
             config
         };
 
         let postgres = postgres_connection(42, postgres_config).await;
-        let mut redis = redis_connection(app_config.redis_url).await?;
-
-        Manager::flush_db(&mut redis).await.expect("Should flush redis database");
+        let mut redis = redis_connection(validator.sentry_config.redis_url.clone()).await?;
 
         let campaign_remaining = CampaignRemaining::new(redis.clone());
+
+        let app = Application::new(
+            adapter,
+            GANACHE_CONFIG.clone(),
+            new_logger(&validator.sentry_logger_prefix),
+            redis.clone(),
+            postgres.clone(),
+            campaign_remaining,
+        );
+
+        // Before the tests, make sure to flush the DB from previous run of `sentry` tests
+        Manager::flush_db(&mut redis)
+            .await
+            .expect("Should flush redis database");
 
         setup_test_migrations(postgres.clone())
             .await
             .expect("Should run migrations");
 
-        let app = Application::new(
-            adapter,
-            GANACHE_CONFIG.clone(),
-            logger(logger_prefix),
-            redis,
-            postgres,
-            campaign_remaining,
-        );
-
         info!(&app.logger, "Spawn sentry Hyper server");
-        tokio::spawn(run(app, socket_addr));
+        tokio::spawn(app.run(socket_addr));
 
         Ok(())
     }

@@ -8,7 +8,7 @@ use once_cell::sync::Lazy;
 use primitives::{adapter::Adapter, config::Environment};
 use redis::ConnectionInfo;
 use serde::{Deserialize, Deserializer};
-use slog::{error, info, Logger};
+use slog::{error, info};
 
 /// an error used when deserializing a [`Config`] instance from environment variables
 /// see [`Config::from_env()`]
