@@ -231,7 +231,6 @@ pub async fn insert_analytics(
     let client = pool.get().await?;
     let initial_count = 1;
 
-
     let query = "INSERT INTO analytics(campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os, event_type, payout_amount, payout_count)
     VALUES ($1, date_trunc('hour', cast($2 as timestamp with time zone)), $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
     ON CONFLICT ON CONSTRAINT analytics_pkey DO UPDATE
@@ -405,7 +404,10 @@ mod test {
 
             assert_eq!(insert_res.ad_unit, analytics_with_empty_fields.ad_unit);
             assert_eq!(insert_res.ad_slot, analytics_with_empty_fields.ad_slot);
-            assert_eq!(insert_res.ad_slot_type, analytics_with_empty_fields.ad_slot_type);
+            assert_eq!(
+                insert_res.ad_slot_type,
+                analytics_with_empty_fields.ad_slot_type
+            );
             assert_eq!(insert_res.hostname, analytics_with_empty_fields.hostname);
             assert_eq!(insert_res.country, analytics_with_empty_fields.country);
         }

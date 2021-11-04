@@ -173,9 +173,10 @@ mod test {
         let (click_analytics, click_count) = find_analytics(&database.pool, &query_click_event)
             .await
             .expect("should find analytics");
-        let (impression_analytics, impression_count) = find_analytics(&database.pool, &query_impression_event)
-            .await
-            .expect("should find analytics");
+        let (impression_analytics, impression_count) =
+            find_analytics(&database.pool, &query_impression_event)
+                .await
+                .expect("should find analytics");
         assert_eq!(click_analytics.event_type, "CLICK".to_string());
         assert_eq!(
             click_analytics.payout_amount,
@@ -197,9 +198,10 @@ mod test {
         let (click_analytics, click_count) = find_analytics(&database.pool, &query_click_event)
             .await
             .expect("should find analytics");
-        let (impression_analytics, impression_count) = find_analytics(&database.pool, &query_impression_event)
-            .await
-            .expect("should find analytics");
+        let (impression_analytics, impression_count) =
+            find_analytics(&database.pool, &query_impression_event)
+                .await
+                .expect("should find analytics");
         assert_eq!(
             click_analytics.payout_amount,
             UnifiedNum::from_u64(2_000_000)

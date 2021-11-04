@@ -588,19 +588,19 @@ mod postgres {
             let ad_slot_type: String = row.get("ad_slot_type");
             let ad_slot_type = match ad_slot_type.len() {
                 0 => None,
-                _ => Some(ad_slot_type)
+                _ => Some(ad_slot_type),
             };
 
             let hostname: String = row.get("hostname");
             let hostname = match hostname.len() {
                 0 => None,
-                _ => Some(hostname)
+                _ => Some(hostname),
             };
 
             let country: String = row.get("country");
             let country = match country.len() {
                 0 => None,
-                _ => Some(country)
+                _ => Some(country),
             };
 
             Self {
