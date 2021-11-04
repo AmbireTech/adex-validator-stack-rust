@@ -277,11 +277,11 @@ pub async fn insert_analytics(
 pub async fn find_analytics(
     pool: &DbPool,
     event: &EventAnalytics,
-) -> Result<(EventAnalytics, i64), PoolError> {
+) -> Result<(EventAnalytics, i32), PoolError> {
     let client = pool.get().await?;
 
-    let query = "SELECT campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os, event_type, payout_amount
-    FROM analytics WHERE campaign_id = $1 AND time = $2 AND ad_unit = $3 AND ad_slot = $4 AND ad_slot_type = $5 AND advertiser = $6 AND publisher = &7 AND hostname = $8 AND country = $9 AND event_type = $10";
+    let query = "SELECT campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os, event_type, payout_amount, payout_count
+    FROM analytics WHERE campaign_id = $1 AND time = date_trunc('hour', cast($2 as timestamp with time zone)) AND ad_unit = $3 AND ad_slot = $4 AND ad_slot_type = $5 AND advertiser = $6 AND publisher = $7 AND hostname = $8 AND country = $9 AND os = $10 AND event_type = $11";
 
     let stmt = client.prepare(query).await?;
 
@@ -315,7 +315,7 @@ pub async fn find_analytics(
         .await?;
 
     let event_analytics = EventAnalytics::from(&row);
-    let payout_count: i64 = row.get("payout_count");
+    let payout_count: i32 = row.get("payout_count");
     Ok((event_analytics, payout_count))
 }
 

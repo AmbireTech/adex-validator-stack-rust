@@ -151,7 +151,7 @@ mod test {
             hostname: None,
             country: None,
             os_name: OperatingSystem::Other,
-            event_type: "Click".to_string(),
+            event_type: "CLICK".to_string(),
             payout_amount: Default::default(),
         };
 
@@ -166,7 +166,7 @@ mod test {
             hostname: None,
             country: None,
             os_name: OperatingSystem::Other,
-            event_type: "Click".to_string(),
+            event_type: "IMPRESSION".to_string(),
             payout_amount: Default::default(),
         };
 
@@ -176,14 +176,14 @@ mod test {
         let (impression_analytics, impression_count) = find_analytics(&database.pool, &query_impression_event)
             .await
             .expect("should find analytics");
-        assert_eq!(click_analytics.event_type, "Click".to_string());
+        assert_eq!(click_analytics.event_type, "CLICK".to_string());
         assert_eq!(
             click_analytics.payout_amount,
             UnifiedNum::from_u64(1_000_000)
         );
         assert_eq!(click_count, 1);
 
-        assert_eq!(impression_analytics.event_type, "Impression".to_string());
+        assert_eq!(impression_analytics.event_type, "IMPRESSION".to_string());
         assert_eq!(
             impression_analytics.payout_amount,
             UnifiedNum::from_u64(1_000_000)
