@@ -15,7 +15,7 @@ use primitives::{
     },
     ValidatorId,
 };
-use validator_worker::worker::run;
+use validator_worker::Worker;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let cli = App::new("Validator worker")
@@ -112,11 +112,25 @@ fn main() -> Result<(), Box<dyn Error>> {
     let logger = new_logger("validator_worker");
 
     match adapter {
-        AdapterTypes::EthereumAdapter(ethadapter) => {
-            run(is_single_tick, sentry_url, &config, *ethadapter, &logger)
+        AdapterTypes::EthereumAdapter(eth_adapter) => {
+            let mut worker = Worker {
+                sentry_url,
+                config,
+                adapter: *eth_adapter,
+                logger,
+            };
+
+            worker.run(is_single_tick)
         }
-        AdapterTypes::DummyAdapter(dummyadapter) => {
-            run(is_single_tick, sentry_url, &config, *dummyadapter, &logger)
+        AdapterTypes::DummyAdapter(dummy_adapter) => {
+            let mut worker = Worker {
+                sentry_url,
+                config,
+                adapter: *dummy_adapter,
+                logger,
+            };
+
+            worker.run(is_single_tick)
         }
     }
 }
