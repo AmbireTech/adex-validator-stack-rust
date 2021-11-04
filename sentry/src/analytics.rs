@@ -58,8 +58,8 @@ pub async fn record(
 
         // DB: Insert or Update all events
         let event_for_db = EventAnalytics {
-            time,
             campaign_id: campaign.id,
+            time,
             ad_unit,
             ad_slot,
             ad_slot_type,
@@ -170,10 +170,10 @@ mod test {
             payout_amount: Default::default(),
         };
 
-        let click_analytics = find_analytics(&database.pool, &query_click_event)
+        let (click_analytics, click_count) = find_analytics(&database.pool, &query_click_event)
             .await
             .expect("should find analytics");
-        let impression_analytics = find_analytics(&database.pool, &query_impression_event)
+        let (impression_analytics, impression_count) = find_analytics(&database.pool, &query_impression_event)
             .await
             .expect("should find analytics");
         assert_eq!(click_analytics.event_type, "Click".to_string());
@@ -181,35 +181,35 @@ mod test {
             click_analytics.payout_amount,
             UnifiedNum::from_u64(1_000_000)
         );
-        // assert_eq!(click_analytics.payout_count, 1);
+        assert_eq!(click_count, 1);
 
         assert_eq!(impression_analytics.event_type, "Impression".to_string());
         assert_eq!(
             impression_analytics.payout_amount,
             UnifiedNum::from_u64(1_000_000)
         );
-        // assert_eq!(impression_analytics.payout_count, 1);
+        assert_eq!(impression_count, 1);
 
         record(&database.clone(), &campaign, &session, input_events)
             .await
             .expect("should record");
 
-        let click_analytics = find_analytics(&database.pool, &query_click_event)
+        let (click_analytics, click_count) = find_analytics(&database.pool, &query_click_event)
             .await
             .expect("should find analytics");
-        let impression_analytics = find_analytics(&database.pool, &query_impression_event)
+        let (impression_analytics, impression_count) = find_analytics(&database.pool, &query_impression_event)
             .await
             .expect("should find analytics");
         assert_eq!(
             click_analytics.payout_amount,
             UnifiedNum::from_u64(2_000_000)
         );
-        // assert_eq!(click_analytics.payout_count, 2);
+        assert_eq!(click_count, 2);
 
         assert_eq!(
             impression_analytics.payout_amount,
             UnifiedNum::from_u64(2_000_000)
         );
-        // assert_eq!(impression_analytics.payout_count, 2);
+        assert_eq!(impression_count, 2);
     }
 }

@@ -585,16 +585,34 @@ mod postgres {
 
     impl From<&Row> for EventAnalytics {
         fn from(row: &Row) -> Self {
+            let ad_slot_type: String = row.get("ad_slot_type");
+            let ad_slot_type = match ad_slot_type.len() {
+                0 => None,
+                _ => Some(ad_slot_type)
+            };
+
+            let hostname: String = row.get("hostname");
+            let hostname = match hostname.len() {
+                0 => None,
+                _ => Some(hostname)
+            };
+
+            let country: String = row.get("country");
+            let country = match country.len() {
+                0 => None,
+                _ => Some(country)
+            };
+
             Self {
                 campaign_id: row.get("campaign_id"),
                 time: row.get("time"),
-                ad_unit: row.get("ad_unit"),
-                ad_slot: row.get("ad_slot"),
-                ad_slot_type: row.get("ad_slot_type"),
+                ad_unit: row.try_get("ad_unit").ok(),
+                ad_slot: row.try_get("ad_slot").ok(),
+                ad_slot_type,
                 advertiser: row.get("advertiser"),
                 publisher: row.get("publisher"),
-                hostname: row.get("hostname"),
-                country: row.get("country"),
+                hostname,
+                country,
                 os_name: row.get("os"),
                 event_type: row.get("event_type"),
                 payout_amount: row.get("payout_amount"),

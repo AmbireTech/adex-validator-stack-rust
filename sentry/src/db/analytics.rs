@@ -231,11 +231,12 @@ pub async fn insert_analytics(
     let client = pool.get().await?;
     let initial_count = 1;
 
+
     let query = "INSERT INTO analytics(campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os, event_type, payout_amount, payout_count)
     VALUES ($1, date_trunc('hour', cast($2 as timestamp with time zone)), $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
     ON CONFLICT ON CONSTRAINT analytics_pkey DO UPDATE
     SET payout_amount = analytics.payout_amount + $12, payout_count = analytics.payout_count + 1
-    RETURNING (campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os, event_type, payout_amount, payout_count)";
+    RETURNING campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os, event_type, payout_amount, payout_count";
 
     let stmt = client.prepare(query).await?;
 
@@ -276,11 +277,11 @@ pub async fn insert_analytics(
 pub async fn find_analytics(
     pool: &DbPool,
     event: &EventAnalytics,
-) -> Result<EventAnalytics, PoolError> {
+) -> Result<(EventAnalytics, i64), PoolError> {
     let client = pool.get().await?;
 
-    let query = "SELECT campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os, event_type, payout_amount, payout_count
-    FROM analytics WHERE campaign_id = $1, time = $2, ad_unit = $3, ad_slot = $4, ad_slot_type = $5, advertiser = $6, publisher = &7, hostname = $8, country = $9, event_type = $10";
+    let query = "SELECT campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os, event_type, payout_amount
+    FROM analytics WHERE campaign_id = $1 AND time = $2 AND ad_unit = $3 AND ad_slot = $4 AND ad_slot_type = $5 AND advertiser = $6 AND publisher = &7 AND hostname = $8 AND country = $9 AND event_type = $10";
 
     let stmt = client.prepare(query).await?;
 
@@ -313,7 +314,9 @@ pub async fn find_analytics(
         )
         .await?;
 
-    Ok(EventAnalytics::from(&row))
+    let event_analytics = EventAnalytics::from(&row);
+    let payout_count: i64 = row.get("payout_count");
+    Ok((event_analytics, payout_count))
 }
 
 #[cfg(test)]
@@ -336,33 +339,75 @@ mod test {
         setup_test_migrations(database.pool.clone())
             .await
             .expect("Migrations should succeed");
+        {
+            let analytics = EventAnalytics {
+                time: Utc.ymd(2021, 2, 1).and_hms(7, 0, 0),
+                campaign_id: DUMMY_CAMPAIGN.id,
+                ad_unit: Some(
+                    IPFS::try_from("Qmasg8FrbuSQpjFu3kRnZF9beg8rEBFrqgi1uXDRwCbX5f")
+                        .expect("should convert"),
+                ),
+                ad_slot: Some(
+                    IPFS::try_from("QmVhRDGXoM3Fg3HZD5xwMuxtb9ZErwC8wHt8CjsfxaiUbZ")
+                        .expect("should convert"),
+                ),
+                ad_slot_type: Some("test".to_string()),
+                advertiser: ADDRESSES["creator"],
+                publisher: ADDRESSES["publisher"],
+                hostname: Some("localhost".to_string()),
+                country: Some("Bulgaria".to_string()),
+                os_name: OperatingSystem::Linux,
+                event_type: "IMPRESSION".to_string(),
+                payout_amount: UnifiedNum::from_u64(1_000_000),
+            };
 
-        let analytics = EventAnalytics {
-            time: Utc.ymd(2021, 2, 1).and_hms(7, 0, 0),
-            campaign_id: DUMMY_CAMPAIGN.id,
-            ad_unit: None,
-            ad_slot: Some(
-                IPFS::try_from("QmVhRDGXoM3Fg3HZD5xwMuxtb9ZErwC8wHt8CjsfxaiUbZ")
-                    .expect("should convert"),
-            ),
-            ad_slot_type: Some("test".to_string()),
-            advertiser: ADDRESSES["creator"],
-            publisher: ADDRESSES["publisher"],
-            hostname: Some("localhost".to_string()),
-            country: Some("Bulgaria".to_string()),
-            os_name: OperatingSystem::Linux,
-            event_type: "IMPRESSION".to_string(),
-            payout_amount: UnifiedNum::from_u64(1_000_000),
-        };
+            let insert_res = insert_analytics(&database.clone(), &analytics.clone())
+                .await
+                .expect("Should insert");
 
-        let insert_res = insert_analytics(&database.clone(), &analytics)
-            .await
-            .expect("Should insert");
-        assert_eq!(insert_res.payout_amount, UnifiedNum::from_u64(1_000_000));
+            assert_eq!(insert_res.campaign_id, analytics.campaign_id);
+            assert_eq!(insert_res.time, analytics.time);
+            assert_eq!(insert_res.ad_unit, analytics.ad_unit);
+            assert_eq!(insert_res.ad_slot, analytics.ad_slot);
+            assert_eq!(insert_res.ad_slot_type, analytics.ad_slot_type);
+            assert_eq!(insert_res.advertiser, analytics.advertiser);
+            assert_eq!(insert_res.publisher, analytics.publisher);
+            assert_eq!(insert_res.hostname, analytics.hostname);
+            assert_eq!(insert_res.country, analytics.country);
+            assert_eq!(insert_res.os_name, analytics.os_name);
+            assert_eq!(insert_res.event_type, analytics.event_type);
+            assert_eq!(insert_res.payout_amount, UnifiedNum::from_u64(1_000_000));
 
-        let update_res = insert_analytics(&database.clone(), &analytics)
-            .await
-            .expect("Should insert");
-        assert_eq!(update_res.payout_amount, UnifiedNum::from_u64(2_000_000));
+            let update_res = insert_analytics(&database.clone(), &analytics)
+                .await
+                .expect("Should insert");
+            assert_eq!(update_res.payout_amount, UnifiedNum::from_u64(2_000_000));
+        }
+        {
+            let analytics_with_empty_fields = EventAnalytics {
+                time: Utc.ymd(2021, 2, 1).and_hms(7, 0, 0),
+                campaign_id: DUMMY_CAMPAIGN.id,
+                ad_unit: None,
+                ad_slot: None,
+                ad_slot_type: None,
+                advertiser: ADDRESSES["creator"],
+                publisher: ADDRESSES["publisher"],
+                hostname: None,
+                country: None,
+                os_name: OperatingSystem::Linux,
+                event_type: "IMPRESSION".to_string(),
+                payout_amount: UnifiedNum::from_u64(1_000_000),
+            };
+
+            let insert_res = insert_analytics(&database.clone(), &analytics_with_empty_fields)
+                .await
+                .expect("Should insert");
+
+            assert_eq!(insert_res.ad_unit, analytics_with_empty_fields.ad_unit);
+            assert_eq!(insert_res.ad_slot, analytics_with_empty_fields.ad_slot);
+            assert_eq!(insert_res.ad_slot_type, analytics_with_empty_fields.ad_slot_type);
+            assert_eq!(insert_res.hostname, analytics_with_empty_fields.hostname);
+            assert_eq!(insert_res.country, analytics_with_empty_fields.country);
+        }
     }
 }
