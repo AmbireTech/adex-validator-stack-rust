@@ -68,37 +68,28 @@ fn default_redis_url() -> ConnectionInfo {
     DEFAULT_REDIS_URL.clone()
 }
 
-/// Starts the `hyper` `Server`.
-pub async fn run<A: Adapter + 'static>(app: Application<A>, socket_addr: SocketAddr) {
-    let logger = app.logger.clone();
-    info!(&logger, "Listening on socket address: {}!", socket_addr);
+impl<A: Adapter + 'static> Application<A> {
+    /// Starts the `hyper` `Server`.
+    pub async fn run(self, socket_addr: SocketAddr) {
+        let logger = self.logger.clone();
+        info!(&logger, "Listening on socket address: {}!", socket_addr);
 
-    let make_service = make_service_fn(|_| {
-        let server = app.clone();
-        async move {
-            Ok::<_, Error>(service_fn(move |req| {
-                let server = server.clone();
-                async move { Ok::<_, Error>(server.handle_routing(req).await) }
-            }))
+        let make_service = make_service_fn(|_| {
+            let server = self.clone();
+            async move {
+                Ok::<_, Error>(service_fn(move |req| {
+                    let server = server.clone();
+                    async move { Ok::<_, Error>(server.handle_routing(req).await) }
+                }))
+            }
+        });
+
+        let server = Server::bind(&socket_addr).serve(make_service);
+
+        if let Err(e) = server.await {
+            error!(&logger, "server error: {}", e; "main" => "run");
         }
-    });
-
-    let server = Server::bind(&socket_addr).serve(make_service);
-
-    if let Err(e) = server.await {
-        error!(&logger, "server error: {}", e; "main" => "run");
     }
-}
-
-pub fn logger(prefix: &str) -> Logger {
-    use primitives::util::logging::{Async, PrefixedCompactFormat, TermDecorator};
-    use slog::{o, Drain};
-
-    let decorator = TermDecorator::new().build();
-    let drain = PrefixedCompactFormat::new(prefix, decorator).fuse();
-    let drain = Async::new(drain).build().fuse();
-
-    Logger::root(drain, o!())
 }
 
 #[cfg(test)]
