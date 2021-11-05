@@ -466,7 +466,7 @@ mod postgres {
     #[cfg(test)]
     mod test {
         use super::*;
-        use crate::util::tests::prep_db::postgres::POSTGRES_POOL;
+        use crate::postgres::POSTGRES_POOL;
 
         #[tokio::test]
         async fn from_and_to_sql() {

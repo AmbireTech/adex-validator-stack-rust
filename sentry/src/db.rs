@@ -1,12 +1,14 @@
 use deadpool_postgres::{Manager, ManagerConfig, RecyclingMethod};
-use redis::aio::MultiplexedConnection;
-use std::{env, str::FromStr};
+use primitives::{
+    config::Environment,
+    postgres::{POSTGRES_DB, POSTGRES_HOST, POSTGRES_PASSWORD, POSTGRES_PORT, POSTGRES_USER},
+};
+use redis::{aio::MultiplexedConnection, IntoConnectionInfo};
+use std::str::FromStr;
 use tokio_postgres::{
     types::{accepts, FromSql, Type},
     NoTls,
 };
-
-use lazy_static::lazy_static;
 
 pub mod accounting;
 pub mod analytics;
@@ -21,40 +23,15 @@ pub use self::channel::*;
 pub use self::event_aggregate::*;
 pub use self::validator_message::*;
 
+// Re-export the Postgres Config
+pub use tokio_postgres::Config as PostgresConfig;
+
 // Re-export the Postgres PoolError for easier usages
 pub use deadpool_postgres::PoolError;
 // Re-export the redis RedisError for easier usage
 pub use redis::RedisError;
 
 pub type DbPool = deadpool_postgres::Pool;
-
-lazy_static! {
-    static ref POSTGRES_USER: String =
-        env::var("POSTGRES_USER").unwrap_or_else(|_| String::from("postgres"));
-    static ref POSTGRES_PASSWORD: String =
-        env::var("POSTGRES_PASSWORD").unwrap_or_else(|_| String::from("postgres"));
-    static ref POSTGRES_HOST: String =
-        env::var("POSTGRES_HOST").unwrap_or_else(|_| String::from("localhost"));
-    static ref POSTGRES_PORT: u16 = env::var("POSTGRES_PORT")
-        .unwrap_or_else(|_| String::from("5432"))
-        .parse()
-        .unwrap();
-    static ref POSTGRES_DB: Option<String> = env::var("POSTGRES_DB").ok();
-    static ref POSTGRES_CONFIG: tokio_postgres::Config = {
-        let mut config = tokio_postgres::Config::new();
-
-        config
-            .user(POSTGRES_USER.as_str())
-            .password(POSTGRES_PASSWORD.as_str())
-            .host(POSTGRES_HOST.as_str())
-            .port(*POSTGRES_PORT);
-        if let Some(db) = POSTGRES_DB.as_ref() {
-            config.dbname(db);
-        }
-
-        config
-    };
-}
 
 pub struct TotalCount(pub u64);
 impl<'a> FromSql<'a> for TotalCount {
@@ -71,23 +48,26 @@ impl<'a> FromSql<'a> for TotalCount {
     accepts!(VARCHAR, TEXT);
 }
 
-pub async fn redis_connection(url: &str) -> Result<MultiplexedConnection, RedisError> {
+pub async fn redis_connection(
+    url: impl IntoConnectionInfo,
+) -> Result<MultiplexedConnection, RedisError> {
     let client = redis::Client::open(url)?;
 
     client.get_multiplexed_async_connection().await
 }
 
-pub async fn postgres_connection(max_size: usize) -> DbPool {
+pub async fn postgres_connection(max_size: usize, config: tokio_postgres::Config) -> DbPool {
     let mgr_config = ManagerConfig {
         recycling_method: RecyclingMethod::Verified,
     };
 
-    let manager = Manager::from_config(POSTGRES_CONFIG.clone(), NoTls, mgr_config);
+    let manager = Manager::from_config(config, NoTls, mgr_config);
 
     DbPool::new(manager, max_size)
 }
 
-pub async fn setup_migrations(environment: &str) {
+/// Sets the migrations using the `POSTGRES_*` environment variables
+pub async fn setup_migrations(environment: Environment) {
     use migrant_lib::{Config, Direction, Migrator, Settings};
 
     let settings = Settings::configure_postgres()
@@ -95,7 +75,7 @@ pub async fn setup_migrations(environment: &str) {
         .database_password(POSTGRES_PASSWORD.as_str())
         .database_host(POSTGRES_HOST.as_str())
         .database_port(*POSTGRES_PORT)
-        .database_name(POSTGRES_DB.as_ref().unwrap_or(&POSTGRES_USER))
+        .database_name(POSTGRES_DB.as_ref())
         .build()
         .expect("Should build migration settings");
 
@@ -118,7 +98,7 @@ pub async fn setup_migrations(environment: &str) {
     // `tests_postgres::MIGRATIONS`
     let mut migrations = vec![make_migration!("20190806011140_initial-tables")];
 
-    if environment == "development" {
+    if let Environment::Development = environment {
         // seeds database tables for testing
         migrations.push(make_migration!("20190806011140_initial-tables/seed"));
     }
@@ -131,7 +111,7 @@ pub async fn setup_migrations(environment: &str) {
     // Reload config, ping the database for applied migrations
     let config = config.reload().expect("Should reload applied migrations");
 
-    if environment == "development" {
+    if let Environment::Development = environment {
         // delete all existing data to make tests reproducible
         Migrator::with_config(&config)
             .all(true)
@@ -158,7 +138,7 @@ pub async fn setup_migrations(environment: &str) {
         .expect("Reloading config for migration failed");
 }
 
-#[cfg(test)]
+#[cfg(feature = "test-util")]
 pub mod tests_postgres {
     use std::{
         ops::{Deref, DerefMut},
@@ -168,11 +148,12 @@ pub mod tests_postgres {
     use deadpool::managed::{Manager as ManagerTrait, RecycleResult};
     use deadpool_postgres::ManagerConfig;
     use once_cell::sync::Lazy;
+    use primitives::postgres::POSTGRES_CONFIG;
     use tokio_postgres::{NoTls, SimpleQueryMessage};
 
     use async_trait::async_trait;
 
-    use super::{DbPool, PoolError, POSTGRES_CONFIG};
+    use super::{DbPool, PoolError};
 
     pub type Pool = deadpool::managed::Pool<Manager>;
 
@@ -346,15 +327,23 @@ pub mod tests_postgres {
 
         async fn recycle(&self, database: &mut Database) -> RecycleResult<Self::Error> {
             // DROP the public schema and create it again for usage after recycling
-            let queries = format!("DROP SCHEMA public CASCADE; CREATE SCHEMA public;");
+            let queries = "DROP SCHEMA public CASCADE; CREATE SCHEMA public;";
 
-            let result = database
-                .pool
-                .get()
-                .await?
-                .simple_query(&queries)
+            database.pool = {
+                let mut config = self.base_config.clone();
+                // set the database in the configuration of the inside Pool (used for tests)
+                config.dbname(&database.name);
+
+                let manager =
+                    deadpool_postgres::Manager::from_config(config, NoTls, self.manager_config.clone());
+                
+                deadpool_postgres::Pool::new(manager, 15)
+            };
+
+            let result = database.pool.get().await?
+                .simple_query(queries)
                 .await
-                .map_err(|err| PoolError::Backend(err))
+                .map_err(PoolError::Backend)
                 .expect("Should not error");
             assert_eq!(2, result.len());
             assert!(matches!(result[0], SimpleQueryMessage::CommandComplete(..)));
@@ -370,19 +359,15 @@ pub mod tests_postgres {
         let full_query: String = MIGRATIONS
             .iter()
             .map(|migration| {
-                use std::{
-                    fs::File,
-                    io::{BufReader, Read},
-                };
-                let file = File::open(format!("migrations/{}/up.sql", migration))
-                    .expect("File migration couldn't be opened");
-                let mut buf_reader = BufReader::new(file);
-                let mut contents = String::new();
+                use std::{env::current_dir, fs::read_to_string};
 
-                buf_reader
-                    .read_to_string(&mut contents)
-                    .expect("File migration couldn't be read");
-                contents
+                let full_path = current_dir().unwrap();
+                // it always starts in `sentry` folder because of the crate scope
+                // even when it's in the workspace
+                let mut file = full_path.parent().unwrap().to_path_buf();
+                file.push(format!("sentry/migrations/{}/up.sql", migration));
+
+                read_to_string(file).expect("File migration couldn't be read")
             })
             .collect();
 
@@ -443,7 +428,7 @@ pub mod tests_postgres {
     }
 }
 
-#[cfg(test)]
+#[cfg(feature = "test-util")]
 pub mod redis_pool {
 
     use dashmap::DashMap;
@@ -456,6 +441,9 @@ pub mod redis_pool {
     use once_cell::sync::Lazy;
 
     use super::*;
+
+    /// Re-export [`redis::cmd`] for testing purposes
+    pub use redis::cmd;
 
     pub type Pool = deadpool::managed::Pool<Manager>;
 
@@ -546,7 +534,7 @@ pub mod redis_pool {
                     // see https://github.com/mitsuhiko/redis-rs/issues/325
                     _ => {
                         let mut redis_conn =
-                            redis_connection(&format!("{}{}", Self::URL, record.key()))
+                            redis_connection(format!("{}{}", Self::URL, record.key()))
                                 .await
                                 .expect("Should connect");
 
@@ -574,7 +562,7 @@ pub mod redis_pool {
         async fn recycle(&self, database: &mut Database) -> RecycleResult<Self::Error> {
             // always make a new connection because of know redis crate issue
             // see https://github.com/mitsuhiko/redis-rs/issues/325
-            let connection = redis_connection(&format!("{}{}", Self::URL, database.index))
+            let connection = redis_connection(format!("{}{}", Self::URL, database.index))
                 .await
                 .expect("Should connect");
             // make the database available

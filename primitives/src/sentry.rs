@@ -245,6 +245,7 @@ pub struct AllSpendersResponse {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AllSpendersQuery {
     // default is `u64::default()` = `0`
+    #[serde(default)]
     pub page: u64,
 }
 
@@ -362,7 +363,7 @@ pub mod campaign {
         pub pagination: Pagination,
     }
 
-    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
     pub struct CampaignListQuery {
         #[serde(default)]
         // default is `u64::default()` = `0`
@@ -373,10 +374,77 @@ pub mod campaign {
         pub active_to_ge: DateTime<Utc>,
         pub creator: Option<Address>,
         /// filters the campaigns containing a specific validator if provided
-        pub validator: Option<ValidatorId>,
-        /// filters the campaigns where the provided validator is a leader if true
-        /// if no validator is provided, but is_leader is true, it uses Auth to obtain a validator
-        pub is_leader: Option<bool>,
+        #[serde(flatten)]
+        pub validator: Option<ValidatorParam>,
+    }
+
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    #[serde(rename_all = "camelCase")]
+    pub enum ValidatorParam {
+        /// Results will include all campaigns that have the provided address as a leader
+        Leader(ValidatorId),
+        /// Results will include all campaigns that have either a leader or follower with the provided address
+        Validator(ValidatorId),
+    }
+
+    #[cfg(test)]
+    mod test {
+        use super::*;
+        use crate::util::tests::prep_db::{ADDRESSES, IDS};
+        use chrono::TimeZone;
+
+        #[test]
+        pub fn deserialize_campaign_list_query() {
+            let query_leader = CampaignListQuery {
+                page: 0,
+                active_to_ge: Utc.ymd(2021, 2, 1).and_hms(7, 0, 0),
+                creator: Some(ADDRESSES["creator"]),
+                validator: Some(ValidatorParam::Leader(IDS["leader"])),
+            };
+
+            let query_leader_string = format!(
+                "page=0&activeTo=1612162800&creator={}&leader={}",
+                ADDRESSES["creator"], ADDRESSES["leader"]
+            );
+            let query_leader_encoded =
+                serde_urlencoded::from_str::<CampaignListQuery>(&query_leader_string)
+                    .expect("should encode");
+
+            pretty_assertions::assert_eq!(query_leader_encoded, query_leader);
+
+            let query_validator = CampaignListQuery {
+                page: 0,
+                active_to_ge: Utc.ymd(2021, 2, 1).and_hms(7, 0, 0),
+                creator: Some(ADDRESSES["creator"]),
+                validator: Some(ValidatorParam::Validator(IDS["follower"])),
+            };
+            let query_validator_string = format!(
+                "page=0&activeTo=1612162800&creator={}&validator={}",
+                ADDRESSES["creator"], ADDRESSES["follower"]
+            );
+            let query_validator_encoded =
+                serde_urlencoded::from_str::<CampaignListQuery>(&query_validator_string)
+                    .expect("should encode");
+
+            pretty_assertions::assert_eq!(query_validator_encoded, query_validator,);
+
+            let query_no_validator = CampaignListQuery {
+                page: 0,
+                active_to_ge: Utc.ymd(2021, 2, 1).and_hms(7, 0, 0),
+                creator: Some(ADDRESSES["creator"]),
+                validator: None,
+            };
+
+            let query_no_validator_string = format!(
+                "page=0&activeTo=1612162800&creator={}",
+                ADDRESSES["creator"]
+            );
+            let query_no_validator_encoded =
+                serde_urlencoded::from_str::<CampaignListQuery>(&query_no_validator_string)
+                    .expect("should encode");
+
+            pretty_assertions::assert_eq!(query_no_validator_encoded, query_no_validator,);
+        }
     }
 }
 
@@ -391,9 +459,11 @@ pub mod campaign_create {
     };
 
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+    #[serde(rename_all = "camelCase")]
     /// All fields are present except the `CampaignId` which is randomly created
     /// This struct defines the Body of the request (in JSON)
     pub struct CreateCampaign {
+        pub id: Option<CampaignId>,
         pub channel: Channel,
         pub creator: Address,
         pub budget: UnifiedNum,
@@ -421,10 +491,11 @@ pub mod campaign_create {
     }
 
     impl CreateCampaign {
-        /// Creates the new `Campaign` with randomly generated `CampaignId`
+        /// Creates a new [`Campaign`]
+        /// If [`CampaignId`] was not provided with the request it will be generated using [`CampaignId::new()`]
         pub fn into_campaign(self) -> Campaign {
             Campaign {
-                id: CampaignId::new(),
+                id: self.id.unwrap_or_else(CampaignId::new),
                 channel: self.channel,
                 creator: self.creator,
                 budget: self.budget,
@@ -438,13 +509,13 @@ pub mod campaign_create {
                 active: self.active,
             }
         }
-    }
 
-    /// This implementation helps with test setup
-    /// **NOTE:** It erases the CampaignId, since the creation of the campaign gives it's CampaignId
-    impl From<Campaign> for CreateCampaign {
-        fn from(campaign: Campaign) -> Self {
-            Self {
+        /// Creates a [`CreateCampaign`] without using the [`Campaign.id`].
+        /// You can either pass [`None`] to randomly generate a new [`CampaignId`].
+        /// Or you can pass a [`CampaignId`] to be used for the [`CreateCampaign`].
+        pub fn from_campaign_erased(campaign: Campaign, id: Option<CampaignId>) -> Self {
+            CreateCampaign {
+                id,
                 channel: campaign.channel,
                 creator: campaign.creator,
                 budget: campaign.budget,
@@ -458,7 +529,34 @@ pub mod campaign_create {
                 active: campaign.active,
             }
         }
+
+        /// This function will retains the original [`Campaign.id`] ([`CampaignId`]).
+        pub fn from_campaign(campaign: Campaign) -> Self {
+            let id = Some(campaign.id);
+            Self::from_campaign_erased(campaign, id)
+        }
     }
+
+    // /// This implementation helps with test setup
+    // /// **NOTE:** It erases the CampaignId, since the creation of the campaign gives it's CampaignId
+    // impl From<Campaign> for CreateCampaign {
+    //     fn from(campaign: Campaign) -> Self {
+    //         Self {
+    //             id: Some(campaign.id),
+    //             channel: campaign.channel,
+    //             creator: campaign.creator,
+    //             budget: campaign.budget,
+    //             validators: campaign.validators,
+    //             title: campaign.title,
+    //             pricing_bounds: campaign.pricing_bounds,
+    //             event_submission: campaign.event_submission,
+    //             ad_units: campaign.ad_units,
+    //             targeting_rules: campaign.targeting_rules,
+    //             created: campaign.created,
+    //             active: campaign.active,
+    //         }
+    //     }
+    // }
 
     // All editable fields stored in one place, used for checking when a budget is changed
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

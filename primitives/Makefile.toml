@@ -13,10 +13,10 @@ dependencies = [
 ]
 
 [tasks.test]
-env = { "POSTGRES_DB" = "sentry_leader" }
+env = { "POSTGRES_DB" = "primitives" }
 
 [tasks.services-up]
-script = "docker-compose -f ../docker-compose.ci.yml up -d postgres-leader && sleep 2"
+script = "docker-compose -f ../docker-compose.harness.yml up -d adex-postgres && sleep 6"
 
 [tasks.services-down]
-script = "docker-compose -f ../docker-compose.ci.yml down"
+script = "docker-compose -f ../docker-compose.harness.yml down"

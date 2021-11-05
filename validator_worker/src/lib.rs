@@ -18,6 +18,7 @@ pub mod follower;
 pub mod heartbeat;
 pub mod leader;
 pub mod sentry_interface;
+pub mod worker;
 
 pub mod core {
     pub mod follower_rules;

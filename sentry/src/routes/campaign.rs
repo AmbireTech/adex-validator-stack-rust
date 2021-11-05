@@ -140,9 +140,10 @@ pub async fn create_campaign<A: Adapter>(
 
     let campaign = serde_json::from_slice::<CreateCampaign>(&body)
         .map_err(|e| ResponseError::FailedValidation(e.to_string()))?
-        // create the actual `Campaign` with random `CampaignId`
+        // create the actual `Campaign` with a randomly generated `CampaignId` or the set `CampaignId`
         .into_campaign();
 
+    // Validate the campaign as soon as a valid JSON was passed.
     campaign
         .validate(&app.config, &app.adapter.whoami())
         .map_err(|err| ResponseError::FailedValidation(err.to_string()))?;
@@ -271,21 +272,7 @@ pub async fn campaign_list<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
-    let mut query =
-        serde_urlencoded::from_str::<CampaignListQuery>(req.uri().query().unwrap_or(""))?;
-
-    query.validator = match (
-        query.validator,
-        query.is_leader,
-        req.extensions().get::<Auth>(),
-    ) {
-        // only case where Auth.uid is used
-        (None, Some(true), Some(auth)) => Some(auth.uid),
-        // for all cases with a validator passed
-        (Some(validator), _, _) => Some(validator),
-        // default, no filtration by validator
-        _ => None,
-    };
+    let query = serde_urlencoded::from_str::<CampaignListQuery>(req.uri().query().unwrap_or(""))?;
 
     let limit = app.config.campaigns_find_limit;
     let skip = query
@@ -298,7 +285,6 @@ pub async fn campaign_list<A: Adapter>(
         limit,
         query.creator,
         query.validator,
-        query.is_leader,
         &query.active_to_ge,
     )
     .await?;
@@ -972,7 +958,7 @@ mod test {
 
         let campaign: Campaign = {
             // erases the CampaignId for the CreateCampaign request
-            let mut create = CreateCampaign::from(dummy_campaign);
+            let mut create = CreateCampaign::from_campaign_erased(dummy_campaign, None);
             create.budget = UnifiedNum::from(500 * multiplier);
             // prepare for Campaign creation
             add_deposit_call(create.channel.id(), create.creator, create.channel.token);
@@ -1045,7 +1031,8 @@ mod test {
         // we have 1000 left from our deposit, so we are using half of it
         let _second_campaign = {
             // erases the CampaignId for the CreateCampaign request
-            let mut create_second = CreateCampaign::from(DUMMY_CAMPAIGN.clone());
+            let mut create_second =
+                CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
             create_second.budget = UnifiedNum::from(500 * multiplier);
 
             // prepare for Campaign creation
@@ -1075,7 +1062,7 @@ mod test {
         // new campaign budget: 600
         {
             // erases the CampaignId for the CreateCampaign request
-            let mut create = CreateCampaign::from(DUMMY_CAMPAIGN.clone());
+            let mut create = CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
             create.budget = UnifiedNum::from(600 * multiplier);
 
             // prepare for Campaign creation
@@ -1134,7 +1121,7 @@ mod test {
         // new campaign budget: 600
         {
             // erases the CampaignId for the CreateCampaign request
-            let mut create = CreateCampaign::from(DUMMY_CAMPAIGN.clone());
+            let mut create = CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
             create.budget = UnifiedNum::from(600 * multiplier);
 
             // prepare for Campaign creation

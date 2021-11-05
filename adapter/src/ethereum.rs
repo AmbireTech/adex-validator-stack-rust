@@ -6,7 +6,7 @@ use ethstore::{
     ethkey::{public_to_address, recover, verify_address, Message, Password, Signature},
     SafeAccount,
 };
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use primitives::{
     adapter::{Adapter, AdapterResult, Deposit, Error as AdapterError, KeystoreOptions, Session},
     config::Config,
@@ -26,27 +26,24 @@ use web3::{
     Web3,
 };
 
-#[cfg(test)]
-use test_utils::*;
-
 mod error;
-#[cfg(test)]
-mod test_utils;
+#[cfg(any(test, feature = "test-util"))]
+pub mod test_util;
 
-lazy_static! {
-    static ref OUTPACE_ABI: &'static [u8] =
-        include_bytes!("../../lib/protocol-eth/abi/OUTPACE.json");
-    static ref ERC20_ABI: &'static [u8] = include_str!("../../lib/protocol-eth/abi/ERC20.json")
+pub static OUTPACE_ABI: Lazy<&'static [u8]> =
+    Lazy::new(|| include_bytes!("../../lib/protocol-eth/abi/OUTPACE.json"));
+pub static ERC20_ABI: Lazy<&'static [u8]> = Lazy::new(|| {
+    include_str!("../../lib/protocol-eth/abi/ERC20.json")
         .trim_end_matches('\n')
-        .as_bytes();
-    static ref SWEEPER_ABI: &'static [u8] =
-        include_bytes!("../../lib/protocol-eth/abi/Sweeper.json");
-    /// Ready to use init code (i.e. decoded) for calculating the create2 address
-    static ref DEPOSITOR_BYTECODE_DECODED: Vec<u8> = {
-        let bytecode = include_str!("../../lib/protocol-eth/resources/bytecode/Depositor.bin");
-        hex::decode(bytecode).expect("Decoded properly")
-    };
-}
+        .as_bytes()
+});
+pub static SWEEPER_ABI: Lazy<&'static [u8]> =
+    Lazy::new(|| include_bytes!("../../lib/protocol-eth/abi/Sweeper.json"));
+/// Ready to use init code (i.e. decoded) for calculating the create2 address
+pub static DEPOSITOR_BYTECODE_DECODED: Lazy<Vec<u8>> = Lazy::new(|| {
+    let bytecode = include_str!("../../lib/protocol-eth/resources/bytecode/Depositor.bin");
+    hex::decode(bytecode).expect("Decoded properly")
+});
 
 trait EthereumChannel {
     fn tokenize(&self) -> Token;
@@ -66,25 +63,25 @@ impl EthereumChannel for Channel {
     }
 }
 
-fn get_counterfactual_address(
-    sweeper: H160,
+pub fn get_counterfactual_address(
+    sweeper: Address,
     channel: &Channel,
-    outpace: H160,
-    depositor: &Address,
-) -> H160 {
+    outpace: Address,
+    depositor: Address,
+) -> Address {
     let salt: [u8; 32] = [0; 32];
     let encoded_params = encode(&[
-        Token::Address(outpace),
+        Token::Address(outpace.as_bytes().into()),
         channel.tokenize(),
-        Token::Address(H160(*depositor.as_bytes())),
+        Token::Address(depositor.as_bytes().into()),
     ]);
 
     let mut init_code = DEPOSITOR_BYTECODE_DECODED.clone();
     init_code.extend(&encoded_params);
 
-    let address = calc_addr(sweeper.as_fixed_bytes(), &salt, &init_code);
+    let address_bytes = calc_addr(sweeper.as_bytes(), &salt, &init_code);
 
-    H160(address)
+    Address::from(address_bytes)
 }
 
 #[derive(Debug, Clone)]
@@ -105,8 +102,9 @@ impl EthereumAdapter {
         let keystore_json: Value =
             serde_json::from_str(&keystore_contents).map_err(KeystoreError::Deserialization)?;
 
-        let address = keystore_json["address"]
-            .as_str()
+        let address = keystore_json
+            .get("address")
+            .and_then(|value| value.as_str())
             .map(eth_checksum::checksum)
             .ok_or(KeystoreError::AddressMissing)?;
 
@@ -134,13 +132,11 @@ impl Adapter for EthereumAdapter {
     type AdapterError = Error;
 
     fn unlock(&mut self) -> AdapterResult<(), Self::AdapterError> {
-        let account = SafeAccount::from_file(
-            serde_json::from_value(self.keystore_json.clone())
-                .map_err(KeystoreError::Deserialization)?,
-            None,
-            &Some(self.keystore_pwd.clone()),
-        )
-        .map_err(Error::WalletUnlock)?;
+        let json = serde_json::from_value(self.keystore_json.clone())
+            .map_err(KeystoreError::Deserialization)?;
+
+        let account = SafeAccount::from_file(json, None, &Some(self.keystore_pwd.clone()))
+            .map_err(Error::WalletUnlock)?;
 
         self.wallet = Some(account);
 
@@ -270,6 +266,12 @@ impl Adapter for EthereumAdapter {
         channel: &Channel,
         depositor_address: &Address,
     ) -> AdapterResult<Deposit, Self::AdapterError> {
+        let token_info = self
+            .config
+            .token_address_whitelist
+            .get(&channel.token)
+            .ok_or(Error::TokenNotWhitelisted(channel.token))?;
+
         let outpace_contract = Contract::from_json(
             self.web3.eth(),
             self.config.outpace_address.into(),
@@ -288,15 +290,15 @@ impl Adapter for EthereumAdapter {
         )
         .map_err(Error::ContractInitialization)?;
 
-        let sweeper_address = sweeper_contract.address();
-        let outpace_address = outpace_contract.address();
+        let sweeper_address = Address::from(sweeper_contract.address().to_fixed_bytes());
+        let outpace_address = Address::from(outpace_contract.address().to_fixed_bytes());
 
         let on_outpace: U256 = outpace_contract
             .query(
                 "deposits",
                 (
                     Token::FixedBytes(channel.id().as_bytes().to_vec()),
-                    Token::Address(depositor_address.as_bytes().into()),
+                    Token::Address(H160(depositor_address.to_bytes())),
                 ),
                 None,
                 Options::default(),
@@ -311,12 +313,12 @@ impl Adapter for EthereumAdapter {
             sweeper_address,
             channel,
             outpace_address,
-            depositor_address,
+            *depositor_address,
         );
         let still_on_create2: U256 = erc20_contract
             .query(
                 "balanceOf",
-                counterfactual_address,
+                H160(counterfactual_address.to_bytes()),
                 None,
                 Options::default(),
                 None,
@@ -328,12 +330,6 @@ impl Adapter for EthereumAdapter {
             .to_string()
             .parse()
             .map_err(Error::BigNumParsing)?;
-
-        let token_info = self
-            .config
-            .token_address_whitelist
-            .get(&channel.token)
-            .ok_or(Error::TokenNotWhitelisted(channel.token))?;
 
         // Count the create2 deposit only if it's > minimum token units configured
         let deposit = if still_on_create2 > token_info.min_token_units_for_deposit {
@@ -502,8 +498,10 @@ pub fn ewt_verify(
 
 #[cfg(test)]
 mod test {
+    use super::test_util::*;
     use super::*;
     use chrono::Utc;
+    use primitives::{config::DEVELOPMENT_CONFIG, util::tests::prep_db::IDS};
     use std::convert::TryFrom;
     use web3::{transports::Http, Web3};
     use wiremock::{
@@ -513,14 +511,14 @@ mod test {
 
     #[test]
     fn should_init_and_unlock_ethereum_adapter() {
-        let mut eth_adapter = setup_eth_adapter(None, None, None);
+        let mut eth_adapter = setup_eth_adapter(DEVELOPMENT_CONFIG.clone());
         eth_adapter.unlock().expect("should unlock eth adapter");
     }
 
     #[test]
     fn should_get_whoami_sign_and_verify_messages() {
         // whoami
-        let mut eth_adapter = setup_eth_adapter(None, None, None);
+        let mut eth_adapter = setup_eth_adapter(DEVELOPMENT_CONFIG.clone());
         let whoami = eth_adapter.whoami();
         assert_eq!(
             whoami.to_string(),
@@ -553,12 +551,7 @@ mod test {
         let message2 = "1648231285e69677531ffe70719f67a07f3d4393b8425a5a1c84b0c72434c77b";
 
         let verify2 = eth_adapter
-            .verify(
-                ValidatorId::try_from("ce07CbB7e054514D590a0262C93070D838bFBA2e")
-                    .expect("Failed to parse id"),
-                message2,
-                &signature2,
-            )
+            .verify(IDS["leader"], message2, &signature2)
             .expect("Failed to verify signatures");
 
         assert!(verify, "invalid signature 1 verification");
@@ -567,7 +560,7 @@ mod test {
 
     #[test]
     fn should_generate_correct_ewt_sign_and_verify() {
-        let mut eth_adapter = setup_eth_adapter(None, None, None);
+        let mut eth_adapter = setup_eth_adapter(DEVELOPMENT_CONFIG.clone());
 
         eth_adapter.unlock().expect("should unlock eth adapter");
 
@@ -614,7 +607,7 @@ mod test {
         let mut identities_owned: HashMap<ValidatorId, u8> = HashMap::new();
         identities_owned.insert(identity, 2);
 
-        let mut eth_adapter = setup_eth_adapter(None, None, None);
+        let mut eth_adapter = setup_eth_adapter(DEVELOPMENT_CONFIG.clone());
 
         Mock::given(method("GET"))
             .and(path(format!("/identity/by-owner/{}", eth_adapter.whoami())))
@@ -644,13 +637,13 @@ mod test {
     async fn get_deposit_and_count_create2_when_min_tokens_received() {
         let web3 = Web3::new(Http::new(&GANACHE_URL).expect("failed to init transport"));
 
-        let leader_account = H160(*GANACHE_ADDRESSES["leader"].as_bytes());
+        let leader_account = GANACHE_ADDRESSES["leader"];
 
         // deploy contracts
         let token = deploy_token_contract(&web3, 1_000)
             .await
             .expect("Correct parameters are passed to the Token constructor.");
-        let token_address = Address::from_bytes(&token.1.to_fixed_bytes());
+        let token_address = token.1;
 
         let sweeper = deploy_sweeper_contract(&web3)
             .await
@@ -664,15 +657,22 @@ mod test {
 
         let channel = get_test_channel(token_address);
 
-        let mut eth_adapter = setup_eth_adapter(
-            Some(*sweeper.0.as_fixed_bytes()),
-            Some(*outpace.0.as_fixed_bytes()),
-            Some((token_address, token.0)),
+        let mut config = DEVELOPMENT_CONFIG.clone();
+        config.sweeper_address = sweeper.0.to_bytes();
+        config.outpace_address = outpace.0.to_bytes();
+        // since we deploy a new contract, it's should be different from all the ones found in config.
+        assert!(
+            config
+                .token_address_whitelist
+                .insert(token_address, token.0)
+                .is_none(),
+            "Should not have previous value, we've just deployed the contract."
         );
+        let mut eth_adapter = setup_eth_adapter(config);
         eth_adapter.unlock().expect("should unlock eth adapter");
 
         let counterfactual_address =
-            get_counterfactual_address(sweeper.0, &channel, outpace.0, &spender);
+            get_counterfactual_address(sweeper.0, &channel, outpace.0, spender);
 
         // No Regular nor Create2 deposits
         {
@@ -696,14 +696,19 @@ mod test {
                 &token.2,
                 *GANACHE_ADDRESSES["leader"].as_bytes(),
                 *spender.as_bytes(),
-                10_000_u64,
+                &BigNum::from(10_000),
             )
             .await
             .expect("Failed to set balance");
 
-            outpace_deposit(&outpace.1, &channel, *spender.as_bytes(), 10_000)
-                .await
-                .expect("Should deposit funds");
+            outpace_deposit(
+                &outpace.1,
+                &channel,
+                *spender.as_bytes(),
+                &BigNum::from(10_000),
+            )
+            .await
+            .expect("Should deposit funds");
 
             let regular_deposit = eth_adapter
                 .get_deposit(&channel, &spender)
@@ -724,9 +729,9 @@ mod test {
             // Set balance < minimal token units, i.e. `1_000`
             mock_set_balance(
                 &token.2,
-                leader_account.to_fixed_bytes(),
-                counterfactual_address.to_fixed_bytes(),
-                999_u64,
+                leader_account.to_bytes(),
+                counterfactual_address.to_bytes(),
+                &BigNum::from(999),
             )
             .await
             .expect("Failed to set balance");
@@ -751,9 +756,9 @@ mod test {
             // Set balance > minimal token units
             mock_set_balance(
                 &token.2,
-                leader_account.to_fixed_bytes(),
-                counterfactual_address.to_fixed_bytes(),
-                1_999_u64,
+                leader_account.to_bytes(),
+                counterfactual_address.to_bytes(),
+                &BigNum::from(1_999),
             )
             .await
             .expect("Failed to set balance");
@@ -777,9 +782,9 @@ mod test {
         {
             sweeper_sweep(
                 &sweeper.1,
-                outpace.0.to_fixed_bytes(),
+                outpace.0.to_bytes(),
                 &channel,
-                *spender.as_bytes(),
+                spender.to_bytes(),
             )
             .await
             .expect("Should sweep the Spender account");
