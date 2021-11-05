@@ -7,7 +7,6 @@ use parse_display::{Display, FromStr, ParseError};
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
-    convert::TryFrom,
     fmt,
     iter::Sum,
     ops::{Add, AddAssign, Div, Mul, Sub},
@@ -429,14 +428,10 @@ mod test {
 }
 
 #[cfg(feature = "postgres")]
-// TODO: Test UnifiedNum postgres impl
 mod postgres {
     use super::UnifiedNum;
     use bytes::BytesMut;
-    use std::{
-        convert::{TryFrom, TryInto},
-        error::Error,
-    };
+    use std::error::Error;
     use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
 
     impl<'a> FromSql<'a> for UnifiedNum {

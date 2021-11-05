@@ -1,6 +1,6 @@
 use hex::{FromHex, FromHexError};
 use serde::{Deserialize, Serialize, Serializer};
-use std::{convert::TryFrom, fmt, str::FromStr};
+use std::{fmt, str::FromStr};
 use thiserror::Error;
 
 use crate::{targeting::Value, DomainError, ToETHChecksum, ToHex};

@@ -19,7 +19,6 @@ use slog::{error, Logger};
 use std::{
     cmp::Ordering,
     collections::VecDeque,
-    convert::TryFrom,
     ops::{Add, Mul},
     sync::Arc,
 };

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, convert::TryFrom, fmt};
+use std::{collections::HashMap, fmt};
 
 use primitives::{
     adapter::{Adapter, AdapterErrorKind, Error as AdapterError},

@@ -15,7 +15,7 @@ use primitives::{
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{convert::TryFrom, fs, str::FromStr};
+use std::{fs, str::FromStr};
 use thiserror::Error;
 use tiny_keccak::Keccak;
 use web3::{
@@ -502,7 +502,6 @@ mod test {
     use super::*;
     use chrono::Utc;
     use primitives::{config::DEVELOPMENT_CONFIG, util::tests::prep_db::IDS};
-    use std::convert::TryFrom;
     use web3::{transports::Http, Web3};
     use wiremock::{
         matchers::{method, path},

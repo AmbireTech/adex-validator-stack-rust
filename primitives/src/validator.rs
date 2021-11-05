@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::{borrow::Borrow, convert::TryFrom, fmt, str::FromStr};
+use std::{borrow::Borrow, fmt, str::FromStr};
 
 use crate::{
     address::Error,
@@ -145,7 +145,7 @@ impl<T> Borrow<T> for Validator<T> {
 
 /// Validator Message Types
 pub mod messages {
-    use std::{any::type_name, convert::TryFrom, fmt, marker::PhantomData};
+    use std::{any::type_name, fmt, marker::PhantomData};
     use thiserror::Error;
 
     use crate::balances::{Balances, BalancesState, CheckedState, UncheckedState};
@@ -361,7 +361,6 @@ pub mod postgres {
     use super::ValidatorId;
     use crate::ToETHChecksum;
     use bytes::BytesMut;
-    use std::convert::TryFrom;
     use std::error::Error;
     use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 

@@ -35,7 +35,7 @@ pub struct MessageResponse<T: MessageType> {
 }
 
 pub mod message {
-    use std::{convert::TryFrom, ops::Deref};
+    use std::ops::Deref;
 
     use crate::validator::messages::*;
     use serde::{Deserialize, Serialize};
@@ -609,7 +609,6 @@ mod postgres {
     };
     use bytes::BytesMut;
     use serde::Deserialize;
-    use std::convert::TryFrom;
     use tokio_postgres::{
         types::{accepts, to_sql_checked, IsNull, Json, ToSql, Type},
         Error, Row,

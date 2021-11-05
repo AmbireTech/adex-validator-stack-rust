@@ -8,7 +8,7 @@ use crate::{
 use chrono::{TimeZone, Utc};
 use hex::FromHex;
 use once_cell::sync::Lazy;
-use std::{collections::HashMap, convert::TryFrom};
+use std::collections::HashMap;
 
 /// Dummy [`crate::ValidatorId`]s
 pub static IDS: Lazy<HashMap<String, ValidatorId>> = Lazy::new(|| {
