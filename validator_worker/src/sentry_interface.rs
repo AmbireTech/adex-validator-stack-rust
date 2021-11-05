@@ -410,42 +410,48 @@ mod test {
     use primitives::{
         adapter::DummyAdapterOptions,
         config::configuration,
-        spender::Spendable,
+        sentry::Pagination,
         util::tests::{
             discard_logger,
             prep_db::{
                 ADDRESSES, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, IDS,
             },
         },
-        Deposit, UnifiedNum,
+        UnifiedNum,
     };
-    use serde_json::json;
     use std::str::FromStr;
     use wiremock::{
-        matchers::{method, path},
+        matchers::{method, path, query_param},
         Mock, MockServer, ResponseTemplate,
     };
 
     #[tokio::test]
     async fn test_get_all_spenders() {
+        // We need to use a custom port as the request will fail on any other port
         let listener = std::net::TcpListener::bind("localhost:8005").unwrap();
         let expected_server_address = listener
             .local_addr()
             .expect("Failed to get server address.");
         let server = MockServer::builder().listener(listener).start().await;
 
-        // Verifying our server is running on the correct port
+        // Verifying our server is running on the correct address and port
         assert_eq!(&expected_server_address, server.address());
 
-        let mut first_page_response = HashMap::new();
-        first_page_response.insert(
+        let mut first_page_response = AllSpendersResponse {
+            spenders: HashMap::new(),
+            pagination: Pagination {
+                page: 0,
+                total_pages: 3,
+            },
+        };
+        first_page_response.spenders.insert(
             ADDRESSES["user"],
             Spender {
                 total_deposited: UnifiedNum::from(100_000_000),
                 spender_leaf: None,
             },
         );
-        first_page_response.insert(
+        first_page_response.spenders.insert(
             ADDRESSES["publisher"],
             Spender {
                 total_deposited: UnifiedNum::from(100_000_000),
@@ -453,15 +459,21 @@ mod test {
             },
         );
 
-        let mut second_page_response = HashMap::new();
-        second_page_response.insert(
+        let mut second_page_response = AllSpendersResponse {
+            spenders: HashMap::new(),
+            pagination: Pagination {
+                page: 1,
+                total_pages: 3,
+            },
+        };
+        second_page_response.spenders.insert(
             ADDRESSES["publisher2"],
             Spender {
                 total_deposited: UnifiedNum::from(100_000_000),
                 spender_leaf: None,
             },
         );
-        second_page_response.insert(
+        second_page_response.spenders.insert(
             ADDRESSES["creator"],
             Spender {
                 total_deposited: UnifiedNum::from(100_000_000),
@@ -469,8 +481,14 @@ mod test {
             },
         );
 
-        let mut third_page_response = HashMap::new();
-        third_page_response.insert(
+        let mut third_page_response = AllSpendersResponse {
+            spenders: HashMap::new(),
+            pagination: Pagination {
+                page: 2,
+                total_pages: 3,
+            },
+        };
+        third_page_response.spenders.insert(
             ADDRESSES["tester"],
             Spender {
                 total_deposited: UnifiedNum::from(100_000_000),
@@ -478,33 +496,32 @@ mod test {
             },
         );
 
-        let first_page_response = json!(first_page_response);
-        let second_page_response = json!(second_page_response);
-        let third_page_response = json!(third_page_response);
-
         Mock::given(method("GET"))
             .and(path(format!(
-                "/v5/channel/{}/spender/all?page=0",
+                "/v5/channel/{}/spender/all",
                 DUMMY_CAMPAIGN.channel.id()
             )))
+            .and(query_param("page", "0"))
             .respond_with(ResponseTemplate::new(200).set_body_json(&first_page_response))
             .mount(&server)
             .await;
 
         Mock::given(method("GET"))
             .and(path(format!(
-                "/v5/channel/{}/spender/all?page=1",
+                "/v5/channel/{}/spender/all",
                 DUMMY_CAMPAIGN.channel.id()
             )))
+            .and(query_param("page", "1"))
             .respond_with(ResponseTemplate::new(200).set_body_json(&second_page_response))
             .mount(&server)
             .await;
 
         Mock::given(method("GET"))
             .and(path(format!(
-                "/v5/channel/{}/spender/all?page=2",
+                "/v5/channel/{}/spender/all",
                 DUMMY_CAMPAIGN.channel.id()
             )))
+            .and(query_param("page", "2"))
             .respond_with(ResponseTemplate::new(200).set_body_json(&third_page_response))
             .mount(&server)
             .await;
@@ -584,8 +601,8 @@ mod test {
             .expect("should get response");
 
         assert!(
-            expected_response.len() == res.len()
+            expected_response.keys().len() == res.keys().len()
                 && expected_response.keys().all(|k| res.contains_key(k))
-        )
+        );
     }
 }
