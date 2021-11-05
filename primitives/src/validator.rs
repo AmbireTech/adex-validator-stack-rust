@@ -361,7 +361,7 @@ pub mod postgres {
     use super::ValidatorId;
     use crate::ToETHChecksum;
     use bytes::BytesMut;
-    use postgres_types::{FromSql, IsNull, ToSql, Type};
+    use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
     use std::convert::TryFrom;
     use std::error::Error;
 

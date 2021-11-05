@@ -433,7 +433,7 @@ mod test {
 mod postgres {
     use super::UnifiedNum;
     use bytes::BytesMut;
-    use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
+    use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
     use std::{
         convert::{TryFrom, TryInto},
         error::Error,

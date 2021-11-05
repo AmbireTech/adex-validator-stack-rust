@@ -32,7 +32,7 @@ mod postgres {
     use super::EventSubmission;
 
     use bytes::BytesMut;
-    use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
+    use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
     use std::error::Error;
 
     impl<'a> FromSql<'a> for EventSubmission {

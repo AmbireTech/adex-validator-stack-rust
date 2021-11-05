@@ -298,7 +298,7 @@ pub mod postgres {
     use super::{Channel, ChannelId, Nonce};
     use bytes::BytesMut;
     use hex::FromHex;
-    use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
+    use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
     use std::error::Error;
     use tokio_postgres::Row;
 
