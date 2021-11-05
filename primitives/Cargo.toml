@@ -6,7 +6,7 @@ authors = [
   "Lachezar Lechev <lachezar@ambire.com>",
   "Omidiora Samuel <sam@ambire.com>",
 ]
-edition = "2018"
+edition = "2021"
 
 [features]
 postgres = ["bytes", "tokio-postgres", "deadpool-postgres"]
