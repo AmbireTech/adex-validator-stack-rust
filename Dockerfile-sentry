@@ -1,7 +1,7 @@
 # Builder
 FROM rust:latest as builder
 
-LABEL maintainer="dev@adex.network"
+LABEL maintainer="dev@ambire.com"
 
 WORKDIR /usr/src/app
 

@@ -139,7 +139,7 @@ impl<A: Adapter + 'static> SentryApi<A> {
             .await
     }
 
-    /// Get's the last approved state and requesting a [`Heartbeat`], see [`LastApprovedResponse`]
+    /// Get's the last approved state and requesting a [`primitives::validator::Heartbeat`], see [`LastApprovedResponse`]
     pub async fn get_last_approved(
         &self,
         channel: ChannelId,
@@ -344,6 +344,7 @@ pub mod channels {
             .await
     }
 }
+
 pub mod campaigns {
     use chrono::Utc;
     use futures::future::try_join_all;

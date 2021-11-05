@@ -4,7 +4,6 @@
 
 use chrono::Utc;
 use hyper::{Body, Method, Request, Response, StatusCode};
-use lazy_static::lazy_static;
 use middleware::{
     auth::{AuthRequired, Authenticate},
     campaign::{CalledByCreator, CampaignLoad},
@@ -45,6 +44,7 @@ pub mod routes {
 
 pub mod access;
 pub mod analytics_recorder;
+pub mod application;
 pub mod db;
 // TODO AIP#61: remove the even aggregator once we've taken out the logic for AIP#61
 // pub mod event_aggregator;
@@ -53,20 +53,34 @@ pub mod db;
 pub mod payout;
 pub mod spender;
 
-lazy_static! {
-    static ref CHANNEL_GET_BY_ID: Regex =
-        Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
-    static ref LAST_APPROVED_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/last-approved/?$").expect("The regex should be valid");
-    static ref CHANNEL_STATUS_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/status/?$").expect("The regex should be valid");
-    // Only the initial Regex to be matched.
-    static ref CHANNEL_VALIDATOR_MESSAGES: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/validator-messages(/.*)?$").expect("The regex should be valid");
-    static ref CHANNEL_EVENTS_AGGREGATES: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events-aggregates/?$").expect("The regex should be valid");
-    static ref ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
-    static ref ADVERTISER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-advertiser/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
-    static ref PUBLISHER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-publisher/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
-    static ref CREATE_EVENTS_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events/?$").expect("The regex should be valid");
-    static ref CHANNEL_SPENDER_LEAF_AND_TOTAL_DEPOSITED: Regex = Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/spender/0x([a-zA-Z0-9]{40})/?$").expect("This regex should be valid");
-}
+static LAST_APPROVED_BY_CHANNEL_ID: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/last-approved/?$")
+        .expect("The regex should be valid")
+});
+// Only the initial Regex to be matched.
+static CHANNEL_VALIDATOR_MESSAGES: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/validator-messages(/.*)?$")
+        .expect("The regex should be valid")
+});
+static CHANNEL_EVENTS_AGGREGATES: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events-aggregates/?$")
+        .expect("The regex should be valid")
+});
+static ANALYTICS_BY_CHANNEL_ID: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^/analytics/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid")
+});
+static ADVERTISER_ANALYTICS_BY_CHANNEL_ID: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^/analytics/for-advertiser/0x([a-zA-Z0-9]{64})/?$")
+        .expect("The regex should be valid")
+});
+static PUBLISHER_ANALYTICS_BY_CHANNEL_ID: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^/analytics/for-publisher/0x([a-zA-Z0-9]{64})/?$")
+        .expect("The regex should be valid")
+});
+static CHANNEL_SPENDER_LEAF_AND_TOTAL_DEPOSITED: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/spender/0x([a-zA-Z0-9]{40})/?$")
+        .expect("This regex should be valid")
+});
 
 static INSERT_EVENTS_BY_CAMPAIGN_ID: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^/v5/campaign/0x([a-zA-Z0-9]{32})/events/?$").expect("The regex should be valid")
@@ -548,7 +562,7 @@ pub mod test_util {
     use adapter::DummyAdapter;
     use primitives::{
         adapter::DummyAdapterOptions,
-        config::configuration,
+        config::DEVELOPMENT_CONFIG,
         util::tests::{discard_logger, prep_db::IDS},
     };
 
@@ -561,9 +575,10 @@ pub mod test_util {
         Application,
     };
 
-    /// Uses development and therefore the goreli testnet addresses of the tokens
+    /// Uses development and therefore the goerli testnet addresses of the tokens
+    /// It still uses DummyAdapter.
     pub async fn setup_dummy_app() -> Application<DummyAdapter> {
-        let config = configuration("development", None).expect("Should get Config");
+        let config = DEVELOPMENT_CONFIG.clone();
         let adapter = DummyAdapter::init(
             DummyAdapterOptions {
                 dummy_identity: IDS["leader"],

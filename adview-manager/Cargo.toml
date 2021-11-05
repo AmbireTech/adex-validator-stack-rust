@@ -1,5 +1,5 @@
 [package]
-authors = ["Lachezar Lechev <lachezar@adex.network>"]
+authors = ["Ambire <dev@ambire.com>", "Lachezar Lechev <lachezar@ambire.com>"]
 edition = "2018"
 name = "adview-manager"
 version = "0.1.0"

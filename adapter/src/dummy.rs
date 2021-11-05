@@ -172,7 +172,7 @@ impl Adapter for DummyAdapter {
 #[cfg(test)]
 mod test {
     use primitives::{
-        config::configuration,
+        config::DEVELOPMENT_CONFIG,
         util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, IDS},
         BigNum,
     };
@@ -181,7 +181,7 @@ mod test {
 
     #[tokio::test]
     async fn test_deposits_calls() {
-        let config = configuration("development", None).expect("Should get Config");
+        let config = DEVELOPMENT_CONFIG.clone();
         let channel = DUMMY_CAMPAIGN.channel.clone();
         let adapter = DummyAdapter::init(
             DummyAdapterOptions {

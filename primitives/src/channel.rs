@@ -375,7 +375,7 @@ pub mod postgres {
 
     #[cfg(test)]
     mod test {
-        use crate::{channel::Nonce, util::tests::prep_db::postgres::POSTGRES_POOL};
+        use crate::{channel::Nonce, postgres::POSTGRES_POOL};
         #[tokio::test]
         async fn nonce_to_from_sql() {
             let client = POSTGRES_POOL.get().await.unwrap();

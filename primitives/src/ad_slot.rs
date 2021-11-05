@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// See [AdEx Protocol adSlot.md][protocol] & [adex-models AdSlot.js][adex-models] for more details.
+///
 /// [protocol]: https://github.com/AdExNetwork/adex-protocol/blob/master/adSlot.md
 /// [adex-models]: https://github.com/AdExNetwork/adex-models/blob/master/src/models/AdSlot.js
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]

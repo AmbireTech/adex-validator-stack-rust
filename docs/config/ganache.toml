@@ -1,0 +1,55 @@
+# based on: prod.toml
+# Maximum number of channels to return per request
+max_channels = 512
+
+channels_find_limit = 512
+campaigns_find_limit = 512
+spendable_find_limit = 512
+
+wait_time = 40000
+
+# V4 Deprecated
+aggr_throttle = 0
+
+events_find_limit = 100
+
+msgs_find_limit = 10
+analytics_find_limit_v5 = 5000
+analytics_maxtime_v5 = 15000
+
+heartbeat_time = 60000
+health_threshold_promilles = 970
+health_unsignable_promilles = 770
+propagation_timeout = 3000
+
+fetch_timeout = 10000
+all_campaigns_timeout = 10000
+channel_tick_timeout = 10000
+
+ip_rate_limit = { type = 'ip', timeframe = 1200000 }
+sid_rate_limit = { type = 'sid', timeframe = 0 }
+
+# Ganache Snapshot address
+outpace_address = '0xcb097e455b7159f902e2eb45562fc397ae6b0f3d'
+# Ganache Snapshot address
+sweeper_address = '0xdd41b0069256a28972458199a3c9cf036384c156'
+
+ethereum_network = 'http://localhost:8545'
+# Mocked relayer
+# TODO: Remove #452 
+ethereum_adapter_relayer = 'http://localhost:8888'
+
+creators_whitelist = []
+validators_whitelist = []
+
+
+[[token_address_whitelist]]
+# Mocked TOKEN
+address = '0x9db7bff788522dbe8fa2e8cbd568a58c471ccd5e'
+# 1 * 10^18 = 1.0000 TOKEN
+min_token_units_for_deposit = '1000000000000000000'
+# multiplier = 10^14 - 10^18 (token precision) = 10^-4
+# min_validator_fee = 1 * 10^-4 = 0.000_1
+min_validator_fee = '100000000000000'
+precision = 18
+
