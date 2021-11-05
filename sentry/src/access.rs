@@ -169,7 +169,7 @@ mod test {
 
     use chrono::TimeZone;
     use primitives::{
-        config::{DEVELOPMENT_CONFIG},
+        config::DEVELOPMENT_CONFIG,
         event_submission::{RateLimit, Rule},
         sentry::Event,
         util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, IDS},

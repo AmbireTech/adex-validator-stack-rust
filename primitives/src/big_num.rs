@@ -323,8 +323,8 @@ where
 pub mod postgres {
     use super::BigNum;
     use bytes::BytesMut;
-    use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
     use std::error::Error;
+    use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
     impl<'a> FromSql<'a> for BigNum {
         fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<BigNum, Box<dyn Error + Sync + Send>> {

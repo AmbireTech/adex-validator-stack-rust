@@ -1228,8 +1228,8 @@ fn math_operator(lhs: Number, rhs: Number, ops: MathOperator) -> Result<Number, 
 pub mod postgres {
     use super::*;
     use bytes::BytesMut;
-    use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
     use std::error::Error;
+    use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
 
     impl ToSql for Rules {
         fn to_sql(

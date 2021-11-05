@@ -32,8 +32,8 @@ mod postgres {
     use super::EventSubmission;
 
     use bytes::BytesMut;
-    use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
     use std::error::Error;
+    use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
 
     impl<'a> FromSql<'a> for EventSubmission {
         fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {

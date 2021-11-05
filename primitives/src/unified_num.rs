@@ -433,11 +433,11 @@ mod test {
 mod postgres {
     use super::UnifiedNum;
     use bytes::BytesMut;
-    use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
     use std::{
         convert::{TryFrom, TryInto},
         error::Error,
     };
+    use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
 
     impl<'a> FromSql<'a> for UnifiedNum {
         fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<UnifiedNum, Box<dyn Error + Sync + Send>> {

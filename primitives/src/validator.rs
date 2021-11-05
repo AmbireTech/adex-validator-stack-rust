@@ -361,9 +361,9 @@ pub mod postgres {
     use super::ValidatorId;
     use crate::ToETHChecksum;
     use bytes::BytesMut;
-    use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
     use std::convert::TryFrom;
     use std::error::Error;
+    use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
     impl<'a> FromSql<'a> for ValidatorId {
         fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
