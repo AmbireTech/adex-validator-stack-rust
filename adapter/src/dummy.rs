@@ -182,7 +182,7 @@ mod test {
     #[tokio::test]
     async fn test_deposits_calls() {
         let config = DEVELOPMENT_CONFIG.clone();
-        let channel = DUMMY_CAMPAIGN.channel.clone();
+        let channel = DUMMY_CAMPAIGN.channel;
         let adapter = DummyAdapter::init(
             DummyAdapterOptions {
                 dummy_identity: IDS["leader"],

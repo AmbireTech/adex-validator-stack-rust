@@ -543,7 +543,7 @@ mod test {
                 ValidatorId::try_from("2892f6C41E0718eeeDd49D98D648C789668cA67d")
                     .expect("Failed to parse id"),
                 "8bc45d8eb27f4c98cab35d17b0baecc2a263d6831ef0800f4c190cbfac6d20a3",
-                &signature,
+                signature,
             )
             .expect("Failed to verify signatures");
 
@@ -551,7 +551,7 @@ mod test {
         let message2 = "1648231285e69677531ffe70719f67a07f3d4393b8425a5a1c84b0c72434c77b";
 
         let verify2 = eth_adapter
-            .verify(IDS["leader"], message2, &signature2)
+            .verify(IDS["leader"], message2, signature2)
             .expect("Failed to verify signatures");
 
         assert!(verify, "invalid signature 1 verification");
@@ -635,7 +635,7 @@ mod test {
 
     #[tokio::test]
     async fn get_deposit_and_count_create2_when_min_tokens_received() {
-        let web3 = Web3::new(Http::new(&GANACHE_URL).expect("failed to init transport"));
+        let web3 = Web3::new(Http::new(GANACHE_URL).expect("failed to init transport"));
 
         let leader_account = GANACHE_ADDRESSES["leader"];
 
