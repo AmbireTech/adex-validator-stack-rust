@@ -410,7 +410,7 @@ mod test {
     use adapter::DummyAdapter;
     use primitives::{
         adapter::DummyAdapterOptions,
-        config::configuration,
+        config::{configuration, Environment},
         sentry::Pagination,
         util::tests::{
             discard_logger,
@@ -543,7 +543,7 @@ mod test {
             },
         );
 
-        let mut config = configuration("development", None).expect("Should get Config");
+        let mut config = configuration(Environment::Development, None).expect("Should get Config");
         config.spendable_find_limit = 2;
 
         let adapter = DummyAdapter::init(
