@@ -334,13 +334,19 @@ pub mod tests_postgres {
                 // set the database in the configuration of the inside Pool (used for tests)
                 config.dbname(&database.name);
 
-                let manager =
-                    deadpool_postgres::Manager::from_config(config, NoTls, self.manager_config.clone());
-                
+                let manager = deadpool_postgres::Manager::from_config(
+                    config,
+                    NoTls,
+                    self.manager_config.clone(),
+                );
+
                 deadpool_postgres::Pool::new(manager, 15)
             };
 
-            let result = database.pool.get().await?
+            let result = database
+                .pool
+                .get()
+                .await?
                 .simple_query(queries)
                 .await
                 .map_err(PoolError::Backend)

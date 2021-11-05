@@ -227,7 +227,7 @@ pub async fn get_advanced_reports(
 pub async fn insert_analytics(
     pool: &DbPool,
     event: &EventAnalytics,
-) -> Result<EventAnalytics, PoolError> {
+) -> Result<(EventAnalytics, i32), PoolError> {
     let client = pool.get().await?;
     let initial_count = 1;
 
@@ -270,7 +270,10 @@ pub async fn insert_analytics(
         )
         .await?;
 
-    Ok(EventAnalytics::from(&row))
+    let payout_count: i32 = row.get("payout_count");
+    let event_analytics = EventAnalytics::from(&row);
+
+    Ok((event_analytics, payout_count))
 }
 
 pub async fn find_analytics(
@@ -360,12 +363,13 @@ mod test {
                 payout_amount: UnifiedNum::from_u64(1_000_000),
             };
 
-            let insert_res = insert_analytics(&database.clone(), &analytics.clone())
-                .await
-                .expect("Should insert");
+            let (insert_res, payout_count) =
+                insert_analytics(&database.clone(), &analytics.clone())
+                    .await
+                    .expect("Should insert");
 
             assert_eq!(insert_res.campaign_id, analytics.campaign_id);
-            assert_eq!(insert_res.time, analytics.time);
+            assert_eq!(insert_res.time.date(), analytics.time.date());
             assert_eq!(insert_res.ad_unit, analytics.ad_unit);
             assert_eq!(insert_res.ad_slot, analytics.ad_slot);
             assert_eq!(insert_res.ad_slot_type, analytics.ad_slot_type);
@@ -376,11 +380,13 @@ mod test {
             assert_eq!(insert_res.os_name, analytics.os_name);
             assert_eq!(insert_res.event_type, analytics.event_type);
             assert_eq!(insert_res.payout_amount, UnifiedNum::from_u64(1_000_000));
+            assert_eq!(payout_count, 1);
 
-            let update_res = insert_analytics(&database.clone(), &analytics)
+            let (update_res, payout_count) = insert_analytics(&database.clone(), &analytics)
                 .await
                 .expect("Should insert");
             assert_eq!(update_res.payout_amount, UnifiedNum::from_u64(2_000_000));
+            assert_eq!(payout_count, 1);
         }
         {
             let analytics_with_empty_fields = EventAnalytics {
@@ -398,7 +404,7 @@ mod test {
                 payout_amount: UnifiedNum::from_u64(1_000_000),
             };
 
-            let insert_res = insert_analytics(&database.clone(), &analytics_with_empty_fields)
+            let (insert_res, _) = insert_analytics(&database.clone(), &analytics_with_empty_fields)
                 .await
                 .expect("Should insert");
 
