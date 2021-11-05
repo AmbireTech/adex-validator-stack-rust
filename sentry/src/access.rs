@@ -169,7 +169,7 @@ mod test {
 
     use chrono::TimeZone;
     use primitives::{
-        config::configuration,
+        config::{configuration, Environment, DEVELOPMENT_CONFIG},
         event_submission::{RateLimit, Rule},
         sentry::Event,
         util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, IDS},
@@ -187,7 +187,7 @@ mod test {
 
     async fn setup() -> (Config, Object<Manager>) {
         let connection = TESTS_POOL.get().await.expect("Should return Object");
-        let config = configuration("development", None).expect("Failed to get dev configuration");
+        let config = DEVELOPMENT_CONFIG.clone();
 
         (config, connection)
     }

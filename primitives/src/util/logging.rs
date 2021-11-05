@@ -1,13 +1,23 @@
-use slog::{Drain, OwnedKVList, Record, KV};
+use slog::{o, Drain, Logger, OwnedKVList, Record, KV};
 use slog_term::{
     timestamp_local, CompactFormatSerializer, CountingWriter, Decorator, RecordDecorator,
     Serializer, ThreadSafeTimestampFn,
 };
-use std::cell::RefCell;
-use std::{io, io::Write};
+use std::{
+    cell::RefCell,
+    io::{Error, Result, Write},
+};
 
 pub use slog_async::Async;
 pub use slog_term::TermDecorator;
+
+pub fn new_logger(prefix: &str) -> Logger {
+    let decorator = TermDecorator::new().build();
+    let drain = PrefixedCompactFormat::new(prefix, decorator).fuse();
+    let drain = Async::new(drain).build().fuse();
+
+    Logger::root(drain, o!())
+}
 
 pub struct PrefixedCompactFormat<D>
 where
@@ -15,7 +25,7 @@ where
 {
     decorator: D,
     history: RefCell<Vec<(Vec<u8>, Vec<u8>)>>,
-    fn_timestamp: Box<dyn ThreadSafeTimestampFn<Output = io::Result<()>>>,
+    fn_timestamp: Box<dyn ThreadSafeTimestampFn<Output = Result<()>>>,
     prefix: String,
 }
 
@@ -24,9 +34,9 @@ where
     D: Decorator,
 {
     type Ok = ();
-    type Err = io::Error;
+    type Err = Error;
 
-    fn log(&self, record: &Record<'_>, values: &OwnedKVList) -> Result<Self::Ok, Self::Err> {
+    fn log(&self, record: &Record<'_>, values: &OwnedKVList) -> Result<Self::Ok> {
         self.format_compact(record, values)
     }
 }
@@ -44,7 +54,7 @@ where
         }
     }
 
-    fn format_compact(&self, record: &Record<'_>, values: &OwnedKVList) -> io::Result<()> {
+    fn format_compact(&self, record: &Record<'_>, values: &OwnedKVList) -> Result<()> {
         self.decorator.with_record(record, values, |decorator| {
             let indent = {
                 let mut history_ref = self.history.borrow_mut();
@@ -83,10 +93,10 @@ where
 
 pub fn print_msg_header(
     prefix: &str,
-    fn_timestamp: &dyn ThreadSafeTimestampFn<Output = io::Result<()>>,
+    fn_timestamp: &dyn ThreadSafeTimestampFn<Output = Result<()>>,
     mut rd: &mut dyn RecordDecorator,
     record: &Record<'_>,
-) -> io::Result<bool> {
+) -> Result<bool> {
     rd.start_timestamp()?;
     fn_timestamp(&mut rd)?;
 

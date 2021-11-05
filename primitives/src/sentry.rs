@@ -227,6 +227,7 @@ pub struct AllSpendersResponse {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AllSpendersQuery {
     // default is `u64::default()` = `0`
+    #[serde(default)]
     pub page: u64,
 }
 
@@ -440,9 +441,11 @@ pub mod campaign_create {
     };
 
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+    #[serde(rename_all = "camelCase")]
     /// All fields are present except the `CampaignId` which is randomly created
     /// This struct defines the Body of the request (in JSON)
     pub struct CreateCampaign {
+        pub id: Option<CampaignId>,
         pub channel: Channel,
         pub creator: Address,
         pub budget: UnifiedNum,
@@ -470,10 +473,11 @@ pub mod campaign_create {
     }
 
     impl CreateCampaign {
-        /// Creates the new `Campaign` with randomly generated `CampaignId`
+        /// Creates a new [`Campaign`]
+        /// If [`CampaignId`] was not provided with the request it will be generated using [`CampaignId::new()`]
         pub fn into_campaign(self) -> Campaign {
             Campaign {
-                id: CampaignId::new(),
+                id: self.id.unwrap_or_else(CampaignId::new),
                 channel: self.channel,
                 creator: self.creator,
                 budget: self.budget,
@@ -487,13 +491,13 @@ pub mod campaign_create {
                 active: self.active,
             }
         }
-    }
 
-    /// This implementation helps with test setup
-    /// **NOTE:** It erases the CampaignId, since the creation of the campaign gives it's CampaignId
-    impl From<Campaign> for CreateCampaign {
-        fn from(campaign: Campaign) -> Self {
-            Self {
+        /// Creates a [`CreateCampaign`] without using the [`Campaign.id`].
+        /// You can either pass [`None`] to randomly generate a new [`CampaignId`].
+        /// Or you can pass a [`CampaignId`] to be used for the [`CreateCampaign`].
+        pub fn from_campaign_erased(campaign: Campaign, id: Option<CampaignId>) -> Self {
+            CreateCampaign {
+                id,
                 channel: campaign.channel,
                 creator: campaign.creator,
                 budget: campaign.budget,
@@ -507,7 +511,34 @@ pub mod campaign_create {
                 active: campaign.active,
             }
         }
+
+        /// This function will retains the original [`Campaign.id`] ([`CampaignId`]).
+        pub fn from_campaign(campaign: Campaign) -> Self {
+            let id = Some(campaign.id);
+            Self::from_campaign_erased(campaign, id)
+        }
     }
+
+    // /// This implementation helps with test setup
+    // /// **NOTE:** It erases the CampaignId, since the creation of the campaign gives it's CampaignId
+    // impl From<Campaign> for CreateCampaign {
+    //     fn from(campaign: Campaign) -> Self {
+    //         Self {
+    //             id: Some(campaign.id),
+    //             channel: campaign.channel,
+    //             creator: campaign.creator,
+    //             budget: campaign.budget,
+    //             validators: campaign.validators,
+    //             title: campaign.title,
+    //             pricing_bounds: campaign.pricing_bounds,
+    //             event_submission: campaign.event_submission,
+    //             ad_units: campaign.ad_units,
+    //             targeting_rules: campaign.targeting_rules,
+    //             created: campaign.created,
+    //             active: campaign.active,
+    //         }
+    //     }
+    // }
 
     // All editable fields stored in one place, used for checking when a budget is changed
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

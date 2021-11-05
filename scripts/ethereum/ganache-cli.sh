@@ -3,12 +3,12 @@
 
 # runs in Docker, so leave default port and export it instead of setting it up here
 
-# Address 0: 0xDf08F82De32B8d460adbE8D72043E3a7e25A3B39
-# Address 1: 0x5a04A8fB90242fB7E1db7d1F51e268A03b7f93A5
-# Address 2: 0xe3896ebd3F32092AFC7D27e9ef7b67E26C49fB02
-# Address 3: 0x0E45891a570Af9e5A962F181C219468A6C9EB4e1
-# Address 4: 0x8c4B95383a46D30F056aCe085D8f453fCF4Ed66d
-# Address 5: 0x1059B025E3F8b8f76A8120D6D6Fd9fBa172c80b8
+# Address 0: 0xDf08F82De32B8d460adbE8D72043E3a7e25A3B39 keystore password: address0
+# Address 1: 0x5a04A8fB90242fB7E1db7d1F51e268A03b7f93A5 keystore password: address1
+# Address 2: 0xe3896ebd3F32092AFC7D27e9ef7b67E26C49fB02 keystore password: address2
+# Address 3: 0x0E45891a570Af9e5A962F181C219468A6C9EB4e1 keystore password: address3
+# Address 4: 0x8c4B95383a46D30F056aCe085D8f453fCF4Ed66d keystore password: address4
+# Address 5: 0x1059B025E3F8b8f76A8120D6D6Fd9fBa172c80b8 keystore password: address5
 node /app/ganache-core.docker.cli.js --gasLimit 0xfffffffffffff \
   --db="./snapshot" \
   --deterministic \

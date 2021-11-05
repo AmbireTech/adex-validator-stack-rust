@@ -1,5 +1,5 @@
 use crate::{
-    campaign::{self, Active, Validators},
+    campaign::{Active, Pricing, PricingBounds, Validators},
     channel::Nonce,
     targeting::Rules,
     AdUnit, Address, Campaign, Channel, ChannelId, EventSubmission, UnifiedNum, ValidatorDesc,
@@ -30,7 +30,7 @@ lazy_static! {
     pub static ref ADDRESSES: HashMap<String, Address> = {
         let mut addresses = HashMap::new();
 
-        addresses.insert("leader".into(),  Address::try_from("0xce07CbB7e054514D590a0262C93070D838bFBA2e").expect("failed to parse id"));
+        addresses.insert("leader".into(), Address::try_from("0xce07CbB7e054514D590a0262C93070D838bFBA2e").expect("failed to parse id"));
         addresses.insert("follower".into(), Address::try_from("0xc91763d7f14ac5c5ddfbcd012e0d2a61ab9bded3").expect("failed to parse id"));
         addresses.insert("user".into(), Address::try_from("0x20754168c00a6e58116ccfd0a5f7d1bb66c5de9d").expect("failed to parse id"));
         addresses.insert("publisher".into(), Address::try_from("0xb7d3f81e857692d13e9d63b232a90f4a1793189e").expect("failed to parse id"));
@@ -96,7 +96,7 @@ lazy_static! {
             budget: UnifiedNum::from(100_000_000_000),
             validators: Validators::new((DUMMY_VALIDATOR_LEADER.clone(), DUMMY_VALIDATOR_FOLLOWER.clone())),
             title: Some("Dummy Campaign".to_string()),
-            pricing_bounds: Some(campaign::PricingBounds {impression: Some(campaign::Pricing { min: 1.into(), max: 10.into()}), click: Some(campaign::Pricing { min: 0.into(), max: 0.into()})}),
+            pricing_bounds: Some(PricingBounds {impression: Some(Pricing { min: 1.into(), max: 10.into()}), click: Some(Pricing { min: 0.into(), max: 0.into()})}),
             event_submission: Some(EventSubmission { allow: vec![] }),
             ad_units: vec![],
             targeting_rules: Rules::new(),
@@ -187,49 +187,4 @@ lazy_static! {
         IPFS::try_from("bafybeif2h3mynaf3ylgdbs6arf6mczqycargt5cqm3rmel3wpjarlswway").expect("Valid IPFS V1"),
     ];
 
-}
-
-#[cfg(all(test, feature = "postgres"))]
-pub mod postgres {
-    use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
-    use lazy_static::lazy_static;
-    use once_cell::sync::Lazy;
-    use std::env;
-    use tokio_postgres::{Config, NoTls};
-
-    // TODO: Fix these values for usage in CI
-    lazy_static! {
-        static ref POSTGRES_USER: String =
-            env::var("POSTGRES_USER").unwrap_or_else(|_| String::from("postgres"));
-        static ref POSTGRES_PASSWORD: String =
-            env::var("POSTGRES_PASSWORD").unwrap_or_else(|_| String::from("postgres"));
-        static ref POSTGRES_HOST: String =
-            env::var("POSTGRES_HOST").unwrap_or_else(|_| String::from("localhost"));
-        static ref POSTGRES_PORT: u16 = env::var("POSTGRES_PORT")
-            .unwrap_or_else(|_| String::from("5432"))
-            .parse()
-            .unwrap();
-        static ref POSTGRES_DB: Option<String> = env::var("POSTGRES_DB").ok();
-    }
-
-    pub static POSTGRES_POOL: Lazy<Pool> = Lazy::new(|| {
-        let mut config = Config::new();
-
-        config
-            .user(&POSTGRES_USER)
-            .password(POSTGRES_PASSWORD.as_str())
-            .host(&POSTGRES_HOST)
-            .port(*POSTGRES_PORT);
-
-        if let Some(db) = POSTGRES_DB.as_ref() {
-            config.dbname(db);
-        }
-
-        let mgr_config = ManagerConfig {
-            recycling_method: RecyclingMethod::Fast,
-        };
-        let mgr = Manager::from_config(config, NoTls, mgr_config);
-        let pool = Pool::new(mgr, 16);
-        pool
-    });
 }
