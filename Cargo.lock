@@ -2600,7 +2600,6 @@ dependencies = [
  "fake",
  "futures",
  "hex",
- "lazy_static",
  "merkletree",
  "num",
  "num-derive",
