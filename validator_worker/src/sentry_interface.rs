@@ -426,7 +426,6 @@ mod test {
         Mock, MockServer, ResponseTemplate,
     };
 
-
     #[tokio::test]
     async fn test_get_all_spenders() {
         let server = MockServer::start().await;
@@ -443,14 +442,12 @@ mod test {
                 total_pages: 3,
             },
         };
-        first_page_response.spenders.insert(
-            ADDRESSES["user"],
-            test_spender.clone(),
-        );
-        first_page_response.spenders.insert(
-            ADDRESSES["publisher"],
-            test_spender.clone(),
-        );
+        first_page_response
+            .spenders
+            .insert(ADDRESSES["user"], test_spender.clone());
+        first_page_response
+            .spenders
+            .insert(ADDRESSES["publisher"], test_spender.clone());
 
         let mut second_page_response = AllSpendersResponse {
             spenders: HashMap::new(),
@@ -459,14 +456,12 @@ mod test {
                 total_pages: 3,
             },
         };
-        second_page_response.spenders.insert(
-            ADDRESSES["publisher2"],
-            test_spender.clone(),
-        );
-        second_page_response.spenders.insert(
-            ADDRESSES["creator"],
-            test_spender.clone(),
-        );
+        second_page_response
+            .spenders
+            .insert(ADDRESSES["publisher2"], test_spender.clone());
+        second_page_response
+            .spenders
+            .insert(ADDRESSES["creator"], test_spender.clone());
 
         let mut third_page_response = AllSpendersResponse {
             spenders: HashMap::new(),
@@ -475,10 +470,9 @@ mod test {
                 total_pages: 3,
             },
         };
-        third_page_response.spenders.insert(
-            ADDRESSES["tester"],
-            test_spender.clone(),
-        );
+        third_page_response
+            .spenders
+            .insert(ADDRESSES["tester"], test_spender.clone());
 
         Mock::given(method("GET"))
             .and(path(format!(
@@ -535,26 +529,11 @@ mod test {
             SentryApi::init(adapter, logger, config, validators).expect("Should build sentry");
 
         let mut expected_response = HashMap::new();
-        expected_response.insert(
-            ADDRESSES["user"],
-            test_spender.clone(),
-        );
-        expected_response.insert(
-            ADDRESSES["publisher"],
-            test_spender.clone(),
-        );
-        expected_response.insert(
-            ADDRESSES["publisher2"],
-            test_spender.clone(),
-        );
-        expected_response.insert(
-            ADDRESSES["creator"],
-            test_spender.clone(),
-        );
-        expected_response.insert(
-            ADDRESSES["tester"],
-            test_spender.clone(),
-        );
+        expected_response.insert(ADDRESSES["user"], test_spender.clone());
+        expected_response.insert(ADDRESSES["publisher"], test_spender.clone());
+        expected_response.insert(ADDRESSES["publisher2"], test_spender.clone());
+        expected_response.insert(ADDRESSES["creator"], test_spender.clone());
+        expected_response.insert(ADDRESSES["tester"], test_spender.clone());
 
         let res = sentry
             .get_all_spenders(DUMMY_CAMPAIGN.channel.id())
@@ -565,7 +544,9 @@ mod test {
         // Is page 1 included
         assert!(res.contains_key(&ADDRESSES["user"]) && res.contains_key(&ADDRESSES["publisher"]));
         // Is page 2 included
-        assert!(res.contains_key(&ADDRESSES["publisher2"]) && res.contains_key(&ADDRESSES["creator"]));
+        assert!(
+            res.contains_key(&ADDRESSES["publisher2"]) && res.contains_key(&ADDRESSES["creator"])
+        );
         // Is page 3 included
         assert!(res.contains_key(&ADDRESSES["tester"]));
     }
