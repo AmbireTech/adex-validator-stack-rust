@@ -426,17 +426,15 @@ mod test {
         Mock, MockServer, ResponseTemplate,
     };
 
+
     #[tokio::test]
     async fn test_get_all_spenders() {
-        // We need to use a custom port as the request will fail on any other port
-        let listener = std::net::TcpListener::bind("localhost:8005").unwrap();
-        let expected_server_address = listener
-            .local_addr()
-            .expect("Failed to get server address.");
-        let server = MockServer::builder().listener(listener).start().await;
+        let server = MockServer::start().await;
 
-        // Verifying our server is running on the correct address and port
-        assert_eq!(&expected_server_address, server.address());
+        let test_spender = Spender {
+            total_deposited: UnifiedNum::from(100_000_000),
+            spender_leaf: None,
+        };
 
         let mut first_page_response = AllSpendersResponse {
             spenders: HashMap::new(),
@@ -447,17 +445,11 @@ mod test {
         };
         first_page_response.spenders.insert(
             ADDRESSES["user"],
-            Spender {
-                total_deposited: UnifiedNum::from(100_000_000),
-                spender_leaf: None,
-            },
+            test_spender.clone(),
         );
         first_page_response.spenders.insert(
             ADDRESSES["publisher"],
-            Spender {
-                total_deposited: UnifiedNum::from(100_000_000),
-                spender_leaf: None,
-            },
+            test_spender.clone(),
         );
 
         let mut second_page_response = AllSpendersResponse {
@@ -469,17 +461,11 @@ mod test {
         };
         second_page_response.spenders.insert(
             ADDRESSES["publisher2"],
-            Spender {
-                total_deposited: UnifiedNum::from(100_000_000),
-                spender_leaf: None,
-            },
+            test_spender.clone(),
         );
         second_page_response.spenders.insert(
             ADDRESSES["creator"],
-            Spender {
-                total_deposited: UnifiedNum::from(100_000_000),
-                spender_leaf: None,
-            },
+            test_spender.clone(),
         );
 
         let mut third_page_response = AllSpendersResponse {
@@ -491,10 +477,7 @@ mod test {
         };
         third_page_response.spenders.insert(
             ADDRESSES["tester"],
-            Spender {
-                total_deposited: UnifiedNum::from(100_000_000),
-                spender_leaf: None,
-            },
+            test_spender.clone(),
         );
 
         Mock::given(method("GET"))
@@ -531,18 +514,10 @@ mod test {
         validators.insert(
             DUMMY_VALIDATOR_LEADER.id,
             Validator {
-                url: ApiUrl::from_str(&DUMMY_VALIDATOR_LEADER.url).expect("Should parse"),
+                url: ApiUrl::from_str(&server.uri()).expect("Should parse"),
                 token: AuthToken::default(),
             },
         );
-        validators.insert(
-            DUMMY_VALIDATOR_FOLLOWER.id,
-            Validator {
-                url: ApiUrl::from_str(&DUMMY_VALIDATOR_FOLLOWER.url).expect("Should parse"),
-                token: AuthToken::default(),
-            },
-        );
-
         let mut config = configuration(Environment::Development, None).expect("Should get Config");
         config.spendable_find_limit = 2;
 
@@ -562,38 +537,23 @@ mod test {
         let mut expected_response = HashMap::new();
         expected_response.insert(
             ADDRESSES["user"],
-            Spender {
-                total_deposited: UnifiedNum::from(100_000_000),
-                spender_leaf: None,
-            },
+            test_spender.clone(),
         );
         expected_response.insert(
             ADDRESSES["publisher"],
-            Spender {
-                total_deposited: UnifiedNum::from(100_000_000),
-                spender_leaf: None,
-            },
+            test_spender.clone(),
         );
         expected_response.insert(
             ADDRESSES["publisher2"],
-            Spender {
-                total_deposited: UnifiedNum::from(100_000_000),
-                spender_leaf: None,
-            },
+            test_spender.clone(),
         );
         expected_response.insert(
             ADDRESSES["creator"],
-            Spender {
-                total_deposited: UnifiedNum::from(100_000_000),
-                spender_leaf: None,
-            },
+            test_spender.clone(),
         );
         expected_response.insert(
             ADDRESSES["tester"],
-            Spender {
-                total_deposited: UnifiedNum::from(100_000_000),
-                spender_leaf: None,
-            },
+            test_spender.clone(),
         );
 
         let res = sentry
@@ -601,9 +561,12 @@ mod test {
             .await
             .expect("should get response");
 
-        assert!(
-            expected_response.keys().len() == res.keys().len()
-                && expected_response.keys().all(|k| res.contains_key(k))
-        );
+        assert!(expected_response.keys().len() == res.keys().len());
+        // Is page 1 included
+        assert!(res.contains_key(&ADDRESSES["user"]) && res.contains_key(&ADDRESSES["publisher"]));
+        // Is page 2 included
+        assert!(res.contains_key(&ADDRESSES["publisher2"]) && res.contains_key(&ADDRESSES["creator"]));
+        // Is page 3 included
+        assert!(res.contains_key(&ADDRESSES["tester"]));
     }
 }
