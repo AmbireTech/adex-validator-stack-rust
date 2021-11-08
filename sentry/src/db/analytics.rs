@@ -386,7 +386,7 @@ mod test {
                 .await
                 .expect("Should insert");
             assert_eq!(update_res.payout_amount, UnifiedNum::from_u64(2_000_000));
-            assert_eq!(payout_count, 1);
+            assert_eq!(payout_count, 2);
         }
         {
             let analytics_with_empty_fields = EventAnalytics {
