@@ -89,30 +89,18 @@ pub enum OperatingSystem {
     Other,
 }
 
+impl Default for OperatingSystem {
+    fn default() -> Self {
+        Self::Other
+    }
+}
+
 impl From<String> for OperatingSystem {
     fn from(operating_system: String) -> Self {
         match operating_system.as_str() {
             "Linux" => OperatingSystem::Linux,
             "Other" => OperatingSystem::Other,
             _ => OperatingSystem::Whitelisted(operating_system),
-        }
-    }
-}
-
-impl OperatingSystem {
-    pub fn map_os(os_name: &str) -> OperatingSystem {
-        if OperatingSystem::LINUX_DISTROS
-            .iter()
-            .any(|distro| os_name.eq(*distro))
-        {
-            OperatingSystem::Linux
-        } else if OperatingSystem::WHITELISTED
-            .iter()
-            .any(|whitelisted| os_name.eq(*whitelisted))
-        {
-            OperatingSystem::Whitelisted(os_name.into())
-        } else {
-            OperatingSystem::Other
         }
     }
 }
@@ -163,6 +151,22 @@ impl OperatingSystem {
         "Symbian",
         "KAIOS",
     ];
+
+    pub fn map_os(os_name: &str) -> OperatingSystem {
+        if OperatingSystem::LINUX_DISTROS
+            .iter()
+            .any(|distro| os_name.eq(*distro))
+        {
+            OperatingSystem::Linux
+        } else if OperatingSystem::WHITELISTED
+            .iter()
+            .any(|whitelisted| os_name.eq(*whitelisted))
+        {
+            OperatingSystem::Whitelisted(os_name.into())
+        } else {
+            OperatingSystem::Other
+        }
+    }
 }
 
 impl AnalyticsQuery {

@@ -239,30 +239,20 @@ pub async fn insert_analytics(
 
     let stmt = client.prepare(query).await?;
 
-    let ad_unit = match event.ad_unit {
-        Some(ipfs) => ipfs.to_string(),
-        None => "".to_string(),
-    };
-
-    let ad_slot = match event.ad_slot {
-        Some(ipfs) => ipfs.to_string(),
-        None => "".to_string(),
-    };
-
     let row = client
         .query_one(
             &stmt,
             &[
                 &event.campaign_id,
                 &event.time,
-                &ad_unit,
-                &ad_slot,
-                &event.ad_slot_type.as_ref().unwrap_or(&"".to_string()),
+                &event.ad_unit,
+                &event.ad_slot,
+                &event.ad_slot_type,
                 &event.advertiser,
                 &event.publisher,
-                &event.hostname.as_ref().unwrap_or(&"".to_string()),
-                &event.country.as_ref().unwrap_or(&"".to_string()),
-                &event.os_name.to_string(),
+                &event.hostname,
+                &event.country,
+                &event.os_name,
                 &event.event_type,
                 &event.payout_amount,
                 &initial_count,
@@ -287,30 +277,20 @@ pub async fn find_analytics(
 
     let stmt = client.prepare(query).await?;
 
-    let ad_unit = match event.ad_unit {
-        Some(ipfs) => ipfs.to_string(),
-        None => "".to_string(),
-    };
-
-    let ad_slot = match event.ad_slot {
-        Some(ipfs) => ipfs.to_string(),
-        None => "".to_string(),
-    };
-
     let row = client
         .query_one(
             &stmt,
             &[
                 &event.campaign_id,
                 &event.time,
-                &ad_unit,
-                &ad_slot,
-                &event.ad_slot_type.as_ref().unwrap_or(&"".to_string()),
+                &event.ad_unit,
+                &event.ad_slot,
+                &event.ad_slot_type,
                 &event.advertiser,
                 &event.publisher,
-                &event.hostname.as_ref().unwrap_or(&"".to_string()),
-                &event.country.as_ref().unwrap_or(&"".to_string()),
-                &event.os_name.to_string(),
+                &event.hostname,
+                &event.country,
+                &event.os_name,
                 &event.event_type,
             ],
         )

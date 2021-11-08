@@ -2,7 +2,7 @@ use crate::{
     db::{analytics::insert_analytics, DbPool, PoolError},
     Session,
 };
-use chrono::Utc;
+use chrono::{Timelike, Utc};
 use primitives::{
     analytics::OperatingSystem,
     sentry::{Event, EventAnalytics},
@@ -16,8 +16,13 @@ pub async fn record(
     session: &Session,
     events_with_payouts: Vec<(Event, Address, UnifiedNum)>,
 ) -> Result<(), PoolError> {
-    let os_name = OperatingSystem::map_os(session.os.as_ref().unwrap_or(&"".to_string()));
-    let time = Utc::now();
+    let os_name = session.os.as_ref().map(|os| OperatingSystem::map_os(os)).unwrap_or_default();
+    let time = {
+        let full_utc = Utc::now();
+
+        // leave only the Hour portion and erase the minutes & seconds
+        full_utc.date().and_hms(full_utc.hour(), 0, 0)
+    };
 
     for (event, _payout_addr, payout_amount) in events_with_payouts {
         let event_type = event.to_string();
@@ -67,7 +72,7 @@ pub async fn record(
             publisher,
             hostname,
             country: session.country.to_owned(),
-            os_name: os_name.to_owned(),
+            os_name: os_name.clone(),
             event_type,
             payout_amount,
         };
@@ -138,7 +143,7 @@ mod test {
 
         record(&database.clone(), &campaign, &session, input_events.clone())
             .await
-            .expect("should recorc");
+            .expect("should record");
 
         let query_click_event = EventAnalytics {
             time: Utc::now(),
