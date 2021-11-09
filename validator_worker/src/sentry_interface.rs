@@ -161,6 +161,7 @@ impl<A: Adapter + 'static> SentryApi<A> {
             .map_err(Error::Request)
     }
 
+    /// page always starts from 0
     pub async fn get_spenders_page(
         &self,
         channel: &ChannelId,
@@ -172,7 +173,7 @@ impl<A: Adapter + 'static> SentryApi<A> {
             .join(&format!("v5/channel/{}/spender/all?page={}", channel, page))
             .expect("Should not error when creating endpoint");
 
-        let first_page: AllSpendersResponse = self
+        let page = self
             .client
             .get(url)
             .bearer_auth(&self.whoami.token)
@@ -181,8 +182,7 @@ impl<A: Adapter + 'static> SentryApi<A> {
             .json()
             .map_err(Error::Request)
             .await?;
-
-        Ok(first_page)
+        Ok(page)
     }
 
     pub async fn get_all_spenders(
@@ -429,50 +429,48 @@ mod test {
     #[tokio::test]
     async fn test_get_all_spenders() {
         let server = MockServer::start().await;
-
         let test_spender = Spender {
             total_deposited: UnifiedNum::from(100_000_000),
             spender_leaf: None,
         };
+        let mut all_spenders = HashMap::new();
+        all_spenders.insert(ADDRESSES["user"], test_spender.clone());
+        all_spenders.insert(ADDRESSES["publisher"], test_spender.clone());
+        all_spenders.insert(ADDRESSES["publisher2"], test_spender.clone());
+        all_spenders.insert(ADDRESSES["creator"], test_spender.clone());
+        all_spenders.insert(ADDRESSES["tester"], test_spender.clone());
 
-        let mut first_page_response = AllSpendersResponse {
-            spenders: HashMap::new(),
+        let first_page_response = AllSpendersResponse {
+            spenders: vec![
+                (ADDRESSES["user"], all_spenders.get(&ADDRESSES["user"]).unwrap().to_owned()),
+                (ADDRESSES["publisher"], all_spenders.get(&ADDRESSES["publisher"]).unwrap().to_owned()),
+            ]
+            .into_iter().collect(),
             pagination: Pagination {
                 page: 0,
                 total_pages: 3,
             },
         };
-        first_page_response
-            .spenders
-            .insert(ADDRESSES["user"], test_spender.clone());
-        first_page_response
-            .spenders
-            .insert(ADDRESSES["publisher"], test_spender.clone());
 
-        let mut second_page_response = AllSpendersResponse {
-            spenders: HashMap::new(),
+        let second_page_response = AllSpendersResponse {
+            spenders: vec![
+                (ADDRESSES["publisher2"], all_spenders.get(&ADDRESSES["publisher2"]).unwrap().to_owned()),
+                (ADDRESSES["creator"], all_spenders.get(&ADDRESSES["creator"]).unwrap().to_owned()),
+            ]
+            .into_iter().collect(),
             pagination: Pagination {
                 page: 1,
                 total_pages: 3,
             },
         };
-        second_page_response
-            .spenders
-            .insert(ADDRESSES["publisher2"], test_spender.clone());
-        second_page_response
-            .spenders
-            .insert(ADDRESSES["creator"], test_spender.clone());
 
-        let mut third_page_response = AllSpendersResponse {
-            spenders: HashMap::new(),
+        let third_page_response = AllSpendersResponse {
+            spenders: vec![(ADDRESSES["tester"], all_spenders.get(&ADDRESSES["tester"]).unwrap().to_owned())].into_iter().collect(),
             pagination: Pagination {
                 page: 2,
                 total_pages: 3,
             },
         };
-        third_page_response
-            .spenders
-            .insert(ADDRESSES["tester"], test_spender.clone());
 
         Mock::given(method("GET"))
             .and(path(format!(
@@ -528,26 +526,31 @@ mod test {
         let sentry =
             SentryApi::init(adapter, logger, config, validators).expect("Should build sentry");
 
-        let mut expected_response = HashMap::new();
-        expected_response.insert(ADDRESSES["user"], test_spender.clone());
-        expected_response.insert(ADDRESSES["publisher"], test_spender.clone());
-        expected_response.insert(ADDRESSES["publisher2"], test_spender.clone());
-        expected_response.insert(ADDRESSES["creator"], test_spender.clone());
-        expected_response.insert(ADDRESSES["tester"], test_spender.clone());
-
-        let res = sentry
+        let mut res = sentry
             .get_all_spenders(DUMMY_CAMPAIGN.channel.id())
             .await
             .expect("should get response");
 
-        assert!(expected_response.keys().len() == res.keys().len());
-        // Is page 1 included
-        assert!(res.contains_key(&ADDRESSES["user"]) && res.contains_key(&ADDRESSES["publisher"]));
-        // Is page 2 included
-        assert!(
-            res.contains_key(&ADDRESSES["publisher2"]) && res.contains_key(&ADDRESSES["creator"])
-        );
-        // Is page 3 included
-        assert!(res.contains_key(&ADDRESSES["tester"]));
+        // Checks for page 1
+        let res_user = res.remove(&ADDRESSES["user"]);
+        let res_publisher = res.remove(&ADDRESSES["publisher"]);
+        assert!(res_user.is_some() && res_publisher.is_some());
+        assert_eq!(res_user.unwrap(), test_spender);
+        assert_eq!(res_publisher.unwrap(), test_spender);
+
+        // Checks for page 2
+        let res_publisher2 = res.remove(&ADDRESSES["publisher2"]);
+        let res_creator = res.remove(&ADDRESSES["creator"]);
+        assert!(res_publisher2.is_some() && res_creator.is_some());
+        assert_eq!(res_publisher2.unwrap(), test_spender);
+        assert_eq!(res_creator.unwrap(), test_spender);
+
+        // Checks for page 3
+        let res_tester = res.remove(&ADDRESSES["tester"]);
+        assert!(res_tester.is_some());
+        assert_eq!(res_tester.unwrap(), test_spender);
+
+        // There should be no remaining elements
+        assert_eq!(res.len(), 0)
     }
 }
