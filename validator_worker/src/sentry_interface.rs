@@ -173,16 +173,14 @@ impl<A: Adapter + 'static> SentryApi<A> {
             .join(&format!("v5/channel/{}/spender/all?page={}", channel, page))
             .expect("Should not error when creating endpoint");
 
-        let page = self
-            .client
+        self.client
             .get(url)
             .bearer_auth(&self.whoami.token)
             .send()
             .await?
             .json()
             .map_err(Error::Request)
-            .await?;
-        Ok(page)
+            .await
     }
 
     pub async fn get_all_spenders(
@@ -415,7 +413,7 @@ mod test {
         util::tests::{
             discard_logger,
             prep_db::{
-                ADDRESSES, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, IDS,
+                ADDRESSES, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_LEADER, IDS,
             },
         },
         UnifiedNum,
@@ -442,10 +440,20 @@ mod test {
 
         let first_page_response = AllSpendersResponse {
             spenders: vec![
-                (ADDRESSES["user"], all_spenders.get(&ADDRESSES["user"]).unwrap().to_owned()),
-                (ADDRESSES["publisher"], all_spenders.get(&ADDRESSES["publisher"]).unwrap().to_owned()),
+                (
+                    ADDRESSES["user"],
+                    all_spenders.get(&ADDRESSES["user"]).unwrap().to_owned(),
+                ),
+                (
+                    ADDRESSES["publisher"],
+                    all_spenders
+                        .get(&ADDRESSES["publisher"])
+                        .unwrap()
+                        .to_owned(),
+                ),
             ]
-            .into_iter().collect(),
+            .into_iter()
+            .collect(),
             pagination: Pagination {
                 page: 0,
                 total_pages: 3,
@@ -454,10 +462,20 @@ mod test {
 
         let second_page_response = AllSpendersResponse {
             spenders: vec![
-                (ADDRESSES["publisher2"], all_spenders.get(&ADDRESSES["publisher2"]).unwrap().to_owned()),
-                (ADDRESSES["creator"], all_spenders.get(&ADDRESSES["creator"]).unwrap().to_owned()),
+                (
+                    ADDRESSES["publisher2"],
+                    all_spenders
+                        .get(&ADDRESSES["publisher2"])
+                        .unwrap()
+                        .to_owned(),
+                ),
+                (
+                    ADDRESSES["creator"],
+                    all_spenders.get(&ADDRESSES["creator"]).unwrap().to_owned(),
+                ),
             ]
-            .into_iter().collect(),
+            .into_iter()
+            .collect(),
             pagination: Pagination {
                 page: 1,
                 total_pages: 3,
@@ -465,7 +483,12 @@ mod test {
         };
 
         let third_page_response = AllSpendersResponse {
-            spenders: vec![(ADDRESSES["tester"], all_spenders.get(&ADDRESSES["tester"]).unwrap().to_owned())].into_iter().collect(),
+            spenders: vec![(
+                ADDRESSES["tester"],
+                all_spenders.get(&ADDRESSES["tester"]).unwrap().to_owned(),
+            )]
+            .into_iter()
+            .collect(),
             pagination: Pagination {
                 page: 2,
                 total_pages: 3,
