@@ -2,7 +2,7 @@ use crate::{epoch, Auth};
 use chrono::Utc;
 use primitives::{
     analytics::{AnalyticsData, AnalyticsQuery, ANALYTICS_QUERY_LIMIT},
-    sentry::{AdvancedAnalyticsResponse, ChannelReport, EventAnalytics, PublisherReport},
+    sentry::{AdvancedAnalyticsResponse, ChannelReport, UpdateAnalytics, Analytics, PublisherReport},
     ChannelId, ValidatorId,
 };
 use redis::{aio::MultiplexedConnection, cmd};
@@ -226,10 +226,9 @@ pub async fn get_advanced_reports(
 /// This will update a record when it's present by incrementing its payout_amount and payout_count fields
 pub async fn insert_analytics(
     pool: &DbPool,
-    event: &EventAnalytics,
-) -> Result<(EventAnalytics, i32), PoolError> {
+    event: &UpdateAnalytics,
+) -> Result<Analytics, PoolError> {
     let client = pool.get().await?;
-    let initial_count = 1;
 
     let query = "INSERT INTO analytics(campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os, event_type, payout_amount, payout_count)
     VALUES ($1, date_trunc('hour', cast($2 as timestamp with time zone)), $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
@@ -239,66 +238,82 @@ pub async fn insert_analytics(
 
     let stmt = client.prepare(query).await?;
 
+    let ad_unit = match event.ad_unit {
+        Some(ipfs) => ipfs.to_string(),
+        None => "".to_string(),
+    };
+
+    let ad_slot = match event.ad_slot {
+        Some(ipfs) => ipfs.to_string(),
+        None => "".to_string(),
+    };
+
     let row = client
         .query_one(
             &stmt,
             &[
                 &event.campaign_id,
                 &event.time,
-                &event.ad_unit,
-                &event.ad_slot,
-                &event.ad_slot_type,
+                &ad_unit,
+                &ad_slot,
+                &event.ad_slot_type.as_ref().unwrap_or(&"".to_string()),
                 &event.advertiser,
                 &event.publisher,
-                &event.hostname,
-                &event.country,
-                &event.os_name,
+                &event.hostname.as_ref().unwrap_or(&"".to_string()),
+                &event.country.as_ref().unwrap_or(&"".to_string()),
+                &event.os_name.to_string(),
                 &event.event_type,
-                &event.payout_amount,
-                &initial_count,
+                &event.amount_to_add,
+                &event.count_to_add,
             ],
         )
         .await?;
 
-    let payout_count: i32 = row.get("payout_count");
-    let event_analytics = EventAnalytics::from(&row);
+    let event_analytics = Analytics::from(&row);
 
-    Ok((event_analytics, payout_count))
+    Ok(event_analytics)
 }
 
 pub async fn find_analytics(
     pool: &DbPool,
-    event: &EventAnalytics,
-) -> Result<(EventAnalytics, i32), PoolError> {
+    event: &Analytics,
+) -> Result<Analytics, PoolError> {
     let client = pool.get().await?;
 
     let query = "SELECT campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os, event_type, payout_amount, payout_count
     FROM analytics WHERE campaign_id = $1 AND time = date_trunc('hour', cast($2 as timestamp with time zone)) AND ad_unit = $3 AND ad_slot = $4 AND ad_slot_type = $5 AND advertiser = $6 AND publisher = $7 AND hostname = $8 AND country = $9 AND os = $10 AND event_type = $11";
 
     let stmt = client.prepare(query).await?;
+    let ad_unit = match event.ad_unit {
+        Some(ipfs) => ipfs.to_string(),
+        None => "".to_string(),
+    };
 
+    let ad_slot = match event.ad_slot {
+        Some(ipfs) => ipfs.to_string(),
+        None => "".to_string(),
+    };
     let row = client
         .query_one(
             &stmt,
             &[
                 &event.campaign_id,
                 &event.time,
-                &event.ad_unit,
-                &event.ad_slot,
-                &event.ad_slot_type,
+                &ad_unit,
+                &ad_slot,
+                &event.ad_slot_type.as_ref().unwrap_or(&"".to_string()),
                 &event.advertiser,
                 &event.publisher,
-                &event.hostname,
-                &event.country,
-                &event.os_name,
+                &event.hostname.as_ref().unwrap_or(&"".to_string()),
+                &event.country.as_ref().unwrap_or(&"".to_string()),
+                &event.os_name.to_string(),
                 &event.event_type,
             ],
         )
         .await?;
 
-    let event_analytics = EventAnalytics::from(&row);
-    let payout_count: i32 = row.get("payout_count");
-    Ok((event_analytics, payout_count))
+    let event_analytics = Analytics::from(&row);
+    Ok(event_analytics)
 }
 
 #[cfg(test)]
@@ -322,7 +337,7 @@ mod test {
             .await
             .expect("Migrations should succeed");
         {
-            let analytics = EventAnalytics {
+            let analytics = UpdateAnalytics {
                 time: Utc.ymd(2021, 2, 1).and_hms(7, 0, 0),
                 campaign_id: DUMMY_CAMPAIGN.id,
                 ad_unit: Some(
@@ -340,10 +355,11 @@ mod test {
                 country: Some("Bulgaria".to_string()),
                 os_name: OperatingSystem::Linux,
                 event_type: "IMPRESSION".to_string(),
-                payout_amount: UnifiedNum::from_u64(1_000_000),
+                amount_to_add: UnifiedNum::from_u64(1_000_000),
+                count_to_add: 1,
             };
 
-            let (insert_res, payout_count) =
+            let insert_res =
                 insert_analytics(&database.clone(), &analytics.clone())
                     .await
                     .expect("Should insert");
@@ -360,16 +376,16 @@ mod test {
             assert_eq!(insert_res.os_name, analytics.os_name);
             assert_eq!(insert_res.event_type, analytics.event_type);
             assert_eq!(insert_res.payout_amount, UnifiedNum::from_u64(1_000_000));
-            assert_eq!(payout_count, 1);
+            assert_eq!(insert_res.payout_count, 1);
 
-            let (update_res, payout_count) = insert_analytics(&database.clone(), &analytics)
+            let update_res = insert_analytics(&database.clone(), &analytics)
                 .await
                 .expect("Should insert");
             assert_eq!(update_res.payout_amount, UnifiedNum::from_u64(2_000_000));
-            assert_eq!(payout_count, 2);
+            assert_eq!(update_res.payout_count, 2);
         }
         {
-            let analytics_with_empty_fields = EventAnalytics {
+            let analytics_with_empty_fields = UpdateAnalytics {
                 time: Utc.ymd(2021, 2, 1).and_hms(7, 0, 0),
                 campaign_id: DUMMY_CAMPAIGN.id,
                 ad_unit: None,
@@ -381,10 +397,11 @@ mod test {
                 country: None,
                 os_name: OperatingSystem::Linux,
                 event_type: "IMPRESSION".to_string(),
-                payout_amount: UnifiedNum::from_u64(1_000_000),
+                amount_to_add: UnifiedNum::from_u64(1_000_000),
+                count_to_add: 1,
             };
 
-            let (insert_res, _) = insert_analytics(&database.clone(), &analytics_with_empty_fields)
+            let insert_res = insert_analytics(&database.clone(), &analytics_with_empty_fields)
                 .await
                 .expect("Should insert");
 

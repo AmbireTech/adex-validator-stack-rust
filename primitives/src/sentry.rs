@@ -139,7 +139,25 @@ pub enum Event {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct EventAnalytics {
+pub struct UpdateAnalytics {
+    pub time: DateTime<Utc>,
+    pub campaign_id: CampaignId,
+    pub ad_unit: Option<IPFS>,
+    pub ad_slot: Option<IPFS>,
+    pub ad_slot_type: Option<String>,
+    pub advertiser: Address,
+    pub publisher: Address,
+    pub hostname: Option<String>,
+    pub country: Option<String>,
+    pub os_name: OperatingSystem,
+    pub event_type: String,
+    pub amount_to_add: UnifiedNum,
+    pub count_to_add: i32,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Analytics {
     pub time: DateTime<Utc>,
     pub campaign_id: CampaignId,
     pub ad_unit: Option<IPFS>,
@@ -152,6 +170,33 @@ pub struct EventAnalytics {
     pub os_name: OperatingSystem,
     pub event_type: String,
     pub payout_amount: UnifiedNum,
+    pub payout_count: i32,
+}
+
+pub struct DateHour {
+    date: Date,
+    hour: u64,
+}
+
+impl <'a> FromSql<'a> for DateHour {
+    fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+        let str_slice = <&str as FromSql>::from_sql(ty, raw)?;
+
+        Ok(json.0)
+    }
+}
+
+impl ToSql for DateHour {
+    fn to_sql(
+        &self,
+        ty: &Type,
+        w: &mut BytesMut,
+    ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+        self.to_string().to_sql(ty, w)
+    }
+
+    accepts!(TEXT, VARCHAR);
+    to_sql_checked!();
 }
 
 impl Event {
@@ -620,7 +665,7 @@ pub mod campaign_create {
 
 #[cfg(feature = "postgres")]
 mod postgres {
-    use super::{EventAnalytics, MessageResponse, ValidatorMessage};
+    use super::{Analytics, UpdateAnalytics, MessageResponse, ValidatorMessage};
     use crate::{
         sentry::EventAggregate,
         validator::{messages::Type as MessageType, MessageTypes},
@@ -681,7 +726,7 @@ mod postgres {
         to_sql_checked!();
     }
 
-    impl From<&Row> for EventAnalytics {
+    impl From<&Row> for Analytics {
         fn from(row: &Row) -> Self {
             let ad_slot_type: String = row.get("ad_slot_type");
             let ad_slot_type = match ad_slot_type.len() {
@@ -714,6 +759,7 @@ mod postgres {
                 os_name: row.get("os"),
                 event_type: row.get("event_type"),
                 payout_amount: row.get("payout_amount"),
+                payout_count: row.get("payout_count"),
             }
         }
     }

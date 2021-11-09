@@ -5,7 +5,7 @@ use crate::{
 use chrono::{Timelike, Utc};
 use primitives::{
     analytics::OperatingSystem,
-    sentry::{Event, EventAnalytics},
+    sentry::{Event, Analytics, UpdateAnalytics},
     Address, Campaign, UnifiedNum,
 };
 
@@ -62,7 +62,7 @@ pub async fn record(
         };
 
         // DB: Insert or Update all events
-        let event_for_db = EventAnalytics {
+        let event_for_db = UpdateAnalytics {
             campaign_id: campaign.id,
             time,
             ad_unit,
@@ -74,7 +74,8 @@ pub async fn record(
             country: session.country.to_owned(),
             os_name: os_name.clone(),
             event_type,
-            payout_amount,
+            amount_to_add: payout_amount,
+            count_to_add: 1,
         };
 
         insert_analytics(pool, &event_for_db).await?;
@@ -145,7 +146,7 @@ mod test {
             .await
             .expect("should record");
 
-        let query_click_event = EventAnalytics {
+        let query_click_event = Analytics {
             time: Utc::now(),
             campaign_id: DUMMY_CAMPAIGN.id,
             ad_unit: None,
@@ -158,9 +159,10 @@ mod test {
             os_name: OperatingSystem::Other,
             event_type: "CLICK".to_string(),
             payout_amount: Default::default(),
+            payout_count: 1,
         };
 
-        let query_impression_event = EventAnalytics {
+        let query_impression_event = Analytics {
             time: Utc::now(),
             campaign_id: DUMMY_CAMPAIGN.id,
             ad_unit: None,
@@ -173,12 +175,13 @@ mod test {
             os_name: OperatingSystem::Other,
             event_type: "IMPRESSION".to_string(),
             payout_amount: Default::default(),
+            payout_count: 1,
         };
 
-        let (click_analytics, click_count) = find_analytics(&database.pool, &query_click_event)
+        let click_analytics = find_analytics(&database.pool, &query_click_event)
             .await
             .expect("should find analytics");
-        let (impression_analytics, impression_count) =
+        let impression_analytics =
             find_analytics(&database.pool, &query_impression_event)
                 .await
                 .expect("should find analytics");
@@ -187,23 +190,23 @@ mod test {
             click_analytics.payout_amount,
             UnifiedNum::from_u64(1_000_000)
         );
-        assert_eq!(click_count, 1);
+        assert_eq!(click_analytics.payout_count, 1);
 
         assert_eq!(impression_analytics.event_type, "IMPRESSION".to_string());
         assert_eq!(
             impression_analytics.payout_amount,
             UnifiedNum::from_u64(1_000_000)
         );
-        assert_eq!(impression_count, 1);
+        assert_eq!(impression_analytics.payout_count, 1);
 
         record(&database.clone(), &campaign, &session, input_events)
             .await
             .expect("should record");
 
-        let (click_analytics, click_count) = find_analytics(&database.pool, &query_click_event)
+        let click_analytics = find_analytics(&database.pool, &query_click_event)
             .await
             .expect("should find analytics");
-        let (impression_analytics, impression_count) =
+        let impression_analytics =
             find_analytics(&database.pool, &query_impression_event)
                 .await
                 .expect("should find analytics");
@@ -211,12 +214,12 @@ mod test {
             click_analytics.payout_amount,
             UnifiedNum::from_u64(2_000_000)
         );
-        assert_eq!(click_count, 2);
+        assert_eq!(click_analytics.payout_count, 2);
 
         assert_eq!(
             impression_analytics.payout_amount,
             UnifiedNum::from_u64(2_000_000)
         );
-        assert_eq!(impression_count, 2);
+        assert_eq!(impression_analytics.payout_count, 2);
     }
 }
