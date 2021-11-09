@@ -80,7 +80,7 @@ pub struct AnalyticsQuery {
     pub segment_by_channel: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Display)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Display, Hash, Eq)]
 #[serde(untagged, into = "String", from = "String")]
 pub enum OperatingSystem {
     Linux,

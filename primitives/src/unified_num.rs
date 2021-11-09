@@ -59,6 +59,7 @@ use std::{
     FromStr,
     Serialize,
     Deserialize,
+    Hash,
 )]
 #[serde(into = "String", try_from = "String")]
 pub struct UnifiedNum(u64);

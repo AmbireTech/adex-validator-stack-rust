@@ -5,9 +5,11 @@ use crate::{
     validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
     Address, Balances, BigNum, CampaignId, Channel, ChannelId, UnifiedNum, ValidatorId, IPFS,
 };
-use chrono::{DateTime, Utc};
+use bytes::BytesMut;
+use chrono::{Date, DateTime, Datelike, TimeZone, Timelike, Utc};
+use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt, hash::Hash};
+use std::{collections::HashMap, error::Error, fmt, hash::Hash};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -137,10 +139,10 @@ pub enum Event {
     },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Hash, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateAnalytics {
-    pub time: DateTime<Utc>,
+    pub time: DateHour,
     pub campaign_id: CampaignId,
     pub ad_unit: Option<IPFS>,
     pub ad_slot: Option<IPFS>,
@@ -158,7 +160,7 @@ pub struct UpdateAnalytics {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Analytics {
-    pub time: DateTime<Utc>,
+    pub time: DateHour,
     pub campaign_id: CampaignId,
     pub ad_unit: Option<IPFS>,
     pub ad_slot: Option<IPFS>,
@@ -173,29 +175,34 @@ pub struct Analytics {
     pub payout_count: i32,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Hash, Eq)]
 pub struct DateHour {
-    date: Date,
-    hour: u64,
+    pub date: DateTime<Utc>,
+    pub hour: u32,
 }
 
-impl <'a> FromSql<'a> for DateHour {
+impl<'a> FromSql<'a> for DateHour {
     fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
-        let str_slice = <&str as FromSql>::from_sql(ty, raw)?;
-
-        Ok(json.0)
+        let date_time = <DateTime<Utc> as FromSql>::from_sql(ty, raw)?;
+        assert_eq!(date_time.time().minute(), 0);
+        assert_eq!(date_time.time().second(), 0);
+        assert_eq!(date_time.time().nanosecond(), 0);
+        Ok(Self {
+            date: date_time,
+            hour: date_time.hour(),
+        })
     }
+    accepts!(TIMESTAMPTZ);
 }
 
 impl ToSql for DateHour {
-    fn to_sql(
-        &self,
-        ty: &Type,
-        w: &mut BytesMut,
-    ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-        self.to_string().to_sql(ty, w)
+    fn to_sql(&self, ty: &Type, w: &mut BytesMut) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+        Utc.ymd(self.date.year(), self.date.month(), self.date.day())
+            .and_hms(self.hour, 0, 0)
+            .to_sql(ty, w)
     }
 
-    accepts!(TEXT, VARCHAR);
+    accepts!(TIMESTAMPTZ);
     to_sql_checked!();
 }
 
@@ -665,7 +672,7 @@ pub mod campaign_create {
 
 #[cfg(feature = "postgres")]
 mod postgres {
-    use super::{Analytics, UpdateAnalytics, MessageResponse, ValidatorMessage};
+    use super::{Analytics, MessageResponse, ValidatorMessage};
     use crate::{
         sentry::EventAggregate,
         validator::{messages::Type as MessageType, MessageTypes},

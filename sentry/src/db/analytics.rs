@@ -2,7 +2,9 @@ use crate::{epoch, Auth};
 use chrono::Utc;
 use primitives::{
     analytics::{AnalyticsData, AnalyticsQuery, ANALYTICS_QUERY_LIMIT},
-    sentry::{AdvancedAnalyticsResponse, ChannelReport, UpdateAnalytics, Analytics, PublisherReport},
+    sentry::{
+        AdvancedAnalyticsResponse, Analytics, ChannelReport, PublisherReport, UpdateAnalytics,
+    },
     ChannelId, ValidatorId,
 };
 use redis::{aio::MultiplexedConnection, cmd};
@@ -274,45 +276,16 @@ pub async fn insert_analytics(
     Ok(event_analytics)
 }
 
-pub async fn find_analytics(
-    pool: &DbPool,
-    event: &Analytics,
-) -> Result<Analytics, PoolError> {
+// Currently used for testing only
+pub async fn find_analytics(pool: &DbPool) -> Result<Vec<Analytics>, PoolError> {
     let client = pool.get().await?;
 
-    let query = "SELECT campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os, event_type, payout_amount, payout_count
-    FROM analytics WHERE campaign_id = $1 AND time = date_trunc('hour', cast($2 as timestamp with time zone)) AND ad_unit = $3 AND ad_slot = $4 AND ad_slot_type = $5 AND advertiser = $6 AND publisher = $7 AND hostname = $8 AND country = $9 AND os = $10 AND event_type = $11";
-
+    let query = "SELECT * FROM analytics";
     let stmt = client.prepare(query).await?;
-    let ad_unit = match event.ad_unit {
-        Some(ipfs) => ipfs.to_string(),
-        None => "".to_string(),
-    };
 
-    let ad_slot = match event.ad_slot {
-        Some(ipfs) => ipfs.to_string(),
-        None => "".to_string(),
-    };
-    let row = client
-        .query_one(
-            &stmt,
-            &[
-                &event.campaign_id,
-                &event.time,
-                &ad_unit,
-                &ad_slot,
-                &event.ad_slot_type.as_ref().unwrap_or(&"".to_string()),
-                &event.advertiser,
-                &event.publisher,
-                &event.hostname.as_ref().unwrap_or(&"".to_string()),
-                &event.country.as_ref().unwrap_or(&"".to_string()),
-                &event.os_name.to_string(),
-                &event.event_type,
-            ],
-        )
-        .await?;
+    let rows = client.query(&stmt, &[]).await?;
 
-    let event_analytics = Analytics::from(&row);
+    let event_analytics: Vec<Analytics> = rows.iter().map(Analytics::from).collect();
     Ok(event_analytics)
 }
 
@@ -321,6 +294,7 @@ mod test {
     use super::*;
     use primitives::{
         analytics::OperatingSystem,
+        sentry::DateHour,
         util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN},
         UnifiedNum, IPFS,
     };
@@ -338,7 +312,10 @@ mod test {
             .expect("Migrations should succeed");
         {
             let analytics = UpdateAnalytics {
-                time: Utc.ymd(2021, 2, 1).and_hms(7, 0, 0),
+                time: DateHour {
+                    date: Utc.ymd(2021, 2, 1).and_hms(1, 0, 0),
+                    hour: 1,
+                },
                 campaign_id: DUMMY_CAMPAIGN.id,
                 ad_unit: Some(
                     IPFS::try_from("Qmasg8FrbuSQpjFu3kRnZF9beg8rEBFrqgi1uXDRwCbX5f")
@@ -359,13 +336,13 @@ mod test {
                 count_to_add: 1,
             };
 
-            let insert_res =
-                insert_analytics(&database.clone(), &analytics.clone())
-                    .await
-                    .expect("Should insert");
+            let insert_res = insert_analytics(&database.clone(), &analytics.clone())
+                .await
+                .expect("Should insert");
 
             assert_eq!(insert_res.campaign_id, analytics.campaign_id);
-            assert_eq!(insert_res.time.date(), analytics.time.date());
+            assert_eq!(insert_res.time.date, analytics.time.date);
+            assert_eq!(insert_res.time.hour, analytics.time.hour);
             assert_eq!(insert_res.ad_unit, analytics.ad_unit);
             assert_eq!(insert_res.ad_slot, analytics.ad_slot);
             assert_eq!(insert_res.ad_slot_type, analytics.ad_slot_type);
@@ -386,7 +363,10 @@ mod test {
         }
         {
             let analytics_with_empty_fields = UpdateAnalytics {
-                time: Utc.ymd(2021, 2, 1).and_hms(7, 0, 0),
+                time: DateHour {
+                    date: Utc.ymd(2021, 2, 1).and_hms(1, 0, 0),
+                    hour: 1,
+                },
                 campaign_id: DUMMY_CAMPAIGN.id,
                 ad_unit: None,
                 ad_slot: None,
