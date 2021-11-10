@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use std::{convert::TryFrom, fmt, str::FromStr};
+use std::{fmt, str::FromStr};
 use thiserror::Error;
 
 const URL_PREFIX: &str = "ipfs://";

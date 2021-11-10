@@ -38,7 +38,7 @@ pub struct MessageResponse<T: MessageType> {
 }
 
 pub mod message {
-    use std::{convert::TryFrom, ops::Deref};
+    use std::ops::Deref;
 
     use crate::validator::messages::*;
     use serde::{Deserialize, Serialize};
@@ -678,10 +678,11 @@ mod postgres {
         validator::{messages::Type as MessageType, MessageTypes},
     };
     use bytes::BytesMut;
-    use postgres_types::{accepts, to_sql_checked, IsNull, Json, ToSql, Type};
     use serde::Deserialize;
-    use std::convert::TryFrom;
-    use tokio_postgres::{Error, Row};
+    use tokio_postgres::{
+        types::{accepts, to_sql_checked, IsNull, Json, ToSql, Type},
+        Error, Row,
+    };
 
     impl From<&Row> for EventAggregate {
         fn from(row: &Row) -> Self {

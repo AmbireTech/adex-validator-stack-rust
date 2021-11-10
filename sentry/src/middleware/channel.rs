@@ -7,7 +7,6 @@ use futures::future::{BoxFuture, FutureExt};
 use hex::FromHex;
 use hyper::{Body, Request};
 use primitives::{adapter::Adapter, ChannelId, ValidatorId};
-use std::convert::TryFrom;
 
 use async_trait::async_trait;
 

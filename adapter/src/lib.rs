@@ -71,8 +71,6 @@ pub fn get_balance_leaf(
 
 #[cfg(test)]
 mod test {
-    use std::convert::TryFrom;
-
     use byteorder::{BigEndian, ByteOrder};
     use chrono::{TimeZone, Utc};
 
