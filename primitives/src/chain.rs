@@ -1,43 +1,41 @@
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt};
 
-lazy_static! {
-    pub static ref CHAINS: HashMap<ChainId, Chain> = {
-        let mut map = HashMap::new();
-        map.insert(
-            ChainId(1),
-            Chain {
-                chain_id: ChainId(1),
-                name: "Ethereum Mainnet",
-                short: "eth",
-                network: "mainnet",
-            },
-        );
+pub static CHAINS: Lazy<HashMap<ChainId, Chain>> = Lazy::new(|| {
+    let mut map = HashMap::new();
+    map.insert(
+        ChainId(1),
+        Chain {
+            chain_id: ChainId(1),
+            name: "Ethereum Mainnet",
+            short: "eth",
+            network: "mainnet",
+        },
+    );
 
-        map.insert(
-            ChainId(5),
-            Chain {
-                chain_id: ChainId(5),
-                name: "Ethereum Testnet Görli",
-                short: "gor",
-                network: "goerli",
-            },
-        );
+    map.insert(
+        ChainId(5),
+        Chain {
+            chain_id: ChainId(5),
+            name: "Ethereum Testnet Görli",
+            short: "gor",
+            network: "goerli",
+        },
+    );
 
-        map.insert(
-            ChainId(100),
-            Chain {
-                chain_id: ChainId(100),
-                name: "xDAI Chain",
-                short: "xdai",
-                network: "mainnet",
-            },
-        );
+    map.insert(
+        ChainId(100),
+        Chain {
+            chain_id: ChainId(100),
+            name: "xDAI Chain",
+            short: "xdai",
+            network: "mainnet",
+        },
+    );
 
-        map
-    };
-}
+    map
+});
 
 /// Ethereum Virtual Machine Chain
 /// see https://chainid.network

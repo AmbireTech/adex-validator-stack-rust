@@ -6,7 +6,7 @@ use primitives::{
     validator::{ApproveState, Heartbeat, NewState},
     Address, BigNum, Channel, ChannelId, ValidatorId,
 };
-use std::{convert::TryFrom, ops::Add};
+use std::ops::Add;
 use tokio_postgres::{
     binary_copy::BinaryCopyInWriter,
     types::{ToSql, Type},

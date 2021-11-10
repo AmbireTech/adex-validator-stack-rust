@@ -1,5 +1,5 @@
 use once_cell::sync::Lazy;
-use std::{collections::HashMap, convert::TryFrom, env::current_dir, num::NonZeroU8};
+use std::{collections::HashMap, env::current_dir, num::NonZeroU8};
 use web3::{
     contract::{Contract, Options},
     ethabi::Token,

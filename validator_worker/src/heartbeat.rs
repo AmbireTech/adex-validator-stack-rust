@@ -1,5 +1,3 @@
-use std::convert::TryFrom;
-
 use chrono::{Duration, Utc};
 
 use adapter::get_signable_state_root;

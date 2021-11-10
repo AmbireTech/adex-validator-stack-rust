@@ -138,7 +138,7 @@ mod test {
 
         let spendable = Spendable {
             spender: ADDRESSES["user"],
-            channel: DUMMY_CAMPAIGN.channel.clone(),
+            channel: DUMMY_CAMPAIGN.channel,
             deposit: Deposit {
                 total: UnifiedNum::from(100_000_000),
                 still_on_create2: UnifiedNum::from(500_000),
@@ -177,7 +177,7 @@ mod test {
             .await
             .expect("Migrations should succeed");
 
-        let channel = DUMMY_CAMPAIGN.channel.clone();
+        let channel = DUMMY_CAMPAIGN.channel;
 
         insert_channel(&database, DUMMY_CAMPAIGN.channel)
             .await
@@ -194,7 +194,7 @@ mod test {
         // Test for 1 pages
         let spendable_user = Spendable {
             spender: ADDRESSES["user"],
-            channel: DUMMY_CAMPAIGN.channel.clone(),
+            channel: DUMMY_CAMPAIGN.channel,
             deposit: Deposit {
                 total: UnifiedNum::from(100_000_000),
                 still_on_create2: UnifiedNum::from(500_000),
@@ -221,7 +221,7 @@ mod test {
         // Test for multiple pages
         let spendable_publisher = Spendable {
             spender: ADDRESSES["publisher"],
-            channel: DUMMY_CAMPAIGN.channel.clone(),
+            channel: DUMMY_CAMPAIGN.channel,
             deposit: Deposit {
                 total: UnifiedNum::from(100_000_000),
                 still_on_create2: UnifiedNum::from(500_000),
@@ -234,7 +234,7 @@ mod test {
 
         let spendable_publisher2 = Spendable {
             spender: ADDRESSES["publisher2"],
-            channel: DUMMY_CAMPAIGN.channel.clone(),
+            channel: DUMMY_CAMPAIGN.channel,
             deposit: Deposit {
                 total: UnifiedNum::from(100_000_000),
                 still_on_create2: UnifiedNum::from(500_000),
@@ -247,7 +247,7 @@ mod test {
 
         let spendable_creator = Spendable {
             spender: ADDRESSES["creator"],
-            channel: DUMMY_CAMPAIGN.channel.clone(),
+            channel: DUMMY_CAMPAIGN.channel,
             deposit: Deposit {
                 total: UnifiedNum::from(100_000_000),
                 still_on_create2: UnifiedNum::from(500_000),
@@ -260,7 +260,7 @@ mod test {
 
         let spendable_tester = Spendable {
             spender: ADDRESSES["tester"],
-            channel: DUMMY_CAMPAIGN.channel.clone(),
+            channel: DUMMY_CAMPAIGN.channel,
             deposit: Deposit {
                 total: UnifiedNum::from(100_000_000),
                 still_on_create2: UnifiedNum::from(500_000),

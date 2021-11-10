@@ -412,9 +412,7 @@ mod test {
         sentry::Pagination,
         util::tests::{
             discard_logger,
-            prep_db::{
-                ADDRESSES, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_LEADER, IDS,
-            },
+            prep_db::{ADDRESSES, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_LEADER, IDS},
         },
         UnifiedNum,
     };
