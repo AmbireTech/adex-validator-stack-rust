@@ -4060,6 +4060,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "toml",
+ "wiremock",
 ]
 
 [[package]]

@@ -730,7 +730,9 @@ pub mod run {
         let postgres = postgres_connection(42, postgres_config).await;
         let mut redis = redis_connection(app_config.redis_url).await?;
 
-        Manager::flush_db(&mut redis).await.expect("Should flush redis database");
+        Manager::flush_db(&mut redis)
+            .await
+            .expect("Should flush redis database");
 
         let campaign_remaining = CampaignRemaining::new(redis.clone());
 
