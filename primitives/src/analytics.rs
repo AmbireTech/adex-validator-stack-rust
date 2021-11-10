@@ -23,9 +23,11 @@ pub struct AnalyticsResponse {
 pub mod postgres {
     use super::{AnalyticsData, OperatingSystem};
     use bytes::BytesMut;
-    use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
     use std::error::Error;
-    use tokio_postgres::Row;
+    use tokio_postgres::{
+        types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type},
+        Row,
+    };
 
     impl From<&Row> for AnalyticsData {
         fn from(row: &Row) -> Self {
