@@ -9,9 +9,9 @@ use adex_primitives::{
     Address, BigNum, CampaignId, ToHex, UnifiedNum, IPFS,
 };
 use async_std::{sync::RwLock, task::block_on};
-use chrono::{DateTime, Utc};
-use lazy_static::lazy_static;
+use chrono::{DateTime, Duration, Utc};
 use num_integer::Integer;
+use once_cell::sync::Lazy;
 use rand::Rng;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
@@ -33,11 +33,10 @@ const WAIT_FOR_IMPRESSION: u32 = 8000;
 // The number of impressions (won auctions) kept in history
 const HISTORY_LIMIT: u32 = 50;
 
-lazy_static! {
-// Impression "stickiness" time: see https://github.com/AdExNetwork/adex-adview-manager/issues/65
-// 4 minutes allows ~4 campaigns to rotate, considering a default frequency cap of 15 minutes
-    pub static ref IMPRESSION_STICKINESS_TIME: chrono::Duration = chrono::Duration::milliseconds(240000);
-}
+/// Impression "stickiness" time: see https://github.com/AdExNetwork/adex-adview-manager/issues/65
+/// 4 minutes allows ~4 campaigns to rotate, considering a default frequency cap of 15 minutes
+pub static IMPRESSION_STICKINESS_TIME: Lazy<Duration> =
+    Lazy::new(|| Duration::milliseconds(240000));
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -313,7 +312,7 @@ impl Manager {
             .rev()
             .find_map(|h| {
                 if h.campaign_id == campaign_id {
-                    let last_impression: chrono::Duration = Utc::now() - h.time;
+                    let last_impression: Duration = Utc::now() - h.time;
 
                     u64::try_from(last_impression.num_seconds()).ok()
                 } else {
