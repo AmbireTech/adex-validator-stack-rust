@@ -1,14 +1,12 @@
 use crate::{
     db::{get_channel_by_id, get_channel_by_id_and_validator},
     middleware::Middleware,
+    Application, ResponseError, RouteParams,
 };
-use crate::{Application, ResponseError, RouteParams};
 use futures::future::{BoxFuture, FutureExt};
 use hex::FromHex;
 use hyper::{Body, Request};
-use primitives::adapter::Adapter;
-use primitives::{ChannelId, ValidatorId};
-use std::convert::TryFrom;
+use primitives::{adapter::Adapter, ChannelId, ValidatorId};
 
 use async_trait::async_trait;
 
@@ -53,6 +51,7 @@ fn channel_load<'a, A: Adapter + 'static>(
 }
 
 #[derive(Debug)]
+#[deprecated = "No longer needed for V4"]
 pub struct ChannelIfActive;
 
 #[async_trait]
@@ -89,7 +88,7 @@ fn channel_if_active<'a, A: Adapter + 'static>(
         let validator_id = ValidatorId::try_from(&validator_id)
             .map_err(|_| ResponseError::BadRequest("Wrong Validator Id".to_string()))?;
 
-        let channel = get_channel_by_id_and_validator(&app.pool, &channel_id, &validator_id)
+        let channel = get_channel_by_id_and_validator(&app.pool, channel_id, validator_id)
             .await?
             .ok_or(ResponseError::NotFound)?;
 

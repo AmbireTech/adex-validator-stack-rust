@@ -5,9 +5,8 @@ use primitives::{
         Adapter, AdapterErrorKind, AdapterResult, Deposit, DummyAdapterOptions,
         Error as AdapterError, Session,
     },
-    channel_v5::Channel,
     config::Config,
-    Address, ChannelId, ToETHChecksum, ValidatorId,
+    Address, Channel, ChannelId, ToETHChecksum, ValidatorId,
 };
 use std::{collections::HashMap, fmt, sync::Arc};
 
@@ -92,8 +91,8 @@ impl Adapter for DummyAdapter {
         Ok(())
     }
 
-    fn whoami(&self) -> &ValidatorId {
-        &self.identity
+    fn whoami(&self) -> ValidatorId {
+        self.identity
     }
 
     fn sign(&self, state_root: &str) -> AdapterResult<String, Self::AdapterError> {
@@ -107,7 +106,7 @@ impl Adapter for DummyAdapter {
 
     fn verify(
         &self,
-        signer: &ValidatorId,
+        signer: ValidatorId,
         _state_root: &str,
         signature: &str,
     ) -> AdapterResult<bool, Self::AdapterError> {
@@ -173,7 +172,7 @@ impl Adapter for DummyAdapter {
 #[cfg(test)]
 mod test {
     use primitives::{
-        config::configuration,
+        config::DEVELOPMENT_CONFIG,
         util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, IDS},
         BigNum,
     };
@@ -182,8 +181,8 @@ mod test {
 
     #[tokio::test]
     async fn test_deposits_calls() {
-        let config = configuration("development", None).expect("Should get Config");
-        let channel = DUMMY_CAMPAIGN.channel.clone();
+        let config = DEVELOPMENT_CONFIG.clone();
+        let channel = DUMMY_CAMPAIGN.channel;
         let adapter = DummyAdapter::init(
             DummyAdapterOptions {
                 dummy_identity: IDS["leader"],

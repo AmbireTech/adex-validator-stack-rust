@@ -7,7 +7,6 @@ use parse_display::{Display, FromStr, ParseError};
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
-    convert::TryFrom,
     fmt,
     iter::Sum,
     ops::{Add, AddAssign, Div, Mul, Sub},
@@ -59,6 +58,7 @@ use std::{
     FromStr,
     Serialize,
     Deserialize,
+    Hash,
 )]
 #[serde(into = "String", try_from = "String")]
 pub struct UnifiedNum(u64);
@@ -120,11 +120,27 @@ impl UnifiedNum {
     /// Transform the UnifiedNum precision 8 to a new precision
     pub fn to_precision(self, precision: u8) -> BigNum {
         let inner = BigNum::from(self.0);
+
         match precision.cmp(&Self::PRECISION) {
             Ordering::Equal => inner,
             Ordering::Less => inner.div_floor(&BigNum::from(10).pow(Self::PRECISION - precision)),
             Ordering::Greater => inner.mul(&BigNum::from(10).pow(precision - Self::PRECISION)),
         }
+    }
+
+    /// Transform the BigNum of a given precision to UnifiedNum with precision 8
+    /// If the resulting value is larger that what UnifiedNum can hold, it will return `None`
+    pub fn from_precision(amount: BigNum, precision: u8) -> Option<Self> {
+        // conversation to the UnifiedNum precision is happening with BigNum
+        let from_precision = match precision.cmp(&Self::PRECISION) {
+            Ordering::Equal => amount,
+            Ordering::Less => amount.mul(&BigNum::from(10).pow(Self::PRECISION - precision)),
+            Ordering::Greater => {
+                amount.div_floor(&BigNum::from(10).pow(precision - Self::PRECISION))
+            }
+        };
+        // only at the end, see if it fits in `u64`
+        from_precision.to_u64().map(Self)
     }
 
     pub fn to_float_string(self) -> String {
@@ -361,7 +377,7 @@ mod test {
     }
 
     #[test]
-    fn test_convert_unified_num_to_new_precision() {
+    fn test_convert_unified_num_to_new_precision_and_from_precision() {
         let dai_precision: u8 = 18;
         let usdt_precision: u8 = 6;
         let same_precision = UnifiedNum::PRECISION;
@@ -371,7 +387,13 @@ mod test {
         // 321.00000000
         let dai_unified = UnifiedNum::from(32_100_000_000_u64);
         let dai_expected = BigNum::from(321_u64) * dai_power;
-        assert_eq!(dai_expected, dai_unified.to_precision(dai_precision));
+        let dai_bignum = dai_unified.to_precision(dai_precision);
+        assert_eq!(dai_expected, dai_bignum);
+        assert_eq!(
+            dai_unified,
+            UnifiedNum::from_precision(dai_bignum, dai_precision)
+                .expect("Should not overflow the UnifiedNum")
+        );
 
         // 321.00000777 - should floor to 321.000007 (precision 6)
         let usdt_unified = UnifiedNum::from(32_100_000_777_u64);
@@ -389,19 +411,29 @@ mod test {
             same_unified.to_precision(same_precision),
             "It should not make any adjustments to the precision"
         );
+
+        // `u64::MAX + 1` should return `None`
+        let larger_bignum = BigNum::from(u64::MAX) + BigNum::from(1);
+
+        // USDT - 18446744073709.551616
+        assert!(UnifiedNum::from_precision(larger_bignum.clone(), usdt_precision).is_none());
+
+        assert_eq!(
+            // DAI - 18.446744073709551616 (MAX + 1)
+            Some(UnifiedNum::from(1844674407)),
+            // UnifiedNum - 18.44674407
+            UnifiedNum::from_precision(larger_bignum, dai_precision),
+            "Should floor the large BigNum"
+        );
     }
 }
 
 #[cfg(feature = "postgres")]
-// TODO: Test UnifiedNum postgres impl
 mod postgres {
     use super::UnifiedNum;
     use bytes::BytesMut;
-    use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
-    use std::{
-        convert::{TryFrom, TryInto},
-        error::Error,
-    };
+    use std::error::Error;
+    use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
 
     impl<'a> FromSql<'a> for UnifiedNum {
         fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<UnifiedNum, Box<dyn Error + Sync + Send>> {
@@ -430,7 +462,7 @@ mod postgres {
     #[cfg(test)]
     mod test {
         use super::*;
-        use crate::util::tests::prep_db::postgres::POSTGRES_POOL;
+        use crate::postgres::POSTGRES_POOL;
 
         #[tokio::test]
         async fn from_and_to_sql() {

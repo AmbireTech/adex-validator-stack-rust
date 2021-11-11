@@ -47,6 +47,6 @@ mod test {
             .strip_prefix("0x")
             .expect("should have prefix");
 
-        assert_eq!(expected_checksum, checksum(&non_prefixed))
+        assert_eq!(expected_checksum, checksum(non_prefixed))
     }
 }

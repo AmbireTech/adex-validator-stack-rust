@@ -4,23 +4,20 @@
 use clap::{crate_version, App, Arg};
 
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
-use hyper::service::{make_service_fn, service_fn};
-use hyper::{Error, Server};
-use primitives::adapter::{Adapter, DummyAdapterOptions, KeystoreOptions};
-use primitives::config::configuration;
-use primitives::util::tests::prep_db::{AUTH, IDS};
-use primitives::ValidatorId;
-use sentry::db::{postgres_connection, redis_connection, setup_migrations};
-use sentry::Application;
-use slog::{error, info, Logger};
-use std::{
-    convert::TryFrom,
-    env,
-    net::{IpAddr, Ipv4Addr, SocketAddr},
+use primitives::{
+    adapter::{DummyAdapterOptions, KeystoreOptions},
+    config::configuration,
+    postgres::POSTGRES_CONFIG,
+    util::tests::prep_db::{AUTH, IDS},
+    ValidatorId,
 };
-
-const DEFAULT_PORT: u16 = 8005;
-const DEFAULT_IP_ADDR: IpAddr = IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0));
+use sentry::{
+    application::{logger, run},
+    db::{postgres_connection, redis_connection, setup_migrations, CampaignRemaining},
+    Application,
+};
+use slog::info;
+use std::{env, net::SocketAddr};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -57,22 +54,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .get_matches();
 
-    let environment = std::env::var("ENV").unwrap_or_else(|_| "development".into());
-    let port = std::env::var("PORT")
-        .map(|s| s.parse::<u16>().expect("Invalid port(u16) was provided"))
-        .unwrap_or_else(|_| DEFAULT_PORT);
+    let env_config = sentry::application::Config::from_env()?;
 
-    let ip_addr = std::env::var("IP_ADDR")
-        .map(|s| {
-            s.parse::<IpAddr>()
-                .expect("Invalid Ip address was provided")
-        })
-        .unwrap_or_else(|_| DEFAULT_IP_ADDR);
-
-    let socket_addr: SocketAddr = (ip_addr, port).into();
+    let socket_addr: SocketAddr = (env_config.ip_addr, env_config.port).into();
 
     let config_file = cli.value_of("config");
-    let config = configuration(&environment, config_file).unwrap();
+    let config = configuration(env_config.env, config_file).unwrap();
 
     let adapter = match cli.value_of("adapter").unwrap() {
         "ethereum" => {
@@ -108,25 +95,41 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         _ => panic!("You can only use `ethereum` & `dummy` adapters!"),
     };
 
-    let logger = logger();
-    let url = env::var("REDIS_URL").unwrap_or_else(|_| String::from("redis://127.0.0.1:6379"));
-    let redis = redis_connection(url.as_str()).await?;
+    let logger = logger("sentry");
+    let redis = redis_connection(env_config.redis_url).await?;
     info!(&logger, "Checking connection and applying migrations...");
     // Check connection and setup migrations before setting up Postgres
-    setup_migrations(&environment).await;
-    let postgres = postgres_connection(42).await;
+    setup_migrations(env_config.env).await;
+
+    // use the environmental variables to setup the Postgres connection
+    let postgres = postgres_connection(42, POSTGRES_CONFIG.clone()).await;
+    let campaign_remaining = CampaignRemaining::new(redis.clone());
 
     match adapter {
         AdapterTypes::EthereumAdapter(adapter) => {
             run(
-                Application::new(*adapter, config, logger, redis, postgres),
+                Application::new(
+                    *adapter,
+                    config,
+                    logger,
+                    redis,
+                    postgres,
+                    campaign_remaining,
+                ),
                 socket_addr,
             )
             .await
         }
         AdapterTypes::DummyAdapter(adapter) => {
             run(
-                Application::new(*adapter, config, logger, redis, postgres),
+                Application::new(
+                    *adapter,
+                    config,
+                    logger,
+                    redis,
+                    postgres,
+                    campaign_remaining,
+                ),
                 socket_addr,
             )
             .await
@@ -134,37 +137,4 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     Ok(())
-}
-
-/// Starts the `hyper` `Server`.
-async fn run<A: Adapter + 'static>(app: Application<A>, socket_addr: SocketAddr) {
-    let logger = app.logger.clone();
-    info!(&logger, "Listening on socket address: {}!", socket_addr);
-
-    let make_service = make_service_fn(|_| {
-        let server = app.clone();
-        async move {
-            Ok::<_, Error>(service_fn(move |req| {
-                let server = server.clone();
-                async move { Ok::<_, Error>(server.handle_routing(req).await) }
-            }))
-        }
-    });
-
-    let server = Server::bind(&socket_addr).serve(make_service);
-
-    if let Err(e) = server.await {
-        error!(&logger, "server error: {}", e; "main" => "run");
-    }
-}
-
-fn logger() -> Logger {
-    use primitives::util::logging::{Async, PrefixedCompactFormat, TermDecorator};
-    use slog::{o, Drain};
-
-    let decorator = TermDecorator::new().build();
-    let drain = PrefixedCompactFormat::new("sentry", decorator).fuse();
-    let drain = Async::new(drain).build().fuse();
-
-    Logger::root(drain, o!())
 }

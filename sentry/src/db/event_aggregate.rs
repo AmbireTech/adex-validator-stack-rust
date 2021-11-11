@@ -1,11 +1,12 @@
 use chrono::{DateTime, Utc};
 use futures::pin_mut;
 use primitives::{
+    balances::UncheckedState,
     sentry::{EventAggregate, MessageResponse},
     validator::{ApproveState, Heartbeat, NewState},
     Address, BigNum, Channel, ChannelId, ValidatorId,
 };
-use std::{convert::TryFrom, ops::Add};
+use std::ops::Add;
 use tokio_postgres::{
     binary_copy::BinaryCopyInWriter,
     types::{ToSql, Type},
@@ -13,7 +14,7 @@ use tokio_postgres::{
 
 use super::{DbPool, PoolError};
 
-pub async fn latest_approve_state(
+pub async fn latest_approve_state_v5(
     pool: &DbPool,
     channel: &Channel,
 ) -> Result<Option<MessageResponse<ApproveState>>, PoolError> {
@@ -21,10 +22,7 @@ pub async fn latest_approve_state(
 
     let select = client.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'ApproveState' ORDER BY received DESC LIMIT 1").await?;
     let rows = client
-        .query(
-            &select,
-            &[&channel.id, &channel.spec.validators.follower().id],
-        )
+        .query(&select, &[&channel.id(), &channel.follower])
         .await?;
 
     rows.get(0)
@@ -33,27 +31,20 @@ pub async fn latest_approve_state(
         .map_err(PoolError::Backend)
 }
 
-pub async fn latest_new_state(
+pub async fn latest_new_state_v5(
     pool: &DbPool,
     channel: &Channel,
     state_root: &str,
-) -> Result<Option<MessageResponse<NewState>>, PoolError> {
+) -> Result<Option<MessageResponse<NewState<UncheckedState>>>, PoolError> {
     let client = pool.get().await?;
 
     let select = client.prepare("SELECT \"from\", msg, received FROM validator_messages WHERE channel_id = $1 AND \"from\" = $2 AND msg ->> 'type' = 'NewState' AND msg->> 'stateRoot' = $3 ORDER BY received DESC LIMIT 1").await?;
     let rows = client
-        .query(
-            &select,
-            &[
-                &channel.id,
-                &channel.spec.validators.leader().id,
-                &state_root,
-            ],
-        )
+        .query(&select, &[&channel.id(), &channel.leader, &state_root])
         .await?;
 
     rows.get(0)
-        .map(MessageResponse::<NewState>::try_from)
+        .map(MessageResponse::<NewState<UncheckedState>>::try_from)
         .transpose()
         .map_err(PoolError::Backend)
 }
@@ -74,6 +65,7 @@ pub async fn latest_heartbeats(
         .map_err(PoolError::Backend)
 }
 
+#[deprecated = "V4 Double check what we will need for analytics and remove this function"]
 pub async fn list_event_aggregates(
     pool: &DbPool,
     channel_id: &ChannelId,
@@ -149,6 +141,7 @@ struct EventData {
     event_payout: BigNum,
 }
 
+#[deprecated = "V4 No longer needed for V5, use analytics instead"]
 pub async fn insert_event_aggregate(
     pool: &DbPool,
     channel_id: &ChannelId,

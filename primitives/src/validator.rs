@@ -1,8 +1,11 @@
 use serde::{Deserialize, Serialize};
-use std::{convert::TryFrom, fmt, str::FromStr};
+use std::{borrow::Borrow, fmt, str::FromStr};
 
 use crate::{
-    address::Error, targeting::Value, Address, DomainError, ToETHChecksum, ToHex, UnifiedNum,
+    address::Error,
+    targeting::Value,
+    util::{api::Error as ApiUrlError, ApiUrl},
+    Address, DomainError, ToETHChecksum, ToHex, UnifiedNum,
 };
 
 pub use messages::*;
@@ -27,7 +30,7 @@ impl ValidatorId {
     }
 
     pub fn inner(&self) -> &[u8; 20] {
-        &self.0.as_bytes()
+        self.0.as_bytes()
     }
 }
 
@@ -39,6 +42,12 @@ impl From<&Address> for ValidatorId {
     }
 }
 
+impl From<Address> for ValidatorId {
+    fn from(address: Address) -> Self {
+        Self(address)
+    }
+}
+
 impl From<&[u8; 20]> for ValidatorId {
     fn from(bytes: &[u8; 20]) -> Self {
         Self(Address::from(bytes))
@@ -47,7 +56,7 @@ impl From<&[u8; 20]> for ValidatorId {
 
 impl AsRef<[u8]> for ValidatorId {
     fn as_ref(&self) -> &[u8] {
-        &self.0.as_ref()
+        self.0.as_ref()
     }
 }
 
@@ -90,92 +99,98 @@ impl TryFrom<Value> for ValidatorId {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
+/// A Validator description which includes the identity, fee (pro milles) and the Sentry URL.
 pub struct ValidatorDesc {
     pub id: ValidatorId,
     /// The validator fee in pro milles (per 1000)
+    /// Used to calculate the validator fee on each payout.
     pub fee: UnifiedNum,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     /// The address which will receive the fees
     pub fee_addr: Option<Address>,
-    /// The url of the Validator on which is the API
+    /// The url of the Validator where Sentry API is running
     pub url: String,
+}
+
+impl ValidatorDesc {
+    /// Tries to create an [`ApiUrl`] from the `url` field.
+    pub fn try_api_url(&self) -> Result<ApiUrl, ApiUrlError> {
+        self.url.parse()
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum Validator<T> {
+    Leader(T),
+    Follower(T),
+}
+
+impl<T> Validator<T> {
+    pub fn into_inner(self) -> T {
+        match self {
+            Self::Leader(validator) => validator,
+            Self::Follower(validator) => validator,
+        }
+    }
+}
+
+impl<T> Borrow<T> for Validator<T> {
+    fn borrow(&self) -> &T {
+        match self {
+            Self::Leader(validator) => validator,
+            Self::Follower(validator) => validator,
+        }
+    }
 }
 
 /// Validator Message Types
 pub mod messages {
-    use std::{any::type_name, convert::TryFrom, fmt, marker::PhantomData};
+    use std::{any::type_name, fmt, marker::PhantomData};
     use thiserror::Error;
 
-    use crate::BalancesMap;
+    use crate::balances::{Balances, BalancesState, CheckedState, UncheckedState};
     use chrono::{DateTime, Utc};
     use serde::{Deserialize, Serialize};
 
     #[derive(Error, Debug)]
-    pub struct MessageTypeError<T: Type> {
-        expected: PhantomData<T>,
-        actual: String,
+    pub enum MessageError<T: Type> {
+        #[error(transparent)]
+        Balances(#[from] crate::balances::Error),
+        #[error("Expected {} message type but the actual is {actual}", type_name::<T>(), )]
+        Type {
+            expected: PhantomData<T>,
+            actual: String,
+        },
     }
 
-    impl<T: Type> MessageTypeError<T> {
+    impl<T: Type> MessageError<T> {
         pub fn for_actual<A: Type>(_actual: &A) -> Self {
-            Self {
+            Self::Type {
                 expected: PhantomData::default(),
                 actual: type_name::<A>().to_string(),
             }
         }
     }
 
-    impl<T: Type> fmt::Display for MessageTypeError<T> {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            write!(
-                f,
-                "Expected {} message type but the actual is {}",
-                type_name::<T>(),
-                self.actual
-            )
-        }
-    }
-
     pub trait Type:
         fmt::Debug
         + Into<MessageTypes>
-        + TryFrom<MessageTypes, Error = MessageTypeError<Self>>
+        + TryFrom<MessageTypes, Error = MessageError<Self>>
         + Clone
         + PartialEq
         + Eq
     {
     }
 
-    impl Type for Accounting {}
-    impl TryFrom<MessageTypes> for Accounting {
-        type Error = MessageTypeError<Self>;
-
-        fn try_from(value: MessageTypes) -> Result<Self, Self::Error> {
-            match value {
-                MessageTypes::ApproveState(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::NewState(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::RejectState(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::Heartbeat(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::Accounting(accounting) => Ok(accounting),
-            }
-        }
-    }
-    impl From<Accounting> for MessageTypes {
-        fn from(accounting: Accounting) -> Self {
-            MessageTypes::Accounting(accounting)
-        }
-    }
-
     impl Type for ApproveState {}
     impl TryFrom<MessageTypes> for ApproveState {
-        type Error = MessageTypeError<Self>;
+        type Error = MessageError<Self>;
 
         fn try_from(value: MessageTypes) -> Result<Self, Self::Error> {
             match value {
-                MessageTypes::NewState(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::RejectState(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::Heartbeat(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::Accounting(msg) => Err(MessageTypeError::for_actual(&msg)),
+                MessageTypes::NewState(msg) => Err(MessageError::for_actual(&msg)),
+                MessageTypes::RejectState(msg) => Err(MessageError::for_actual(&msg)),
+                MessageTypes::Heartbeat(msg) => Err(MessageError::for_actual(&msg)),
                 MessageTypes::ApproveState(approve_state) => Ok(approve_state),
             }
         }
@@ -186,58 +201,85 @@ pub mod messages {
         }
     }
 
-    impl Type for NewState {}
-    impl TryFrom<MessageTypes> for NewState {
-        type Error = MessageTypeError<Self>;
+    impl<S: BalancesState> Type for NewState<S> {}
+    impl<S: BalancesState> TryFrom<MessageTypes> for NewState<S> {
+        type Error = MessageError<Self>;
 
         fn try_from(value: MessageTypes) -> Result<Self, Self::Error> {
             match value {
-                MessageTypes::ApproveState(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::RejectState(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::Heartbeat(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::Accounting(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::NewState(new_state) => Ok(new_state),
+                MessageTypes::ApproveState(msg) => Err(MessageError::for_actual(&msg)),
+                MessageTypes::RejectState(msg) => Err(MessageError::for_actual(&msg)),
+                MessageTypes::Heartbeat(msg) => Err(MessageError::for_actual(&msg)),
+                MessageTypes::NewState(new_state) => {
+                    let balances = S::from_unchecked(new_state.balances)?;
+
+                    Ok(Self {
+                        state_root: new_state.state_root,
+                        signature: new_state.signature,
+                        balances,
+                    })
+                }
             }
         }
     }
 
-    impl From<NewState> for MessageTypes {
-        fn from(new_state: NewState) -> Self {
-            MessageTypes::NewState(new_state)
+    impl<S: BalancesState> From<NewState<S>> for MessageTypes {
+        fn from(new_state: NewState<S>) -> Self {
+            MessageTypes::NewState(NewState {
+                state_root: new_state.state_root,
+                signature: new_state.signature,
+                balances: new_state.balances.into_unchecked(),
+            })
         }
     }
 
-    impl Type for RejectState {}
-    impl TryFrom<MessageTypes> for RejectState {
-        type Error = MessageTypeError<Self>;
+    impl<S: BalancesState> Type for RejectState<S> {}
+    impl<S: BalancesState> TryFrom<MessageTypes> for RejectState<S> {
+        type Error = MessageError<Self>;
 
         fn try_from(value: MessageTypes) -> Result<Self, Self::Error> {
             match value {
-                MessageTypes::ApproveState(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::NewState(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::Heartbeat(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::Accounting(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::RejectState(reject_state) => Ok(reject_state),
+                MessageTypes::ApproveState(msg) => Err(MessageError::for_actual(&msg)),
+                MessageTypes::NewState(msg) => Err(MessageError::for_actual(&msg)),
+                MessageTypes::Heartbeat(msg) => Err(MessageError::for_actual(&msg)),
+                MessageTypes::RejectState(reject_state) => {
+                    let balances = reject_state.balances.map(S::from_unchecked).transpose()?;
+
+                    Ok(Self {
+                        reason: reject_state.reason,
+                        state_root: reject_state.state_root,
+                        signature: reject_state.signature,
+                        balances,
+                        timestamp: reject_state.timestamp,
+                    })
+                }
             }
         }
     }
 
-    impl From<RejectState> for MessageTypes {
-        fn from(reject_state: RejectState) -> Self {
-            MessageTypes::RejectState(reject_state)
+    impl<S: BalancesState> From<RejectState<S>> for MessageTypes {
+        fn from(reject_state: RejectState<S>) -> Self {
+            MessageTypes::RejectState(RejectState {
+                reason: reject_state.reason,
+                state_root: reject_state.state_root,
+                signature: reject_state.signature,
+                balances: reject_state
+                    .balances
+                    .map(|balances| balances.into_unchecked()),
+                timestamp: reject_state.timestamp,
+            })
         }
     }
 
     impl Type for Heartbeat {}
     impl TryFrom<MessageTypes> for Heartbeat {
-        type Error = MessageTypeError<Self>;
+        type Error = MessageError<Self>;
 
         fn try_from(value: MessageTypes) -> Result<Self, Self::Error> {
             match value {
-                MessageTypes::ApproveState(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::NewState(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::RejectState(msg) => Err(MessageTypeError::for_actual(&msg)),
-                MessageTypes::Accounting(msg) => Err(MessageTypeError::for_actual(&msg)),
+                MessageTypes::ApproveState(msg) => Err(MessageError::for_actual(&msg)),
+                MessageTypes::NewState(msg) => Err(MessageError::for_actual(&msg)),
+                MessageTypes::RejectState(msg) => Err(MessageError::for_actual(&msg)),
                 MessageTypes::Heartbeat(heartbeat) => Ok(heartbeat),
             }
         }
@@ -251,44 +293,39 @@ pub mod messages {
 
     #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
     #[serde(rename_all = "camelCase")]
-    pub struct Accounting {
-        pub balances: BalancesMap,
-        pub last_aggregate: DateTime<Utc>,
-    }
-
-    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-    #[serde(rename_all = "camelCase")]
     pub struct ApproveState {
         pub state_root: String,
         pub signature: String,
         pub is_healthy: bool,
-        //
-        // TODO: AIP#61 Remove exhausted property
-        //
-        #[serde(default)]
-        pub exhausted: bool,
     }
 
     #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
     #[serde(rename_all = "camelCase")]
-    pub struct NewState {
+    pub struct NewState<S: BalancesState> {
         pub state_root: String,
         pub signature: String,
-        pub balances: BalancesMap,
-        //
-        // TODO: AIP#61 Remove exhausted property
-        //
-        #[serde(default)]
-        pub exhausted: bool,
+        #[serde(flatten, bound = "S: BalancesState")]
+        pub balances: Balances<S>,
+    }
+
+    impl NewState<UncheckedState> {
+        pub fn try_checked(self) -> Result<NewState<CheckedState>, crate::balances::Error> {
+            Ok(NewState {
+                state_root: self.state_root,
+                signature: self.signature,
+                balances: self.balances.check()?,
+            })
+        }
     }
 
     #[derive(Default, Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
     #[serde(rename_all = "camelCase")]
-    pub struct RejectState {
+    pub struct RejectState<S: BalancesState> {
         pub reason: String,
         pub state_root: String,
         pub signature: String,
-        pub balances: Option<BalancesMap>,
+        #[serde(flatten, bound = "S: BalancesState")]
+        pub balances: Option<Balances<S>>,
         pub timestamp: Option<DateTime<Utc>>,
     }
 
@@ -314,10 +351,9 @@ pub mod messages {
     #[serde(tag = "type")]
     pub enum MessageTypes {
         ApproveState(ApproveState),
-        NewState(NewState),
-        RejectState(RejectState),
+        NewState(NewState<UncheckedState>),
+        RejectState(RejectState<UncheckedState>),
         Heartbeat(Heartbeat),
-        Accounting(Accounting),
     }
 }
 #[cfg(feature = "postgres")]
@@ -325,9 +361,8 @@ pub mod postgres {
     use super::ValidatorId;
     use crate::ToETHChecksum;
     use bytes::BytesMut;
-    use postgres_types::{FromSql, IsNull, ToSql, Type};
-    use std::convert::TryFrom;
     use std::error::Error;
+    use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
     impl<'a> FromSql<'a> for ValidatorId {
         fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {

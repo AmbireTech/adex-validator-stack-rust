@@ -1,12 +1,14 @@
 use crate::{db::fetch_campaign, middleware::Middleware};
-use crate::{Application, ResponseError, RouteParams};
+use crate::{Application, Auth, ResponseError, RouteParams};
 use hyper::{Body, Request};
-use primitives::adapter::Adapter;
+use primitives::{adapter::Adapter, campaign::Campaign};
 
 use async_trait::async_trait;
 
 #[derive(Debug)]
 pub struct CampaignLoad;
+#[derive(Debug)]
+pub struct CalledByCreator;
 
 #[async_trait]
 impl<A: Adapter + 'static> Middleware<A> for CampaignLoad {
@@ -35,59 +37,49 @@ impl<A: Adapter + 'static> Middleware<A> for CampaignLoad {
     }
 }
 
+#[async_trait]
+impl<A: Adapter + 'static> Middleware<A> for CalledByCreator {
+    async fn call<'a>(
+        &self,
+        request: Request<Body>,
+        _application: &'a Application<A>,
+    ) -> Result<Request<Body>, ResponseError> {
+        let campaign = request
+            .extensions()
+            .get::<Campaign>()
+            .expect("We must have a campaign in extensions")
+            .to_owned();
+
+        let auth = request
+            .extensions()
+            .get::<Auth>()
+            .expect("request should have session")
+            .to_owned();
+
+        if auth.uid.to_address() != campaign.creator {
+            return Err(ResponseError::Forbidden(
+                "Request not sent by campaign creator".to_string(),
+            ));
+        }
+
+        Ok(request)
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use adapter::DummyAdapter;
-    use primitives::{
-        adapter::DummyAdapterOptions,
-        config::configuration,
-        util::tests::{
-            discard_logger,
-            prep_db::{DUMMY_CAMPAIGN, IDS},
-        },
-        Campaign,
-    };
+    use primitives::{util::tests::prep_db::DUMMY_CAMPAIGN, Campaign};
 
-    use crate::db::{
-        insert_campaign,
-        redis_pool::TESTS_POOL,
-        tests_postgres::{setup_test_migrations, DATABASE_POOL},
+    use crate::{
+        db::{insert_campaign, insert_channel},
+        test_util::setup_dummy_app,
     };
 
     use super::*;
 
-    async fn setup_app() -> Application<DummyAdapter> {
-        let config = configuration("development", None).expect("Should get Config");
-        let adapter = DummyAdapter::init(
-            DummyAdapterOptions {
-                dummy_identity: IDS["leader"],
-                dummy_auth: Default::default(),
-                dummy_auth_tokens: Default::default(),
-            },
-            &config,
-        );
-
-        let redis = TESTS_POOL.get().await.expect("Should return Object");
-        let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
-
-        setup_test_migrations(database.pool.clone())
-            .await
-            .expect("Migrations should succeed");
-
-        let app = Application::new(
-            adapter,
-            config,
-            discard_logger(),
-            redis.connection.clone(),
-            database.pool.clone(),
-        );
-
-        app
-    }
-
     #[tokio::test]
     async fn campaign_loading() {
-        let app = setup_app().await;
+        let app = setup_dummy_app().await;
 
         let build_request = |params: RouteParams| {
             Request::builder()
@@ -128,6 +120,10 @@ mod test {
 
         // existing Campaign
         {
+            // insert Channel
+            insert_channel(&app.pool, campaign.channel)
+                .await
+                .expect("Should insert Channel");
             // insert Campaign
             assert!(insert_campaign(&app.pool, &campaign)
                 .await

@@ -1,49 +1,41 @@
-use crate::{channel_v5::Channel, Address, BalancesMap, UnifiedNum};
-use chrono::{DateTime, Utc};
+use crate::{Address, Channel, Deposit, UnifiedNum};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct Deposit {
-    pub total: UnifiedNum,
-    pub still_on_create2: UnifiedNum,
+pub struct SpenderLeaf {
+    pub total_spent: UnifiedNum,
+    // merkle_proof: [u8; 32], // TODO
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct Spender {
+    pub total_deposited: UnifiedNum,
+    pub spender_leaf: Option<SpenderLeaf>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Spendable {
     pub spender: Address,
     pub channel: Channel,
-    #[serde(flatten)]
-    pub deposit: Deposit,
+    pub deposit: Deposit<UnifiedNum>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Aggregate {
-    pub spender: Address,
-    pub channel: Channel,
-    pub balances: BalancesMap,
-    pub created: DateTime<Utc>,
-}
 #[cfg(feature = "postgres")]
 mod postgres {
-    use std::convert::TryFrom;
-    use tokio_postgres::{Error, Row};
-
     use super::*;
+    use tokio_postgres::Row;
 
-    impl TryFrom<Row> for Spendable {
-        type Error = Error;
-
-        fn try_from(row: Row) -> Result<Self, Self::Error> {
-            Ok(Spendable {
-                spender: row.try_get("spender")?,
-                channel: row.try_get("channel")?,
+    impl From<&Row> for Spendable {
+        fn from(row: &Row) -> Self {
+            Self {
+                spender: row.get("spender"),
+                channel: Channel::from(row),
                 deposit: Deposit {
-                    total: row.try_get("total")?,
-                    still_on_create2: row.try_get("still_on_create2")?,
+                    total: row.get("total"),
+                    still_on_create2: row.get("still_on_create2"),
                 },
-            })
+            }
         }
     }
 }

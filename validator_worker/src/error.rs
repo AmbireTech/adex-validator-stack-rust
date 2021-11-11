@@ -1,6 +1,6 @@
-use primitives::adapter::AdapterErrorKind;
 use primitives::ChannelId;
 use std::fmt;
+use thiserror::Error;
 
 #[derive(Debug)]
 pub enum TickError {
@@ -17,23 +17,19 @@ impl fmt::Display for TickError {
     }
 }
 
-#[derive(Debug)]
-pub enum Error<AE: AdapterErrorKind> {
-    SentryApi(crate::sentry_interface::Error<AE>),
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("SentryApi: {0}")]
+    SentryApi(#[from] crate::sentry_interface::Error),
+    #[error("LeaderTick {0}: {1}")]
     LeaderTick(ChannelId, TickError),
+    #[error("FollowerTick {0}: {1}")]
     FollowerTick(ChannelId, TickError),
-}
-
-impl<AE: AdapterErrorKind> std::error::Error for Error<AE> {}
-
-impl<AE: AdapterErrorKind> fmt::Display for Error<AE> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Error::*;
-
-        match self {
-            SentryApi(err) => write!(f, "SentryApi: {}", err),
-            LeaderTick(channel_id, err) => write!(f, "LeaderTick {:#?}: {}", channel_id, err),
-            FollowerTick(channel_id, err) => write!(f, "FollowerTick {:#?}: {}", channel_id, err),
-        }
-    }
+    #[error("Placeholder for Validation errors")]
+    Validation,
+    #[error("Whoami is neither a Leader or follower in channel")]
+    // TODO: Add channel, validatorId, etc.
+    ChannelNotIntendedForUs,
+    #[error("Channel token is not whitelisted")]
+    ChannelTokenNotWhitelisted,
 }

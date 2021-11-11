@@ -6,4 +6,5 @@ members = [
     "adview-manager",
     "validator_worker",
     "sentry",
+    "test_harness",
 ]

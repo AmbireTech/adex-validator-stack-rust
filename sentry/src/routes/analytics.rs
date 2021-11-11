@@ -80,7 +80,7 @@ pub async fn process_analytics<A: Adapter>(
     app: &Application<A>,
     analytics_type: AnalyticsType,
 ) -> Result<String, ResponseError> {
-    let query = serde_urlencoded::from_str::<AnalyticsQuery>(&req.uri().query().unwrap_or(""))?;
+    let query = serde_urlencoded::from_str::<AnalyticsQuery>(req.uri().query().unwrap_or(""))?;
     query
         .is_valid()
         .map_err(|e| ResponseError::BadRequest(e.to_string()))?;
@@ -113,7 +113,7 @@ pub async fn advanced_analytics<A: Adapter>(
     let auth = req.extensions().get::<Auth>().expect("auth is required");
     let advertiser_channels = advertiser_channel_ids(&app.pool, &auth.uid).await?;
 
-    let query = serde_urlencoded::from_str::<AnalyticsQuery>(&req.uri().query().unwrap_or(""))?;
+    let query = serde_urlencoded::from_str::<AnalyticsQuery>(req.uri().query().unwrap_or(""))?;
 
     let response = get_advanced_reports(
         &app.redis,

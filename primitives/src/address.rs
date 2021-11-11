@@ -1,6 +1,6 @@
 use hex::{FromHex, FromHexError};
 use serde::{Deserialize, Serialize, Serializer};
-use std::{convert::TryFrom, fmt, str::FromStr};
+use std::{fmt, str::FromStr};
 use thiserror::Error;
 
 use crate::{targeting::Value, DomainError, ToETHChecksum, ToHex};
@@ -26,6 +26,10 @@ pub struct Address(
 );
 
 impl Address {
+    pub fn to_bytes(&self) -> [u8; 20] {
+        self.0
+    }
+
     pub fn as_bytes(&self) -> &[u8; 20] {
         &self.0
     }
@@ -65,8 +69,20 @@ impl From<&[u8; 20]> for Address {
     }
 }
 
+impl From<[u8; 20]> for Address {
+    fn from(bytes: [u8; 20]) -> Self {
+        Self(bytes)
+    }
+}
+
 impl AsRef<[u8]> for Address {
     fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl AsRef<[u8; 20]> for Address {
+    fn as_ref(&self) -> &[u8; 20] {
         &self.0
     }
 }
@@ -161,8 +177,8 @@ pub mod postgres {
     use super::Address;
     use crate::ToETHChecksum;
     use bytes::BytesMut;
-    use postgres_types::{FromSql, IsNull, ToSql, Type};
     use std::error::Error;
+    use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
     impl<'a> FromSql<'a> for Address {
         fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {

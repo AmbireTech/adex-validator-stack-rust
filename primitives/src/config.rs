@@ -1,18 +1,35 @@
 use crate::{event_submission::RateLimit, Address, BigNum, ValidatorId};
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_hex::{SerHex, StrictPfx};
-use std::collections::HashMap;
-use std::fs;
-use std::num::NonZeroU8;
+use std::{collections::HashMap, num::NonZeroU8};
+use thiserror::Error;
 
-lazy_static! {
-    static ref DEVELOPMENT_CONFIG: Config =
-        toml::from_str(include_str!("../../docs/config/dev.toml"))
-            .expect("Failed to parse dev.toml config file");
-    static ref PRODUCTION_CONFIG: Config =
-        toml::from_str(include_str!("../../docs/config/prod.toml"))
-            .expect("Failed to parse prod.toml config file");
+pub use toml::de::Error as TomlError;
+
+pub static DEVELOPMENT_CONFIG: Lazy<Config> = Lazy::new(|| {
+    toml::from_str(include_str!("../../docs/config/dev.toml"))
+        .expect("Failed to parse dev.toml config file")
+});
+
+pub static PRODUCTION_CONFIG: Lazy<Config> = Lazy::new(|| {
+    toml::from_str(include_str!("../../docs/config/prod.toml"))
+        .expect("Failed to parse prod.toml config file")
+});
+
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+/// The environment in which the application is running
+/// Defaults to [`Environment::Development`]
+pub enum Environment {
+    Development,
+    Production,
+}
+
+impl Default for Environment {
+    fn default() -> Self {
+        Self::Development
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -27,16 +44,33 @@ pub struct TokenInfo {
 pub struct Config {
     pub max_channels: u32,
     pub channels_find_limit: u32,
+    pub campaigns_find_limit: u32,
+    pub spendable_find_limit: u32,
     pub wait_time: u32,
+    #[deprecated = "redundant V4 value. No aggregates are needed for V5"]
     pub aggr_throttle: u32,
+    #[deprecated = "For V5 this should probably be part of the Analytics"]
     pub events_find_limit: u32,
     pub msgs_find_limit: u32,
-    pub heartbeat_time: u32, // in milliseconds
+    pub analytics_find_limit_v5: u32,
+    /// In milliseconds
+    pub analytics_maxtime_v5: u32,
+    /// In milliseconds
+    pub heartbeat_time: u32,
     pub health_threshold_promilles: u32,
     pub health_unsignable_promilles: u32,
+    /// Sets the timeout for propagating a Validator message to a validator
+    /// In Milliseconds
     pub propagation_timeout: u32,
+    /// in milliseconds
+    /// Set's the Client timeout for `SentryApi`
+    /// This includes all requests made to sentry except propagating messages.
+    /// When propagating messages we make requests to foreign Sentry instances as well.
     pub fetch_timeout: u32,
-    pub validator_tick_timeout: u32,
+    /// In Milliseconds
+    pub all_campaigns_timeout: u32,
+    /// In Milliseconds
+    pub channel_tick_timeout: u32,
     pub ip_rate_limit: RateLimit,  // HashMap??
     pub sid_rate_limit: RateLimit, // HashMap ??
     #[serde(with = "SerHex::<StrictPfx>")]
@@ -49,6 +83,15 @@ pub struct Config {
     pub validators_whitelist: Vec<ValidatorId>,
     #[serde(deserialize_with = "deserialize_token_whitelist")]
     pub token_address_whitelist: HashMap<Address, TokenInfo>,
+}
+
+impl Config {
+    /// Utility method that will deserialize a Toml file content into a `Config`.
+    ///
+    /// Instead of relying on the `toml` crate directly, use this method instead.
+    pub fn try_toml(toml: &str) -> Result<Self, TomlError> {
+        toml::from_str(toml)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -84,26 +127,27 @@ where
     Ok(tokens_whitelist)
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Debug, Error)]
 pub enum ConfigError {
-    InvalidFile(String),
+    #[error("Toml parsing: {0}")]
+    Toml(#[from] toml::de::Error),
+    #[error("File reading: {0}")]
+    InvalidFile(#[from] std::io::Error),
 }
 
-pub fn configuration(environment: &str, config_file: Option<&str>) -> Result<Config, ConfigError> {
+pub fn configuration(
+    environment: Environment,
+    config_file: Option<&str>,
+) -> Result<Config, ConfigError> {
     match config_file {
-        Some(config_file) => match fs::read_to_string(config_file) {
-            Ok(config) => match toml::from_str(&config) {
-                Ok(data) => data,
-                Err(e) => Err(ConfigError::InvalidFile(e.to_string())),
-            },
-            Err(e) => Err(ConfigError::InvalidFile(format!(
-                "Unable to read provided config file {} {}",
-                config_file, e
-            ))),
-        },
+        Some(config_file) => {
+            let content = std::fs::read(config_file)?;
+
+            Ok(toml::from_slice(&content)?)
+        }
         None => match environment {
-            "production" => Ok(PRODUCTION_CONFIG.clone()),
-            _ => Ok(DEVELOPMENT_CONFIG.clone()),
+            Environment::Production => Ok(PRODUCTION_CONFIG.clone()),
+            Environment::Development => Ok(DEVELOPMENT_CONFIG.clone()),
         },
     }
 }

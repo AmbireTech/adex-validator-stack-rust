@@ -1,63 +1,123 @@
-use std::error::Error;
+use thiserror::Error;
 
-use primitives::adapter::{Adapter, AdapterErrorKind};
 use primitives::{
-    validator::{Accounting, MessageTypes, NewState},
-    BalancesMap, BigNum,
+    adapter::{Adapter, AdapterErrorKind, Error as AdapterError},
+    balances::CheckedState,
+    config::TokenInfo,
+    validator::{MessageError, MessageTypes, NewState},
+    Balances, Channel, ChannelId,
 };
 
-use crate::heartbeat::{heartbeat, HeartbeatStatus};
-use crate::sentry_interface::{PropagationResult, SentryApi};
-use crate::{get_state_root_hash, producer};
+use crate::{
+    heartbeat::{heartbeat, Error as HeartbeatError, HeartbeatStatus},
+    sentry_interface::{Error as SentryApiError, PropagationResult, SentryApi},
+    GetStateRoot, GetStateRootError,
+};
 
 #[derive(Debug)]
-pub struct TickStatus<AE: AdapterErrorKind> {
-    pub heartbeat: HeartbeatStatus<AE>,
-    /// If None, then the conditions for handling a new state haven't been met
-    pub new_state: Option<Vec<PropagationResult<AE>>>,
-    pub producer_tick: producer::TickStatus<AE>,
+pub struct TickStatus {
+    pub heartbeat: HeartbeatStatus,
+    /// When `None` the conditions for creating a `NewState` haven't been met
+    pub new_state: Option<Vec<PropagationResult>>,
+}
+
+#[derive(Debug, Error)]
+pub enum Error<AE: AdapterErrorKind + 'static> {
+    #[error("SentryApi: {0}")]
+    SentryApi(#[from] SentryApiError),
+    #[error("StateRootHash: {0}")]
+    StateRootHash(#[from] GetStateRootError),
+    #[error("Adapter: {0}")]
+    Adapter(#[from] AdapterError<AE>),
+    #[error("Heartbeat: {0}")]
+    Heartbeat(#[from] HeartbeatError<AE>),
+    #[error("NewState Balances: {0}")]
+    Message(#[from] MessageError<NewState<CheckedState>>),
+    #[error("Overflow")]
+    Overflow,
 }
 
 pub async fn tick<A: Adapter + 'static>(
-    iface: &SentryApi<A>,
-) -> Result<TickStatus<A::AdapterError>, Box<dyn Error>> {
-    let producer_tick = producer::tick(&iface).await?;
-    let empty_balances = BalancesMap::default();
-    let (balances, new_state) = match &producer_tick {
-        producer::TickStatus::Sent { new_accounting, .. } => {
-            let new_state = on_new_accounting(&iface, new_accounting).await?;
-            (&new_accounting.balances, Some(new_state))
+    sentry: &SentryApi<A>,
+    channel: Channel,
+    accounting_balances: Balances<CheckedState>,
+    token: &TokenInfo,
+) -> Result<TickStatus, Error<A::AdapterError>> {
+    // Check if Accounting != than latest NewState (Accounting.balances != NewState.balances)
+    let should_generate_new_state = {
+        let latest_new_state = sentry
+            .get_our_latest_msg(channel.id(), &["NewState"])
+            .await?
+            .map(NewState::<CheckedState>::try_from)
+            .transpose()?;
+
+        match latest_new_state {
+            Some(new_state) => {
+                let check_spenders =
+                    accounting_balances
+                        .spenders
+                        .iter()
+                        .any(|(spender, accounting_balance)| {
+                            match new_state.balances.spenders.get(spender) {
+                                Some(prev_balance) => accounting_balance > prev_balance,
+                                // if there is no previous balance for this Spender then it should generate a `NewState`
+                                // this includes adding an empty Spender to be included in the MerkleTree
+                                None => true,
+                            }
+                        });
+
+                let check_earners =
+                    accounting_balances
+                        .earners
+                        .iter()
+                        .any(|(earner, accounting_balance)| {
+                            match new_state.balances.earners.get(earner) {
+                                Some(prev_balance) => accounting_balance > prev_balance,
+                                // if there is no previous balance for this Earner then it should generate a `NewState`
+                                // this includes adding an empty Earner to be included in the MerkleTree
+                                None => true,
+                            }
+                        });
+
+                check_spenders || check_earners
+            }
+            // if no previous `NewState` (i.e. `Channel` is new) - it should generate a `NewState`
+            None => true,
         }
-        producer::TickStatus::NoNewEventAggr(balances) => (balances, None),
-        producer::TickStatus::EmptyBalances => (&empty_balances, None),
+    };
+
+    // Create a `NewState` if balances have changed
+    let new_state = if should_generate_new_state {
+        Some(on_new_accounting(sentry, channel.id(), accounting_balances, token).await?)
+    } else {
+        None
     };
 
     Ok(TickStatus {
-        heartbeat: heartbeat(&iface, &balances).await?,
+        heartbeat: heartbeat(sentry, channel.id()).await?,
         new_state,
-        producer_tick,
     })
 }
 
 async fn on_new_accounting<A: Adapter + 'static>(
-    iface: &SentryApi<A>,
-    new_accounting: &Accounting,
-) -> Result<Vec<PropagationResult<A::AdapterError>>, Box<dyn Error>> {
-    let state_root_raw = get_state_root_hash(&iface, &new_accounting.balances)?;
-    let state_root = hex::encode(state_root_raw);
+    sentry: &SentryApi<A>,
+    channel: ChannelId,
+    accounting_balances: Balances<CheckedState>,
+    token: &TokenInfo,
+) -> Result<Vec<PropagationResult>, Error<A::AdapterError>> {
+    let state_root = accounting_balances.encode(channel, token.precision.get())?;
 
-    let signature = iface.adapter.sign(&state_root)?;
+    let signature = sentry.adapter.sign(&state_root)?;
 
-    let exhausted =
-        new_accounting.balances.values().sum::<BigNum>() == iface.channel.deposit_amount;
-
-    let propagation_results = iface
-        .propagate(&[&MessageTypes::NewState(NewState {
-            state_root,
-            signature,
-            balances: new_accounting.balances.clone(),
-            exhausted,
-        })])
+    let propagation_results = sentry
+        .propagate(
+            channel,
+            &[&MessageTypes::NewState(NewState {
+                state_root,
+                signature,
+                balances: accounting_balances.into_unchecked(),
+            })],
+        )
         .await;
 
     Ok(propagation_results)

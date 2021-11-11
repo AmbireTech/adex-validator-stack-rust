@@ -19,7 +19,6 @@ use slog::{error, Logger};
 use std::{
     cmp::Ordering,
     collections::VecDeque,
-    convert::TryFrom,
     ops::{Add, Mul},
     sync::Arc,
 };
@@ -172,7 +171,7 @@ fn get_unit_html(
 ) -> String {
     let image_url = normalize_url(&ad_unit.media_url);
 
-    let element_html = if is_video(&ad_unit) {
+    let element_html = if is_video(ad_unit) {
         video_html(on_load, size, &image_url, &ad_unit.media_mime)
     } else {
         image_html(on_load, size, &image_url)
@@ -601,7 +600,7 @@ mod test {
 
     fn get_ad_unit(media_mime: &str) -> AdUnit {
         AdUnit {
-            id: DUMMY_IPFS[0].clone(),
+            id: DUMMY_IPFS[0],
             media_url: "".to_string(),
             media_mime: media_mime.to_string(),
             target_url: "".to_string(),
@@ -610,8 +609,8 @@ mod test {
 
     #[test]
     fn test_is_video() {
-        assert_eq!(true, is_video(&get_ad_unit("video/avi")));
-        assert_eq!(false, is_video(&get_ad_unit("image/jpeg")));
+        assert!(is_video(&get_ad_unit("video/avi")));
+        assert!(!is_video(&get_ad_unit("image/jpeg")));
     }
 
     #[test]
@@ -634,7 +633,7 @@ mod test {
         #[test]
         fn test_randomized_position() {
             let ad_unit = AdUnit {
-                id: DUMMY_IPFS[0].clone(),
+                id: DUMMY_IPFS[0],
                 media_url: "ipfs://QmWWQSuPMS6aXCbZKpEjPHPUZN2NjB3YrhJTHsV4X3vb2t".to_string(),
                 media_mime: "image/jpeg".to_string(),
                 target_url: "https://google.com".to_string(),

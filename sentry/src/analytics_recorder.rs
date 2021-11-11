@@ -101,20 +101,19 @@ pub async fn record(
                     )
                     .ignore();
                     db.zincr(
-                        format!("{}:{}:{}", ChannelReport::Hostname, event, channel.id),
+                        format!("{}:{}:{}", ChannelReport::Hostname, event, channel.id()),
                         hostname,
                         1,
                     )
                     .ignore();
                     db.zincr(
-                        format!("{}:{}:{}", ChannelReport::HostnamePay, event, channel.id),
+                        format!("{}:{}:{}", ChannelReport::HostnamePay, event, channel.id()),
                         hostname,
                         1,
                     )
                     .ignore();
                 }
             }
-            _ => {}
         });
 
     if let Err(err) = db.query_async::<_, Option<String>>(&mut conn).await {

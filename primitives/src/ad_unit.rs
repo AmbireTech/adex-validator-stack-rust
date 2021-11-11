@@ -58,8 +58,8 @@ mod postgres {
     use super::AdUnit;
 
     use bytes::BytesMut;
-    use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
     use std::error::Error;
+    use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
     impl<'a> FromSql<'a> for AdUnit {
         fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
             let json = <Json<Self> as FromSql>::from_sql(ty, raw)?;

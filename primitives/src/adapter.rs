@@ -1,6 +1,4 @@
-use crate::{
-    channel::ChannelError, channel_v5::Channel, Address, BigNum, DomainError, ValidatorId,
-};
+use crate::{Address, BigNum, Channel, ValidatorId};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::From, fmt};
@@ -8,22 +6,15 @@ use std::{collections::HashMap, convert::From, fmt};
 pub type AdapterResult<T, AE> = Result<T, Error<AE>>;
 
 pub trait AdapterErrorKind: fmt::Debug + fmt::Display {}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct Deposit {
-    pub total: BigNum,
-    pub still_on_create2: BigNum,
-}
+pub type Deposit = crate::Deposit<BigNum>;
 
 #[derive(Debug)]
 pub enum Error<AE: AdapterErrorKind> {
     Authentication(String),
     Authorization(String),
-    InvalidChannel(ChannelError),
     /// Adapter specific errors
     // Since we don't know the size of the Adapter Error we use a Box to limit the size of this enum
     Adapter(Box<AE>),
-    Domain(DomainError),
     /// You need to `.unlock()` the wallet first
     LockedWallet,
 }
@@ -41,17 +32,9 @@ impl<AE: AdapterErrorKind> fmt::Display for Error<AE> {
         match self {
             Error::Authentication(error) => write!(f, "Authentication: {}", error),
             Error::Authorization(error) => write!(f, "Authorization: {}", error),
-            Error::InvalidChannel(error) => write!(f, "{}", error),
             Error::Adapter(error) => write!(f, "Adapter: {}", *error),
-            Error::Domain(error) => write!(f, "Domain: {}", error),
             Error::LockedWallet => write!(f, "You must `.unlock()` the wallet first"),
         }
-    }
-}
-
-impl<AE: AdapterErrorKind> From<DomainError> for Error<AE> {
-    fn from(err: DomainError) -> Error<AE> {
-        Error::Domain(err)
     }
 }
 
@@ -81,7 +64,7 @@ pub trait Adapter: Send + Sync + fmt::Debug + Clone {
     fn unlock(&mut self) -> AdapterResult<(), Self::AdapterError>;
 
     /// Get Adapter whoami
-    fn whoami(&self) -> &ValidatorId;
+    fn whoami(&self) -> ValidatorId;
 
     /// Signs the provided state_root
     fn sign(&self, state_root: &str) -> AdapterResult<String, Self::AdapterError>;
@@ -89,7 +72,7 @@ pub trait Adapter: Send + Sync + fmt::Debug + Clone {
     /// Verify, based on the signature & state_root, that the signer is the same
     fn verify(
         &self,
-        signer: &ValidatorId,
+        signer: ValidatorId,
         state_root: &str,
         signature: &str,
     ) -> AdapterResult<bool, Self::AdapterError>;

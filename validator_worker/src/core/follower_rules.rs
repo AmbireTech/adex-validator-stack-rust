@@ -1,61 +1,62 @@
-use primitives::{BalancesMap, BigNum, Channel};
+use primitives::{UnifiedMap, UnifiedNum};
 
-pub fn is_valid_transition(channel: &Channel, prev: &BalancesMap, next: &BalancesMap) -> bool {
-    let sum_prev: BigNum = prev.values().sum();
-    let sum_next: BigNum = next.values().sum();
-
-    let deposit = channel.deposit_amount.clone();
+pub fn is_valid_transition(
+    all_spenders_sum: UnifiedNum,
+    prev: &UnifiedMap,
+    next: &UnifiedMap,
+) -> Option<bool> {
+    let sum_prev = prev.values().sum::<Option<_>>()?;
+    let sum_next = next.values().sum::<Option<_>>()?;
 
     let prev_checks = prev.iter().all(|(acc, bal)| match next.get(acc) {
         Some(next_bal) => next_bal >= bal,
         None => false,
     });
 
-    // no need to check if there are negative balances as we don't allow them using BigUint
-    sum_next >= sum_prev && sum_next <= deposit && prev_checks
+    // no need to check if there are negative balances as we don't allow them using UnifiedNum
+    Some(sum_next >= sum_prev && sum_next <= all_spenders_sum && prev_checks)
 }
 
-pub fn get_health(channel: &Channel, our: &BalancesMap, approved: &BalancesMap) -> u64 {
-    let sum_our: BigNum = our.values().sum();
+pub fn get_health(
+    all_spenders_sum: UnifiedNum,
+    our: &UnifiedMap,
+    approved: &UnifiedMap,
+) -> Option<u64> {
+    let sum_our: UnifiedNum = our.values().sum::<Option<_>>()?;
 
-    let zero = BigNum::from(0);
+    let zero = UnifiedNum::from(0);
     let sum_approved_mins = our
         .iter()
         .map(|(acc, val)| val.min(approved.get(acc).unwrap_or(&zero)))
-        .sum();
+        .sum::<Option<_>>()?;
 
     if sum_approved_mins >= sum_our {
-        return 1_000;
+        return Some(1_000);
     }
 
     let diff = sum_our - sum_approved_mins;
-    let health_penalty = diff * &BigNum::from(1_000) / &channel.deposit_amount;
-    1_000 - health_penalty.to_u64().unwrap_or(1_000)
+    let health_penalty = diff * UnifiedNum::from(1_000) / all_spenders_sum;
+
+    Some(1_000 - health_penalty.to_u64())
 }
 
 #[cfg(test)]
 mod test {
-    use primitives::util::tests::prep_db::{ADDRESSES, DUMMY_CHANNEL};
+    use primitives::util::tests::prep_db::ADDRESSES;
 
     use super::*;
 
     const HEALTH_THRESHOLD: u64 = 950;
 
-    fn get_dummy_channel<T: Into<BigNum>>(deposit: T) -> Channel {
-        Channel {
-            deposit_amount: deposit.into(),
-            ..DUMMY_CHANNEL.clone()
-        }
-    }
-
     #[test]
     fn is_valid_transition_empty_to_empty() {
         assert!(
             is_valid_transition(
-                &get_dummy_channel(100),
-                &BalancesMap::default(),
-                &BalancesMap::default(),
-            ),
+                UnifiedNum::from_u64(100),
+                &UnifiedMap::default(),
+                &UnifiedMap::default()
+            )
+            .expect("No overflow"),
             "is valid transition"
         )
     }
@@ -67,13 +68,14 @@ mod test {
             .collect();
 
         assert!(
-            is_valid_transition(&get_dummy_channel(100), &BalancesMap::default(), &next,),
+            is_valid_transition(UnifiedNum::from_u64(100), &UnifiedMap::default(), &next)
+                .expect("No overflow"),
             "is valid transition"
         )
     }
 
     #[test]
-    fn is_valid_transition_more_funds_than_dummy_channel() {
+    fn is_valid_transition_more_funds_than_all_spenders_sum() {
         let next = vec![
             (ADDRESSES["publisher"], 51.into()),
             (ADDRESSES["publisher2"], 50.into()),
@@ -82,7 +84,8 @@ mod test {
         .collect();
 
         assert!(
-            !is_valid_transition(&get_dummy_channel(100), &BalancesMap::default(), &next),
+            !is_valid_transition(UnifiedNum::from_u64(100), &UnifiedMap::default(), &next)
+                .expect("No overflow"),
             "not a valid transition"
         );
     }
@@ -98,7 +101,7 @@ mod test {
             .collect();
 
         assert!(
-            !is_valid_transition(&get_dummy_channel(100), &prev, &next),
+            !is_valid_transition(UnifiedNum::from_u64(100), &prev, &next).expect("No overflow"),
             "not a valid transition"
         );
     }
@@ -117,7 +120,7 @@ mod test {
         .collect();
 
         assert!(
-            !is_valid_transition(&get_dummy_channel(100), &prev, &next),
+            !is_valid_transition(UnifiedNum::from_u64(100), &prev, &next).expect("No overflow"),
             "not a valid transition"
         );
     }
@@ -136,7 +139,7 @@ mod test {
             .collect();
 
         assert!(
-            !is_valid_transition(&get_dummy_channel(100), &prev, &next),
+            !is_valid_transition(UnifiedNum::from_u64(100), &prev, &next).expect("No overflow"),
             "not a valid transition"
         );
     }
@@ -155,46 +158,32 @@ mod test {
             .collect();
 
         assert!(
-            !is_valid_transition(&get_dummy_channel(100), &prev, &next),
-            "not a valid transition"
-        );
-    }
-
-    #[test]
-    fn is_valid_transition_transition_to_a_state_with_a_negative_number() {
-        let prev = vec![
-            (ADDRESSES["publisher"], 54.into()),
-            (ADDRESSES["publisher2"], 3.into()),
-        ]
-        .into_iter()
-        .collect();
-
-        let next = vec![(ADDRESSES["publisher"], 57.into())]
-            .into_iter()
-            .collect();
-
-        assert!(
-            !is_valid_transition(&get_dummy_channel(100), &prev, &next),
+            !is_valid_transition(UnifiedNum::from_u64(100), &prev, &next).expect("No overflow"),
             "not a valid transition"
         );
     }
 
     #[test]
     fn get_health_the_approved_balance_tree_gte_our_accounting_is_healthy() {
-        let channel = get_dummy_channel(50);
+        let all_spenders_sum = UnifiedNum::from(50);
         let our = vec![(ADDRESSES["publisher"], 50.into())]
             .into_iter()
             .collect();
-        assert!(get_health(&channel, &our, &our) >= HEALTH_THRESHOLD);
+        assert!(
+            get_health(all_spenders_sum, &our, &our).expect("Should not overflow")
+                >= HEALTH_THRESHOLD
+        );
 
         assert!(
             get_health(
-                &channel,
+                all_spenders_sum,
                 &our,
                 &vec![(ADDRESSES["publisher"], 60.into())]
                     .into_iter()
                     .collect()
-            ) >= HEALTH_THRESHOLD
+            )
+            .expect("Should not overflow")
+                >= HEALTH_THRESHOLD
         );
     }
 
@@ -205,76 +194,83 @@ mod test {
             .collect();
 
         assert!(
-            get_health(&get_dummy_channel(50), &BalancesMap::default(), &approved)
+            get_health(UnifiedNum::from(50), &UnifiedMap::default(), &approved)
+                .expect("Should not overflow")
                 >= HEALTH_THRESHOLD
         );
     }
 
     #[test]
     fn get_health_the_approved_balance_tree_has_less_but_within_margin_it_is_healthy() {
-        let channel = get_dummy_channel(80);
+        let all_spenders_sum = UnifiedNum::from(80);
 
         assert!(
             get_health(
-                &channel,
+                all_spenders_sum,
                 &vec![(ADDRESSES["publisher"], 80.into())]
                     .into_iter()
                     .collect(),
                 &vec![(ADDRESSES["publisher"], 79.into())]
                     .into_iter()
                     .collect()
-            ) >= HEALTH_THRESHOLD
+            )
+            .expect("Should not overflow")
+                >= HEALTH_THRESHOLD
         );
 
         assert!(
             get_health(
-                &channel,
+                all_spenders_sum,
                 &vec![(ADDRESSES["publisher"], 2.into())]
                     .into_iter()
                     .collect(),
                 &vec![(ADDRESSES["publisher"], 1.into())]
                     .into_iter()
                     .collect()
-            ) >= HEALTH_THRESHOLD
+            )
+            .expect("Should not overflow")
+                >= HEALTH_THRESHOLD
         );
     }
 
     #[test]
     fn get_health_the_approved_balance_tree_has_less_it_is_unhealthy() {
-        let channel = get_dummy_channel(80);
-
         assert!(
             get_health(
-                &channel,
+                UnifiedNum::from(80),
                 &vec![(ADDRESSES["publisher"], 80.into())]
                     .into_iter()
                     .collect(),
                 &vec![(ADDRESSES["publisher"], 70.into())]
                     .into_iter()
                     .collect()
-            ) < HEALTH_THRESHOLD
+            )
+            .expect("Should not overflow")
+                < HEALTH_THRESHOLD
         );
     }
 
     #[test]
     fn get_health_they_have_the_same_sum_but_different_entities_are_earning() {
-        let channel = get_dummy_channel(80);
+        let all_spenders_sum = UnifiedNum::from(80);
 
         assert!(
             get_health(
-                &channel,
+                all_spenders_sum,
                 &vec![(ADDRESSES["publisher"], 80.into())]
                     .into_iter()
                     .collect(),
                 &vec![(ADDRESSES["publisher2"], 80.into())]
                     .into_iter()
                     .collect()
-            ) < HEALTH_THRESHOLD
+            )
+            .expect("Should not overflow")
+                < HEALTH_THRESHOLD
         );
 
         assert!(
             get_health(
-                &channel,
+                all_spenders_sum,
                 &vec![(ADDRESSES["publisher"], 80.into())]
                     .into_iter()
                     .collect(),
@@ -284,12 +280,14 @@ mod test {
                 ]
                 .into_iter()
                 .collect()
-            ) < HEALTH_THRESHOLD
+            )
+            .expect("Should not overflow")
+                < HEALTH_THRESHOLD
         );
 
         assert!(
             get_health(
-                &channel,
+                all_spenders_sum,
                 &vec![(ADDRESSES["publisher"], 80.into())]
                     .into_iter()
                     .collect(),
@@ -299,12 +297,14 @@ mod test {
                 ]
                 .into_iter()
                 .collect()
-            ) < HEALTH_THRESHOLD
+            )
+            .expect("Should not overflow")
+                < HEALTH_THRESHOLD
         );
 
         assert!(
             get_health(
-                &channel,
+                all_spenders_sum,
                 &vec![(ADDRESSES["publisher"], 80.into())]
                     .into_iter()
                     .collect(),
@@ -314,12 +314,14 @@ mod test {
                 ]
                 .into_iter()
                 .collect()
-            ) >= HEALTH_THRESHOLD
+            )
+            .expect("Should not overflow")
+                >= HEALTH_THRESHOLD
         );
 
         assert!(
             get_health(
-                &channel,
+                all_spenders_sum,
                 &vec![
                     (ADDRESSES["publisher"], 100.into()),
                     (ADDRESSES["publisher2"], 1.into())
@@ -329,7 +331,9 @@ mod test {
                 &vec![(ADDRESSES["publisher"], 100.into())]
                     .into_iter()
                     .collect()
-            ) >= HEALTH_THRESHOLD
+            )
+            .expect("Should not overflow")
+                >= HEALTH_THRESHOLD
         );
     }
 }

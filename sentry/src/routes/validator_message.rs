@@ -46,7 +46,7 @@ pub async fn list_validator_messages<A: Adapter>(
     message_types: &[String],
 ) -> Result<Response<Body>, ResponseError> {
     let query =
-        serde_urlencoded::from_str::<ValidatorMessagesListQuery>(&req.uri().query().unwrap_or(""))?;
+        serde_urlencoded::from_str::<ValidatorMessagesListQuery>(req.uri().query().unwrap_or(""))?;
 
     let channel = req
         .extensions()
@@ -61,7 +61,8 @@ pub async fn list_validator_messages<A: Adapter>(
         .min(config_limit);
 
     let validator_messages =
-        get_validator_messages(&app.pool, &channel.id, validator_id, message_types, limit).await?;
+        get_validator_messages(&app.pool, &channel.id(), validator_id, message_types, limit)
+            .await?;
 
     let response = ValidatorMessageResponse { validator_messages };
 

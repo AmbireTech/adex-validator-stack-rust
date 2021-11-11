@@ -1,5 +1,5 @@
 use crate::{
-    channel_v5::Channel, targeting::Rules, AdUnit, Address, EventSubmission, UnifiedNum,
+    targeting::Rules, AdUnit, Address, Channel, EventSubmission, UnifiedNum, Validator,
     ValidatorDesc, ValidatorId,
 };
 
@@ -13,7 +13,7 @@ use serde_with::with_prefix;
 pub use {
     campaign_id::CampaignId,
     pricing::{Pricing, PricingBounds},
-    validators::{ValidatorRole, Validators},
+    validators::Validators,
 };
 
 with_prefix!(pub prefix_active "active_");
@@ -29,7 +29,7 @@ mod campaign_id {
     use thiserror::Error;
     use uuid::Uuid;
 
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     /// an Id of 16 bytes, (de)serialized as a `0x` prefixed hex
     /// In this implementation of the `CampaignId` the value is generated from a `Uuid::new_v4().to_simple()`
     pub struct CampaignId([u8; 16]);
@@ -156,6 +156,7 @@ mod campaign_id {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct Campaign {
     pub id: CampaignId,
     pub channel: Channel,
@@ -185,17 +186,15 @@ pub struct Campaign {
 }
 
 impl Campaign {
-    pub fn find_validator(&self, validator: &ValidatorId) -> Option<ValidatorRole<'_>> {
+    pub fn find_validator(&self, validator: &ValidatorId) -> Option<Validator<&ValidatorDesc>> {
         match (self.leader(), self.follower()) {
-            (Some(leader), _) if &leader.id == validator => Some(ValidatorRole::Leader(leader)),
-            (_, Some(follower)) if &follower.id == validator => {
-                Some(ValidatorRole::Follower(follower))
-            }
+            (Some(leader), _) if &leader.id == validator => Some(Validator::Leader(leader)),
+            (_, Some(follower)) if &follower.id == validator => Some(Validator::Follower(follower)),
             _ => None,
         }
     }
 
-    /// Matches the Channel.leader to the Campaign.spec.leader
+    /// Matches the Channel.leader to the Campaign.validators.leader
     /// If they match it returns `Some`, otherwise, it returns `None`
     pub fn leader(&self) -> Option<&'_ ValidatorDesc> {
         self.validators.find(&self.channel.leader)
@@ -277,30 +276,16 @@ mod pricing {
         }
     }
 }
-// TODO AIP#61: Double check if we require all the methods and enums, as some parts are now in the `Campaign`
-// This includes the matching of the Channel leader & follower to the Validators
+/// Campaign Validators
 pub mod validators {
+    use std::ops::Index;
+
     use crate::{ValidatorDesc, ValidatorId};
     use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
     /// Unordered list of the validators representing the leader & follower
     pub struct Validators(ValidatorDesc, ValidatorDesc);
-
-    #[derive(Debug, PartialEq, Eq, Clone)]
-    pub enum ValidatorRole<'a> {
-        Leader(&'a ValidatorDesc),
-        Follower(&'a ValidatorDesc),
-    }
-
-    impl<'a> ValidatorRole<'a> {
-        pub fn validator(&self) -> &'a ValidatorDesc {
-            match self {
-                ValidatorRole::Leader(validator) => validator,
-                ValidatorRole::Follower(validator) => validator,
-            }
-        }
-    }
 
     impl Validators {
         pub fn new(validators: (ValidatorDesc, ValidatorDesc)) -> Self {
@@ -318,13 +303,24 @@ pub mod validators {
         }
 
         pub fn iter(&self) -> Iter<'_> {
-            Iter::new(&self)
+            Iter::new(self)
         }
     }
 
     impl From<(ValidatorDesc, ValidatorDesc)> for Validators {
         fn from(validators: (ValidatorDesc, ValidatorDesc)) -> Self {
             Self(validators.0, validators.1)
+        }
+    }
+
+    impl Index<usize> for Validators {
+        type Output = ValidatorDesc;
+        fn index(&self, index: usize) -> &Self::Output {
+            match index {
+                0 => &self.0,
+                1 => &self.1,
+                _ => panic!("Validators index is out of bound"),
+            }
         }
     }
 
@@ -375,17 +371,19 @@ pub mod validators {
 
 #[cfg(feature = "postgres")]
 mod postgres {
+    use crate::Channel;
+
     use super::{Active, Campaign, CampaignId, PricingBounds, Validators};
     use bytes::BytesMut;
-    use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
     use std::error::Error;
+    use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
     use tokio_postgres::Row;
 
     impl From<&Row> for Campaign {
         fn from(row: &Row) -> Self {
             Self {
                 id: row.get("id"),
-                channel: row.get("channel"),
+                channel: Channel::from(row),
                 creator: row.get("creator"),
                 budget: row.get("budget"),
                 validators: row.get("validators"),
@@ -411,6 +409,12 @@ mod postgres {
         }
 
         accepts!(TEXT, VARCHAR);
+    }
+
+    impl From<&Row> for CampaignId {
+        fn from(row: &Row) -> Self {
+            row.get("id")
+        }
     }
 
     impl ToSql for CampaignId {
