@@ -19,6 +19,6 @@ slog = { version = "^2.5.2", features = ["max_level_trace"] }
 # Async
 async-std = "^1.8"
 # Other
-lazy_static = "1.4"
+once_cell = "^1.8"
 thiserror = "^1.0"
 rand = "^0.8"
