@@ -269,7 +269,11 @@ mod test {
                     .unwrap()
                     .get(0);
 
-                assert_eq!(&actual_os, &row_os);
+                assert_eq!(
+                    &actual_os, &row_os,
+                    "expected and actual FromSql differ for {}",
+                    input
+                );
             }
 
             // to SQL
@@ -279,7 +283,11 @@ mod test {
                     .await
                     .unwrap()
                     .get(0);
-                assert_eq!(&actual_os, &row_os);
+                assert_eq!(
+                    &actual_os, &row_os,
+                    "expected and actual ToSql differ for {}",
+                    input
+                );
             }
         }
     }
@@ -289,7 +297,6 @@ mod test {
         for (input, (expect_os, expect_json)) in TEST_CASES.iter() {
             let actual_os = OperatingSystem::map_os(input);
 
-            // let input_json = Value::String(input.clone());
             assert_eq!(
                 expect_os, &actual_os,
                 "expected and actual differ for {}",
