@@ -293,6 +293,42 @@ pub async fn campaign_list<A: Adapter>(
     Ok(success_response(serde_json::to_string(&list_response)?))
 }
 
+/// Can only be called by creator
+/// sets redis remaining = 0 (`newBudget = totalSpent`, i.e. `newBudget = oldBudget - remaining`)
+pub async fn close_campaign<A: Adapter>(
+    req: Request<Body>,
+    app: &Application<A>,
+) -> Result<Response<Body>, ResponseError> {
+    let auth = req.extensions().get::<Auth>();
+
+    let campaign = req
+        .extensions()
+        .get::<Campaign>()
+        .expect("We must have a campaign in extensions")
+        .to_owned();
+
+    let is_creator = match auth {
+        Some(auth) => auth.uid.to_address() == campaign.creator,
+        None => false,
+    };
+
+    match is_creator {
+        false => Err(ResponseError::Forbidden(
+            "Request not sent by campaign creator".to_string(),
+        )),
+        _ => {
+            CampaignRemaining::new(app.redis.clone())
+                .set_remaining_to_zero(campaign.id)
+                .await
+                .map_err(|e| ResponseError::BadRequest(e.to_string()))?;
+
+            Ok(success_response(serde_json::to_string(&SuccessResponse {
+                success: true,
+            })?))
+        }
+    }
+}
+
 pub mod update_campaign {
     use primitives::Config;
 
@@ -1250,40 +1286,41 @@ mod test {
             assert_eq!(delta_budget, Some(DeltaBudget::Decrease(decrease_by)));
         }
     }
-}
 
-/// Can only be called by creator
-/// sets redis remaining = 0 (`newBudget = totalSpent`, i.e. `newBudget = oldBudget - remaining`)
-pub async fn close_campaign<A: Adapter>(
-    req: Request<Body>,
-    app: &Application<A>,
-) -> Result<Response<Body>, ResponseError> {
-    let auth = req.extensions().get::<Auth>();
+    #[tokio::test]
+    async fn campaign_is_closed_properly() {
+        let redis = TESTS_POOL.get().await.expect("Should return Object");
+        let campaign_remaining = CampaignRemaining::new(redis.connection.clone());
+        let multiplier = 10_u64.pow(UnifiedNum::PRECISION.into());
+        let campaign = DUMMY_CAMPAIGN.clone();
+        let app = setup_dummy_app().await;
+        let auth = Auth {
+            era: 0,
+            uid: ValidatorId::from(campaign.creator),
+        };
 
-    let campaign = req
-        .extensions()
-        .get::<Campaign>()
-        .expect("We must have a campaign in extensions")
-        .to_owned();
+        let req = Request::builder()
+            .extension(auth)
+            .extension(campaign.clone())
+            .body(Body::empty())
+            .expect("Should build Request");
 
-    let is_creator = match auth {
-        Some(auth) => auth.uid.to_address() == campaign.creator,
-        None => false,
-    };
+        campaign_remaining.set_initial(campaign.id, UnifiedNum::from_u64(1000 * multiplier)).await.expect("should set");
 
-    match is_creator {
-        false => Err(ResponseError::Forbidden(
-            "Request not sent by campaign creator".to_string(),
-        )),
-        _ => {
-            CampaignRemaining::new(app.redis.clone())
-                .set_remaining_to_zero(campaign.id)
+        let close_response = close_campaign(req, &app).await.expect("Should close campaign");
+        let json = hyper::body::to_bytes(close_response.into_body())
                 .await
-                .map_err(|_| ResponseError::BadRequest("couldn't close campaign".to_string()))?;
+                .expect("Should get json");
+        let res: SuccessResponse = serde_json::from_slice(&json).expect("should get");
 
-            Ok(success_response(serde_json::to_string(&SuccessResponse {
-                success: true,
-            })?))
-        }
+        assert_eq!(res.success, true);
+
+        let remaining = campaign_remaining
+            .get_remaining_opt(campaign.id)
+            .await
+            .expect("Should get remaining from redis")
+            .expect("There should be value for the Campaign");
+
+        assert_eq!(remaining, 0);
     }
 }
