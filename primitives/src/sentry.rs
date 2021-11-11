@@ -5,11 +5,10 @@ use crate::{
     validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
     Address, Balances, BigNum, CampaignId, Channel, ChannelId, UnifiedNum, ValidatorId, IPFS,
 };
-use bytes::BytesMut;
-use chrono::{Date, DateTime, Datelike, TimeZone, Timelike, Utc};
-use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
-use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, error::Error, fmt, hash::Hash};
+use chrono::{Date, DateTime, NaiveDate, TimeZone, Timelike, Utc};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::{collections::HashMap, fmt, hash::Hash};
+use thiserror::Error;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -120,7 +119,7 @@ pub mod message {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 #[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum Event {
     #[serde(rename_all = "camelCase")]
@@ -137,73 +136,6 @@ pub enum Event {
         ad_slot: Option<IPFS>,
         referrer: Option<String>,
     },
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Hash, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct UpdateAnalytics {
-    pub time: DateHour,
-    pub campaign_id: CampaignId,
-    pub ad_unit: Option<IPFS>,
-    pub ad_slot: Option<IPFS>,
-    pub ad_slot_type: Option<String>,
-    pub advertiser: Address,
-    pub publisher: Address,
-    pub hostname: Option<String>,
-    pub country: Option<String>,
-    pub os_name: OperatingSystem,
-    pub event_type: String,
-    pub amount_to_add: UnifiedNum,
-    pub count_to_add: i32,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct Analytics {
-    pub time: DateHour,
-    pub campaign_id: CampaignId,
-    pub ad_unit: Option<IPFS>,
-    pub ad_slot: Option<IPFS>,
-    pub ad_slot_type: Option<String>,
-    pub advertiser: Address,
-    pub publisher: Address,
-    pub hostname: Option<String>,
-    pub country: Option<String>,
-    pub os_name: OperatingSystem,
-    pub event_type: String,
-    pub payout_amount: UnifiedNum,
-    pub payout_count: i32,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Hash, Eq)]
-pub struct DateHour {
-    pub date: DateTime<Utc>,
-    pub hour: u32,
-}
-
-impl<'a> FromSql<'a> for DateHour {
-    fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
-        let date_time = <DateTime<Utc> as FromSql>::from_sql(ty, raw)?;
-        assert_eq!(date_time.time().minute(), 0);
-        assert_eq!(date_time.time().second(), 0);
-        assert_eq!(date_time.time().nanosecond(), 0);
-        Ok(Self {
-            date: date_time,
-            hour: date_time.hour(),
-        })
-    }
-    accepts!(TIMESTAMPTZ);
-}
-
-impl ToSql for DateHour {
-    fn to_sql(&self, ty: &Type, w: &mut BytesMut) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-        Utc.ymd(self.date.year(), self.date.month(), self.date.day())
-            .and_hms(self.hour, 0, 0)
-            .to_sql(ty, w)
-    }
-
-    accepts!(TIMESTAMPTZ);
-    to_sql_checked!();
 }
 
 impl Event {
@@ -232,6 +164,153 @@ impl AsRef<str> for Event {
 impl fmt::Display for Event {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.as_ref())
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateAnalytics {
+    pub time: DateHour<Utc>,
+    pub campaign_id: CampaignId,
+    pub ad_unit: Option<IPFS>,
+    pub ad_slot: Option<IPFS>,
+    pub ad_slot_type: Option<String>,
+    pub advertiser: Address,
+    pub publisher: Address,
+    pub hostname: Option<String>,
+    pub country: Option<String>,
+    pub os_name: OperatingSystem,
+    pub event_type: String,
+    pub amount_to_add: UnifiedNum,
+    pub count_to_add: i32,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Analytics {
+    pub time: DateHour<Utc>,
+    pub campaign_id: CampaignId,
+    pub ad_unit: Option<IPFS>,
+    pub ad_slot: Option<IPFS>,
+    pub ad_slot_type: Option<String>,
+    pub advertiser: Address,
+    pub publisher: Address,
+    pub hostname: Option<String>,
+    pub country: Option<String>,
+    pub os_name: OperatingSystem,
+    pub event_type: String,
+    pub payout_amount: UnifiedNum,
+    pub payout_count: u32,
+}
+
+#[derive(Debug, Error, PartialEq, Eq)]
+#[error("Minutes ({minutes}), seconds ({seconds}) & nanoseconds ({nanoseconds}) should all be set to 0 (zero)")]
+pub struct DateHourError {
+    pub minutes: u32,
+    pub seconds: u32,
+    pub nanoseconds: u32,
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+/// [`DateHour`] holds the date and hour (only).
+/// It uses [`chrono::DateTime`] when serializing and deserializing.
+/// When serializing it always sets minutes and seconds to `0` (zero).
+/// When deserializing the minutes and seconds should always be set to `0` (zero),
+/// otherwise an error will be returned.
+pub struct DateHour<Tz: TimeZone> {
+    pub date: Date<Tz>,
+    /// hour is in the range of `0 - 23`
+    pub hour: u32,
+}
+
+impl DateHour<Utc> {
+    /// # Panics
+    ///
+    /// When wrong inputs have been passed, i.e. for year, month, day or hour.
+    pub fn from_ymdh(year: i32, month: u32, day: u32, hour: u32) -> Self {
+        Self::from_ymdh_opt(year, month, day, hour).expect("Valid Date with hour")
+    }
+
+    /// Makes a new [`DateHour`] from year, month, day and hour.
+    ///
+    /// Returns `None` on invalid year, month, day or hour.
+    ///
+    /// See [`chrono::NaiveDate::from_ymd_opt()`] & [`chrono::NaiveTime::from_hms_opt()`] for details
+    pub fn from_ymdh_opt(year: i32, month: u32, day: u32, hour: u32) -> Option<Self> {
+        if hour >= 24 {
+            return None;
+        }
+
+        let date = NaiveDate::from_ymd_opt(year, month, day)?;
+        Some(Self {
+            date: Date::from_utc(date, Utc),
+            hour,
+        })
+    }
+
+    pub fn now() -> Self {
+        let datetime = Utc::now();
+
+        Self {
+            date: datetime.date(),
+            hour: datetime.hour(),
+        }
+    }
+}
+
+/// Manually implement [`Copy`] as it requires a where clause for the [`TimeZone::Offset`]
+impl<Tz: TimeZone> Copy for DateHour<Tz> where Tz::Offset: Copy {}
+
+impl<Tz: TimeZone> DateHour<Tz> {
+    /// Creates a [`DateTime`] with minutes, seconds, nanoseconds set to `0` (zero)
+    pub fn to_datetime(&self) -> DateTime<Tz> {
+        self.date.and_hms(self.hour, 0, 0)
+    }
+}
+
+impl<Tz: TimeZone> fmt::Debug for DateHour<Tz> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.to_datetime().fmt(f)
+    }
+}
+
+impl<Tz: TimeZone> TryFrom<DateTime<Tz>> for DateHour<Tz> {
+    type Error = DateHourError;
+
+    fn try_from(datetime: DateTime<Tz>) -> Result<Self, Self::Error> {
+        let time = datetime.time();
+
+        match (time.minute(), time.second(), time.nanosecond()) {
+            (0, 0, 0) => Ok(Self {
+                date: datetime.date(),
+                hour: datetime.hour(),
+            }),
+            _ => Err(DateHourError {
+                minutes: datetime.minute(),
+                seconds: datetime.second(),
+                nanoseconds: datetime.nanosecond(),
+            }),
+        }
+    }
+}
+
+impl Serialize for DateHour<Utc> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.to_datetime().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for DateHour<Utc> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let datetime = <DateTime<Utc>>::deserialize(deserializer)?;
+
+        Self::try_from(datetime).map_err(serde::de::Error::custom)
     }
 }
 
@@ -672,15 +751,16 @@ pub mod campaign_create {
 
 #[cfg(feature = "postgres")]
 mod postgres {
-    use super::{Analytics, MessageResponse, ValidatorMessage};
+    use super::{Analytics, DateHour, MessageResponse, ValidatorMessage};
     use crate::{
         sentry::EventAggregate,
         validator::{messages::Type as MessageType, MessageTypes},
     };
     use bytes::BytesMut;
+    use chrono::{DateTime, Timelike, Utc};
     use serde::Deserialize;
     use tokio_postgres::{
-        types::{accepts, to_sql_checked, IsNull, Json, ToSql, Type},
+        types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type},
         Error, Row,
     };
 
@@ -735,30 +815,40 @@ mod postgres {
     }
 
     impl From<&Row> for Analytics {
+        /// # Panics
+        ///
+        /// When a field is missing in [`Row`] or if the [`Analytics`] `ad_unit` or `ad_slot` [`crate::IPFS`] is wrong.
         fn from(row: &Row) -> Self {
-            let ad_slot_type: String = row.get("ad_slot_type");
-            let ad_slot_type = match ad_slot_type.len() {
-                0 => None,
-                _ => Some(ad_slot_type),
-            };
+            let ad_slot_type = row
+                .get::<_, Option<String>>("ad_slot_type")
+                .filter(|string| !string.is_empty());
+            let hostname = row
+                .get::<_, Option<String>>("hostname")
+                .filter(|string| !string.is_empty());
+            let country = row
+                .get::<_, Option<String>>("country")
+                .filter(|string| !string.is_empty());
 
-            let hostname: String = row.get("hostname");
-            let hostname = match hostname.len() {
-                0 => None,
-                _ => Some(hostname),
-            };
-
-            let country: String = row.get("country");
-            let country = match country.len() {
-                0 => None,
-                _ => Some(country),
-            };
+            let ad_unit = row.get::<_, Option<String>>("ad_unit").and_then(|string| {
+                if !string.is_empty() {
+                    Some(string.parse().expect("Valid IPFS"))
+                } else {
+                    None
+                }
+            });
+            let ad_slot = row.get::<_, Option<String>>("ad_slot").and_then(|string| {
+                if !string.is_empty() {
+                    Some(string.parse().expect("Valid IPFS"))
+                } else {
+                    None
+                }
+            });
 
             Self {
                 campaign_id: row.get("campaign_id"),
                 time: row.get("time"),
-                ad_unit: row.try_get("ad_unit").ok(),
-                ad_slot: row.try_get("ad_slot").ok(),
+                ad_unit,
+                ad_slot,
                 ad_slot_type,
                 advertiser: row.get("advertiser"),
                 publisher: row.get("publisher"),
@@ -767,9 +857,40 @@ mod postgres {
                 os_name: row.get("os"),
                 event_type: row.get("event_type"),
                 payout_amount: row.get("payout_amount"),
-                payout_count: row.get("payout_count"),
+                payout_count: row.get::<_, i32>("payout_count").unsigned_abs(),
             }
         }
+    }
+
+    impl<'a> FromSql<'a> for DateHour<Utc> {
+        fn from_sql(
+            ty: &Type,
+            raw: &'a [u8],
+        ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+            let datetime = <DateTime<Utc> as FromSql>::from_sql(ty, raw)?;
+            assert_eq!(datetime.time().minute(), 0);
+            assert_eq!(datetime.time().second(), 0);
+            assert_eq!(datetime.time().nanosecond(), 0);
+
+            Ok(Self {
+                date: datetime.date(),
+                hour: datetime.hour(),
+            })
+        }
+        accepts!(TIMESTAMPTZ);
+    }
+
+    impl ToSql for DateHour<Utc> {
+        fn to_sql(
+            &self,
+            ty: &Type,
+            w: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn std::error::Error + Sync + Send>> {
+            self.date.and_hms(self.hour, 0, 0).to_sql(ty, w)
+        }
+
+        accepts!(TIMESTAMPTZ);
+        to_sql_checked!();
     }
 }
 

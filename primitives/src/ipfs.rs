@@ -95,8 +95,8 @@ impl Url {
 mod postgres {
     use super::IPFS;
     use bytes::BytesMut;
-    use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
     use std::error::Error;
+    use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
 
     impl ToSql for IPFS {
         fn to_sql(

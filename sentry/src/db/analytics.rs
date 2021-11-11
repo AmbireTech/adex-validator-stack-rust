@@ -226,9 +226,9 @@ pub async fn get_advanced_reports(
 }
 
 /// This will update a record when it's present by incrementing its payout_amount and payout_count fields
-pub async fn insert_analytics(
+pub async fn update_analytics(
     pool: &DbPool,
-    event: &UpdateAnalytics,
+    update_analytics: UpdateAnalytics,
 ) -> Result<Analytics, PoolError> {
     let client = pool.get().await?;
 
@@ -240,33 +240,32 @@ pub async fn insert_analytics(
 
     let stmt = client.prepare(query).await?;
 
-    let ad_unit = match event.ad_unit {
-        Some(ipfs) => ipfs.to_string(),
-        None => "".to_string(),
-    };
-
-    let ad_slot = match event.ad_slot {
-        Some(ipfs) => ipfs.to_string(),
-        None => "".to_string(),
-    };
-
     let row = client
         .query_one(
             &stmt,
             &[
-                &event.campaign_id,
-                &event.time,
-                &ad_unit,
-                &ad_slot,
-                &event.ad_slot_type.as_ref().unwrap_or(&"".to_string()),
-                &event.advertiser,
-                &event.publisher,
-                &event.hostname.as_ref().unwrap_or(&"".to_string()),
-                &event.country.as_ref().unwrap_or(&"".to_string()),
-                &event.os_name.to_string(),
-                &event.event_type,
-                &event.amount_to_add,
-                &event.count_to_add,
+                &update_analytics.campaign_id,
+                &update_analytics.time,
+                &update_analytics
+                    .ad_unit
+                    .map(|ipfs| ipfs.to_string())
+                    .unwrap_or_default(),
+                &update_analytics
+                    .ad_slot
+                    .map(|ipfs| ipfs.to_string())
+                    .unwrap_or_default(),
+                &update_analytics.ad_slot_type.clone().unwrap_or_default(),
+                &update_analytics.advertiser,
+                &update_analytics.publisher,
+                &update_analytics
+                    .hostname
+                    .as_ref()
+                    .unwrap_or(&"".to_string()),
+                &update_analytics.country.as_ref().unwrap_or(&"".to_string()),
+                &update_analytics.os_name.to_string(),
+                &update_analytics.event_type,
+                &update_analytics.amount_to_add,
+                &update_analytics.count_to_add,
             ],
         )
         .await?;
@@ -276,56 +275,37 @@ pub async fn insert_analytics(
     Ok(event_analytics)
 }
 
-// Currently used for testing only
-pub async fn find_analytics(pool: &DbPool) -> Result<Vec<Analytics>, PoolError> {
-    let client = pool.get().await?;
-
-    let query = "SELECT * FROM analytics";
-    let stmt = client.prepare(query).await?;
-
-    let rows = client.query(&stmt, &[]).await?;
-
-    let event_analytics: Vec<Analytics> = rows.iter().map(Analytics::from).collect();
-    Ok(event_analytics)
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
     use primitives::{
         analytics::OperatingSystem,
         sentry::DateHour,
-        util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN},
-        UnifiedNum, IPFS,
+        util::tests::prep_db::{ADDRESSES, DUMMY_AD_UNITS, DUMMY_CAMPAIGN, DUMMY_IPFS},
+        UnifiedNum,
     };
 
     use crate::db::tests_postgres::{setup_test_migrations, DATABASE_POOL};
-    use chrono::TimeZone;
-    use std::convert::TryFrom;
 
     #[tokio::test]
     async fn insert_update_and_get_analytics() {
         let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
 
+        let ad_unit = DUMMY_AD_UNITS[0].clone();
+        let ad_slot_ipfs = DUMMY_IPFS[0];
+
         setup_test_migrations(database.pool.clone())
             .await
             .expect("Migrations should succeed");
+
+        // Inserts a new Analytics and later updates it by adding more payout & count
         {
-            let analytics = UpdateAnalytics {
-                time: DateHour {
-                    date: Utc.ymd(2021, 2, 1).and_hms(1, 0, 0),
-                    hour: 1,
-                },
+            let update = UpdateAnalytics {
+                time: DateHour::from_ymdh(2021, 2, 1, 1),
                 campaign_id: DUMMY_CAMPAIGN.id,
-                ad_unit: Some(
-                    IPFS::try_from("Qmasg8FrbuSQpjFu3kRnZF9beg8rEBFrqgi1uXDRwCbX5f")
-                        .expect("should convert"),
-                ),
-                ad_slot: Some(
-                    IPFS::try_from("QmVhRDGXoM3Fg3HZD5xwMuxtb9ZErwC8wHt8CjsfxaiUbZ")
-                        .expect("should convert"),
-                ),
-                ad_slot_type: Some("test".to_string()),
+                ad_unit: Some(ad_unit.ipfs),
+                ad_slot: Some(ad_slot_ipfs),
+                ad_slot_type: Some(ad_unit.ad_type.clone()),
                 advertiser: ADDRESSES["creator"],
                 publisher: ADDRESSES["publisher"],
                 hostname: Some("localhost".to_string()),
@@ -336,37 +316,40 @@ mod test {
                 count_to_add: 1,
             };
 
-            let insert_res = insert_analytics(&database.clone(), &analytics.clone())
+            let analytics = update_analytics(&database.clone(), update.clone())
                 .await
                 .expect("Should insert");
 
-            assert_eq!(insert_res.campaign_id, analytics.campaign_id);
-            assert_eq!(insert_res.time.date, analytics.time.date);
-            assert_eq!(insert_res.time.hour, analytics.time.hour);
-            assert_eq!(insert_res.ad_unit, analytics.ad_unit);
-            assert_eq!(insert_res.ad_slot, analytics.ad_slot);
-            assert_eq!(insert_res.ad_slot_type, analytics.ad_slot_type);
-            assert_eq!(insert_res.advertiser, analytics.advertiser);
-            assert_eq!(insert_res.publisher, analytics.publisher);
-            assert_eq!(insert_res.hostname, analytics.hostname);
-            assert_eq!(insert_res.country, analytics.country);
-            assert_eq!(insert_res.os_name, analytics.os_name);
-            assert_eq!(insert_res.event_type, analytics.event_type);
-            assert_eq!(insert_res.payout_amount, UnifiedNum::from_u64(1_000_000));
-            assert_eq!(insert_res.payout_count, 1);
+            assert_eq!(update.campaign_id, analytics.campaign_id);
+            assert_eq!(update.time.date, analytics.time.date);
+            assert_eq!(update.time.hour, analytics.time.hour);
+            assert_eq!(update.ad_unit, analytics.ad_unit);
+            assert_eq!(update.ad_slot, analytics.ad_slot);
+            assert_eq!(update.ad_slot_type, analytics.ad_slot_type);
+            assert_eq!(update.advertiser, analytics.advertiser);
+            assert_eq!(update.publisher, analytics.publisher);
+            assert_eq!(update.hostname, analytics.hostname);
+            assert_eq!(update.country, analytics.country);
+            assert_eq!(update.os_name, analytics.os_name);
+            assert_eq!(update.event_type, analytics.event_type);
 
-            let update_res = insert_analytics(&database.clone(), &analytics)
+            assert_eq!(UnifiedNum::from_u64(1_000_000), analytics.payout_amount);
+            assert_eq!(1, analytics.payout_count);
+
+            let analytics_updated = update_analytics(&database.clone(), update.clone())
                 .await
-                .expect("Should insert");
-            assert_eq!(update_res.payout_amount, UnifiedNum::from_u64(2_000_000));
-            assert_eq!(update_res.payout_count, 2);
+                .expect("Should update");
+            assert_eq!(
+                analytics_updated.payout_amount,
+                UnifiedNum::from_u64(2_000_000)
+            );
+            assert_eq!(analytics_updated.payout_count, 2);
         }
+
+        // On empty fields marked as `NOT NULL` it should successfully insert a new analytics
         {
             let analytics_with_empty_fields = UpdateAnalytics {
-                time: DateHour {
-                    date: Utc.ymd(2021, 2, 1).and_hms(1, 0, 0),
-                    hour: 1,
-                },
+                time: DateHour::from_ymdh(2021, 2, 1, 1),
                 campaign_id: DUMMY_CAMPAIGN.id,
                 ad_unit: None,
                 ad_slot: None,
@@ -381,9 +364,10 @@ mod test {
                 count_to_add: 1,
             };
 
-            let insert_res = insert_analytics(&database.clone(), &analytics_with_empty_fields)
-                .await
-                .expect("Should insert");
+            let insert_res =
+                update_analytics(&database.clone(), analytics_with_empty_fields.clone())
+                    .await
+                    .expect("Should insert");
 
             assert_eq!(insert_res.ad_unit, analytics_with_empty_fields.ad_unit);
             assert_eq!(insert_res.ad_slot, analytics_with_empty_fields.ad_slot);
