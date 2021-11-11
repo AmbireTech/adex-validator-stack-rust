@@ -217,18 +217,18 @@ async fn campaigns_router<A: Adapter + 'static>(
 
         campaign::insert_events::handle_route(req, app).await
     } else if let (Some(caps), &Method::POST) =
-        (CLOSE_CAMPAIGN_BY_CAMPAIGN_ID.captures(&path), method)
+        (CLOSE_CAMPAIGN_BY_CAMPAIGN_ID.captures(path), method)
     {
         let param = RouteParams(vec![caps
             .get(1)
             .map_or("".to_string(), |m| m.as_str().to_string())]);
-
         req.extensions_mut().insert(param);
+
         req = Chain::new()
-                    .chain(AuthRequired)
-                    .chain(CampaignLoad)
-                    .apply(req, app)
-                    .await?;
+            .chain(AuthRequired)
+            .chain(CampaignLoad)
+            .apply(req, app)
+            .await?;
 
         campaign::close_campaign(req, app).await
     } else if method == Method::POST && path == "/v5/campaign/list" {

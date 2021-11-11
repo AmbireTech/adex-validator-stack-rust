@@ -21,6 +21,7 @@ use primitives::{
     sentry::{
         campaign::CampaignListQuery,
         campaign_create::{CreateCampaign, ModifyCampaign},
+        SuccessResponse,
     },
     spender::Spendable,
     Address, Campaign, CampaignId, Channel, ChannelId, Deposit, UnifiedNum,
@@ -1251,15 +1252,13 @@ mod test {
     }
 }
 
-pub async fn close_campaign<A: Adapter> (
+/// Can only be called by creator
+/// sets redis remaining = 0 (`newBudget = totalSpent`, i.e. `newBudget = oldBudget - remaining`)
+pub async fn close_campaign<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
-    // - only by creator
-    // - sets redis remaining = 0 (`newBudget = totalSpent`, i.e. `newBudget = oldBudget - remaining`)
-    let auth = req
-        .extensions()
-        .get::<Auth>();
+    let auth = req.extensions().get::<Auth>();
 
     let campaign = req
         .extensions()
@@ -1267,33 +1266,24 @@ pub async fn close_campaign<A: Adapter> (
         .expect("We must have a campaign in extensions")
         .to_owned();
 
-    let (is_creator, auth_uid) = match auth {
-        Some(auth) => (auth.uid.to_address() == campaign.creator, auth.uid.to_string()),
-        None => (false, Default::default()),
+    let is_creator = match auth {
+        Some(auth) => auth.uid.to_address() == campaign.creator,
+        None => false,
     };
 
-    let has_close_event = true; // TODO: Discuss how get this info
-    // Closing a campaign is allowed only by the creator
-    if has_close_event && is_creator {
-        set_campaign_remaining_to_zero(&app.redis, campaign.id).await.map_err(|_| ResponseError::BadRequest("couldn't close campaign".to_string()))?;
-        return Ok(success_response(serde_json::to_string(&SuccessResponse {
-            success: true,
-        })?)); // TODO: Could there be a need to return the closed Campaign instead?
+    match is_creator {
+        false => Err(ResponseError::Forbidden(
+            "Request not sent by campaign creator".to_string(),
+        )),
+        _ => {
+            CampaignRemaining::new(app.redis.clone())
+                .set_remaining_to_zero(campaign.id)
+                .await
+                .map_err(|_| ResponseError::BadRequest("couldn't close campaign".to_string()))?;
+
+            Ok(success_response(serde_json::to_string(&SuccessResponse {
+                success: true,
+            })?))
+        }
     }
-
-    Err(ResponseError::Forbidden("Request not sent by campaign creator".to_string()))
-}
-
-// Not allowing to use SET with a predefined amount due to a possible race condition
-// use increase/decrease functions instead
-pub async fn set_campaign_remaining_to_zero(
-    redis: &MultiplexedConnection,
-    id: CampaignId
-) -> Result<i64, RedisError> {
-    let key = format!("{}:{}", "campaignRemaining", id); // TODO use key variable once 408 is merged
-    redis::cmd("SET")
-        .arg(&key)
-        .arg(0)
-        .query_async::<_, i64>(&mut redis.clone())
-        .await
 }
