@@ -51,8 +51,8 @@ version = "0.1.0"
 dependencies = [
  "async-std",
  "chrono",
- "lazy_static",
  "num-integer",
+ "once_cell",
  "primitives",
  "rand 0.8.3",
  "reqwest",
