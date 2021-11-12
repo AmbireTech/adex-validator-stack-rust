@@ -313,10 +313,8 @@ mod campaign_remaining {
         /// Doesn't allow the usage of SET with a predefined amount due to a possible race condition
         /// use increase/decrease functions instead
         pub async fn set_remaining_to_zero(&self, campaign: CampaignId) -> Result<bool, RedisError> {
-            let key = CampaignRemaining::get_key(campaign);
-
             redis::cmd("SET")
-                .arg(&key)
+                .arg(&Self::get_key(campaign))
                 .arg(0)
                 .query_async(&mut self.redis.clone())
                 .await

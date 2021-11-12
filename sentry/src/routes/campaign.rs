@@ -300,6 +300,7 @@ pub async fn close_campaign<A: Adapter>(
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
     let auth = req.extensions().get::<Auth>();
+    let campaign_remaining = CampaignRemaining::new(app.redis.clone());
 
     let campaign = req
         .extensions()
@@ -312,21 +313,20 @@ pub async fn close_campaign<A: Adapter>(
         None => false,
     };
 
-    match is_creator {
-        false => Err(ResponseError::Forbidden(
+    if is_creator == false {
+        return Err(ResponseError::Forbidden(
             "Request not sent by campaign creator".to_string(),
-        )),
-        _ => {
-            CampaignRemaining::new(app.redis.clone())
-                .set_remaining_to_zero(campaign.id)
-                .await
-                .map_err(|e| ResponseError::BadRequest(e.to_string()))?;
-
-            Ok(success_response(serde_json::to_string(&SuccessResponse {
-                success: true,
-            })?))
-        }
+        ));
     }
+
+    campaign_remaining
+        .set_remaining_to_zero(campaign.id)
+        .await
+        .map_err(|e| ResponseError::BadRequest(e.to_string()))?;
+
+    Ok(success_response(serde_json::to_string(&SuccessResponse {
+        success: true,
+    })?))
 }
 
 pub mod update_campaign {
@@ -1289,38 +1289,57 @@ mod test {
 
     #[tokio::test]
     async fn campaign_is_closed_properly() {
-        let redis = TESTS_POOL.get().await.expect("Should return Object");
-        let campaign_remaining = CampaignRemaining::new(redis.connection.clone());
         let multiplier = 10_u64.pow(UnifiedNum::PRECISION.into());
         let campaign = DUMMY_CAMPAIGN.clone();
+
         let app = setup_dummy_app().await;
-        let auth = Auth {
-            era: 0,
-            uid: ValidatorId::from(campaign.creator),
-        };
 
-        let req = Request::builder()
-            .extension(auth)
-            .extension(campaign.clone())
-            .body(Body::empty())
-            .expect("Should build Request");
+        // Test if remaining is set to 0
+        {
+            let campaign_remaining = CampaignRemaining::new(app.redis.clone());
+            campaign_remaining.set_initial(campaign.id, UnifiedNum::from_u64(1000 * multiplier)).await.expect("should set");
 
-        campaign_remaining.set_initial(campaign.id, UnifiedNum::from_u64(1000 * multiplier)).await.expect("should set");
+            let auth = Auth {
+                era: 0,
+                uid: ValidatorId::from(campaign.creator),
+            };
 
-        let close_response = close_campaign(req, &app).await.expect("Should close campaign");
-        let json = hyper::body::to_bytes(close_response.into_body())
+            let req = Request::builder()
+                .extension(auth)
+                .extension(campaign.clone())
+                .body(Body::empty())
+                .expect("Should build Request");
+
+            close_campaign(req, &app).await.expect("Should close campaign");
+
+            let remaining = campaign_remaining
+                .get_remaining_opt(campaign.id)
                 .await
-                .expect("Should get json");
-        let res: SuccessResponse = serde_json::from_slice(&json).expect("should get");
+                .expect("Should get remaining from redis")
+                .expect("There should be value for the Campaign");
 
-        assert_eq!(res.success, true);
+            assert_eq!(remaining, 0);
+        }
 
-        let remaining = campaign_remaining
-            .get_remaining_opt(campaign.id)
-            .await
-            .expect("Should get remaining from redis")
-            .expect("There should be value for the Campaign");
+        // Test if an error is returned when request is not sent by creator
+        {
+            let auth = Auth {
+                era: 0,
+                uid: ValidatorId::try_from("0xce07CbB7e054514D590a0262C93070D838bFBA2e").expect("should parse"),
+            };
 
-        assert_eq!(remaining, 0);
+            let req = Request::builder()
+                .extension(auth)
+                .extension(campaign.clone())
+                .body(Body::empty())
+                .expect("Should build Request");
+
+            let res = close_campaign(req, &app).await.expect_err("Should return error for Bad Campaign");
+
+            assert_eq!(
+                ResponseError::Forbidden("Request not sent by campaign creator".to_string()),
+                res
+            );
+        }
     }
 }
