@@ -1297,7 +1297,10 @@ mod test {
         // Test if remaining is set to 0
         {
             let campaign_remaining = CampaignRemaining::new(app.redis.clone());
-            campaign_remaining.set_initial(campaign.id, UnifiedNum::from_u64(1000 * multiplier)).await.expect("should set");
+            campaign_remaining
+                .set_initial(campaign.id, UnifiedNum::from_u64(1000 * multiplier))
+                .await
+                .expect("should set");
 
             let auth = Auth {
                 era: 0,
@@ -1310,7 +1313,9 @@ mod test {
                 .body(Body::empty())
                 .expect("Should build Request");
 
-            close_campaign(req, &app).await.expect("Should close campaign");
+            close_campaign(req, &app)
+                .await
+                .expect("Should close campaign");
 
             let remaining = campaign_remaining
                 .get_remaining_opt(campaign.id)
@@ -1325,7 +1330,8 @@ mod test {
         {
             let auth = Auth {
                 era: 0,
-                uid: ValidatorId::try_from("0xce07CbB7e054514D590a0262C93070D838bFBA2e").expect("should parse"),
+                uid: ValidatorId::try_from("0xce07CbB7e054514D590a0262C93070D838bFBA2e")
+                    .expect("should parse"),
             };
 
             let req = Request::builder()
@@ -1334,7 +1340,9 @@ mod test {
                 .body(Body::empty())
                 .expect("Should build Request");
 
-            let res = close_campaign(req, &app).await.expect_err("Should return error for Bad Campaign");
+            let res = close_campaign(req, &app)
+                .await
+                .expect_err("Should return error for Bad Campaign");
 
             assert_eq!(
                 ResponseError::Forbidden("Request not sent by campaign creator".to_string()),
