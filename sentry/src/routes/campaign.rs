@@ -313,7 +313,7 @@ pub async fn close_campaign<A: Adapter>(
         None => false,
     };
 
-    if is_creator == false {
+    if !is_creator {
         return Err(ResponseError::Forbidden(
             "Request not sent by campaign creator".to_string(),
         ));
