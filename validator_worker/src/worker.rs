@@ -2,7 +2,7 @@ use crate::{
     channel::{channel_tick, collect_channels},
     SentryApi,
 };
-use primitives::{adapter::Adapter, util::ApiUrl, Config};
+use primitives::{adapter::Adapter, Config};
 use slog::{error, info, Logger};
 use std::{error::Error, time::Duration};
 
@@ -14,20 +14,30 @@ use tokio::{runtime::Runtime, time::sleep};
 
 #[derive(Debug, Clone)]
 pub struct Worker<A: Adapter> {
-    pub sentry_url: ApiUrl,
+    /// SentryApi with set `whoami` validator
+    /// Requires an unlocked adapter to create [`SentryApi`], use [`Worker::init_unlock`].
+    pub sentry: SentryApi<A, ()>,
     pub config: Config,
+    /// The unlocked Adapter
     pub adapter: A,
     pub logger: Logger,
 }
 
 impl<A: Adapter + 'static> Worker<A> {
-    /// Runs the validator in a single tick or it runs infinitely.
-    /// Before running, unlocks the adapter using [`Adapter::unlock`]!
-    /// Uses [`tokio::runtime::Runtime`]
-    pub fn run(&mut self, is_single_tick: bool) -> Result<(), Box<dyn Error>> {
-        // unlock adapter
-        self.adapter.unlock()?;
+    // /// Requires an unlocked [`Adapter`]
+    // /// Before running, unlocks the adapter using [`Adapter::unlock`]!
+    pub fn from_sentry(sentry: SentryApi<A, ()>) -> Self {
+        Self {
+            config: sentry.config.clone(),
+            adapter: sentry.adapter.clone(),
+            logger: sentry.logger.clone(),
+            sentry,
+        }
+    }
 
+    /// Runs the validator in a single tick or it runs infinitely.
+    /// Uses [`tokio::runtime::Runtime`]
+    pub fn run(self, is_single_tick: bool) -> Result<(), Box<dyn Error>> {
         // Create the runtime
         let rt = Runtime::new()?;
 
@@ -52,7 +62,7 @@ impl<A: Adapter + 'static> Worker<A> {
         let logger = &self.logger;
         let (channels, validators) = match collect_channels(
             &self.adapter,
-            &self.sentry_url,
+            &self.sentry.whoami.url,
             &self.config,
             logger,
         )
@@ -66,22 +76,11 @@ impl<A: Adapter + 'static> Worker<A> {
         };
         let channels_size = channels.len();
 
-        // initialize SentryApi once we have all the Campaign Validators we need to propagate messages to
-        let sentry = match SentryApi::init(
-            self.adapter.clone(),
-            logger.clone(),
-            self.config.clone(),
-            validators.clone(),
-        ) {
-            Ok(sentry) => sentry,
-            Err(err) => {
-                error!(logger, "Failed to initialize SentryApi for all channels"; "SentryApi::init()" => ?err, "main" => "all_channels_tick");
-                return;
-            }
-        };
+        let sentry_with_propagate = self.sentry.clone().with_propagate(validators);
 
         let tick_results = join_all(channels.into_iter().map(|channel| {
-            channel_tick(&sentry, &self.config, channel).map_err(move |err| (channel, err))
+            channel_tick(&sentry_with_propagate, &self.config, channel)
+                .map_err(move |err| (channel, err))
         }))
         .await;
 

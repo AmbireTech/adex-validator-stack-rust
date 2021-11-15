@@ -227,7 +227,7 @@ mod tests {
         Balances, BigNum, Campaign, Channel, ChannelId, UnifiedNum,
     };
     use reqwest::{Client, StatusCode};
-    use validator_worker::{worker::Worker, SentryApi};
+    use validator_worker::{sentry_interface::Validator, worker::Worker, SentryApi};
 
     #[tokio::test]
     #[ignore = "We use a snapshot, however, we have left this test for convenience"]
@@ -480,8 +480,19 @@ mod tests {
         }
 
         let api_client = reqwest::Client::new();
-        let leader_url = CAMPAIGN_1.validators[0].try_api_url().expect("Valid url");
-        let follower_url = CAMPAIGN_1.validators[1].try_api_url().expect("Valid url");
+
+        // check Campaign Leader & Follower urls
+        // they should be the same as the test validators
+        // TODO: Should we use leader.sentry_url in the test directly after this check?
+        let (leader_url, follower_url) = {
+            let leader_url = CAMPAIGN_1.validators[0].try_api_url().expect("Valid url");
+            let follower_url = CAMPAIGN_1.validators[1].try_api_url().expect("Valid url");
+
+            assert_eq!(&leader.sentry_url, &leader_url);
+            assert_eq!(&follower.sentry_url, &follower_url);
+
+            (leader_url, follower_url)
+        };
 
         // No Channel 1 - 404
         // GET /v5/channel/{}/spender/all
@@ -629,43 +640,62 @@ mod tests {
             }
         }
 
-        let leader_worker = Worker {
-            sentry_url: leader.sentry_url.clone(),
-            config: leader.config.clone(),
-            adapter: leader_adapter.clone(),
-            logger: new_logger(&leader.worker_logger_prefix),
+        let leader_sentry = {
+            // should get self Auth from Leader's EthereumAdapter
+            let leader_auth = leader_adapter
+                .get_auth(&leader_adapter.whoami())
+                .expect("Get authentication");
+            let whoami_validator = Validator {
+                url: leader.sentry_url.clone(),
+                token: leader_auth,
+            };
+
+            SentryApi::new(
+                leader_adapter.clone(),
+                new_logger(&leader.worker_logger_prefix),
+                leader.config.clone(),
+                whoami_validator,
+            )
+            .expect("Should create new SentryApi for the Leader Worker")
         };
 
-        let follower_worker = Worker {
-            sentry_url: follower.sentry_url.clone(),
-            config: follower.config.clone(),
-            adapter: follower_adapter.clone(),
-            logger: new_logger(&leader.worker_logger_prefix),
+        let follower_sentry = {
+            // should get self Auth from Follower's EthereumAdapter
+            let follower_auth = follower_adapter
+                .get_auth(&follower_adapter.whoami())
+                .expect("Get authentication");
+            let whoami_validator = Validator {
+                url: follower.sentry_url.clone(),
+                token: follower_auth,
+            };
+
+            SentryApi::new(
+                follower_adapter.clone(),
+                new_logger(&follower.worker_logger_prefix),
+                follower.config.clone(),
+                whoami_validator,
+            )
+            .expect("Should create new SentryApi for the Leader Worker")
         };
+
+        let leader_worker = Worker::from_sentry(leader_sentry.clone());
+        let follower_worker = Worker::from_sentry(follower_sentry.clone());
+
         // leader single worker tick
         leader_worker.all_channels_tick().await;
         // follower single worker tick
         follower_worker.all_channels_tick().await;
-
-        // TODO: There should not be propagation needed for each SentryApi.
-        // TODO: Improve usage by returning SentryApi from Worker maybe?!
-        let sentry_leader = SentryApi::init(
-            leader_adapter.clone(),
-            leader_worker.logger.clone(),
-            leader_worker.config.clone(),
-            Default::default(),
-        )
-        .expect("Sentry::init");
 
         // Channel 1 expected Accounting
         {
             let expected_accounting = AccountingResponse {
                 balances: Balances::<CheckedState>::new(),
             };
-            let actual_accounting = sentry_leader
+            let actual_accounting = leader_sentry
                 .get_accounting(CAMPAIGN_1.channel.id())
                 .await
                 .expect("Should get Channel Accounting");
+
             assert_eq!(expected_accounting, actual_accounting);
         }
     }
@@ -774,7 +804,7 @@ pub mod run {
         };
 
         let postgres = postgres_connection(42, postgres_config).await;
-        let mut redis = redis_connection(app_config.redis_url).await?;
+        let mut redis = redis_connection(validator.sentry_config.redis_url.clone()).await?;
 
         Manager::flush_db(&mut redis)
             .await

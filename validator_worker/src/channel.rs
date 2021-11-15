@@ -96,19 +96,27 @@ pub async fn channel_tick<A: Adapter + 'static>(
 
 /// Fetches all `Campaign`s from Sentry and builds the `Channel`s to be processed
 /// along side all the `Validator`s' url & auth token
+// TODO: Move to [`SentryApi`]
 pub async fn collect_channels<A: Adapter + 'static>(
     adapter: &A,
     sentry_url: &ApiUrl,
     config: &Config,
     _logger: &Logger,
 ) -> Result<(HashSet<Channel>, Validators), reqwest::Error> {
-    let whoami = adapter.whoami();
+    let for_whoami = adapter.whoami();
 
     let all_campaigns_timeout = Duration::from_millis(config.all_campaigns_timeout as u64);
     let client = reqwest::Client::builder()
         .timeout(all_campaigns_timeout)
         .build()?;
-    let campaigns = all_campaigns(client, sentry_url, whoami).await?;
+
+    let whoami_validator = Validator {
+        url: sentry_url.clone(),
+        token: adapter
+            .get_auth(&for_whoami)
+            .expect("Should get WhoAmI auth"),
+    };
+    let campaigns = all_campaigns(client, &whoami_validator, Some(for_whoami)).await?;
     let channels = campaigns
         .iter()
         .map(|campaign| campaign.channel)

@@ -7,7 +7,7 @@ use clap::{crate_version, App, Arg};
 
 use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
 use primitives::{
-    adapter::{DummyAdapterOptions, KeystoreOptions},
+    adapter::{Adapter, DummyAdapterOptions, KeystoreOptions},
     config::{configuration, Environment},
     util::{
         logging::new_logger,
@@ -15,7 +15,7 @@ use primitives::{
     },
     ValidatorId,
 };
-use validator_worker::Worker;
+use validator_worker::{sentry_interface::Validator, SentryApi, Worker};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let cli = App::new("Validator worker")
@@ -80,7 +80,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .parse()?;
     let is_single_tick = cli.is_present("singleTick");
 
-    let adapter = match cli.value_of("adapter").unwrap() {
+    let unlocked_adapter = match cli.value_of("adapter").unwrap() {
         "ethereum" => {
             let keystore_file = cli
                 .value_of("keystoreFile")
@@ -90,9 +90,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 keystore_file: keystore_file.to_string(),
                 keystore_pwd,
             };
-            AdapterTypes::EthereumAdapter(Box::new(
-                EthereumAdapter::init(keystore_options, &config).expect("failed to init adapter"),
-            ))
+            let mut adapter = EthereumAdapter::init(keystore_options, &config)
+                .expect("failed to init Ethereum adapter");
+
+            adapter.unlock().expect("failed to Unlock Ethereum adapter");
+            AdapterTypes::EthereumAdapter(Box::new(adapter))
         }
         "dummy" => {
             let dummy_identity = cli
@@ -103,7 +105,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 dummy_auth: IDS.clone(),
                 dummy_auth_tokens: AUTH.clone(),
             };
-            AdapterTypes::DummyAdapter(Box::new(DummyAdapter::init(options, &config)))
+            let mut adapter = DummyAdapter::init(options, &config);
+            // unlock adapter
+            adapter.unlock().expect("failed to Unlock Ethereum adapter");
+
+            AdapterTypes::DummyAdapter(Box::new(adapter))
         }
         // @TODO exit gracefully
         _ => panic!("We don't have any other adapters implemented yet!"),
@@ -111,26 +117,32 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let logger = new_logger("validator_worker");
 
-    match adapter {
+    match unlocked_adapter {
         AdapterTypes::EthereumAdapter(eth_adapter) => {
-            let mut worker = Worker {
-                sentry_url,
-                config,
-                adapter: *eth_adapter,
-                logger,
+            let whoami = Validator {
+                url: sentry_url,
+                token: eth_adapter
+                    .get_auth(&eth_adapter.whoami())
+                    .expect("Failed to get Authentication token for Who am I"),
             };
 
-            worker.run(is_single_tick)
+            let sentry = SentryApi::new(*eth_adapter, logger.clone(), config, whoami)
+                .expect("Should create the SentryApi");
+
+            Worker::from_sentry(sentry).run(is_single_tick)
         }
         AdapterTypes::DummyAdapter(dummy_adapter) => {
-            let mut worker = Worker {
-                sentry_url,
-                config,
-                adapter: *dummy_adapter,
-                logger,
+            let whoami = Validator {
+                url: sentry_url,
+                token: dummy_adapter
+                    .get_auth(&dummy_adapter.whoami())
+                    .expect("Failed to get Authentication token for Who am I"),
             };
 
-            worker.run(is_single_tick)
+            let sentry = SentryApi::new(*dummy_adapter, logger.clone(), config, whoami)
+                .expect("Should create the SentryApi");
+
+            Worker::from_sentry(sentry).run(is_single_tick)
         }
     }
 }
