@@ -80,13 +80,13 @@ static CHANNEL_SPENDER_LEAF_AND_TOTAL_DEPOSITED: Lazy<Regex> = Lazy::new(|| {
 });
 
 static INSERT_EVENTS_BY_CAMPAIGN_ID: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/v5/campaign/0x([a-zA-Z0-9]{32})/events/?$").expect("The regex should be valid")
+    Regex::new(r"^/v5/campaign/(0x[a-zA-Z0-9]{32})/events/?$").expect("The regex should be valid")
 });
 static CLOSE_CAMPAIGN_BY_CAMPAIGN_ID: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/v5/campaign/0x([a-zA-Z0-9]{32})/close/?$").expect("The regex should be valid")
+    Regex::new(r"^/v5/campaign/(0x[a-zA-Z0-9]{32})/close/?$").expect("The regex should be valid")
 });
 static CAMPAIGN_UPDATE_BY_ID: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/v5/campaign/0x([a-zA-Z0-9]{32})/?$").expect("The regex should be valid")
+    Regex::new(r"^/v5/campaign/(0x[a-zA-Z0-9]{32})/?$").expect("The regex should be valid")
 });
 static CHANNEL_ALL_SPENDER_LIMITS: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/spender/all/?$")
