@@ -1,6 +1,6 @@
 use parse_display::{Display as DeriveDisplay, FromStr as DeriveFromStr};
 use serde::{Deserialize, Serialize};
-use std::{convert::TryFrom, str::FromStr};
+use std::str::FromStr;
 
 use crate::targeting::Error;
 

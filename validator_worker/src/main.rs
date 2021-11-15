@@ -1,7 +1,7 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
 
-use std::{convert::TryFrom, error::Error};
+use std::error::Error;
 
 use clap::{crate_version, App, Arg};
 

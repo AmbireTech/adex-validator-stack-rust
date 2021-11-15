@@ -1,4 +1,3 @@
-use std::convert::TryFrom;
 use thiserror::Error;
 
 use primitives::{

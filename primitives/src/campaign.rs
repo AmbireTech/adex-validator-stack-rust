@@ -29,7 +29,7 @@ mod campaign_id {
     use thiserror::Error;
     use uuid::Uuid;
 
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     /// an Id of 16 bytes, (de)serialized as a `0x` prefixed hex
     /// In this implementation of the `CampaignId` the value is generated from a `Uuid::new_v4().to_simple()`
     pub struct CampaignId([u8; 16]);
@@ -375,8 +375,8 @@ mod postgres {
 
     use super::{Active, Campaign, CampaignId, PricingBounds, Validators};
     use bytes::BytesMut;
-    use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
     use std::error::Error;
+    use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
     use tokio_postgres::Row;
 
     impl From<&Row> for Campaign {

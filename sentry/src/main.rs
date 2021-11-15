@@ -19,7 +19,7 @@ use sentry::{
     Application,
 };
 use slog::info;
-use std::{convert::TryFrom, env, net::SocketAddr};
+use std::{env, net::SocketAddr};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

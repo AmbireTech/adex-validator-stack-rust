@@ -499,7 +499,7 @@ mod test {
         },
         EventSubmission, UnifiedNum, ValidatorDesc, ValidatorId,
     };
-    use std::{convert::TryFrom, time::Duration};
+    use std::time::Duration;
     use tokio_postgres::error::SqlState;
 
     use super::*;

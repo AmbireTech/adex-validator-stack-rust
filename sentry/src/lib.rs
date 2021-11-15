@@ -32,6 +32,7 @@ use {
     },
 };
 
+pub mod analytics;
 pub mod middleware;
 pub mod routes {
     pub mod analytics;
@@ -46,10 +47,6 @@ pub mod access;
 pub mod analytics_recorder;
 pub mod application;
 pub mod db;
-// TODO AIP#61: remove the even aggregator once we've taken out the logic for AIP#61
-// pub mod event_aggregator;
-// TODO AIP#61: Remove even reducer or alter depending on our needs
-// pub mod event_reducer;
 pub mod payout;
 pub mod spender;
 

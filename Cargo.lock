@@ -51,8 +51,8 @@ version = "0.1.0"
 dependencies = [
  "async-std",
  "chrono",
- "lazy_static",
  "num-integer",
+ "once_cell",
  "primitives",
  "rand 0.8.3",
  "reqwest",
@@ -2600,14 +2600,12 @@ dependencies = [
  "fake",
  "futures",
  "hex",
- "lazy_static",
  "merkletree",
  "num",
  "num-derive",
  "num-traits",
  "once_cell",
  "parse-display",
- "postgres-types",
  "pretty_assertions",
  "rand 0.8.3",
  "serde",
@@ -4061,6 +4059,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "toml",
+ "wiremock",
 ]
 
 [[package]]

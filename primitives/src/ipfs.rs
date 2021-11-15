@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use std::{convert::TryFrom, fmt, str::FromStr};
+use std::{fmt, str::FromStr};
 use thiserror::Error;
 
 const URL_PREFIX: &str = "ipfs://";
@@ -88,6 +88,37 @@ impl Url {
 
     pub fn as_ipfs(&self) -> &IPFS {
         &self.0
+    }
+}
+
+#[cfg(feature = "postgres")]
+mod postgres {
+    use super::IPFS;
+    use bytes::BytesMut;
+    use std::error::Error;
+    use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
+
+    impl ToSql for IPFS {
+        fn to_sql(
+            &self,
+            ty: &Type,
+            w: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+            self.0.to_string().to_sql(ty, w)
+        }
+
+        accepts!(TEXT, VARCHAR);
+        to_sql_checked!();
+    }
+
+    impl<'a> FromSql<'a> for IPFS {
+        fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+            let str_slice = <&str as FromSql>::from_sql(ty, raw)?;
+
+            Ok(str_slice.parse()?)
+        }
+
+        accepts!(TEXT, VARCHAR);
     }
 }
 

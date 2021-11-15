@@ -232,7 +232,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "We use a snapshot, however, we have left this test for convenience"]
     async fn deploy_contracts() {
-        let web3 = Web3::new(Http::new(&GANACHE_URL).expect("failed to init transport"));
+        let web3 = Web3::new(Http::new(GANACHE_URL).expect("failed to init transport"));
         let setup = Setup { web3 };
         // deploy contracts
         let _contracts = setup.deploy_contracts().await;
@@ -250,7 +250,7 @@ mod tests {
         let channel = Channel {
             leader: VALIDATORS["leader"].address.into(),
             follower: VALIDATORS["follower"].address.into(),
-            guardian: GANACHE_ADDRESSES["guardian"].into(),
+            guardian: GANACHE_ADDRESSES["guardian"],
             token: SNAPSHOT_CONTRACTS.token.1,
             nonce: 0_u64.into(),
         };
@@ -329,7 +329,7 @@ mod tests {
         let channel = Channel {
             leader: VALIDATORS["follower"].address.into(),
             follower: VALIDATORS["leader"].address.into(),
-            guardian: GANACHE_ADDRESSES["guardian2"].into(),
+            guardian: GANACHE_ADDRESSES["guardian2"],
             token: SNAPSHOT_CONTRACTS.token.1,
             nonce: 0_u64.into(),
         };
@@ -363,7 +363,7 @@ mod tests {
             channel,
             creator: GANACHE_ADDRESSES["advertiser"],
             // 20.00000000
-            budget: UnifiedNum::from(20_00_000_000),
+            budget: UnifiedNum::from(2_000_000_000),
             validators,
             title: Some("Dummy Campaign".to_string()),
             pricing_bounds: Some(PricingBounds {
@@ -397,7 +397,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn run_full_test() {
-        let web3 = Web3::new(Http::new(&GANACHE_URL).expect("failed to init transport"));
+        let web3 = Web3::new(Http::new(GANACHE_URL).expect("failed to init transport"));
         let setup = Setup { web3 };
         // Use snapshot contracts
         let contracts = SNAPSHOT_CONTRACTS.clone();
@@ -774,7 +774,11 @@ pub mod run {
         };
 
         let postgres = postgres_connection(42, postgres_config).await;
-        let mut redis = redis_connection(validator.sentry_config.redis_url.clone()).await?;
+        let mut redis = redis_connection(app_config.redis_url).await?;
+
+        Manager::flush_db(&mut redis)
+            .await
+            .expect("Should flush redis database");
 
         let campaign_remaining = CampaignRemaining::new(redis.clone());
 

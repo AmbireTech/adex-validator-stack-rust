@@ -169,7 +169,7 @@ mod test {
 
     use chrono::TimeZone;
     use primitives::{
-        config::{configuration, Environment, DEVELOPMENT_CONFIG},
+        config::DEVELOPMENT_CONFIG,
         event_submission::{RateLimit, Rule},
         sentry::Event,
         util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, IDS},
@@ -606,7 +606,7 @@ mod test {
             &session,
             Some(&auth),
             &config.ip_rate_limit,
-            &&campaign,
+            &campaign,
             &get_impression_events(2),
         )
         .await;

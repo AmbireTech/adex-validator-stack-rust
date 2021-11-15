@@ -400,7 +400,7 @@ mod test {
     async fn create_and_fetch_spendable() {
         let app = setup_dummy_app().await;
 
-        let channel = DUMMY_CAMPAIGN.channel.clone();
+        let channel = DUMMY_CAMPAIGN.channel;
 
         let token_info = app
             .config
@@ -492,7 +492,7 @@ mod test {
     #[tokio::test]
     async fn get_accountings_for_channel() {
         let app = setup_dummy_app().await;
-        let channel = DUMMY_CAMPAIGN.channel.clone();
+        let channel = DUMMY_CAMPAIGN.channel;
         insert_channel(&app.pool, channel)
             .await
             .expect("should insert channel");
@@ -504,7 +504,7 @@ mod test {
         };
         // Testing for no accounting yet
         {
-            let res = get_accounting_for_channel(build_request(channel.clone()), &app)
+            let res = get_accounting_for_channel(build_request(channel), &app)
                 .await
                 .expect("should get response");
             assert_eq!(StatusCode::OK, res.status());
@@ -535,7 +535,7 @@ mod test {
                 .await
                 .expect("should spend");
 
-            let res = get_accounting_for_channel(build_request(channel.clone()), &app)
+            let res = get_accounting_for_channel(build_request(channel), &app)
                 .await
                 .expect("should get response");
             assert_eq!(StatusCode::OK, res.status());
@@ -547,7 +547,7 @@ mod test {
 
         // Testing for 2 accountings - second channel (same address is both an earner and a spender)
         {
-            let mut second_channel = DUMMY_CAMPAIGN.channel.clone();
+            let mut second_channel = DUMMY_CAMPAIGN.channel;
             second_channel.leader = IDS["user"]; // channel.id() will be different now
             insert_channel(&app.pool, second_channel)
                 .await
@@ -566,7 +566,7 @@ mod test {
                 .await
                 .expect("should spend");
 
-            let res = get_accounting_for_channel(build_request(second_channel.clone()), &app)
+            let res = get_accounting_for_channel(build_request(second_channel), &app)
                 .await
                 .expect("should get response");
             assert_eq!(StatusCode::OK, res.status());
@@ -589,7 +589,7 @@ mod test {
                 .await
                 .expect("should spend");
 
-            let res = get_accounting_for_channel(build_request(channel.clone()), &app).await;
+            let res = get_accounting_for_channel(build_request(channel), &app).await;
             let expected = ResponseError::FailedValidation(
                 "Earners sum is not equal to spenders sum for channel".to_string(),
             );
