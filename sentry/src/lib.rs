@@ -51,16 +51,16 @@ pub mod payout;
 pub mod spender;
 
 static LAST_APPROVED_BY_CHANNEL_ID: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/last-approved/?$")
+    Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/last-approved/?$")
         .expect("The regex should be valid")
 });
 // Only the initial Regex to be matched.
 static CHANNEL_VALIDATOR_MESSAGES: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/validator-messages(/.*)?$")
+    Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/validator-messages(/.*)?$")
         .expect("The regex should be valid")
 });
 static CHANNEL_EVENTS_AGGREGATES: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events-aggregates/?$")
+    Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/events-aggregates/?$")
         .expect("The regex should be valid")
 });
 static ANALYTICS_BY_CHANNEL_ID: Lazy<Regex> = Lazy::new(|| {
@@ -155,17 +155,6 @@ impl<A: Adapter + 'static> Application<A> {
         let mut response = match (req.uri().path(), req.method()) {
             ("/cfg", &Method::GET) => config(req, self).await,
             ("/channel/list", &Method::GET) => channel_list(req, self).await,
-            // For creating campaigns
-            ("/v5/campaign", &Method::POST) => {
-                let req = match AuthRequired.call(req, self).await {
-                    Ok(req) => req,
-                    Err(error) => {
-                        return map_response_error(error);
-                    }
-                };
-
-                create_campaign(req, self).await
-            }
             (route, _) if route.starts_with("/analytics") => analytics_router(req, self).await,
             // This is important because it prevents us from doing
             // expensive regex matching for routes without /channel
@@ -229,9 +218,7 @@ async fn campaigns_router<A: Adapter + 'static>(
         // }
 
         Err(ResponseError::NotFound)
-    } else if method == Method::POST && path == "/v5/campaign/list" {
-        req = AuthRequired.call(req, app).await?;
-
+    } else if method == Method::GET && path == "/v5/campaign/list" {
         campaign_list(req, app).await
     } else {
         Err(ResponseError::NotFound)
@@ -509,7 +496,7 @@ pub fn bad_validation_response(response_body: String) -> Response<Body> {
         validation: vec![response_body],
     };
 
-    let body = Body::from(serde_json::to_string(&error_response).expect("serialise err response"));
+    let body = Body::from(serde_json::to_string(&error_response).expect("serialize err response"));
 
     let mut response = Response::new(body);
     response
