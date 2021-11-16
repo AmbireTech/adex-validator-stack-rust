@@ -897,7 +897,10 @@ mod postgres {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::util::tests::prep_db::{ADDRESSES, DUMMY_IPFS};
+    use crate::{
+        postgres::POSTGRES_POOL,
+        util::tests::prep_db::{ADDRESSES, DUMMY_IPFS},
+    };
     use serde_json::json;
 
     #[test]
@@ -921,5 +924,34 @@ mod test {
             click_json,
             serde_json::to_value(click).expect("should serialize")
         );
+    }
+
+    #[tokio::test]
+    pub async fn datehour_from_to_sql() {
+        let client = POSTGRES_POOL.get().await.unwrap();
+        let sql_type = "TIMESTAMPTZ";
+
+        let actual_datehour = DateHour::<Utc>::from_ymdh(2021, 1, 1, 1);
+
+        // from SQL
+        let row_datehour: DateHour<Utc> = client
+            .query_one(
+                &*format!("SELECT '{:?}'::{}", actual_datehour, sql_type),
+                &[],
+            )
+            .await
+            .unwrap()
+            .get(0);
+
+        assert_eq!(&actual_datehour, &row_datehour);
+
+        // to SQL
+        let row_datehour: DateHour<Utc> = client
+            .query_one(&*format!("SELECT $1::{}", sql_type), &[&actual_datehour])
+            .await
+            .unwrap()
+            .get(0);
+
+        assert_eq!(&actual_datehour, &row_datehour);
     }
 }

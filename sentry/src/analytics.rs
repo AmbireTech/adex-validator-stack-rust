@@ -98,7 +98,7 @@ mod test {
     use super::*;
     use primitives::{
         sentry::Analytics,
-        util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN},
+        util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, DUMMY_IPFS},
         UnifiedNum,
     };
 
@@ -152,76 +152,222 @@ mod test {
                     UnifiedNum::from_u64(1_000_000),
                 ),
             ),
+            (
+                "click_with_unit_and_slot".into(),
+                (
+                    Event::Click {
+                        publisher: ADDRESSES["publisher"],
+                        ad_unit: Some(DUMMY_IPFS[0]),
+                        ad_slot: Some(DUMMY_IPFS[1]),
+                        referrer: Some("http://127.0.0.1".into()),
+                    },
+                    ADDRESSES["publisher"],
+                    UnifiedNum::from_u64(1_000_000),
+                ),
+            ),
+            (
+                "click_with_different_data".into(),
+                (
+                    Event::Click {
+                        publisher: ADDRESSES["publisher"],
+                        ad_unit: Some(DUMMY_IPFS[2]),
+                        ad_slot: Some(DUMMY_IPFS[3]),
+                        referrer: Some("http://127.0.0.1".into()),
+                    },
+                    ADDRESSES["publisher"],
+                    UnifiedNum::from_u64(1_000_000),
+                ),
+            ),
+            (
+                "impression_with_slot_unit_and_referrer".into(),
+                (
+                    Event::Impression {
+                        publisher: ADDRESSES["publisher"],
+                        ad_unit: Some(DUMMY_IPFS[0]),
+                        ad_slot: Some(DUMMY_IPFS[1]),
+                        referrer: Some("http://127.0.0.1".into()),
+                    },
+                    ADDRESSES["publisher"],
+                    UnifiedNum::from_u64(1_000_000),
+                ),
+            ),
         ]
         .into_iter()
         .collect::<HashMap<String, _>>();
 
         let campaign = DUMMY_CAMPAIGN.clone();
-        let session = Session {
-            ip: None,
-            country: None,
-            referrer_header: None,
-            os: None,
-        };
 
-        let input_events = vec![
-            test_events["click_empty"].clone(),
-            test_events["impression_empty"].clone(),
-        ];
+        // Testing record with empty events and session
+        {
+            let session = Session {
+                ip: None,
+                country: None,
+                referrer_header: None,
+                os: None,
+            };
 
-        record(&database.clone(), &campaign, &session, input_events.clone())
+            let input_events = vec![
+                test_events["click_empty"].clone(),
+                test_events["impression_empty"].clone(),
+            ];
+
+            record(&database.clone(), &campaign, &session, input_events.clone())
+                .await
+                .expect("should record");
+
+            let analytics = get_all_analytics(&database.pool)
+                .await
+                .expect("should get all analytics");
+
+            let click_analytics = analytics
+                .iter()
+                .find(|a| a.event_type == "CLICK")
+                .expect("There should be a click Analytics");
+            let impression_analytics = analytics
+                .iter()
+                .find(|a| a.event_type == "IMPRESSION")
+                .expect("There should be an impression Analytics");
+            assert_eq!(
+                click_analytics.payout_amount,
+                UnifiedNum::from_u64(1_000_000)
+            );
+            assert_eq!(click_analytics.payout_count, 1);
+
+            assert_eq!(
+                impression_analytics.payout_amount,
+                UnifiedNum::from_u64(1_000_000)
+            );
+            assert_eq!(impression_analytics.payout_count, 1);
+
+            record(&database.clone(), &campaign, &session, input_events)
+                .await
+                .expect("should record");
+
+            let analytics = get_all_analytics(&database.pool)
+                .await
+                .expect("should find analytics");
+            let click_analytics = analytics
+                .iter()
+                .find(|a| a.event_type == "CLICK")
+                .expect("There should be a click event");
+            let impression_analytics = analytics
+                .iter()
+                .find(|a| a.event_type == "IMPRESSION")
+                .expect("There should be an impression event");
+            assert_eq!(
+                click_analytics.payout_amount,
+                UnifiedNum::from_u64(2_000_000)
+            );
+            assert_eq!(click_analytics.payout_count, 2);
+
+            assert_eq!(
+                impression_analytics.payout_amount,
+                UnifiedNum::from_u64(2_000_000)
+            );
+            assert_eq!(impression_analytics.payout_count, 2);
+        }
+
+        // Testing record with non-empty events and non-empty session
+        {
+            let session = Session {
+                ip: Default::default(),
+                country: Some("Bulgaria".into()),
+                referrer_header: Some("http://127.0.0.1".into()),
+                os: Some("Windows".into()),
+            };
+
+            let other_session = Session {
+                ip: Default::default(),
+                country: Some("Japan".into()),
+                referrer_header: Some("http://127.0.0.1".into()),
+                os: Some("Android".into()),
+            };
+
+            let input_events = vec![
+                test_events["click_with_unit_and_slot"].clone(),
+                test_events["click_with_different_data"].clone(),
+                test_events["impression_with_slot_unit_and_referrer"].clone(),
+            ];
+
+            record(&database.clone(), &campaign, &session, input_events.clone())
+                .await
+                .expect("should record");
+
+            let analytics = get_all_analytics(&database.pool)
+                .await
+                .expect("should get all analytics");
+
+            assert_eq!(analytics.len(), 5);
+
+            let with_slot_and_unit: Vec<Analytics> = analytics
+                .clone()
+                .into_iter()
+                .filter(|a| a.ad_unit == Some(DUMMY_IPFS[0]) && a.ad_slot == Some(DUMMY_IPFS[1]))
+                .collect();
+            assert_eq!(with_slot_and_unit.len(), 2);
+
+            let with_different_slot_and_unit: Vec<Analytics> = analytics
+                .clone()
+                .into_iter()
+                .filter(|a| a.ad_unit == Some(DUMMY_IPFS[2]) && a.ad_slot == Some(DUMMY_IPFS[3]))
+                .collect();
+            assert_eq!(with_different_slot_and_unit.len(), 1);
+
+            record(
+                &database.clone(),
+                &campaign,
+                &other_session,
+                input_events.clone(),
+            )
             .await
             .expect("should record");
+            let analytics = get_all_analytics(&database.pool)
+                .await
+                .expect("should get all analytics");
 
-        let analytics = get_all_analytics(&database.pool)
-            .await
-            .expect("should get all analytics");
+            assert_eq!(analytics.len(), 8);
 
-        let click_analytics = analytics
-            .iter()
-            .find(|a| a.event_type == "CLICK")
-            .expect("There should be a click Analytics");
-        let impression_analytics = analytics
-            .iter()
-            .find(|a| a.event_type == "IMPRESSION")
-            .expect("There should be an impression Analytics");
-        assert_eq!(
-            click_analytics.payout_amount,
-            UnifiedNum::from_u64(1_000_000)
-        );
-        assert_eq!(click_analytics.payout_count, 1);
+            let with_slot_and_unit: Vec<Analytics> = analytics
+                .clone()
+                .into_iter()
+                .filter(|a| a.ad_unit == Some(DUMMY_IPFS[0]))
+                .collect();
+            assert_eq!(with_slot_and_unit.len(), 4);
 
-        assert_eq!(
-            impression_analytics.payout_amount,
-            UnifiedNum::from_u64(1_000_000)
-        );
-        assert_eq!(impression_analytics.payout_count, 1);
+            let with_different_slot_and_unit: Vec<Analytics> = analytics
+                .clone()
+                .into_iter()
+                .filter(|a| a.ad_unit == Some(DUMMY_IPFS[2]) && a.ad_slot == Some(DUMMY_IPFS[3]))
+                .collect();
+            assert_eq!(with_different_slot_and_unit.len(), 2);
 
-        record(&database.clone(), &campaign, &session, input_events)
-            .await
-            .expect("should record");
+            let with_country: Vec<Analytics> = analytics
+                .clone()
+                .into_iter()
+                .filter(|a| a.country == Some("Bulgaria".into()))
+                .collect();
+            assert_eq!(with_country.len(), 3);
 
-        let analytics = get_all_analytics(&database.pool)
-            .await
-            .expect("should find analytics");
-        let click_analytics = analytics
-            .iter()
-            .find(|a| a.event_type == "CLICK")
-            .expect("There should be a click event");
-        let impression_analytics = analytics
-            .iter()
-            .find(|a| a.event_type == "IMPRESSION")
-            .expect("There should be an impression event");
-        assert_eq!(
-            click_analytics.payout_amount,
-            UnifiedNum::from_u64(2_000_000)
-        );
-        assert_eq!(click_analytics.payout_count, 2);
+            let with_other_country: Vec<Analytics> = analytics
+                .clone()
+                .into_iter()
+                .filter(|a| a.country == Some("Japan".into()))
+                .collect();
+            assert_eq!(with_other_country.len(), 3);
 
-        assert_eq!(
-            impression_analytics.payout_amount,
-            UnifiedNum::from_u64(2_000_000)
-        );
-        assert_eq!(impression_analytics.payout_count, 2);
+            let with_os: Vec<Analytics> = analytics
+                .clone()
+                .into_iter()
+                .filter(|a| a.os_name == OperatingSystem::map_os("Windows"))
+                .collect();
+            assert_eq!(with_os.len(), 3);
+
+            let with_other_os: Vec<Analytics> = analytics
+                .clone()
+                .into_iter()
+                .filter(|a| a.os_name == OperatingSystem::map_os("Android"))
+                .collect();
+            assert_eq!(with_other_os.len(), 3);
+        }
     }
 }
