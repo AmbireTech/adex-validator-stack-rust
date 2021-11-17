@@ -294,39 +294,50 @@ pub async fn campaign_list<A: Adapter>(
 }
 
 /// Can only be called by creator
-/// sets redis remaining = 0 (`newBudget = totalSpent`, i.e. `newBudget = oldBudget - remaining`)
+/// to close a campaign, just set it's budget to what it's spent so far (so that remaining == 0)
+/// newBudget = totalSpent, i.e. newBudget = oldBudget - remaining
 pub async fn close_campaign<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
-    let auth = req.extensions().get::<Auth>();
-    let campaign_remaining = CampaignRemaining::new(app.redis.clone());
+    let auth = req
+        .extensions()
+        .get::<Auth>()
+        .expect("Auth should be present");
 
-    let campaign = req
+    let mut campaign = req
         .extensions()
         .get::<Campaign>()
         .expect("We must have a campaign in extensions")
         .to_owned();
 
-    let is_creator = match auth {
-        Some(auth) => auth.uid.to_address() == campaign.creator,
-        None => false,
-    };
-
-    if !is_creator {
-        return Err(ResponseError::Forbidden(
+    if auth.uid.to_address() != campaign.creator {
+        Err(ResponseError::Forbidden(
             "Request not sent by campaign creator".to_string(),
-        ));
+        ))
+    } else {
+        let remaining = app
+            .campaign_remaining
+            .get_remaining_opt(campaign.id)
+            .await?
+            .map(|remaining| UnifiedNum::from(max(0, remaining).unsigned_abs()))
+            .ok_or_else(|| {
+                ResponseError::BadRequest("No remaining entry for campaign".to_string())
+            })?;
+
+        campaign.budget = campaign.budget - remaining;
+        update_campaign(&app.pool, &campaign).await?;
+
+        // Remaining should be modified only after the budget is updated successfully
+        app.campaign_remaining
+            .set_remaining_to_zero(campaign.id)
+            .await
+            .map_err(|e| ResponseError::BadRequest(e.to_string()))?;
+
+        Ok(success_response(serde_json::to_string(&SuccessResponse {
+            success: true,
+        })?))
     }
-
-    campaign_remaining
-        .set_remaining_to_zero(campaign.id)
-        .await
-        .map_err(|e| ResponseError::BadRequest(e.to_string()))?;
-
-    Ok(success_response(serde_json::to_string(&SuccessResponse {
-        success: true,
-    })?))
 }
 
 pub mod update_campaign {
@@ -940,13 +951,15 @@ mod test {
         update_campaign::{get_delta_budget, modify_campaign},
         *,
     };
-    use crate::db::redis_pool::TESTS_POOL;
+    use crate::db::{fetch_campaign, redis_pool::TESTS_POOL};
     use crate::test_util::setup_dummy_app;
     use crate::update_campaign::DeltaBudget;
     use adapter::DummyAdapter;
     use hyper::StatusCode;
     use primitives::{
-        adapter::Deposit, util::tests::prep_db::DUMMY_CAMPAIGN, BigNum, ChannelId, ValidatorId,
+        adapter::Deposit,
+        util::tests::prep_db::{DUMMY_CAMPAIGN, IDS},
+        BigNum, ChannelId, ValidatorId,
     };
 
     #[tokio::test]
@@ -1294,11 +1307,18 @@ mod test {
 
         let app = setup_dummy_app().await;
 
+        insert_channel(&app.pool, campaign.channel.clone())
+            .await
+            .expect("Should insert dummy channel");
+        insert_campaign(&app.pool, &campaign)
+            .await
+            .expect("Should insert dummy campaign");
+
         // Test if remaining is set to 0
         {
-            let campaign_remaining = CampaignRemaining::new(app.redis.clone());
-            campaign_remaining
-                .set_initial(campaign.id, UnifiedNum::from_u64(1000 * multiplier))
+            let remaining = UnifiedNum::from_u64(100 * multiplier);
+            app.campaign_remaining
+                .set_initial(campaign.id, remaining)
                 .await
                 .expect("should set");
 
@@ -1317,7 +1337,15 @@ mod test {
                 .await
                 .expect("Should close campaign");
 
-            let remaining = campaign_remaining
+            let closed_campaign = fetch_campaign(app.pool.clone(), &campaign.id)
+                .await
+                .expect("Should fetch campaign")
+                .expect("Campaign should exist");
+
+            assert_eq!(closed_campaign.budget, campaign.budget - remaining);
+
+            let remaining = app
+                .campaign_remaining
                 .get_remaining_opt(campaign.id)
                 .await
                 .expect("Should get remaining from redis")
@@ -1330,8 +1358,7 @@ mod test {
         {
             let auth = Auth {
                 era: 0,
-                uid: ValidatorId::try_from("0xce07CbB7e054514D590a0262C93070D838bFBA2e")
-                    .expect("should parse"),
+                uid: IDS["leader"],
             };
 
             let req = Request::builder()
