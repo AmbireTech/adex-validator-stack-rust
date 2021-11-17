@@ -316,23 +316,19 @@ pub async fn close_campaign<A: Adapter>(
             "Request not sent by campaign creator".to_string(),
         ))
     } else {
-        let remaining = app
+        let old_remaining = app
             .campaign_remaining
-            .get_remaining_opt(campaign.id)
-            .await?
-            .map(|remaining| UnifiedNum::from(max(0, remaining).unsigned_abs()))
-            .ok_or_else(|| {
-                ResponseError::BadRequest("No remaining entry for campaign".to_string())
-            })?;
-
-        campaign.budget = campaign.budget - remaining;
-        update_campaign(&app.pool, &campaign).await?;
-
-        // Remaining should be modified only after the budget is updated successfully
-        app.campaign_remaining
-            .set_remaining_to_zero(campaign.id)
+            .getset_remaining_to_zero(campaign.id)
             .await
             .map_err(|e| ResponseError::BadRequest(e.to_string()))?;
+
+        campaign.budget = campaign
+            .budget
+            .checked_sub(&UnifiedNum::from(old_remaining))
+            .ok_or_else(|| {
+                ResponseError::BadRequest("Campaign budget overflows/underflows".to_string())
+            })?;
+        update_campaign(&app.pool, &campaign).await?;
 
         Ok(success_response(serde_json::to_string(&SuccessResponse {
             success: true,
@@ -1302,12 +1298,11 @@ mod test {
 
     #[tokio::test]
     async fn campaign_is_closed_properly() {
-        let multiplier = 10_u64.pow(UnifiedNum::PRECISION.into());
         let campaign = DUMMY_CAMPAIGN.clone();
 
         let app = setup_dummy_app().await;
 
-        insert_channel(&app.pool, campaign.channel.clone())
+        insert_channel(&app.pool, campaign.channel)
             .await
             .expect("Should insert dummy channel");
         insert_campaign(&app.pool, &campaign)
@@ -1316,9 +1311,8 @@ mod test {
 
         // Test if remaining is set to 0
         {
-            let remaining = UnifiedNum::from_u64(100 * multiplier);
             app.campaign_remaining
-                .set_initial(campaign.id, remaining)
+                .set_initial(campaign.id, campaign.budget)
                 .await
                 .expect("should set");
 
@@ -1342,7 +1336,8 @@ mod test {
                 .expect("Should fetch campaign")
                 .expect("Campaign should exist");
 
-            assert_eq!(closed_campaign.budget, campaign.budget - remaining);
+            // remaining = campaign_budget therefore sold_budget - remaining = 0
+            assert_eq!(closed_campaign.budget, UnifiedNum::from_u64(0));
 
             let remaining = app
                 .campaign_remaining
