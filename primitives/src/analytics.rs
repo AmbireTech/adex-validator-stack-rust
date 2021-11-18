@@ -222,6 +222,8 @@ fn default_timeframe() -> String {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[cfg(feature = "postgres")]
     use crate::postgres::POSTGRES_POOL;
     use once_cell::sync::Lazy;
     use serde_json::{from_value, to_value, Value};

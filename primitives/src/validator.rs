@@ -103,7 +103,10 @@ impl TryFrom<Value> for ValidatorId {
 pub struct ValidatorDesc {
     pub id: ValidatorId,
     /// The validator fee in pro milles (per 1000)
-    /// Used to calculate the validator fee on each payout.
+    ///
+    /// Each fee is calculated based on the payout for an event.
+    ///
+    /// payout * fee / 1000 = event fee payoout
     pub fee: UnifiedNum,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     /// The address which will receive the fees

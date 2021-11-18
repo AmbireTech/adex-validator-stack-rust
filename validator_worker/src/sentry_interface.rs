@@ -2,7 +2,7 @@ use std::{collections::HashMap, time::Duration};
 
 use futures::future::{join_all, try_join_all, TryFutureExt};
 use reqwest::{Client, Method};
-use slog::{debug, Logger};
+use slog::Logger;
 
 use primitives::{
     adapter::Adapter,
