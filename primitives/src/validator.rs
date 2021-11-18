@@ -1,3 +1,4 @@
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{borrow::Borrow, fmt, str::FromStr};
 
@@ -45,6 +46,14 @@ impl From<&Address> for ValidatorId {
 impl From<Address> for ValidatorId {
     fn from(address: Address) -> Self {
         Self(address)
+    }
+}
+
+impl From<&Lazy<Address>> for ValidatorId {
+    fn from(address: &Lazy<Address>) -> Self {
+        // once for the reference of &Lazy into Lazy
+        // and once for moving out of Lazy into Address
+        Self(**address)
     }
 }
 
