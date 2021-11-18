@@ -501,7 +501,7 @@ mod test {
     use super::test_util::*;
     use super::*;
     use chrono::Utc;
-    use primitives::{config::DEVELOPMENT_CONFIG, util::tests::prep_db::IDS};
+    use primitives::{config::DEVELOPMENT_CONFIG, test_util::{LEADER, CREATOR, IDS}};
     use web3::{transports::Http, Web3};
     use wiremock::{
         matchers::{method, path},
@@ -636,7 +636,7 @@ mod test {
     async fn get_deposit_and_count_create2_when_min_tokens_received() {
         let web3 = Web3::new(Http::new(GANACHE_URL).expect("failed to init transport"));
 
-        let leader_account = GANACHE_ADDRESSES["leader"];
+        let leader_account = *LEADER;
 
         // deploy contracts
         let token = deploy_token_contract(&web3, 1_000)
@@ -652,7 +652,7 @@ mod test {
             .await
             .expect("Correct parameters are passed to the OUTPACE constructor.");
 
-        let spender = GANACHE_ADDRESSES["creator"];
+        let spender = *CREATOR;
 
         let channel = get_test_channel(token_address);
 
@@ -693,7 +693,7 @@ mod test {
         {
             mock_set_balance(
                 &token.2,
-                *GANACHE_ADDRESSES["leader"].as_bytes(),
+                *LEADER.as_bytes(),
                 *spender.as_bytes(),
                 &BigNum::from(10_000),
             )

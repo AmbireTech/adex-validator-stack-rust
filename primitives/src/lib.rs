@@ -41,6 +41,8 @@ pub mod sentry;
 pub mod spender;
 pub mod supermarket;
 pub mod targeting;
+#[cfg(feature = "test-util")]
+pub mod test_util;
 mod unified_num;
 pub mod validator;
 

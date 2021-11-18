@@ -354,7 +354,7 @@ pub struct LastApprovedQuery {
     pub with_heartbeat: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct SuccessResponse {
     pub success: bool,
 }

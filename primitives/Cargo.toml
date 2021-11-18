@@ -10,6 +10,9 @@ edition = "2021"
 
 [features]
 postgres = ["bytes", "tokio-postgres", "deadpool-postgres"]
+# Enables the testing utilities like addresses, dummy Campaigns, Validators, IPFSes, AdUnits, etc.
+# All Addresses and keystore files exist in the ganache-cli setup for testing with the EthereumAdapter
+test-util = []
 
 [dependencies]
 # (De)Serialization

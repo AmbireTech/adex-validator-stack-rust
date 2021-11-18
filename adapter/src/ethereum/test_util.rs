@@ -12,6 +12,7 @@ use primitives::{
     adapter::KeystoreOptions,
     channel::{Channel, Nonce},
     config::TokenInfo,
+    test_util::{ADVERTISER, CREATOR, FOLLOWER, GUARDIAN, GUARDIAN_2, LEADER, PUBLISHER},
     Address, BigNum, Config, ValidatorId,
 };
 
@@ -48,129 +49,41 @@ pub static KEYSTORE_IDENTITY: Lazy<(Address, KeystoreOptions)> = Lazy::new(|| {
     (address, keystore_options("keystore.json", "adexvalidator"))
 });
 
-pub static GANACHE_KEYSTORES: Lazy<HashMap<String, (Address, KeystoreOptions)>> = Lazy::new(|| {
+pub static KEYSTORES: Lazy<HashMap<Address, KeystoreOptions>> = Lazy::new(|| {
     vec![
         (
-            "guardian".to_string(),
-            (
-                "0xDf08F82De32B8d460adbE8D72043E3a7e25A3B39"
-                    .parse()
-                    .expect("Valid Address"),
-                keystore_options(
-                    "0xDf08F82De32B8d460adbE8D72043E3a7e25A3B39_keystore.json",
-                    "address0",
-                ),
-            ),
+            *LEADER,
+            keystore_options(&format!("{}_keystore.json", *LEADER), "ganache0"),
         ),
         (
-            "leader".to_string(),
-            (
-                "0x5a04A8fB90242fB7E1db7d1F51e268A03b7f93A5"
-                    .parse()
-                    .expect("Valid Address"),
-                keystore_options(
-                    "0x5a04A8fB90242fB7E1db7d1F51e268A03b7f93A5_keystore.json",
-                    "address1",
-                ),
-            ),
+            *FOLLOWER,
+            keystore_options(&format!("{}_keystore.json", *FOLLOWER), "ganache1"),
         ),
         (
-            "follower".to_string(),
-            (
-                "0xe3896ebd3F32092AFC7D27e9ef7b67E26C49fB02"
-                    .parse()
-                    .expect("Valid Address"),
-                keystore_options(
-                    "0xe3896ebd3F32092AFC7D27e9ef7b67E26C49fB02_keystore.json",
-                    "address2",
-                ),
-            ),
+            *GUARDIAN,
+            keystore_options(&format!("{}_keystore.json", *GUARDIAN), "ganache2"),
         ),
         (
-            "creator".to_string(),
-            (
-                "0x0E45891a570Af9e5A962F181C219468A6C9EB4e1"
-                    .parse()
-                    .expect("Valid Address"),
-                keystore_options(
-                    "0x0E45891a570Af9e5A962F181C219468A6C9EB4e1_keystore.json",
-                    "address3",
-                ),
-            ),
+            *CREATOR,
+            keystore_options(&format!("{}_keystore.json", *CREATOR), "ganache3"),
         ),
         (
-            "advertiser".to_string(),
-            (
-                "0x8c4B95383a46D30F056aCe085D8f453fCF4Ed66d"
-                    .parse()
-                    .expect("Valid Address"),
-                keystore_options(
-                    "0x8c4B95383a46D30F056aCe085D8f453fCF4Ed66d_keystore.json",
-                    "address4",
-                ),
-            ),
+            *ADVERTISER,
+            keystore_options(&format!("{}_keystore.json", *ADVERTISER), "ganache4"),
         ),
         (
-            "guardian2".to_string(),
-            (
-                "0x1059B025E3F8b8f76A8120D6D6Fd9fBa172c80b8"
-                    .parse()
-                    .expect("Valid Address"),
-                keystore_options(
-                    "0x1059B025E3F8b8f76A8120D6D6Fd9fBa172c80b8_keystore.json",
-                    "address5",
-                ),
-            ),
+            *PUBLISHER,
+            keystore_options(&format!("{}_keystore.json", *PUBLISHER), "ganache5"),
+        ),
+        (
+            *GUARDIAN_2,
+            keystore_options(&format!("{}_keystore.json", *GUARDIAN_2), "ganache6"),
         ),
     ]
     .into_iter()
     .collect()
 });
 
-/// Addresses generated on local running `ganache` for testing purposes.
-/// see the `ganache-cli.sh` script in the repository
-pub static GANACHE_ADDRESSES: Lazy<HashMap<String, Address>> = Lazy::new(|| {
-    vec![
-        (
-            "guardian".to_string(),
-            "0xDf08F82De32B8d460adbE8D72043E3a7e25A3B39"
-                .parse()
-                .expect("Valid Address"),
-        ),
-        (
-            "leader".to_string(),
-            "0x5a04A8fB90242fB7E1db7d1F51e268A03b7f93A5"
-                .parse()
-                .expect("Valid Address"),
-        ),
-        (
-            "follower".to_string(),
-            "0xe3896ebd3F32092AFC7D27e9ef7b67E26C49fB02"
-                .parse()
-                .expect("Valid Address"),
-        ),
-        (
-            "creator".to_string(),
-            "0x0E45891a570Af9e5A962F181C219468A6C9EB4e1"
-                .parse()
-                .expect("Valid Address"),
-        ),
-        (
-            "advertiser".to_string(),
-            "0x8c4B95383a46D30F056aCe085D8f453fCF4Ed66d"
-                .parse()
-                .expect("Valid Address"),
-        ),
-        (
-            "guardian2".to_string(),
-            "0x1059B025E3F8b8f76A8120D6D6Fd9fBa172c80b8"
-                .parse()
-                .expect("Valid Address"),
-        ),
-    ]
-    .into_iter()
-    .collect()
-});
 /// Local `ganache` is running at:
 pub const GANACHE_URL: &str = "http://localhost:8545";
 
@@ -193,9 +106,9 @@ fn keystore_options(file_name: &str, password: &str) -> KeystoreOptions {
 
 pub fn get_test_channel(token_address: Address) -> Channel {
     Channel {
-        leader: ValidatorId::from(&GANACHE_ADDRESSES["leader"]),
-        follower: ValidatorId::from(&GANACHE_ADDRESSES["follower"]),
-        guardian: GANACHE_ADDRESSES["advertiser"],
+        leader: ValidatorId::from(&LEADER),
+        follower: ValidatorId::from(&FOLLOWER),
+        guardian: *GUARDIAN,
         token: token_address,
         nonce: Nonce::from(12345_u32),
     }
@@ -251,7 +164,7 @@ pub async fn sweeper_sweep(
     channel: &Channel,
     depositor: [u8; 20],
 ) -> web3::contract::Result<H256> {
-    let from_leader_account = H160(*GANACHE_ADDRESSES["leader"].as_bytes());
+    let from_leader_account = H160(*LEADER.as_bytes());
 
     sweeper_contract
         .call(
@@ -284,7 +197,7 @@ pub async fn deploy_sweeper_contract(
         .execute(
             *SWEEPER_BYTECODE,
             (),
-            H160(GANACHE_ADDRESSES["leader"].to_bytes()),
+            H160(LEADER.to_bytes()),
         )
         .await?;
 
@@ -307,7 +220,7 @@ pub async fn deploy_outpace_contract(
         .execute(
             *OUTPACE_BYTECODE,
             (),
-            H160(GANACHE_ADDRESSES["leader"].to_bytes()),
+            H160(LEADER.to_bytes()),
         )
         .await?;
     let outpace_address = Address::from(outpace_contract.address().to_fixed_bytes());
@@ -330,7 +243,7 @@ pub async fn deploy_token_contract(
         .execute(
             *MOCK_TOKEN_BYTECODE,
             (),
-            H160(GANACHE_ADDRESSES["leader"].to_bytes()),
+            H160(LEADER.to_bytes()),
         )
         .await?;
 
