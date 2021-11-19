@@ -110,6 +110,9 @@ impl TryFrom<&str> for Address {
 ///
 /// # Example
 /// ```
+/// use once_cell::sync::Lazy;
+/// use crate::Address;
+///
 /// static ADDRESS_0: Lazy<Address> = Lazy::new(|| b"0x80690751969B234697e9059e04ed72195c3507fa".try_into().unwrap());
 ///
 /// println!("Address: {}", ADDRESS_0);

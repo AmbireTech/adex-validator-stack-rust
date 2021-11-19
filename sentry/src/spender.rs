@@ -36,6 +36,7 @@ pub mod fee {
 
             // normal payout - no flooring
             {
+                // 300 * 100 / 1000 = 30
                 let payout = (*PUBLISHER, UnifiedNum::from(300));
 
                 let validator_fee =
