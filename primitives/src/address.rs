@@ -111,11 +111,11 @@ impl TryFrom<&str> for Address {
 /// # Example
 /// ```
 /// use once_cell::sync::Lazy;
-/// use crate::Address;
+/// use primitives::Address;
 ///
 /// static ADDRESS_0: Lazy<Address> = Lazy::new(|| b"0x80690751969B234697e9059e04ed72195c3507fa".try_into().unwrap());
 ///
-/// println!("Address: {}", ADDRESS_0);
+/// println!("Address: {}", *ADDRESS_0);
 /// ```
 impl TryFrom<&'static [u8; 42]> for Address {
     type Error = Error;

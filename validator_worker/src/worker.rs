@@ -1,7 +1,4 @@
-use crate::{
-    channel::{channel_tick, collect_channels},
-    SentryApi,
-};
+use crate::{channel::channel_tick, SentryApi};
 use primitives::{adapter::Adapter, Config};
 use slog::{error, info, Logger};
 use std::{error::Error, time::Duration};
@@ -60,14 +57,8 @@ impl<A: Adapter + 'static> Worker<A> {
 
     pub async fn all_channels_tick(&self) {
         let logger = &self.logger;
-        let (channels, validators) = match collect_channels(
-            &self.adapter,
-            &self.sentry.whoami.url,
-            &self.config,
-            logger,
-        )
-        .await
-        {
+
+        let (channels, validators) = match self.sentry.collect_channels().await {
             Ok(res) => res,
             Err(err) => {
                 error!(logger, "Error collecting all channels for tick"; "collect_channels" => ?err, "main" => "all_channels_tick");

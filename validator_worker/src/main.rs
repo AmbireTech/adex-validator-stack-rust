@@ -107,7 +107,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             };
             let mut adapter = DummyAdapter::init(options, &config);
             // unlock adapter
-            adapter.unlock().expect("failed to Unlock Ethereum adapter");
+            adapter.unlock().expect("failed to Unlock Dummy adapter");
 
             AdapterTypes::DummyAdapter(Box::new(adapter))
         }
