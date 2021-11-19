@@ -28,3 +28,4 @@ anyhow = { version = "1" }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 # probably needed for Relayer calls
 # wiremock = "0.5"
+pretty_assertions = "^1.0"
