@@ -20,7 +20,8 @@ pub mod fee {
     #[cfg(test)]
     mod test {
         use primitives::{
-            test_util::{PUBLISHER, DUMMY_VALIDATOR_LEADER}, UnifiedNum,
+            test_util::{DUMMY_VALIDATOR_LEADER, PUBLISHER},
+            UnifiedNum,
         };
 
         use crate::spender::fee::calculate_fee;

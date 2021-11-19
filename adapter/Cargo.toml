@@ -10,7 +10,7 @@ edition = "2021"
 
 [features]
 
-test-util = []
+test-util = ["primitives/test-util"]
 
 [dependencies]
 primitives = { path = "../primitives" }

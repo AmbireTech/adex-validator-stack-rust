@@ -194,11 +194,7 @@ pub async fn deploy_sweeper_contract(
             opt.gas_price = Some(1.into());
             opt.gas = Some(6_721_975.into());
         }))
-        .execute(
-            *SWEEPER_BYTECODE,
-            (),
-            H160(LEADER.to_bytes()),
-        )
+        .execute(*SWEEPER_BYTECODE, (), H160(LEADER.to_bytes()))
         .await?;
 
     let sweeper_address = Address::from(sweeper_contract.address().to_fixed_bytes());
@@ -217,18 +213,14 @@ pub async fn deploy_outpace_contract(
             opt.gas_price = Some(1.into());
             opt.gas = Some(6_721_975.into());
         }))
-        .execute(
-            *OUTPACE_BYTECODE,
-            (),
-            H160(LEADER.to_bytes()),
-        )
+        .execute(*OUTPACE_BYTECODE, (), H160(LEADER.to_bytes()))
         .await?;
     let outpace_address = Address::from(outpace_contract.address().to_fixed_bytes());
 
     Ok((outpace_address, outpace_contract))
 }
 
-/// Deploys the Mock Token contract from `GANACHE_ADDRESS['leader']`
+/// Deploys the Mock Token contract from [`LEADER`]
 pub async fn deploy_token_contract(
     web3: &Web3<Http>,
     min_token_units: u64,
@@ -240,11 +232,7 @@ pub async fn deploy_token_contract(
             opt.gas_price = Some(1.into());
             opt.gas = Some(6_721_975.into());
         }))
-        .execute(
-            *MOCK_TOKEN_BYTECODE,
-            (),
-            H160(LEADER.to_bytes()),
-        )
+        .execute(*MOCK_TOKEN_BYTECODE, (), H160(LEADER.to_bytes()))
         .await?;
 
     let token_info = TokenInfo {

@@ -501,7 +501,10 @@ mod test {
     use super::test_util::*;
     use super::*;
     use chrono::Utc;
-    use primitives::{config::DEVELOPMENT_CONFIG, test_util::{LEADER, CREATOR, IDS}};
+    use primitives::{
+        config::DEVELOPMENT_CONFIG,
+        test_util::{CREATOR, IDS, LEADER},
+    };
     use web3::{transports::Http, Web3};
     use wiremock::{
         matchers::{method, path},

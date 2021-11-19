@@ -5,13 +5,13 @@ use crate::Address;
 /// re-export all other statics before moving all of them to this module
 pub use crate::util::tests::prep_db::*;
 
-pub static LEADER: Lazy<Address> = Lazy::new(|| ADDRESS_0.clone());
-pub static FOLLOWER: Lazy<Address> = Lazy::new(|| ADDRESS_1.clone());
-pub static GUARDIAN: Lazy<Address> = Lazy::new(|| ADDRESS_2.clone());
-pub static CREATOR: Lazy<Address> = Lazy::new(|| ADDRESS_3.clone());
-pub static ADVERTISER: Lazy<Address> = Lazy::new(|| ADDRESS_4.clone());
-pub static PUBLISHER: Lazy<Address> = Lazy::new(|| ADDRESS_5.clone());
-pub static GUARDIAN_2: Lazy<Address> = Lazy::new(|| ADDRESS_6.clone());
+pub static LEADER: Lazy<Address> = Lazy::new(|| *ADDRESS_0);
+pub static FOLLOWER: Lazy<Address> = Lazy::new(|| *ADDRESS_1);
+pub static GUARDIAN: Lazy<Address> = Lazy::new(|| *ADDRESS_2);
+pub static CREATOR: Lazy<Address> = Lazy::new(|| *ADDRESS_3);
+pub static ADVERTISER: Lazy<Address> = Lazy::new(|| *ADDRESS_4);
+pub static PUBLISHER: Lazy<Address> = Lazy::new(|| *ADDRESS_5);
+pub static GUARDIAN_2: Lazy<Address> = Lazy::new(|| *ADDRESS_6);
 
 /// passhprase: ganache0
 pub static ADDRESS_0: Lazy<Address> = Lazy::new(|| {
