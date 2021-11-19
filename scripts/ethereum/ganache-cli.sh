@@ -33,6 +33,9 @@
 # (7) 0x0d137045e22a98ee462f4d86939dd8ff3c8570e7fb72e4fea5c9e7ef09ab7276
 # (8) 0xd2d8a41c67627e43c0f46c2c73a4631b11e291bb0917da51b231da780d3fd074
 # (9) 0xf1571482718eefe760ad89269202a33409299af1b9057aa40699a11fb358572b
+#
+# gasLimit = 4503599627370495 (0xfffffffffffff)
+#
 node /app/ganache-core.docker.cli.js --gasLimit 0xfffffffffffff \
   --db="./snapshot" \
   --deterministic \
