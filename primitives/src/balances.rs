@@ -6,7 +6,7 @@ use thiserror::Error;
 
 #[derive(Serialize, Debug, Clone, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct Balances<S: BalancesState> {
+pub struct Balances<S: BalancesState = CheckedState> {
     pub earners: UnifiedMap,
     pub spenders: UnifiedMap,
     state: PhantomData<S>,
@@ -38,31 +38,12 @@ impl Balances<UncheckedState> {
 }
 
 impl<S: BalancesState> Balances<S> {
-    pub fn new() -> Balances<CheckedState> {
+    pub fn new() -> Balances<S> {
         Balances {
             earners: Default::default(),
             spenders: Default::default(),
             state: Default::default(),
         }
-    }
-
-    pub fn spend(
-        &mut self,
-        spender: Address,
-        earner: Address,
-        amount: UnifiedNum,
-    ) -> Result<(), OverflowError> {
-        let spent = self.spenders.entry(spender).or_default();
-        *spent = spent
-            .checked_add(&amount)
-            .ok_or(OverflowError::Spender(spender))?;
-
-        let earned = self.earners.entry(earner).or_default();
-        *earned = earned
-            .checked_add(&amount)
-            .ok_or(OverflowError::Earner(earner))?;
-
-        Ok(())
     }
 
     /// Adds the spender to the Balances with `0` if he does not exist
@@ -98,6 +79,27 @@ impl<S: BalancesState> Balances<S> {
                 Some((earners, spenders))
             })
             .flatten()
+    }
+}
+
+impl Balances<CheckedState> {
+    pub fn spend(
+        &mut self,
+        spender: Address,
+        earner: Address,
+        amount: UnifiedNum,
+    ) -> Result<(), OverflowError> {
+        let spent = self.spenders.entry(spender).or_default();
+        *spent = spent
+            .checked_add(&amount)
+            .ok_or(OverflowError::Spender(spender))?;
+
+        let earned = self.earners.entry(earner).or_default();
+        *earned = earned
+            .checked_add(&amount)
+            .ok_or(OverflowError::Earner(earner))?;
+
+        Ok(())
     }
 }
 
