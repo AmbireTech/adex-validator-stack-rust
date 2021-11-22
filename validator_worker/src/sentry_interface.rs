@@ -246,10 +246,10 @@ impl<A: Adapter + 'static, P> SentryApi<A, P> {
 
         assert_eq!(reqwest::StatusCode::OK, response.status());
 
-        Ok(response
+        response
             .json::<AccountingResponse<CheckedState>>()
             .map_err(Error::Request)
-            .await?)
+            .await
     }
 
     /// Fetches all `Campaign`s from the _Who am I_ Sentry.

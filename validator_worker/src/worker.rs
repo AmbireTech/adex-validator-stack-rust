@@ -21,8 +21,7 @@ pub struct Worker<A: Adapter> {
 }
 
 impl<A: Adapter + 'static> Worker<A> {
-    // /// Requires an unlocked [`Adapter`]
-    // /// Before running, unlocks the adapter using [`Adapter::unlock`]!
+    /// Requires an unlocked [`Adapter`]
     pub fn from_sentry(sentry: SentryApi<A, ()>) -> Self {
         Self {
             config: sentry.config.clone(),
