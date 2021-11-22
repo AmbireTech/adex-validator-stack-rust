@@ -1336,7 +1336,7 @@ mod test {
                 .expect("Should fetch campaign")
                 .expect("Campaign should exist");
 
-            // remaining = campaign_budget therefore sold_budget - remaining = 0
+            // remaining == campaign_budget therefore old_budget - remaining = 0
             assert_eq!(closed_campaign.budget, UnifiedNum::from_u64(0));
 
             let remaining = app
