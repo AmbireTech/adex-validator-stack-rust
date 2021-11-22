@@ -212,23 +212,21 @@ async fn campaigns_router<A: Adapter + 'static>(
         let req = CampaignLoad.call(req, app).await?;
 
         campaign::insert_events::handle_route(req, app).await
-    } else if let (Some(_caps), &Method::POST) =
+    } else if let (Some(caps), &Method::POST) =
         (CLOSE_CAMPAIGN_BY_CAMPAIGN_ID.captures(path), method)
     {
-        // TODO AIP#61: Close campaign:
-        // - only by creator
-        // - sets redis remaining = 0 (`newBudget = totalSpent`, i.e. `newBudget = oldBudget - remaining`)
+        let param = RouteParams(vec![caps
+            .get(1)
+            .map_or("".to_string(), |m| m.as_str().to_string())]);
+        req.extensions_mut().insert(param);
 
-        // let (is_creator, auth_uid) = match auth {
-        // Some(auth) => (auth.uid == channel.creator, auth.uid.to_string()),
-        // None => (false, Default::default()),
-        // };
-        // Closing a campaign is allowed only by the creator
-        // if has_close_event && is_creator {
-        //     return Ok(());
-        // }
+        req = Chain::new()
+            .chain(AuthRequired)
+            .chain(CampaignLoad)
+            .apply(req, app)
+            .await?;
 
-        Err(ResponseError::NotFound)
+        campaign::close_campaign(req, app).await
     } else if method == Method::POST && path == "/v5/campaign/list" {
         req = AuthRequired.call(req, app).await?;
 
