@@ -21,6 +21,7 @@ use primitives::{
     sentry::{
         campaign::CampaignListQuery,
         campaign_create::{CreateCampaign, ModifyCampaign},
+        SuccessResponse,
     },
     spender::Spendable,
     Address, Campaign, CampaignId, Channel, ChannelId, Deposit, UnifiedNum,
@@ -290,6 +291,49 @@ pub async fn campaign_list<A: Adapter>(
     .await?;
 
     Ok(success_response(serde_json::to_string(&list_response)?))
+}
+
+/// Can only be called by creator
+/// to close a campaign, just set it's budget to what it's spent so far (so that remaining == 0)
+/// newBudget = totalSpent, i.e. newBudget = oldBudget - remaining
+pub async fn close_campaign<A: Adapter>(
+    req: Request<Body>,
+    app: &Application<A>,
+) -> Result<Response<Body>, ResponseError> {
+    let auth = req
+        .extensions()
+        .get::<Auth>()
+        .expect("Auth should be present");
+
+    let mut campaign = req
+        .extensions()
+        .get::<Campaign>()
+        .expect("We must have a campaign in extensions")
+        .to_owned();
+
+    if auth.uid.to_address() != campaign.creator {
+        Err(ResponseError::Forbidden(
+            "Request not sent by campaign creator".to_string(),
+        ))
+    } else {
+        let old_remaining = app
+            .campaign_remaining
+            .getset_remaining_to_zero(campaign.id)
+            .await
+            .map_err(|e| ResponseError::BadRequest(e.to_string()))?;
+
+        campaign.budget = campaign
+            .budget
+            .checked_sub(&UnifiedNum::from(old_remaining))
+            .ok_or_else(|| {
+                ResponseError::BadRequest("Campaign budget overflows/underflows".to_string())
+            })?;
+        update_campaign(&app.pool, &campaign).await?;
+
+        Ok(success_response(serde_json::to_string(&SuccessResponse {
+            success: true,
+        })?))
+    }
 }
 
 pub mod update_campaign {
@@ -903,13 +947,15 @@ mod test {
         update_campaign::{get_delta_budget, modify_campaign},
         *,
     };
-    use crate::db::redis_pool::TESTS_POOL;
+    use crate::db::{fetch_campaign, redis_pool::TESTS_POOL};
     use crate::test_util::setup_dummy_app;
     use crate::update_campaign::DeltaBudget;
     use adapter::DummyAdapter;
     use hyper::StatusCode;
     use primitives::{
-        adapter::Deposit, util::tests::prep_db::DUMMY_CAMPAIGN, BigNum, ChannelId, ValidatorId,
+        adapter::Deposit,
+        util::tests::prep_db::{DUMMY_CAMPAIGN, IDS},
+        BigNum, ChannelId, ValidatorId,
     };
 
     #[tokio::test]
@@ -1247,6 +1293,83 @@ mod test {
             let decrease_by = UnifiedNum::from_u64(200 * multiplier);
 
             assert_eq!(delta_budget, Some(DeltaBudget::Decrease(decrease_by)));
+        }
+    }
+
+    #[tokio::test]
+    async fn campaign_is_closed_properly() {
+        let campaign = DUMMY_CAMPAIGN.clone();
+
+        let app = setup_dummy_app().await;
+
+        insert_channel(&app.pool, campaign.channel)
+            .await
+            .expect("Should insert dummy channel");
+        insert_campaign(&app.pool, &campaign)
+            .await
+            .expect("Should insert dummy campaign");
+
+        // Test if remaining is set to 0
+        {
+            app.campaign_remaining
+                .set_initial(campaign.id, campaign.budget)
+                .await
+                .expect("should set");
+
+            let auth = Auth {
+                era: 0,
+                uid: ValidatorId::from(campaign.creator),
+            };
+
+            let req = Request::builder()
+                .extension(auth)
+                .extension(campaign.clone())
+                .body(Body::empty())
+                .expect("Should build Request");
+
+            close_campaign(req, &app)
+                .await
+                .expect("Should close campaign");
+
+            let closed_campaign = fetch_campaign(app.pool.clone(), &campaign.id)
+                .await
+                .expect("Should fetch campaign")
+                .expect("Campaign should exist");
+
+            // remaining == campaign_budget therefore old_budget - remaining = 0
+            assert_eq!(closed_campaign.budget, UnifiedNum::from_u64(0));
+
+            let remaining = app
+                .campaign_remaining
+                .get_remaining_opt(campaign.id)
+                .await
+                .expect("Should get remaining from redis")
+                .expect("There should be value for the Campaign");
+
+            assert_eq!(remaining, 0);
+        }
+
+        // Test if an error is returned when request is not sent by creator
+        {
+            let auth = Auth {
+                era: 0,
+                uid: IDS["leader"],
+            };
+
+            let req = Request::builder()
+                .extension(auth)
+                .extension(campaign.clone())
+                .body(Body::empty())
+                .expect("Should build Request");
+
+            let res = close_campaign(req, &app)
+                .await
+                .expect_err("Should return error for Bad Campaign");
+
+            assert_eq!(
+                ResponseError::Forbidden("Request not sent by campaign creator".to_string()),
+                res
+            );
         }
     }
 }
