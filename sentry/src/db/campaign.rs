@@ -309,6 +309,19 @@ mod campaign_remaining {
                 .query_async(&mut self.redis.clone())
                 .await
         }
+
+        /// Atomic `getset` [`redis`] operation
+        /// Used to close a [`Campaign`] `POST /campaign/close`
+        pub async fn getset_remaining_to_zero(
+            &self,
+            campaign: CampaignId,
+        ) -> Result<u64, RedisError> {
+            redis::cmd("GETSET")
+                .arg(&Self::get_key(campaign))
+                .arg(0)
+                .query_async(&mut self.redis.clone())
+                .await
+        }
     }
 
     #[cfg(test)]
