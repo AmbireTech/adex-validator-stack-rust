@@ -310,8 +310,8 @@ mod campaign_remaining {
                 .await
         }
 
-        /// Doesn't allow the usage of SET with a predefined amount due to a possible race condition
-        /// use increase/decrease functions instead
+        /// Atomic `getset` [`redis`] operation
+        /// Used to close a [`Campaign`] `POST /campaign/close`
         pub async fn getset_remaining_to_zero(
             &self,
             campaign: CampaignId,
