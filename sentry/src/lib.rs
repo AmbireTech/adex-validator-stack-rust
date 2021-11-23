@@ -7,7 +7,7 @@ use hyper::{Body, Method, Request, Response, StatusCode};
 use middleware::{
     auth::{AuthRequired, Authenticate},
     campaign::{CalledByCreator, CampaignLoad},
-    channel::{ChannelLoad, GetChannelId},
+    channel::ChannelLoad,
     cors::{cors, Cors},
     Chain, Middleware,
 };
@@ -247,18 +247,13 @@ async fn analytics_router<A: Adapter + 'static>(
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
     use routes::analytics::{
-        advanced_analytics, advertiser_analytics, analytics, publisher_analytics,
+        admin_analytics, advertiser_analytics, analytics, publisher_analytics,
     };
 
     let (route, method) = (req.uri().path(), req.method());
 
     match (route, method) {
-        ("/analytics", &Method::GET) => analytics(req, app).await,
-        ("/analytics/advanced", &Method::GET) => {
-            let req = AuthRequired.call(req, app).await?;
-
-            advanced_analytics(req, app).await
-        }
+        ("/analytics", &Method::GET) => analytics(req, app, Some(vec!["country".to_string(), "ad_slot_type".to_string()]), None).await,
         ("/analytics/for-advertiser", &Method::GET) => {
             let req = AuthRequired.call(req, app).await?;
             advertiser_analytics(req, app).await
@@ -268,52 +263,10 @@ async fn analytics_router<A: Adapter + 'static>(
 
             publisher_analytics(req, app).await
         }
-        (route, &Method::GET) => {
-            if let Some(caps) = ANALYTICS_BY_CHANNEL_ID.captures(route) {
-                let param = RouteParams(vec![caps
-                    .get(1)
-                    .map_or("".to_string(), |m| m.as_str().to_string())]);
-                req.extensions_mut().insert(param);
+        ("/analytics/for-admin", &Method::GET) => {
+            let req = AuthRequired.call(req, app).await?;
 
-                // apply middlewares
-                req = Chain::new()
-                    .chain(ChannelLoad)
-                    .chain(GetChannelId)
-                    .apply(req, app)
-                    .await?;
-
-                analytics(req, app).await
-            } else if let Some(caps) = ADVERTISER_ANALYTICS_BY_CHANNEL_ID.captures(route) {
-                let param = RouteParams(vec![caps
-                    .get(1)
-                    .map_or("".to_string(), |m| m.as_str().to_string())]);
-                req.extensions_mut().insert(param);
-
-                // apply middlewares
-                req = Chain::new()
-                    .chain(AuthRequired)
-                    .chain(GetChannelId)
-                    .apply(req, app)
-                    .await?;
-
-                advertiser_analytics(req, app).await
-            } else if let Some(caps) = PUBLISHER_ANALYTICS_BY_CHANNEL_ID.captures(route) {
-                let param = RouteParams(vec![caps
-                    .get(1)
-                    .map_or("".to_string(), |m| m.as_str().to_string())]);
-                req.extensions_mut().insert(param);
-
-                // apply middlewares
-                req = Chain::new()
-                    .chain(AuthRequired)
-                    .chain(GetChannelId)
-                    .apply(req, app)
-                    .await?;
-
-                publisher_analytics(req, app).await
-            } else {
-                Err(ResponseError::NotFound)
-            }
+            admin_analytics(req, app).await
         }
         _ => Err(ResponseError::NotFound),
     }

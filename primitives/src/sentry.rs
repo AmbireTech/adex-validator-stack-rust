@@ -6,7 +6,7 @@ use crate::{
     Address, Balances, BigNum, CampaignId, Channel, ChannelId, UnifiedNum, ValidatorId, IPFS,
 };
 use bytes::BytesMut;
-use chrono::{Date, DateTime, Datelike, TimeZone, Timelike, Utc};
+use chrono::{DateTime, Datelike, TimeZone, Timelike, Utc};
 use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, error::Error, fmt, hash::Hash};

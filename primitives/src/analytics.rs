@@ -1,6 +1,7 @@
-use crate::{ChannelId, DomainError};
+use crate::{ChannelId, DomainError, sentry::DateHour, CampaignId, IPFS, Address};
 use parse_display::Display;
 use serde::{Deserialize, Serialize};
+use chrono::{Utc, DateTime, serde::ts_seconds};
 
 pub const ANALYTICS_QUERY_LIMIT: u32 = 200;
 
@@ -66,6 +67,7 @@ pub mod postgres {
     }
 }
 
+// TODO: Clean up query defaults/start/end
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AnalyticsQuery {
@@ -77,7 +79,29 @@ pub struct AnalyticsQuery {
     pub metric: String,
     #[serde(default = "default_timeframe")]
     pub timeframe: String,
-    pub segment_by_channel: Option<String>,
+    pub segment_by: Option<String>,
+    #[serde(with = "ts_seconds", default = "Utc::now", rename = "activeTo")]
+    pub start: DateTime<Utc>,
+    #[serde(with = "ts_seconds", default = "Utc::now", rename = "activeTo")]
+    pub end: DateTime<Utc>,
+    #[serde(default = "default_timezone")]
+    pub timezone: String,
+    #[serde(flatten)]
+    pub keys: AnalyticsQueryKeys,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnalyticsQueryKeys {
+    pub campaign_id: Option<CampaignId>,
+    pub ad_unit: Option<IPFS>,
+    pub ad_slot: Option<IPFS>,
+    pub ad_slot_type: Option<String>,
+    pub advertiser: Option<Address>,
+    pub publisher: Option<Address>,
+    pub hostname: Option<String>,
+	pub country: Option<String>,
+    pub os_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Display, Hash, Eq)]
@@ -215,6 +239,10 @@ fn default_metric() -> String {
 
 fn default_timeframe() -> String {
     "hour".into()
+}
+
+fn default_timezone() -> String {
+    "UTC".into()
 }
 
 #[cfg(test)]
