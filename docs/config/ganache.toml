@@ -30,9 +30,9 @@ ip_rate_limit = { type = 'ip', timeframe = 1200000 }
 sid_rate_limit = { type = 'sid', timeframe = 0 }
 
 # Ganache Snapshot address
-outpace_address = '0xcb097e455b7159f902e2eb45562fc397ae6b0f3d'
+outpace_address = '0xabc27d46a458e2e49dabfef45ca74dedbac3dd06'
 # Ganache Snapshot address
-sweeper_address = '0xdd41b0069256a28972458199a3c9cf036384c156'
+sweeper_address = '0x7dd57c0324284102a757153e18f2cb1acdb7d2bd'
 
 ethereum_network = 'http://localhost:8545'
 # Mocked relayer
@@ -45,11 +45,11 @@ validators_whitelist = []
 
 [[token_address_whitelist]]
 # Mocked TOKEN
-address = '0x9db7bff788522dbe8fa2e8cbd568a58c471ccd5e'
+address = '0x2bcaf6968aec8a3b5126fbfab5fd419da6e8ad8e'
 # 1 * 10^18 = 1.0000 TOKEN
 min_token_units_for_deposit = '1000000000000000000'
-# multiplier = 10^14 - 10^18 (token precision) = 10^-4
-# min_validator_fee = 1 * 10^-4 = 0.000_1
-min_validator_fee = '100000000000000'
+# multiplier = 10^13 - 10^18 (token precision) = 10^-5
+# min_validator_fee = 1 * 10^-5 = 0.000_01
+min_validator_fee = '10000000000000'
 precision = 18
 

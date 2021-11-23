@@ -1,13 +1,14 @@
 [package]
-edition = "2018"
+edition = "2021"
 name = "test_harness"
 version = "0.1.0"
 authors = ["Ambire <dev@ambire.com>", "Lachezar Lechev <lachezar@ambire.com>"]
 
 [dependencies]
-primitives = { path = "../primitives", features = ["postgres"] }
+primitives = { path = "../primitives", features = ["postgres", "test-util"] }
 adapter = { version = "0.1", path = "../adapter", features = ["test-util"] }
 sentry = { version = "0.1", path = "../sentry", features = ["test-util"] }
+validator_worker = { version = "0.2", path = "../validator_worker" }
 
 chrono = { version = "0.4", features = ["serde"] }
 
@@ -27,3 +28,4 @@ anyhow = { version = "1" }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 # probably needed for Relayer calls
 # wiremock = "0.5"
+pretty_assertions = "^1.0"

@@ -1,7 +1,9 @@
-use std::{collections::HashMap, time::Duration};
+use std::{
+    collections::{hash_map::Entry, HashMap, HashSet},
+    time::Duration,
+};
 
-use chrono::{DateTime, Utc};
-use futures::future::{join_all, TryFutureExt};
+use futures::future::{join_all, try_join_all, TryFutureExt};
 use reqwest::{Client, Method};
 use slog::Logger;
 
@@ -9,13 +11,13 @@ use primitives::{
     adapter::Adapter,
     balances::{CheckedState, UncheckedState},
     sentry::{
-        AccountingResponse, EventAggregateResponse, LastApprovedResponse, SuccessResponse,
+        AccountingResponse, AllSpendersResponse, LastApprovedResponse, SuccessResponse,
         ValidatorMessageResponse,
     },
     spender::Spender,
     util::ApiUrl,
     validator::MessageTypes,
-    Address, ChannelId, Config, ValidatorId,
+    Address, Channel, ChannelId, Config, ValidatorId,
 };
 use thiserror::Error;
 
@@ -32,42 +34,61 @@ pub struct Validator {
     pub token: AuthToken,
 }
 
-#[derive(Debug, Clone)]
-pub struct SentryApi<A: Adapter> {
-    pub adapter: A,
-    pub client: Client,
-    pub logger: Logger,
-    pub config: Config,
-    pub whoami: Validator,
-    pub propagate_to: Validators,
-}
-
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("Building client: {0}")]
     BuildingClient(reqwest::Error),
     #[error("Making a request: {0}")]
     Request(#[from] reqwest::Error),
+    /// Error returned when the passed [`Validators`] to [`SentryApi::init()`] do not contain
+    /// the _Who am I_ a record of the [`Adapter::whoami()`]
     #[error(
         "Missing validator URL & Auth token entry for whoami {whoami:#?} in the propagation list"
     )]
     WhoamiMissing { whoami: ValidatorId },
-    #[error("Failed to parse validator url: {0}")]
-    ValidatorUrl(#[from] primitives::util::api::ParseError),
 }
 
-impl<A: Adapter + 'static> SentryApi<A> {
-    pub fn init(
+#[derive(Debug, Clone)]
+pub struct SentryApi<A: Adapter, P = Validators> {
+    pub adapter: A,
+    pub client: Client,
+    pub logger: Logger,
+    pub config: Config,
+    pub whoami: Validator,
+    /// If set with [`Validators`], `propagate_to` should contain the `whoami` [`Validator`].
+    pub propagate_to: P,
+}
+
+impl<A: Adapter + 'static> SentryApi<A, ()> {
+    pub fn new(
         adapter: A,
         logger: Logger,
         config: Config,
-        propagate_to: Validators,
-    ) -> Result<Self, Error> {
+        whoami_validator: Validator,
+    ) -> Result<SentryApi<A, ()>, Error> {
         let client = Client::builder()
             .timeout(Duration::from_millis(config.fetch_timeout.into()))
             .build()
             .map_err(Error::BuildingClient)?;
 
+        Ok(SentryApi {
+            adapter,
+            client,
+            logger,
+            config,
+            whoami: whoami_validator,
+            propagate_to: (),
+        })
+    }
+
+    /// Initialize the [`SentryApi`] and makes sure that [`Adapter::whoami()`] is present in [`Validators`].
+    /// Sets the _Who am I_ [`ApiUrl`] and the Authentication Token for calls requiring authentication.
+    pub fn init(
+        adapter: A,
+        logger: Logger,
+        config: Config,
+        propagate_to: Validators,
+    ) -> Result<SentryApi<A, Validators>, Error> {
         let whoami = propagate_to
             .get(&adapter.whoami())
             .cloned()
@@ -75,33 +96,31 @@ impl<A: Adapter + 'static> SentryApi<A> {
                 whoami: adapter.whoami(),
             })?;
 
-        Ok(Self {
-            adapter,
-            client,
-            logger,
-            config,
-            whoami,
+        let sentry_api = SentryApi::new(adapter, logger, config, whoami)?;
+
+        Ok(sentry_api.with_propagate(propagate_to))
+    }
+
+    /// If the _Who am I_ Validator is not found in `propagate_to` it will add it.
+    /// Propagation should happen to all validators Sentry instances including _Who am I_
+    /// i.e. the current validator
+    pub fn with_propagate(self, mut propagate_to: Validators) -> SentryApi<A, Validators> {
+        let _ = propagate_to
+            .entry(self.adapter.whoami())
+            .or_insert_with(|| self.whoami.clone());
+
+        SentryApi {
+            adapter: self.adapter,
+            client: self.client,
+            logger: self.logger,
+            config: self.config,
+            whoami: self.whoami,
             propagate_to,
-        })
+        }
     }
+}
 
-    pub async fn propagate(
-        &self,
-        channel: ChannelId,
-        messages: &[&MessageTypes],
-    ) -> Vec<PropagationResult> {
-        join_all(self.propagate_to.iter().map(|(validator_id, validator)| {
-            propagate_to::<A>(
-                &self.client,
-                self.config.propagation_timeout,
-                channel,
-                (*validator_id, validator),
-                messages,
-            )
-        }))
-        .await
-    }
-
+impl<A: Adapter + 'static, P> SentryApi<A, P> {
     pub async fn get_latest_msg(
         &self,
         channel: ChannelId,
@@ -161,15 +180,16 @@ impl<A: Adapter + 'static> SentryApi<A> {
             .map_err(Error::Request)
     }
 
-    // TODO: Pagination & use of `AllSpendersResponse`
-    pub async fn get_all_spenders(
+    /// page always starts from 0
+    pub async fn get_spenders_page(
         &self,
-        channel: ChannelId,
-    ) -> Result<HashMap<Address, Spender>, Error> {
+        channel: &ChannelId,
+        page: u64,
+    ) -> Result<AllSpendersResponse, Error> {
         let url = self
             .whoami
             .url
-            .join(&format!("v5/channel/{}/spender/all", channel))
+            .join(&format!("v5/channel/{}/spender/all?page={}", channel, page))
             .expect("Should not error when creating endpoint");
 
         self.client
@@ -177,10 +197,32 @@ impl<A: Adapter + 'static> SentryApi<A> {
             .bearer_auth(&self.whoami.token)
             .send()
             .await?
-            // TODO: Should be `AllSpendersResponse` and should have pagination!
             .json()
             .map_err(Error::Request)
             .await
+    }
+
+    pub async fn get_all_spenders(
+        &self,
+        channel: ChannelId,
+    ) -> Result<HashMap<Address, Spender>, Error> {
+        let first_page = self.get_spenders_page(&channel, 0).await?;
+
+        if first_page.pagination.total_pages < 2 {
+            Ok(first_page.spenders)
+        } else {
+            let all: Vec<AllSpendersResponse> = try_join_all(
+                (1..first_page.pagination.total_pages).map(|i| self.get_spenders_page(&channel, i)),
+            )
+            .await?;
+
+            let result_all: HashMap<Address, Spender> = std::iter::once(first_page)
+                .chain(all.into_iter())
+                .flat_map(|p| p.spenders)
+                .collect();
+
+            Ok(result_all)
+        }
     }
 
     /// Get the accounting from Sentry
@@ -195,38 +237,89 @@ impl<A: Adapter + 'static> SentryApi<A> {
             .join(&format!("v5/channel/{}/accounting", channel))
             .expect("Should not error when creating endpoint");
 
-        self.client
+        let response = self
+            .client
             .get(url)
             .bearer_auth(&self.whoami.token)
             .send()
-            .await?
+            .await?;
+
+        assert_eq!(reqwest::StatusCode::OK, response.status());
+
+        response
             .json::<AccountingResponse<CheckedState>>()
             .map_err(Error::Request)
             .await
     }
 
-    #[deprecated = "V5 no longer needs event aggregates"]
-    pub async fn get_event_aggregates(
-        &self,
-        after: DateTime<Utc>,
-    ) -> Result<EventAggregateResponse, Error> {
-        let url = self
-            .whoami
-            .url
-            .join(&format!(
-                "events-aggregates?after={}",
-                after.timestamp_millis()
-            ))
-            .expect("Should not error when creating endpoint");
+    /// Fetches all `Campaign`s from the _Who am I_ Sentry.
+    /// It builds the `Channel`s to be processed alongside all the `Validator`s' url & auth token.
+    pub async fn collect_channels(&self) -> Result<(HashSet<Channel>, Validators), Error> {
+        let all_campaigns_timeout = Duration::from_millis(self.config.all_campaigns_timeout as u64);
+        let client = reqwest::Client::builder()
+            .timeout(all_campaigns_timeout)
+            .build()?;
 
-        self.client
-            .get(url)
-            .bearer_auth(&self.whoami.token)
-            .send()
-            .await?
-            .json()
-            .map_err(Error::Request)
-            .await
+        let campaigns =
+            campaigns::all_campaigns(client, &self.whoami, Some(self.adapter.whoami())).await?;
+        let channels = campaigns
+            .iter()
+            .map(|campaign| campaign.channel)
+            .collect::<HashSet<_>>();
+
+        let validators = campaigns
+            .into_iter()
+            .fold(Validators::new(), |mut acc, campaign| {
+                for validator_desc in campaign.validators.iter() {
+                    // if Validator is already there, we can just skip it
+                    // remember, the campaigns are ordered by `created DESC`
+                    // so we will always get the latest Validator url first
+                    match acc.entry(validator_desc.id) {
+                        Entry::Occupied(_) => continue,
+                        Entry::Vacant(entry) => {
+                            // try to parse the url of the Validator Desc
+                            let validator_url = validator_desc.url.parse::<ApiUrl>();
+                            // and also try to find the Auth token in the config
+
+                            // if there was an error with any of the operations, skip this `ValidatorDesc`
+                            let auth_token = self.adapter.get_auth(&validator_desc.id);
+
+                            // only if `ApiUrl` parsing is `Ok` & Auth Token is found in the `Adapter`
+                            if let (Ok(url), Ok(auth_token)) = (validator_url, auth_token) {
+                                // add an entry for propagation
+                                entry.insert(Validator {
+                                    url,
+                                    token: auth_token,
+                                });
+                            }
+                            // otherwise it will try to do the same things on the next encounter of this `ValidatorId`
+                        }
+                    }
+                }
+
+                acc
+            });
+
+        Ok((channels, validators))
+    }
+}
+
+impl<A: Adapter + 'static> SentryApi<A> {
+    pub async fn propagate(
+        &self,
+        channel: ChannelId,
+        messages: &[&MessageTypes],
+    ) -> Vec<PropagationResult> {
+        join_all(self.propagate_to.iter().map(|(validator_id, validator)| {
+            propagate_to::<A>(
+                &self.client,
+                self.config.propagation_timeout,
+                channel,
+                (*validator_id, validator),
+                messages,
+            )
+        }))
+        .await
     }
 }
 
@@ -325,25 +418,28 @@ pub mod campaigns {
     use futures::future::try_join_all;
     use primitives::{
         sentry::campaign::{CampaignListQuery, CampaignListResponse, ValidatorParam},
-        util::ApiUrl,
         Campaign, ValidatorId,
     };
     use reqwest::Client;
 
+    use super::Validator;
+
     /// Fetches all `Campaign`s from `sentry` by going through all pages and collecting the `Campaign`s into a single `Vec`
+    /// You can filter by `&validator=0x...` when passing `for_validator`.
+    /// This will return campaigns that include the provided `for_validator` validator.
     pub async fn all_campaigns(
         client: Client,
-        sentry_url: &ApiUrl,
-        whoami: ValidatorId,
+        whoami: &Validator,
+        for_validator: Option<ValidatorId>,
     ) -> Result<Vec<Campaign>, reqwest::Error> {
-        let first_page = fetch_page(&client, sentry_url, 0, whoami).await?;
+        let first_page = fetch_page(&client, whoami, 0, for_validator).await?;
 
         if first_page.pagination.total_pages < 2 {
             Ok(first_page.campaigns)
         } else {
             let all = try_join_all(
                 (1..first_page.pagination.total_pages)
-                    .map(|i| fetch_page(&client, sentry_url, i, whoami)),
+                    .map(|i| fetch_page(&client, whoami, i, for_validator)),
             )
             .await?;
 
@@ -357,18 +453,19 @@ pub mod campaigns {
 
     async fn fetch_page(
         client: &Client,
-        sentry_url: &ApiUrl,
+        whoami: &Validator,
         page: u64,
-        validator: ValidatorId,
+        for_validator: Option<ValidatorId>,
     ) -> Result<CampaignListResponse, reqwest::Error> {
         let query = CampaignListQuery {
             page,
             active_to_ge: Utc::now(),
             creator: None,
-            validator: Some(ValidatorParam::Validator(validator)),
+            validator: for_validator.map(ValidatorParam::Validator),
         };
 
-        let endpoint = sentry_url
+        let endpoint = whoami
+            .url
             .join(&format!(
                 "v5/campaign/list?{}",
                 serde_urlencoded::to_string(query).expect("Should not fail to serialize")
@@ -376,5 +473,179 @@ pub mod campaigns {
             .expect("Should not fail to create endpoint URL");
 
         client.get(endpoint).send().await?.json().await
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use adapter::DummyAdapter;
+    use primitives::{
+        adapter::DummyAdapterOptions,
+        config::{configuration, Environment},
+        sentry::Pagination,
+        util::tests::{
+            discard_logger,
+            prep_db::{ADDRESSES, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_LEADER, IDS},
+        },
+        UnifiedNum,
+    };
+    use std::str::FromStr;
+    use wiremock::{
+        matchers::{method, path, query_param},
+        Mock, MockServer, ResponseTemplate,
+    };
+
+    #[tokio::test]
+    async fn test_get_all_spenders() {
+        let server = MockServer::start().await;
+        let test_spender = Spender {
+            total_deposited: UnifiedNum::from(100_000_000),
+            spender_leaf: None,
+        };
+        let mut all_spenders = HashMap::new();
+        all_spenders.insert(ADDRESSES["user"], test_spender.clone());
+        all_spenders.insert(ADDRESSES["publisher"], test_spender.clone());
+        all_spenders.insert(ADDRESSES["publisher2"], test_spender.clone());
+        all_spenders.insert(ADDRESSES["creator"], test_spender.clone());
+        all_spenders.insert(ADDRESSES["tester"], test_spender.clone());
+
+        let first_page_response = AllSpendersResponse {
+            spenders: vec![
+                (
+                    ADDRESSES["user"],
+                    all_spenders.get(&ADDRESSES["user"]).unwrap().to_owned(),
+                ),
+                (
+                    ADDRESSES["publisher"],
+                    all_spenders
+                        .get(&ADDRESSES["publisher"])
+                        .unwrap()
+                        .to_owned(),
+                ),
+            ]
+            .into_iter()
+            .collect(),
+            pagination: Pagination {
+                page: 0,
+                total_pages: 3,
+            },
+        };
+
+        let second_page_response = AllSpendersResponse {
+            spenders: vec![
+                (
+                    ADDRESSES["publisher2"],
+                    all_spenders
+                        .get(&ADDRESSES["publisher2"])
+                        .unwrap()
+                        .to_owned(),
+                ),
+                (
+                    ADDRESSES["creator"],
+                    all_spenders.get(&ADDRESSES["creator"]).unwrap().to_owned(),
+                ),
+            ]
+            .into_iter()
+            .collect(),
+            pagination: Pagination {
+                page: 1,
+                total_pages: 3,
+            },
+        };
+
+        let third_page_response = AllSpendersResponse {
+            spenders: vec![(
+                ADDRESSES["tester"],
+                all_spenders.get(&ADDRESSES["tester"]).unwrap().to_owned(),
+            )]
+            .into_iter()
+            .collect(),
+            pagination: Pagination {
+                page: 2,
+                total_pages: 3,
+            },
+        };
+
+        Mock::given(method("GET"))
+            .and(path(format!(
+                "/v5/channel/{}/spender/all",
+                DUMMY_CAMPAIGN.channel.id()
+            )))
+            .and(query_param("page", "0"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&first_page_response))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path(format!(
+                "/v5/channel/{}/spender/all",
+                DUMMY_CAMPAIGN.channel.id()
+            )))
+            .and(query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&second_page_response))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path(format!(
+                "/v5/channel/{}/spender/all",
+                DUMMY_CAMPAIGN.channel.id()
+            )))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&third_page_response))
+            .mount(&server)
+            .await;
+
+        let mut validators = Validators::new();
+        validators.insert(
+            DUMMY_VALIDATOR_LEADER.id,
+            Validator {
+                url: ApiUrl::from_str(&server.uri()).expect("Should parse"),
+                token: AuthToken::default(),
+            },
+        );
+        let mut config = configuration(Environment::Development, None).expect("Should get Config");
+        config.spendable_find_limit = 2;
+
+        let adapter = DummyAdapter::init(
+            DummyAdapterOptions {
+                dummy_identity: IDS["leader"],
+                dummy_auth: Default::default(),
+                dummy_auth_tokens: Default::default(),
+            },
+            &config,
+        );
+        let logger = discard_logger();
+
+        let sentry =
+            SentryApi::init(adapter, logger, config, validators).expect("Should build sentry");
+
+        let mut res = sentry
+            .get_all_spenders(DUMMY_CAMPAIGN.channel.id())
+            .await
+            .expect("should get response");
+
+        // Checks for page 1
+        let res_user = res.remove(&ADDRESSES["user"]);
+        let res_publisher = res.remove(&ADDRESSES["publisher"]);
+        assert!(res_user.is_some() && res_publisher.is_some());
+        assert_eq!(res_user.unwrap(), test_spender);
+        assert_eq!(res_publisher.unwrap(), test_spender);
+
+        // Checks for page 2
+        let res_publisher2 = res.remove(&ADDRESSES["publisher2"]);
+        let res_creator = res.remove(&ADDRESSES["creator"]);
+        assert!(res_publisher2.is_some() && res_creator.is_some());
+        assert_eq!(res_publisher2.unwrap(), test_spender);
+        assert_eq!(res_creator.unwrap(), test_spender);
+
+        // Checks for page 3
+        let res_tester = res.remove(&ADDRESSES["tester"]);
+        assert!(res_tester.is_some());
+        assert_eq!(res_tester.unwrap(), test_spender);
+
+        // There should be no remaining elements
+        assert_eq!(res.len(), 0)
     }
 }

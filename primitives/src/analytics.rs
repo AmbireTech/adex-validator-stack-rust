@@ -24,9 +24,11 @@ pub struct AnalyticsResponse {
 pub mod postgres {
     use super::{AnalyticsData, OperatingSystem};
     use bytes::BytesMut;
-    use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
     use std::error::Error;
-    use tokio_postgres::Row;
+    use tokio_postgres::{
+        types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type},
+        Row,
+    };
 
     impl From<&Row> for AnalyticsData {
         fn from(row: &Row) -> Self {
@@ -248,6 +250,8 @@ fn default_timezone() -> String {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[cfg(feature = "postgres")]
     use crate::postgres::POSTGRES_POOL;
     use once_cell::sync::Lazy;
     use serde_json::{from_value, to_value, Value};
@@ -295,7 +299,11 @@ mod test {
                     .unwrap()
                     .get(0);
 
-                assert_eq!(&actual_os, &row_os);
+                assert_eq!(
+                    &actual_os, &row_os,
+                    "expected and actual FromSql differ for {}",
+                    input
+                );
             }
 
             // to SQL
@@ -305,7 +313,11 @@ mod test {
                     .await
                     .unwrap()
                     .get(0);
-                assert_eq!(&actual_os, &row_os);
+                assert_eq!(
+                    &actual_os, &row_os,
+                    "expected and actual ToSql differ for {}",
+                    input
+                );
             }
         }
     }
@@ -315,7 +327,6 @@ mod test {
         for (input, (expect_os, expect_json)) in TEST_CASES.iter() {
             let actual_os = OperatingSystem::map_os(input);
 
-            // let input_json = Value::String(input.clone());
             assert_eq!(
                 expect_os, &actual_os,
                 "expected and actual differ for {}",

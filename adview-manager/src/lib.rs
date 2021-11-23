@@ -9,9 +9,9 @@ use adex_primitives::{
     Address, BigNum, CampaignId, ToHex, UnifiedNum, IPFS,
 };
 use async_std::{sync::RwLock, task::block_on};
-use chrono::{DateTime, Utc};
-use lazy_static::lazy_static;
+use chrono::{DateTime, Duration, Utc};
 use num_integer::Integer;
+use once_cell::sync::Lazy;
 use rand::Rng;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
@@ -19,7 +19,6 @@ use slog::{error, Logger};
 use std::{
     cmp::Ordering,
     collections::VecDeque,
-    convert::TryFrom,
     ops::{Add, Mul},
     sync::Arc,
 };
@@ -34,11 +33,10 @@ const WAIT_FOR_IMPRESSION: u32 = 8000;
 // The number of impressions (won auctions) kept in history
 const HISTORY_LIMIT: u32 = 50;
 
-lazy_static! {
-// Impression "stickiness" time: see https://github.com/AdExNetwork/adex-adview-manager/issues/65
-// 4 minutes allows ~4 campaigns to rotate, considering a default frequency cap of 15 minutes
-    pub static ref IMPRESSION_STICKINESS_TIME: chrono::Duration = chrono::Duration::milliseconds(240000);
-}
+/// Impression "stickiness" time: see https://github.com/AdExNetwork/adex-adview-manager/issues/65
+/// 4 minutes allows ~4 campaigns to rotate, considering a default frequency cap of 15 minutes
+pub static IMPRESSION_STICKINESS_TIME: Lazy<Duration> =
+    Lazy::new(|| Duration::milliseconds(240000));
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -314,7 +312,7 @@ impl Manager {
             .rev()
             .find_map(|h| {
                 if h.campaign_id == campaign_id {
-                    let last_impression: chrono::Duration = Utc::now() - h.time;
+                    let last_impression: Duration = Utc::now() - h.time;
 
                     u64::try_from(last_impression.num_seconds()).ok()
                 } else {
@@ -601,7 +599,7 @@ mod test {
 
     fn get_ad_unit(media_mime: &str) -> AdUnit {
         AdUnit {
-            id: DUMMY_IPFS[0].clone(),
+            id: DUMMY_IPFS[0],
             media_url: "".to_string(),
             media_mime: media_mime.to_string(),
             target_url: "".to_string(),
@@ -610,8 +608,8 @@ mod test {
 
     #[test]
     fn test_is_video() {
-        assert_eq!(true, is_video(&get_ad_unit("video/avi")));
-        assert_eq!(false, is_video(&get_ad_unit("image/jpeg")));
+        assert!(is_video(&get_ad_unit("video/avi")));
+        assert!(!is_video(&get_ad_unit("image/jpeg")));
     }
 
     #[test]
@@ -634,7 +632,7 @@ mod test {
         #[test]
         fn test_randomized_position() {
             let ad_unit = AdUnit {
-                id: DUMMY_IPFS[0].clone(),
+                id: DUMMY_IPFS[0],
                 media_url: "ipfs://QmWWQSuPMS6aXCbZKpEjPHPUZN2NjB3YrhJTHsV4X3vb2t".to_string(),
                 media_mime: "image/jpeg".to_string(),
                 target_url: "https://google.com".to_string(),

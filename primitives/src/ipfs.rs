@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use std::{convert::TryFrom, fmt, str::FromStr};
+use std::{fmt, str::FromStr};
 use thiserror::Error;
 
 const URL_PREFIX: &str = "ipfs://";
@@ -95,8 +95,8 @@ impl Url {
 mod postgres {
     use super::IPFS;
     use bytes::BytesMut;
-    use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
     use std::error::Error;
+    use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
 
     impl ToSql for IPFS {
         fn to_sql(

@@ -1,5 +1,6 @@
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use std::{borrow::Borrow, convert::TryFrom, fmt, str::FromStr};
+use std::{borrow::Borrow, fmt, str::FromStr};
 
 use crate::{
     address::Error,
@@ -45,6 +46,14 @@ impl From<&Address> for ValidatorId {
 impl From<Address> for ValidatorId {
     fn from(address: Address) -> Self {
         Self(address)
+    }
+}
+
+impl From<&Lazy<Address>> for ValidatorId {
+    fn from(address: &Lazy<Address>) -> Self {
+        // once for the reference of &Lazy into Lazy
+        // and once for moving out of Lazy into Address
+        Self(**address)
     }
 }
 
@@ -103,7 +112,10 @@ impl TryFrom<Value> for ValidatorId {
 pub struct ValidatorDesc {
     pub id: ValidatorId,
     /// The validator fee in pro milles (per 1000)
-    /// Used to calculate the validator fee on each payout.
+    ///
+    /// Each fee is calculated based on the payout for an event.
+    ///
+    /// payout * fee / 1000 = event fee payoout
     pub fee: UnifiedNum,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     /// The address which will receive the fees
@@ -145,7 +157,7 @@ impl<T> Borrow<T> for Validator<T> {
 
 /// Validator Message Types
 pub mod messages {
-    use std::{any::type_name, convert::TryFrom, fmt, marker::PhantomData};
+    use std::{any::type_name, fmt, marker::PhantomData};
     use thiserror::Error;
 
     use crate::balances::{Balances, BalancesState, CheckedState, UncheckedState};
@@ -361,9 +373,8 @@ pub mod postgres {
     use super::ValidatorId;
     use crate::ToETHChecksum;
     use bytes::BytesMut;
-    use postgres_types::{FromSql, IsNull, ToSql, Type};
-    use std::convert::TryFrom;
     use std::error::Error;
+    use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
     impl<'a> FromSql<'a> for ValidatorId {
         fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {

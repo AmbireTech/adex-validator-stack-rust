@@ -47,24 +47,20 @@ pub mod access;
 pub mod analytics_recorder;
 pub mod application;
 pub mod db;
-// TODO AIP#61: remove the even aggregator once we've taken out the logic for AIP#61
-// pub mod event_aggregator;
-// TODO AIP#61: Remove even reducer or alter depending on our needs
-// pub mod event_reducer;
 pub mod payout;
 pub mod spender;
 
 static LAST_APPROVED_BY_CHANNEL_ID: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/last-approved/?$")
+    Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/last-approved/?$")
         .expect("The regex should be valid")
 });
 // Only the initial Regex to be matched.
 static CHANNEL_VALIDATOR_MESSAGES: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/validator-messages(/.*)?$")
+    Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/validator-messages(/.*)?$")
         .expect("The regex should be valid")
 });
 static CHANNEL_EVENTS_AGGREGATES: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events-aggregates/?$")
+    Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/events-aggregates/?$")
         .expect("The regex should be valid")
 });
 static ANALYTICS_BY_CHANNEL_ID: Lazy<Regex> = Lazy::new(|| {
@@ -84,13 +80,13 @@ static CHANNEL_SPENDER_LEAF_AND_TOTAL_DEPOSITED: Lazy<Regex> = Lazy::new(|| {
 });
 
 static INSERT_EVENTS_BY_CAMPAIGN_ID: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/v5/campaign/0x([a-zA-Z0-9]{32})/events/?$").expect("The regex should be valid")
+    Regex::new(r"^/v5/campaign/(0x[a-zA-Z0-9]{32})/events/?$").expect("The regex should be valid")
 });
 static CLOSE_CAMPAIGN_BY_CAMPAIGN_ID: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/v5/campaign/0x([a-zA-Z0-9]{32})/close/?$").expect("The regex should be valid")
+    Regex::new(r"^/v5/campaign/(0x[a-zA-Z0-9]{32})/close/?$").expect("The regex should be valid")
 });
 static CAMPAIGN_UPDATE_BY_ID: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/v5/campaign/0x([a-zA-Z0-9]{32})/?$").expect("The regex should be valid")
+    Regex::new(r"^/v5/campaign/(0x[a-zA-Z0-9]{32})/?$").expect("The regex should be valid")
 });
 static CHANNEL_ALL_SPENDER_LIMITS: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/spender/all/?$")
@@ -159,17 +155,6 @@ impl<A: Adapter + 'static> Application<A> {
         let mut response = match (req.uri().path(), req.method()) {
             ("/cfg", &Method::GET) => config(req, self).await,
             ("/channel/list", &Method::GET) => channel_list(req, self).await,
-            // For creating campaigns
-            ("/v5/campaign", &Method::POST) => {
-                let req = match AuthRequired.call(req, self).await {
-                    Ok(req) => req,
-                    Err(error) => {
-                        return map_response_error(error);
-                    }
-                };
-
-                create_campaign(req, self).await
-            }
             (route, _) if route.starts_with("/analytics") => analytics_router(req, self).await,
             // This is important because it prevents us from doing
             // expensive regex matching for routes without /channel
@@ -216,23 +201,21 @@ async fn campaigns_router<A: Adapter + 'static>(
         let req = CampaignLoad.call(req, app).await?;
 
         campaign::insert_events::handle_route(req, app).await
-    } else if let (Some(_caps), &Method::POST) =
+    } else if let (Some(caps), &Method::POST) =
         (CLOSE_CAMPAIGN_BY_CAMPAIGN_ID.captures(path), method)
     {
-        // TODO AIP#61: Close campaign:
-        // - only by creator
-        // - sets redis remaining = 0 (`newBudget = totalSpent`, i.e. `newBudget = oldBudget - remaining`)
+        let param = RouteParams(vec![caps
+            .get(1)
+            .map_or("".to_string(), |m| m.as_str().to_string())]);
+        req.extensions_mut().insert(param);
 
-        // let (is_creator, auth_uid) = match auth {
-        // Some(auth) => (auth.uid == channel.creator, auth.uid.to_string()),
-        // None => (false, Default::default()),
-        // };
-        // Closing a campaign is allowed only by the creator
-        // if has_close_event && is_creator {
-        //     return Ok(());
-        // }
+        req = Chain::new()
+            .chain(AuthRequired)
+            .chain(CampaignLoad)
+            .apply(req, app)
+            .await?;
 
-        Err(ResponseError::NotFound)
+        campaign::close_campaign(req, app).await
     } else if method == Method::POST && path == "/v5/campaign/list" {
         req = AuthRequired.call(req, app).await?;
 
@@ -466,7 +449,7 @@ pub fn bad_validation_response(response_body: String) -> Response<Body> {
         validation: vec![response_body],
     };
 
-    let body = Body::from(serde_json::to_string(&error_response).expect("serialise err response"));
+    let body = Body::from(serde_json::to_string(&error_response).expect("serialize err response"));
 
     let mut response = Response::new(body);
     response

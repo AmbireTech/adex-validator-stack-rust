@@ -1,5 +1,4 @@
 use std::{
-    convert::TryFrom,
     fmt,
     iter::Sum,
     ops::{Add, AddAssign, Div, Mul, Sub},
@@ -323,13 +322,11 @@ where
 pub mod postgres {
     use super::BigNum;
     use bytes::BytesMut;
-    use postgres_types::{FromSql, IsNull, ToSql, Type};
     use std::error::Error;
+    use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
     impl<'a> FromSql<'a> for BigNum {
         fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<BigNum, Box<dyn Error + Sync + Send>> {
-            use std::convert::TryInto;
-
             let str_slice = <&str as FromSql>::from_sql(ty, raw)?;
 
             Ok(str_slice.try_into()?)

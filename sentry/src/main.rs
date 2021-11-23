@@ -8,16 +8,18 @@ use primitives::{
     adapter::{DummyAdapterOptions, KeystoreOptions},
     config::configuration,
     postgres::POSTGRES_CONFIG,
-    util::tests::prep_db::{AUTH, IDS},
+    util::{
+        logging::new_logger,
+        tests::prep_db::{AUTH, IDS},
+    },
     ValidatorId,
 };
 use sentry::{
-    application::{logger, run},
     db::{postgres_connection, redis_connection, setup_migrations, CampaignRemaining},
     Application,
 };
 use slog::info;
-use std::{convert::TryFrom, env, net::SocketAddr};
+use std::{env, net::SocketAddr};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -95,7 +97,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         _ => panic!("You can only use `ethereum` & `dummy` adapters!"),
     };
 
-    let logger = logger("sentry");
+    let logger = new_logger("sentry");
     let redis = redis_connection(env_config.redis_url).await?;
     info!(&logger, "Checking connection and applying migrations...");
     // Check connection and setup migrations before setting up Postgres
@@ -107,31 +109,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match adapter {
         AdapterTypes::EthereumAdapter(adapter) => {
-            run(
-                Application::new(
-                    *adapter,
-                    config,
-                    logger,
-                    redis,
-                    postgres,
-                    campaign_remaining,
-                ),
-                socket_addr,
+            Application::new(
+                *adapter,
+                config,
+                logger,
+                redis,
+                postgres,
+                campaign_remaining,
             )
+            .run(socket_addr)
             .await
         }
         AdapterTypes::DummyAdapter(adapter) => {
-            run(
-                Application::new(
-                    *adapter,
-                    config,
-                    logger,
-                    redis,
-                    postgres,
-                    campaign_remaining,
-                ),
-                socket_addr,
+            Application::new(
+                *adapter,
+                config,
+                logger,
+                redis,
+                postgres,
+                campaign_remaining,
             )
+            .run(socket_addr)
             .await
         }
     };

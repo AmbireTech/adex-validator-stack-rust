@@ -1,14 +1,13 @@
 use crate::{
-    db::{analytics::insert_analytics, DbPool, PoolError},
+    db::{analytics::update_analytics, DbPool, PoolError},
     Session,
 };
-use chrono::{Timelike, Utc};
 use primitives::{
     analytics::OperatingSystem,
     sentry::{DateHour, Event, UpdateAnalytics},
     Address, Campaign, UnifiedNum,
 };
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 /// Validator fees will not be included in analytics
 pub async fn record(
@@ -22,33 +21,27 @@ pub async fn record(
         .as_ref()
         .map(|os| OperatingSystem::map_os(os))
         .unwrap_or_default();
-    let time = {
-        let full_utc = Utc::now();
+    // This DateHour is used for all events that are being recorded
+    let datehour = DateHour::now();
 
-        // leave only the Hour portion and erase the minutes & seconds
-        DateHour {
-            date: full_utc.date().and_hms(0, 0, 0), // TODO: Fix
-            hour: full_utc.hour(),
-        }
-    };
+    let mut batch_update = HashMap::<Event, UpdateAnalytics>::new();
 
-    let mut analytics_set: HashSet<UpdateAnalytics> = HashSet::new();
     for (event, _payout_addr, payout_amount) in events_with_payouts {
         let event_type = event.to_string();
         let (publisher, ad_unit, referrer, ad_slot, ad_slot_type) = {
-            let (publisher, event_ad_unit, referrer, ad_slot) = match event {
+            let (publisher, event_ad_unit, referrer, ad_slot) = match &event {
                 Event::Impression {
                     publisher,
                     ad_unit,
                     referrer,
                     ad_slot,
-                } => (publisher, ad_unit, referrer, ad_slot),
+                } => (*publisher, *ad_unit, referrer.clone(), *ad_slot),
                 Event::Click {
                     publisher,
                     ad_unit,
                     referrer,
                     ad_slot,
-                } => (publisher, ad_unit, referrer, ad_slot),
+                } => (*publisher, *ad_unit, referrer.clone(), *ad_slot),
             };
             let ad_unit = event_ad_unit.and_then(|ipfs| {
                 campaign
@@ -70,36 +63,32 @@ pub async fn record(
             (None, None) => None,
         };
 
-        // DB: Insert or Update all events
-        let mut analytics = UpdateAnalytics {
-            campaign_id: campaign.id,
-            time,
-            ad_unit,
-            ad_slot,
-            ad_slot_type,
-            advertiser: campaign.creator,
-            publisher,
-            hostname,
-            country: session.country.to_owned(),
-            os_name: os_name.clone(),
-            event_type,
-            amount_to_add: payout_amount,
-            count_to_add: 1,
-        };
         // TODO: tidy up this operation
-        match analytics_set.get(&analytics) {
-            Some(a) => {
-                analytics.amount_to_add += &a.amount_to_add;
-                analytics.count_to_add = a.count_to_add + 1;
-                let _ = &analytics_set.replace(a.to_owned());
-            }
-            None => {
-                let _ = &analytics_set.insert(analytics);
-            }
-        }
+        batch_update
+            .entry(event)
+            .and_modify(|analytics| {
+                analytics.amount_to_add += &payout_amount;
+                analytics.count_to_add += 1;
+            })
+            .or_insert_with(|| UpdateAnalytics {
+                campaign_id: campaign.id,
+                time: datehour,
+                ad_unit,
+                ad_slot,
+                ad_slot_type,
+                advertiser: campaign.creator,
+                publisher,
+                hostname,
+                country: session.country.to_owned(),
+                os_name: os_name.clone(),
+                event_type,
+                amount_to_add: payout_amount,
+                count_to_add: 1,
+            });
     }
-    for a in analytics_set.iter() {
-        insert_analytics(pool, a).await?;
+
+    for (_event, update) in batch_update.into_iter() {
+        update_analytics(pool, update).await?;
     }
     Ok(())
 }
@@ -108,16 +97,26 @@ pub async fn record(
 mod test {
     use super::*;
     use primitives::{
+        sentry::Analytics,
         util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN},
         UnifiedNum,
     };
 
-    use crate::db::{
-        analytics::find_analytics,
-        tests_postgres::{setup_test_migrations, DATABASE_POOL},
-    };
+    use crate::db::tests_postgres::{setup_test_migrations, DATABASE_POOL};
 
-    // NOTE: The test could fail if it's ran at --:59:59
+    // Currently used for testing
+    async fn get_all_analytics(pool: &DbPool) -> Result<Vec<Analytics>, PoolError> {
+        let client = pool.get().await?;
+
+        let query = "SELECT * FROM analytics";
+        let stmt = client.prepare(query).await?;
+
+        let rows = client.query(&stmt, &[]).await?;
+
+        let event_analytics: Vec<Analytics> = rows.iter().map(Analytics::from).collect();
+        Ok(event_analytics)
+    }
+
     #[tokio::test]
     async fn test_analytics_recording() {
         let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
@@ -125,6 +124,37 @@ mod test {
         setup_test_migrations(database.pool.clone())
             .await
             .expect("Migrations should succeed");
+
+        let test_events = vec![
+            (
+                "click_empty".into(),
+                (
+                    Event::Click {
+                        publisher: ADDRESSES["publisher"],
+                        ad_unit: None,
+                        ad_slot: None,
+                        referrer: None,
+                    },
+                    ADDRESSES["publisher"],
+                    UnifiedNum::from_u64(1_000_000),
+                ),
+            ),
+            (
+                "impression_empty".into(),
+                (
+                    Event::Impression {
+                        publisher: ADDRESSES["publisher"],
+                        ad_unit: None,
+                        ad_slot: None,
+                        referrer: None,
+                    },
+                    ADDRESSES["publisher"],
+                    UnifiedNum::from_u64(1_000_000),
+                ),
+            ),
+        ]
+        .into_iter()
+        .collect::<HashMap<String, _>>();
 
         let campaign = DUMMY_CAMPAIGN.clone();
         let session = Session {
@@ -134,48 +164,27 @@ mod test {
             os: None,
         };
 
-        let click_event = Event::Click {
-            publisher: ADDRESSES["leader"],
-            ad_unit: None,
-            ad_slot: None,
-            referrer: None,
-        };
-
-        let impression_event = Event::Impression {
-            publisher: ADDRESSES["leader"],
-            ad_unit: None,
-            ad_slot: None,
-            referrer: None,
-        };
-
         let input_events = vec![
-            (
-                click_event,
-                ADDRESSES["creator"],
-                UnifiedNum::from_u64(1_000_000),
-            ),
-            (
-                impression_event,
-                ADDRESSES["creator"],
-                UnifiedNum::from_u64(1_000_000),
-            ),
+            test_events["click_empty"].clone(),
+            test_events["impression_empty"].clone(),
         ];
 
         record(&database.clone(), &campaign, &session, input_events.clone())
             .await
             .expect("should record");
 
-        let analytics = find_analytics(&database.pool)
+        let analytics = get_all_analytics(&database.pool)
             .await
-            .expect("should find analytics");
+            .expect("should get all analytics");
+
         let click_analytics = analytics
             .iter()
             .find(|a| a.event_type == "CLICK")
-            .expect("There should be a click event");
+            .expect("There should be a click Analytics");
         let impression_analytics = analytics
             .iter()
             .find(|a| a.event_type == "IMPRESSION")
-            .expect("There should be an impression event");
+            .expect("There should be an impression Analytics");
         assert_eq!(
             click_analytics.payout_amount,
             UnifiedNum::from_u64(1_000_000)
@@ -192,7 +201,7 @@ mod test {
             .await
             .expect("should record");
 
-        let analytics = find_analytics(&database.pool)
+        let analytics = get_all_analytics(&database.pool)
             .await
             .expect("should find analytics");
         let click_analytics = analytics

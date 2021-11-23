@@ -144,6 +144,15 @@ mod campaign_id {
         use super::*;
 
         #[test]
+        fn parse_and_display_campaign_id() {
+            let str_id = "0x936da01f9abd4d9d80c702af85c822a8";
+
+            let campaign_id: CampaignId = str_id.parse().expect("Should parse");
+
+            assert_eq!(str_id, &campaign_id.to_string())
+        }
+
+        #[test]
         fn de_serializes_campaign_id() {
             let id = CampaignId::new();
 
@@ -375,8 +384,8 @@ mod postgres {
 
     use super::{Active, Campaign, CampaignId, PricingBounds, Validators};
     use bytes::BytesMut;
-    use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
     use std::error::Error;
+    use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
     use tokio_postgres::Row;
 
     impl From<&Row> for Campaign {
