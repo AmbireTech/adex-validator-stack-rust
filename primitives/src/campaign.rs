@@ -144,6 +144,15 @@ mod campaign_id {
         use super::*;
 
         #[test]
+        fn parse_and_display_campaign_id() {
+            let str_id = "0x936da01f9abd4d9d80c702af85c822a8";
+
+            let campaign_id: CampaignId = str_id.parse().expect("Should parse");
+
+            assert_eq!(str_id, &campaign_id.to_string())
+        }
+
+        #[test]
         fn de_serializes_campaign_id() {
             let id = CampaignId::new();
 

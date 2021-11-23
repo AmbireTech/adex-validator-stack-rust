@@ -95,6 +95,7 @@ mod test {
     use super::*;
     use primitives::{
         campaign::{Pricing, PricingBounds},
+        test_util::PUBLISHER,
         util::tests::{
             discard_logger,
             prep_db::{ADDRESSES, DUMMY_CAMPAIGN},
@@ -155,7 +156,7 @@ mod test {
         });
 
         let event = Event::Click {
-            publisher: ADDRESSES["leader"],
+            publisher: *PUBLISHER,
             ad_unit: None,
             ad_slot: None,
             referrer: None,
@@ -170,7 +171,7 @@ mod test {
 
         let payout = get_payout(&logger, &campaign, &event, &session).expect("Should be OK");
 
-        let expected_option = Some((ADDRESSES["leader"], 23.into()));
+        let expected_option = Some((*PUBLISHER, 23.into()));
         assert_eq!(expected_option, payout, "pricingBounds: click event");
     }
 }

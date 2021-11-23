@@ -51,16 +51,16 @@ pub mod payout;
 pub mod spender;
 
 static LAST_APPROVED_BY_CHANNEL_ID: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/last-approved/?$")
+    Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/last-approved/?$")
         .expect("The regex should be valid")
 });
 // Only the initial Regex to be matched.
 static CHANNEL_VALIDATOR_MESSAGES: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/validator-messages(/.*)?$")
+    Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/validator-messages(/.*)?$")
         .expect("The regex should be valid")
 });
 static CHANNEL_EVENTS_AGGREGATES: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events-aggregates/?$")
+    Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/events-aggregates/?$")
         .expect("The regex should be valid")
 });
 static ANALYTICS_BY_CHANNEL_ID: Lazy<Regex> = Lazy::new(|| {
@@ -80,13 +80,13 @@ static CHANNEL_SPENDER_LEAF_AND_TOTAL_DEPOSITED: Lazy<Regex> = Lazy::new(|| {
 });
 
 static INSERT_EVENTS_BY_CAMPAIGN_ID: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/v5/campaign/0x([a-zA-Z0-9]{32})/events/?$").expect("The regex should be valid")
+    Regex::new(r"^/v5/campaign/(0x[a-zA-Z0-9]{32})/events/?$").expect("The regex should be valid")
 });
 static CLOSE_CAMPAIGN_BY_CAMPAIGN_ID: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/v5/campaign/0x([a-zA-Z0-9]{32})/close/?$").expect("The regex should be valid")
+    Regex::new(r"^/v5/campaign/(0x[a-zA-Z0-9]{32})/close/?$").expect("The regex should be valid")
 });
 static CAMPAIGN_UPDATE_BY_ID: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/v5/campaign/0x([a-zA-Z0-9]{32})/?$").expect("The regex should be valid")
+    Regex::new(r"^/v5/campaign/(0x[a-zA-Z0-9]{32})/?$").expect("The regex should be valid")
 });
 static CHANNEL_ALL_SPENDER_LIMITS: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/spender/all/?$")
@@ -155,17 +155,6 @@ impl<A: Adapter + 'static> Application<A> {
         let mut response = match (req.uri().path(), req.method()) {
             ("/cfg", &Method::GET) => config(req, self).await,
             ("/channel/list", &Method::GET) => channel_list(req, self).await,
-            // For creating campaigns
-            ("/v5/campaign", &Method::POST) => {
-                let req = match AuthRequired.call(req, self).await {
-                    Ok(req) => req,
-                    Err(error) => {
-                        return map_response_error(error);
-                    }
-                };
-
-                create_campaign(req, self).await
-            }
             (route, _) if route.starts_with("/analytics") => analytics_router(req, self).await,
             // This is important because it prevents us from doing
             // expensive regex matching for routes without /channel
@@ -507,7 +496,7 @@ pub fn bad_validation_response(response_body: String) -> Response<Body> {
         validation: vec![response_body],
     };
 
-    let body = Body::from(serde_json::to_string(&error_response).expect("serialise err response"));
+    let body = Body::from(serde_json::to_string(&error_response).expect("serialize err response"));
 
     let mut response = Response::new(body);
     response

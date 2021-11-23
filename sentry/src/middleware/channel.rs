@@ -39,6 +39,7 @@ fn channel_load<'a, A: Adapter + 'static>(
 
         let channel_id = ChannelId::from_hex(id)
             .map_err(|_| ResponseError::BadRequest("Wrong Channel Id".to_string()))?;
+
         let channel = get_channel_by_id(&app.pool, &channel_id)
             .await?
             .ok_or(ResponseError::NotFound)?;

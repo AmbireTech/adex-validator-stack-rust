@@ -3720,6 +3720,7 @@ dependencies = [
  "chrono",
  "futures",
  "once_cell",
+ "pretty_assertions",
  "primitives",
  "reqwest",
  "sentry",
@@ -3727,6 +3728,7 @@ dependencies = [
  "slog",
  "subprocess",
  "tokio",
+ "validator_worker",
  "web3",
 ]
 

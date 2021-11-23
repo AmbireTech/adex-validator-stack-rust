@@ -44,47 +44,50 @@ pub async fn tick<A: Adapter + 'static>(
     token: &TokenInfo,
 ) -> Result<TickStatus, Error<A::AdapterError>> {
     // Check if Accounting != than latest NewState (Accounting.balances != NewState.balances)
-    let should_generate_new_state = {
-        let latest_new_state = sentry
-            .get_our_latest_msg(channel.id(), &["NewState"])
-            .await?
-            .map(NewState::<CheckedState>::try_from)
-            .transpose()?;
+    let should_generate_new_state =
+        {
+            // If the accounting is empty, then we don't need to create a NewState
+            if accounting_balances.earners.is_empty() || accounting_balances.spenders.is_empty() {
+                false
+            } else {
+                let latest_new_state = sentry
+                    .get_our_latest_msg(channel.id(), &["NewState"])
+                    .await?
+                    .map(NewState::<CheckedState>::try_from)
+                    .transpose()?;
 
-        match latest_new_state {
-            Some(new_state) => {
-                let check_spenders =
-                    accounting_balances
-                        .spenders
-                        .iter()
-                        .any(|(spender, accounting_balance)| {
-                            match new_state.balances.spenders.get(spender) {
-                                Some(prev_balance) => accounting_balance > prev_balance,
-                                // if there is no previous balance for this Spender then it should generate a `NewState`
-                                // this includes adding an empty Spender to be included in the MerkleTree
-                                None => true,
-                            }
-                        });
+                match latest_new_state {
+                    Some(new_state) => {
+                        let check_spenders = accounting_balances.spenders.iter().any(
+                            |(spender, accounting_balance)| {
+                                match new_state.balances.spenders.get(spender) {
+                                    Some(prev_balance) => accounting_balance > prev_balance,
+                                    // if there is no previous balance for this Spender then it should generate a `NewState`
+                                    // this includes adding an empty Spender to be included in the MerkleTree
+                                    None => true,
+                                }
+                            },
+                        );
 
-                let check_earners =
-                    accounting_balances
-                        .earners
-                        .iter()
-                        .any(|(earner, accounting_balance)| {
-                            match new_state.balances.earners.get(earner) {
-                                Some(prev_balance) => accounting_balance > prev_balance,
-                                // if there is no previous balance for this Earner then it should generate a `NewState`
-                                // this includes adding an empty Earner to be included in the MerkleTree
-                                None => true,
-                            }
-                        });
+                        let check_earners = accounting_balances.earners.iter().any(
+                            |(earner, accounting_balance)| {
+                                match new_state.balances.earners.get(earner) {
+                                    Some(prev_balance) => accounting_balance > prev_balance,
+                                    // if there is no previous balance for this Earner then it should generate a `NewState`
+                                    // this includes adding an empty Earner to be included in the MerkleTree
+                                    None => true,
+                                }
+                            },
+                        );
 
-                check_spenders || check_earners
+                        check_spenders || check_earners
+                    }
+                    // if no previous `NewState` (i.e. `Channel` is new) - it should generate a `NewState`
+                    // this is only valid if the Accounting balances are not empty!
+                    None => true,
+                }
             }
-            // if no previous `NewState` (i.e. `Channel` is new) - it should generate a `NewState`
-            None => true,
-        }
-    };
+        };
 
     // Create a `NewState` if balances have changed
     let new_state = if should_generate_new_state {

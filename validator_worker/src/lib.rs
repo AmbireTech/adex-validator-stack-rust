@@ -11,6 +11,7 @@ use primitives::{
 use thiserror::Error;
 
 pub use self::sentry_interface::SentryApi;
+pub use worker::Worker;
 
 pub mod channel;
 pub mod error;

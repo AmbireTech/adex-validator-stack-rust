@@ -324,7 +324,7 @@ pub mod postgres {
             ty: &Type,
             w: &mut BytesMut,
         ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-            let string = format!("0x{}", hex::encode(self));
+            let string = self.to_string();
 
             <String as ToSql>::to_sql(&string, ty, w)
         }

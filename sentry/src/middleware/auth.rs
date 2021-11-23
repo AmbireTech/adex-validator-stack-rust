@@ -137,8 +137,10 @@ mod test {
 
     use deadpool::managed::Object;
 
-    use crate::db::redis_pool::Manager;
-    use crate::{db::redis_pool::TESTS_POOL, Session};
+    use crate::{
+        db::redis_pool::{Manager, TESTS_POOL},
+        Session,
+    };
 
     use super::*;
 

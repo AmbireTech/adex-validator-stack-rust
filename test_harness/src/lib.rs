@@ -13,7 +13,13 @@ use adapter::ethereum::{
 };
 use deposits::Deposit;
 use once_cell::sync::Lazy;
-use primitives::{adapter::KeystoreOptions, config::TokenInfo, Address, Config};
+use primitives::{
+    adapter::KeystoreOptions,
+    config::TokenInfo,
+    test_util::{FOLLOWER, LEADER},
+    util::ApiUrl,
+    Address, Config,
+};
 use web3::{contract::Contract, transports::Http, types::H160, Web3};
 
 pub mod deposits;
@@ -24,40 +30,31 @@ pub static GANACHE_CONFIG: Lazy<Config> = Lazy::new(|| {
 });
 
 /// ganache-cli setup with deployed contracts using the snapshot directory
+/// Uses the [`GANACHE_CONFIG`] & [`GANACHE_URL`] statics to init the contracts
 pub static SNAPSHOT_CONTRACTS: Lazy<Contracts> = Lazy::new(|| {
-    use primitives::BigNum;
-    use std::num::NonZeroU8;
-
     let web3 = Web3::new(Http::new(GANACHE_URL).expect("failed to init transport"));
 
-    let token_address = "0x9db7bff788522dbe8fa2e8cbd568a58c471ccd5e"
-        .parse::<Address>()
-        .unwrap();
+    let (token_address, token_info) = GANACHE_CONFIG
+        .token_address_whitelist
+        .iter()
+        .next()
+        .expect("Shanpshot token should be included in Ganache config");
+
     let token = (
-        // copied from deploy_token_contract
-        TokenInfo {
-            min_token_units_for_deposit: BigNum::from(10_u64.pow(18)),
-            precision: NonZeroU8::new(18).expect("should create NonZeroU8"),
-            // multiplier = 10^14 - 10^18 (token precision) = 10^-4
-            // min_validator_fee = 1' * 10^-4 = 0.000_1
-            min_validator_fee: BigNum::from(100_000_000_000_000),
-        },
-        token_address,
+        // use Ganache Config
+        token_info.clone(),
+        *token_address,
         Contract::from_json(web3.eth(), H160(token_address.to_bytes()), &MOCK_TOKEN_ABI).unwrap(),
     );
 
-    let sweeper_address = "0xdd41b0069256a28972458199a3c9cf036384c156"
-        .parse::<Address>()
-        .unwrap();
+    let sweeper_address = Address::from(GANACHE_CONFIG.sweeper_address);
 
     let sweeper = (
         sweeper_address,
         Contract::from_json(web3.eth(), H160(sweeper_address.to_bytes()), &SWEEPER_ABI).unwrap(),
     );
 
-    let outpace_address = "0xcb097e455b7159f902e2eb45562fc397ae6b0f3d"
-        .parse::<Address>()
-        .unwrap();
+    let outpace_address = Address::from(GANACHE_CONFIG.outpace_address);
 
     let outpace = (
         outpace_address,
@@ -76,45 +73,57 @@ pub struct TestValidator {
     pub address: Address,
     pub keystore: KeystoreOptions,
     pub sentry_config: sentry::application::Config,
-    /// Prefix for the loggers
-    pub logger_prefix: String,
+    /// Sentry REST API url
+    pub sentry_url: ApiUrl,
+    /// Used for the _Sentry REST API_ [`sentry::Application`] as well as the _Validator worker_ [`validator_worker::worker::Args`]
+    pub config: Config,
+    /// Prefix for sentry logger
+    pub sentry_logger_prefix: String,
+    /// Prefix for validator worker logger
+    pub worker_logger_prefix: String,
     /// Postgres DB name
     /// The rest of the Postgres values are taken from env. variables
     pub db_name: String,
 }
 
-pub static VALIDATORS: Lazy<HashMap<&'static str, TestValidator>> = Lazy::new(|| {
-    use adapter::ethereum::test_util::GANACHE_KEYSTORES;
+pub static VALIDATORS: Lazy<HashMap<Address, TestValidator>> = Lazy::new(|| {
+    use adapter::ethereum::test_util::KEYSTORES;
     use primitives::config::Environment;
 
     vec![
         (
-            "leader",
+            *LEADER,
             TestValidator {
-                address: GANACHE_KEYSTORES["leader"].0,
-                keystore: GANACHE_KEYSTORES["leader"].1.clone(),
+                address: *LEADER,
+                keystore: KEYSTORES[&LEADER].clone(),
                 sentry_config: sentry::application::Config {
                     env: Environment::Development,
                     port: 8005,
                     ip_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                     redis_url: "redis://127.0.0.1:6379/1".parse().unwrap(),
                 },
-                logger_prefix: "sentry-leader".into(),
+                config: GANACHE_CONFIG.clone(),
+                sentry_url: "http://localhost:8005".parse().expect("Valid Sentry URL"),
+                sentry_logger_prefix: "sentry-leader".into(),
+                worker_logger_prefix: "worker-leader".into(),
                 db_name: "harness_leader".into(),
             },
         ),
         (
-            "follower",
+            *FOLLOWER,
             TestValidator {
-                address: GANACHE_KEYSTORES["follower"].0,
-                keystore: GANACHE_KEYSTORES["follower"].1.clone(),
+                address: *FOLLOWER,
+                keystore: KEYSTORES[&FOLLOWER].clone(),
                 sentry_config: sentry::application::Config {
                     env: Environment::Development,
                     port: 8006,
                     ip_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                     redis_url: "redis://127.0.0.1:6379/2".parse().unwrap(),
                 },
-                logger_prefix: "sentry-follower".into(),
+                config: GANACHE_CONFIG.clone(),
+                sentry_url: "http://localhost:8006".parse().expect("Valid Sentry URL"),
+                sentry_logger_prefix: "sentry-follower".into(),
+                worker_logger_prefix: "worker-follower".into(),
                 db_name: "harness_follower".into(),
             },
         ),
@@ -204,14 +213,20 @@ mod tests {
 
     use super::*;
     use adapter::ethereum::{
-        test_util::{GANACHE_ADDRESSES, GANACHE_KEYSTORES, GANACHE_URL},
+        test_util::{GANACHE_URL, KEYSTORES},
         EthereumAdapter,
     };
     use primitives::{
-        adapter::Adapter, sentry::campaign_create::CreateCampaign, util::ApiUrl, BigNum, Campaign,
-        Channel, ChannelId, UnifiedNum,
+        adapter::Adapter,
+        balances::CheckedState,
+        sentry::{campaign_create::CreateCampaign, AccountingResponse, Event, SuccessResponse},
+        spender::Spender,
+        test_util::{ADVERTISER, DUMMY_AD_UNITS, DUMMY_IPFS, GUARDIAN, GUARDIAN_2, PUBLISHER},
+        util::{logging::new_logger, ApiUrl},
+        Balances, BigNum, Campaign, CampaignId, Channel, ChannelId, UnifiedNum,
     };
     use reqwest::{Client, StatusCode};
+    use validator_worker::{sentry_interface::Validator, worker::Worker, SentryApi};
 
     #[tokio::test]
     #[ignore = "We use a snapshot, however, we have left this test for convenience"]
@@ -232,26 +247,30 @@ mod tests {
         };
 
         let channel = Channel {
-            leader: VALIDATORS["leader"].address.into(),
-            follower: VALIDATORS["follower"].address.into(),
-            guardian: GANACHE_ADDRESSES["guardian"],
+            leader: VALIDATORS[&LEADER].address.into(),
+            follower: VALIDATORS[&FOLLOWER].address.into(),
+            guardian: *GUARDIAN,
             token: SNAPSHOT_CONTRACTS.token.1,
             nonce: 0_u64.into(),
         };
 
         let leader_desc = ValidatorDesc {
-            id: VALIDATORS["leader"].address.into(),
-            url: "http://localhost:8005".to_string(),
-            // fee per 1000 (pro mille) = 0.03000000 (UnifiedNum)
-            fee: 3_000_000.into(),
+            id: VALIDATORS[&LEADER].address.into(),
+            url: VALIDATORS[&LEADER].sentry_url.to_string(),
+            // min_validator_fee for token: 0.000_010
+            // fee per 1000 (pro mille) = 0.00003000 (UnifiedNum)
+            // fee per 1 payout: payout * fee / 1000 = payout * 0.00000003
+            fee: 3_000.into(),
             fee_addr: None,
         };
 
         let follower_desc = ValidatorDesc {
-            id: VALIDATORS["follower"].address.into(),
-            url: "http://localhost:8006".to_string(),
-            // fee per 1000 (pro mille) = 0.02000000 (UnifiedNum)
-            fee: 2_000_000.into(),
+            id: VALIDATORS[&FOLLOWER].address.into(),
+            url: VALIDATORS[&FOLLOWER].sentry_url.to_string(),
+            // min_validator_fee for token: 0.000_010
+            // fee per 1000 (pro mille) = 0.00002000 (UnifiedNum)
+            // fee per 1 payout: payout * fee / 1000 = payout * 0.00000002
+            fee: 2_000.into(),
             fee_addr: None,
         };
 
@@ -262,31 +281,31 @@ mod tests {
                 .parse()
                 .expect("Should parse"),
             channel,
-            creator: GANACHE_ADDRESSES["advertiser"],
+            creator: *ADVERTISER,
             // 20.00000000
             budget: UnifiedNum::from(200_000_000),
             validators,
             title: Some("Dummy Campaign".to_string()),
             pricing_bounds: Some(PricingBounds {
                 impression: Some(Pricing {
-                    // 0.00000100
-                    // Per 1000 = 0.00100000
-                    min: 100.into(),
-                    // 0.00000200
-                    // Per 1000 = 0.00200000
-                    max: 200.into(),
+                    // 0.00003000
+                    // Per 1000 = 0.03000000
+                    min: 3_000.into(),
+                    // 0.00005000
+                    // Per 1000 = 0.05000000
+                    max: 5_000.into(),
                 }),
                 click: Some(Pricing {
-                    // 0.00000300
-                    // Per 1000 = 0.00300000
-                    min: 300.into(),
-                    // 0.00000500
-                    // Per 1000 = 0.00500000
-                    max: 500.into(),
+                    // 0.00006000
+                    // Per 1000 = 0.06000000
+                    min: 6_000.into(),
+                    // 0.00010000
+                    // Per 1000 = 0.10000000
+                    max: 10_000.into(),
                 }),
             }),
             event_submission: Some(EventSubmission { allow: vec![] }),
-            ad_units: vec![],
+            ad_units: vec![DUMMY_AD_UNITS[0].clone(), DUMMY_AD_UNITS[1].clone()],
             targeting_rules: Rules::new(),
             created: Utc.ymd(2021, 2, 1).and_hms(7, 0, 0),
             active: Active {
@@ -311,28 +330,28 @@ mod tests {
         };
 
         let channel = Channel {
-            leader: VALIDATORS["follower"].address.into(),
-            follower: VALIDATORS["leader"].address.into(),
-            guardian: GANACHE_ADDRESSES["guardian2"],
+            leader: VALIDATORS[&FOLLOWER].address.into(),
+            follower: VALIDATORS[&LEADER].address.into(),
+            guardian: *GUARDIAN_2,
             token: SNAPSHOT_CONTRACTS.token.1,
             nonce: 0_u64.into(),
         };
 
-        // Uses the VALIDATORS["follower"] as the Leader for this Channel
+        // Uses the VALIDATORS[&FOLLOWER] as the Leader for this Channel
         // switches the URL as well
         let leader_desc = ValidatorDesc {
-            id: VALIDATORS["follower"].address.into(),
-            url: "http://localhost:8006".to_string(),
+            id: VALIDATORS[&FOLLOWER].address.into(),
+            url: VALIDATORS[&FOLLOWER].sentry_url.to_string(),
             // fee per 1000 (pro mille) = 0.10000000 (UnifiedNum)
             fee: 10_000_000.into(),
             fee_addr: None,
         };
 
-        // Uses the VALIDATORS["leader"] as the Follower for this Channel
+        // Uses the VALIDATORS[&LEADER] as the Follower for this Channel
         // switches the URL as well
         let follower_desc = ValidatorDesc {
-            id: VALIDATORS["leader"].address.into(),
-            url: "http://localhost:8005".to_string(),
+            id: VALIDATORS[&LEADER].address.into(),
+            url: VALIDATORS[&LEADER].sentry_url.to_string(),
             // fee per 1000 (pro mille) = 0.05000000 (UnifiedNum)
             fee: 5_000_000.into(),
             fee_addr: None,
@@ -345,27 +364,23 @@ mod tests {
                 .parse()
                 .expect("Should parse"),
             channel,
-            creator: GANACHE_ADDRESSES["advertiser"],
+            creator: *ADVERTISER,
             // 20.00000000
             budget: UnifiedNum::from(2_000_000_000),
             validators,
             title: Some("Dummy Campaign".to_string()),
             pricing_bounds: Some(PricingBounds {
                 impression: Some(Pricing {
-                    // 0.00000100
-                    // Per 1000 = 0.00100000
-                    min: 100.into(),
-                    // 0.00000200
-                    // Per 1000 = 0.00200000
-                    max: 200.into(),
+                    // 0.00001000
+                    min: 1_000.into(),
+                    // 0.00002000
+                    max: 2_000.into(),
                 }),
                 click: Some(Pricing {
-                    // 0.00000300
-                    // Per 1000 = 0.00300000
-                    min: 300.into(),
-                    // 0.00000500
-                    // Per 1000 = 0.00500000
-                    max: 500.into(),
+                    // 0.00003000
+                    min: 3_000.into(),
+                    // 0.00005000
+                    max: 5_000.into(),
                 }),
             }),
             event_submission: Some(EventSubmission { allow: vec![] }),
@@ -385,31 +400,16 @@ mod tests {
         let setup = Setup { web3 };
         // Use snapshot contracts
         let contracts = SNAPSHOT_CONTRACTS.clone();
+        // let contracts = setup.deploy_contracts().await;
 
-        let leader = VALIDATORS["leader"].clone();
-        let follower = VALIDATORS["follower"].clone();
+        let leader = VALIDATORS[&LEADER].clone();
+        let follower = VALIDATORS[&FOLLOWER].clone();
 
-        // let channel_1 = Channel {
-        //     leader: leader.address.into(),
-        //     follower: follower.address.into(),
-        //     guardian: GANACHE_ADDRESSES["guardian"].into(),
-        //     token: contracts.token.1,
-        //     nonce: 0_u64.into(),
-        // };
-
-        // // switch the roles of the 2 validators & use a new guardian
-        // let channel_2 = Channel {
-        //     leader: follower.address.into(),
-        //     follower: leader.address.into(),
-        //     guardian: GANACHE_ADDRESSES["guardian2"].into(),
-        //     token: contracts.token.1,
-        //     nonce: 1_u64.into(),
-        // };
         let token_precision = contracts.token.0.precision.get();
 
         // We use the Advertiser's `EthereumAdapter::get_auth` for authentication!
         let mut advertiser_adapter =
-            EthereumAdapter::init(GANACHE_KEYSTORES["advertiser"].1.clone(), &GANACHE_CONFIG)
+            EthereumAdapter::init(KEYSTORES[&ADVERTISER].clone(), &GANACHE_CONFIG)
                 .expect("Should initialize creator adapter");
         advertiser_adapter
             .unlock()
@@ -417,8 +417,64 @@ mod tests {
         let advertiser_adapter = advertiser_adapter;
 
         // setup Sentry & returns Adapter
-        let leader_adapter = setup_sentry(leader).await;
-        let follower_adapter = setup_sentry(follower).await;
+        let leader_adapter = setup_sentry(&leader).await;
+        let follower_adapter = setup_sentry(&follower).await;
+
+        let leader_sentry = {
+            // should get self Auth from Leader's EthereumAdapter
+            let leader_auth = leader_adapter
+                .get_auth(&leader_adapter.whoami())
+                .expect("Get authentication");
+            let whoami_validator = Validator {
+                url: leader.sentry_url.clone(),
+                token: leader_auth,
+            };
+
+            SentryApi::new(
+                leader_adapter.clone(),
+                new_logger(&leader.worker_logger_prefix),
+                leader.config.clone(),
+                whoami_validator,
+            )
+            .expect("Should create new SentryApi for the Leader Worker")
+        };
+
+        let follower_sentry = {
+            // should get self Auth from Follower's EthereumAdapter
+            let follower_auth = follower_adapter
+                .get_auth(&follower_adapter.whoami())
+                .expect("Get authentication");
+            let whoami_validator = Validator {
+                url: follower.sentry_url.clone(),
+                token: follower_auth,
+            };
+
+            SentryApi::new(
+                follower_adapter.clone(),
+                new_logger(&follower.worker_logger_prefix),
+                follower.config.clone(),
+                whoami_validator,
+            )
+            .expect("Should create new SentryApi for the Leader Worker")
+        };
+
+        // check Campaign Leader & Follower urls
+        // they should be the same as the test validators
+        {
+            let campaign_leader_url = CAMPAIGN_1
+                .leader()
+                .expect("Channel.leader should match a Campaign validator!")
+                .try_api_url()
+                .expect("Valid url");
+            let campaign_follower_url = CAMPAIGN_1
+                .follower()
+                .expect("Channel.follower should match a Campaign validator!")
+                .try_api_url()
+                .expect("Valid url");
+
+            assert_eq!(&leader.sentry_url, &campaign_leader_url);
+            assert_eq!(&follower.sentry_url, &campaign_follower_url);
+        }
 
         // Advertiser deposits
         //
@@ -480,8 +536,6 @@ mod tests {
         }
 
         let api_client = reqwest::Client::new();
-        let leader_url = CAMPAIGN_1.validators[0].try_api_url().expect("Valid url");
-        let follower_url = CAMPAIGN_1.validators[1].try_api_url().expect("Valid url");
 
         // No Channel 1 - 404
         // GET /v5/channel/{}/spender/all
@@ -492,7 +546,7 @@ mod tests {
 
             let leader_response = get_spender_all_page_0(
                 &api_client,
-                &leader_url,
+                &leader.sentry_url,
                 &leader_auth,
                 CAMPAIGN_1.channel.id(),
             )
@@ -516,10 +570,14 @@ mod tests {
             // Campaign Budget: 40 TOKENs
             no_budget_campaign.budget = UnifiedNum::from(4_000_000_000);
 
-            let no_budget_response =
-                create_campaign(&api_client, &leader_url, &leader_auth, &no_budget_campaign)
-                    .await
-                    .expect("Should return Response");
+            let no_budget_response = create_campaign(
+                &api_client,
+                &leader.sentry_url,
+                &leader_auth,
+                &no_budget_campaign,
+            )
+            .await
+            .expect("Should return Response");
             let status = no_budget_response.status();
             let response = no_budget_response
                 .json::<serde_json::Value>()
@@ -538,20 +596,23 @@ mod tests {
         // Exists from the previously failed create Campaign 1 request
         // GET /v5/channel/{}/spender/all
         {
-            let leader_auth = advertiser_adapter
-                .get_auth(&leader_adapter.whoami())
-                .expect("Get authentication");
+            let leader_response = leader_sentry
+                .get_all_spenders(CAMPAIGN_1.channel.id())
+                .await
+                .expect("Should return Response");
 
-            let leader_response = get_spender_all_page_0(
-                &api_client,
-                &leader_url,
-                &leader_auth,
-                CAMPAIGN_1.channel.id(),
-            )
-            .await
-            .expect("Should return Response");
+            let expected = vec![(
+                advertiser_adapter.whoami().to_address(),
+                Spender {
+                    // Expected: 30 TOKENs
+                    total_deposited: UnifiedNum::from(3_000_000_000),
+                    spender_leaf: None,
+                },
+            )]
+            .into_iter()
+            .collect::<HashMap<_, _>>();
 
-            assert_eq!(StatusCode::OK, leader_response.status());
+            assert_eq!(expected, leader_response);
         }
 
         // Create Campaign 1 w/ Channel 1 using Advertiser
@@ -564,10 +625,14 @@ mod tests {
                     .get_auth(&leader_adapter.whoami())
                     .expect("Get authentication");
 
-                let leader_response =
-                    create_campaign(&api_client, &leader_url, &leader_token, &create_campaign_1)
-                        .await
-                        .expect("Should return Response");
+                let leader_response = create_campaign(
+                    &api_client,
+                    &leader.sentry_url,
+                    &leader_token,
+                    &create_campaign_1,
+                )
+                .await
+                .expect("Should return Response");
 
                 assert_eq!(StatusCode::OK, leader_response.status());
             }
@@ -579,7 +644,7 @@ mod tests {
 
                 let follower_response = create_campaign(
                     &api_client,
-                    &follower_url,
+                    &follower.sentry_url,
                     &follower_token,
                     &create_campaign_1,
                 )
@@ -602,10 +667,14 @@ mod tests {
                     .get_auth(&leader_adapter.whoami())
                     .expect("Get authentication");
 
-                let leader_response =
-                    create_campaign(&api_client, &leader_url, &leader_token, &create_campaign_2)
-                        .await
-                        .expect("Should return Response");
+                let leader_response = create_campaign(
+                    &api_client,
+                    &leader.sentry_url,
+                    &leader_token,
+                    &create_campaign_2,
+                )
+                .await
+                .expect("Should return Response");
                 let status = leader_response.status();
 
                 assert_eq!(StatusCode::OK, status);
@@ -618,7 +687,7 @@ mod tests {
 
                 let follower_response = create_campaign(
                     &api_client,
-                    &follower_url,
+                    &follower.sentry_url,
                     &follower_token,
                     &create_campaign_2,
                 )
@@ -629,29 +698,130 @@ mod tests {
             }
         }
 
-        // setup worker
+        let leader_worker = Worker::from_sentry(leader_sentry.clone());
+        let follower_worker = Worker::from_sentry(follower_sentry.clone());
 
-        // run worker single-tick
+        // leader single worker tick
+        leader_worker.all_channels_tick().await;
+        // follower single worker tick
+        follower_worker.all_channels_tick().await;
+
+        // Channel 1 expected Accounting - Empty
+        {
+            let expected_accounting = AccountingResponse {
+                balances: Balances::<CheckedState>::new(),
+            };
+            let actual_accounting = leader_sentry
+                .get_accounting(CAMPAIGN_1.channel.id())
+                .await
+                .expect("Should get Channel Accounting");
+
+            assert_eq!(expected_accounting, actual_accounting);
+        }
+
+        // Add new events to sentry
+        {
+            let events = vec![
+                Event::Impression {
+                    publisher: *PUBLISHER,
+                    ad_unit: Some(
+                        CAMPAIGN_1
+                            .ad_units
+                            .get(0)
+                            .expect("Should exist in Campaign")
+                            .ipfs,
+                    ),
+                    ad_slot: Some(DUMMY_IPFS[2]),
+                    referrer: Some("https://adex.network".into()),
+                },
+                Event::Click {
+                    publisher: *PUBLISHER,
+                    ad_unit: Some(
+                        CAMPAIGN_1
+                            .ad_units
+                            .get(0)
+                            .expect("Should exist in Campaign")
+                            .ipfs,
+                    ),
+                    ad_slot: Some(DUMMY_IPFS[2]),
+                    referrer: Some("https://ambire.com".into()),
+                },
+            ];
+
+            let response = post_new_events(&leader_sentry, CAMPAIGN_1.id, &events)
+                .await
+                .expect("Posted events");
+
+            assert_eq!(SuccessResponse { success: true }, response)
+        }
+
+        // Channel 1 expected Accounting
+        // Fees are calculated based on pro mile of the payout
+        // event payout * fee / 1000
+        //
+        //
+        // IMPRESSION:
+        // - Publisher payout: 3000
+        // - Leader fees: 3000 * 3000 / 1 000 = 9 000
+        // - Follower fees: 3000 * 2000 / 1000 = 6 000
+        //
+        // CLICK:
+        // - Publisher payout: 6000
+        // - Leader fees: 6000 * 3000 / 1000 = 18 000
+        // - Follower fees: 6000 * 2000 / 1000 = 12 000
+        //
+        // Creator (Advertiser) pays out:
+        // events_payout + leader fee + follower fee
+        // events_payout = 3000 (impression) + 6000 (click) = 9 000
+        // 9000 + (9000 + 18000) + (6000 + 12000) = 54 000
+        {
+            let mut expected_balances = Balances::new();
+
+            expected_balances
+                .spend(
+                    CAMPAIGN_1.creator,
+                    CAMPAIGN_1.channel.leader.to_address(),
+                    UnifiedNum::from(27_000),
+                )
+                .expect("Should spend for Leader");
+            expected_balances
+                .spend(
+                    CAMPAIGN_1.creator,
+                    CAMPAIGN_1.channel.follower.to_address(),
+                    UnifiedNum::from(18_000),
+                )
+                .expect("Should spend for Follower");
+            expected_balances
+                .spend(CAMPAIGN_1.creator, *PUBLISHER, UnifiedNum::from(9_000))
+                .expect("Should spend for Publisher");
+
+            let expected_accounting = AccountingResponse {
+                balances: expected_balances,
+            };
+
+            let actual_accounting = leader_sentry
+                .get_accounting(CAMPAIGN_1.channel.id())
+                .await
+                .expect("Should get Channel Accounting");
+
+            pretty_assertions::assert_eq!(expected_accounting, actual_accounting);
+        }
     }
 
-    async fn setup_sentry(validator: TestValidator) -> EthereumAdapter {
-        let mut adapter = EthereumAdapter::init(validator.keystore, &GANACHE_CONFIG)
+    async fn setup_sentry(validator: &TestValidator) -> EthereumAdapter {
+        let mut adapter = EthereumAdapter::init(validator.keystore.clone(), &GANACHE_CONFIG)
             .expect("EthereumAdapter::init");
 
         adapter.unlock().expect("Unlock successfully adapter");
 
-        run_sentry_app(
-            adapter.clone(),
-            &validator.logger_prefix,
-            validator.sentry_config,
-            &validator.db_name,
-        )
-        .await
-        .expect("To run Sentry API server");
+        run_sentry_app(adapter.clone(), &validator)
+            .await
+            .expect("To run Sentry API server");
 
         adapter
     }
 
+    /// Used to test if it returns correct Status code on non-existing Channel.
     async fn get_spender_all_page_0(
         api_client: &Client,
         url: &ApiUrl,
@@ -669,6 +839,38 @@ mod tests {
             .await?)
     }
 
+    /// Used to test if it returns correct Status code on non-existing Channel.
+    /// Authentication required!
+    /// Asserts: [`StatusCode::OK`]
+    async fn post_new_events<A: Adapter>(
+        sentry: &SentryApi<A, ()>,
+        campaign: CampaignId,
+        events: &[Event],
+    ) -> anyhow::Result<SuccessResponse> {
+        let endpoint_url = sentry
+            .whoami
+            .url
+            .join(&format!("v5/campaign/{}/events", campaign))
+            .expect("valid endpoint");
+
+        let request_body = vec![("events".to_string(), events)]
+            .into_iter()
+            .collect::<HashMap<_, _>>();
+
+        let response = sentry
+            .client
+            .post(endpoint_url)
+            .json(&request_body)
+            .bearer_auth(&sentry.whoami.token)
+            .send()
+            .await?;
+
+        assert_eq!(StatusCode::OK, response.status());
+
+        Ok(response.json().await?)
+    }
+
+    /// Authentication required!
     async fn create_campaign(
         api_client: &Client,
         url: &ApiUrl,
@@ -691,10 +893,10 @@ pub mod run {
     use adapter::EthereumAdapter;
     use primitives::{
         postgres::{POSTGRES_HOST, POSTGRES_PASSWORD, POSTGRES_PORT, POSTGRES_USER},
+        util::logging::new_logger,
         ToETHChecksum, ValidatorId,
     };
     use sentry::{
-        application::{logger, run},
         db::{
             postgres_connection, redis_connection, redis_pool::Manager,
             tests_postgres::setup_test_migrations, CampaignRemaining,
@@ -704,15 +906,16 @@ pub mod run {
     use slog::info;
     use subprocess::{Popen, PopenConfig, Redirection};
 
-    use crate::GANACHE_CONFIG;
+    use crate::{TestValidator, GANACHE_CONFIG};
 
     pub async fn run_sentry_app(
         adapter: EthereumAdapter,
-        logger_prefix: &str,
-        app_config: sentry::application::Config,
-        db_name: &str,
+        validator: &TestValidator,
     ) -> anyhow::Result<()> {
-        let socket_addr = SocketAddr::new(app_config.ip_addr, app_config.port);
+        let socket_addr = SocketAddr::new(
+            validator.sentry_config.ip_addr,
+            validator.sentry_config.port,
+        );
 
         let postgres_config = {
             let mut config = sentry::db::PostgresConfig::new();
@@ -722,13 +925,13 @@ pub mod run {
                 .password(POSTGRES_PASSWORD.as_str())
                 .host(POSTGRES_HOST.as_str())
                 .port(*POSTGRES_PORT)
-                .dbname(db_name);
+                .dbname(&validator.db_name);
 
             config
         };
 
         let postgres = postgres_connection(42, postgres_config).await;
-        let mut redis = redis_connection(app_config.redis_url).await?;
+        let mut redis = redis_connection(validator.sentry_config.redis_url.clone()).await?;
 
         Manager::flush_db(&mut redis)
             .await
@@ -736,21 +939,26 @@ pub mod run {
 
         let campaign_remaining = CampaignRemaining::new(redis.clone());
 
+        let app = Application::new(
+            adapter,
+            GANACHE_CONFIG.clone(),
+            new_logger(&validator.sentry_logger_prefix),
+            redis.clone(),
+            postgres.clone(),
+            campaign_remaining,
+        );
+
+        // Before the tests, make sure to flush the DB from previous run of `sentry` tests
+        Manager::flush_db(&mut redis)
+            .await
+            .expect("Should flush redis database");
+
         setup_test_migrations(postgres.clone())
             .await
             .expect("Should run migrations");
 
-        let app = Application::new(
-            adapter,
-            GANACHE_CONFIG.clone(),
-            logger(logger_prefix),
-            redis,
-            postgres,
-            campaign_remaining,
-        );
-
         info!(&app.logger, "Spawn sentry Hyper server");
-        tokio::spawn(run(app, socket_addr));
+        tokio::spawn(app.run(socket_addr));
 
         Ok(())
     }
