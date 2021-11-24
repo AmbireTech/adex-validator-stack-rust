@@ -110,17 +110,16 @@ pub enum EwtVerifyError {
     #[error("Address recovery: {0}")]
     AddressRecovery(#[from] ethstore::ethkey::Error),
     #[error("Signature decoding: {0}")]
-    SignatureDecoding(#[source]base64::DecodeError),
+    SignatureDecoding(#[source] base64::DecodeError),
     /// When token is decoded but creating a Signature results in empty Signature.
     /// Signature is encoded as RSV (V in "Electrum" notation)
     /// See [`Signature::from_electrum`]
     #[error("Error when decoding token signature")]
     InvalidSignature,
     #[error("Payload decoding: {0}")]
-    PayloadDecoding(#[source]base64::DecodeError),
+    PayloadDecoding(#[source] base64::DecodeError),
     #[error("Payload deserialization: {0}")]
     PayloadDeserialization(#[from] serde_json::Error),
     #[error("Payload is not a valid utf8 string: {0}")]
     PayloadUtf8(#[from] std::string::FromUtf8Error),
 }
-

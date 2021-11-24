@@ -18,7 +18,7 @@ use primitives::{
 
 use crate::EthereumAdapter;
 
-use super::{EthereumChannel, OUTPACE_ABI, SWEEPER_ABI};
+use super::{EthereumChannel, IDENTITY_ABI, OUTPACE_ABI, SWEEPER_ABI};
 
 // See `adex-eth-protocol` `contracts/mocks/Token.sol`
 /// Mocked Token ABI
@@ -33,6 +33,9 @@ pub static SWEEPER_BYTECODE: Lazy<&'static str> =
 /// Outpace bytecode
 pub static OUTPACE_BYTECODE: Lazy<&'static str> =
     Lazy::new(|| include_str!("../../../lib/protocol-eth/resources/bytecode/OUTPACE.bin"));
+/// Identity bytecode
+pub static IDENTITY_BYTECODE: Lazy<&'static str> =
+    Lazy::new(|| include_str!("../../../lib/protocol-eth/resources/bytecode/Identity5.2.bin"));
 
 /// Uses local `keystore.json` file and it's address for testing and working with [`EthereumAdapter`]
 pub static KEYSTORE_IDENTITY: Lazy<(Address, KeystoreOptions)> = Lazy::new(|| {
@@ -183,7 +186,7 @@ pub async fn sweeper_sweep(
         .await
 }
 
-/// Deploys the Sweeper contract from `GANACHE_ADDRESS['leader']`
+/// Deploys the Sweeper contract from [`LEADER`]
 pub async fn deploy_sweeper_contract(
     web3: &Web3<Http>,
 ) -> web3::contract::Result<(Address, Contract<Http>)> {
@@ -202,7 +205,7 @@ pub async fn deploy_sweeper_contract(
     Ok((sweeper_address, sweeper_contract))
 }
 
-/// Deploys the Outpace contract from `GANACHE_ADDRESS['leader']`
+/// Deploys the Outpace contract from [`LEADER`]
 pub async fn deploy_outpace_contract(
     web3: &Web3<Http>,
 ) -> web3::contract::Result<(Address, Contract<Http>)> {
@@ -218,6 +221,36 @@ pub async fn deploy_outpace_contract(
     let outpace_address = Address::from(outpace_contract.address().to_fixed_bytes());
 
     Ok((outpace_address, outpace_contract))
+}
+
+/// Deploys the Sweeper contract from [`LEADER`]
+pub async fn deploy_identity_contract(
+    web3: &Web3<Http>,
+    for_address: Address,
+    add_privileges_to: &[Address],
+) -> web3::contract::Result<(Address, Contract<Http>)> {
+    let add_privileges_to: Vec<_> = add_privileges_to
+        .iter()
+        .map(|a| Token::Address(H160(a.to_bytes())))
+        .collect();
+
+    let sweeper_contract = Contract::deploy(web3.eth(), &IDENTITY_ABI)
+        .expect("Invalid ABI of Sweeper contract")
+        .confirmations(0)
+        .options(Options::with(|opt| {
+            opt.gas_price = Some(1.into());
+            opt.gas = Some(6_721_975.into());
+        }))
+        .execute(
+            *IDENTITY_BYTECODE,
+            Token::Array(add_privileges_to),
+            H160(for_address.to_bytes()),
+        )
+        .await?;
+
+    let sweeper_address = Address::from(sweeper_contract.address().to_fixed_bytes());
+
+    Ok((sweeper_address, sweeper_contract))
 }
 
 /// Deploys the Mock Token contract from [`LEADER`]
