@@ -17,6 +17,11 @@ pub static PRODUCTION_CONFIG: Lazy<Config> = Lazy::new(|| {
         .expect("Failed to parse prod.toml config file")
 });
 
+pub static GANACHE_CONFIG: Lazy<Config> = Lazy::new(|| {
+    Config::try_toml(include_str!("../../docs/config/ganache.toml"))
+        .expect("Failed to parse ganache.toml config file")
+});
+
 #[derive(Debug, Deserialize, PartialEq, Eq, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
 /// The environment in which the application is running

@@ -12,11 +12,9 @@ use primitives::{
     config::Config,
     Address, BigNum, Channel, ToETHChecksum, ValidatorId,
 };
-use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{fs, str::FromStr};
-use thiserror::Error;
 use tiny_keccak::Keccak;
 use web3::{
     contract::{Contract, Options},
@@ -39,6 +37,9 @@ pub static ERC20_ABI: Lazy<&'static [u8]> = Lazy::new(|| {
 });
 pub static SWEEPER_ABI: Lazy<&'static [u8]> =
     Lazy::new(|| include_bytes!("../../lib/protocol-eth/abi/Sweeper.json"));
+pub static IDENTITY_ABI: Lazy<&'static [u8]> =
+    Lazy::new(|| include_bytes!("../../lib/protocol-eth/abi/Identity5.2.json"));
+
 /// Ready to use init code (i.e. decoded) for calculating the create2 address
 pub static DEPOSITOR_BYTECODE_DECODED: Lazy<Vec<u8>> = Lazy::new(|| {
     let bytecode = include_str!("../../lib/protocol-eth/resources/bytecode/Depositor.bin");
@@ -92,7 +93,6 @@ pub struct EthereumAdapter {
     config: Config,
     wallet: Option<SafeAccount>,
     web3: Web3<Http>,
-    relayer: RelayerClient,
 }
 
 impl EthereumAdapter {
@@ -113,7 +113,6 @@ impl EthereumAdapter {
         let transport =
             web3::transports::Http::new(&config.ethereum_network).map_err(Error::Web3)?;
         let web3 = web3::Web3::new(transport);
-        let relayer = RelayerClient::new(&config.ethereum_adapter_relayer)?;
 
         Ok(Self {
             address,
@@ -122,8 +121,44 @@ impl EthereumAdapter {
             wallet: None,
             config: config.to_owned(),
             web3,
-            relayer,
         })
+    }
+
+    /// Checks if the `from` address has privilages,
+    /// by using the Identity contract with a create2 address created with the `from` address
+    pub async fn has_privilages(
+        &self,
+        identity: Address,
+        check_for: Address,
+        hash: [u8; 32],
+        signature: &[u8],
+    ) -> Result<bool, Error> {
+        // see https://eips.ethereum.org/EIPS/eip-1271
+        let magic_value: u32 = 0x1626ba7e;
+        // 0x4e487b710000000000000000000000000000000000000000000000000000000000000021
+
+        let identity_contract =
+            Contract::from_json(self.web3.eth(), H160(identity.to_bytes()), &IDENTITY_ABI)
+                .map_err(Error::ContractInitialization)?;
+
+        let status: u32 = identity_contract
+            .query(
+                "isValidSignature",
+                (
+                    // bytes32
+                    Token::FixedBytes(hash.to_vec()),
+                    // bytes
+                    Token::Bytes(signature.to_vec()),
+                ),
+                Some(H160(check_for.to_bytes())),
+                Options::default(),
+                None,
+            )
+            .await
+            .map_err(Error::ContractQuerying)?;
+
+        // if it is the magical value then the address has privileges.
+        Ok(status == magic_value)
     }
 }
 
@@ -222,9 +257,19 @@ impl Adapter for EthereumAdapter {
 
         let sess = match &verified.payload.identity {
             Some(identity) => {
+                let decoded_signature =
+                    base64::decode_config(token_encoded, base64::URL_SAFE_NO_PAD).unwrap();
+                    
+                let hash =
+                    hash_message(format!("{}.{}", header_encoded, payload_encoded).as_bytes());
+
                 if self
-                    .relayer
-                    .has_privileges(&verified.from, identity)
+                    .has_privilages(
+                        identity.to_address(),
+                        self.whoami().to_address(),
+                        hash,
+                        &decoded_signature,
+                    )
                     .await?
                 {
                     Session {
@@ -348,49 +393,6 @@ impl Adapter for EthereumAdapter {
     }
 }
 
-#[derive(Debug, Clone)]
-struct RelayerClient {
-    client: Client,
-    relayer_url: String,
-}
-
-#[derive(Debug, Error)]
-#[error(transparent)]
-pub struct RelayerError(#[from] pub reqwest::Error);
-
-impl RelayerClient {
-    pub fn new(relayer_url: &str) -> Result<Self, RelayerError> {
-        let client = Client::builder().build()?;
-
-        Ok(Self {
-            relayer_url: relayer_url.to_string(),
-            client,
-        })
-    }
-
-    /// Checks whether there are any privileges (i.e. > 0)
-    pub async fn has_privileges(
-        &self,
-        from: &ValidatorId,
-        identity: &ValidatorId,
-    ) -> Result<bool, RelayerError> {
-        use std::collections::HashMap;
-        let relay_url = format!(
-            "{}/identity/by-owner/{}",
-            self.relayer_url,
-            from.to_checksum()
-        );
-
-        let identities_owned: HashMap<ValidatorId, u8> =
-            self.client.get(&relay_url).send().await?.json().await?;
-
-        let has_privileges = identities_owned
-            .get(identity)
-            .map_or(false, |privileges| *privileges > 0);
-        Ok(has_privileges)
-    }
-}
-
 fn hash_message(message: &[u8]) -> [u8; 32] {
     let eth = "\x19Ethereum Signed Message:\n";
     let message_length = message.len();
@@ -476,6 +478,10 @@ pub fn ewt_verify(
     let decoded_signature = base64::decode_config(&token, base64::URL_SAFE_NO_PAD)
         .map_err(EwtVerifyError::SignatureDecoding)?;
     let signature = Signature::from_electrum(&decoded_signature);
+    // signature is empty, so it is invalid, see `Signature::from_electrum`
+    if *signature == [0; 65] {
+        return Err(EwtVerifyError::InvalidSignature);
+    }
 
     let address =
         public_to_address(&recover(&signature, &message).map_err(EwtVerifyError::AddressRecovery)?);
@@ -485,6 +491,7 @@ pub fn ewt_verify(
             .map_err(EwtVerifyError::PayloadDecoding)?,
     )
     .map_err(EwtVerifyError::PayloadUtf8)?;
+
     let payload: Payload =
         serde_json::from_str(&payload_string).map_err(EwtVerifyError::PayloadDeserialization)?;
 
@@ -502,14 +509,10 @@ mod test {
     use super::*;
     use chrono::Utc;
     use primitives::{
-        config::DEVELOPMENT_CONFIG,
+        config::{DEVELOPMENT_CONFIG, GANACHE_CONFIG},
         test_util::{CREATOR, IDS, LEADER},
     };
     use web3::{transports::Http, Web3};
-    use wiremock::{
-        matchers::{method, path},
-        Mock, MockServer, ResponseTemplate,
-    };
 
     #[test]
     fn should_init_and_unlock_ethereum_adapter() {
@@ -590,6 +593,7 @@ mod test {
         };
 
         let parts: Vec<&str> = expected.split('.').collect();
+
         let verification =
             ewt_verify(parts[0], parts[1], parts[2]).expect("Failed to verify ewt token");
 
@@ -602,37 +606,44 @@ mod test {
     #[tokio::test]
     async fn test_session_from_token() {
         use primitives::ToETHChecksum;
-        use std::collections::HashMap;
 
-        let identity = ValidatorId::try_from("0x5B04DBc513F90CaAFAa09307Ad5e3C65EB4b26F0").unwrap();
-        let server = MockServer::start().await;
-        let mut identities_owned: HashMap<ValidatorId, u8> = HashMap::new();
-        identities_owned.insert(identity, 2);
+        // let identity = ValidatorId::try_from("0x5B04DBc513F90CaAFAa09307Ad5e3C65EB4b26F0").unwrap();
 
-        let mut eth_adapter = setup_eth_adapter(DEVELOPMENT_CONFIG.clone());
+        // let mut eth_adapter = setup_eth_adapter(GANACHE_CONFIG.clone());
+        let mut adapter = EthereumAdapter::init(KEYSTORES[&CREATOR].clone(), &GANACHE_CONFIG)
+            .expect("should init ethereum adapter");
 
-        Mock::given(method("GET"))
-            .and(path(format!("/identity/by-owner/{}", eth_adapter.whoami())))
-            .respond_with(ResponseTemplate::new(200).set_body_json(&identities_owned))
-            .mount(&server)
-            .await;
+        adapter.unlock().expect("should unlock eth adapter");
 
-        eth_adapter.unlock().expect("should unlock eth adapter");
-        let wallet = eth_adapter.wallet.clone();
+        let whoami = adapter.whoami().to_address();
+
+        // todo: Deploy Identity
+        let (identity_address, _contract) =
+            deploy_identity_contract(&adapter.web3, adapter.whoami().to_address(), &[whoami])
+                .await
+                .expect("Should deploy identity");
+        let identity_id = ValidatorId::from(identity_address);
+
+        let wallet = adapter.wallet.clone().expect("Should have unlocked wallet");
 
         let era = Utc::now().timestamp_millis() as f64 / 60000.0;
         let payload = Payload {
-            id: eth_adapter.whoami().to_checksum(),
+            id: adapter.whoami().to_checksum(),
             era: era.floor() as i64,
-            identity: Some(identity),
-            address: eth_adapter.whoami().to_checksum(),
+            identity: Some(identity_id),
+            address: adapter.whoami().to_checksum(),
         };
 
-        let token = ewt_sign(&wallet.unwrap(), &eth_adapter.keystore_pwd, &payload).unwrap();
+        let token = ewt_sign(&wallet, &adapter.keystore_pwd, &payload)
+            .expect("Sould successfully sign the Paypload");
+        // let parts = token.split('.').collect::<Vec<_>>();
 
-        let session: Session = eth_adapter.session_from_token(&token).await.unwrap();
+        // double check that we have access for _Who Am I_
+        // eth_adapter.has_privilages(identity_address, whoami, ).await.expect("Ok");
 
-        assert_eq!(session.uid, identity);
+        let session: Session = adapter.session_from_token(&token).await.unwrap();
+
+        assert_eq!(session.uid, identity_id);
     }
 
     #[tokio::test]
