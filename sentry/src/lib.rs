@@ -5,7 +5,7 @@
 use chrono::Utc;
 use hyper::{Body, Method, Request, Response, StatusCode};
 use middleware::{
-    auth::{AuthRequired, Authenticate},
+    auth::{AuthRequired, Authenticate, IsAdmin},
     campaign::{CalledByCreator, CampaignLoad},
     channel::ChannelLoad,
     cors::{cors, Cors},
@@ -61,17 +61,6 @@ static CHANNEL_VALIDATOR_MESSAGES: Lazy<Regex> = Lazy::new(|| {
 });
 static CHANNEL_EVENTS_AGGREGATES: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/events-aggregates/?$")
-        .expect("The regex should be valid")
-});
-static ANALYTICS_BY_CHANNEL_ID: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/analytics/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid")
-});
-static ADVERTISER_ANALYTICS_BY_CHANNEL_ID: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/analytics/for-advertiser/0x([a-zA-Z0-9]{64})/?$")
-        .expect("The regex should be valid")
-});
-static PUBLISHER_ANALYTICS_BY_CHANNEL_ID: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/analytics/for-publisher/0x([a-zA-Z0-9]{64})/?$")
         .expect("The regex should be valid")
 });
 static CHANNEL_SPENDER_LEAF_AND_TOTAL_DEPOSITED: Lazy<Regex> = Lazy::new(|| {
@@ -229,27 +218,35 @@ async fn analytics_router<A: Adapter + 'static>(
     mut req: Request<Body>,
     app: &Application<A>,
 ) -> Result<Response<Body>, ResponseError> {
-    use routes::analytics::{
-        admin_analytics, advertiser_analytics, analytics, publisher_analytics,
-    };
+    use routes::analytics::analytics;
 
     let (route, method) = (req.uri().path(), req.method());
 
     match (route, method) {
-        ("/analytics", &Method::GET) => analytics(req, app, Some(vec!["country".to_string(), "ad_slot_type".to_string()]), None).await,
+        ("/analytics", &Method::GET) => {
+            analytics(
+                req,
+                app,
+                Some(vec!["country".to_string(), "ad_slot_type".to_string()]),
+                None,
+            )
+            .await
+        }
         ("/analytics/for-advertiser", &Method::GET) => {
             let req = AuthRequired.call(req, app).await?;
-            advertiser_analytics(req, app).await
+            analytics(req, app, None, Some("advertiser".into())).await
         }
         ("/analytics/for-publisher", &Method::GET) => {
             let req = AuthRequired.call(req, app).await?;
-
-            publisher_analytics(req, app).await
+            analytics(req, app, None, Some("publisher".into())).await
         }
         ("/analytics/for-admin", &Method::GET) => {
-            let req = AuthRequired.call(req, app).await?;
-
-            admin_analytics(req, app).await
+            req = Chain::new()
+                .chain(AuthRequired)
+                .chain(IsAdmin)
+                .apply(req, app)
+                .await?;
+            analytics(req, app, None, None).await
         }
         _ => Err(ResponseError::NotFound),
     }

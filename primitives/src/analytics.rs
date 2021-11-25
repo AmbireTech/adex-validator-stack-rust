@@ -1,7 +1,7 @@
-use crate::{ChannelId, DomainError, sentry::DateHour, CampaignId, IPFS, Address};
+use crate::ChannelId;
+use chrono::{DateTime, Utc};
 use parse_display::Display;
 use serde::{Deserialize, Serialize};
-use chrono::{Utc, DateTime, serde::ts_seconds};
 
 pub const ANALYTICS_QUERY_LIMIT: u32 = 200;
 
@@ -78,32 +78,72 @@ pub struct AnalyticsQuery {
     #[serde(default = "default_event_type")]
     pub event_type: String,
     #[serde(default = "default_metric")]
-    pub metric: String,
+    pub metric: Metric,
     #[serde(default = "default_timeframe")]
-    pub timeframe: String,
+    pub timeframe: Timeframe,
     pub segment_by: Option<String>,
-    #[serde(with = "ts_seconds", default = "Utc::now", rename = "activeTo")]
-    pub start: DateTime<Utc>,
-    #[serde(with = "ts_seconds", default = "Utc::now", rename = "activeTo")]
-    pub end: DateTime<Utc>,
-    #[serde(default = "default_timezone")]
-    pub timezone: String,
-    #[serde(flatten)]
-    pub keys: AnalyticsQueryKeys,
+    pub start: Option<DateTime<Utc>>,
+    pub end: Option<DateTime<Utc>>,
+    // #[serde(default = "default_timezone")]
+    // pub timezone: String,
+    pub campaign_id: Option<String>,
+    pub ad_unit: Option<String>,
+    pub ad_slot: Option<String>,
+    pub ad_slot_type: Option<String>,
+    pub advertiser: Option<String>,
+    pub publisher: Option<String>,
+    pub hostname: Option<String>,
+    pub country: Option<String>,
+    pub os_name: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AnalyticsQueryKeys {
-    pub campaign_id: Option<CampaignId>,
-    pub ad_unit: Option<IPFS>,
-    pub ad_slot: Option<IPFS>,
-    pub ad_slot_type: Option<String>,
-    pub advertiser: Option<Address>,
-    pub publisher: Option<Address>,
-    pub hostname: Option<String>,
-	pub country: Option<String>,
-    pub os_name: Option<String>,
+impl AnalyticsQuery {
+    pub fn keys(&self) -> Vec<String> {
+        let mut keys = vec![];
+        if self.campaign_id.is_some() {
+            keys.push("campaignId".into())
+        }
+        if self.ad_unit.is_some() {
+            keys.push("adUnit".into())
+        }
+        if self.ad_slot.is_some() {
+            keys.push("adslot".into())
+        }
+        if self.ad_slot_type.is_some() {
+            keys.push("adSlotType".into())
+        }
+        if self.advertiser.is_some() {
+            keys.push("advertiser".into())
+        }
+        if self.publisher.is_some() {
+            keys.push("publisher".into())
+        }
+        if self.hostname.is_some() {
+            keys.push("hostname".into())
+        }
+        if self.campaign_id.is_some() {
+            keys.push("country".into())
+        }
+        if self.campaign_id.is_some() {
+            keys.push("osName".into())
+        }
+        keys
+    }
+
+    pub fn try_get_key(&self, key: &str) -> &Option<String> {
+        match key {
+            "campaign_id" => &self.campaign_id,
+            "ad_unit" => &self.ad_unit,
+            "ad_slot" => &self.ad_slot,
+            "ad_slot_type" => &self.ad_slot_type,
+            "advertiser" => &self.advertiser,
+            "publisher" => &self.publisher,
+            "hostname" => &self.hostname,
+            "country" => &self.country,
+            "os_name" => &self.os_name,
+            _ => &None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Display, Hash, Eq)]
@@ -113,6 +153,34 @@ pub enum OperatingSystem {
     #[display("{0}")]
     Whitelisted(String),
     Other,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Display)]
+pub enum Timeframe {
+    Year,
+    Month,
+    Week,
+    Day,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Display)]
+pub enum Metric {
+    Count,
+    Paid,
+}
+
+impl Timeframe {
+    pub fn get_period_in_hours(&self) -> i64 {
+        let hour = 1;
+        let day = 24 * hour;
+        let year = 365 * day;
+        match self {
+            Timeframe::Day => day,
+            Timeframe::Week => 7 * day,
+            Timeframe::Month => year / 12,
+            Timeframe::Year => year,
+        }
+    }
 }
 
 impl Default for OperatingSystem {
@@ -195,38 +263,6 @@ impl OperatingSystem {
     }
 }
 
-impl AnalyticsQuery {
-    pub fn is_valid(&self) -> Result<(), DomainError> {
-        let valid_event_types = ["IMPRESSION", "CLICK"];
-        let valid_metric = ["eventPayouts", "eventCounts"];
-        let valid_timeframe = ["year", "month", "week", "day", "hour"];
-
-        if !valid_event_types.contains(&self.event_type.as_str()) {
-            Err(DomainError::InvalidArgument(format!(
-                "invalid event_type, possible values are: {}",
-                valid_event_types.join(" ,")
-            )))
-        } else if !valid_metric.contains(&self.metric.as_str()) {
-            Err(DomainError::InvalidArgument(format!(
-                "invalid metric, possible values are: {}",
-                valid_metric.join(" ,")
-            )))
-        } else if !valid_timeframe.contains(&self.timeframe.as_str()) {
-            Err(DomainError::InvalidArgument(format!(
-                "invalid timeframe, possible values are: {}",
-                valid_timeframe.join(" ,")
-            )))
-        } else if self.limit > ANALYTICS_QUERY_LIMIT {
-            Err(DomainError::InvalidArgument(format!(
-                "invalid limit {}, maximum value 200",
-                self.limit
-            )))
-        } else {
-            Ok(())
-        }
-    }
-}
-
 fn default_limit() -> u32 {
     100
 }
@@ -235,17 +271,17 @@ fn default_event_type() -> String {
     "IMPRESSION".into()
 }
 
-fn default_metric() -> String {
-    "eventCounts".into()
+fn default_metric() -> Metric {
+    Metric::Count
 }
 
-fn default_timeframe() -> String {
-    "hour".into()
+fn default_timeframe() -> Timeframe {
+    Timeframe::Day
 }
 
-fn default_timezone() -> String {
-    "UTC".into()
-}
+// fn default_timezone() -> String {
+//     "UTC".into()
+// }
 
 #[cfg(test)]
 mod test {

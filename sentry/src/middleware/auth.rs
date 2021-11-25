@@ -47,6 +47,30 @@ impl<A: Adapter + 'static> Middleware<A> for AuthRequired {
     }
 }
 
+#[derive(Debug)]
+pub struct IsAdmin;
+
+#[async_trait]
+impl<A: Adapter + 'static> Middleware<A> for IsAdmin {
+    async fn call<'a>(
+        &self,
+        request: Request<Body>,
+        application: &'a Application<A>,
+    ) -> Result<Request<Body>, ResponseError> {
+        let auth = request
+            .extensions()
+            .get::<Auth>()
+            .expect("request should have session")
+            .to_owned();
+
+        if !application.config.admins.contains(&auth.uid.to_string()) {
+            return Err(ResponseError::Unauthorized);
+        }
+
+        Ok(request)
+    }
+}
+
 /// Check `Authorization` header for `Bearer` scheme with `Adapter::session_from_token`.
 /// If the `Adapter` fails to create an `AdapterSession`, `ResponseError::BadRequest` will be returned.
 async fn for_request(

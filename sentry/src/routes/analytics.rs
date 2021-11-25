@@ -1,56 +1,12 @@
-use crate::{
-    db::analytics::{advertiser_channel_ids, get_advanced_reports, get_analytics, AnalyticsType},
-    success_response, Application, Auth, ResponseError, RouteParams,
-};
+use crate::{db::analytics::get_analytics, success_response, Application, Auth, ResponseError};
+use chrono::{Duration, Utc};
 use hyper::{Body, Request, Response};
 use primitives::{
     adapter::Adapter,
-    analytics::{AnalyticsQuery, AnalyticsResponse},
-    sentry::DateHour,
-    ChannelId,
+    analytics::{AnalyticsQuery, Metric, ANALYTICS_QUERY_LIMIT},
+    sentry::{DateHour, FetchedAnalytics},
+    UnifiedNum,
 };
-use redis::aio::MultiplexedConnection;
-use slog::{error, Logger};
-
-pub const ALLOWED_KEYS: [&'static str; 9] = [
-	"campaignId",
-	"adUnit",
-	"adSlot",
-	"adSlotType",
-	"advertiser",
-	"publisher",
-	"hostname",
-	"country",
-	"osName"
-];
-
-// TODO: Convert timeframe to enum and add this as an enum method
-pub fn get_period_in_hours(timeframe: String) -> u64 {
-    let hour = 1;
-    let day = 24 * hour;
-    let year = 365 * day;
-    if timeframe == "day" {
-        day
-    } else if timeframe == "week" {
-        7 * day
-    } else if timeframe == "month" {
-        year / 12
-    } else if timeframe == "year" {
-        year
-    } else {
-        day
-    }
-}
-
-pub fn get_time_period_query_clause(start: Option<DateTime<Utc>, end: Option<DateTime<Utc>>, period: u64, event_type: String, metric: String, timezone: String) -> String {
-    // start && !Number.isNaN(new Date(start)) ? new Date(start) : new Date(Date.now() - period),
-    let start = match start {
-        Some(start) => {
-            DateHour::from()
-        },
-        None => DateHour::now() -
-    }
-}
 
 pub async fn analytics<A: Adapter>(
     req: Request<Body>,
@@ -60,99 +16,91 @@ pub async fn analytics<A: Adapter>(
 ) -> Result<Response<Body>, ResponseError> {
     let query = serde_urlencoded::from_str::<AnalyticsQuery>(req.uri().query().unwrap_or(""))?;
 
-    let period = get_period_in_hours(query.timeframe);
+    let period_in_hours = query.timeframe.get_period_in_hours();
+    let start_date = match query.start {
+        Some(start_date) => DateHour::try_from(start_date)?,
+        None => DateHour::try_from(Utc::now() - Duration::hours(period_in_hours))?,
+    };
 
+    let end_date = match query.end {
+        Some(end_date) => Some(DateHour::try_from(end_date)?),
+        None => None,
+    };
 
-    todo!();
-}
+    let applied_limit = query.limit.min(ANALYTICS_QUERY_LIMIT);
 
+    let allowed_keys = match allowed_keys {
+        Some(keys) => keys,
+        None => vec![
+            "campaignId".to_string(),
+            "adUnit".to_string(),
+            "adSlot".to_string(),
+            "adSlotType".to_string(),
+            "advertiser".to_string(),
+            "publisher".to_string(),
+            "hostname".to_string(),
+            "country".to_string(),
+            "osName".to_string(),
+        ],
+    };
 
-// TODO: remove each of these
-pub async fn publisher_analytics<A: Adapter>(
-    req: Request<Body>,
-    app: &Application<A>,
-) -> Result<Response<Body>, ResponseError> {
-    todo!();
-    // let auth = req
-    //     .extensions()
-    //     .get::<Auth>()
-    //     .ok_or(ResponseError::Unauthorized)?
-    //     .clone();
+    if let Some(segment_by) = &query.segment_by {
+        if !allowed_keys.contains(segment_by) {
+            return Err(ResponseError::BadRequest(
+                "Disallowed segmentBy".to_string(),
+            ));
+        }
+    }
 
-    // let analytics_type = AnalyticsType::Publisher { auth };
+    let keys_in_query = query.keys();
+    for key in keys_in_query {
+        if !allowed_keys.contains(&key) {
+            return Err(ResponseError::BadRequest(format!(
+                "disallowed key in query: {}",
+                key
+            )));
+        }
+    }
 
-    // process_analytics(req, app, analytics_type)
-    //     .await
-    //     .map(success_response)
-}
+    let auth = req
+        .extensions()
+        .get::<Auth>()
+        .expect("request should have session")
+        .to_owned();
 
-pub async fn advertiser_analytics<A: Adapter>(
-    req: Request<Body>,
-    app: &Application<A>,
-) -> Result<Response<Body>, ResponseError> {
-    todo!();
-    // let sess = req.extensions().get::<Auth>();
-    // let analytics_type = AnalyticsType::Advertiser {
-    //     auth: sess.ok_or(ResponseError::Unauthorized)?.to_owned(),
-    // };
+    let analytics = get_analytics(
+        &app.pool,
+        start_date,
+        end_date,
+        &query,
+        auth_as_key,
+        auth.uid,
+        applied_limit,
+    )
+    .await?;
 
-    // process_analytics(req, app, analytics_type)
-    //     .await
-    //     .map(success_response)
-}
+    let mut count = 0;
+    let paid = UnifiedNum::from_u64(0);
 
-pub async fn process_analytics<A: Adapter>(
-    req: Request<Body>,
-    app: &Application<A>,
-    analytics_type: AnalyticsType,
-) -> Result<String, ResponseError> {
-    todo!();
-    // let query = serde_urlencoded::from_str::<AnalyticsQuery>(req.uri().query().unwrap_or(""))?;
-    // query
-    //     .is_valid()
-    //     .map_err(|e| ResponseError::BadRequest(e.to_string()))?;
+    // TODO: We can do this part in the SLQ querry if needed
+    analytics.iter().for_each(|entry| match &query.metric {
+        Metric::Count => count += entry.payout_count.unwrap(),
+        Metric::Paid => {
+            paid.checked_add(&entry.payout_amount.unwrap());
+        }
+    });
+    let output: FetchedAnalytics = match query.metric {
+        Metric::Count => FetchedAnalytics {
+            payout_count: Some(count),
+            payout_amount: None,
+        },
+        Metric::Paid => FetchedAnalytics {
+            payout_count: None,
+            payout_amount: Some(paid),
+        },
+    };
 
-    // let channel_id = req.extensions().get::<ChannelId>();
-
-    // let segment_channel = query.segment_by_channel.is_some();
-
-    // let limit = query.limit;
-
-    // let aggr = get_analytics(
-    //     query,
-    //     &app.pool,
-    //     analytics_type,
-    //     segment_channel,
-    //     channel_id,
-    // )
-    // .await?;
-
-    // let response = AnalyticsResponse { aggr, limit };
-
-    // serde_json::to_string(&response)
-    //     .map_err(|_| ResponseError::BadRequest("error occurred; try again later".to_string()))
-}
-
-pub async fn admin_analytics<A: Adapter>(
-    req: Request<Body>,
-    app: &Application<A>,
-) -> Result<Response<Body>, ResponseError> {
-    todo!();
-    // let auth = req.extensions().get::<Auth>().expect("auth is required");
-    // let advertiser_channels = advertiser_channel_ids(&app.pool, &auth.uid).await?;
-
-    // let query = serde_urlencoded::from_str::<AnalyticsQuery>(req.uri().query().unwrap_or(""))?;
-
-    // let response = get_advanced_reports(
-    //     &app.redis,
-    //     &query.event_type,
-    //     &auth.uid,
-    //     &advertiser_channels,
-    // )
-    // .await
-    // .map_err(|_| ResponseError::BadRequest("error occurred; try again later".to_string()))?;
-
-    // Ok(success_response(serde_json::to_string(&response)?))
+    Ok(success_response(serde_json::to_string(&output)?))
 }
 
 // async fn cache(

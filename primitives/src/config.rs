@@ -81,6 +81,7 @@ pub struct Config {
     pub ethereum_adapter_relayer: String,
     pub creators_whitelist: Vec<Address>,
     pub validators_whitelist: Vec<ValidatorId>,
+    pub admins: Vec<String>,
     #[serde(deserialize_with = "deserialize_token_whitelist")]
     pub token_address_whitelist: HashMap<Address, TokenInfo>,
 }

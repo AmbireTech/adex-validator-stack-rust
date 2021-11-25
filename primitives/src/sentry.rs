@@ -5,11 +5,10 @@ use crate::{
     validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
     Address, Balances, BigNum, CampaignId, Channel, ChannelId, UnifiedNum, ValidatorId, IPFS,
 };
-use bytes::BytesMut;
-use chrono::{DateTime, Datelike, TimeZone, Timelike, Utc};
-use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
-use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, error::Error, fmt, hash::Hash};
+use chrono::{Date, DateTime, NaiveDate, TimeZone, Timelike, Utc};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::{collections::HashMap, fmt, hash::Hash};
+use thiserror::Error;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -202,6 +201,14 @@ pub struct Analytics {
     pub event_type: String,
     pub payout_amount: UnifiedNum,
     pub payout_count: u32,
+}
+
+// TODO: Verify this is the needed output
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct FetchedAnalytics {
+    pub payout_amount: Option<UnifiedNum>,
+    pub payout_count: Option<u32>,
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -752,7 +759,7 @@ pub mod campaign_create {
 
 #[cfg(feature = "postgres")]
 mod postgres {
-    use super::{Analytics, DateHour, MessageResponse, ValidatorMessage};
+    use super::{Analytics, DateHour, FetchedAnalytics, MessageResponse, ValidatorMessage};
     use crate::{
         sentry::EventAggregate,
         validator::{messages::Type as MessageType, MessageTypes},
@@ -892,6 +899,15 @@ mod postgres {
 
         accepts!(TIMESTAMPTZ);
         to_sql_checked!();
+    }
+
+    impl From<&Row> for FetchedAnalytics {
+        fn from(row: &Row) -> Self {
+            Self {
+                payout_amount: row.get("payout_amount"),
+                payout_count: Some(row.get::<_, i32>("payout_count").unsigned_abs()),
+            }
+        }
     }
 }
 
