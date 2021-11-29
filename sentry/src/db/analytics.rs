@@ -21,7 +21,10 @@ pub async fn get_analytics(
     let mut where_clauses = vec![format!("time >= {}", start_date.to_datetime())];
 
     for key in query.keys() {
-        let key_value = query.try_get_key(&key).as_ref().unwrap();
+        let key_value = query
+            .try_get_key(&key)
+            .as_ref()
+            .expect("Should exist, values have already been validated");
         where_clauses.push(format!("{} = {}", key, key_value));
     }
 

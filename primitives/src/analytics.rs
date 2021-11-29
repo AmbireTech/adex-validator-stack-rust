@@ -69,7 +69,6 @@ pub mod postgres {
     }
 }
 
-// TODO: Clean up query defaults/start/end
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AnalyticsQuery {
@@ -132,15 +131,15 @@ impl AnalyticsQuery {
 
     pub fn try_get_key(&self, key: &str) -> &Option<String> {
         match key {
-            "campaign_id" => &self.campaign_id,
-            "ad_unit" => &self.ad_unit,
-            "ad_slot" => &self.ad_slot,
-            "ad_slot_type" => &self.ad_slot_type,
+            "campaignId" => &self.campaign_id,
+            "adUnit" => &self.ad_unit,
+            "adSlot" => &self.ad_slot,
+            "adSlotType" => &self.ad_slot_type,
             "advertiser" => &self.advertiser,
             "publisher" => &self.publisher,
             "hostname" => &self.hostname,
             "country" => &self.country,
-            "os_name" => &self.os_name,
+            "osName" => &self.os_name,
             _ => &None,
         }
     }

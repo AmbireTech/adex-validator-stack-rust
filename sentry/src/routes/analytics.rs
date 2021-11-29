@@ -1,12 +1,27 @@
 use crate::{db::analytics::get_analytics, success_response, Application, Auth, ResponseError};
 use chrono::{Duration, Utc};
 use hyper::{Body, Request, Response};
+use once_cell::sync::Lazy;
 use primitives::{
     adapter::Adapter,
     analytics::{AnalyticsQuery, Metric, ANALYTICS_QUERY_LIMIT},
     sentry::{DateHour, FetchedAnalytics},
     UnifiedNum,
 };
+
+pub static ALLOWED_KEYS: Lazy<[String; 9]> = Lazy::new(|| {
+    [
+        "campaignId".to_string(),
+        "adUnit".to_string(),
+        "adSlot".to_string(),
+        "adSlotType".to_string(),
+        "advertiser".to_string(),
+        "publisher".to_string(),
+        "hostname".to_string(),
+        "country".to_string(),
+        "osName".to_string(),
+    ]
+});
 
 pub async fn analytics<A: Adapter>(
     req: Request<Body>,
@@ -31,17 +46,7 @@ pub async fn analytics<A: Adapter>(
 
     let allowed_keys = match allowed_keys {
         Some(keys) => keys,
-        None => vec![
-            "campaignId".to_string(),
-            "adUnit".to_string(),
-            "adSlot".to_string(),
-            "adSlotType".to_string(),
-            "advertiser".to_string(),
-            "publisher".to_string(),
-            "hostname".to_string(),
-            "country".to_string(),
-            "osName".to_string(),
-        ],
+        None => ALLOWED_KEYS.to_vec(),
     };
 
     if let Some(segment_by) = &query.segment_by {
@@ -52,8 +57,7 @@ pub async fn analytics<A: Adapter>(
         }
     }
 
-    let keys_in_query = query.keys();
-    for key in keys_in_query {
+    for key in query.keys() {
         if !allowed_keys.contains(&key) {
             return Err(ResponseError::BadRequest(format!(
                 "disallowed key in query: {}",
@@ -82,22 +86,33 @@ pub async fn analytics<A: Adapter>(
     let mut count = 0;
     let paid = UnifiedNum::from_u64(0);
 
-    // TODO: We can do this part in the SLQ querry if needed
-    analytics.iter().for_each(|entry| match &query.metric {
-        Metric::Count => count += entry.payout_count.unwrap(),
-        Metric::Paid => {
-            paid.checked_add(&entry.payout_amount.unwrap());
+    // TODO: Discuss this part and potentially implement it as logic in the SQL Query
+    let output: FetchedAnalytics = match &query.metric {
+        Metric::Count => {
+            analytics.iter().for_each(|entry| {
+                count += entry
+                    .payout_count
+                    .expect("payout_count should be selected and not null")
+            });
+            FetchedAnalytics {
+                payout_count: Some(count),
+                payout_amount: None,
+            }
         }
-    });
-    let output: FetchedAnalytics = match query.metric {
-        Metric::Count => FetchedAnalytics {
-            payout_count: Some(count),
-            payout_amount: None,
-        },
-        Metric::Paid => FetchedAnalytics {
-            payout_count: None,
-            payout_amount: Some(paid),
-        },
+        Metric::Paid => {
+            analytics.iter().for_each(|entry| {
+                paid.checked_add(
+                    &entry
+                        .payout_amount
+                        .expect("payout_amount should be selected and not null"),
+                )
+                .expect("TODO");
+            });
+            FetchedAnalytics {
+                payout_count: None,
+                payout_amount: Some(paid),
+            }
+        }
     };
 
     Ok(success_response(serde_json::to_string(&output)?))
