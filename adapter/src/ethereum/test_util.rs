@@ -223,7 +223,8 @@ pub async fn deploy_outpace_contract(
     Ok((outpace_address, outpace_contract))
 }
 
-/// Deploys the Sweeper contract from [`LEADER`]
+/// Deploys the Identity contract for the give `for_address`
+/// Adds privileges by the constructor for the `add_privileges_to` addresses
 pub async fn deploy_identity_contract(
     web3: &Web3<Http>,
     for_address: Address,
@@ -234,8 +235,8 @@ pub async fn deploy_identity_contract(
         .map(|a| Token::Address(H160(a.to_bytes())))
         .collect();
 
-    let sweeper_contract = Contract::deploy(web3.eth(), &IDENTITY_ABI)
-        .expect("Invalid ABI of Sweeper contract")
+    let identity_contract = Contract::deploy(web3.eth(), &IDENTITY_ABI)
+        .expect("Invalid ABI of Identity contract")
         .confirmations(0)
         .options(Options::with(|opt| {
             opt.gas_price = Some(1.into());
@@ -248,9 +249,9 @@ pub async fn deploy_identity_contract(
         )
         .await?;
 
-    let sweeper_address = Address::from(sweeper_contract.address().to_fixed_bytes());
+    let identity_address = Address::from(identity_contract.address().to_fixed_bytes());
 
-    Ok((sweeper_address, sweeper_contract))
+    Ok((identity_address, identity_contract))
 }
 
 /// Deploys the Mock Token contract from [`LEADER`]
