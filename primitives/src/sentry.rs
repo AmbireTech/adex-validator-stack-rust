@@ -931,27 +931,33 @@ mod test {
         let client = POSTGRES_POOL.get().await.unwrap();
         let sql_type = "TIMESTAMPTZ";
 
-        let actual_datehour = DateHour::<Utc>::from_ymdh(2021, 1, 1, 1);
+        let example_datehour = DateHour::<Utc>::from_ymdh(2021, 1, 1, 1);
+        let expected_datehour =
+            DateHour::try_from(Utc.ymd(2021, 1, 1).and_hms(1, 0, 0)).expect("Should get DateHour");
+        assert_eq!(
+            example_datehour, expected_datehour,
+            "Example and expected datehour must be the same"
+        );
 
         // from SQL
-        let row_datehour: DateHour<Utc> = client
+        let actual_datehour: DateHour<Utc> = client
             .query_one(
-                &*format!("SELECT '{:?}'::{}", actual_datehour, sql_type),
+                &*format!("SELECT '{}'::{}", example_datehour.to_datetime(), sql_type),
                 &[],
             )
             .await
             .unwrap()
             .get(0);
 
-        assert_eq!(&actual_datehour, &row_datehour);
+        assert_eq!(&expected_datehour, &actual_datehour);
 
         // to SQL
-        let row_datehour: DateHour<Utc> = client
-            .query_one(&*format!("SELECT $1::{}", sql_type), &[&actual_datehour])
+        let actual_datehour: DateHour<Utc> = client
+            .query_one(&*format!("SELECT $1::{}", sql_type), &[&example_datehour])
             .await
             .unwrap()
             .get(0);
 
-        assert_eq!(&actual_datehour, &row_datehour);
+        assert_eq!(&expected_datehour, &actual_datehour);
     }
 }
