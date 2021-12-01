@@ -897,7 +897,10 @@ mod postgres {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::util::tests::prep_db::{ADDRESSES, DUMMY_IPFS};
+    use crate::{
+        postgres::POSTGRES_POOL,
+        util::tests::prep_db::{ADDRESSES, DUMMY_IPFS},
+    };
     use serde_json::json;
 
     #[test]
@@ -921,5 +924,40 @@ mod test {
             click_json,
             serde_json::to_value(click).expect("should serialize")
         );
+    }
+
+    #[tokio::test]
+    pub async fn datehour_from_to_sql() {
+        let client = POSTGRES_POOL.get().await.unwrap();
+        let sql_type = "TIMESTAMPTZ";
+
+        let example_datehour = DateHour::<Utc>::from_ymdh(2021, 1, 1, 1);
+        let expected_datehour =
+            DateHour::try_from(Utc.ymd(2021, 1, 1).and_hms(1, 0, 0)).expect("Should get DateHour");
+        assert_eq!(
+            example_datehour, expected_datehour,
+            "Example and expected datehour must be the same"
+        );
+
+        // from SQL
+        let actual_datehour: DateHour<Utc> = client
+            .query_one(
+                &*format!("SELECT '{}'::{}", example_datehour.to_datetime(), sql_type),
+                &[],
+            )
+            .await
+            .unwrap()
+            .get(0);
+
+        assert_eq!(&expected_datehour, &actual_datehour);
+
+        // to SQL
+        let actual_datehour: DateHour<Utc> = client
+            .query_one(&*format!("SELECT $1::{}", sql_type), &[&example_datehour])
+            .await
+            .unwrap()
+            .get(0);
+
+        assert_eq!(&expected_datehour, &actual_datehour);
     }
 }
