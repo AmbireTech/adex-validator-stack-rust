@@ -1,9 +1,9 @@
 use chrono::Utc;
 use primitives::{
-    analytics::AnalyticsQuery,
+    analytics::{AnalyticsQuery, AuthenticateAs},
     sentry::{Analytics, DateHour, FetchedAnalytics, UpdateAnalytics},
-    ValidatorId,
 };
+use tokio_postgres::types::ToSql;
 
 use super::{DbPool, PoolError};
 
@@ -12,60 +12,77 @@ pub async fn get_analytics(
     start_date: DateHour<Utc>,
     end_date: Option<DateHour<Utc>>,
     query: &AnalyticsQuery,
-    auth_as_key: Option<String>,
-    auth_uid: ValidatorId,
+    auth_as: Option<AuthenticateAs>,
     limit: u32,
 ) -> Result<Vec<FetchedAnalytics>, PoolError> {
     let client = pool.get().await?;
 
-    let mut where_clauses = vec![format!("time >= {}", start_date.to_datetime())];
+    let (where_clauses, mut params) = analytics_query_params(&start_date, &end_date, query, &auth_as);
 
-    for key in query.keys() {
-        let key_value = query
-            .try_get_key(&key)
-            .as_ref()
-            .expect("Should exist, values have already been validated");
-        where_clauses.push(format!("{} = {}", key, key_value));
+    let mut select_clause = vec!["time".to_string(), format!("${}", params.len() + 1)];
+    params.push(&query.metric);
+    let mut group_clause = vec!["time".to_string()];
+
+    if let Some(segment_by) = &query.segment_by {
+        select_clause.push(segment_by.to_string());
+        group_clause.push(segment_by.to_string());
     }
-
-    if let Some(auth_as_key) = auth_as_key {
-        where_clauses.push(format!("{} = {}", auth_as_key, auth_uid))
-    }
-
-    if let Some(end_date) = end_date {
-        where_clauses.push(format!("time <= {}", end_date.to_datetime()));
-    }
-    where_clauses.extend(vec![
-        format!("event_type = ${}", query.event_type),
-        format!("{} IS NOT NULL", query.metric.to_string()),
-    ]);
-
-    let (select_clause, group_clause) = match &query.segment_by {
-        Some(segment_by) => (
-            format!("{}, time, {}", &query.metric.to_string(), segment_by),
-            format!("time, {}", segment_by),
-        ),
-        None => (
-            format!("{}, time", query.metric.to_string()),
-            "time".to_string(),
-        ),
-    };
 
     let sql_query = format!(
-        "SELECT {} FROM analytics WHERE {} GROUP BY {} LIMIT {}",
-        select_clause,
+        "SELECT {} FROM analytics WHERE {} GROUP BY {} ORDER BY time DESC LIMIT {}",
+        select_clause.join(","),
         where_clauses.join(" AND "),
-        group_clause,
+        group_clause.join(","),
         limit,
     );
 
+    println!("{}", sql_query);
     // execute query
     let stmt = client.prepare(&sql_query).await?;
-    let rows = client.query(&stmt, &[]).await?;
+    let rows = client.query(&stmt, params.as_slice()).await?;
 
     let analytics: Vec<FetchedAnalytics> = rows.iter().map(FetchedAnalytics::from).collect();
 
     Ok(analytics)
+}
+
+fn analytics_query_params<'a>(
+    start_date: &'a DateHour<Utc>,
+    end_date: &'a Option<DateHour<Utc>>,
+    query: &'a AnalyticsQuery,
+    auth_as: &'a Option<AuthenticateAs>,
+) -> (Vec<String>, Vec<&'a (dyn ToSql + Sync)>) {
+    let mut where_clauses: Vec<String> = vec!["time >= $1".to_string()];
+    let mut params: Vec<&(dyn ToSql + Sync)> = vec![start_date];
+
+    for (key, value) in query.available_keys() {
+        where_clauses.push(format!("{} = ${}", key, params.len() + 1));
+        params.push(&value);
+    }
+
+    if let Some(auth_as) = auth_as {
+        match auth_as {
+            AuthenticateAs::Publisher(uid) => {
+                where_clauses.push(format!("publisher = ${}", params.len() + 1));
+                params.push(uid);
+            },
+            AuthenticateAs::Advertiser(uid) => {
+                where_clauses.push(format!("advertiser = ${}", params.len() + 1));
+                params.push(uid);
+            }
+        }
+    }
+
+    if let Some(end_date) = end_date {
+        where_clauses.push(format!("time <= ${}", params.len() + 1));
+        params.push(end_date);
+    }
+    where_clauses.push(format!("event_type = ${}", params.len() + 1));
+    params.push(&query.event_type);
+
+    where_clauses.push(format!("{} IS NOT NULL", query.metric.column_name()));
+
+    (where_clauses, params)
 }
 
 /// This will update a record when it's present by incrementing its payout_amount and payout_count fields

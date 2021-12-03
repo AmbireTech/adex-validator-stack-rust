@@ -1,44 +1,19 @@
-use crate::ChannelId;
-use chrono::{DateTime, Utc};
+use crate::{sentry::DateHour, ValidatorId, CampaignId, IPFS, Address};
+use chrono::Utc;
 use parse_display::Display;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 pub const ANALYTICS_QUERY_LIMIT: u32 = 200;
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AnalyticsData {
-    pub time: f64,
-    pub value: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub channel_id: Option<ChannelId>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AnalyticsResponse {
-    pub aggr: Vec<AnalyticsData>,
-    pub limit: u32,
-}
-
 #[cfg(feature = "postgres")]
 pub mod postgres {
-    use super::{AnalyticsData, OperatingSystem};
+    use super::{OperatingSystem, Metric};
     use bytes::BytesMut;
     use std::error::Error;
     use tokio_postgres::{
         types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type},
-        Row,
     };
-
-    impl From<&Row> for AnalyticsData {
-        fn from(row: &Row) -> Self {
-            Self {
-                time: row.get("time"),
-                value: row.get("value"),
-                channel_id: row.try_get("channel_id").ok(),
-            }
-        }
-    }
 
     impl<'a> FromSql<'a> for OperatingSystem {
         fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
@@ -67,9 +42,18 @@ pub mod postgres {
         accepts!(TEXT, VARCHAR);
         to_sql_checked!();
     }
+
+    impl ToSql for Metric {
+        fn to_sql(&self, ty: &Type, w: &mut BytesMut) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+            self.column_name().to_sql(ty, w)
+        }
+
+        accepts!(TEXT, VARCHAR);
+        to_sql_checked!();
+    }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AnalyticsQuery {
     #[serde(default = "default_limit")]
@@ -81,67 +65,52 @@ pub struct AnalyticsQuery {
     #[serde(default = "default_timeframe")]
     pub timeframe: Timeframe,
     pub segment_by: Option<String>,
-    pub start: Option<DateTime<Utc>>,
-    pub end: Option<DateTime<Utc>>,
+    pub start: Option<DateHour<Utc>>,
+    pub end: Option<DateHour<Utc>>,
     // #[serde(default = "default_timezone")]
     // pub timezone: String,
-    pub campaign_id: Option<String>,
-    pub ad_unit: Option<String>,
-    pub ad_slot: Option<String>,
+    pub campaign_id: Option<CampaignId>,
+    pub ad_unit: Option<IPFS>,
+    pub ad_slot: Option<IPFS>,
     pub ad_slot_type: Option<String>,
-    pub advertiser: Option<String>,
-    pub publisher: Option<String>,
+    pub advertiser: Option<Address>,
+    pub publisher: Option<Address>,
     pub hostname: Option<String>,
     pub country: Option<String>,
-    pub os_name: Option<String>,
+    pub os_name: Option<OperatingSystem>,
 }
 
 impl AnalyticsQuery {
-    pub fn keys(&self) -> Vec<String> {
-        let mut keys = vec![];
-        if self.campaign_id.is_some() {
-            keys.push("campaignId".into())
+    pub fn available_keys(&self) -> HashMap<String, String>{
+        let mut keys: HashMap<String, String> = HashMap::new();
+        if let Some(campaign_id) = self.campaign_id {
+            keys.insert("campaign_id".into(), campaign_id.to_string());
         }
-        if self.ad_unit.is_some() {
-            keys.push("adUnit".into())
+        if let Some(ad_unit) = self.ad_unit {
+            keys.insert("ad_unit".into(), ad_unit.to_string());
         }
-        if self.ad_slot.is_some() {
-            keys.push("adslot".into())
+        if let Some(ad_slot) = self.ad_slot {
+            keys.insert("ad_slot".into(), ad_slot.to_string());
         }
-        if self.ad_slot_type.is_some() {
-            keys.push("adSlotType".into())
+        if let Some(ad_slot_type) = &self.ad_slot_type {
+            keys.insert("ad_slot_type".into(), ad_slot_type.to_string());
         }
-        if self.advertiser.is_some() {
-            keys.push("advertiser".into())
+        if let Some(advertiser) = self.advertiser {
+            keys.insert("advertiser".into(), advertiser.to_string());
         }
-        if self.publisher.is_some() {
-            keys.push("publisher".into())
+        if let Some(publisher) = self.publisher {
+            keys.insert("publisher".into(), publisher.to_string());
         }
-        if self.hostname.is_some() {
-            keys.push("hostname".into())
+        if let Some(hostname) = &self.hostname {
+            keys.insert("hostname".into(), hostname.to_string());
         }
-        if self.campaign_id.is_some() {
-            keys.push("country".into())
+        if let Some(country) = &self.country {
+            keys.insert("country".into(), country.to_string());
         }
-        if self.campaign_id.is_some() {
-            keys.push("osName".into())
+        if let Some(os_name) = &self.os_name {
+            keys.insert("os_name".into(), os_name.to_string());
         }
         keys
-    }
-
-    pub fn try_get_key(&self, key: &str) -> &Option<String> {
-        match key {
-            "campaignId" => &self.campaign_id,
-            "adUnit" => &self.ad_unit,
-            "adSlot" => &self.ad_slot,
-            "adSlotType" => &self.ad_slot_type,
-            "advertiser" => &self.advertiser,
-            "publisher" => &self.publisher,
-            "hostname" => &self.hostname,
-            "country" => &self.country,
-            "osName" => &self.os_name,
-            _ => &None,
-        }
     }
 }
 
@@ -155,6 +124,7 @@ pub enum OperatingSystem {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Display)]
+#[serde(rename_all = "lowercase")]
 pub enum Timeframe {
     Year,
     Month,
@@ -163,13 +133,42 @@ pub enum Timeframe {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Display)]
+#[serde(rename_all = "lowercase")]
 pub enum Metric {
     Count,
     Paid,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Display)]
+pub enum AuthenticateAs {
+    #[display("{0}")]
+    Advertiser(ValidatorId),
+    #[display("{0}")]
+    Publisher(ValidatorId),
+}
+
+impl AuthenticateAs {
+    pub fn try_from(key: &str, uid: ValidatorId) -> Option<Self> {
+        match key {
+            "advertiser" => Some(Self::Advertiser(uid)),
+            "publisher" => Some(Self::Publisher(uid)),
+            // TODO: Should we throw an error here
+            _ => None,
+        }
+    }
+}
+
+impl Metric {
+    pub fn column_name(&self) -> String {
+        match self {
+            Metric::Count => "payout_count".to_string(),
+            Metric::Paid => "payout_amount".to_string(),
+        }
+    }
+}
+
 impl Timeframe {
-    pub fn get_period_in_hours(&self) -> i64 {
+    pub fn to_hours(&self) -> i64 {
         let hour = 1;
         let day = 24 * hour;
         let year = 365 * day;

@@ -41,7 +41,7 @@ ethereum_adapter_relayer = 'http://localhost:8888'
 
 creators_whitelist = []
 validators_whitelist = []
-admins = ['0xce07CbB7e054514D590a0262C93070D838bFBA2e']
+admins = ['0x80690751969B234697e9059e04ed72195c3507fa']
 
 [[token_address_whitelist]]
 # Mocked TOKEN
