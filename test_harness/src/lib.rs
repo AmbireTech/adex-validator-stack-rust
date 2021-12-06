@@ -7,7 +7,7 @@ use adapter::ethereum::{
     get_counterfactual_address,
     test_util::{
         deploy_outpace_contract, deploy_sweeper_contract, deploy_token_contract, mock_set_balance,
-        outpace_deposit, GANACHE_URL, MOCK_TOKEN_ABI
+        outpace_deposit, GANACHE_URL, MOCK_TOKEN_ABI,
     },
     OUTPACE_ABI, SWEEPER_ABI,
 };
@@ -16,9 +16,10 @@ use once_cell::sync::Lazy;
 use primitives::{
     adapter::KeystoreOptions,
     config::TokenInfo,
+    config::GANACHE_CONFIG,
     test_util::{FOLLOWER, LEADER},
     util::ApiUrl,
-    Address, Config, config::GANACHE_CONFIG,
+    Address, Config,
 };
 use web3::{contract::Contract, transports::Http, types::H160, Web3};
 
