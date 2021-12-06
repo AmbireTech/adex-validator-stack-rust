@@ -29,7 +29,7 @@ pub async fn get_analytics(
     }
 
     let sql_query = format!(
-        "SELECT {} FROM analytics WHERE {} GROUP BY {} ORDER BY time DESC LIMIT {}",
+        "SELECT {} FROM analytics WHERE {} GROUP BY {} ORDER BY time ASC LIMIT {}",
         select_clause.join(","),
         where_clauses.join(" AND "),
         group_clause.join(","),
@@ -41,7 +41,19 @@ pub async fn get_analytics(
     let stmt = client.prepare(&sql_query).await?;
     let rows = client.query(&stmt, params.as_slice()).await?;
 
-    let analytics: Vec<FetchedAnalytics> = rows.iter().map(FetchedAnalytics::from).collect();
+    let analytics: Vec<FetchedAnalytics> = rows.iter().map(|row| {
+        // Since segment_by is a dynamic value/type it can't be passed to from<&Row> so we're building the object here
+        let segment_value = match &query.segment_by {
+            Some(segment_by) => row.try_get(&**segment_by).ok(),
+            None => None
+        };
+        FetchedAnalytics {
+            time: row.get("time"),
+            payout_amount: row.try_get("payout_amount").ok(),
+            payout_count: row.try_get("payout_count").ok(),
+            segment: segment_value,
+        }
+    }).collect();
 
     Ok(analytics)
 }

@@ -85,39 +85,54 @@ pub async fn analytics<A: Adapter>(
     )
     .await?;
 
-    let mut count = 0;
-    let paid = UnifiedNum::from_u64(0);
-
-    // TODO: Discuss this part and potentially implement it as logic in the SQL Query
-    let output: FetchedAnalytics = match &query.metric {
-        Metric::Count => {
-            analytics.iter().for_each(|entry| {
-                count += entry
-                    .payout_count
-                    .expect("payout_count should be selected and not null")
-            });
-            FetchedAnalytics {
-                payout_count: Some(count),
-                payout_amount: None,
-            }
-        }
-        Metric::Paid => {
-            analytics.iter().for_each(|entry| {
-                paid.checked_add(
-                    &entry
-                        .payout_amount
-                        .expect("payout_amount should be selected and not null"),
-                )
-                .expect("TODO");
-            });
-            FetchedAnalytics {
-                payout_count: None,
-                payout_amount: Some(paid),
-            }
-        }
-    };
+    let output = split_entries_by_timeframe(analytics, period_in_hours, &query.metric, &query.segment_by);
 
     Ok(success_response(serde_json::to_string(&output)?))
+}
+
+fn split_entries_by_timeframe(mut analytics: Vec<FetchedAnalytics>, period_in_hours: i64, metric: &Metric, segment: &Option<String>) -> Vec<FetchedAnalytics> {
+    let mut res: Vec<FetchedAnalytics> = vec![];
+    let period_in_hours = period_in_hours as usize;
+    while analytics.len() > period_in_hours {
+        let drain_index = analytics.len() - period_in_hours;
+        let analytics_fraction: Vec<FetchedAnalytics> = analytics.drain(drain_index..).collect();
+        let merged_analytics = merge_analytics(analytics_fraction, metric, segment);
+        res.push(merged_analytics);
+    }
+
+    if analytics.len() > 0 {
+        let merged_analytics = merge_analytics(analytics, metric, segment);
+        res.push(merged_analytics);
+    }
+
+    res
+}
+
+fn merge_analytics(analytics: Vec<FetchedAnalytics>, metric: &Metric, segment: &Option<String>) -> FetchedAnalytics {
+    let mut count = 0;
+    let amount = UnifiedNum::from_u64(0);
+    match metric {
+        Metric::Count => {
+            analytics.iter().for_each(|a| count += a.payout_count.unwrap());
+            FetchedAnalytics {
+                time: analytics.iter().nth(0).unwrap().time,
+                payout_count: Some(count),
+                payout_amount: None,
+                segment: segment.clone(),
+            }
+        },
+        Metric::Paid => {
+            analytics.iter().for_each(|a| {
+                amount.checked_add(&a.payout_amount.unwrap()).unwrap();
+            });
+            FetchedAnalytics {
+                time: analytics.iter().nth(0).unwrap().time,
+                payout_count: None,
+                payout_amount: Some(amount),
+                segment: segment.clone(),
+            }
+        }
+    }
 }
 
 // async fn cache(

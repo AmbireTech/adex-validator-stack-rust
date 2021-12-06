@@ -207,8 +207,12 @@ pub struct Analytics {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct FetchedAnalytics {
+    // time is represented as a timestamp
+    pub time: i64,
     pub payout_amount: Option<UnifiedNum>,
     pub payout_count: Option<u32>,
+    // We can't know the exact segment type but it can always be represented as a string
+    pub segment: Option<String>,
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -759,7 +763,7 @@ pub mod campaign_create {
 
 #[cfg(feature = "postgres")]
 mod postgres {
-    use super::{Analytics, DateHour, FetchedAnalytics, MessageResponse, ValidatorMessage};
+    use super::{Analytics, DateHour, MessageResponse, ValidatorMessage};
     use crate::{
         sentry::EventAggregate,
         validator::{messages::Type as MessageType, MessageTypes},
@@ -899,15 +903,6 @@ mod postgres {
 
         accepts!(TIMESTAMPTZ);
         to_sql_checked!();
-    }
-
-    impl From<&Row> for FetchedAnalytics {
-        fn from(row: &Row) -> Self {
-            Self {
-                payout_amount: row.get("payout_amount"),
-                payout_count: Some(row.get::<_, i32>("payout_count").unsigned_abs()),
-            }
-        }
     }
 }
 
