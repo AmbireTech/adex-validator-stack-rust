@@ -107,6 +107,12 @@ impl From<EwtSigningError> for AdapterError<Error> {
 
 #[derive(Debug, Error)]
 pub enum EwtVerifyError {
+    #[error("The Ethereum Web Token header is invalid")]
+    InvalidHeader,
+    #[error("The token length should be at least 16 characters of length")]
+    InvalidTokenLength,
+    #[error("The token does not comply to the format of header.payload.signature")]
+    InvalidToken,
     #[error("Address recovery: {0}")]
     AddressRecovery(#[from] ethstore::ethkey::Error),
     #[error("Signature decoding: {0}")]
@@ -120,6 +126,6 @@ pub enum EwtVerifyError {
     PayloadDecoding(#[source] base64::DecodeError),
     #[error("Payload deserialization: {0}")]
     PayloadDeserialization(#[from] serde_json::Error),
-    #[error("Payload is not a valid utf8 string: {0}")]
-    PayloadUtf8(#[from] std::string::FromUtf8Error),
+    #[error("Payload is not a valid UTF-8 string: {0}")]
+    PayloadUtf8(#[from] std::str::Utf8Error),
 }

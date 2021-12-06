@@ -8,10 +8,8 @@ use primitives::{
     adapter::{DummyAdapterOptions, KeystoreOptions},
     config::configuration,
     postgres::POSTGRES_CONFIG,
-    util::{
-        logging::new_logger,
-        tests::prep_db::{AUTH, IDS},
-    },
+    test_util::ADDRESSES,
+    util::{logging::new_logger, tests::prep_db::AUTH},
     ValidatorId,
 };
 use sentry::{
@@ -87,7 +85,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let options = DummyAdapterOptions {
                 dummy_identity: ValidatorId::try_from(dummy_identity)
                     .expect("failed to parse dummy identity"),
-                dummy_auth: IDS.clone(),
+                dummy_auth: ADDRESSES.clone(),
                 dummy_auth_tokens: AUTH.clone(),
             };
 

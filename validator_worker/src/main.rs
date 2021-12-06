@@ -11,7 +11,7 @@ use primitives::{
     config::{configuration, Environment},
     util::{
         logging::new_logger,
-        tests::prep_db::{AUTH, IDS},
+        tests::prep_db::{ADDRESSES, AUTH},
     },
     ValidatorId,
 };
@@ -102,7 +102,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .expect("unable to get dummyIdentity");
             let options = DummyAdapterOptions {
                 dummy_identity: ValidatorId::try_from(dummy_identity)?,
-                dummy_auth: IDS.clone(),
+                dummy_auth: ADDRESSES.clone(),
                 dummy_auth_tokens: AUTH.clone(),
             };
             let mut adapter = DummyAdapter::init(options, &config);

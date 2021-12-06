@@ -12,11 +12,12 @@ use std::{collections::HashMap, fmt, sync::Arc};
 
 #[derive(Debug, Clone)]
 pub struct DummyAdapter {
+    /// Who am I
     identity: ValidatorId,
     config: Config,
-    // Auth tokens that we have verified (tokenId => session)
-    session_tokens: HashMap<String, ValidatorId>,
-    // Auth tokens that we've generated to authenticate with someone (address => token)
+    /// Auth tokens that we have verified (tokenId => session)
+    session_tokens: HashMap<String, Address>,
+    /// Auth tokens that we've generated to authenticate with someone (address => token)
     authorization_tokens: HashMap<String, String>,
     deposits: Deposits,
 }
@@ -145,7 +146,7 @@ impl Adapter for DummyAdapter {
         let who = self
             .session_tokens
             .iter()
-            .find(|(_, id)| *id == &self.identity);
+            .find(|(_, id)| *id == &self.identity.to_address());
         match who {
             Some((id, _)) => {
                 let auth = self.authorization_tokens.get(id).expect("id should exist");

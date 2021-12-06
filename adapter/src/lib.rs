@@ -4,11 +4,13 @@
 
 use primitives::{Address, BigNum};
 use thiserror::Error;
-use tiny_keccak::Keccak;
 use web3::{
     ethabi::{encode, token::Token},
     types::{Address as EthAddress, U256},
 };
+
+/// Re-export the function `keccak256` for convenience
+pub use web3::signing::keccak256;
 
 pub use self::dummy::DummyAdapter;
 pub use self::ethereum::EthereumAdapter;
@@ -33,13 +35,7 @@ pub fn get_signable_state_root(channel_id: &[u8], balance_root: &[u8; 32]) -> [u
 
     let encoded = encode(&tokens).to_vec();
 
-    let mut result = Keccak::new_keccak256();
-    result.update(&encoded);
-
-    let mut res: [u8; 32] = [0; 32];
-    result.finalize(&mut res);
-
-    res
+    keccak256(&encoded)
 }
 
 pub fn get_balance_leaf(
@@ -60,13 +56,7 @@ pub fn get_balance_leaf(
     };
     let encoded = encode(&tokens).to_vec();
 
-    let mut result = Keccak::new_keccak256();
-    result.update(&encoded);
-
-    let mut res: [u8; 32] = [0; 32];
-    result.finalize(&mut res);
-
-    Ok(res)
+    Ok(keccak256(&encoded))
 }
 
 #[cfg(test)]

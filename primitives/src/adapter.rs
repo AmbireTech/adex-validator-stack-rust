@@ -40,7 +40,7 @@ impl<AE: AdapterErrorKind> fmt::Display for Error<AE> {
 
 pub struct DummyAdapterOptions {
     pub dummy_identity: ValidatorId,
-    pub dummy_auth: HashMap<String, ValidatorId>,
+    pub dummy_auth: HashMap<String, Address>,
     pub dummy_auth_tokens: HashMap<String, String>,
 }
 
@@ -53,7 +53,7 @@ pub struct KeystoreOptions {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Session {
     pub era: i64,
-    pub uid: ValidatorId,
+    pub uid: Address,
 }
 
 #[async_trait]

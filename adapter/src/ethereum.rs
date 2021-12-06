@@ -3,28 +3,37 @@ use chrono::Utc;
 use create2::calc_addr;
 use error::*;
 use ethstore::{
-    ethkey::{public_to_address, recover, verify_address, Message, Password, Signature},
+    ethkey::{verify_address, Message, Password, Signature},
     SafeAccount,
 };
 use once_cell::sync::Lazy;
 use primitives::{
     adapter::{Adapter, AdapterResult, Deposit, Error as AdapterError, KeystoreOptions, Session},
     config::Config,
-    Address, BigNum, Channel, ToETHChecksum, ValidatorId,
+    Address, BigNum, Channel, ValidatorId,
 };
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{fs, str::FromStr};
-use tiny_keccak::Keccak;
 use web3::{
     contract::{Contract, Options},
     ethabi::{encode, Token},
+    signing::keccak256,
     transports::Http,
     types::{H160, U256},
     Web3,
 };
 
+use self::ewt::Payload;
+
 mod error;
+/// Ethereum Web Token
+///
+/// This module implements the Ethereum Web Token with 2 difference:
+/// - The signature includes the Ethereum signature mode, see [`ETH_SIGN_SUFFIX`]
+/// - The message being signed is not the `header.payload` directly,
+///   but the `keccak256("header.payload")`.
+pub mod ewt;
+
 #[cfg(any(test, feature = "test-util"))]
 pub mod test_util;
 
@@ -46,22 +55,16 @@ pub static DEPOSITOR_BYTECODE_DECODED: Lazy<Vec<u8>> = Lazy::new(|| {
     hex::decode(bytecode).expect("Decoded properly")
 });
 
-trait EthereumChannel {
-    fn tokenize(&self) -> Token;
-}
+/// Hashes the passed message with the format of `Signed Data Standard`
+/// See https://eips.ethereum.org/EIPS/eip-191
+fn to_ethereum_signed(message: &[u8]) -> [u8; 32] {
+    let eth = "\x19Ethereum Signed Message:\n";
+    let message_length = message.len();
 
-impl EthereumChannel for Channel {
-    fn tokenize(&self) -> Token {
-        let tokens = vec![
-            Token::Address(self.leader.as_bytes().into()),
-            Token::Address(self.follower.as_bytes().into()),
-            Token::Address(self.guardian.as_bytes().into()),
-            Token::Address(self.token.as_bytes().into()),
-            Token::FixedBytes(self.nonce.to_bytes().to_vec()),
-        ];
+    let mut bytes = format!("{}{}", eth, message_length).into_bytes();
+    bytes.extend(message);
 
-        Token::Tuple(tokens)
-    }
+    keccak256(&bytes)
 }
 
 pub fn get_counterfactual_address(
@@ -85,6 +88,24 @@ pub fn get_counterfactual_address(
     Address::from(address_bytes)
 }
 
+trait EthereumChannel {
+    fn tokenize(&self) -> Token;
+}
+
+impl EthereumChannel for Channel {
+    fn tokenize(&self) -> Token {
+        let tokens = vec![
+            Token::Address(self.leader.as_bytes().into()),
+            Token::Address(self.follower.as_bytes().into()),
+            Token::Address(self.guardian.as_bytes().into()),
+            Token::Address(self.token.as_bytes().into()),
+            Token::FixedBytes(self.nonce.to_bytes().to_vec()),
+        ];
+
+        Token::Tuple(tokens)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct EthereumAdapter {
     address: ValidatorId,
@@ -102,13 +123,16 @@ impl EthereumAdapter {
         let keystore_json: Value =
             serde_json::from_str(&keystore_contents).map_err(KeystoreError::Deserialization)?;
 
-        let address = keystore_json
-            .get("address")
-            .and_then(|value| value.as_str())
-            .map(eth_checksum::checksum)
-            .ok_or(KeystoreError::AddressMissing)?;
+        let address = {
+            let keystore_address = keystore_json
+                .get("address")
+                .and_then(|value| value.as_str())
+                .ok_or(KeystoreError::AddressMissing)?;
 
-        let address = ValidatorId::try_from(&address).map_err(KeystoreError::AddressInvalid)?;
+            keystore_address
+                .parse()
+                .map_err(KeystoreError::AddressInvalid)
+        }?;
 
         let transport =
             web3::transports::Http::new(&config.ethereum_network).map_err(Error::Web3)?;
@@ -124,41 +148,47 @@ impl EthereumAdapter {
         })
     }
 
-    /// Checks if the `from` address has privilages,
-    /// by using the Identity contract with a create2 address created with the `from` address
-    pub async fn has_privilages(
+    /// Checks if the signer of the `hash` & `signature` has privileges,
+    /// by using the Identity contract and the passed identity [`Address`]
+    /// See https://eips.ethereum.org/EIPS/eip-1271
+    /// Signature should be `01` suffixed for Eth Sign
+    pub async fn has_privileges(
         &self,
         identity: Address,
-        check_for: Address,
         hash: [u8; 32],
-        signature: &[u8],
+        signature_with_mode: &[u8],
     ) -> Result<bool, Error> {
-        // see https://eips.ethereum.org/EIPS/eip-1271
-        let magic_value: u32 = 0x1626ba7e;
-        // 0x4e487b710000000000000000000000000000000000000000000000000000000000000021
+        // 0x1626ba7e is in little endian
+        let magic_value: u32 = 2126128662;
+        // u32::MAX = 4294967295
+        let _no_access_value: u32 = 0xffffffff;
 
         let identity_contract =
             Contract::from_json(self.web3.eth(), H160(identity.to_bytes()), &IDENTITY_ABI)
                 .map_err(Error::ContractInitialization)?;
 
-        let status: u32 = identity_contract
+        // we receive `bytes4` from the contract
+        let status: [u8; 4] = identity_contract
             .query(
                 "isValidSignature",
                 (
                     // bytes32
                     Token::FixedBytes(hash.to_vec()),
                     // bytes
-                    Token::Bytes(signature.to_vec()),
+                    Token::Bytes(signature_with_mode.to_vec()),
                 ),
-                Some(H160(check_for.to_bytes())),
+                None,
                 Options::default(),
                 None,
             )
             .await
             .map_err(Error::ContractQuerying)?;
 
+        // turn this into `u32` (EVM is in little endian)
+        let actual_value = u32::from_le_bytes(status);
+
         // if it is the magical value then the address has privileges.
-        Ok(status == magic_value)
+        Ok(actual_value == magic_value)
     }
 }
 
@@ -185,7 +215,7 @@ impl Adapter for EthereumAdapter {
     fn sign(&self, state_root: &str) -> AdapterResult<String, Self::AdapterError> {
         if let Some(wallet) = &self.wallet {
             let state_root = hex::decode(state_root).map_err(VerifyError::StateRootDecoding)?;
-            let message = Message::from(hash_message(&state_root));
+            let message = Message::from(to_ethereum_signed(&state_root));
             let wallet_sign = wallet
                 .sign(&self.keystore_pwd, &message)
                 .map_err(EwtSigningError::SigningMessage)?;
@@ -212,7 +242,7 @@ impl Adapter for EthereumAdapter {
         let address = ethstore::ethkey::Address::from(*signer.as_bytes());
         let signature = Signature::from_electrum(&decoded_signature);
         let state_root = hex::decode(state_root).map_err(VerifyError::StateRootDecoding)?;
-        let message = Message::from(hash_message(&state_root));
+        let message = Message::from(to_ethereum_signed(&state_root));
 
         let verify_address = verify_address(&address, &signature, &message)
             .map_err(VerifyError::PublicKeyRecovery)?;
@@ -226,30 +256,9 @@ impl Adapter for EthereumAdapter {
         &'a self,
         token: &'a str,
     ) -> AdapterResult<Session, Self::AdapterError> {
-        if token.len() < 16 {
-            return Err(AdapterError::Authentication(
-                "Invalid token id length".to_string(),
-            ));
-        }
+        let (verified_token, verified) = ewt::Token::verify(token).map_err(Error::VerifyMessage)?;
 
-        let parts: Vec<&str> = token.split('.').collect();
-        let (header_encoded, payload_encoded, token_encoded) =
-            match (parts.get(0), parts.get(1), parts.get(2)) {
-                (Some(header_encoded), Some(payload_encoded), Some(token_encoded)) => {
-                    (header_encoded, payload_encoded, token_encoded)
-                }
-                _ => {
-                    return Err(AdapterError::Authentication(format!(
-                        "{} token string is incorrect",
-                        token
-                    )))
-                }
-            };
-
-        let verified = ewt_verify(header_encoded, payload_encoded, token_encoded)
-            .map_err(Error::VerifyMessage)?;
-
-        if self.whoami().to_checksum() != verified.payload.id {
+        if self.whoami() != verified.payload.id {
             return Err(AdapterError::Authentication(
                 "token payload.id !== whoami(): token was not intended for us".to_string(),
             ));
@@ -257,18 +266,13 @@ impl Adapter for EthereumAdapter {
 
         let sess = match &verified.payload.identity {
             Some(identity) => {
-                let decoded_signature =
-                    base64::decode_config(token_encoded, base64::URL_SAFE_NO_PAD).unwrap();
-                    
-                let hash =
-                    hash_message(format!("{}.{}", header_encoded, payload_encoded).as_bytes());
+                // the Hash for has_privileges should **not** be an Ethereum Signed Message hash
 
                 if self
-                    .has_privilages(
-                        identity.to_address(),
-                        self.whoami().to_address(),
-                        hash,
-                        &decoded_signature,
+                    .has_privileges(
+                        *identity,
+                        verified_token.message_hash,
+                        &verified_token.signature,
                     )
                     .await?
                 {
@@ -291,19 +295,21 @@ impl Adapter for EthereumAdapter {
         Ok(sess)
     }
 
-    fn get_auth(&self, validator: &ValidatorId) -> AdapterResult<String, Self::AdapterError> {
+    fn get_auth(&self, intended_for: &ValidatorId) -> AdapterResult<String, Self::AdapterError> {
         let wallet = self.wallet.as_ref().ok_or(AdapterError::LockedWallet)?;
 
         let era = Utc::now().timestamp_millis() as f64 / 60000.0;
         let payload = Payload {
-            id: validator.to_checksum(),
+            id: *intended_for,
             era: era.floor() as i64,
             identity: None,
-            address: self.whoami().to_checksum(),
+            address: self.whoami().to_address(),
         };
 
-        ewt_sign(wallet, &self.keystore_pwd, &payload)
-            .map_err(|err| AdapterError::Adapter(Error::SignMessage(err).into()))
+        let token = ewt::Token::sign(wallet, &self.keystore_pwd, payload)
+            .map_err(|err| AdapterError::Adapter(Error::SignMessage(err).into()))?;
+
+        Ok(token.to_string())
     }
 
     async fn get_deposit(
@@ -393,124 +399,14 @@ impl Adapter for EthereumAdapter {
     }
 }
 
-fn hash_message(message: &[u8]) -> [u8; 32] {
-    let eth = "\x19Ethereum Signed Message:\n";
-    let message_length = message.len();
-
-    let mut result = Keccak::new_keccak256();
-    result.update(format!("{}{}", eth, message_length).as_bytes());
-    result.update(message);
-
-    let mut res: [u8; 32] = [0; 32];
-    result.finalize(&mut res);
-
-    res
-}
-
-// Ethereum Web Tokens
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Payload {
-    pub id: String,
-    pub era: i64,
-    pub address: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub identity: Option<ValidatorId>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct VerifyPayload {
-    pub from: ValidatorId,
-    pub payload: Payload,
-}
-
-#[derive(Serialize, Deserialize)]
-struct Header {
-    #[serde(rename = "type")]
-    header_type: String,
-    alg: String,
-}
-
-pub fn ewt_sign(
-    signer: &SafeAccount,
-    password: &Password,
-    payload: &Payload,
-) -> Result<String, EwtSigningError> {
-    let header = Header {
-        header_type: "JWT".to_string(),
-        alg: "ETH".to_string(),
-    };
-
-    let header_encoded = base64::encode_config(
-        &serde_json::to_string(&header).map_err(EwtSigningError::HeaderSerialization)?,
-        base64::URL_SAFE_NO_PAD,
-    );
-
-    let payload_encoded = base64::encode_config(
-        &serde_json::to_string(payload).map_err(EwtSigningError::PayloadSerialization)?,
-        base64::URL_SAFE_NO_PAD,
-    );
-    let message = Message::from(hash_message(
-        format!("{}.{}", header_encoded, payload_encoded).as_bytes(),
-    ));
-    let signature: Signature = signer
-        .sign(password, &message)
-        .map_err(EwtSigningError::SigningMessage)?
-        .into_electrum()
-        .into();
-
-    let token = base64::encode_config(
-        &hex::decode(format!("{}", signature)).map_err(EwtSigningError::DecodingHexSignature)?,
-        base64::URL_SAFE_NO_PAD,
-    );
-
-    Ok(format!("{}.{}.{}", header_encoded, payload_encoded, token))
-}
-
-pub fn ewt_verify(
-    header_encoded: &str,
-    payload_encoded: &str,
-    token: &str,
-) -> Result<VerifyPayload, EwtVerifyError> {
-    let message = Message::from(hash_message(
-        format!("{}.{}", header_encoded, payload_encoded).as_bytes(),
-    ));
-
-    let decoded_signature = base64::decode_config(&token, base64::URL_SAFE_NO_PAD)
-        .map_err(EwtVerifyError::SignatureDecoding)?;
-    let signature = Signature::from_electrum(&decoded_signature);
-    // signature is empty, so it is invalid, see `Signature::from_electrum`
-    if *signature == [0; 65] {
-        return Err(EwtVerifyError::InvalidSignature);
-    }
-
-    let address =
-        public_to_address(&recover(&signature, &message).map_err(EwtVerifyError::AddressRecovery)?);
-
-    let payload_string = String::from_utf8(
-        base64::decode_config(&payload_encoded, base64::URL_SAFE_NO_PAD)
-            .map_err(EwtVerifyError::PayloadDecoding)?,
-    )
-    .map_err(EwtVerifyError::PayloadUtf8)?;
-
-    let payload: Payload =
-        serde_json::from_str(&payload_string).map_err(EwtVerifyError::PayloadDeserialization)?;
-
-    let verified_payload = VerifyPayload {
-        from: ValidatorId::from(&address.0),
-        payload,
-    };
-
-    Ok(verified_payload)
-}
-
 #[cfg(test)]
 mod test {
-    use super::test_util::*;
-    use super::*;
+    use super::{ewt::ETH_SIGN_SUFFIX, test_util::*, *};
     use chrono::Utc;
     use primitives::{
         config::{DEVELOPMENT_CONFIG, GANACHE_CONFIG},
-        test_util::{CREATOR, IDS, LEADER},
+        test_util::{ADDRESS_3, ADDRESS_4, ADDRESS_5, ADVERTISER, CREATOR, IDS, LEADER},
+        ToHex,
     };
     use web3::{transports::Http, Web3};
 
@@ -563,87 +459,202 @@ mod test {
         assert!(verify2, "invalid signature 2 verification");
     }
 
-    #[test]
-    fn should_generate_correct_ewt_sign_and_verify() {
-        let mut eth_adapter = setup_eth_adapter(DEVELOPMENT_CONFIG.clone());
+    /// Validated using `lib/protocol-eth/js/Bundle.js`
+    #[tokio::test]
+    async fn test_has_privileges_with_raw_data() {
+        let user = *ADDRESS_4;
+        // the web3 from Adapter is used to deploy the Identity contract
+        let mut user_adapter = EthereumAdapter::init(KEYSTORES[&user].clone(), &GANACHE_CONFIG)
+            .expect("should init ethereum adapter");
+        user_adapter.unlock().expect("should unlock eth adapter");
 
-        eth_adapter.unlock().expect("should unlock eth adapter");
+        let evil = *ADDRESS_5;
+        let identify_as = *ADDRESS_3;
 
-        let payload = Payload {
-            id: "awesomeValidator".into(),
-            era: 100_000,
-            address: eth_adapter.whoami().to_checksum(),
-            identity: None,
-        };
-        let wallet = eth_adapter.wallet.clone();
-        let response = ewt_sign(&wallet.unwrap(), &eth_adapter.keystore_pwd, &payload)
-            .expect("failed to generate ewt signature");
-        let expected = "eyJ0eXBlIjoiSldUIiwiYWxnIjoiRVRIIn0.eyJpZCI6ImF3ZXNvbWVWYWxpZGF0b3IiLCJlcmEiOjEwMDAwMCwiYWRkcmVzcyI6IjB4MmJEZUFGQUU1Mzk0MDY2OURhQTZGNTE5MzczZjY4NmMxZjNkMzM5MyJ9.gGw_sfnxirENdcX5KJQWaEt4FVRvfEjSLD4f3OiPrJIltRadeYP2zWy9T2GYcK5xxD96vnqAw4GebAW7rMlz4xw";
-        assert_eq!(response, expected, "generated wrong ewt signature");
+        let msg_hash_actual = keccak256(&hex::decode("21851b").unwrap());
 
-        let expected_verification_response = VerifyPayload {
-            from: ValidatorId::try_from("0x2bdeafae53940669daa6f519373f686c1f3d3393")
-                .expect("Valid ValidatorId"),
-            payload: Payload {
-                id: "awesomeValidator".to_string(),
-                era: 100_000,
-                address: "0x2bDeAFAE53940669DaA6F519373f686c1f3d3393".to_string(),
-                identity: None,
-            },
-        };
+        let msg_hash = "978d98785935b5526480e9ca00d01b063a6c56f51afbc4ad27b28daecb14258d";
+        let msg_hash_decoded = hex::decode(msg_hash).unwrap();
+        assert_eq!(msg_hash_decoded.len(), 32);
+        assert_eq!(&hex::encode(msg_hash_actual), msg_hash);
+        assert_eq!(&msg_hash_decoded, &msg_hash_actual);
 
-        let parts: Vec<&str> = expected.split('.').collect();
+        let (identity_address, _contract) =
+            deploy_identity_contract(&user_adapter.web3, identify_as, &[user])
+                .await
+                .expect("Should deploy identity");
 
-        let verification =
-            ewt_verify(parts[0], parts[1], parts[2]).expect("Failed to verify ewt token");
+        // User should have privileges!
+        {
+            let user_sig = "0x41fb9082f8d369256ed7f46afff32efe1511128b92d0be3b2457f012e389320f348700a58395d8f55836cf5d95db431b1061d30b11114d21bd0c5d9dcd4791e71b01";
 
-        assert_eq!(
-            expected_verification_response, verification,
-            "generated wrong verification payload"
-        );
+            let wallet = user_adapter.wallet.clone().unwrap();
+
+            let signature_actual = {
+                let ethers_sign_message = to_ethereum_signed(&msg_hash_actual);
+                let message = Message::from(ethers_sign_message);
+
+                let mut signature = wallet
+                    .sign(&user_adapter.keystore_pwd, &message)
+                    .expect("Should sign message")
+                    .into_electrum()
+                    .to_vec();
+
+                signature.extend(ETH_SIGN_SUFFIX.as_slice());
+                signature
+            };
+
+            assert_eq!(user_sig, signature_actual.to_hex_prefixed());
+
+            let has_privileges = user_adapter
+                .has_privileges(identity_address, msg_hash_actual, &signature_actual)
+                .await
+                .expect("Should get privileges");
+
+            assert!(has_privileges, "User should have privileges!")
+        }
+
+        // Evil should **not** have privileges!
+        {
+            let evil_sig = "0x78b1d955c38baa3d98e11c5ed379191880d9f85acde31a1b7da1436825f688ec1b0a12bc749701a0135643dfb7f84a65697afa8065f886edb259f500651e415b1b01";
+
+            let mut evil_adapter = EthereumAdapter::init(KEYSTORES[&evil].clone(), &GANACHE_CONFIG)
+                .expect("should init ethereum adapter");
+            evil_adapter.unlock().expect("should unlock eth adapter");
+            let wallet = evil_adapter.wallet.clone().unwrap();
+
+            let signature_actual = {
+                let ethers_sign_message = to_ethereum_signed(&msg_hash_actual);
+                let message = Message::from(ethers_sign_message);
+
+                let mut signature = wallet
+                    .sign(&evil_adapter.keystore_pwd, &message)
+                    .expect("Should sign message")
+                    .into_electrum()
+                    .to_vec();
+
+                signature.extend(ETH_SIGN_SUFFIX.as_slice());
+                signature
+            };
+
+            assert_eq!(evil_sig, signature_actual.to_hex_prefixed());
+
+            let has_privileges = evil_adapter
+                .has_privileges(identity_address, msg_hash_actual, &signature_actual)
+                .await
+                .expect("Should get privileges");
+
+            assert!(!has_privileges, "Evil should not have privileges!")
+        }
     }
 
     #[tokio::test]
-    async fn test_session_from_token() {
-        use primitives::ToETHChecksum;
-
-        // let identity = ValidatorId::try_from("0x5B04DBc513F90CaAFAa09307Ad5e3C65EB4b26F0").unwrap();
-
-        // let mut eth_adapter = setup_eth_adapter(GANACHE_CONFIG.clone());
-        let mut adapter = EthereumAdapter::init(KEYSTORES[&CREATOR].clone(), &GANACHE_CONFIG)
+    async fn test_has_privileges_with_payload() {
+        let mut adapter = EthereumAdapter::init(KEYSTORES[&LEADER].clone(), &GANACHE_CONFIG)
             .expect("should init ethereum adapter");
-
         adapter.unlock().expect("should unlock eth adapter");
 
         let whoami = adapter.whoami().to_address();
+        assert_eq!(
+            *LEADER, whoami,
+            "Ethereum address should be authenticated with keystore file as LEADER!"
+        );
 
-        // todo: Deploy Identity
-        let (identity_address, _contract) =
-            deploy_identity_contract(&adapter.web3, adapter.whoami().to_address(), &[whoami])
+        let (identity_address, contract) =
+            deploy_identity_contract(&adapter.web3, *CREATOR, &[whoami])
                 .await
                 .expect("Should deploy identity");
-        let identity_id = ValidatorId::from(identity_address);
+
+        let set_privileges: [u8; 32] = contract
+            .query(
+                "privileges",
+                Token::Address(H160(whoami.to_bytes())),
+                None,
+                Options::default(),
+                None,
+            )
+            .await
+            .expect("should query contract privileges");
+
+        let expected_privileges = {
+            let mut bytes32 = [0_u8; 32];
+            bytes32[31] = 1;
+            bytes32
+        };
+        assert_eq!(
+            expected_privileges, set_privileges,
+            "The Privilege set through constructor should be `1`"
+        );
 
         let wallet = adapter.wallet.clone().expect("Should have unlocked wallet");
 
         let era = Utc::now().timestamp_millis() as f64 / 60000.0;
         let payload = Payload {
-            id: adapter.whoami().to_checksum(),
+            id: adapter.whoami(),
             era: era.floor() as i64,
-            identity: Some(identity_id),
-            address: adapter.whoami().to_checksum(),
+            address: adapter.whoami().to_address(),
+            identity: Some(identity_address),
         };
 
-        let token = ewt_sign(&wallet, &adapter.keystore_pwd, &payload)
-            .expect("Sould successfully sign the Paypload");
-        // let parts = token.split('.').collect::<Vec<_>>();
+        let auth_token = ewt::Token::sign(&wallet, &adapter.keystore_pwd, payload)
+            .expect("Should sign successfully the Payload");
 
-        // double check that we have access for _Who Am I_
-        // eth_adapter.has_privilages(identity_address, whoami, ).await.expect("Ok");
+        let has_privileges = adapter
+            .has_privileges(
+                identity_address,
+                auth_token.message_hash,
+                &auth_token.signature,
+            )
+            .await
+            .expect("Should get privileges");
 
-        let session: Session = adapter.session_from_token(&token).await.unwrap();
+        assert!(has_privileges);
+    }
 
-        assert_eq!(session.uid, identity_id);
+    #[tokio::test]
+    async fn test_session_from_token() {
+        let mut adapter = EthereumAdapter::init(KEYSTORES[&LEADER].clone(), &GANACHE_CONFIG)
+            .expect("should init Leader ethereum adapter");
+        adapter.unlock().expect("should unlock eth adapter");
+
+        let (identity_address, _contract) =
+            deploy_identity_contract(&adapter.web3, *CREATOR, &[*ADVERTISER])
+                .await
+                .expect("Should deploy identity");
+
+        let mut signer_adapter =
+            EthereumAdapter::init(KEYSTORES[&ADVERTISER].clone(), &GANACHE_CONFIG)
+                .expect("should init Advertiser ethereum adapter");
+        signer_adapter.unlock().expect("Should unlock eth adapter");
+
+        assert_eq!(signer_adapter.whoami(), ValidatorId::from(*ADVERTISER));
+
+        let signer_wallet = signer_adapter
+            .wallet
+            .clone()
+            .expect("Should have unlocked wallet");
+
+        let era = Utc::now().timestamp_millis() as f64 / 60000.0;
+        let payload = Payload {
+            // the intended ValidatorId for whom the payload is.
+            id: adapter.whoami(),
+            era: era.floor() as i64,
+            identity: Some(identity_address),
+            // The singer address
+            address: signer_adapter.whoami().to_address(),
+        };
+
+        let token = ewt::Token::sign(&signer_wallet, &signer_adapter.keystore_pwd, payload)
+            .expect("Should sign successfully the Payload");
+
+        // double check that we have privileges for _Who Am I_
+        assert!(adapter
+            .has_privileges(identity_address, token.message_hash, &token.signature)
+            .await
+            .expect("Ok"));
+
+        let session: Session = adapter.session_from_token(token.as_str()).await.unwrap();
+        assert_eq!(session.uid, identity_address);
     }
 
     #[tokio::test]

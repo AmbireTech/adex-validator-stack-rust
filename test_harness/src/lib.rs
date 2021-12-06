@@ -7,7 +7,7 @@ use adapter::ethereum::{
     get_counterfactual_address,
     test_util::{
         deploy_outpace_contract, deploy_sweeper_contract, deploy_token_contract, mock_set_balance,
-        outpace_deposit, GANACHE_URL, MOCK_TOKEN_ABI,
+        outpace_deposit, GANACHE_URL, MOCK_TOKEN_ABI
     },
     OUTPACE_ABI, SWEEPER_ABI,
 };
@@ -18,16 +18,11 @@ use primitives::{
     config::TokenInfo,
     test_util::{FOLLOWER, LEADER},
     util::ApiUrl,
-    Address, Config,
+    Address, Config, config::GANACHE_CONFIG,
 };
 use web3::{contract::Contract, transports::Http, types::H160, Web3};
 
 pub mod deposits;
-
-pub static GANACHE_CONFIG: Lazy<Config> = Lazy::new(|| {
-    Config::try_toml(include_str!("../../docs/config/ganache.toml"))
-        .expect("Failed to parse ganache.toml config file")
-});
 
 /// ganache-cli setup with deployed contracts using the snapshot directory
 /// Uses the [`GANACHE_CONFIG`] & [`GANACHE_URL`] statics to init the contracts

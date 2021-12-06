@@ -5,7 +5,10 @@ use hyper::header::{AUTHORIZATION, REFERER};
 use hyper::{Body, Request};
 use redis::aio::MultiplexedConnection;
 
-use primitives::adapter::{Adapter, Session as AdapterSession};
+use primitives::{
+    adapter::{Adapter, Session as AdapterSession},
+    ValidatorId,
+};
 
 use crate::{middleware::Middleware, Application, Auth, ResponseError, Session};
 
@@ -107,7 +110,7 @@ async fn for_request(
 
         let auth = Auth {
             era: adapter_session.era,
-            uid: adapter_session.uid,
+            uid: ValidatorId::from(adapter_session.uid),
         };
 
         req.extensions_mut().insert(auth);
@@ -132,6 +135,7 @@ mod test {
     use primitives::{
         adapter::DummyAdapterOptions,
         config::DEVELOPMENT_CONFIG,
+        test_util::ADDRESSES,
         util::tests::prep_db::{AUTH, IDS},
     };
 
@@ -148,7 +152,7 @@ mod test {
         let connection = TESTS_POOL.get().await.expect("Should return Object");
         let adapter_options = DummyAdapterOptions {
             dummy_identity: IDS["leader"],
-            dummy_auth: IDS.clone(),
+            dummy_auth: ADDRESSES.clone(),
             dummy_auth_tokens: AUTH.clone(),
         };
         let config = DEVELOPMENT_CONFIG.clone();
