@@ -29,6 +29,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "adapter-v3"
+version = "0.1.0"
+dependencies = [
+ "primitives",
+]
+
+[[package]]
 name = "addr2line"
 version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
