@@ -47,18 +47,18 @@ impl<C: LockedClient + Unlockable> Adapter<C, Locked<C>> {
     }
 }
 
-impl<C: UnlockedClient> Adapter<C, Unlocked<C>> {
-    pub fn sign(&self, state_root: &str) -> Result<String, Error> {
+impl<C: UnlockedClient> UnlockedClient for Adapter<C, Unlocked<C>> {
+    fn sign(&self, state_root: &str) -> Result<String, Error> {
         Ok(state_root.to_string())
     }
 
-    pub fn get_auth(&self, intended_for: ValidatorId) -> Result<String, Error> {
+    fn get_auth(&self, intended_for: ValidatorId) -> Result<String, Error> {
         Ok(intended_for.to_string())
     }
 }
 
-impl<C: LockedClient, S: Deref<Target=C>> Adapter<C, S> {
-    pub fn get_deposit(
+impl<C, S> LockedClient for Adapter<C, S> where C: LockedClient, S: Deref<Target=C> {
+    fn get_deposit(
         &self,
         channel: &Channel,
         depositor_address: &Address,
@@ -109,9 +109,12 @@ pub struct UnlockedWallet {
 }
 
 #[derive(Debug)]
-pub struct LockedWallet {
-    keystore: (),
-    password: (),
+pub enum LockedWallet {
+    KeyStore {
+        keystore: (),
+        password: (),
+    },
+    PrivateKey(String)
 }
 
 pub trait WalletState {}
@@ -154,8 +157,8 @@ impl Unlockable for Ethereum<UnlockedWallet> {
 impl<S: WalletState> LockedClient for Ethereum<S> {
     fn get_deposit(
         &self,
-        channel: &Channel,
-        depositor_address: &Address,
+        _channel: &Channel,
+        _depositor_address: &Address,
     ) -> Result<Deposit, Error> {
         Ok(Deposit {
             total: BigNum::from(42_u64),
@@ -188,11 +191,10 @@ mod test {
                 web3: (),
                 keystore: (),
                 keystore_pwd: (),
-                state: LockedWallet {
+                state: LockedWallet::KeyStore {
                     keystore: (),
                     password: (),
                 },
-                // state: UnlockedWallet { wallet: (), password: () },
             };
             let adapter = Adapter::new(ethereum);
 

@@ -1,4 +1,4 @@
-use adapter_v3::{Adapter, Locked, Unlocked, Error, UnlockedClient, LockedClient, Unlockable};
+use adapter_v3::{Adapter, Error, UnlockedClient, LockedClient, Unlockable};
 use primitives::{ValidatorId, Channel, Address, adapter::Deposit, BigNum, test_util::{DUMMY_CAMPAIGN, ADDRESS_1}};
 
 #[derive(Debug)]
@@ -17,8 +17,8 @@ impl Unlockable for Dummy {
 impl LockedClient for Dummy {
     fn get_deposit(
         &self,
-        channel: &Channel,
-        depositor_address: &Address,
+        _channel: &Channel,
+        _depositor_address: &Address,
     ) -> Result<Deposit, Error> {
         Ok(Deposit {
             total: BigNum::from(42_u64),
@@ -45,10 +45,14 @@ fn main() {
 
     let adapter = Adapter::new(dummy);
     
+    // Should be able to call get_deposit before unlocking!
     adapter.get_deposit(&DUMMY_CAMPAIGN.channel, &ADDRESS_1).expect("Should get deposit");
     
     // by default the Dummy adapter is Unlocked, but we still need to Unlock it!
     let unlocked = adapter.unlock().expect("Should unlock");
 
     assert_eq!("test".to_string(), unlocked.sign("test").expect("Ok"));
+
+    // Should be able to call get_deposit after unlocking!
+    unlocked.get_deposit(&DUMMY_CAMPAIGN.channel, &ADDRESS_1).expect("Should get deposit");
 }
