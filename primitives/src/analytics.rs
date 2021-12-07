@@ -124,7 +124,7 @@ pub enum OperatingSystem {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Display)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "camelCase")]
 pub enum Timeframe {
     Year,
     Month,
@@ -132,14 +132,14 @@ pub enum Timeframe {
     Day,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Display)]
-#[serde(rename_all = "lowercase")]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Display)]
+#[serde(rename_all = "camelCase")]
 pub enum Metric {
     Count,
     Paid,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Display)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Display)]
 pub enum AuthenticateAs {
     #[display("{0}")]
     Advertiser(ValidatorId),
