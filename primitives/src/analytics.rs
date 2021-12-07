@@ -160,7 +160,7 @@ pub enum Timeframe {
     Day,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Display)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Display)]
 #[serde(rename_all = "camelCase")]
 pub enum Metric {
     Count,
