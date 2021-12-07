@@ -47,13 +47,13 @@ pub mod postgres {
             w: &mut BytesMut,
         ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
             match self {
-                Self::CampaignId(id) => id.to_string().to_sql(ty, w),
-                Self::AdUnit(ipfs) | Self::AdSlot(ipfs) => ipfs.to_string().to_sql(ty, w),
+                Self::CampaignId(id) => id.to_sql(ty, w),
+                Self::AdUnit(ipfs) | Self::AdSlot(ipfs) => ipfs.to_sql(ty, w),
                 Self::AdSlotType(value) | Self::Hostname(value) | Self::Country(value) => {
                     value.to_sql(ty, w)
                 }
-                Self::Advertiser(addr) | Self::Publisher(addr) => addr.to_string().to_sql(ty, w),
-                Self::OperatingSystem(os_name) => os_name.to_string().to_sql(ty, w),
+                Self::Advertiser(addr) | Self::Publisher(addr) => addr.to_sql(ty, w),
+                Self::OperatingSystem(os_name) => os_name.to_sql(ty, w),
             }
         }
 
@@ -126,18 +126,18 @@ pub enum AnalyticsQueryKey {
 }
 
 impl AnalyticsQuery {
-    pub fn get_key(&self, key: &str) -> &Option<AnalyticsQueryKey> {
+    pub fn get_key(&self, key: &str) -> Option<&AnalyticsQueryKey> {
         match key {
-            "campaignId" => &self.campaign_id,
-            "adUnit" => &self.ad_unit,
-            "adSlot" => &self.ad_slot,
-            "adSlotType" => &self.ad_slot_type,
-            "advertiser" => &self.advertiser,
-            "publisher" => &self.publisher,
-            "hostname" => &self.hostname,
-            "country" => &self.country,
-            "osName" => &self.os_name,
-            _ => &None,
+            "campaignId" => self.campaign_id.as_ref(),
+            "adUnit" => self.ad_unit.as_ref(),
+            "adSlot" => self.ad_slot.as_ref(),
+            "adSlotType" => self.ad_slot_type.as_ref(),
+            "advertiser" => self.advertiser.as_ref(),
+            "publisher" => self.publisher.as_ref(),
+            "hostname" => self.hostname.as_ref(),
+            "country" => self.country.as_ref(),
+            "osName" => self.os_name.as_ref(),
+            _ => None,
         }
     }
 }

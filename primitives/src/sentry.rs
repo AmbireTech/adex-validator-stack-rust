@@ -1,13 +1,13 @@
 use crate::{
-    analytics::OperatingSystem,
+    analytics::{OperatingSystem, Timeframe},
     balances::BalancesState,
     spender::Spender,
     validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
     Address, Balances, BigNum, CampaignId, Channel, ChannelId, UnifiedNum, ValidatorId, IPFS,
 };
-use chrono::{Date, DateTime, NaiveDate, TimeZone, Timelike, Utc};
+use chrono::{Date, DateTime, Duration, NaiveDate, TimeZone, Timelike, Utc};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::{collections::HashMap, fmt, hash::Hash};
+use std::{collections::HashMap, fmt, hash::Hash, ops::Sub};
 use thiserror::Error;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -235,6 +235,14 @@ pub struct DateHour<Tz: TimeZone> {
     pub hour: u32,
 }
 
+impl<Tz: TimeZone> fmt::Display for DateHour<Tz> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let datetime = self.to_datetime();
+
+        datetime.fmt(f)
+    }
+}
+
 impl DateHour<Utc> {
     /// # Panics
     ///
@@ -302,6 +310,33 @@ impl<Tz: TimeZone> TryFrom<DateTime<Tz>> for DateHour<Tz> {
                 seconds: datetime.second(),
                 nanoseconds: datetime.nanosecond(),
             }),
+        }
+    }
+}
+
+impl<Tz: TimeZone> Sub<&Timeframe> for DateHour<Tz> {
+    type Output = DateHour<Tz>;
+
+    fn sub(self, rhs: &Timeframe) -> Self::Output {
+        let result = self.to_datetime() - Duration::hours(rhs.to_hours());
+
+        DateHour {
+            date: result.date(),
+            hour: result.hour(),
+        }
+    }
+}
+
+/// Subtracts **X** hours from the [`DateHour`]
+impl<Tz: TimeZone> Sub<i64> for DateHour<Tz> {
+    type Output = DateHour<Tz>;
+
+    fn sub(self, rhs: i64) -> Self::Output {
+        let result = self.to_datetime() - Duration::hours(rhs);
+
+        DateHour {
+            date: result.date(),
+            hour: result.hour(),
         }
     }
 }

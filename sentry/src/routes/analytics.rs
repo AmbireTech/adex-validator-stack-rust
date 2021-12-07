@@ -1,5 +1,4 @@
 use crate::{db::analytics::get_analytics, success_response, Application, Auth, ResponseError};
-use chrono::{Duration, Timelike, Utc};
 use hyper::{Body, Request, Response};
 use once_cell::sync::Lazy;
 use primitives::{
@@ -33,9 +32,7 @@ pub async fn analytics<A: Adapter>(
     let period_in_hours = query.timeframe.to_hours();
     let start_date = match query.start {
         Some(start_date) => start_date,
-        None => DateHour::try_from(
-            Utc::today().and_hms(Utc::now().hour(), 0, 0) - Duration::hours(period_in_hours),
-        )?,
+        None => DateHour::now() - &query.timeframe,
     };
 
     let applied_limit = query.limit.min(ANALYTICS_QUERY_LIMIT);
@@ -177,6 +174,7 @@ mod test {
         routes::analytics::analytics,
         test_util::setup_dummy_app,
     };
+    use chrono::{Utc, Duration};
     use primitives::{
         analytics::OperatingSystem,
         sentry::UpdateAnalytics,
@@ -374,7 +372,7 @@ mod test {
         assert_eq!(fetched_analytics.payout_count.unwrap(), 4);
         // Test with start date
 
-        let start_date = Utc::today().and_hms(Utc::now().hour(), 0, 0) - Duration::hours(1);
+        let start_date = DateHour::<Utc>::now() - 1;
         let req = Request::builder()
             .uri(format!("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day&start={}", start_date))
             .body(Body::empty())
@@ -397,7 +395,7 @@ mod test {
         assert_eq!(fetched_analytics.payout_count.unwrap(), 2);
 
         // Test with end date
-        let end_date = Utc::today().and_hms(Utc::now().hour(), 0, 0) - Duration::hours(1);
+        let end_date = DateHour::<Utc>::now() - 1;
         let req = Request::builder()
             .uri(format!("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day&end={}", end_date))
             .body(Body::empty())
@@ -420,8 +418,11 @@ mod test {
         assert_eq!(fetched_analytics.payout_count.unwrap(), 3);
 
         // Test with start_date and end_date
-        let start_date = Utc::today().and_hms(Utc::now().hour(), 0, 0) - Duration::hours(72);
-        let end_date = Utc::today().and_hms(Utc::now().hour(), 0, 0) - Duration::hours(1);
+
+        // subtract 72 hours
+        let start_date = DateHour::<Utc>::now() - 72;
+        // subtract 1 hour
+        let end_date = DateHour::<Utc>::now() - 1;
         let req = Request::builder()
             .uri(format!("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day&start={}&end={}", start_date, end_date))
             .body(Body::empty())

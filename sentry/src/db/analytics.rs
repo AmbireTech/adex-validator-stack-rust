@@ -72,8 +72,10 @@ fn analytics_query_params<'a>(
     let mut params: Vec<&(dyn ToSql + Sync)> = vec![start_date];
 
     allowed_keys.iter().for_each(|key| {
-        where_clauses.push(format!("{} = ${}", key, params.len() + 1));
-        params.push(query.get_key(key));
+        if let Some(param_value) = query.get_key(key) {
+            where_clauses.push(format!("{} = ${}", key, params.len() + 1));
+            params.push(param_value);
+        }
     });
 
     if let Some(auth_as) = auth_as {
