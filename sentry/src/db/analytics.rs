@@ -10,14 +10,15 @@ use super::{DbPool, PoolError};
 pub async fn get_analytics(
     pool: &DbPool,
     start_date: DateHour<Utc>,
-    end_date: Option<DateHour<Utc>>,
     query: &AnalyticsQuery,
+    allowed_keys: Vec<String>,
     auth_as: Option<AuthenticateAs>,
     limit: u32,
 ) -> Result<Vec<FetchedAnalytics>, PoolError> {
     let client = pool.get().await?;
 
-    let (where_clauses, mut params) = analytics_query_params(&start_date, &end_date, query, &auth_as);
+    let (where_clauses, mut params) =
+        analytics_query_params(&start_date, query, &auth_as, &allowed_keys);
 
     let mut select_clause = vec!["time".to_string(), format!("${}", params.len() + 1)];
     params.push(&query.metric);
@@ -41,43 +42,46 @@ pub async fn get_analytics(
     let stmt = client.prepare(&sql_query).await?;
     let rows = client.query(&stmt, params.as_slice()).await?;
 
-    let analytics: Vec<FetchedAnalytics> = rows.iter().map(|row| {
-        // Since segment_by is a dynamic value/type it can't be passed to from<&Row> so we're building the object here
-        let segment_value = match &query.segment_by {
-            Some(segment_by) => row.try_get(&**segment_by).ok(),
-            None => None
-        };
-        FetchedAnalytics {
-            time: row.get("time"),
-            payout_amount: row.try_get("payout_amount").ok(),
-            payout_count: row.try_get("payout_count").ok(),
-            segment: segment_value,
-        }
-    }).collect();
+    let analytics: Vec<FetchedAnalytics> = rows
+        .iter()
+        .map(|row| {
+            // Since segment_by is a dynamic value/type it can't be passed to from<&Row> so we're building the object here
+            let segment_value = match &query.segment_by {
+                Some(segment_by) => row.try_get(&**segment_by).ok(),
+                None => None,
+            };
+            FetchedAnalytics {
+                time: row.get("time"),
+                payout_amount: row.try_get("payout_amount").ok(),
+                payout_count: row.try_get("payout_count").ok(),
+                segment: segment_value,
+            }
+        })
+        .collect();
 
     Ok(analytics)
 }
 
 fn analytics_query_params<'a>(
     start_date: &'a DateHour<Utc>,
-    end_date: &'a Option<DateHour<Utc>>,
     query: &'a AnalyticsQuery,
     auth_as: &'a Option<AuthenticateAs>,
+    allowed_keys: &[String],
 ) -> (Vec<String>, Vec<&'a (dyn ToSql + Sync)>) {
     let mut where_clauses: Vec<String> = vec!["time >= $1".to_string()];
     let mut params: Vec<&(dyn ToSql + Sync)> = vec![start_date];
 
-    for (key, value) in query.available_keys() {
+    allowed_keys.iter().for_each(|key| {
         where_clauses.push(format!("{} = ${}", key, params.len() + 1));
-        params.push(&value);
-    }
+        params.push(query.get_key(key));
+    });
 
     if let Some(auth_as) = auth_as {
         match auth_as {
             AuthenticateAs::Publisher(uid) => {
                 where_clauses.push(format!("publisher = ${}", params.len() + 1));
                 params.push(uid);
-            },
+            }
             AuthenticateAs::Advertiser(uid) => {
                 where_clauses.push(format!("advertiser = ${}", params.len() + 1));
                 params.push(uid);
@@ -85,7 +89,7 @@ fn analytics_query_params<'a>(
         }
     }
 
-    if let Some(end_date) = end_date {
+    if let Some(end_date) = &query.end {
         where_clauses.push(format!("time <= ${}", params.len() + 1));
         params.push(end_date);
     }

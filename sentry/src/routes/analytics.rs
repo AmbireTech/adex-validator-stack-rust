@@ -1,10 +1,10 @@
 use crate::{db::analytics::get_analytics, success_response, Application, Auth, ResponseError};
-use chrono::{Duration, Utc, Timelike};
+use chrono::{Duration, Timelike, Utc};
 use hyper::{Body, Request, Response};
 use once_cell::sync::Lazy;
 use primitives::{
     adapter::Adapter,
-    analytics::{AnalyticsQuery, Metric, AuthenticateAs, ANALYTICS_QUERY_LIMIT},
+    analytics::{AnalyticsQuery, AuthenticateAs, Metric, ANALYTICS_QUERY_LIMIT},
     sentry::{DateHour, FetchedAnalytics},
     UnifiedNum,
 };
@@ -32,32 +32,29 @@ pub async fn analytics<A: Adapter>(
     let query = serde_urlencoded::from_str::<AnalyticsQuery>(req.uri().query().unwrap_or(""))?;
     let period_in_hours = query.timeframe.to_hours();
     let start_date = match query.start {
-        Some(start_date) => DateHour::try_from(start_date)?,
-        None => DateHour::try_from(Utc::today().and_hms(Utc::now().hour(), 0, 0) - Duration::hours(period_in_hours))?,
-    };
-
-    let end_date = match query.end {
-        Some(end_date) => Some(DateHour::try_from(end_date)?),
-        None => None,
+        Some(start_date) => start_date,
+        None => DateHour::try_from(
+            Utc::today().and_hms(Utc::now().hour(), 0, 0) - Duration::hours(period_in_hours),
+        )?,
     };
 
     let applied_limit = query.limit.min(ANALYTICS_QUERY_LIMIT);
 
-    let allowed_keys = match allowed_keys {
-        Some(keys) => keys,
-        None => ALLOWED_KEYS.to_vec(),
+    let not_allowed_keys = match &allowed_keys {
+        Some(keys) => ALLOWED_KEYS.iter().filter(|k| !keys.contains(k)).collect(),
+        None => vec![],
     };
 
     if let Some(segment_by) = &query.segment_by {
-        if !allowed_keys.contains(segment_by) {
+        if not_allowed_keys.contains(&segment_by) {
             return Err(ResponseError::BadRequest(
                 "Disallowed segmentBy".to_string(),
             ));
         }
     }
 
-    for (key, _) in query.available_keys() {
-        if !allowed_keys.contains(&key) {
+    for key in not_allowed_keys {
+        if query.get_key(key).is_some() {
             return Err(ResponseError::BadRequest(format!(
                 "disallowed key in query: {}",
                 key
@@ -65,32 +62,41 @@ pub async fn analytics<A: Adapter>(
         }
     }
 
-    let auth = req
-        .extensions()
-        .get::<Auth>();
+    let auth = req.extensions().get::<Auth>();
 
     let auth_as = match (auth_as_key, auth) {
         (Some(auth_as_key), Some(auth)) => AuthenticateAs::try_from(&auth_as_key, auth.uid),
-        (Some(_), None) => return Err(ResponseError::BadRequest("auth_as_key is provided but there is no Auth object".to_string())),
-        _ => None
+        (Some(_), None) => {
+            return Err(ResponseError::BadRequest(
+                "auth_as_key is provided but there is no Auth object".to_string(),
+            ))
+        }
+        _ => None,
     };
 
+    let allowed_keys = allowed_keys.unwrap_or_else(|| ALLOWED_KEYS.to_vec());
     let analytics = get_analytics(
         &app.pool,
         start_date,
-        end_date,
         &query,
+        allowed_keys,
         auth_as,
         applied_limit,
     )
     .await?;
 
-    let output = split_entries_by_timeframe(analytics, period_in_hours, &query.metric, &query.segment_by);
+    let output =
+        split_entries_by_timeframe(analytics, period_in_hours, &query.metric, &query.segment_by);
 
     Ok(success_response(serde_json::to_string(&output)?))
 }
 
-fn split_entries_by_timeframe(mut analytics: Vec<FetchedAnalytics>, period_in_hours: i64, metric: &Metric, segment: &Option<String>) -> Vec<FetchedAnalytics> {
+fn split_entries_by_timeframe(
+    mut analytics: Vec<FetchedAnalytics>,
+    period_in_hours: i64,
+    metric: &Metric,
+    segment: &Option<String>,
+) -> Vec<FetchedAnalytics> {
     let mut res: Vec<FetchedAnalytics> = vec![];
     let period_in_hours = period_in_hours as usize;
     while analytics.len() > period_in_hours {
@@ -100,7 +106,7 @@ fn split_entries_by_timeframe(mut analytics: Vec<FetchedAnalytics>, period_in_ho
         res.push(merged_analytics);
     }
 
-    if analytics.len() > 0 {
+    if !analytics.is_empty() {
         let merged_analytics = merge_analytics(analytics, metric, segment);
         res.push(merged_analytics);
     }
@@ -108,25 +114,31 @@ fn split_entries_by_timeframe(mut analytics: Vec<FetchedAnalytics>, period_in_ho
     res
 }
 
-fn merge_analytics(analytics: Vec<FetchedAnalytics>, metric: &Metric, segment: &Option<String>) -> FetchedAnalytics {
+fn merge_analytics(
+    analytics: Vec<FetchedAnalytics>,
+    metric: &Metric,
+    segment: &Option<String>,
+) -> FetchedAnalytics {
     let mut count = 0;
     let amount = UnifiedNum::from_u64(0);
     match metric {
         Metric::Count => {
-            analytics.iter().for_each(|a| count += a.payout_count.unwrap());
+            analytics
+                .iter()
+                .for_each(|a| count += a.payout_count.unwrap());
             FetchedAnalytics {
-                time: analytics.iter().nth(0).unwrap().time,
+                time: analytics.get(0).unwrap().time,
                 payout_count: Some(count),
                 payout_amount: None,
                 segment: segment.clone(),
             }
-        },
+        }
         Metric::Paid => {
             analytics.iter().for_each(|a| {
                 amount.checked_add(&a.payout_amount.unwrap()).unwrap();
             });
             FetchedAnalytics {
-                time: analytics.iter().nth(0).unwrap().time,
+                time: analytics.get(0).unwrap().time,
                 payout_count: None,
                 payout_amount: Some(amount),
                 segment: segment.clone(),
@@ -156,22 +168,19 @@ fn merge_analytics(analytics: Vec<FetchedAnalytics>, metric: &Metric, segment: &
 #[cfg(test)]
 mod test {
     use super::*;
-    use primitives::{
-        sentry::UpdateAnalytics,
-        analytics::OperatingSystem,
-        util::tests::prep_db::{
-            DUMMY_CAMPAIGN, ADDRESSES
-        },
-    };
-    use crate::
-    {
-        test_util::setup_dummy_app,
-        routes::analytics::analytics,
+    use crate::{
         db::{
             analytics::update_analytics,
             tests_postgres::{setup_test_migrations, DATABASE_POOL},
-            DbPool
-        }
+            DbPool,
+        },
+        routes::analytics::analytics,
+        test_util::setup_dummy_app,
+    };
+    use primitives::{
+        analytics::OperatingSystem,
+        sentry::UpdateAnalytics,
+        util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN},
     };
 
     async fn insert_mock_analytics(pool: &DbPool) {
@@ -192,7 +201,9 @@ mod test {
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
         };
-        update_analytics(pool, analytics_now).await.expect("Should update analytics");
+        update_analytics(pool, analytics_now)
+            .await
+            .expect("Should update analytics");
 
         let analytics_now_different_country = UpdateAnalytics {
             time: DateHour::try_from(now_date).expect("should parse"),
@@ -209,7 +220,9 @@ mod test {
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
         };
-        update_analytics(pool, analytics_now_different_country).await.expect("Should update analytics");
+        update_analytics(pool, analytics_now_different_country)
+            .await
+            .expect("Should update analytics");
 
         let analytics_two_hours_ago = UpdateAnalytics {
             time: DateHour::try_from(now_date - Duration::hours(2)).expect("should parse"),
@@ -226,7 +239,9 @@ mod test {
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
         };
-        update_analytics(pool, analytics_two_hours_ago).await.expect("Should update analytics");
+        update_analytics(pool, analytics_two_hours_ago)
+            .await
+            .expect("Should update analytics");
 
         let analytics_four_hours_ago = UpdateAnalytics {
             time: DateHour::try_from(now_date - Duration::hours(4)).expect("should parse"),
@@ -243,7 +258,9 @@ mod test {
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
         };
-        update_analytics(pool, analytics_four_hours_ago).await.expect("Should update analytics");
+        update_analytics(pool, analytics_four_hours_ago)
+            .await
+            .expect("Should update analytics");
 
         let analytics_three_days_ago = UpdateAnalytics {
             time: DateHour::try_from(now_date - Duration::days(3)).expect("should parse"),
@@ -260,7 +277,9 @@ mod test {
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
         };
-        update_analytics(pool, analytics_three_days_ago).await.expect("Should update analytics");
+        update_analytics(pool, analytics_three_days_ago)
+            .await
+            .expect("Should update analytics");
         // analytics from 10 days ago
         let analytics_ten_days_ago = UpdateAnalytics {
             time: DateHour::try_from(now_date - Duration::days(10)).expect("should parse"),
@@ -277,7 +296,9 @@ mod test {
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
         };
-        update_analytics(pool, analytics_ten_days_ago).await.expect("Should update analytics");
+        update_analytics(pool, analytics_ten_days_ago)
+            .await
+            .expect("Should update analytics");
 
         let analytics_sixty_days_ago = UpdateAnalytics {
             time: DateHour::try_from(now_date - Duration::days(60)).expect("should parse"),
@@ -294,7 +315,9 @@ mod test {
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
         };
-        update_analytics(pool, analytics_sixty_days_ago).await.expect("Should update analytics");
+        update_analytics(pool, analytics_sixty_days_ago)
+            .await
+            .expect("Should update analytics");
 
         let analytics_two_years_ago = UpdateAnalytics {
             time: DateHour::try_from(now_date - Duration::weeks(104)).expect("should parse"),
@@ -311,7 +334,9 @@ mod test {
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
         };
-        update_analytics(pool, analytics_two_years_ago).await.expect("Should update analytics");
+        update_analytics(pool, analytics_two_years_ago)
+            .await
+            .expect("Should update analytics");
     }
 
     #[tokio::test]
@@ -327,11 +352,18 @@ mod test {
 
         // Test with no optional values
         let req = Request::builder()
-                .uri("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day")
-                .body(Body::empty())
-                .expect("Should build Request");
+            .uri("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day")
+            .body(Body::empty())
+            .expect("Should build Request");
 
-        let analytics_response = analytics(req, &app, Some(vec!["country".into(), "ad_slot_type".into()]), None).await.expect("Should get analytics data");
+        let analytics_response = analytics(
+            req,
+            &app,
+            Some(vec!["country".into(), "ad_slot_type".into()]),
+            None,
+        )
+        .await
+        .expect("Should get analytics data");
         let json = hyper::body::to_bytes(analytics_response.into_body())
             .await
             .expect("Should get json");
@@ -348,7 +380,14 @@ mod test {
             .body(Body::empty())
             .expect("Should build Request");
 
-        let analytics_response = analytics(req, &app, Some(vec!["country".into(), "ad_slot_type".into()]), None).await.expect("Should get analytics data");
+        let analytics_response = analytics(
+            req,
+            &app,
+            Some(vec!["country".into(), "ad_slot_type".into()]),
+            None,
+        )
+        .await
+        .expect("Should get analytics data");
         let json = hyper::body::to_bytes(analytics_response.into_body())
             .await
             .expect("Should get json");
@@ -364,7 +403,14 @@ mod test {
             .body(Body::empty())
             .expect("Should build Request");
 
-        let analytics_response = analytics(req, &app, Some(vec!["country".into(), "ad_slot_type".into()]), None).await.expect("Should get analytics data");
+        let analytics_response = analytics(
+            req,
+            &app,
+            Some(vec!["country".into(), "ad_slot_type".into()]),
+            None,
+        )
+        .await
+        .expect("Should get analytics data");
         let json = hyper::body::to_bytes(analytics_response.into_body())
             .await
             .expect("Should get json");
@@ -381,7 +427,14 @@ mod test {
             .body(Body::empty())
             .expect("Should build Request");
 
-        let analytics_response = analytics(req, &app, Some(vec!["country".into(), "ad_slot_type".into()]), None).await.expect("Should get analytics data");
+        let analytics_response = analytics(
+            req,
+            &app,
+            Some(vec!["country".into(), "ad_slot_type".into()]),
+            None,
+        )
+        .await
+        .expect("Should get analytics data");
         let json = hyper::body::to_bytes(analytics_response.into_body())
             .await
             .expect("Should get json");

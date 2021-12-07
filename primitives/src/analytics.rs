@@ -1,19 +1,16 @@
-use crate::{sentry::DateHour, ValidatorId, CampaignId, IPFS, Address};
+use crate::{sentry::DateHour, Address, CampaignId, ValidatorId, IPFS};
 use chrono::Utc;
 use parse_display::Display;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 pub const ANALYTICS_QUERY_LIMIT: u32 = 200;
 
 #[cfg(feature = "postgres")]
 pub mod postgres {
-    use super::{OperatingSystem, Metric};
+    use super::{AnalyticsQueryKey, Metric, OperatingSystem};
     use bytes::BytesMut;
     use std::error::Error;
-    use tokio_postgres::{
-        types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type},
-    };
+    use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
 
     impl<'a> FromSql<'a> for OperatingSystem {
         fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
@@ -43,8 +40,33 @@ pub mod postgres {
         to_sql_checked!();
     }
 
+    impl ToSql for AnalyticsQueryKey {
+        fn to_sql(
+            &self,
+            ty: &Type,
+            w: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+            match self {
+                Self::CampaignId(id) => id.to_string().to_sql(ty, w),
+                Self::AdUnit(ipfs) | Self::AdSlot(ipfs) => ipfs.to_string().to_sql(ty, w),
+                Self::AdSlotType(value) | Self::Hostname(value) | Self::Country(value) => {
+                    value.to_sql(ty, w)
+                }
+                Self::Advertiser(addr) | Self::Publisher(addr) => addr.to_string().to_sql(ty, w),
+                Self::OperatingSystem(os_name) => os_name.to_string().to_sql(ty, w),
+            }
+        }
+
+        accepts!(TEXT, VARCHAR);
+        to_sql_checked!();
+    }
+
     impl ToSql for Metric {
-        fn to_sql(&self, ty: &Type, w: &mut BytesMut) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+        fn to_sql(
+            &self,
+            ty: &Type,
+            w: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
             self.column_name().to_sql(ty, w)
         }
 
@@ -69,48 +91,54 @@ pub struct AnalyticsQuery {
     pub end: Option<DateHour<Utc>>,
     // #[serde(default = "default_timezone")]
     // pub timezone: String,
-    pub campaign_id: Option<CampaignId>,
-    pub ad_unit: Option<IPFS>,
-    pub ad_slot: Option<IPFS>,
-    pub ad_slot_type: Option<String>,
-    pub advertiser: Option<Address>,
-    pub publisher: Option<Address>,
-    pub hostname: Option<String>,
-    pub country: Option<String>,
-    pub os_name: Option<OperatingSystem>,
+    #[serde(flatten)]
+    pub campaign_id: Option<AnalyticsQueryKey>,
+    #[serde(flatten)]
+    pub ad_unit: Option<AnalyticsQueryKey>,
+    #[serde(flatten)]
+    pub ad_slot: Option<AnalyticsQueryKey>,
+    #[serde(flatten)]
+    pub ad_slot_type: Option<AnalyticsQueryKey>,
+    #[serde(flatten)]
+    pub advertiser: Option<AnalyticsQueryKey>,
+    #[serde(flatten)]
+    pub publisher: Option<AnalyticsQueryKey>,
+    #[serde(flatten)]
+    pub hostname: Option<AnalyticsQueryKey>,
+    #[serde(flatten)]
+    pub country: Option<AnalyticsQueryKey>,
+    #[serde(flatten)]
+    pub os_name: Option<AnalyticsQueryKey>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum AnalyticsQueryKey {
+    CampaignId(CampaignId),
+    AdUnit(IPFS),
+    AdSlot(IPFS),
+    AdSlotType(String),
+    Advertiser(Address),
+    Publisher(Address),
+    Hostname(String),
+    Country(String),
+    OperatingSystem(OperatingSystem),
 }
 
 impl AnalyticsQuery {
-    pub fn available_keys(&self) -> HashMap<String, String>{
-        let mut keys: HashMap<String, String> = HashMap::new();
-        if let Some(campaign_id) = self.campaign_id {
-            keys.insert("campaign_id".into(), campaign_id.to_string());
+    pub fn get_key(&self, key: &str) -> &Option<AnalyticsQueryKey> {
+        match key {
+            "campaignId" => &self.campaign_id,
+            "adUnit" => &self.ad_unit,
+            "adSlot" => &self.ad_slot,
+            "adSlotType" => &self.ad_slot_type,
+            "advertiser" => &self.advertiser,
+            "publisher" => &self.publisher,
+            "hostname" => &self.hostname,
+            "country" => &self.country,
+            "osName" => &self.os_name,
+            _ => &None,
         }
-        if let Some(ad_unit) = self.ad_unit {
-            keys.insert("ad_unit".into(), ad_unit.to_string());
-        }
-        if let Some(ad_slot) = self.ad_slot {
-            keys.insert("ad_slot".into(), ad_slot.to_string());
-        }
-        if let Some(ad_slot_type) = &self.ad_slot_type {
-            keys.insert("ad_slot_type".into(), ad_slot_type.to_string());
-        }
-        if let Some(advertiser) = self.advertiser {
-            keys.insert("advertiser".into(), advertiser.to_string());
-        }
-        if let Some(publisher) = self.publisher {
-            keys.insert("publisher".into(), publisher.to_string());
-        }
-        if let Some(hostname) = &self.hostname {
-            keys.insert("hostname".into(), hostname.to_string());
-        }
-        if let Some(country) = &self.country {
-            keys.insert("country".into(), country.to_string());
-        }
-        if let Some(os_name) = &self.os_name {
-            keys.insert("os_name".into(), os_name.to_string());
-        }
-        keys
     }
 }
 
@@ -124,7 +152,7 @@ pub enum OperatingSystem {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Display)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "camelCase")]
 pub enum Timeframe {
     Year,
     Month,
@@ -133,13 +161,13 @@ pub enum Timeframe {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Display)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "camelCase")]
 pub enum Metric {
     Count,
     Paid,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Display)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Display)]
 pub enum AuthenticateAs {
     #[display("{0}")]
     Advertiser(ValidatorId),
