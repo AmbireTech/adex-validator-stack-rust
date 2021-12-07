@@ -12,6 +12,10 @@ dependencies = [
   "ganache-down",
 ]
 
+[tasks.test]
+# run tests in release because of slow unlock time of Ethereum adapter (i.e. keystore decryption)
+args = ["test", "--release", "--all-features"]
+
 [tasks.ganache-up]
 script = '''
 docker-compose -f ../docker-compose.harness.yml up --renew-anon-volumes -d ganache \

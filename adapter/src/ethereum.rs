@@ -27,6 +27,7 @@ use self::ewt::Payload;
 
 mod error;
 /// Ethereum Web Token
+/// See https://github.com/ethereum/EIPs/issues/1341
 ///
 /// This module implements the Ethereum Web Token with 2 difference:
 /// - The signature includes the Ethereum signature mode, see [`ETH_SIGN_SUFFIX`]
