@@ -1,9 +1,12 @@
 use crate::{db::analytics::get_analytics, success_response, Application, Auth, ResponseError};
+use chrono::{Duration, Timelike, Utc};
 use hyper::{Body, Request, Response};
 use once_cell::sync::Lazy;
 use primitives::{
     adapter::Adapter,
-    analytics::{AnalyticsQuery, AuthenticateAs, Metric, ANALYTICS_QUERY_LIMIT},
+    analytics::{
+        AnalyticsQuery, AnalyticsQueryTime, AuthenticateAs, Metric, ANALYTICS_QUERY_LIMIT,
+    },
     sentry::{DateHour, FetchedAnalytics},
     UnifiedNum,
 };
@@ -31,8 +34,13 @@ pub async fn analytics<A: Adapter>(
     let query = serde_urlencoded::from_str::<AnalyticsQuery>(req.uri().query().unwrap_or(""))?;
     let period_in_hours = query.timeframe.to_hours();
     let start_date = match query.start {
-        Some(start_date) => start_date,
-        None => DateHour::now() - &query.timeframe,
+        Some(ref start_date) => start_date.to_owned(),
+        None => {
+            let datetime = Utc::now() - Duration::hours(period_in_hours);
+            let datehour =
+                DateHour::try_from(datetime.date().and_hms(datetime.hour(), 0, 0)).unwrap();
+            AnalyticsQueryTime::Date(datehour)
+        }
     };
 
     let applied_limit = query.limit.min(ANALYTICS_QUERY_LIMIT);
@@ -74,7 +82,7 @@ pub async fn analytics<A: Adapter>(
     let allowed_keys = allowed_keys.unwrap_or_else(|| ALLOWED_KEYS.to_vec());
     let analytics = get_analytics(
         &app.pool,
-        start_date,
+        &start_date,
         &query,
         allowed_keys,
         auth_as,
@@ -174,7 +182,7 @@ mod test {
         routes::analytics::analytics,
         test_util::setup_dummy_app,
     };
-    use chrono::{Utc, Duration};
+    use chrono::{Duration, Utc};
     use primitives::{
         analytics::OperatingSystem,
         sentry::UpdateAnalytics,

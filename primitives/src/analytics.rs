@@ -7,8 +7,9 @@ pub const ANALYTICS_QUERY_LIMIT: u32 = 200;
 
 #[cfg(feature = "postgres")]
 pub mod postgres {
-    use super::{AnalyticsQueryKey, Metric, OperatingSystem};
+    use super::{AnalyticsQueryKey, AnalyticsQueryTime, Metric, OperatingSystem};
     use bytes::BytesMut;
+    use chrono::{DateTime, NaiveDateTime, Timelike, Utc};
     use std::error::Error;
     use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
 
@@ -61,6 +62,28 @@ pub mod postgres {
         to_sql_checked!();
     }
 
+    impl ToSql for AnalyticsQueryTime {
+        fn to_sql(
+            &self,
+            ty: &Type,
+            w: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+            match self {
+                Self::Date(datehour) => datehour.date.and_hms(datehour.hour, 0, 0).to_sql(ty, w),
+                Self::Timestamp(ts) => {
+                    // Create a NaiveDateTime from the timestamp
+                    let naive = NaiveDateTime::from_timestamp(0, *ts);
+                    // Create a normal DateTime from the NaiveDateTime
+                    let datetime: DateTime<Utc> = DateTime::from_utc(naive, Utc);
+                    datetime.date().and_hms(datetime.hour(), 0, 0).to_sql(ty, w)
+                }
+            }
+        }
+
+        accepts!(TIMESTAMPTZ);
+        to_sql_checked!();
+    }
+
     impl ToSql for Metric {
         fn to_sql(
             &self,
@@ -87,8 +110,8 @@ pub struct AnalyticsQuery {
     #[serde(default = "default_timeframe")]
     pub timeframe: Timeframe,
     pub segment_by: Option<String>,
-    pub start: Option<DateHour<Utc>>,
-    pub end: Option<DateHour<Utc>>,
+    pub start: Option<AnalyticsQueryTime>,
+    pub end: Option<AnalyticsQueryTime>,
     // #[serde(default = "default_timezone")]
     // pub timezone: String,
     #[serde(flatten)]
@@ -109,6 +132,13 @@ pub struct AnalyticsQuery {
     pub country: Option<AnalyticsQueryKey>,
     #[serde(flatten)]
     pub os_name: Option<AnalyticsQueryKey>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum AnalyticsQueryTime {
+    Date(DateHour<Utc>),
+    Timestamp(u32),
 }
 
 #[derive(Debug, Serialize, Deserialize)]

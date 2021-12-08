@@ -1,7 +1,6 @@
-use chrono::Utc;
 use primitives::{
-    analytics::{AnalyticsQuery, AuthenticateAs},
-    sentry::{Analytics, DateHour, FetchedAnalytics, UpdateAnalytics},
+    analytics::{AnalyticsQuery, AnalyticsQueryTime, AuthenticateAs},
+    sentry::{Analytics, FetchedAnalytics, UpdateAnalytics},
 };
 use tokio_postgres::types::ToSql;
 
@@ -9,7 +8,7 @@ use super::{DbPool, PoolError};
 
 pub async fn get_analytics(
     pool: &DbPool,
-    start_date: DateHour<Utc>,
+    start_date: &AnalyticsQueryTime,
     query: &AnalyticsQuery,
     allowed_keys: Vec<String>,
     auth_as: Option<AuthenticateAs>,
@@ -18,7 +17,7 @@ pub async fn get_analytics(
     let client = pool.get().await?;
 
     let (where_clauses, mut params) =
-        analytics_query_params(&start_date, query, &auth_as, &allowed_keys);
+        analytics_query_params(start_date, query, &auth_as, &allowed_keys);
 
     let mut select_clause = vec!["time".to_string(), format!("${}", params.len() + 1)];
     params.push(&query.metric);
@@ -63,7 +62,7 @@ pub async fn get_analytics(
 }
 
 fn analytics_query_params<'a>(
-    start_date: &'a DateHour<Utc>,
+    start_date: &'a AnalyticsQueryTime,
     query: &'a AnalyticsQuery,
     auth_as: &'a Option<AuthenticateAs>,
     allowed_keys: &[String],
