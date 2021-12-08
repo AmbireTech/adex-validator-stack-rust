@@ -235,7 +235,7 @@ pub struct DateHour<Tz: TimeZone> {
     pub hour: u32,
 }
 
-impl<Tz: TimeZone> fmt::Display for DateHour<Tz> {
+impl<Tz: TimeZone> fmt::Display for DateHour<Tz> where Tz::Offset: fmt::Display {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let datetime = self.to_datetime();
 
