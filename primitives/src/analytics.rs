@@ -1,13 +1,13 @@
 use crate::{sentry::DateHour, Address, CampaignId, ValidatorId, IPFS};
-use chrono::Utc;
+use chrono::{DateTime, NaiveDateTime, Utc};
 use parse_display::Display;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 pub const ANALYTICS_QUERY_LIMIT: u32 = 200;
 
 #[cfg(feature = "postgres")]
 pub mod postgres {
-    use super::{AnalyticsQueryKey, AnalyticsQueryTime, Metric, OperatingSystem};
+    use super::{AnalyticsQueryKey, AnalyticsQueryTime, OperatingSystem};
     use bytes::BytesMut;
     use chrono::{DateTime, NaiveDateTime, Timelike, Utc};
     use std::error::Error;
@@ -83,19 +83,6 @@ pub mod postgres {
         accepts!(TIMESTAMPTZ);
         to_sql_checked!();
     }
-
-    impl ToSql for Metric {
-        fn to_sql(
-            &self,
-            ty: &Type,
-            w: &mut BytesMut,
-        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-            self.column_name().to_sql(ty, w)
-        }
-
-        accepts!(TEXT, VARCHAR);
-        to_sql_checked!();
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -110,7 +97,11 @@ pub struct AnalyticsQuery {
     #[serde(default = "default_timeframe")]
     pub timeframe: Timeframe,
     pub segment_by: Option<String>,
+    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_query_time")]
     pub start: Option<AnalyticsQueryTime>,
+    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_query_time")]
     pub end: Option<AnalyticsQueryTime>,
     // #[serde(default = "default_timezone")]
     // pub timezone: String,
@@ -217,7 +208,7 @@ impl AuthenticateAs {
 }
 
 impl Metric {
-    pub fn column_name(&self) -> String {
+    pub fn column_name(self) -> String {
         match self {
             Metric::Count => "payout_count".to_string(),
             Metric::Paid => "payout_amount".to_string(),
@@ -333,6 +324,27 @@ fn default_metric() -> Metric {
 
 fn default_timeframe() -> Timeframe {
     Timeframe::Day
+}
+
+fn deserialize_query_time<'de, D>(deserializer: D) -> Result<Option<AnalyticsQueryTime>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let date_as_str = String::deserialize(deserializer)?;
+    let naive = NaiveDateTime::parse_from_str(&date_as_str, "%Y-%m-%dT%H:%M:%SZ");
+    match naive {
+        Ok(naive) => {
+            let datetime: DateTime<Utc> = DateTime::from_utc(naive, Utc);
+            let dh = DateHour::try_from(datetime).map_err(serde::de::Error::custom)?;
+            Ok(Some(AnalyticsQueryTime::Date(dh)))
+        }
+        _ => {
+            let timestamp = date_as_str
+                .parse::<u32>()
+                .map_err(serde::de::Error::custom)?;
+            Ok(Some(AnalyticsQueryTime::Timestamp(timestamp)))
+        }
+    }
 }
 
 // fn default_timezone() -> String {

@@ -210,7 +210,7 @@ pub struct FetchedAnalytics {
     // time is represented as a timestamp
     pub time: i64,
     pub payout_amount: Option<UnifiedNum>,
-    pub payout_count: Option<u32>,
+    pub payout_count: Option<i32>,
     // We can't know the exact segment type but it can always be represented as a string
     pub segment: Option<String>,
 }

@@ -52,8 +52,14 @@ pub async fn analytics<A: Adapter>(
 
     if let Some(segment_by) = &query.segment_by {
         if not_allowed_keys.contains(&segment_by) {
+            return Err(ResponseError::BadRequest(format!(
+                "Disallowed segmentBy: {}",
+                segment_by
+            )));
+        }
+        if query.get_key(segment_by).is_none() {
             return Err(ResponseError::BadRequest(
-                "Disallowed segmentBy".to_string(),
+                "SegmentBy is provided but a key is not passed".to_string(),
             ));
         }
     }
@@ -104,6 +110,8 @@ fn split_entries_by_timeframe(
 ) -> Vec<FetchedAnalytics> {
     let mut res: Vec<FetchedAnalytics> = vec![];
     let period_in_hours = period_in_hours as usize;
+    // TODO: If there is an hour with no events this logic will fail
+    // FIX BEFORE MERGE!
     while analytics.len() > period_in_hours {
         let drain_index = analytics.len() - period_in_hours;
         let analytics_fraction: Vec<FetchedAnalytics> = analytics.drain(drain_index..).collect();
@@ -115,7 +123,6 @@ fn split_entries_by_timeframe(
         let merged_analytics = merge_analytics(analytics, metric, segment);
         res.push(merged_analytics);
     }
-
     res
 }
 
@@ -174,11 +181,7 @@ fn merge_analytics(
 mod test {
     use super::*;
     use crate::{
-        db::{
-            analytics::update_analytics,
-            tests_postgres::{setup_test_migrations, DATABASE_POOL},
-            DbPool,
-        },
+        db::{analytics::update_analytics, DbPool},
         routes::analytics::analytics,
         test_util::setup_dummy_app,
     };
@@ -347,14 +350,9 @@ mod test {
 
     #[tokio::test]
     async fn test_analytics_route_for_guest() {
-        let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
         let app = setup_dummy_app().await;
 
-        setup_test_migrations(database.pool.clone())
-            .await
-            .expect("Migrations should succeed");
-
-        insert_mock_analytics(&database.pool).await;
+        insert_mock_analytics(&app.pool).await;
 
         // Test with no optional values
         let req = Request::builder()
@@ -374,13 +372,21 @@ mod test {
             .await
             .expect("Should get json");
 
-        let fetched_analytics: FetchedAnalytics =
+        let fetched_analytics: Vec<FetchedAnalytics> =
             serde_json::from_slice(&json).expect("Should get analytics response");
-        assert!(fetched_analytics.payout_count.is_some());
-        assert_eq!(fetched_analytics.payout_count.unwrap(), 4);
-        // Test with start date
+        assert_eq!(fetched_analytics.len(), 1);
+        assert!(fetched_analytics.get(0).unwrap().payout_count.is_some());
+        assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 4);
 
+        // Test with start date
         let start_date = DateHour::<Utc>::now() - 1;
+        // let query = format!(
+        //     "?limit=100&eventType=CLICK&metric=count&timeframe=day&start={}",
+        //     start_date
+        // );
+        // let query_str =
+        //     serde_urlencoded::from_str::<AnalyticsQuery>(&query)
+        //         .expect("should encode");
         let req = Request::builder()
             .uri(format!("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day&start={}", start_date))
             .body(Body::empty())
@@ -398,9 +404,11 @@ mod test {
             .await
             .expect("Should get json");
 
-        let fetched_analytics: FetchedAnalytics =
+        let fetched_analytics: Vec<FetchedAnalytics> =
             serde_json::from_slice(&json).expect("Should get analytics response");
-        assert_eq!(fetched_analytics.payout_count.unwrap(), 2);
+        assert_eq!(fetched_analytics.len(), 1);
+        assert!(fetched_analytics.get(0).unwrap().payout_count.is_some());
+        assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 2);
 
         // Test with end date
         let end_date = DateHour::<Utc>::now() - 1;
@@ -421,12 +429,13 @@ mod test {
             .await
             .expect("Should get json");
 
-        let fetched_analytics: FetchedAnalytics =
+        let fetched_analytics: Vec<FetchedAnalytics> =
             serde_json::from_slice(&json).expect("Should get analytics response");
-        assert_eq!(fetched_analytics.payout_count.unwrap(), 3);
+        assert_eq!(fetched_analytics.len(), 1);
+        assert!(fetched_analytics.get(0).unwrap().payout_count.is_some());
+        assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 3);
 
         // Test with start_date and end_date
-
         // subtract 72 hours
         let start_date = DateHour::<Utc>::now() - 72;
         // subtract 1 hour
@@ -448,12 +457,149 @@ mod test {
             .await
             .expect("Should get json");
 
-        let fetched_analytics: FetchedAnalytics =
+        let fetched_analytics: Vec<FetchedAnalytics> =
             serde_json::from_slice(&json).expect("Should get analytics response");
-        assert_eq!(fetched_analytics.payout_count.unwrap(), 2);
+        assert_eq!(fetched_analytics.len(), 1);
+        assert!(fetched_analytics.get(0).unwrap().payout_count.is_some());
+        assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 2);
+
         // Test with segment_by
-        // test with not allowed segment by
+        let req = Request::builder()
+            .uri("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day&segment_by=country&country=Bulgaria")
+            .body(Body::empty())
+            .expect("Should build Request");
+
+        let analytics_response = analytics(
+            req,
+            &app,
+            Some(vec!["country".into(), "ad_slot_type".into()]),
+            None,
+        )
+        .await
+        .expect("Should get analytics data");
+        let json = hyper::body::to_bytes(analytics_response.into_body())
+            .await
+            .expect("Should get json");
+
+        let fetched_analytics: Vec<FetchedAnalytics> =
+            serde_json::from_slice(&json).expect("Should get analytics response");
+        assert_eq!(fetched_analytics.len(), 1);
+        assert!(fetched_analytics.get(0).unwrap().payout_count.is_some());
+        assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 4);
+
+        // Test with not allowed segment by
+        let req = Request::builder()
+            .uri("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day&segment_by=campaignId&campaignId=0x936da01f9abd4d9d80c702af85c822a8")
+            .body(Body::empty())
+            .expect("Should build Request");
+
+        let analytics_response = analytics(
+            req,
+            &app,
+            Some(vec!["country".into(), "ad_slot_type".into()]),
+            None,
+        )
+        .await;
+
+        let err_msg = "Disallowed segmentBy: campaignId".to_string();
+        assert!(matches!(
+            analytics_response,
+            Err(ResponseError::BadRequest(err_msg))
+        ));
+
         // test with not allowed key
+        let req = Request::builder()
+            .uri("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day&campaignId=0x936da01f9abd4d9d80c702af85c822a8")
+            .body(Body::empty())
+            .expect("Should build Request");
+
+        let analytics_response = analytics(
+            req,
+            &app,
+            Some(vec!["country".into(), "ad_slot_type".into()]),
+            None,
+        )
+        .await;
+
+        let err_msg = "disallowed key in query: campaignId".to_string();
+        assert!(matches!(
+            analytics_response,
+            Err(ResponseError::BadRequest(err_msg))
+        ));
+
+        // test with not segmentBy which is then not provided
+        let req = Request::builder()
+            .uri("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day&segmentBy=country")
+            .body(Body::empty())
+            .expect("Should build Request");
+
+        let analytics_response = analytics(
+            req,
+            &app,
+            Some(vec!["country".into(), "ad_slot_type".into()]),
+            None,
+        )
+        .await;
+
+        let err_msg = "SegmentBy is provided but a key is not passed".to_string();
+        assert!(matches!(
+            analytics_response,
+            Err(ResponseError::BadRequest(err_msg))
+        ));
+
         // test with different metric
+        let req = Request::builder()
+            .uri("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=paid&timeframe=day")
+            .body(Body::empty())
+            .expect("Should build Request");
+
+        let analytics_response = analytics(
+            req,
+            &app,
+            Some(vec!["country".into(), "ad_slot_type".into()]),
+            None,
+        )
+        .await
+        .expect("Should get analytics data");
+        let json = hyper::body::to_bytes(analytics_response.into_body())
+            .await
+            .expect("Should get json");
+
+        let fetched_analytics: Vec<FetchedAnalytics> =
+            serde_json::from_slice(&json).expect("Should get analytics response");
+        assert_eq!(fetched_analytics.len(), 1);
+        assert!(fetched_analytics.get(0).unwrap().payout_amount.is_some());
+        assert_eq!(
+            fetched_analytics.get(0).unwrap().payout_amount.unwrap(),
+            UnifiedNum::from_u64(4_000_000)
+        );
+
+        // Test with different timeframe
+        let req = Request::builder()
+            .uri("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=week")
+            .body(Body::empty())
+            .expect("Should build Request");
+
+        let analytics_response = analytics(
+            req,
+            &app,
+            Some(vec!["country".into(), "ad_slot_type".into()]),
+            None,
+        )
+        .await
+        .expect("Should get analytics data");
+        let json = hyper::body::to_bytes(analytics_response.into_body())
+            .await
+            .expect("Should get json");
+
+        let fetched_analytics: Vec<FetchedAnalytics> =
+            serde_json::from_slice(&json).expect("Should get analytics response");
+        assert_eq!(fetched_analytics.len(), 1);
+        assert!(fetched_analytics.get(0).unwrap().payout_count.is_some());
+        assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 5);
     }
+    // test for publisher
+    // test for advertiser
+    // test for admin
+    // test for admin with all optional keys
 }

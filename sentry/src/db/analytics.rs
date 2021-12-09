@@ -1,5 +1,6 @@
+use chrono::{DateTime, Utc};
 use primitives::{
-    analytics::{AnalyticsQuery, AnalyticsQueryTime, AuthenticateAs},
+    analytics::{AnalyticsQuery, AnalyticsQueryTime, AuthenticateAs, Metric},
     sentry::{Analytics, FetchedAnalytics, UpdateAnalytics},
 };
 use tokio_postgres::types::ToSql;
@@ -16,11 +17,14 @@ pub async fn get_analytics(
 ) -> Result<Vec<FetchedAnalytics>, PoolError> {
     let client = pool.get().await?;
 
-    let (where_clauses, mut params) =
+    let (where_clauses, params) =
         analytics_query_params(start_date, query, &auth_as, &allowed_keys);
 
-    let mut select_clause = vec!["time".to_string(), format!("${}", params.len() + 1)];
-    params.push(&query.metric);
+    let mut select_clause = vec!["time".to_string()];
+    match &query.metric {
+        Metric::Paid => select_clause.push("payout_amount".to_string()),
+        Metric::Count => select_clause.push("payout_count".to_string()),
+    }
     let mut group_clause = vec!["time".to_string()];
 
     if let Some(segment_by) = &query.segment_by {
@@ -28,15 +32,15 @@ pub async fn get_analytics(
         group_clause.push(segment_by.to_string());
     }
 
+    // TODO: Is a GROUP BY clause really needed here?
     let sql_query = format!(
-        "SELECT {} FROM analytics WHERE {} GROUP BY {} ORDER BY time ASC LIMIT {}",
-        select_clause.join(","),
+        "SELECT {} FROM analytics WHERE {} ORDER BY time ASC LIMIT {}",
+        select_clause.join(", "),
         where_clauses.join(" AND "),
-        group_clause.join(","),
+        // group_clause.join(", "),
         limit,
     );
 
-    println!("{}", sql_query);
     // execute query
     let stmt = client.prepare(&sql_query).await?;
     let rows = client.query(&stmt, params.as_slice()).await?;
@@ -49,8 +53,10 @@ pub async fn get_analytics(
                 Some(segment_by) => row.try_get(&**segment_by).ok(),
                 None => None,
             };
+            let time = row.get::<_, DateTime<Utc>>("time");
+
             FetchedAnalytics {
-                time: row.get("time"),
+                time: time.timestamp(),
                 payout_amount: row.try_get("payout_amount").ok(),
                 payout_count: row.try_get("payout_count").ok(),
                 segment: segment_value,
