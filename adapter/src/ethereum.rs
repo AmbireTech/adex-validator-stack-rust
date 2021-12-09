@@ -406,7 +406,8 @@ mod test {
     use chrono::Utc;
     use primitives::{
         config::{DEVELOPMENT_CONFIG, GANACHE_CONFIG},
-        test_util::{ADDRESS_3, ADDRESS_4, ADDRESS_5, ADVERTISER, CREATOR, IDS, LEADER},
+        test_util::{ADDRESS_3, ADDRESS_4, ADDRESS_5, ADVERTISER, CREATOR, LEADER},
+        util::tests::prep_db::IDS,
         ToHex,
     };
     use web3::{transports::Http, Web3};

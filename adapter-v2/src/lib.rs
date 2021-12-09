@@ -1,225 +1,221 @@
-use std::{marker::PhantomData, ops::Deref};
-use primitives::{ValidatorId, Address, Channel, adapter::Deposit, BigNum};
+// use client::{LockedClient, Unlockable, UnlockedClient};
+use async_trait::async_trait;
+use primitives::adapter::client::{LockedClient, Unlockable, UnlockedClient};
+use primitives::{
+    adapter::{
+        adapter2::{Error2, Locked, Unlocked},
+        Deposit, Session,
+    },
+    Address, Channel, ValidatorId,
+};
+// pub use state::{Locked, Unlocked};
+use std::{marker::PhantomData, sync::Arc};
 
-#[derive(Debug)]
-pub struct Locked<T: LockedClient>(T);
-#[derive(Debug)]
-pub struct Unlocked<T: UnlockedClient>(T);
+pub mod ethereum;
 
-mod impls;
+mod state {
+    #[derive(Debug, Clone, Copy)]
+    pub struct Locked;
 
-pub struct Adapter<C, S = Locked<C>> {
+    #[derive(Debug, Clone, Copy)]
+    pub struct Unlocked;
+}
+
+// pub mod client {
+//     use async_trait::async_trait;
+//     use primitives::{
+//         adapter::{Deposit, Session},
+//         Address, Channel, ValidatorId,
+//     };
+
+//     #[async_trait]
+//     /// Available methods for Locked clients.
+//     pub trait LockedClient {
+//         type Error: std::error::Error + Into<Error>;
+//         /// Get Adapter whoami
+//         fn whoami(&self) -> ValidatorId;
+
+//         /// Verify, based on the signature & state_root, that the signer is the same
+//         fn verify(
+//             &self,
+//             signer: ValidatorId,
+//             state_root: &str,
+//             signature: &str,
+//         ) -> Result<bool, Self::Error>;
+
+//         /// Creates a `Session` from a provided Token by calling the Contract.
+//         /// Does **not** cache the (`Token`, `Session`) pair.
+//         async fn session_from_token(&self, token: &str) -> Result<Session, Self::Error>;
+
+//         async fn get_deposit(
+//             &self,
+//             channel: &Channel,
+//             depositor_address: &Address,
+//         ) -> Result<Deposit, Self::Error>;
+//     }
+
+//     /// Available methods for Unlocked clients.
+//     /// Unlocked clients should also implement [`LockedClient`].
+//     #[async_trait]
+//     pub trait UnlockedClient: LockedClient {
+//         // requires Unlocked
+//         fn sign(&self, state_root: &str) -> Result<String, Self::Error>;
+
+//         // requires Unlocked
+//         async fn get_auth(&self, intended_for: ValidatorId) -> Result<String, Self::Error>;
+//     }
+
+//     /// A client that can be `unlock()`ed
+//     /// and implements both [`LockedClient`] & [`UnlockedClient`].
+//     ///
+//     /// **Note:** A possibly expensive operation as it might result in cloning
+//     pub trait Unlockable {
+//         type Unlocked: UnlockedClient;
+
+//         fn unlock(&self) -> Result<Self::Unlocked, <Self::Unlocked as LockedClient>::Error>;
+//     }
+// }
+
+#[derive(Clone, Debug)]
+pub struct Adapter<C, S = Locked> {
     /// client in a specific state - Locked or Unlocked
-    client: S,
-    /// We must use the `C` type from the definition
-    _phantom: PhantomData<C>,
+    client: Arc<C>,
+    // /// We must use the `C` type from the definition
+    _state: PhantomData<S>,
 }
 
 impl<C: LockedClient> Adapter<C> {
-    pub fn new(client: C) -> Self {
-        Self {
-            client: Locked(client),
-            _phantom: PhantomData::default(),
-        }
-    }
-}
-
-impl<C: UnlockedClient> Adapter<C> {
-    pub fn with_unlocked(client: C) -> Adapter<C, Unlocked<C>> {
+    /// Create a new [`Adapter`] in [`Locked`] state using a [`LockedClient`].
+    pub fn new(client: C) -> Adapter<C, Locked> {
         Adapter {
-            client: Unlocked(client),
-            _phantom: PhantomData::default(),
+            client: Arc::new(client),
+            _state: PhantomData::default(),
+        }
+    }
+}
+impl<C: UnlockedClient> Adapter<C, Unlocked> {
+    /// Create a new [`Adapter`] in [`Unlocked`] state using an [`UnlockedClient`].
+    pub fn with_unlocked(client: C) -> Adapter<C, Unlocked> {
+        Adapter {
+            client: Arc::new(client),
+            _state: PhantomData::default(),
         }
     }
 }
 
-#[derive(Debug)]
-pub struct Error {}
-
-impl<C: LockedClient + Unlockable> Adapter<C, Locked<C>> {
-    pub fn unlock(self) -> Result<Adapter<C::Unlocked, Unlocked<C::Unlocked>>, Error> {
-        let unlocked = self.client.0.unlock()?;
+impl<C: LockedClient + Unlockable> Adapter<C, Locked>
+where
+    C::Error: Into<Error2>,
+    <C::Unlocked as LockedClient>::Error: Into<Error2>,
+{
+    pub fn unlock(self) -> Result<Adapter<C::Unlocked, Unlocked>, Error2> {
+        let unlocked = self.client.unlock().map_err(Into::into)?;
 
         Ok(Adapter {
-            client: Unlocked(unlocked),
-            _phantom: PhantomData::default()
+            client: Arc::new(unlocked),
+            _state: PhantomData::default(),
         })
     }
 }
 
-impl<C: UnlockedClient> UnlockedClient for Adapter<C, Unlocked<C>> {
-    fn sign(&self, state_root: &str) -> Result<String, Error> {
+#[async_trait]
+impl<C: UnlockedClient> UnlockedClient for Adapter<C, Unlocked>
+where
+    C: UnlockedClient + Send + Sync,
+    C::Error: Into<Error2>,
+{
+    fn sign(&self, state_root: &str) -> Result<String, Error2> {
         Ok(state_root.to_string())
     }
 
-    fn get_auth(&self, intended_for: ValidatorId) -> Result<String, Error> {
+    async fn get_auth(&self, intended_for: ValidatorId) -> Result<String, Error2> {
         Ok(intended_for.to_string())
     }
 }
 
-impl<C, S> LockedClient for Adapter<C, S> where C: LockedClient, S: Deref<Target=C> {
-    fn get_deposit(
+#[async_trait]
+impl<C, S> LockedClient for Adapter<C, S>
+where
+    C: LockedClient + Send + Sync,
+    C::Error: Into<Error2>,
+    S: Sync + Send,
+{
+    type Error = Error2;
+
+    fn whoami(&self) -> ValidatorId {
+        todo!()
+    }
+
+    fn verify(
+        &self,
+        signer: ValidatorId,
+        state_root: &str,
+        signature: &str,
+    ) -> Result<bool, Self::Error> {
+        todo!()
+    }
+
+    async fn session_from_token(&self, token: &str) -> Result<Session, Self::Error> {
+        todo!()
+    }
+
+    async fn get_deposit(
         &self,
         channel: &Channel,
         depositor_address: &Address,
-    ) -> Result<Deposit, Error> {
-        self.client.deref().get_deposit(channel, depositor_address)
+    ) -> Result<Deposit, Error2> {
+        self.client
+            .get_deposit(channel, depositor_address)
+            .await
+            .map_err(Into::into)
     }
 }
 
-pub trait LockedClient {
-    fn get_deposit(
-        &self,
-        channel: &Channel,
-        depositor_address: &Address,
-    ) -> Result<Deposit, Error>;
-}
-pub trait UnlockedClient: LockedClient {
-    // requires Unlocked
-    fn sign(&self, state_root: &str) -> Result<String, Error>;
-
-    // requires Unlocked
-    fn get_auth(&self, intended_for: ValidatorId) -> Result<String, Error>;
-}
-
-// pub trait Client: fmt::Debug + Unlockable {
-//     // requires Unlocked
-//     fn sign(&self, state_root: &str) -> Result<String, Error>;
-
-//     // requires Unlocked
-//     fn get_auth(&self, intended_for: ValidatorId) -> Result<String, Error>;
-
-//     fn get_deposit(
-//         &self,
-//         channel: &Channel,
-//         depositor_address: &Address,
-//     ) -> Result<Deposit, Error>;
+// #[derive(Debug)]
+// /// The Errors that may occur when processing a `Request`.
+// pub struct Error {
+//     inner: Box<Inner>,
 // }
 
-pub trait Unlockable {
-    type Unlocked: UnlockedClient;
+// pub(crate) type BoxError = Box<dyn StdError + Send + Sync>;
 
-    fn unlock(self) -> Result<Self::Unlocked, Error>;
-}
+// struct Inner {
+//     kind: Kind,
+//     source: Option<BoxError>,
+// }
 
-#[derive(Debug)]
-pub struct UnlockedWallet {
-    wallet: (),
-    password: (),
-}
+// impl fmt::Debug for Error {
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         let mut builder = f.debug_struct("reqwest::Error");
 
-#[derive(Debug)]
-pub enum LockedWallet {
-    KeyStore {
-        keystore: (),
-        password: (),
-    },
-    PrivateKey(String)
-}
+//         builder.field("kind", &self.inner.kind);
 
-pub trait WalletState {}
-impl WalletState for UnlockedWallet {}
-impl WalletState for LockedWallet {}
+//         if let Some(ref url) = self.inner.url {
+//             builder.field("url", url);
+//         }
+//         if let Some(ref source) = self.inner.source {
+//             builder.field("source", source);
+//         }
 
+//         builder.finish()
+//     }
+// }
 
-#[derive(Debug)]
-pub struct Ethereum<S = LockedWallet> {
-    web3: (),
-    keystore: (),
-    keystore_pwd: (),
-    state: S,
-}
+// impl Error {
+//     pub(crate) fn new<E>(kind: Kind, source: Option<E>) -> Error
+//     where
+//         E: Into<BoxError>,
+//     {
+//         Error {
+//             inner: Box::new(Inner {
+//                 kind,
+//                 source: source.map(Into::into),
+//             }),
+//         }
+//     }
+// }
 
-impl Unlockable for Ethereum<LockedWallet> {
-    type Unlocked = Ethereum<UnlockedWallet>;
+// #[derive(Debug)]
+// pub(crate) enum Kind {
 
-    fn unlock(self) -> Result<Ethereum<UnlockedWallet>, Error> {
-        Ok(Ethereum {
-            web3: self.web3,
-            keystore: self.keystore,
-            keystore_pwd: self.keystore_pwd.clone(),
-            state: UnlockedWallet {
-                wallet: (),
-                password: self.keystore_pwd.clone(),
-            }
-        })
-    }
-}
-
-impl Unlockable for Ethereum<UnlockedWallet> {
-    type Unlocked = Self;
-
-    fn unlock(self) -> Result<Self, Error> {
-        Ok(self)
-    }
-}
-
-impl<S: WalletState> LockedClient for Ethereum<S> {
-    fn get_deposit(
-        &self,
-        _channel: &Channel,
-        _depositor_address: &Address,
-    ) -> Result<Deposit, Error> {
-        Ok(Deposit {
-            total: BigNum::from(42_u64),
-            still_on_create2: BigNum::from(12_u64),
-        })
-    }
-}
-
-impl UnlockedClient for Ethereum<UnlockedWallet> {
-    fn sign(&self, state_root: &str) -> Result<String, Error> {
-        Ok(state_root.to_string())
-    }
-
-    fn get_auth(&self, intended_for: ValidatorId) -> Result<String, Error> {
-        Ok(intended_for.to_string())
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use primitives::test_util::{ADDRESS_1, DUMMY_CAMPAIGN};
-
-    use super::*;
-
-    #[test]
-    fn use_adapter() {
-        // With Locked Client
-        {
-            let ethereum = Ethereum {
-                web3: (),
-                keystore: (),
-                keystore_pwd: (),
-                state: LockedWallet::KeyStore {
-                    keystore: (),
-                    password: (),
-                },
-            };
-            let adapter = Adapter::new(ethereum);
-
-            // Should be able to call get_deposit before unlocking!
-            adapter.get_deposit(&DUMMY_CAMPAIGN.channel, &ADDRESS_1).expect("Should get deposit");
-    
-            let unlocked = adapter.unlock().expect("Should unlock");
-
-            unlocked.get_auth((*ADDRESS_1).into()).expect("Should get Auth");
-
-        }
-        
-        // with Unlocked Client
-        {
-            let ethereum = Ethereum {
-                web3: (),
-                keystore: (),
-                keystore_pwd: (),
-                state: UnlockedWallet { wallet: (), password: () },
-            };
-
-            let adapter = Adapter::with_unlocked(ethereum);
-            
-            adapter.get_deposit(&DUMMY_CAMPAIGN.channel, &ADDRESS_1).expect("Should get deposit");
-            adapter.get_auth((*ADDRESS_1).into()).expect("Should get Auth");
-        }
-    }
-}
+// }
