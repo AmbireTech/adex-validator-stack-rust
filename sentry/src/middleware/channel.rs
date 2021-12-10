@@ -3,10 +3,11 @@ use crate::{
     middleware::Middleware,
     Application, ResponseError, RouteParams,
 };
+use adapter::client::UnlockedClient;
 use futures::future::{BoxFuture, FutureExt};
 use hex::FromHex;
 use hyper::{Body, Request};
-use primitives::{adapter::Adapter, ChannelId, ValidatorId};
+use primitives::{ChannelId, ValidatorId};
 
 use async_trait::async_trait;
 
@@ -14,20 +15,20 @@ use async_trait::async_trait;
 pub struct ChannelLoad;
 
 #[async_trait]
-impl<A: Adapter + 'static> Middleware<A> for ChannelLoad {
+impl<C: UnlockedClient + 'static> Middleware<C> for ChannelLoad {
     async fn call<'a>(
         &self,
         request: Request<Body>,
-        application: &'a Application<A>,
+        application: &'a Application<C>,
     ) -> Result<Request<Body>, ResponseError> {
         channel_load(request, application).await
     }
 }
 
 /// channel_load & channel_if_exist
-fn channel_load<'a, A: Adapter + 'static>(
+fn channel_load<'a, C: UnlockedClient>(
     mut req: Request<Body>,
-    app: &'a Application<A>,
+    app: &'a Application<C>,
 ) -> BoxFuture<'a, Result<Request<Body>, ResponseError>> {
     async move {
         let id = req
@@ -56,19 +57,19 @@ fn channel_load<'a, A: Adapter + 'static>(
 pub struct ChannelIfActive;
 
 #[async_trait]
-impl<A: Adapter + 'static> Middleware<A> for ChannelIfActive {
+impl<C: UnlockedClient + 'static> Middleware<C> for ChannelIfActive {
     async fn call<'a>(
         &self,
         request: Request<Body>,
-        application: &'a Application<A>,
+        application: &'a Application<C>,
     ) -> Result<Request<Body>, ResponseError> {
         channel_if_active(request, application).await
     }
 }
 
-fn channel_if_active<'a, A: Adapter + 'static>(
+fn channel_if_active<'a, C: UnlockedClient>(
     mut req: Request<Body>,
-    app: &'a Application<A>,
+    app: &'a Application<C>,
 ) -> BoxFuture<'a, Result<Request<Body>, ResponseError>> {
     async move {
         let route_params = req
@@ -104,19 +105,19 @@ fn channel_if_active<'a, A: Adapter + 'static>(
 pub struct GetChannelId;
 
 #[async_trait]
-impl<A: Adapter + 'static> Middleware<A> for GetChannelId {
+impl<C: UnlockedClient + 'static> Middleware<C> for GetChannelId {
     async fn call<'a>(
         &self,
         request: Request<Body>,
-        application: &'a Application<A>,
+        application: &'a Application<C>,
     ) -> Result<Request<Body>, ResponseError> {
         get_channel_id(request, application).await
     }
 }
 
-fn get_channel_id<'a, A: Adapter + 'static>(
+fn get_channel_id<'a, C: UnlockedClient>(
     mut req: Request<Body>,
-    _: &'a Application<A>,
+    _: &'a Application<C>,
 ) -> BoxFuture<'a, Result<Request<Body>, ResponseError>> {
     async move {
         match req.extensions().get::<RouteParams>() {

@@ -11,11 +11,11 @@ pub struct CampaignLoad;
 pub struct CalledByCreator;
 
 #[async_trait]
-impl<A: Adapter + 'static> Middleware<A> for CampaignLoad {
+impl<C: adapter::client::UnlockedClient + 'static> Middleware<C> for CampaignLoad {
     async fn call<'a>(
         &self,
         mut request: Request<Body>,
-        application: &'a Application<A>,
+        application: &'a Application<C>,
     ) -> Result<Request<Body>, ResponseError> {
         let id = request
             .extensions()
@@ -38,11 +38,11 @@ impl<A: Adapter + 'static> Middleware<A> for CampaignLoad {
 }
 
 #[async_trait]
-impl<A: Adapter + 'static> Middleware<A> for CalledByCreator {
+impl<C: adapter::client::UnlockedClient + 'static> Middleware<C> for CalledByCreator {
     async fn call<'a>(
         &self,
         request: Request<Body>,
-        _application: &'a Application<A>,
+        _application: &'a Application<C>,
     ) -> Result<Request<Body>, ResponseError> {
         let campaign = request
             .extensions()

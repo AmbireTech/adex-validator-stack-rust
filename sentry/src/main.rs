@@ -3,9 +3,8 @@
 
 use clap::{crate_version, App, Arg};
 
-use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
+// use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
 use primitives::{
-    adapter::{DummyAdapterOptions, KeystoreOptions},
     config::configuration,
     postgres::POSTGRES_CONFIG,
     test_util::ADDRESSES,
@@ -68,29 +67,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .expect("keystore file is required for the ethereum adapter");
             let keystore_pwd = std::env::var("KEYSTORE_PWD").expect("unable to get keystore pwd");
 
-            let options = KeystoreOptions {
+            let options = adapter::ethereum::Options {
                 keystore_file: keystore_file.to_string(),
                 keystore_pwd,
             };
-            let ethereum_adapter = EthereumAdapter::init(options, &config)
+            let ethereum_adapter = ethereum::Adapter::init(options, &config)
                 .expect("Should initialize ethereum adapter");
 
-            AdapterTypes::EthereumAdapter(Box::new(ethereum_adapter))
+                ethereum_adapter
+            // AdapterTypes::EthereumAdapter(Box::new(ethereum_adapter))
         }
         "dummy" => {
             let dummy_identity = cli
                 .value_of("dummyIdentity")
                 .expect("Dummy identity is required for the dummy adapter");
 
-            let options = DummyAdapterOptions {
+            let options = adapter::dummy::Options {
                 dummy_identity: ValidatorId::try_from(dummy_identity)
                     .expect("failed to parse dummy identity"),
                 dummy_auth: ADDRESSES.clone(),
                 dummy_auth_tokens: AUTH.clone(),
             };
 
-            let dummy_adapter = DummyAdapter::init(options, &config);
-            AdapterTypes::DummyAdapter(Box::new(dummy_adapter))
+            let dummy_adapter = dummy::Adapter::init(options, &config);
+            dummy_adapter
+            // AdapterTypes::DummyAdapter(Box::new(dummy_adapter))
         }
         _ => panic!("You can only use `ethereum` & `dummy` adapters!"),
     };

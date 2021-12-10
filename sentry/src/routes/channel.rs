@@ -6,6 +6,7 @@ use crate::db::{
     DbPool,
 };
 use crate::{success_response, Application, Auth, ResponseError, RouteParams};
+use adapter::client::UnlockedClient;
 use futures::future::try_join_all;
 use hyper::{Body, Request, Response};
 use primitives::{
@@ -23,9 +24,9 @@ use primitives::{
 use slog::{error, Logger};
 use std::{collections::HashMap, str::FromStr};
 
-pub async fn channel_list<A: Adapter>(
+pub async fn channel_list<C: UnlockedClient + 'static>(
     req: Request<Body>,
-    app: &Application<A>,
+    app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
     let query = serde_urlencoded::from_str::<ChannelListQuery>(req.uri().query().unwrap_or(""))?;
     let skip = query
@@ -44,9 +45,9 @@ pub async fn channel_list<A: Adapter>(
     Ok(success_response(serde_json::to_string(&list_response)?))
 }
 
-pub async fn last_approved<A: Adapter>(
+pub async fn last_approved<C: UnlockedClient + 'static>(
     req: Request<Body>,
-    app: &Application<A>,
+    app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
     // get request Channel
     let channel = *req
@@ -107,9 +108,9 @@ pub async fn last_approved<A: Adapter>(
         .unwrap())
 }
 
-pub async fn create_validator_messages<A: Adapter + 'static>(
+pub async fn create_validator_messages<C: UnlockedClient + 'static>(
     req: Request<Body>,
-    app: &Application<A>,
+    app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
     let session = req
         .extensions()
@@ -196,9 +197,9 @@ fn spender_response_without_leaf(
     Ok(success_response(serde_json::to_string(&res)?))
 }
 
-pub async fn get_spender_limits<A: Adapter + 'static>(
+pub async fn get_spender_limits<C: UnlockedClient + 'static>(
     req: Request<Body>,
-    app: &Application<A>,
+    app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
     let route_params = req
         .extensions()
@@ -257,9 +258,9 @@ pub async fn get_spender_limits<A: Adapter + 'static>(
     Ok(success_response(serde_json::to_string(&res)?))
 }
 
-pub async fn get_all_spender_limits<A: Adapter + 'static>(
+pub async fn get_all_spender_limits<C: UnlockedClient + 'static>(
     req: Request<Body>,
-    app: &Application<A>,
+    app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
     let channel = req
         .extensions()
@@ -345,9 +346,9 @@ async fn get_corresponding_new_state(
     new_state
 }
 
-pub async fn get_accounting_for_channel<A: Adapter + 'static>(
+pub async fn get_accounting_for_channel<C: UnlockedClient + 'static>(
     req: Request<Body>,
-    app: &Application<A>,
+    app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
     let channel = req
         .extensions()

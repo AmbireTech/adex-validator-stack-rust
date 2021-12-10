@@ -1,10 +1,13 @@
-use async_trait::async_trait;
 use crate::primitives::*;
+use async_trait::async_trait;
 use std::{marker::PhantomData, sync::Arc};
 
 use crate::{prelude::*, Error};
 
 pub use self::state::{Locked, Unlocked};
+
+pub type UnlockedC = Adapter<dyn UnlockedClient<Error = crate::Error>, Unlocked>;
+pub type LockedC = Adapter<dyn LockedClient<Error = crate::Error>, Unlocked>;
 
 mod state {
     #[derive(Debug, Clone, Copy)]
@@ -18,13 +21,22 @@ mod state {
     pub struct Unlocked;
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 /// [`Adapter`] struct
 pub struct Adapter<C, S = Locked> {
     /// client in a specific state - Locked or Unlocked
     pub client: Arc<C>,
     // /// We must use the `C` type from the definition
     _state: PhantomData<S>,
+}
+
+impl<C, S: Clone> Clone for Adapter<C, S> {
+    fn clone(&self) -> Self {
+        Self {
+            client: self.client.clone(),
+            _state: self._state.clone(),
+        }
+    }
 }
 
 impl<C: LockedClient> Adapter<C> {

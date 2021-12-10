@@ -5,10 +5,8 @@ use hyper::header::{AUTHORIZATION, REFERER};
 use hyper::{Body, Request};
 use redis::aio::MultiplexedConnection;
 
-use primitives::{
-    adapter::{Adapter, Session as AdapterSession},
-    ValidatorId,
-};
+use adapter::{Adapter, prelude::*, primitives::Session as AdapterSession, client::UnlockedClient, Unlocked};
+use primitives::ValidatorId;
 
 use crate::{middleware::Middleware, Application, Auth, ResponseError, Session};
 
@@ -16,11 +14,11 @@ use crate::{middleware::Middleware, Application, Auth, ResponseError, Session};
 pub struct Authenticate;
 
 #[async_trait]
-impl<A: Adapter + 'static> Middleware<A> for Authenticate {
+impl<C: UnlockedClient + 'static> Middleware<C> for Authenticate {
     async fn call<'a>(
         &self,
         request: Request<Body>,
-        application: &'a Application<A>,
+        application: &'a Application<C>,
     ) -> Result<Request<Body>, ResponseError> {
         for_request(request, &application.adapter, &application.redis.clone())
             .await
@@ -36,11 +34,11 @@ impl<A: Adapter + 'static> Middleware<A> for Authenticate {
 pub struct AuthRequired;
 
 #[async_trait]
-impl<A: Adapter + 'static> Middleware<A> for AuthRequired {
+impl<C: UnlockedClient + 'static> Middleware<C> for AuthRequired {
     async fn call<'a>(
         &self,
         request: Request<Body>,
-        _application: &'a Application<A>,
+        _application: &'a Application<C>,
     ) -> Result<Request<Body>, ResponseError> {
         if request.extensions().get::<Auth>().is_some() {
             Ok(request)
@@ -52,9 +50,9 @@ impl<A: Adapter + 'static> Middleware<A> for AuthRequired {
 
 /// Check `Authorization` header for `Bearer` scheme with `Adapter::session_from_token`.
 /// If the `Adapter` fails to create an `AdapterSession`, `ResponseError::BadRequest` will be returned.
-async fn for_request(
+async fn for_request<C: UnlockedClient<Error = adapter::Error>>(
     mut req: Request<Body>,
-    adapter: &impl Adapter,
+    adapter: &Adapter<C, Unlocked>,
     redis: &MultiplexedConnection,
 ) -> Result<Request<Body>, Box<dyn error::Error>> {
     let referrer = req
@@ -130,10 +128,9 @@ fn get_request_ip(req: &Request<Body>) -> Option<String> {
 
 #[cfg(test)]
 mod test {
-    use adapter::DummyAdapter;
+    use adapter::dummy::{Dummy, Options};
     use hyper::Request;
     use primitives::{
-        adapter::DummyAdapterOptions,
         config::DEVELOPMENT_CONFIG,
         test_util::ADDRESSES,
         util::tests::prep_db::{AUTH, IDS},
@@ -148,16 +145,16 @@ mod test {
 
     use super::*;
 
-    async fn setup() -> (DummyAdapter, Object<Manager>) {
+    async fn setup() -> (Dummy, Object<Manager>) {
         let connection = TESTS_POOL.get().await.expect("Should return Object");
-        let adapter_options = DummyAdapterOptions {
+        let adapter_options = Options {
             dummy_identity: IDS["leader"],
             dummy_auth: ADDRESSES.clone(),
             dummy_auth_tokens: AUTH.clone(),
         };
         let config = DEVELOPMENT_CONFIG.clone();
 
-        (DummyAdapter::init(adapter_options, &config), connection)
+        (Dummy::init(adapter_options, &config), connection)
     }
 
     #[tokio::test]

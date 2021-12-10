@@ -12,7 +12,8 @@ use middleware::{
     Chain, Middleware,
 };
 use once_cell::sync::Lazy;
-use primitives::{adapter::Adapter, sentry::ValidationErrorResponse, Config, ValidatorId};
+use adapter::prelude::*;
+use primitives::{sentry::ValidationErrorResponse, Config, ValidatorId};
 use redis::aio::MultiplexedConnection;
 use regex::Regex;
 use slog::Logger;
@@ -31,6 +32,11 @@ use {
         validator_message::{extract_params, list_validator_messages},
     },
 };
+
+/// For sentry to work properly, we need an [`adapter::Adapter`] in an [`Unlocked`] state.
+/// Use this type across `sentry`.
+pub type Adapter = adapter::Adapter<dyn UnlockedClient<Error = adapter::Error>, adapter::Unlocked>;
+// pub type Adapter = adapter::UnlockedC;
 
 pub mod analytics;
 pub mod middleware;
@@ -110,9 +116,10 @@ impl RouteParams {
     }
 }
 
-#[derive(Clone)]
-pub struct Application<A: Adapter> {
-    pub adapter: A,
+// #[derive(Clone)]
+pub struct Application<C: UnlockedClient + 'static> {
+    /// For sentry to work properly, we need an [`adapter::Adapter`] in an [`Unlocked`] state.
+    pub adapter: Adapter<C>,
     pub config: Config,
     pub logger: Logger,
     pub redis: MultiplexedConnection,
@@ -120,9 +127,9 @@ pub struct Application<A: Adapter> {
     pub campaign_remaining: CampaignRemaining,
 }
 
-impl<A: Adapter + 'static> Application<A> {
+impl<C: UnlockedClient> Application<C> {
     pub fn new(
-        adapter: A,
+        adapter: C,
         config: Config,
         logger: Logger,
         redis: MultiplexedConnection,
@@ -130,7 +137,7 @@ impl<A: Adapter + 'static> Application<A> {
         campaign_remaining: CampaignRemaining,
     ) -> Self {
         Self {
-            adapter,
+            adapter: Adapter::with_unlocked(adapter),
             config,
             logger,
             redis,
@@ -170,9 +177,9 @@ impl<A: Adapter + 'static> Application<A> {
     }
 }
 
-async fn campaigns_router<A: Adapter + 'static>(
+async fn campaigns_router<C: UnlockedClient + 'static>(
     mut req: Request<Body>,
-    app: &Application<A>,
+    app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
     let (path, method) = (req.uri().path(), req.method());
 
@@ -225,9 +232,9 @@ async fn campaigns_router<A: Adapter + 'static>(
     }
 }
 
-async fn analytics_router<A: Adapter + 'static>(
+async fn analytics_router<C: UnlockedClient + 'static>(
     mut req: Request<Body>,
-    app: &Application<A>,
+    app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
     use routes::analytics::{
         advanced_analytics, advertiser_analytics, analytics, publisher_analytics,
@@ -302,9 +309,9 @@ async fn analytics_router<A: Adapter + 'static>(
     }
 }
 
-async fn channels_router<A: Adapter + 'static>(
+async fn channels_router<C: UnlockedClient + 'static>(
     mut req: Request<Body>,
-    app: &Application<A>,
+    app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
     let (path, method) = (req.uri().path().to_owned(), req.method());
 
@@ -543,9 +550,8 @@ pub struct Auth {
 
 #[cfg(test)]
 pub mod test_util {
-    use adapter::DummyAdapter;
+    use adapter::dummy::{Options, Dummy};
     use primitives::{
-        adapter::DummyAdapterOptions,
         config::DEVELOPMENT_CONFIG,
         util::tests::{discard_logger, prep_db::IDS},
     };
@@ -561,10 +567,10 @@ pub mod test_util {
 
     /// Uses development and therefore the goerli testnet addresses of the tokens
     /// It still uses DummyAdapter.
-    pub async fn setup_dummy_app() -> Application<DummyAdapter> {
+    pub async fn setup_dummy_app() -> Application<Dummy> {
         let config = DEVELOPMENT_CONFIG.clone();
-        let adapter = DummyAdapter::init(
-            DummyAdapterOptions {
+        let adapter = Dummy::init(
+            Options {
                 dummy_identity: IDS["leader"],
                 dummy_auth: Default::default(),
                 dummy_auth_tokens: Default::default(),

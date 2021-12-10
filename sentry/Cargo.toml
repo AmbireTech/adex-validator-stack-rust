@@ -19,7 +19,7 @@ async-std = "^1"
 async-trait = "^0.1"
 # Primitives
 primitives = { path = "../primitives", features = ["postgres"] }
-adapter = { version = "0.1", path = "../adapter" }
+adapter = { version = "0.2", path = "../adapter" }
 chrono = { version = "0.4", features = ["serde"] }
 dashmap = "4"
 hex = "0.4"

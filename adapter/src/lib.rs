@@ -1,4 +1,5 @@
 pub use error::Error;
+pub use adapter::{LockedC, UnlockedC};
 
 /// only re-export types from the `primitives` crate that are being used by the [`crate::Adapter`].
 pub mod primitives {
