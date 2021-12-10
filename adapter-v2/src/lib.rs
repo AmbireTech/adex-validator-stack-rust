@@ -1,5 +1,6 @@
-// use client::{LockedClient, Unlockable, UnlockedClient};
 use async_trait::async_trait;
+pub use dummy::Dummy;
+pub use ethereum::Ethereum;
 use primitives::adapter::client::{LockedClient, Unlockable, UnlockedClient};
 use primitives::{
     adapter::{
@@ -8,9 +9,9 @@ use primitives::{
     },
     Address, Channel, ValidatorId,
 };
-// pub use state::{Locked, Unlocked};
 use std::{marker::PhantomData, sync::Arc};
 
+pub mod dummy;
 pub mod ethereum;
 
 mod state {
@@ -152,17 +153,22 @@ where
         state_root: &str,
         signature: &str,
     ) -> Result<bool, Self::Error> {
-        todo!()
+        self.client
+            .verify(signer, state_root, signature)
+            .map_err(Into::into)
     }
 
     async fn session_from_token(&self, token: &str) -> Result<Session, Self::Error> {
-        todo!()
+        self.client
+            .session_from_token(token)
+            .await
+            .map_err(Into::into)
     }
 
     async fn get_deposit(
         &self,
         channel: &Channel,
-        depositor_address: &Address,
+        depositor_address: Address,
     ) -> Result<Deposit, Error2> {
         self.client
             .get_deposit(channel, depositor_address)

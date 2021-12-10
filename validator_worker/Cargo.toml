@@ -7,6 +7,7 @@ authors = [
   "Samparsky <sam@ambire.com>",
 ]
 edition = "2021"
+license = "AGPL-3.0"
 
 [lib]
 name = "validator_worker"

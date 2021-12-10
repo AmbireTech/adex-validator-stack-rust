@@ -1,9 +1,11 @@
-use adapter_v2::{
-    Adapter,
-};
+use adapter_v2::Adapter;
 use async_trait::async_trait;
 use primitives::{
-    adapter::{Deposit, adapter2::Error2, client::{LockedClient, Unlockable, UnlockedClient}, Session},
+    adapter::{
+        adapter2::Error2,
+        client::{LockedClient, Unlockable, UnlockedClient},
+        Deposit, Session,
+    },
     test_util::{ADDRESS_1, DUMMY_CAMPAIGN},
     Address, BigNum, Channel, ValidatorId,
 };
@@ -40,7 +42,7 @@ impl LockedClient for Dummy {
     async fn get_deposit(
         &self,
         _channel: &Channel,
-        _depositor_address: &Address,
+        _depositor_address: Address,
     ) -> Result<Deposit, Self::Error> {
         Ok(Deposit {
             total: BigNum::from(42_u64),
@@ -80,7 +82,7 @@ async fn main() {
 
         // Should be able to call get_deposit before unlocking!
         locked_adapter
-            .get_deposit(&DUMMY_CAMPAIGN.channel, &ADDRESS_1)
+            .get_deposit(&DUMMY_CAMPAIGN.channel, *ADDRESS_1)
             .await
             .expect("Should get deposit");
 
@@ -94,7 +96,7 @@ async fn main() {
 
         // Should be able to call get_deposit after unlocking!
         unlocked_adapter
-            .get_deposit(&DUMMY_CAMPAIGN.channel, &ADDRESS_1)
+            .get_deposit(&DUMMY_CAMPAIGN.channel, *ADDRESS_1)
             .await
             .expect("Should get deposit");
     }
@@ -105,7 +107,7 @@ async fn main() {
 
         // Should be able to call `get_deposit()` on unlocked adapter
         unlocked_adapter
-            .get_deposit(&DUMMY_CAMPAIGN.channel, &ADDRESS_1)
+            .get_deposit(&DUMMY_CAMPAIGN.channel, *ADDRESS_1)
             .await
             .expect("Should get deposit");
 

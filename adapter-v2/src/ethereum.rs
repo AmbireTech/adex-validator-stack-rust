@@ -1,159 +1,76 @@
-use async_trait::async_trait;
-use primitives::{
-    adapter::{
-        adapter2::Error2,
-        client::{LockedClient, Unlockable, UnlockedClient},
-        Deposit, Session,
-    },
-    Address, BigNum, Channel, ValidatorId,
+use ethstore::{ethkey::Password, SafeAccount};
+
+use once_cell::sync::Lazy;
+use serde_json::Value;
+use web3::signing::keccak256;
+
+pub use {
+    client::{get_counterfactual_address, Ethereum},
+    error::Error,
 };
-use thiserror::Error;
 
-pub use error::Error as EthereumError;
+pub type Adapter<S> = primitives::adapter::adapter2::Adapter<client::Ethereum, S>;
+pub type LockedClient = client::Ethereum<LockedWallet>;
+pub type UnlockedClient = client::Ethereum<UnlockedWallet>;
 
+mod channel;
+mod client;
 mod error;
+
+/// Ethereum Web Token
+/// See https://github.com/ethereum/EIPs/issues/1341
+///
+/// This module implements the Ethereum Web Token with 2 difference:
+/// - The signature includes the Ethereum signature mode, see [`ETH_SIGN_SUFFIX`]
+/// - The message being signed is not the `header.payload` directly,
+///   but the `keccak256("header.payload")`.
+pub mod ewt;
+
+#[cfg(any(test, feature = "test-util"))]
+pub mod test_util;
+
+pub static OUTPACE_ABI: Lazy<&'static [u8]> =
+    Lazy::new(|| include_bytes!("../../lib/protocol-eth/abi/OUTPACE.json"));
+pub static ERC20_ABI: Lazy<&'static [u8]> = Lazy::new(|| {
+    include_str!("../../lib/protocol-eth/abi/ERC20.json")
+        .trim_end_matches('\n')
+        .as_bytes()
+});
+pub static SWEEPER_ABI: Lazy<&'static [u8]> =
+    Lazy::new(|| include_bytes!("../../lib/protocol-eth/abi/Sweeper.json"));
+pub static IDENTITY_ABI: Lazy<&'static [u8]> =
+    Lazy::new(|| include_bytes!("../../lib/protocol-eth/abi/Identity5.2.json"));
+
+/// Ready to use init code (i.e. decoded) for calculating the create2 address
+pub static DEPOSITOR_BYTECODE_DECODED: Lazy<Vec<u8>> = Lazy::new(|| {
+    let bytecode = include_str!("../../lib/protocol-eth/resources/bytecode/Depositor.bin");
+    hex::decode(bytecode).expect("Decoded properly")
+});
+
+/// Hashes the passed message with the format of `Signed Data Standard`
+/// See https://eips.ethereum.org/EIPS/eip-191
+fn to_ethereum_signed(message: &[u8]) -> [u8; 32] {
+    let eth = "\x19Ethereum Signed Message:\n";
+    let message_length = message.len();
+
+    let mut bytes = format!("{}{}", eth, message_length).into_bytes();
+    bytes.extend(message);
+
+    keccak256(&bytes)
+}
 
 #[derive(Debug, Clone)]
 pub struct UnlockedWallet {
-    wallet: (),
-    password: (),
+    wallet: SafeAccount,
+    password: Password,
 }
 
 #[derive(Debug, Clone)]
 pub enum LockedWallet {
-    KeyStore { keystore: (), password: () },
+    KeyStore { keystore: Value, password: Password },
     PrivateKey(String),
 }
 
 pub trait WalletState: Send + Sync {}
 impl WalletState for UnlockedWallet {}
 impl WalletState for LockedWallet {}
-
-#[derive(Debug, Clone)]
-pub struct Ethereum<S = LockedWallet> {
-    web3: (),
-    state: S,
-}
-
-
-impl Unlockable for Ethereum<LockedWallet> {
-    type Unlocked = Ethereum<UnlockedWallet>;
-
-    fn unlock(&self) -> Result<Ethereum<UnlockedWallet>, EthereumError> {
-        let unlocked_wallet = match &self.state {
-            LockedWallet::KeyStore { keystore, password } => UnlockedWallet {
-                wallet: (),
-                password: password.clone(),
-            },
-            LockedWallet::PrivateKey(_priv_key) => todo!(),
-        };
-
-        Ok(Ethereum {
-            web3: self.web3.clone(),
-            state: unlocked_wallet,
-        })
-    }
-}
-
-#[async_trait]
-impl<S: WalletState> LockedClient for Ethereum<S> {
-    type Error = EthereumError;
-    async fn get_deposit(
-        &self,
-        _channel: &Channel,
-        _depositor_address: &Address,
-    ) -> Result<Deposit, EthereumError> {
-        Ok(Deposit {
-            total: BigNum::from(42_u64),
-            still_on_create2: BigNum::from(12_u64),
-        })
-    }
-
-    fn whoami(&self) -> ValidatorId {
-        todo!()
-    }
-
-    fn verify(
-        &self,
-        signer: ValidatorId,
-        state_root: &str,
-        signature: &str,
-    ) -> Result<bool, Self::Error> {
-        todo!()
-    }
-
-    async fn session_from_token(&self, token: &str) -> Result<Session, Self::Error> {
-        todo!()
-    }
-}
-
-#[async_trait]
-impl UnlockedClient for Ethereum<UnlockedWallet> {
-    fn sign(&self, state_root: &str) -> Result<String, EthereumError> {
-        Ok(state_root.to_string())
-    }
-
-    async fn get_auth(&self, intended_for: ValidatorId) -> Result<String, EthereumError> {
-        Ok(intended_for.to_string())
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use primitives::{
-        adapter::adapter2::Adapter,
-        test_util::{ADDRESS_1, DUMMY_CAMPAIGN},
-    };
-
-    use super::*;
-
-    #[tokio::test]
-    async fn use_adapter() {
-        // With Locked Client
-        {
-            let ethereum = Ethereum {
-                web3: (),
-                state: LockedWallet::KeyStore {
-                    keystore: (),
-                    password: (),
-                },
-            };
-            let adapter = Adapter::new(ethereum);
-
-            // Should be able to call get_deposit before unlocking!
-            adapter
-                .get_deposit(&DUMMY_CAMPAIGN.channel, &ADDRESS_1)
-                .await
-                .expect("Should get deposit");
-
-            let unlocked = adapter.unlock().expect("Should unlock");
-
-            unlocked
-                .get_auth((*ADDRESS_1).into())
-                .await
-                .expect("Should get Auth");
-        }
-
-        // with Unlocked Client
-        {
-            let ethereum = Ethereum {
-                web3: (),
-                state: UnlockedWallet {
-                    wallet: (),
-                    password: (),
-                },
-            };
-
-            let adapter = Adapter::with_unlocked(ethereum);
-
-            adapter
-                .get_deposit(&DUMMY_CAMPAIGN.channel, &ADDRESS_1)
-                .await
-                .expect("Should get deposit");
-            adapter
-                .get_auth((*ADDRESS_1).into())
-                .await
-                .expect("Should get Auth");
-        }
-    }
-}

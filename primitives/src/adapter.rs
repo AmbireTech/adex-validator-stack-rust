@@ -17,7 +17,6 @@ mod state {
 }
 
 pub mod client {
-    use super::adapter2::Error2;
     use crate::{
         adapter::{Deposit, Session},
         Address, Channel, ValidatorId,
@@ -46,8 +45,20 @@ pub mod client {
         async fn get_deposit(
             &self,
             channel: &Channel,
-            depositor_address: &Address,
+            depositor_address: Address,
         ) -> Result<Deposit, Self::Error>;
+
+        // fn unlock(
+        //     &self,
+        // ) -> Result<
+        //     <Self as Unlockable>::Unlocked,
+        //     <<Self as Unlockable>::Unlocked as LockedClient>::Error,
+        // >
+        // where
+        //     Self: Unlockable,
+        // {
+        //     <Self as Unlockable>::unlock(self)
+        // }
     }
 
     /// Available methods for Unlocked clients.
@@ -79,36 +90,19 @@ pub mod adapter2 {
     };
     use crate::{adapter::Deposit, Address, Channel, ValidatorId};
     use async_trait::async_trait;
-    use std::error::Error as StdError;
+    use parse_display::Display;
+    use std::{error::Error as StdError, fmt};
     use std::{marker::PhantomData, sync::Arc};
     use thiserror::Error;
-    use parse_display::Display;
 
     pub use super::state::{Locked, Unlocked};
-
-    #[derive(Debug, Error)]
-    // TODO: Make the error & impl Debug!
-    #[error("{inner}")]
-    pub struct Error2 {
-        inner: Box<Inner>,
-    }
 
     pub(crate) type BoxError = Box<dyn StdError + Send + Sync>;
 
     #[derive(Debug, Error)]
-    #[error("Kind {kind}")]
-    struct Inner {
-        kind: Kind,
-        source: Option<BoxError>,
-    }
-
-    #[derive(Debug, Display)]
-    pub(crate) enum Kind {
-        Adapter,
-        WalletUnlock,
-        Verify,
-        Authentication,
-        Authorization,
+    #[error("{inner}")]
+    pub struct Error2 {
+        inner: Box<Inner>,
     }
 
     impl Error2 {
@@ -158,7 +152,31 @@ pub mod adapter2 {
         {
             Self::new(Kind::Verify, Some(source))
         }
-        // TODO: Add helper functions
+    }
+    #[derive(Debug, Error)]
+    struct Inner {
+        kind: Kind,
+        source: Option<BoxError>,
+    }
+
+    impl fmt::Display for Inner {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match &self.source {
+                // Writes: "Kind: Error message here"
+                Some(source) => write!(f, "{}: {}", self.kind, source.to_string()),
+                // Writes: "Kind"
+                None => write!(f, "{}", self.kind),
+            }
+        }
+    }
+
+    #[derive(Debug, Display)]
+    pub(crate) enum Kind {
+        Adapter,
+        WalletUnlock,
+        Verify,
+        Authentication,
+        Authorization,
     }
 
     // impl<E: Into<BoxError>> From<E> for Error2 {
@@ -198,7 +216,7 @@ pub mod adapter2 {
     #[derive(Clone, Debug)]
     pub struct Adapter<C, S = Locked> {
         /// client in a specific state - Locked or Unlocked
-        client: Arc<C>,
+        pub client: Arc<C>,
         // /// We must use the `C` type from the definition
         _state: PhantomData<S>,
     }
@@ -224,9 +242,11 @@ pub mod adapter2 {
     }
 
     impl<C> Adapter<C, Locked>
-    where C: LockedClient + Unlockable,
+    where
+        C: LockedClient + Unlockable,
         <C::Unlocked as LockedClient>::Error: Into<Error2>,
-        C::Error: Into<Error2> {
+        C::Error: Into<Error2>,
+    {
         pub fn unlock(self) -> Result<Adapter<C::Unlocked, Unlocked>, Error2> {
             let unlocked = self.client.unlock().map_err(Into::into)?;
 
@@ -239,8 +259,10 @@ pub mod adapter2 {
 
     #[async_trait]
     impl<C> UnlockedClient for Adapter<C, Unlocked>
-    where C:  UnlockedClient + Sync + Send,
-    C::Error: Into<Error2> {
+    where
+        C: UnlockedClient + Sync + Send,
+        C::Error: Into<Error2>,
+    {
         fn sign(&self, state_root: &str) -> Result<String, Error2> {
             Ok(state_root.to_string())
         }
@@ -270,21 +292,29 @@ pub mod adapter2 {
             state_root: &str,
             signature: &str,
         ) -> Result<bool, Error2> {
-            self.client.verify(signer, state_root, signature).map_err(Into::into)
+            self.client
+                .verify(signer, state_root, signature)
+                .map_err(Into::into)
         }
 
         /// Creates a `Session` from a provided Token by calling the Contract.
         /// Does **not** cache the (`Token`, `Session`) pair.
         async fn session_from_token(&self, token: &str) -> Result<Session, Error2> {
-            self.client.session_from_token(token).await.map_err(Into::into)
+            self.client
+                .session_from_token(token)
+                .await
+                .map_err(Into::into)
         }
 
         async fn get_deposit(
             &self,
             channel: &Channel,
-            depositor_address: &Address,
+            depositor_address: Address,
         ) -> Result<Deposit, Error2> {
-            self.client.get_deposit(channel, depositor_address).await.map_err(Into::into)
+            self.client
+                .get_deposit(channel, depositor_address)
+                .await
+                .map_err(Into::into)
         }
     }
 }

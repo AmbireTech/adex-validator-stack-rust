@@ -1,10 +1,43 @@
 use primitives::{
-    adapter::{AdapterErrorKind, Error as AdapterError},
+    adapter::{AdapterErrorKind, Error as AdapterError, adapter2::{Error2}},
     address::Error as AddressError,
     big_num::ParseBigIntError,
     Address, ChannelId,
 };
 use thiserror::Error;
+
+/// Wrapper around the [`ethstore::Error`] since it does **not** implement [`std::error::Error`].
+#[derive(Debug, Error)]
+#[error("Safe account: {0}")]
+pub struct SafeAccountError(pub String);
+
+
+// impl AdapterError2 for VerifyError {}
+// impl AdapterError2 for KeystoreError {}
+// impl AdapterError2 for EwtSigningError {}
+// impl AdapterError2 for EwtVerifyError {}
+
+// impl Into<Error2> for VerifyError {
+//     fn into(self) -> Error2 {
+//         Error2::verify(self)
+//     }
+// }
+// impl Into<Error2> for KeystoreError {
+//     fn into(self) -> Error2 {
+//         Error2::adapter(self)
+//     }
+// }
+
+// impl Into<Error2> for EwtSigningError {
+//     fn into(self) -> Error2 {
+//         Error2::adapter(self)
+//     }
+// }
+// impl Into<Error2> for EwtVerifyError {
+//     fn into(self) -> Error2 {
+//         Error2::adapter(self)
+//     }
+// }
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -44,6 +77,13 @@ pub enum Error {
 }
 
 impl AdapterErrorKind for Error {}
+
+// impl AdapterError2 for Error {}
+// impl Into<Error2> for Error {
+//     fn into(self) -> Error2 {
+//         Error2::adapter(self)
+//     }
+// }
 
 #[derive(Debug, Error)]
 /// Error returned on `eth_adapter.verify()` when the combination of
@@ -105,6 +145,7 @@ impl From<EwtSigningError> for AdapterError<Error> {
     }
 }
 
+
 #[derive(Debug, Error)]
 pub enum EwtVerifyError {
     #[error("The Ethereum Web Token header is invalid")]
@@ -129,3 +170,4 @@ pub enum EwtVerifyError {
     #[error("Payload is not a valid UTF-8 string: {0}")]
     PayloadUtf8(#[from] std::str::Utf8Error),
 }
+

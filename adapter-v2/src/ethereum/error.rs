@@ -1,16 +1,16 @@
-use std::{boxed::Box, sync::Mutex};
-
 use primitives::{
     adapter::adapter2::Error2, address::Error as AddressError, big_num::ParseBigIntError, Address,
-    ChannelId,
+    ChannelId, ValidatorId,
 };
 use thiserror::Error;
 
-impl Into<Error2> for Error {
-    fn into(self) -> Error2 {
-        match self {
+use super::ewt::Payload;
+
+impl From<Error> for Error2 {
+    fn from(error: Error) -> Self {
+        match error {
             err @ Error::Keystore(..) => Error2::adapter(err),
-            Error::WalletUnlock(err) => Error2::wallet_unlock(err.to_string()),
+            Error::WalletUnlock(err) => Error2::wallet_unlock(err),
             err @ Error::Web3(..) => Error2::adapter(err),
             err @ Error::InvalidChannelId { .. } => Error2::adapter(err),
             err @ Error::ChannelInactive(..) => Error2::adapter(err),
@@ -22,8 +22,9 @@ impl Into<Error2> for Error {
             err @ Error::ContractInitialization(..) => Error2::adapter(err),
             err @ Error::ContractQuerying(..) => Error2::adapter(err),
             err @ Error::VerifyAddress(..) => Error2::adapter(err),
+            err @ Error::AuthenticationTokenNotIntendedForUs { .. } => Error2::authentication(err),
+            err @ Error::InsufficientAuthorizationPrivilege { .. } => Error2::authorization(err),
         }
-        // Error2::adapter(self)
     }
 }
 
@@ -56,13 +57,20 @@ pub enum Error {
     ContractQuerying(web3::contract::Error),
     /// Error occurred during verification of Signature and/or StateRoot and/or Address
     #[error("Verifying address: {0}")]
-    VerifyAddress(VerifyError),
+    VerifyAddress(#[from] VerifyError),
     #[error("Token not whitelisted: {0}")]
     TokenNotWhitelisted(Address),
     #[error("Deposit asset {0} is invalid")]
     InvalidDepositAsset(#[from] AddressError),
     #[error("Parsing BigNum: {0}")]
     BigNumParsing(#[from] ParseBigIntError),
+    #[error("Token Payload.id({}) !== whoami({whoami}): token was not intended for us", .payload.id)]
+    AuthenticationTokenNotIntendedForUs {
+        payload: Payload,
+        whoami: ValidatorId,
+    },
+    #[error("Insufficient privilege")]
+    InsufficientAuthorizationPrivilege,
 }
 
 #[derive(Debug, Error)]
@@ -131,4 +139,18 @@ pub enum EwtVerifyError {
     PayloadDeserialization(#[from] serde_json::Error),
     #[error("Payload is not a valid UTF-8 string: {0}")]
     PayloadUtf8(#[from] std::str::Utf8Error),
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn assert_send<T: Send>() {}
+    fn assert_sync<T: Sync>() {}
+
+    #[test]
+    fn a_correct_error() {
+        assert_send::<Error>();
+        assert_sync::<Error>();
+    }
 }
