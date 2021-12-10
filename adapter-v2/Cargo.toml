@@ -12,6 +12,8 @@ async-trait = "0.1"
 thiserror = "1"
 
 serde_json = "1.0"
+hex = "0.4"
+base64 = "0.13"
 
 web3 = { version = "0.17", features = ["http-tls", "signing"] }
 ethstore = { git = "https://github.com/openethereum/openethereum", tag = "v3.1.1-rc.1" }

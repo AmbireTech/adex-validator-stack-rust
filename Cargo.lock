@@ -33,7 +33,9 @@ name = "adapter-v2"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "base64",
  "ethstore",
+ "hex",
  "primitives",
  "serde_json",
  "thiserror",

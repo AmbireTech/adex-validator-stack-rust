@@ -9,6 +9,10 @@ use primitives::{
 };
 use thiserror::Error;
 
+pub use error::Error as EthereumError;
+
+mod error;
+
 #[derive(Debug, Clone)]
 pub struct UnlockedWallet {
     wallet: (),
@@ -31,14 +35,6 @@ pub struct Ethereum<S = LockedWallet> {
     state: S,
 }
 
-#[derive(Debug, Error)]
-#[error("Error!")]
-pub enum EthereumError {}
-impl Into<Error2> for EthereumError {
-    fn into(self) -> Error2 {
-        Error2::adapter(self)
-    }
-}
 
 impl Unlockable for Ethereum<LockedWallet> {
     type Unlocked = Ethereum<UnlockedWallet>;
