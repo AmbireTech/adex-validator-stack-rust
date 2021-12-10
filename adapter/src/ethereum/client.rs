@@ -7,11 +7,8 @@ use ethstore::{
     ethkey::{verify_address, Message, Signature},
     SafeAccount,
 };
+use crate::{prelude::*, primitives::{Session, Deposit}};
 use primitives::{
-    adapter::{
-        client::{LockedClient, Unlockable, UnlockedClient},
-        Deposit, KeystoreOptions, Session,
-    },
     Address, BigNum, Channel, Config, ValidatorId,
 };
 
@@ -24,7 +21,7 @@ use super::{
 };
 use serde_json::Value;
 use web3::{
-    contract::{Contract, Options},
+    contract::{Contract, Options as ContractOptions},
     ethabi::{encode, Token},
     transports::Http,
     types::{H160, U256},
@@ -52,7 +49,15 @@ pub fn get_counterfactual_address(
     Address::from(address_bytes)
 }
 
+
 #[derive(Debug, Clone)]
+pub struct Options {
+    pub keystore_file: String,
+    pub keystore_pwd: String,
+}
+
+#[derive(Debug, Clone)]
+/// Ethereum client implementation for the [`Adapter`].
 pub struct Ethereum<S = LockedWallet> {
     address: ValidatorId,
     config: Config,
@@ -61,7 +66,7 @@ pub struct Ethereum<S = LockedWallet> {
 }
 
 impl Ethereum<LockedWallet> {
-    pub fn init(opts: KeystoreOptions, config: &Config) -> Result<Self, Error> {
+    pub fn init(opts: Options, config: &Config) -> Result<Self, Error> {
         let keystore_contents =
             fs::read_to_string(&opts.keystore_file).map_err(KeystoreError::ReadingFile)?;
         let keystore_json: Value =
@@ -96,8 +101,9 @@ impl Ethereum<LockedWallet> {
 impl<S: WalletState> Ethereum<S> {
     /// Checks if the signer of the `hash` & `signature` has privileges,
     /// by using the Identity contract and the passed identity [`Address`]
-    /// See https://eips.ethereum.org/EIPS/eip-1271
-    /// Signature should be `01` suffixed for Eth Sign
+    /// See <https://eips.ethereum.org/EIPS/eip-1271>
+    ///
+    /// **Note:** Signature should be `01` suffixed for Eth Sign for this call.
     pub async fn has_privileges(
         &self,
         identity: Address,
@@ -124,7 +130,7 @@ impl<S: WalletState> Ethereum<S> {
                     Token::Bytes(signature_with_mode.to_vec()),
                 ),
                 None,
-                Options::default(),
+                ContractOptions::default(),
                 None,
             )
             .await
@@ -277,7 +283,7 @@ impl<S: WalletState> LockedClient for Ethereum<S> {
                     Token::Address(H160(depositor_address.to_bytes())),
                 ),
                 None,
-                Options::default(),
+                ContractOptions::default(),
                 None,
             )
             .await
@@ -296,7 +302,7 @@ impl<S: WalletState> LockedClient for Ethereum<S> {
                 "balanceOf",
                 H160(counterfactual_address.to_bytes()),
                 None,
-                Options::default(),
+                ContractOptions::default(),
                 None,
             )
             .await
@@ -425,20 +431,21 @@ mod test {
         to_ethereum_signed,
     };
 
+    use crate::{
+        prelude::*,
+        primitives::{Deposit, Session},
+    };
     use chrono::Utc;
     use ethstore::ethkey::Message;
+
     use primitives::{
-        adapter::{
-            client::{LockedClient, Unlockable, UnlockedClient},
-            Deposit, Session,
-        },
         config::{DEVELOPMENT_CONFIG, GANACHE_CONFIG},
         test_util::{ADDRESS_3, ADDRESS_4, ADDRESS_5, ADVERTISER, CREATOR, LEADER},
         util::tests::prep_db::IDS,
         BigNum, ToHex, ValidatorId,
     };
     use web3::{
-        contract::Options, ethabi::Token, signing::keccak256, transports::Http, types::H160, Web3,
+        contract::Options as ContractOptions, ethabi::Token, signing::keccak256, transports::Http, types::H160, Web3,
     };
 
     #[test]
@@ -608,7 +615,7 @@ mod test {
                 "privileges",
                 Token::Address(H160(whoami.to_bytes())),
                 None,
-                Options::default(),
+                ContractOptions::default(),
                 None,
             )
             .await

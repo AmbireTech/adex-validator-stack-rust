@@ -1,9 +1,5 @@
-use adapter_v2::{ethereum::test_util::KEYSTORES, Ethereum};
+use adapter::{ethereum::test_util::KEYSTORES, Ethereum, Adapter, prelude::*};
 use primitives::{
-    adapter::{
-        adapter2::Adapter,
-        client::{LockedClient, UnlockedClient},
-    },
     config::GANACHE_CONFIG,
     test_util::LEADER,
 };

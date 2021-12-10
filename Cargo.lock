@@ -4,29 +4,6 @@ version = 3
 
 [[package]]
 name = "adapter"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "base64",
- "byteorder 1.4.3",
- "chrono",
- "create2",
- "dashmap",
- "ethstore",
- "futures",
- "hex",
- "once_cell",
- "primitives",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
- "web3",
- "wiremock",
-]
-
-[[package]]
-name = "adapter-v2"
 version = "0.2.0"
 dependencies = [
  "async-trait",
@@ -37,6 +14,7 @@ dependencies = [
  "ethstore",
  "hex",
  "once_cell",
+ "parse-display",
  "primitives",
  "serde",
  "serde_json",

@@ -1,50 +1,41 @@
 use primitives::{
-    adapter::{AdapterErrorKind, Error as AdapterError, adapter2::{Error2}},
-    address::Error as AddressError,
-    big_num::ParseBigIntError,
-    Address, ChannelId,
+    address::Error as AddressError, big_num::ParseBigIntError, Address,
+    ChannelId, ValidatorId,
 };
+use crate::Error as AdapterError;
 use thiserror::Error;
 
-/// Wrapper around the [`ethstore::Error`] since it does **not** implement [`std::error::Error`].
-#[derive(Debug, Error)]
-#[error("Safe account: {0}")]
-pub struct SafeAccountError(pub String);
+use super::ewt::Payload;
 
-
-// impl AdapterError2 for VerifyError {}
-// impl AdapterError2 for KeystoreError {}
-// impl AdapterError2 for EwtSigningError {}
-// impl AdapterError2 for EwtVerifyError {}
-
-// impl Into<Error2> for VerifyError {
-//     fn into(self) -> Error2 {
-//         Error2::verify(self)
-//     }
-// }
-// impl Into<Error2> for KeystoreError {
-//     fn into(self) -> Error2 {
-//         Error2::adapter(self)
-//     }
-// }
-
-// impl Into<Error2> for EwtSigningError {
-//     fn into(self) -> Error2 {
-//         Error2::adapter(self)
-//     }
-// }
-// impl Into<Error2> for EwtVerifyError {
-//     fn into(self) -> Error2 {
-//         Error2::adapter(self)
-//     }
-// }
+impl From<Error> for AdapterError {
+    fn from(error: Error) -> Self {
+        match error {
+            err @ Error::Keystore(..) => AdapterError::adapter(err),
+            Error::WalletUnlock(err) => AdapterError::wallet_unlock(err),
+            err @ Error::Web3(..) => AdapterError::adapter(err),
+            err @ Error::InvalidChannelId { .. } => AdapterError::adapter(err),
+            err @ Error::ChannelInactive(..) => AdapterError::adapter(err),
+            err @ Error::TokenNotWhitelisted(..) => AdapterError::adapter(err),
+            err @ Error::InvalidDepositAsset(..) => AdapterError::adapter(err),
+            err @ Error::BigNumParsing(..) => AdapterError::adapter(err),
+            err @ Error::SignMessage(..) => AdapterError::adapter(err),
+            err @ Error::VerifyMessage(..) => AdapterError::adapter(err),
+            err @ Error::ContractInitialization(..) => AdapterError::adapter(err),
+            err @ Error::ContractQuerying(..) => AdapterError::adapter(err),
+            err @ Error::VerifyAddress(..) => AdapterError::adapter(err),
+            err @ Error::AuthenticationTokenNotIntendedForUs { .. } => AdapterError::authentication(err),
+            err @ Error::InsufficientAuthorizationPrivilege { .. } => AdapterError::authorization(err),
+        }
+    }
+}
 
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("Keystore: {0}")]
     Keystore(#[from] KeystoreError),
     #[error("Wallet unlocking: {0}")]
-    WalletUnlock(ethstore::Error),
+    /// Since [`ethstore::Error`] is not [`Sync`] we must use a [`String`] instead.
+    WalletUnlock(String),
     #[error("Web3: {0}")]
     Web3(#[from] web3::Error),
     /// When the ChannelId that we get from hashing the EthereumChannel with the contract address
@@ -65,25 +56,23 @@ pub enum Error {
     ContractInitialization(web3::ethabi::Error),
     #[error("Contract querying: {0}")]
     ContractQuerying(web3::contract::Error),
-    #[error("Verifying address: {0}")]
     /// Error occurred during verification of Signature and/or StateRoot and/or Address
-    VerifyAddress(VerifyError),
+    #[error("Verifying address: {0}")]
+    VerifyAddress(#[from] VerifyError),
     #[error("Token not whitelisted: {0}")]
     TokenNotWhitelisted(Address),
     #[error("Deposit asset {0} is invalid")]
     InvalidDepositAsset(#[from] AddressError),
     #[error("Parsing BigNum: {0}")]
     BigNumParsing(#[from] ParseBigIntError),
+    #[error("Token Payload.id({}) !== whoami({whoami}): token was not intended for us", .payload.id)]
+    AuthenticationTokenNotIntendedForUs {
+        payload: Payload,
+        whoami: ValidatorId,
+    },
+    #[error("Insufficient privilege")]
+    InsufficientAuthorizationPrivilege,
 }
-
-impl AdapterErrorKind for Error {}
-
-// impl AdapterError2 for Error {}
-// impl Into<Error2> for Error {
-//     fn into(self) -> Error2 {
-//         Error2::adapter(self)
-//     }
-// }
 
 #[derive(Debug, Error)]
 /// Error returned on `eth_adapter.verify()` when the combination of
@@ -97,12 +86,6 @@ pub enum VerifyError {
     SignatureDecoding(#[source] hex::FromHexError),
     #[error("Signature is not prefixed with `0x`")]
     SignatureNotPrefixed,
-}
-
-impl From<VerifyError> for AdapterError<Error> {
-    fn from(err: VerifyError) -> Self {
-        AdapterError::Adapter(Error::VerifyAddress(err).into())
-    }
 }
 
 #[derive(Debug, Error)]
@@ -121,30 +104,18 @@ pub enum KeystoreError {
     Deserialization(#[source] serde_json::Error),
 }
 
-impl From<KeystoreError> for AdapterError<Error> {
-    fn from(err: KeystoreError) -> Self {
-        AdapterError::Adapter(Error::Keystore(err).into())
-    }
-}
-
 #[derive(Debug, Error)]
 pub enum EwtSigningError {
     #[error("Header serialization: {0}")]
     HeaderSerialization(#[source] serde_json::Error),
     #[error("Payload serialization: {0}")]
     PayloadSerialization(#[source] serde_json::Error),
+    /// Since [`ethstore::Error`] is not [`Sync`] we must use a [`String`] instead.
     #[error("Signing message: {0}")]
-    SigningMessage(ethstore::Error),
+    SigningMessage(String),
     #[error("Decoding hex of Signature: {0}")]
     DecodingHexSignature(#[from] hex::FromHexError),
 }
-
-impl From<EwtSigningError> for AdapterError<Error> {
-    fn from(err: EwtSigningError) -> Self {
-        AdapterError::Adapter(Error::SignMessage(err).into())
-    }
-}
-
 
 #[derive(Debug, Error)]
 pub enum EwtVerifyError {
@@ -171,3 +142,18 @@ pub enum EwtVerifyError {
     PayloadUtf8(#[from] std::str::Utf8Error),
 }
 
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn assert_send<T: Send>() {}
+    fn assert_sync<T: Sync>() {}
+
+    #[test]
+    fn a_correct_error() {
+        // Ethereum adapter should be Send!
+        assert_send::<Error>();
+        // Ethereum adapter should be Sync!
+        assert_sync::<Error>();
+    }
+}

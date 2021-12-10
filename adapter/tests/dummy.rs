@@ -1,9 +1,8 @@
-use adapter_v2::Adapter;
 use async_trait::async_trait;
+use adapter::{Adapter, prelude::*};
+
 use primitives::{
     adapter::{
-        adapter2::Error2,
-        client::{LockedClient, Unlockable, UnlockedClient},
         Deposit, Session,
     },
     test_util::{ADDRESS_1, DUMMY_CAMPAIGN},
