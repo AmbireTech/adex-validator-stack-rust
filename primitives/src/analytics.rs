@@ -1,7 +1,8 @@
 use crate::{sentry::DateHour, Address, CampaignId, ValidatorId, IPFS};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use parse_display::Display;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use tokio_postgres::types::ToSql;
 
 pub const ANALYTICS_QUERY_LIMIT: u32 = 200;
 
@@ -69,7 +70,7 @@ pub mod postgres {
             w: &mut BytesMut,
         ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
             match self {
-                Self::Date(datehour) => datehour.date.and_hms(datehour.hour, 0, 0).to_sql(ty, w),
+                Self::Date(datehour) => datehour.to_sql(ty, w),
                 Self::Timestamp(ts) => {
                     // Create a NaiveDateTime from the timestamp
                     let naive = NaiveDateTime::from_timestamp(0, *ts);
@@ -126,7 +127,7 @@ pub struct AnalyticsQuery {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(untagged, rename_all = "camelCase")]
 pub enum AnalyticsQueryTime {
     Date(DateHour<Utc>),
     Timestamp(u32),
@@ -147,7 +148,7 @@ pub enum AnalyticsQueryKey {
 }
 
 impl AnalyticsQuery {
-    pub fn get_key(&self, key: &str) -> Option<&AnalyticsQueryKey> {
+    pub fn get_key<T: ToSql>(&self, key: &str) -> Option<&T> {
         match key {
             "campaignId" => self.campaign_id.as_ref(),
             "adUnit" => self.ad_unit.as_ref(),

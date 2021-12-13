@@ -51,6 +51,8 @@ pub async fn analytics<A: Adapter>(
                 segment_by
             )));
         }
+        println!("{}", segment_by);
+        println!("{:?}", query.country);
         if query.get_key(segment_by).is_none() {
             return Err(ResponseError::BadRequest(
                 "SegmentBy is provided but a key is not passed".to_string(),
@@ -180,7 +182,7 @@ mod test {
         test_util::setup_dummy_app,
         ValidatorId,
     };
-    use chrono::Utc;
+    use chrono::{Utc, Timelike};
     use primitives::{
         analytics::{OperatingSystem, Timeframe},
         sentry::UpdateAnalytics,
@@ -189,7 +191,7 @@ mod test {
 
     async fn insert_mock_analytics(pool: &DbPool) {
         // analytics for NOW
-        let now_date = DateHour::try_from(Utc::today().and_hms(1, 0, 0)).expect("should parse");
+        let now_date = DateHour::try_from(Utc::today().and_hms(Utc::now().hour(), 0, 0)).expect("should parse");
         let analytics_now = UpdateAnalytics {
             time: now_date,
             campaign_id: DUMMY_CAMPAIGN.id,
@@ -396,7 +398,7 @@ mod test {
         };
         let query = serde_urlencoded::to_string(query).expect("should parse query");
         let req = Request::builder()
-            .extension(query)
+            .uri(format!("http://127.0.0.1/analytics?{}", query))
             .body(Body::empty())
             .expect("Should build Request");
 
@@ -420,36 +422,27 @@ mod test {
 
         // Test with end date
         let end_date = DateHour::<Utc>::now() - 1;
+        let query = AnalyticsQuery { 
+            limit: 1000,
+            event_type: "CLICK".into(),
+            metric: Metric::Count,
+            timeframe: Timeframe::Day,
+            segment_by: None,
+            start: None,
+            end: Some(AnalyticsQueryTime::Date(end_date)),
+            campaign_id: None,
+            ad_unit: None,
+            ad_slot: None,
+            ad_slot_type: None,
+            advertiser: None,
+            publisher: None,
+            hostname: None,
+            country: None,
+            os_name: None
+        };
+        let query = serde_urlencoded::to_string(query).expect("should parse query");
         let req = Request::builder()
-            .uri(format!("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day&end={}", end_date))
-            .body(Body::empty())
-            .expect("Should build Request");
-
-        let analytics_response = analytics(
-            req,
-            &app,
-            Some(vec!["country".into(), "ad_slot_type".into()]),
-            None,
-        )
-        .await
-        .expect("Should get analytics data");
-        let json = hyper::body::to_bytes(analytics_response.into_body())
-            .await
-            .expect("Should get json");
-
-        let fetched_analytics: Vec<FetchedAnalytics> =
-            serde_json::from_slice(&json).expect("Should get analytics response");
-        assert_eq!(fetched_analytics.len(), 1);
-        assert!(fetched_analytics.get(0).unwrap().payout_count.is_some());
-        assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 3);
-
-        // Test with start_date and end_date
-        // subtract 72 hours
-        let start_date = DateHour::<Utc>::now() - 72;
-        // subtract 1 hour
-        let end_date = DateHour::<Utc>::now() - 1;
-        let req = Request::builder()
-            .uri(format!("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day&start={}&end={}", start_date, end_date))
+            .uri(format!("http://127.0.0.1/analytics?{}", query))
             .body(Body::empty())
             .expect("Should build Request");
 
@@ -471,9 +464,74 @@ mod test {
         assert!(fetched_analytics.get(0).unwrap().payout_count.is_some());
         assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 2);
 
-        // Test with segment_by
+        // Test with start_date and end_date
+        // subtract 72 hours, there is an event exactly 72 hours ago so this also tests GTE
+        let start_date = DateHour::<Utc>::now() - 72;
+        // subtract 1 hour
+        let end_date = DateHour::<Utc>::now() - 1;
+        let query = AnalyticsQuery { 
+            limit: 1000,
+            event_type: "CLICK".into(),
+            metric: Metric::Count,
+            timeframe: Timeframe::Day,
+            segment_by: None,
+            start: Some(AnalyticsQueryTime::Date(start_date)),
+            end: Some(AnalyticsQueryTime::Date(end_date)),
+            campaign_id: None,
+            ad_unit: None,
+            ad_slot: None,
+            ad_slot_type: None,
+            advertiser: None,
+            publisher: None,
+            hostname: None,
+            country: None,
+            os_name: None
+        };
+        let query = serde_urlencoded::to_string(query).expect("should parse query");
         let req = Request::builder()
-            .uri("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day&segment_by=country&country=Bulgaria")
+            .uri(format!("http://127.0.0.1/analytics?{}", query))
+            .body(Body::empty())
+            .expect("Should build Request");
+        let analytics_response = analytics(
+            req,
+            &app,
+            Some(vec!["country".into(), "ad_slot_type".into()]),
+            None,
+        )
+        .await
+        .expect("Should get analytics data");
+        let json = hyper::body::to_bytes(analytics_response.into_body())
+            .await
+            .expect("Should get json");
+
+        let fetched_analytics: Vec<FetchedAnalytics> =
+            serde_json::from_slice(&json).expect("Should get analytics response");
+        assert_eq!(fetched_analytics.len(), 1);
+        assert!(fetched_analytics.get(0).unwrap().payout_count.is_some());
+        assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 3);
+
+        // Test with segment_by
+        let query = AnalyticsQuery { 
+            limit: 1000,
+            event_type: "CLICK".into(),
+            metric: Metric::Count,
+            timeframe: Timeframe::Day,
+            segment_by: Some("country".into()),
+            start: None,
+            end: Some(AnalyticsQueryTime::Date(end_date)),
+            campaign_id: None,
+            ad_unit: None,
+            ad_slot: None,
+            ad_slot_type: None,
+            advertiser: None,
+            publisher: None,
+            hostname: None,
+            country: None,
+            os_name: None
+        };
+        let query = serde_urlencoded::to_string(query).expect("should parse query");
+        let req = Request::builder()
+            .uri(format!("http://127.0.0.1/analytics?{}", query))
             .body(Body::empty())
             .expect("Should build Request");
 
@@ -497,7 +555,7 @@ mod test {
 
         // Test with not allowed segment by
         let req = Request::builder()
-            .uri("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day&segment_by=campaignId&campaignId=0x936da01f9abd4d9d80c702af85c822a8")
+            .uri("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day&segmentBy=campaignId&campaignId=0x936da01f9abd4d9d80c702af85c822a8")
             .body(Body::empty())
             .expect("Should build Request");
 
