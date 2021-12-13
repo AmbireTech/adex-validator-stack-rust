@@ -13,7 +13,7 @@ use tokio::{runtime::Runtime, time::sleep};
 #[derive(Debug, Clone)]
 pub struct Worker<C: Unlocked> {
     /// SentryApi with set `whoami` validator
-    /// Requires an unlocked adapter to create [`SentryApi`], use [`Worker::init_unlock`].
+    /// Requires an unlocked adapter to create [`SentryApi`], use `Worker::init_unlock()`.
     pub sentry: SentryApi<C, ()>,
     pub config: Config,
     /// The unlocked Adapter

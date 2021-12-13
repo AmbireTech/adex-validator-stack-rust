@@ -32,7 +32,7 @@ pub trait Locked: Sync + Send {
     //     &self,
     // ) -> Result<
     //     <Self as Unlockable>::Unlocked,
-    //     <<Self as Unlockable>::Unlocked as LockedClient>::Error,
+    //     <<Self as Unlockable>::Unlocked as Locked>::Error,
     // >
     // where
     //     Self: Unlockable,
@@ -42,7 +42,7 @@ pub trait Locked: Sync + Send {
 }
 
 /// Available methods for Unlocked clients.
-/// Unlocked clients should also implement [`LockedClient`].
+/// Unlocked clients should also implement [`Locked`].
 #[async_trait]
 pub trait Unlocked: Locked {
     // requires Unlocked
@@ -53,7 +53,7 @@ pub trait Unlocked: Locked {
 }
 
 /// A client that can be `unlock()`ed
-/// and implements both [`LockedClient`] & [`UnlockedClient`].
+/// and implements both [`Locked`] & [`Unlocked`].
 ///
 /// **Note:** A possibly expensive operation as it might result in cloning
 pub trait Unlockable {

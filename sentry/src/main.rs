@@ -5,11 +5,8 @@ use adapter::{primitives::AdapterTypes, Adapter};
 use clap::{crate_version, App, Arg};
 
 use primitives::{
-    config::configuration,
-    postgres::POSTGRES_CONFIG,
-    test_util::ADDRESSES,
-    util::{logging::new_logger, tests::prep_db::AUTH},
-    ValidatorId,
+    config::configuration, postgres::POSTGRES_CONFIG, test_util::DUMMY_AUTH,
+    util::logging::new_logger, ValidatorId,
 };
 use sentry::{
     db::{postgres_connection, redis_connection, setup_migrations, CampaignRemaining},
@@ -86,11 +83,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let options = adapter::dummy::Options {
                 dummy_identity: ValidatorId::try_from(dummy_identity)
                     .expect("failed to parse dummy identity"),
-                dummy_auth: ADDRESSES.clone(),
-                dummy_auth_tokens: AUTH.clone(),
+                dummy_auth_tokens: DUMMY_AUTH.clone(),
             };
 
-            let dummy_adapter = Adapter::new(adapter::Dummy::init(options, &config));
+            let dummy_adapter = Adapter::new(adapter::Dummy::init(options));
             AdapterTypes::Dummy(Box::new(dummy_adapter))
         }
         _ => panic!("You can only use `ethereum` & `dummy` adapters!"),

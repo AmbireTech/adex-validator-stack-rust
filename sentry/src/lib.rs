@@ -569,14 +569,10 @@ pub mod test_util {
     /// It still uses DummyAdapter.
     pub async fn setup_dummy_app() -> Application<Dummy> {
         let config = DEVELOPMENT_CONFIG.clone();
-        let adapter = Adapter::new(Dummy::init(
-            Options {
-                dummy_identity: IDS["leader"],
-                dummy_auth: Default::default(),
-                dummy_auth_tokens: Default::default(),
-            },
-            &config,
-        ));
+        let adapter = Adapter::new(Dummy::init(Options {
+            dummy_identity: IDS["leader"],
+            dummy_auth_tokens: Default::default(),
+        }));
 
         let redis = TESTS_POOL.get().await.expect("Should return Object");
         let database = DATABASE_POOL.get().await.expect("Should get a DB pool");

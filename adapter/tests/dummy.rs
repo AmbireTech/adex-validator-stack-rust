@@ -12,7 +12,7 @@ use primitives::{
 
 #[derive(Debug, Clone)]
 pub struct Dummy {
-    whoami: (),
+    _whoami: (),
 }
 
 #[async_trait]
@@ -74,7 +74,7 @@ impl Unlockable for Dummy {
 
 #[tokio::main]
 async fn main() {
-    let dummy = Dummy { whoami: () };
+    let dummy = Dummy { _whoami: () };
 
     // With new Locked Adapter
     {

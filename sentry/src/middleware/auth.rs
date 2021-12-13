@@ -131,9 +131,8 @@ mod test {
     use adapter::dummy::{Dummy, Options};
     use hyper::Request;
     use primitives::{
-        config::DEVELOPMENT_CONFIG,
-        test_util::ADDRESSES,
-        util::tests::prep_db::{AUTH, IDS},
+        test_util::{DUMMY_AUTH, LEADER},
+        util::tests::prep_db::IDS,
     };
 
     use deadpool::managed::Object;
@@ -149,15 +148,10 @@ mod test {
         let connection = TESTS_POOL.get().await.expect("Should return Object");
         let adapter_options = Options {
             dummy_identity: IDS["leader"],
-            dummy_auth: ADDRESSES.clone(),
-            dummy_auth_tokens: AUTH.clone(),
+            dummy_auth_tokens: DUMMY_AUTH.clone(),
         };
-        let config = DEVELOPMENT_CONFIG.clone();
 
-        (
-            Adapter::new(Dummy::init(adapter_options, &config)),
-            connection,
-        )
+        (Adapter::new(Dummy::init(adapter_options)), connection)
     }
 
     #[tokio::test]
@@ -206,7 +200,7 @@ mod test {
     async fn session_from_correct_authentication_token() {
         let (dummy_adapter, database) = setup().await;
 
-        let token = AUTH["leader"].clone();
+        let token = DUMMY_AUTH[&LEADER].clone();
         let auth_header = format!("Bearer {}", token);
         let req = Request::builder()
             .header(AUTHORIZATION, auth_header)
@@ -222,7 +216,7 @@ mod test {
             .get::<Auth>()
             .expect("There should be a Session set inside the request");
 
-        assert_eq!(IDS["leader"], auth.uid);
+        assert_eq!(*LEADER, auth.uid.to_address());
 
         let session = altered_request
             .extensions()

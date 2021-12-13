@@ -485,9 +485,7 @@ pub mod campaigns {
             ))
             .expect("Should not fail to create endpoint URL");
 
-        let resp = client.get(endpoint).send().await?;
-        dbg!(resp.status());
-        resp.json().await
+        client.get(endpoint).send().await?.json().await
     }
 }
 
@@ -622,14 +620,10 @@ mod test {
         let mut config = configuration(Environment::Development, None).expect("Should get Config");
         config.spendable_find_limit = 2;
 
-        let adapter = Adapter::with_unlocked(Dummy::init(
-            Options {
-                dummy_identity: IDS["leader"],
-                dummy_auth: Default::default(),
-                dummy_auth_tokens: Default::default(),
-            },
-            &config,
-        ));
+        let adapter = Adapter::with_unlocked(Dummy::init(Options {
+            dummy_identity: IDS["leader"],
+            dummy_auth_tokens: Default::default(),
+        }));
         let logger = discard_logger();
 
         let sentry =

@@ -6,7 +6,7 @@ use crate::{
 use async_trait::async_trait;
 use dashmap::{mapref::entry::Entry, DashMap};
 
-use primitives::{config::Config, Address, Channel, ChannelId, ToETHChecksum, ValidatorId};
+use primitives::{Address, Channel, ChannelId, ToETHChecksum, ValidatorId};
 use std::{collections::HashMap, sync::Arc};
 
 pub type Adapter<S> = crate::Adapter<Dummy, S>;
@@ -16,18 +16,14 @@ pub type Adapter<S> = crate::Adapter<Dummy, S>;
 pub struct Dummy {
     /// Who am I
     identity: ValidatorId,
-    config: Config,
-    /// Auth tokens that we have verified (tokenId => session)
-    session_tokens: HashMap<String, Address>,
-    /// Auth tokens that we've generated to authenticate with someone (address => token)
-    authorization_tokens: HashMap<String, String>,
+    /// Static authentication tokens (address => token)
+    authorization_tokens: HashMap<Address, String>,
     deposits: Deposits,
 }
 
 pub struct Options {
     pub dummy_identity: ValidatorId,
-    pub dummy_auth: HashMap<String, Address>,
-    pub dummy_auth_tokens: HashMap<String, String>,
+    pub dummy_auth_tokens: HashMap<Address, String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -67,11 +63,9 @@ impl Deposits {
 }
 
 impl Dummy {
-    pub fn init(opts: Options, config: &Config) -> Self {
+    pub fn init(opts: Options) -> Self {
         Self {
             identity: opts.dummy_identity,
-            config: config.to_owned(),
-            session_tokens: opts.dummy_auth,
             authorization_tokens: opts.dummy_auth_tokens,
             deposits: Default::default(),
         }
@@ -112,11 +106,11 @@ impl Locked for Dummy {
         let identity = self
             .authorization_tokens
             .iter()
-            .find(|(_, id)| *id == token);
+            .find(|(_, address_token)| *address_token == token);
 
         match identity {
-            Some((id, _)) => Ok(Session {
-                uid: self.session_tokens[id],
+            Some((address, _token)) => Ok(Session {
+                uid: *address,
                 era: 0,
             }),
             None => Err(Error::authentication(format!(
@@ -156,20 +150,15 @@ impl Unlocked for Dummy {
 
     // requires Unlocked
     fn get_auth(&self, _intended_for: ValidatorId) -> Result<String, Error> {
-        let who = self
-            .session_tokens
-            .iter()
-            .find(|(_, id)| *id == &self.identity.to_address());
-        match who {
-            Some((id, _)) => {
-                let auth = self.authorization_tokens.get(id).expect("id should exist");
-                Ok(auth.to_owned())
-            }
-            None => Err(Error::authentication(format!(
-                "No auth token for this identity: {}",
-                self.identity
-            ))),
-        }
+        self.authorization_tokens
+            .get(&self.identity.to_address())
+            .cloned()
+            .ok_or_else(|| {
+                Error::authentication(format!(
+                    "No auth token for this identity: {}",
+                    self.identity
+                ))
+            })
     }
 }
 
@@ -181,96 +170,9 @@ impl Unlockable for Dummy {
     }
 }
 
-// #[async_trait]
-// impl Adapter for Dummy {
-//     type AdapterError = Error;
-
-//     fn unlock(&mut self) -> AdapterResult<(), Self::AdapterError> {
-//         Ok(())
-//     }
-
-//     fn whoami(&self) -> ValidatorId {
-//         self.identity
-//     }
-
-//     fn sign(&self, state_root: &str) -> AdapterResult<String, Self::AdapterError> {
-//         let signature = format!(
-//             "Dummy adapter signature for {} by {}",
-//             state_root,
-//             self.whoami().to_checksum()
-//         );
-//         Ok(signature)
-//     }
-
-//     fn verify(
-//         &self,
-//         signer: ValidatorId,
-//         _state_root: &str,
-//         signature: &str,
-//     ) -> AdapterResult<bool, Self::AdapterError> {
-//         // select the `identity` and compare it to the signer
-//         // for empty string this will return array with 1 element - an empty string `[""]`
-//         let is_same = match signature.rsplit(' ').take(1).next() {
-//             Some(from) => from == signer.to_checksum(),
-//             None => false,
-//         };
-
-//         Ok(is_same)
-//     }
-
-//     async fn session_from_token<'a>(
-//         &'a self,
-//         token: &'a str,
-//     ) -> AdapterResult<Session, Self::AdapterError> {
-//         let identity = self
-//             .authorization_tokens
-//             .iter()
-//             .find(|(_, id)| *id == token);
-
-//         match identity {
-//             Some((id, _)) => Ok(Session {
-//                 uid: self.session_tokens[id],
-//                 era: 0,
-//             }),
-//             None => Err(AdapterError::Authentication(format!(
-//                 "no session token for this auth: {}",
-//                 token
-//             ))),
-//         }
-//     }
-
-//     fn get_auth(&self, _validator: &ValidatorId) -> AdapterResult<String, Self::AdapterError> {
-//         let who = self
-//             .session_tokens
-//             .iter()
-//             .find(|(_, id)| *id == &self.identity.to_address());
-//         match who {
-//             Some((id, _)) => {
-//                 let auth = self.authorization_tokens.get(id).expect("id should exist");
-//                 Ok(auth.to_owned())
-//             }
-//             None => Err(AdapterError::Authentication(format!(
-//                 "no auth token for this identity: {}",
-//                 self.identity
-//             ))),
-//         }
-//     }
-
-//     async fn get_deposit(
-//         &self,
-//         channel: &Channel,
-//         address: &Address,
-//     ) -> AdapterResult<Deposit, Self::AdapterError> {
-//         self.deposits
-//             .get_next_deposit(channel.id(), *address)
-//             .ok_or_else(|| AdapterError::Adapter(Box::new(Error {})))
-//     }
-// }
-
 #[cfg(test)]
 mod test {
     use primitives::{
-        config::DEVELOPMENT_CONFIG,
         util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, IDS},
         BigNum,
     };
@@ -279,16 +181,11 @@ mod test {
 
     #[tokio::test]
     async fn test_deposits_calls() {
-        let config = DEVELOPMENT_CONFIG.clone();
         let channel = DUMMY_CAMPAIGN.channel;
-        let dummy_client = Dummy::init(
-            Options {
-                dummy_identity: IDS["leader"],
-                dummy_auth: Default::default(),
-                dummy_auth_tokens: Default::default(),
-            },
-            &config,
-        );
+        let dummy_client = Dummy::init(Options {
+            dummy_identity: IDS["leader"],
+            dummy_auth_tokens: Default::default(),
+        });
 
         let address = ADDRESSES["creator"];
 

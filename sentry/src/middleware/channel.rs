@@ -26,10 +26,10 @@ impl<C: Locked + 'static> Middleware<C> for ChannelLoad {
 }
 
 /// channel_load & channel_if_exist
-fn channel_load<'a, C: Locked>(
+fn channel_load<C: Locked>(
     mut req: Request<Body>,
-    app: &'a Application<C>,
-) -> BoxFuture<'a, Result<Request<Body>, ResponseError>> {
+    app: &Application<C>,
+) -> BoxFuture<'_, Result<Request<Body>, ResponseError>> {
     async move {
         let id = req
             .extensions()
@@ -67,10 +67,10 @@ impl<C: Locked + 'static> Middleware<C> for ChannelIfActive {
     }
 }
 
-fn channel_if_active<'a, C: Locked>(
+fn channel_if_active<C: Locked>(
     mut req: Request<Body>,
-    app: &'a Application<C>,
-) -> BoxFuture<'a, Result<Request<Body>, ResponseError>> {
+    app: &Application<C>,
+) -> BoxFuture<'_, Result<Request<Body>, ResponseError>> {
     async move {
         let route_params = req
             .extensions()
@@ -115,10 +115,10 @@ impl<C: Locked + 'static> Middleware<C> for GetChannelId {
     }
 }
 
-fn get_channel_id<'a, C: Locked>(
+fn get_channel_id<C: Locked>(
     mut req: Request<Body>,
-    _: &'a Application<C>,
-) -> BoxFuture<'a, Result<Request<Body>, ResponseError>> {
+    _: &Application<C>,
+) -> BoxFuture<'_, Result<Request<Body>, ResponseError>> {
     async move {
         match req.extensions().get::<RouteParams>() {
             Some(param) => {

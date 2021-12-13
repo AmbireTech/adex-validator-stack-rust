@@ -8,10 +8,8 @@ use clap::{crate_version, App, Arg};
 use adapter::{prelude::*, primitives::AdapterTypes, Adapter, Dummy, Ethereum};
 use primitives::{
     config::{configuration, Environment},
-    util::{
-        logging::new_logger,
-        tests::prep_db::{ADDRESSES, AUTH},
-    },
+    test_util::DUMMY_AUTH,
+    util::logging::new_logger,
     ValidatorId,
 };
 use validator_worker::{sentry_interface::Validator, SentryApi, Worker};
@@ -106,10 +104,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .expect("unable to get dummyIdentity");
             let options = adapter::dummy::Options {
                 dummy_identity: ValidatorId::try_from(dummy_identity)?,
-                dummy_auth: ADDRESSES.clone(),
-                dummy_auth_tokens: AUTH.clone(),
+                dummy_auth_tokens: DUMMY_AUTH.clone(),
             };
-            let adapter = Adapter::with_unlocked(Dummy::init(options, &config));
+            let adapter = Adapter::with_unlocked(Dummy::init(options));
 
             AdapterTypes::dummy(adapter)
         }

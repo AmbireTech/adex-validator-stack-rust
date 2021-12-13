@@ -56,7 +56,7 @@ pub mod prelude {
 /// The [`Adapter`] struct and it's states
 /// Used for communication with underlying implementation.
 /// 2 Adapters are available in this crate:
-/// - [`crate::ethereum::Adapter`] and it's client implementation [`crate::Ethereum`] for chains compatible with EVM.
+/// - [`crate::ethereum::LockedAdapter`] and [`crate::ethereum::UnlockedAdapter`] and it's client implementation [`crate::Ethereum`] for chains compatible with EVM.
 /// - [`crate::dummy::Adapter`] and it's client implementation [`crate::Dummy`] for testing.
 mod adapter;
 pub mod client;
