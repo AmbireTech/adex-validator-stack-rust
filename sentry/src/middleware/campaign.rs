@@ -1,9 +1,9 @@
 use crate::{db::fetch_campaign, middleware::Middleware};
 use crate::{Application, Auth, ResponseError, RouteParams};
-use hyper::{Body, Request};
-use primitives::{adapter::Adapter, campaign::Campaign};
-
+use adapter::client::Locked;
 use async_trait::async_trait;
+use hyper::{Body, Request};
+use primitives::campaign::Campaign;
 
 #[derive(Debug)]
 pub struct CampaignLoad;
@@ -11,7 +11,7 @@ pub struct CampaignLoad;
 pub struct CalledByCreator;
 
 #[async_trait]
-impl<C: adapter::client::Locked + 'static> Middleware<C> for CampaignLoad {
+impl<C: Locked + 'static> Middleware<C> for CampaignLoad {
     async fn call<'a>(
         &self,
         mut request: Request<Body>,
@@ -38,7 +38,7 @@ impl<C: adapter::client::Locked + 'static> Middleware<C> for CampaignLoad {
 }
 
 #[async_trait]
-impl<C: adapter::client::Locked + 'static> Middleware<C> for CalledByCreator {
+impl<C: Locked + 'static> Middleware<C> for CalledByCreator {
     async fn call<'a>(
         &self,
         request: Request<Body>,

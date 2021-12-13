@@ -91,8 +91,8 @@ where
         Ok(state_root.to_string())
     }
 
-    async fn get_auth(&self, intended_for: ValidatorId) -> Result<String, Error> {
-        self.client.get_auth(intended_for).await.map_err(Into::into)
+    fn get_auth(&self, intended_for: ValidatorId) -> Result<String, Error> {
+        self.client.get_auth(intended_for).map_err(Into::into)
     }
 }
 

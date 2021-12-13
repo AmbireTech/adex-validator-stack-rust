@@ -49,7 +49,7 @@ pub trait Unlocked: Locked {
     fn sign(&self, state_root: &str) -> Result<String, Self::Error>;
 
     // requires Unlocked
-    async fn get_auth(&self, intended_for: ValidatorId) -> Result<String, Self::Error>;
+    fn get_auth(&self, intended_for: ValidatorId) -> Result<String, Self::Error>;
 }
 
 /// A client that can be `unlock()`ed

@@ -346,7 +346,7 @@ impl Unlocked for Ethereum<UnlockedWallet> {
         Ok(format!("0x{}", signature))
     }
 
-    async fn get_auth(&self, intended_for: ValidatorId) -> Result<String, Error> {
+    fn get_auth(&self, intended_for: ValidatorId) -> Result<String, Error> {
         let era = Utc::now().timestamp_millis() as f64 / 60000.0;
         let payload = Payload {
             id: intended_for,

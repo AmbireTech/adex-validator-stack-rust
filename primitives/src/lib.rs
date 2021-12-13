@@ -22,7 +22,6 @@ pub use self::{
 
 mod ad_slot;
 mod ad_unit;
-pub mod adapter;
 pub mod address;
 pub mod analytics;
 pub mod balances;

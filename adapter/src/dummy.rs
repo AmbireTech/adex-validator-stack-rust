@@ -155,7 +155,7 @@ impl Unlocked for Dummy {
     }
 
     // requires Unlocked
-    async fn get_auth(&self, _intended_for: ValidatorId) -> Result<String, Error> {
+    fn get_auth(&self, _intended_for: ValidatorId) -> Result<String, Error> {
         let who = self
             .session_tokens
             .iter()

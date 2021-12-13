@@ -1,10 +1,9 @@
 #![deny(clippy::all)]
 #![deny(rust_2018_idioms)]
 
-use adapter::{client::Locked, Adapter};
+use adapter::{primitives::AdapterTypes, Adapter};
 use clap::{crate_version, App, Arg};
 
-// use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
 use primitives::{
     config::configuration,
     postgres::POSTGRES_CONFIG,
@@ -61,45 +60,41 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config_file = cli.value_of("config");
     let config = configuration(env_config.env, config_file).unwrap();
 
-    let adapter: Box<Adapter<dyn Locked<Error = adapter::Error>>> =
-        match cli.value_of("adapter").unwrap() {
-            "ethereum" => {
-                let keystore_file = cli
-                    .value_of("keystoreFile")
-                    .expect("keystore file is required for the ethereum adapter");
-                let keystore_pwd =
-                    std::env::var("KEYSTORE_PWD").expect("unable to get keystore pwd");
+    let adapter = match cli.value_of("adapter").unwrap() {
+        "ethereum" => {
+            let keystore_file = cli
+                .value_of("keystoreFile")
+                .expect("keystore file is required for the ethereum adapter");
+            let keystore_pwd = std::env::var("KEYSTORE_PWD").expect("unable to get keystore pwd");
 
-                let options = adapter::ethereum::Options {
-                    keystore_file: keystore_file.to_string(),
-                    keystore_pwd,
-                };
-                let ethereum_adapter = adapter::Ethereum::init(options, &config)
-                    .expect("Should initialize ethereum adapter");
+            let options = adapter::ethereum::Options {
+                keystore_file: keystore_file.to_string(),
+                keystore_pwd,
+            };
+            let ethereum_adapter = Adapter::new(
+                adapter::Ethereum::init(options, &config)
+                    .expect("Should initialize ethereum adapter"),
+            );
 
-                Box::new(Adapter::new(ethereum_adapter))
+            AdapterTypes::Ethereum(Box::new(ethereum_adapter))
+        }
+        "dummy" => {
+            let dummy_identity = cli
+                .value_of("dummyIdentity")
+                .expect("Dummy identity is required for the dummy adapter");
 
-                // Box::new(ethereum_adapter)
-                // AdapterTypes::EthereumAdapter(Box::new(ethereum_adapter))
-            }
-            "dummy" => {
-                let dummy_identity = cli
-                    .value_of("dummyIdentity")
-                    .expect("Dummy identity is required for the dummy adapter");
+            let options = adapter::dummy::Options {
+                dummy_identity: ValidatorId::try_from(dummy_identity)
+                    .expect("failed to parse dummy identity"),
+                dummy_auth: ADDRESSES.clone(),
+                dummy_auth_tokens: AUTH.clone(),
+            };
 
-                let options = adapter::dummy::Options {
-                    dummy_identity: ValidatorId::try_from(dummy_identity)
-                        .expect("failed to parse dummy identity"),
-                    dummy_auth: ADDRESSES.clone(),
-                    dummy_auth_tokens: AUTH.clone(),
-                };
-
-                let dummy_adapter = adapter::dummy::Adapter::init(options, &config);
-                Box::new(Adapter::new(dummy_adapter))
-                // AdapterTypes::DummyAdapter(Box::new(dummy_adapter))
-            }
-            _ => panic!("You can only use `ethereum` & `dummy` adapters!"),
-        };
+            let dummy_adapter = Adapter::new(adapter::Dummy::init(options, &config));
+            AdapterTypes::Dummy(Box::new(dummy_adapter))
+        }
+        _ => panic!("You can only use `ethereum` & `dummy` adapters!"),
+    };
 
     let logger = new_logger("sentry");
     let redis = redis_connection(env_config.redis_url).await?;
@@ -111,43 +106,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let postgres = postgres_connection(42, POSTGRES_CONFIG.clone()).await;
     let campaign_remaining = CampaignRemaining::new(redis.clone());
 
-    Application::new(
-        *adapter,
-        config,
-        logger,
-        redis,
-        postgres,
-        campaign_remaining,
-    )
-    .run(socket_addr)
-    .await;
-
-    // match adapter {
-    //     AdapterTypes::EthereumAdapter(adapter) => {
-    //         Application::new(
-    //             *adapter,
-    //             config,
-    //             logger,
-    //             redis,
-    //             postgres,
-    //             campaign_remaining,
-    //         )
-    //         .run(socket_addr)
-    //         .await
-    //     }
-    //     AdapterTypes::DummyAdapter(adapter) => {
-    //         Application::new(
-    //             *adapter,
-    //             config,
-    //             logger,
-    //             redis,
-    //             postgres,
-    //             campaign_remaining,
-    //         )
-    //         .run(socket_addr)
-    //         .await
-    //     }
-    // };
+    match adapter {
+        AdapterTypes::Ethereum(adapter) => {
+            Application::new(
+                *adapter,
+                config,
+                logger,
+                redis,
+                postgres,
+                campaign_remaining,
+            )
+            .run(socket_addr)
+            .await
+        }
+        AdapterTypes::Dummy(adapter) => {
+            Application::new(
+                *adapter,
+                config,
+                logger,
+                redis,
+                postgres,
+                campaign_remaining,
+            )
+            .run(socket_addr)
+            .await
+        }
+    };
 
     Ok(())
 }

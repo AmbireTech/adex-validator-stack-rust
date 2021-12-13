@@ -2,7 +2,7 @@
 #![deny(rust_2018_idioms)]
 #![allow(deprecated)]
 
-use adapter::{prelude::*, Adapter, LockedState};
+use adapter::{prelude::*, Adapter};
 use chrono::Utc;
 use hyper::{Body, Method, Request, Response, StatusCode};
 use middleware::{
@@ -33,10 +33,6 @@ use {
     },
 };
 
-/// For sentry to work properly, we need an [`adapter::Adapter`] in an [`Unlocked`] state.
-/// Use this type across `sentry`.
-// pub type Adapter<C: Locked> = adapter::Adapter<C, adapter::Locked>;
-// pub type Adapter = adapter::UnlockedC;
 pub mod analytics;
 pub mod middleware;
 pub mod routes {
@@ -119,7 +115,7 @@ impl RouteParams {
 // pub struct Application<C: Locked + 'static> {
 pub struct Application<C: Locked + 'static> {
     /// For sentry to work properly, we need an [`adapter::Adapter`] in a [`adapter::LockedState`] state.
-    pub adapter: Adapter<dyn Locked<Error = adapter::Error>>,
+    pub adapter: Adapter<C>,
     pub config: Config,
     pub logger: Logger,
     pub redis: MultiplexedConnection,
@@ -127,9 +123,12 @@ pub struct Application<C: Locked + 'static> {
     pub campaign_remaining: CampaignRemaining,
 }
 
-impl<C: Locked> Application<C> {
+impl<C> Application<C>
+where
+    C: Locked,
+{
     pub fn new(
-        adapter: C,
+        adapter: Adapter<C>,
         config: Config,
         logger: Logger,
         redis: MultiplexedConnection,
@@ -137,7 +136,7 @@ impl<C: Locked> Application<C> {
         campaign_remaining: CampaignRemaining,
     ) -> Self {
         Self {
-            adapter: Adapter::new(adapter),
+            adapter,
             config,
             logger,
             redis,
@@ -550,7 +549,10 @@ pub struct Auth {
 
 #[cfg(test)]
 pub mod test_util {
-    use adapter::dummy::{Dummy, Options};
+    use adapter::{
+        dummy::{Dummy, Options},
+        Adapter,
+    };
     use primitives::{
         config::DEVELOPMENT_CONFIG,
         util::tests::{discard_logger, prep_db::IDS},
@@ -569,14 +571,14 @@ pub mod test_util {
     /// It still uses DummyAdapter.
     pub async fn setup_dummy_app() -> Application<Dummy> {
         let config = DEVELOPMENT_CONFIG.clone();
-        let adapter = Dummy::init(
+        let adapter = Adapter::new(Dummy::init(
             Options {
                 dummy_identity: IDS["leader"],
                 dummy_auth: Default::default(),
                 dummy_auth_tokens: Default::default(),
             },
             &config,
-        );
+        ));
 
         let redis = TESTS_POOL.get().await.expect("Should return Object");
         let database = DATABASE_POOL.get().await.expect("Should get a DB pool");

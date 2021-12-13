@@ -2,7 +2,6 @@ use crate::db::get_validator_messages;
 use crate::{success_response, Application, ResponseError};
 use adapter::client::Locked;
 use hyper::{Body, Request, Response};
-use primitives::adapter::Adapter;
 use primitives::sentry::ValidatorMessageResponse;
 use primitives::{Channel, DomainError, ValidatorId};
 use serde::Deserialize;

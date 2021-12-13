@@ -4,12 +4,15 @@ use once_cell::sync::Lazy;
 use serde_json::Value;
 use web3::signing::keccak256;
 
+use crate::{UnlockedState, LockedState};
+
 pub use {
     client::{get_counterfactual_address, Ethereum, Options},
     error::Error,
 };
 
-pub type Adapter<S> = crate::Adapter<client::Ethereum, S>;
+pub type UnlockedAdapter = crate::Adapter<client::Ethereum<UnlockedWallet>, UnlockedState>;
+pub type LockedAdapter = crate::Adapter<client::Ethereum<LockedWallet>, LockedState>;
 pub type LockedClient = client::Ethereum<LockedWallet>;
 pub type UnlockedClient = client::Ethereum<UnlockedWallet>;
 

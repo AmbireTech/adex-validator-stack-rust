@@ -59,7 +59,7 @@ impl Unlocked for Dummy {
     }
 
     // requires Unlocked
-    async fn get_auth(&self, intended_for: ValidatorId) -> Result<String, Error> {
+    fn get_auth(&self, intended_for: ValidatorId) -> Result<String, Error> {
         Ok(intended_for.to_string())
     }
 }

@@ -52,7 +52,7 @@ impl<C: Locked + 'static> Middleware<C> for AuthRequired {
 /// If the `Adapter` fails to create an `AdapterSession`, `ResponseError::BadRequest` will be returned.
 async fn for_request<C: Locked>(
     mut req: Request<Body>,
-    adapter: &Adapter<C, LockedState>,
+    adapter: &Adapter<C>,
     redis: &MultiplexedConnection,
 ) -> Result<Request<Body>, Box<dyn error::Error>> {
     let referrer = req
@@ -196,7 +196,7 @@ mod test {
             .unwrap();
         match for_request(non_existent_token_req, &dummy_adapter, &database).await {
             Err(error) => {
-                assert!(error.to_string().contains("no session token for this auth: wrong-token"), "Wrong error received");
+                assert!(error.to_string().contains("No identity found that matches authentication token: wrong-token"), "Wrong error received");
             }
             _ => panic!("We shouldn't get a success response nor a different Error than BadRequest for this call"),
         };

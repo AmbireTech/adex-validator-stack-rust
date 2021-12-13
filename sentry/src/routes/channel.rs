@@ -389,9 +389,9 @@ mod test {
     use super::*;
     use crate::db::{accounting::spend_amount, insert_channel};
     use crate::test_util::setup_dummy_app;
+    use adapter::primitives::Deposit;
     use hyper::StatusCode;
     use primitives::{
-        adapter::Deposit,
         util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, IDS},
         BigNum,
     };

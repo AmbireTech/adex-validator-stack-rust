@@ -956,9 +956,9 @@ mod test {
     use crate::db::{fetch_campaign, redis_pool::TESTS_POOL};
     use crate::test_util::setup_dummy_app;
     use crate::update_campaign::DeltaBudget;
+    use adapter::primitives::Deposit;
     use hyper::StatusCode;
     use primitives::{
-        adapter::Deposit,
         util::tests::prep_db::{DUMMY_CAMPAIGN, IDS},
         BigNum, ChannelId, ValidatorId,
     };
