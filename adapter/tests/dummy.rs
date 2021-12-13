@@ -1,10 +1,11 @@
+use adapter::{
+    prelude::*,
+    primitives::{Deposit, Session},
+    Adapter, Error,
+};
 use async_trait::async_trait;
-use adapter::{Adapter, prelude::*};
 
 use primitives::{
-    adapter::{
-        Deposit, Session,
-    },
     test_util::{ADDRESS_1, DUMMY_CAMPAIGN},
     Address, BigNum, Channel, ValidatorId,
 };
@@ -15,8 +16,8 @@ pub struct Dummy {
 }
 
 #[async_trait]
-impl LockedClient for Dummy {
-    type Error = Error2;
+impl Locked for Dummy {
+    type Error = Error;
     /// Get Adapter whoami
     fn whoami(&self) -> ValidatorId {
         todo!()
@@ -28,13 +29,13 @@ impl LockedClient for Dummy {
         signer: ValidatorId,
         state_root: &str,
         signature: &str,
-    ) -> Result<bool, Self::Error> {
+    ) -> Result<bool, crate::Error> {
         todo!()
     }
 
     /// Creates a `Session` from a provided Token by calling the Contract.
     /// Does **not** cache the (`Token`, `Session`) pair.
-    async fn session_from_token(&self, token: &str) -> Result<Session, Self::Error> {
+    async fn session_from_token(&self, token: &str) -> Result<Session, crate::Error> {
         todo!()
     }
 
@@ -42,7 +43,7 @@ impl LockedClient for Dummy {
         &self,
         _channel: &Channel,
         _depositor_address: Address,
-    ) -> Result<Deposit, Self::Error> {
+    ) -> Result<Deposit, crate::Error> {
         Ok(Deposit {
             total: BigNum::from(42_u64),
             still_on_create2: BigNum::from(12_u64),
@@ -51,14 +52,14 @@ impl LockedClient for Dummy {
 }
 
 #[async_trait]
-impl UnlockedClient for Dummy {
+impl Unlocked for Dummy {
     // requires Unlocked
-    fn sign(&self, state_root: &str) -> Result<String, Error2> {
+    fn sign(&self, state_root: &str) -> Result<String, Error> {
         Ok(state_root.to_string())
     }
 
     // requires Unlocked
-    async fn get_auth(&self, intended_for: ValidatorId) -> Result<String, Error2> {
+    async fn get_auth(&self, intended_for: ValidatorId) -> Result<String, Error> {
         Ok(intended_for.to_string())
     }
 }
@@ -66,7 +67,7 @@ impl UnlockedClient for Dummy {
 impl Unlockable for Dummy {
     type Unlocked = Self;
 
-    fn unlock(&self) -> Result<Self::Unlocked, Error2> {
+    fn unlock(&self) -> Result<Self::Unlocked, Error> {
         Ok(self.clone())
     }
 }

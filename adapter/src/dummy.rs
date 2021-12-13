@@ -1,12 +1,12 @@
+use crate::{
+    prelude::*,
+    primitives::{Deposit, Session},
+    Error,
+};
 use async_trait::async_trait;
 use dashmap::{mapref::entry::Entry, DashMap};
-use crate::{prelude::*, primitives::{Session, Deposit}, Error};
 
-
-use primitives::{
-    config::Config,
-    Address, Channel, ChannelId, ToETHChecksum, ValidatorId,
-};
+use primitives::{config::Config, Address, Channel, ChannelId, ToETHChecksum, ValidatorId};
 use std::{collections::HashMap, sync::Arc};
 
 pub type Adapter<S> = crate::Adapter<Dummy, S>;
@@ -82,7 +82,7 @@ impl Dummy {
     }
 }
 #[async_trait]
-impl LockedClient for Dummy {
+impl Locked for Dummy {
     type Error = Error;
     /// Get Adapter whoami
     fn whoami(&self) -> ValidatorId {
@@ -95,7 +95,7 @@ impl LockedClient for Dummy {
         signer: ValidatorId,
         _state_root: &str,
         signature: &str,
-    ) -> Result<bool, Self::Error> {
+    ) -> Result<bool, crate::Error> {
         // select the `identity` and compare it to the signer
         // for empty string this will return array with 1 element - an empty string `[""]`
         let is_same = match signature.rsplit(' ').take(1).next() {
@@ -108,7 +108,7 @@ impl LockedClient for Dummy {
 
     /// Creates a `Session` from a provided Token by calling the Contract.
     /// Does **not** cache the (`Token`, `Session`) pair.
-    async fn session_from_token(&self, token: &str) -> Result<Session, Self::Error> {
+    async fn session_from_token(&self, token: &str) -> Result<Session, crate::Error> {
         let identity = self
             .authorization_tokens
             .iter()
@@ -130,7 +130,7 @@ impl LockedClient for Dummy {
         &self,
         channel: &Channel,
         depositor_address: Address,
-    ) -> Result<Deposit, Self::Error> {
+    ) -> Result<Deposit, crate::Error> {
         self.deposits
             .get_next_deposit(channel.id(), depositor_address)
             .ok_or_else(|| {
@@ -143,7 +143,7 @@ impl LockedClient for Dummy {
 }
 
 #[async_trait]
-impl UnlockedClient for Dummy {
+impl Unlocked for Dummy {
     // requires Unlocked
     fn sign(&self, state_root: &str) -> Result<String, Error> {
         let signature = format!(

@@ -5,7 +5,7 @@ use serde_json::Value;
 use web3::signing::keccak256;
 
 pub use {
-    client::{get_counterfactual_address, Ethereum},
+    client::{get_counterfactual_address, Ethereum, Options},
     error::Error,
 };
 

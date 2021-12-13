@@ -4,8 +4,9 @@ use primitives::{Address, Channel, ValidatorId};
 
 #[async_trait]
 /// Available methods for Locked clients.
-pub trait LockedClient: Sync + Send {
-    type Error: std::error::Error;
+pub trait Locked: Sync + Send {
+    type Error: std::error::Error + Into<crate::Error> + 'static;
+
     /// Get Adapter whoami
     fn whoami(&self) -> ValidatorId;
 
@@ -43,7 +44,7 @@ pub trait LockedClient: Sync + Send {
 /// Available methods for Unlocked clients.
 /// Unlocked clients should also implement [`LockedClient`].
 #[async_trait]
-pub trait UnlockedClient: LockedClient {
+pub trait Unlocked: Locked {
     // requires Unlocked
     fn sign(&self, state_root: &str) -> Result<String, Self::Error>;
 
@@ -56,7 +57,7 @@ pub trait UnlockedClient: LockedClient {
 ///
 /// **Note:** A possibly expensive operation as it might result in cloning
 pub trait Unlockable {
-    type Unlocked: UnlockedClient;
+    type Unlocked: Unlocked;
 
-    fn unlock(&self) -> Result<Self::Unlocked, <Self::Unlocked as LockedClient>::Error>;
+    fn unlock(&self) -> Result<Self::Unlocked, <Self::Unlocked as Locked>::Error>;
 }

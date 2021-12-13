@@ -1,8 +1,7 @@
-use primitives::{
-    address::Error as AddressError, big_num::ParseBigIntError, Address,
-    ChannelId, ValidatorId,
-};
 use crate::Error as AdapterError;
+use primitives::{
+    address::Error as AddressError, big_num::ParseBigIntError, Address, ChannelId, ValidatorId,
+};
 use thiserror::Error;
 
 use super::ewt::Payload;
@@ -23,8 +22,12 @@ impl From<Error> for AdapterError {
             err @ Error::ContractInitialization(..) => AdapterError::adapter(err),
             err @ Error::ContractQuerying(..) => AdapterError::adapter(err),
             err @ Error::VerifyAddress(..) => AdapterError::adapter(err),
-            err @ Error::AuthenticationTokenNotIntendedForUs { .. } => AdapterError::authentication(err),
-            err @ Error::InsufficientAuthorizationPrivilege { .. } => AdapterError::authorization(err),
+            err @ Error::AuthenticationTokenNotIntendedForUs { .. } => {
+                AdapterError::authentication(err)
+            }
+            err @ Error::InsufficientAuthorizationPrivilege { .. } => {
+                AdapterError::authorization(err)
+            }
         }
     }
 }

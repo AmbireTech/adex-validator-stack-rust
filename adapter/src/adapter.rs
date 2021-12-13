@@ -2,28 +2,34 @@ use crate::primitives::*;
 use async_trait::async_trait;
 use std::{marker::PhantomData, sync::Arc};
 
-use crate::{prelude::*, Error};
+use crate::{
+    client::{Locked, Unlockable, Unlocked},
+    Error,
+};
 
-pub use self::state::{Locked, Unlocked};
+// pub use self::state::{Locked, Unlocked};
 
-pub type UnlockedC = Adapter<dyn UnlockedClient<Error = crate::Error>, Unlocked>;
-pub type LockedC = Adapter<dyn LockedClient<Error = crate::Error>, Unlocked>;
+// pub type UnlockedC = Adapter<dyn Unlocked<Error = crate::Error>, state::UnlockedState>;
+// pub type LockedC = Adapter<dyn Locked<Error = crate::Error>, state::UnlockedState>;
 
-mod state {
+pub(crate) mod state {
     #[derive(Debug, Clone, Copy)]
     /// The `Locked` state of the [`crate::Adapter`].
-    /// See [`crate::client::LockedClient`]
-    pub struct Locked;
+    /// See [`crate::client::Locked`]
+    pub struct LockedState;
 
     /// The `Unlocked` state of the [`crate::Adapter`].
-    /// See [`crate::client::UnlockedClient`]
+    /// See [`crate::client::Unlocked`]
     #[derive(Debug, Clone, Copy)]
-    pub struct Unlocked;
+    pub struct UnlockedState;
 }
 
 #[derive(Debug)]
 /// [`Adapter`] struct
-pub struct Adapter<C, S = Locked> {
+pub struct Adapter<C, S = state::LockedState>
+where
+    C: ?Sized,
+{
     /// client in a specific state - Locked or Unlocked
     pub client: Arc<C>,
     // /// We must use the `C` type from the definition
@@ -39,9 +45,9 @@ impl<C, S: Clone> Clone for Adapter<C, S> {
     }
 }
 
-impl<C: LockedClient> Adapter<C> {
-    /// Create a new [`Adapter`] in [`Locked`] state using a [`LockedClient`].
-    pub fn new(client: C) -> Adapter<C, Locked> {
+impl<C: Locked> Adapter<C> {
+    /// Create a new [`Adapter`] in [`Locked`] state using a [`Locked`].
+    pub fn new(client: C) -> Adapter<C, state::LockedState> {
         Adapter {
             client: Arc::new(client),
             _state: PhantomData::default(),
@@ -49,9 +55,9 @@ impl<C: LockedClient> Adapter<C> {
     }
 }
 
-impl<C: UnlockedClient> Adapter<C, Unlocked> {
-    /// Create a new [`Adapter`] in [`Unlocked`] state using an [`UnlockedClient`].
-    pub fn with_unlocked(client: C) -> Adapter<C, Unlocked> {
+impl<C: Unlocked> Adapter<C, state::LockedState> {
+    /// Create a new [`Adapter`] in [`state::UnlockedState`] state using an [`Unlocked`] client.
+    pub fn with_unlocked(client: C) -> Adapter<C, state::UnlockedState> {
         Adapter {
             client: Arc::new(client),
             _state: PhantomData::default(),
@@ -59,13 +65,13 @@ impl<C: UnlockedClient> Adapter<C, Unlocked> {
     }
 }
 
-impl<C> Adapter<C, Locked>
+impl<C> Adapter<C, state::LockedState>
 where
-    C: LockedClient + Unlockable,
-    <C::Unlocked as LockedClient>::Error: Into<Error>,
+    C: Locked + Unlockable,
+    <C::Unlocked as Locked>::Error: Into<Error>,
     C::Error: Into<Error>,
 {
-    pub fn unlock(self) -> Result<Adapter<C::Unlocked, Unlocked>, Error> {
+    pub fn unlock(self) -> Result<Adapter<C::Unlocked, state::UnlockedState>, Error> {
         let unlocked = self.client.unlock().map_err(Into::into)?;
 
         Ok(Adapter {
@@ -76,9 +82,9 @@ where
 }
 
 #[async_trait]
-impl<C> UnlockedClient for Adapter<C, Unlocked>
+impl<C> Unlocked for Adapter<C, state::UnlockedState>
 where
-    C: UnlockedClient + Sync + Send,
+    C: Unlocked + Sync + Send,
     C::Error: Into<Error>,
 {
     fn sign(&self, state_root: &str) -> Result<String, Error> {
@@ -91,9 +97,9 @@ where
 }
 
 #[async_trait]
-impl<C, S> LockedClient for Adapter<C, S>
+impl<C, S> Locked for Adapter<C, S>
 where
-    C: LockedClient + Sync + Send,
+    C: Locked + Sync + Send,
     C::Error: Into<Error>,
     S: Sync + Send,
 {

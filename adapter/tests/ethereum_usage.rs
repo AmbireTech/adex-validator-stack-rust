@@ -1,8 +1,5 @@
-use adapter::{ethereum::test_util::KEYSTORES, Ethereum, Adapter, prelude::*};
-use primitives::{
-    config::GANACHE_CONFIG,
-    test_util::LEADER,
-};
+use adapter::{ethereum::test_util::KEYSTORES, prelude::*, Adapter, Ethereum};
+use primitives::{config::GANACHE_CONFIG, test_util::LEADER};
 
 #[tokio::test]
 async fn it_creates_a_usable_adapter() {

@@ -15,7 +15,7 @@ use primitives::{
     Address, BigNum, ValidatorId,
 };
 
-use super::{channel::EthereumChannel, IDENTITY_ABI, OUTPACE_ABI, SWEEPER_ABI, client::Options};
+use super::{channel::EthereumChannel, client::Options, IDENTITY_ABI, OUTPACE_ABI, SWEEPER_ABI};
 
 // See `adex-eth-protocol` `contracts/mocks/Token.sol`
 /// Mocked Token ABI
@@ -44,7 +44,7 @@ pub static KEYSTORE_IDENTITY: Lazy<(Address, Options)> = Lazy::new(|| {
     // it always starts in `adapter` folder because of the crate scope
     // even when it's in the workspace
     let mut keystore_file = full_path.parent().unwrap().to_path_buf();
-    keystore_file.push("adapter/test/resources/keystore.json");
+    keystore_file.push("adapter/tests/resources/keystore.json");
 
     (address, keystore_options("keystore.json", "adexvalidator"))
 });
@@ -96,7 +96,7 @@ fn keystore_options(file_name: &str, password: &str) -> Options {
     // it always starts in `adapter` folder because of the crate scope
     // even when it's in the workspace
     let mut keystore_file = full_path.parent().unwrap().to_path_buf();
-    keystore_file.push(format!("adapter/test/resources/{}", file_name));
+    keystore_file.push(format!("adapter/tests/resources/{}", file_name));
 
     Options {
         keystore_file: keystore_file.display().to_string(),

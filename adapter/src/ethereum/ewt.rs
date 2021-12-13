@@ -225,7 +225,7 @@ mod test {
     };
 
     use super::*;
-    use crate::ethereum::{Ethereum, test_util::KEYSTORES};
+    use crate::ethereum::{test_util::KEYSTORES, Ethereum};
 
     #[test]
     fn should_generate_correct_ewt_sign_and_verify() {

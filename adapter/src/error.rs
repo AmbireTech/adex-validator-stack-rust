@@ -1,6 +1,6 @@
 use parse_display::Display;
-use thiserror::Error;
 use std::{error::Error as StdError, fmt};
+use thiserror::Error;
 
 pub(crate) type BoxError = Box<dyn StdError + Send + Sync>;
 

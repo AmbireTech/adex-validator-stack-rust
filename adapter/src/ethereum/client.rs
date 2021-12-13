@@ -1,5 +1,9 @@
 use std::{fs, str::FromStr};
 
+use crate::{
+    prelude::*,
+    primitives::{Deposit, Session},
+};
 use async_trait::async_trait;
 use chrono::Utc;
 use create2::calc_addr;
@@ -7,10 +11,7 @@ use ethstore::{
     ethkey::{verify_address, Message, Signature},
     SafeAccount,
 };
-use crate::{prelude::*, primitives::{Session, Deposit}};
-use primitives::{
-    Address, BigNum, Channel, Config, ValidatorId,
-};
+use primitives::{Address, BigNum, Channel, Config, ValidatorId};
 
 use super::{
     channel::EthereumChannel,
@@ -49,7 +50,6 @@ pub fn get_counterfactual_address(
     Address::from(address_bytes)
 }
 
-
 #[derive(Debug, Clone)]
 pub struct Options {
     pub keystore_file: String,
@@ -57,7 +57,7 @@ pub struct Options {
 }
 
 #[derive(Debug, Clone)]
-/// Ethereum client implementation for the [`Adapter`].
+/// Ethereum client implementation for the [`crate::Adapter`].
 pub struct Ethereum<S = LockedWallet> {
     address: ValidatorId,
     config: Config,
@@ -147,7 +147,7 @@ impl<S: WalletState> Ethereum<S> {
 impl Unlockable for Ethereum<LockedWallet> {
     type Unlocked = Ethereum<UnlockedWallet>;
 
-    fn unlock(&self) -> Result<Ethereum<UnlockedWallet>, Error> {
+    fn unlock(&self) -> Result<Ethereum<UnlockedWallet>, <Self::Unlocked as Locked>::Error> {
         let unlocked_wallet = match &self.state {
             LockedWallet::KeyStore { keystore, password } => {
                 let json = serde_json::from_value(keystore.clone())
@@ -174,7 +174,7 @@ impl Unlockable for Ethereum<LockedWallet> {
 }
 
 #[async_trait]
-impl<S: WalletState> LockedClient for Ethereum<S> {
+impl<S: WalletState> Locked for Ethereum<S> {
     type Error = Error;
     fn whoami(&self) -> ValidatorId {
         self.address
@@ -247,7 +247,7 @@ impl<S: WalletState> LockedClient for Ethereum<S> {
         &self,
         channel: &Channel,
         depositor_address: Address,
-    ) -> Result<Deposit, Error> {
+    ) -> Result<Deposit, Self::Error> {
         let token_info = self
             .config
             .token_address_whitelist
@@ -331,7 +331,7 @@ impl<S: WalletState> LockedClient for Ethereum<S> {
 }
 
 #[async_trait]
-impl UnlockedClient for Ethereum<UnlockedWallet> {
+impl Unlocked for Ethereum<UnlockedWallet> {
     fn sign(&self, state_root: &str) -> Result<String, Error> {
         let state_root = hex::decode(state_root).map_err(VerifyError::StateRootDecoding)?;
         let message = Message::from(to_ethereum_signed(&state_root));
@@ -445,7 +445,8 @@ mod test {
         BigNum, ToHex, ValidatorId,
     };
     use web3::{
-        contract::Options as ContractOptions, ethabi::Token, signing::keccak256, transports::Http, types::H160, Web3,
+        contract::Options as ContractOptions, ethabi::Token, signing::keccak256, transports::Http,
+        types::H160, Web3,
     };
 
     #[test]
