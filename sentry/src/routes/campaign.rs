@@ -72,8 +72,10 @@ pub async fn update_latest_spendable<C>(
     channel: Channel,
     token: &TokenInfo,
     address: Address,
-) -> Result<Spendable, LatestSpendableError> where
-C: UnlockedClient<Error = adapter::Error> + 'static,{
+) -> Result<Spendable, LatestSpendableError>
+where
+    C: Locked + 'static,
+{
     let latest_deposit = adapter.get_deposit(&channel, address).await?;
 
     let spendable = Spendable {
@@ -133,7 +135,7 @@ pub async fn create_campaign<C>(
     app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError>
 where
-    C: UnlockedClient<Error = adapter::Error> + 'static,
+    C: Locked + 'static,
 {
     let auth = req
         .extensions()
@@ -273,7 +275,7 @@ where
     Ok(success_response(serde_json::to_string(&campaign)?))
 }
 
-pub async fn campaign_list<C: UnlockedClient + 'static>(
+pub async fn campaign_list<C: Locked + 'static>(
     req: Request<Body>,
     app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
@@ -300,7 +302,7 @@ pub async fn campaign_list<C: UnlockedClient + 'static>(
 /// Can only be called by creator
 /// to close a campaign, just set it's budget to what it's spent so far (so that remaining == 0)
 /// newBudget = totalSpent, i.e. newBudget = oldBudget - remaining
-pub async fn close_campaign<C: UnlockedClient + 'static>(
+pub async fn close_campaign<C: Locked + 'static>(
     req: Request<Body>,
     app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
@@ -347,7 +349,7 @@ pub mod update_campaign {
 
     use super::*;
 
-    pub async fn handle_route<C: UnlockedClient + 'static>(
+    pub async fn handle_route<C: Locked + 'static>(
         req: Request<Body>,
         app: &Application<C>,
     ) -> Result<Response<Body>, ResponseError> {
@@ -377,8 +379,8 @@ pub mod update_campaign {
         Ok(success_response(serde_json::to_string(&modified_campaign)?))
     }
 
-    pub async fn modify_campaign<C: UnlockedClient + 'static>(
-        adapter: &Adapter<C>,
+    pub async fn modify_campaign<C: Locked + 'static>(
+        adapter: Adapter<C>,
         pool: &DbPool,
         config: &Config,
         campaign_remaining: &CampaignRemaining,
@@ -603,7 +605,7 @@ pub mod insert_events {
         CampaignOutOfBudget,
     }
 
-    pub async fn handle_route<C: UnlockedClient + 'static>(
+    pub async fn handle_route<C: Locked + 'static>(
         req: Request<Body>,
         app: &Application<C>,
     ) -> Result<Response<Body>, ResponseError> {
@@ -635,7 +637,7 @@ pub mod insert_events {
             .unwrap())
     }
 
-    async fn process_events<C: UnlockedClient + 'static>(
+    async fn process_events<C: Locked + 'static>(
         app: &Application<C>,
         auth: Option<&Auth>,
         session: &Session,
@@ -972,7 +974,7 @@ mod test {
 
         // this function should be called before each creation/modification of a Campaign!
         let add_deposit_call = |channel: ChannelId, creator: Address, token: Address| {
-            app.adapter.add_deposit_call(
+            app.adapter.client.add_deposit_call(
                 channel,
                 creator,
                 Deposit {

@@ -1,4 +1,4 @@
-use adapter::client::UnlockedClient;
+use adapter::client::Locked;
 use chrono::{serde::ts_milliseconds_option, DateTime, Utc};
 use hyper::{Body, Request, Response};
 use serde::Deserialize;
@@ -14,7 +14,7 @@ pub struct EventAggregatesQuery {
     after: Option<DateTime<Utc>>,
 }
 #[deprecated = "V5 - Double check what is need from the event aggregates from V4"]
-pub async fn list_channel_event_aggregates<C: UnlockedClient + 'static>(
+pub async fn list_channel_event_aggregates<C: Locked + 'static>(
     req: Request<Body>,
     _app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {

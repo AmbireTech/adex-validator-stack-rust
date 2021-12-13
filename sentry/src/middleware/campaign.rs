@@ -11,7 +11,7 @@ pub struct CampaignLoad;
 pub struct CalledByCreator;
 
 #[async_trait]
-impl<C: adapter::client::UnlockedClient + 'static> Middleware<C> for CampaignLoad {
+impl<C: adapter::client::Locked + 'static> Middleware<C> for CampaignLoad {
     async fn call<'a>(
         &self,
         mut request: Request<Body>,
@@ -38,7 +38,7 @@ impl<C: adapter::client::UnlockedClient + 'static> Middleware<C> for CampaignLoa
 }
 
 #[async_trait]
-impl<C: adapter::client::UnlockedClient + 'static> Middleware<C> for CalledByCreator {
+impl<C: adapter::client::Locked + 'static> Middleware<C> for CalledByCreator {
     async fn call<'a>(
         &self,
         request: Request<Body>,

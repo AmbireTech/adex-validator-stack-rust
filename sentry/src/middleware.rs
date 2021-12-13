@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use crate::{Application, ResponseError};
-use adapter::client::UnlockedClient;
+use adapter::client::Locked;
 use hyper::{Body, Request};
 
 use async_trait::async_trait;
@@ -12,7 +12,7 @@ pub mod channel;
 pub mod cors;
 
 #[async_trait]
-pub trait Middleware<C: UnlockedClient + 'static>: Send + Sync + Debug {
+pub trait Middleware<C: Locked + 'static>: Send + Sync + Debug {
     async fn call<'a>(
         &self,
         request: Request<Body>,
@@ -23,9 +23,9 @@ pub trait Middleware<C: UnlockedClient + 'static>: Send + Sync + Debug {
 #[derive(Debug, Default)]
 /// `Chain` allows chaining multiple middleware to be applied on the Request of the application
 /// Chained middlewares are applied in the order they were chained
-pub struct Chain<C: UnlockedClient + 'static>(Vec<Box<dyn Middleware<C>>>);
+pub struct Chain<C: Locked + 'static>(Vec<Box<dyn Middleware<C>>>);
 
-impl<C: UnlockedClient + 'static> Chain<C> {
+impl<C: Locked + 'static> Chain<C> {
     pub fn new() -> Self {
         Chain(vec![])
     }

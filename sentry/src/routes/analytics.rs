@@ -2,7 +2,7 @@ use crate::{
     db::analytics::{advertiser_channel_ids, get_advanced_reports, get_analytics, AnalyticsType},
     success_response, Application, Auth, ResponseError, RouteParams,
 };
-use adapter::client::UnlockedClient;
+use adapter::client::Locked;
 use hyper::{Body, Request, Response};
 use primitives::{
     analytics::{AnalyticsQuery, AnalyticsResponse},
@@ -11,7 +11,7 @@ use primitives::{
 use redis::aio::MultiplexedConnection;
 use slog::{error, Logger};
 
-pub async fn publisher_analytics<C: UnlockedClient + 'static>(
+pub async fn publisher_analytics<C: Locked + 'static>(
     req: Request<Body>,
     app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
@@ -28,7 +28,7 @@ pub async fn publisher_analytics<C: UnlockedClient + 'static>(
         .map(success_response)
 }
 
-pub async fn analytics<C: UnlockedClient + 'static>(
+pub async fn analytics<C: Locked + 'static>(
     req: Request<Body>,
     app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
@@ -61,7 +61,7 @@ pub async fn analytics<C: UnlockedClient + 'static>(
     }
 }
 
-pub async fn advertiser_analytics<C: UnlockedClient + 'static>(
+pub async fn advertiser_analytics<C: Locked + 'static>(
     req: Request<Body>,
     app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
@@ -75,7 +75,7 @@ pub async fn advertiser_analytics<C: UnlockedClient + 'static>(
         .map(success_response)
 }
 
-pub async fn process_analytics<C: UnlockedClient + 'static>(
+pub async fn process_analytics<C: Locked + 'static>(
     req: Request<Body>,
     app: &Application<C>,
     analytics_type: AnalyticsType,
@@ -106,7 +106,7 @@ pub async fn process_analytics<C: UnlockedClient + 'static>(
         .map_err(|_| ResponseError::BadRequest("error occurred; try again later".to_string()))
 }
 
-pub async fn advanced_analytics<C: UnlockedClient + 'static>(
+pub async fn advanced_analytics<C: Locked + 'static>(
     req: Request<Body>,
     app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {

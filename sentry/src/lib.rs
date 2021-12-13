@@ -2,6 +2,7 @@
 #![deny(rust_2018_idioms)]
 #![allow(deprecated)]
 
+use adapter::{prelude::*, Adapter, LockedState};
 use chrono::Utc;
 use hyper::{Body, Method, Request, Response, StatusCode};
 use middleware::{
@@ -12,7 +13,6 @@ use middleware::{
     Chain, Middleware,
 };
 use once_cell::sync::Lazy;
-use adapter::prelude::*;
 use primitives::{sentry::ValidationErrorResponse, Config, ValidatorId};
 use redis::aio::MultiplexedConnection;
 use regex::Regex;
@@ -35,9 +35,8 @@ use {
 
 /// For sentry to work properly, we need an [`adapter::Adapter`] in an [`Unlocked`] state.
 /// Use this type across `sentry`.
-pub type Adapter = adapter::Adapter<dyn UnlockedClient<Error = adapter::Error>, adapter::Unlocked>;
+// pub type Adapter<C: Locked> = adapter::Adapter<C, adapter::Locked>;
 // pub type Adapter = adapter::UnlockedC;
-
 pub mod analytics;
 pub mod middleware;
 pub mod routes {
@@ -117,9 +116,10 @@ impl RouteParams {
 }
 
 // #[derive(Clone)]
-pub struct Application<C: UnlockedClient + 'static> {
-    /// For sentry to work properly, we need an [`adapter::Adapter`] in an [`Unlocked`] state.
-    pub adapter: Adapter<C>,
+// pub struct Application<C: Locked + 'static> {
+pub struct Application<C: Locked + 'static> {
+    /// For sentry to work properly, we need an [`adapter::Adapter`] in a [`adapter::LockedState`] state.
+    pub adapter: Adapter<dyn Locked<Error = adapter::Error>>,
     pub config: Config,
     pub logger: Logger,
     pub redis: MultiplexedConnection,
@@ -127,7 +127,7 @@ pub struct Application<C: UnlockedClient + 'static> {
     pub campaign_remaining: CampaignRemaining,
 }
 
-impl<C: UnlockedClient> Application<C> {
+impl<C: Locked> Application<C> {
     pub fn new(
         adapter: C,
         config: Config,
@@ -137,7 +137,7 @@ impl<C: UnlockedClient> Application<C> {
         campaign_remaining: CampaignRemaining,
     ) -> Self {
         Self {
-            adapter: Adapter::with_unlocked(adapter),
+            adapter: Adapter::new(adapter),
             config,
             logger,
             redis,
@@ -177,7 +177,7 @@ impl<C: UnlockedClient> Application<C> {
     }
 }
 
-async fn campaigns_router<C: UnlockedClient + 'static>(
+async fn campaigns_router<C: Locked + 'static>(
     mut req: Request<Body>,
     app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
@@ -232,7 +232,7 @@ async fn campaigns_router<C: UnlockedClient + 'static>(
     }
 }
 
-async fn analytics_router<C: UnlockedClient + 'static>(
+async fn analytics_router<C: Locked + 'static>(
     mut req: Request<Body>,
     app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
@@ -309,7 +309,7 @@ async fn analytics_router<C: UnlockedClient + 'static>(
     }
 }
 
-async fn channels_router<C: UnlockedClient + 'static>(
+async fn channels_router<C: Locked + 'static>(
     mut req: Request<Body>,
     app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
@@ -550,7 +550,7 @@ pub struct Auth {
 
 #[cfg(test)]
 pub mod test_util {
-    use adapter::dummy::{Options, Dummy};
+    use adapter::dummy::{Dummy, Options};
     use primitives::{
         config::DEVELOPMENT_CONFIG,
         util::tests::{discard_logger, prep_db::IDS},

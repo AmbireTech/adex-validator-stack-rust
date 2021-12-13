@@ -1,6 +1,6 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
-use adapter::client::UnlockedClient;
+use adapter::client::Locked;
 use hyper::{
     service::{make_service_fn, service_fn},
     Error, Server,
@@ -69,7 +69,7 @@ fn default_redis_url() -> ConnectionInfo {
     DEFAULT_REDIS_URL.clone()
 }
 
-impl<C: UnlockedClient + 'static> Application<C> {
+impl<C: Locked + 'static> Application<C> {
     /// Starts the `hyper` `Server`.
     pub async fn run(self, socket_addr: SocketAddr) {
         let logger = self.logger.clone();
@@ -93,7 +93,7 @@ impl<C: UnlockedClient + 'static> Application<C> {
     }
 }
 
-impl<C: UnlockedClient> Clone for Application<C> {
+impl<C: Locked> Clone for Application<C> {
     fn clone(&self) -> Self {
         Self {
             adapter: self.adapter.clone(),

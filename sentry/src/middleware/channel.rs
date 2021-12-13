@@ -3,7 +3,7 @@ use crate::{
     middleware::Middleware,
     Application, ResponseError, RouteParams,
 };
-use adapter::client::UnlockedClient;
+use adapter::client::Locked;
 use futures::future::{BoxFuture, FutureExt};
 use hex::FromHex;
 use hyper::{Body, Request};
@@ -15,7 +15,7 @@ use async_trait::async_trait;
 pub struct ChannelLoad;
 
 #[async_trait]
-impl<C: UnlockedClient + 'static> Middleware<C> for ChannelLoad {
+impl<C: Locked + 'static> Middleware<C> for ChannelLoad {
     async fn call<'a>(
         &self,
         request: Request<Body>,
@@ -26,7 +26,7 @@ impl<C: UnlockedClient + 'static> Middleware<C> for ChannelLoad {
 }
 
 /// channel_load & channel_if_exist
-fn channel_load<'a, C: UnlockedClient>(
+fn channel_load<'a, C: Locked>(
     mut req: Request<Body>,
     app: &'a Application<C>,
 ) -> BoxFuture<'a, Result<Request<Body>, ResponseError>> {
@@ -57,7 +57,7 @@ fn channel_load<'a, C: UnlockedClient>(
 pub struct ChannelIfActive;
 
 #[async_trait]
-impl<C: UnlockedClient + 'static> Middleware<C> for ChannelIfActive {
+impl<C: Locked + 'static> Middleware<C> for ChannelIfActive {
     async fn call<'a>(
         &self,
         request: Request<Body>,
@@ -67,7 +67,7 @@ impl<C: UnlockedClient + 'static> Middleware<C> for ChannelIfActive {
     }
 }
 
-fn channel_if_active<'a, C: UnlockedClient>(
+fn channel_if_active<'a, C: Locked>(
     mut req: Request<Body>,
     app: &'a Application<C>,
 ) -> BoxFuture<'a, Result<Request<Body>, ResponseError>> {
@@ -105,7 +105,7 @@ fn channel_if_active<'a, C: UnlockedClient>(
 pub struct GetChannelId;
 
 #[async_trait]
-impl<C: UnlockedClient + 'static> Middleware<C> for GetChannelId {
+impl<C: Locked + 'static> Middleware<C> for GetChannelId {
     async fn call<'a>(
         &self,
         request: Request<Body>,
@@ -115,7 +115,7 @@ impl<C: UnlockedClient + 'static> Middleware<C> for GetChannelId {
     }
 }
 
-fn get_channel_id<'a, C: UnlockedClient>(
+fn get_channel_id<'a, C: Locked>(
     mut req: Request<Body>,
     _: &'a Application<C>,
 ) -> BoxFuture<'a, Result<Request<Body>, ResponseError>> {
