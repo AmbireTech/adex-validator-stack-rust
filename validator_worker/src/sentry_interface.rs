@@ -485,7 +485,9 @@ pub mod campaigns {
             ))
             .expect("Should not fail to create endpoint URL");
 
-        client.get(endpoint).send().await?.json().await
+        let resp = client.get(endpoint).send().await?;
+        dbg!(resp.status());
+        resp.json().await
     }
 }
 

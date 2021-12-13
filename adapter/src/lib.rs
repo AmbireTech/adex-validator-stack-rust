@@ -1,7 +1,13 @@
 pub use {
-    adapter::state::{LockedState, UnlockedState},
+    self::adapter::{
+        state::{LockedState, UnlockedState},
+        Adapter,
+    },
     error::Error,
 };
+
+pub use dummy::Dummy;
+pub use ethereum::Ethereum;
 
 /// only re-export types from the `primitives` crate that are being used by the [`crate::Adapter`].
 pub mod primitives {
@@ -54,15 +60,7 @@ pub mod prelude {
 /// - [`crate::dummy::Adapter`] and it's client implementation [`crate::Dummy`] for testing.
 mod adapter;
 pub mod client;
-mod error;
-pub mod util;
-
-pub use adapter::Adapter;
-
-/// Dummy testing client for [`Adapter`]
-pub use dummy::Dummy;
-/// Ethereum Client
-pub use ethereum::Ethereum;
-
 pub mod dummy;
+mod error;
 pub mod ethereum;
+pub mod util;

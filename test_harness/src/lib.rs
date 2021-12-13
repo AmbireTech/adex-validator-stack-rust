@@ -9,11 +9,10 @@ use adapter::ethereum::{
         deploy_outpace_contract, deploy_sweeper_contract, deploy_token_contract, mock_set_balance,
         outpace_deposit, GANACHE_URL, MOCK_TOKEN_ABI,
     },
-    OUTPACE_ABI, SWEEPER_ABI,
+    Options, OUTPACE_ABI, SWEEPER_ABI,
 };
 use deposits::Deposit;
 use once_cell::sync::Lazy;
-use adapter::ethereum::Options;
 use primitives::{
     config::TokenInfo,
     config::GANACHE_CONFIG,
@@ -208,10 +207,8 @@ mod tests {
     use crate::run::run_sentry_app;
 
     use super::*;
-    use adapter::ethereum::{
-        test_util::{GANACHE_URL, KEYSTORES},
-    };
-    use adapter::{Adapter, prelude::*, Ethereum};
+    use adapter::ethereum::test_util::{GANACHE_URL, KEYSTORES};
+    use adapter::{prelude::*, Adapter, Ethereum};
     use primitives::{
         balances::CheckedState,
         sentry::{campaign_create::CreateCampaign, AccountingResponse, Event, SuccessResponse},
@@ -403,16 +400,23 @@ mod tests {
         let token_precision = contracts.token.0.precision.get();
 
         // We use the Advertiser's `EthereumAdapter::get_auth` for authentication!
-        let advertiser_adapter =
-        Adapter::new(Ethereum::init(KEYSTORES[&ADVERTISER].clone(), &GANACHE_CONFIG)
-                .expect("Should initialize creator adapter"))
-            .unlock()
-            .expect("Should unlock advertiser's Ethereum Adapter");
+        let advertiser_adapter = Adapter::new(
+            Ethereum::init(KEYSTORES[&ADVERTISER].clone(), &GANACHE_CONFIG)
+                .expect("Should initialize creator adapter"),
+        )
+        .unlock()
+        .expect("Should unlock advertiser's Ethereum Adapter");
         let advertiser_adapter = advertiser_adapter;
 
         // setup Sentry & returns Adapter
-        let leader_adapter = setup_sentry(&leader).await.unlock().expect("Failed to unlock Leader ethereum adapter");
-        let follower_adapter = setup_sentry(&follower).await.unlock().expect("Failed to unlock Follower ethereum adapter");
+        let leader_adapter = setup_sentry(&leader)
+            .await
+            .unlock()
+            .expect("Failed to unlock Leader ethereum adapter");
+        let follower_adapter = setup_sentry(&follower)
+            .await
+            .unlock()
+            .expect("Failed to unlock Follower ethereum adapter");
 
         let leader_sentry = {
             // should get self Auth from Leader's EthereumAdapter
@@ -805,7 +809,7 @@ mod tests {
     async fn setup_sentry(validator: &TestValidator) -> adapter::ethereum::LockedAdapter {
         let adapter = Adapter::new(
             Ethereum::init(validator.keystore.clone(), &GANACHE_CONFIG)
-            .expect("EthereumAdapter::init")
+                .expect("EthereumAdapter::init"),
         );
 
         run_sentry_app(adapter.clone(), &validator)

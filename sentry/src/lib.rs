@@ -222,9 +222,7 @@ async fn campaigns_router<C: Locked + 'static>(
             .await?;
 
         campaign::close_campaign(req, app).await
-    } else if method == Method::POST && path == "/v5/campaign/list" {
-        req = AuthRequired.call(req, app).await?;
-
+    } else if method == Method::GET && path == "/v5/campaign/list" {
         campaign_list(req, app).await
     } else {
         Err(ResponseError::NotFound)

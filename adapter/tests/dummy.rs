@@ -26,16 +26,16 @@ impl Locked for Dummy {
     /// Verify, based on the signature & state_root, that the signer is the same
     fn verify(
         &self,
-        signer: ValidatorId,
-        state_root: &str,
-        signature: &str,
+        _signer: ValidatorId,
+        _state_root: &str,
+        _signature: &str,
     ) -> Result<bool, crate::Error> {
         todo!()
     }
 
     /// Creates a `Session` from a provided Token by calling the Contract.
     /// Does **not** cache the (`Token`, `Session`) pair.
-    async fn session_from_token(&self, token: &str) -> Result<Session, crate::Error> {
+    async fn session_from_token(&self, _token: &str) -> Result<Session, crate::Error> {
         todo!()
     }
 

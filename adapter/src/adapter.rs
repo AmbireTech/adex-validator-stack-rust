@@ -26,10 +26,7 @@ pub(crate) mod state {
 
 #[derive(Debug)]
 /// [`Adapter`] struct
-pub struct Adapter<C, S = state::LockedState>
-where
-    C: ?Sized,
-{
+pub struct Adapter<C, S = state::LockedState> {
     /// client in a specific state - Locked or Unlocked
     pub client: Arc<C>,
     // /// We must use the `C` type from the definition
@@ -40,7 +37,7 @@ impl<C, S: Clone> Clone for Adapter<C, S> {
     fn clone(&self) -> Self {
         Self {
             client: self.client.clone(),
-            _state: self._state.clone(),
+            _state: self._state,
         }
     }
 }

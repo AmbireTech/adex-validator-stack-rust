@@ -3,7 +3,6 @@
 members = [
     "primitives",
     "adapter",
-    # "adapter-old",
     "adview-manager",
     "validator_worker",
     "sentry",

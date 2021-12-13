@@ -5,7 +5,7 @@ use hyper::header::{AUTHORIZATION, REFERER};
 use hyper::{Body, Request};
 use redis::aio::MultiplexedConnection;
 
-use adapter::{client::Locked, prelude::*, primitives::Session as AdapterSession, Adapter};
+use adapter::{prelude::*, primitives::Session as AdapterSession, Adapter};
 use primitives::ValidatorId;
 
 use crate::{middleware::Middleware, Application, Auth, ResponseError, Session};
