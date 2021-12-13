@@ -4,20 +4,21 @@ pub use {
         Adapter,
     },
     error::Error,
+    dummy::Dummy,
+    ethereum::Ethereum,
 };
 
-pub use dummy::Dummy;
-pub use ethereum::Ethereum;
-
-/// only re-export types from the `primitives` crate that are being used by the [`crate::Adapter`].
+/// Primitives used by the [`Adapter`].
+/// Including re-exported types from the `primitives` crate that are being used.
 pub mod primitives {
     use serde::{Deserialize, Serialize};
 
-    /// Re-export all the types used from the [`primitives`] crate.
     pub use ::primitives::{Address, BigNum, Channel, ValidatorId};
 
     use crate::ethereum::WalletState;
 
+    /// The [`Deposit`] struct with [`BigNum`] values.
+    /// Returned by [`crate::client::Locked::get_deposit`]
     pub type Deposit = ::primitives::Deposit<primitives::BigNum>;
 
     /// A helper type that allows you to use either of them
@@ -38,6 +39,7 @@ pub mod primitives {
         }
     }
 
+    /// [`Session`] struct returned by the [`crate::Adapter`] when [`crate::client::Locked::session_from_token`] is called.
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct Session {
         pub era: i64,
@@ -45,7 +47,7 @@ pub mod primitives {
     }
 }
 
-/// Re-export of the [`crate::client`] traits.
+/// Re-export of the [`crate::client`] traits and the states of the [`Adapter`].
 pub mod prelude {
     /// Re-export traits used for working with the [`crate::Adapter`].
     pub use crate::client::{Locked, Unlockable, Unlocked};
@@ -53,14 +55,14 @@ pub mod prelude {
     pub use crate::{LockedState, UnlockedState};
 }
 
-/// The [`Adapter`] struct and it's states
-/// Used for communication with underlying implementation.
-/// 2 Adapters are available in this crate:
-/// - [`crate::ethereum::LockedAdapter`] and [`crate::ethereum::UnlockedAdapter`] and it's client implementation [`crate::Ethereum`] for chains compatible with EVM.
-/// - [`crate::dummy::Adapter`] and it's client implementation [`crate::Dummy`] for testing.
 mod adapter;
+
+
 pub mod client;
+
 pub mod dummy;
+
 mod error;
+
 pub mod ethereum;
 pub mod util;

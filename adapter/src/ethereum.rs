@@ -1,20 +1,22 @@
+//! The [`Ethereum`] client for the [`Adapter`].
+
 use ethstore::{ethkey::Password, SafeAccount};
 
 use once_cell::sync::Lazy;
 use serde_json::Value;
 use web3::signing::keccak256;
 
-use crate::{LockedState, UnlockedState};
+use crate::{LockedState, UnlockedState, Adapter};
 
 pub use {
     client::{get_counterfactual_address, Ethereum, Options},
     error::Error,
 };
 
-pub type UnlockedAdapter = crate::Adapter<client::Ethereum<UnlockedWallet>, UnlockedState>;
-pub type LockedAdapter = crate::Adapter<client::Ethereum<LockedWallet>, LockedState>;
-pub type LockedClient = client::Ethereum<LockedWallet>;
-pub type UnlockedClient = client::Ethereum<UnlockedWallet>;
+pub type UnlockedAdapter = Adapter<client::Ethereum<UnlockedWallet>, UnlockedState>;
+pub type LockedAdapter = Adapter<client::Ethereum<LockedWallet>, LockedState>;
+pub type LockedClient = Ethereum<LockedWallet>;
+pub type UnlockedClient = Ethereum<UnlockedWallet>;
 
 mod channel;
 mod client;

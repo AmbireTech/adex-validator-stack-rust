@@ -1,3 +1,9 @@
+//! The Client traits that define the actions for each state.
+//!
+//! - [`Locked`]
+//! - [`Unlocked`]
+//! - [`Unlockable`]
+
 use crate::primitives::{Deposit, Session};
 use async_trait::async_trait;
 use primitives::{Address, Channel, ValidatorId};

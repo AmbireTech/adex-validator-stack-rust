@@ -70,7 +70,7 @@ pub struct TestValidator {
     pub sentry_config: sentry::application::Config,
     /// Sentry REST API url
     pub sentry_url: ApiUrl,
-    /// Used for the _Sentry REST API_ [`sentry::Application`] as well as the _Validator worker_ [`validator_worker::worker::Args`]
+    /// Used for the _Sentry REST API_ [`sentry::Application`] as well as the _Validator worker_ [`validator_worker::Worker`]
     pub config: Config,
     /// Prefix for sentry logger
     pub sentry_logger_prefix: String,

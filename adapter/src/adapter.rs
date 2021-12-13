@@ -25,7 +25,18 @@ pub(crate) mod state {
 }
 
 #[derive(Debug)]
-/// [`Adapter`] struct
+/// The [`Adapter`] struct and it's states.
+///
+/// Used for communication with the underlying client implementation.
+///
+/// # Available adapters
+///
+/// 2 Adapters are available in this crate:
+/// - Ethereum
+///   - [`crate::ethereum::LockedAdapter`] and [`crate::ethereum::UnlockedAdapter`]
+///   - Client implementation [`crate::Ethereum`] for chains compatible with EVM.
+/// - Dummy
+///   - [`crate::dummy::Adapter`] and it's client implementation [`crate::Dummy`] for testing.
 pub struct Adapter<C, S = state::LockedState> {
     /// client in a specific state - Locked or Unlocked
     pub client: Arc<C>,
@@ -119,7 +130,7 @@ where
     }
 
     /// Creates a `Session` from a provided Token by calling the Contract.
-    /// Does **not** cache the (`Token`, `Session`) pair.
+    /// Does **not** cache the (`Token`, [`Session`]) pair.
     async fn session_from_token(&self, token: &str) -> Result<Session, Error> {
         self.client
             .session_from_token(token)

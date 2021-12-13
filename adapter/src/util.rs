@@ -1,7 +1,8 @@
+//! Utilities for working with the `State root` and the `Balances`
+
 use thiserror::Error;
 
-/// Re-export all the types used from the [`primitives`] crate.
-pub use ::primitives::{Address, BigNum, Channel, ValidatorId};
+use crate::primitives::{Address, BigNum};
 use web3::{
     ethabi::{encode, Address as EthAddress, Token},
     signing::keccak256,

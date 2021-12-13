@@ -4,6 +4,8 @@ use thiserror::Error;
 
 pub(crate) type BoxError = Box<dyn StdError + Send + Sync>;
 
+/// The error used by the [`crate::Adapter`] to wrap any custom error from the client
+/// and the kinds of errors that the [`crate::Adapter`] can return.
 #[derive(Debug, Error)]
 #[error("{inner}")]
 pub struct Error {

@@ -1,3 +1,5 @@
+//! The [`Dummy`] client for the [`Adapter`].
+//! 
 use crate::{
     prelude::*,
     primitives::{Deposit, Session},
@@ -11,8 +13,8 @@ use std::{collections::HashMap, sync::Arc};
 
 pub type Adapter<S> = crate::Adapter<Dummy, S>;
 
+/// Dummy adapter implementation intended for testing.
 #[derive(Debug, Clone)]
-/// Dummy adapter implementation.
 pub struct Dummy {
     /// Who am I
     identity: ValidatorId,
