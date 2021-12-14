@@ -53,3 +53,7 @@ serde_urlencoded = "^0.7"
 # Other
 thiserror = "^1.0"
 once_cell = "1.5.2"
+
+[dev-dependencies]
+pretty_assertions = "1"
+

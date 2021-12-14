@@ -21,6 +21,22 @@ pub struct Spendable {
     pub deposit: Deposit<UnifiedNum>,
 }
 
+impl PartialEq<Spendable> for &Spendable {
+    fn eq(&self, other: &Spendable) -> bool {
+        self.spender == other.spender
+            && self.channel == other.channel
+            && self.deposit == other.deposit
+    }
+}
+
+impl PartialEq<&Spendable> for Spendable {
+    fn eq(&self, other: &&Spendable) -> bool {
+        self.spender == other.spender
+            && self.channel == other.channel
+            && self.deposit == other.deposit
+    }
+}
+
 #[cfg(feature = "postgres")]
 mod postgres {
     use super::*;
