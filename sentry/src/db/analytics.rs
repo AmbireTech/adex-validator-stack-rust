@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use primitives::{
     analytics::{AnalyticsQuery, AnalyticsQueryTime, AuthenticateAs, Metric},
     sentry::{Analytics, FetchedAnalytics, UpdateAnalytics},
+    UnifiedNum,
 };
 use tokio_postgres::types::ToSql;
 
@@ -22,8 +23,8 @@ pub async fn get_analytics(
 
     let mut select_clause = vec!["time".to_string()];
     match &query.metric {
-        Metric::Paid => select_clause.push("payout_amount".to_string()),
-        Metric::Count => select_clause.push("payout_count".to_string()),
+        Metric::Paid => select_clause.push("payout_amount as value".to_string()),
+        Metric::Count => select_clause.push("payout_count as value".to_string()),
     }
     let mut group_clause = vec!["time".to_string()];
 
@@ -54,11 +55,16 @@ pub async fn get_analytics(
                 None => None,
             };
             let time = row.get::<_, DateTime<Utc>>("time");
-
+            let value = match &query.metric {
+                Metric::Paid => row.get("value"),
+                Metric::Count => {
+                    let count: i32 = row.get("value");
+                    UnifiedNum::from_u64(count as u64)
+                }
+            };
             FetchedAnalytics {
                 time: time.timestamp(),
-                payout_amount: row.try_get("payout_amount").ok(),
-                payout_count: row.try_get("payout_count").ok(),
+                value,
                 segment: segment_value,
             }
         })

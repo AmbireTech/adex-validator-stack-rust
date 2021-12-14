@@ -70,7 +70,7 @@ pub mod postgres {
                 Self::Date(datehour) => datehour.to_sql(ty, w),
                 Self::Timestamp(ts) => {
                     // Create a NaiveDateTime from the timestamp
-                    let naive = NaiveDateTime::from_timestamp(0, *ts);
+                    let naive = NaiveDateTime::from_timestamp(*ts, 0);
                     // Create a normal DateTime from the NaiveDateTime
                     let datetime: DateTime<Utc> = DateTime::from_utc(naive, Utc);
                     datetime.date().and_hms(datetime.hour(), 0, 0).to_sql(ty, w)
@@ -118,7 +118,7 @@ pub struct AnalyticsQuery {
 #[serde(untagged, rename_all = "camelCase")]
 pub enum AnalyticsQueryTime {
     Date(DateHour<Utc>),
-    Timestamp(u32),
+    Timestamp(i64),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -325,7 +325,7 @@ where
         }
         _ => {
             let timestamp = date_as_str
-                .parse::<u32>()
+                .parse::<i64>()
                 .map_err(serde::de::Error::custom)?;
             Ok(Some(AnalyticsQueryTime::Timestamp(timestamp)))
         }

@@ -3,9 +3,7 @@ use hyper::{Body, Request, Response};
 use once_cell::sync::Lazy;
 use primitives::{
     adapter::Adapter,
-    analytics::{
-        AnalyticsQuery, AnalyticsQueryTime, AuthenticateAs, Metric, ANALYTICS_QUERY_LIMIT,
-    },
+    analytics::{AnalyticsQuery, AnalyticsQueryTime, AuthenticateAs, ANALYTICS_QUERY_LIMIT},
     sentry::{DateHour, FetchedAnalytics},
     UnifiedNum,
 };
@@ -79,6 +77,7 @@ pub async fn analytics<A: Adapter>(
         _ => None,
     };
 
+    // TODO: Clean up this logic
     let allowed_keys: Vec<&str> = allowed_keys
         .unwrap_or_else(|| ALLOWED_KEYS.to_vec())
         .iter()
@@ -105,16 +104,15 @@ pub async fn analytics<A: Adapter>(
     )
     .await?;
 
-    let output =
-        split_entries_by_timeframe(analytics, period_in_hours, &query.metric, &query.segment_by);
+    let output = split_entries_by_timeframe(analytics, period_in_hours, &query.segment_by);
 
     Ok(success_response(serde_json::to_string(&output)?))
 }
 
+// TODO: This logic can be simplified or done in the SQL query
 fn split_entries_by_timeframe(
     mut analytics: Vec<FetchedAnalytics>,
     period_in_hours: i64,
-    metric: &Metric,
     segment: &Option<String>,
 ) -> Vec<FetchedAnalytics> {
     let mut res: Vec<FetchedAnalytics> = vec![];
@@ -124,50 +122,26 @@ fn split_entries_by_timeframe(
     while analytics.len() > period_in_hours {
         let drain_index = analytics.len() - period_in_hours;
         let analytics_fraction: Vec<FetchedAnalytics> = analytics.drain(drain_index..).collect();
-        let merged_analytics = merge_analytics(analytics_fraction, metric, segment);
+        let merged_analytics = merge_analytics(analytics_fraction, segment);
         res.push(merged_analytics);
     }
 
     if !analytics.is_empty() {
-        let merged_analytics = merge_analytics(analytics, metric, segment);
+        let merged_analytics = merge_analytics(analytics, segment);
         res.push(merged_analytics);
     }
     res
 }
 
-fn merge_analytics(
-    analytics: Vec<FetchedAnalytics>,
-    metric: &Metric,
-    segment: &Option<String>,
-) -> FetchedAnalytics {
-    match metric {
-        Metric::Count => {
-            let mut count = 0;
-            analytics
-                .iter()
-                .for_each(|a| count += a.payout_count.unwrap());
-            FetchedAnalytics {
-                time: analytics.get(0).unwrap().time,
-                payout_count: Some(count),
-                payout_amount: None,
-                segment: segment.clone(),
-            }
-        }
-        Metric::Paid => {
-            let mut amount = UnifiedNum::from_u64(0);
-            analytics.iter().for_each(|a| {
-                let amount_to_add = a.payout_amount.unwrap();
-                amount = amount
-                    .checked_add(&amount_to_add)
-                    .expect("TODO: Use Result to handle possible overflows");
-            });
-            FetchedAnalytics {
-                time: analytics.get(0).unwrap().time,
-                payout_count: None,
-                payout_amount: Some(amount),
-                segment: segment.clone(),
-            }
-        }
+fn merge_analytics(analytics: Vec<FetchedAnalytics>, segment: &Option<String>) -> FetchedAnalytics {
+    let mut amount = UnifiedNum::from_u64(0);
+    analytics
+        .iter()
+        .for_each(|a| amount = amount.checked_add(&a.value).expect("TODO: Use result here"));
+    FetchedAnalytics {
+        time: analytics.get(0).unwrap().time,
+        value: amount,
+        segment: segment.clone(),
     }
 }
 
@@ -200,7 +174,7 @@ mod test {
     };
     use chrono::{Timelike, Utc};
     use primitives::{
-        analytics::{AnalyticsQueryKey, OperatingSystem, Timeframe},
+        analytics::{AnalyticsQueryKey, Metric, OperatingSystem, Timeframe},
         sentry::UpdateAnalytics,
         util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, DUMMY_IPFS},
     };
@@ -389,8 +363,10 @@ mod test {
         let fetched_analytics: Vec<FetchedAnalytics> =
             serde_json::from_slice(&json).expect("Should get analytics response");
         assert_eq!(fetched_analytics.len(), 1);
-        assert!(fetched_analytics.get(0).unwrap().payout_count.is_some());
-        assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 4);
+        assert_eq!(
+            fetched_analytics.get(0).unwrap().value,
+            UnifiedNum::from_u64(4)
+        );
 
         // Test with start date
         let start_date = DateHour::<Utc>::now() - 1;
@@ -434,8 +410,10 @@ mod test {
         let fetched_analytics: Vec<FetchedAnalytics> =
             serde_json::from_slice(&json).expect("Should get analytics response");
         assert_eq!(fetched_analytics.len(), 1);
-        assert!(fetched_analytics.get(0).unwrap().payout_count.is_some());
-        assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 2);
+        assert_eq!(
+            fetched_analytics.get(0).unwrap().value,
+            UnifiedNum::from_u64(2)
+        );
 
         // Test with end date
         let end_date = DateHour::<Utc>::now() - 1;
@@ -478,8 +456,10 @@ mod test {
         let fetched_analytics: Vec<FetchedAnalytics> =
             serde_json::from_slice(&json).expect("Should get analytics response");
         assert_eq!(fetched_analytics.len(), 1);
-        assert!(fetched_analytics.get(0).unwrap().payout_count.is_some());
-        assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 2);
+        assert_eq!(
+            fetched_analytics.get(0).unwrap().value,
+            UnifiedNum::from_u64(2)
+        );
 
         // Test with start_date and end_date
         // subtract 72 hours, there is an event exactly 72 hours ago so this also tests GTE
@@ -524,8 +504,10 @@ mod test {
         let fetched_analytics: Vec<FetchedAnalytics> =
             serde_json::from_slice(&json).expect("Should get analytics response");
         assert_eq!(fetched_analytics.len(), 1);
-        assert!(fetched_analytics.get(0).unwrap().payout_count.is_some());
-        assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 3);
+        assert_eq!(
+            fetched_analytics.get(0).unwrap().value,
+            UnifiedNum::from_u64(3)
+        );
 
         // Test with segment_by
         let query = AnalyticsQuery {
@@ -567,8 +549,10 @@ mod test {
         let fetched_analytics: Vec<FetchedAnalytics> =
             serde_json::from_slice(&json).expect("Should get analytics response");
         assert_eq!(fetched_analytics.len(), 1);
-        assert!(fetched_analytics.get(0).unwrap().payout_count.is_some());
-        assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 3);
+        assert_eq!(
+            fetched_analytics.get(0).unwrap().value,
+            UnifiedNum::from_u64(3)
+        );
 
         // Test with not allowed segment by
         let req = Request::builder()
@@ -651,9 +635,8 @@ mod test {
         let fetched_analytics: Vec<FetchedAnalytics> =
             serde_json::from_slice(&json).expect("Should get analytics response");
         assert_eq!(fetched_analytics.len(), 1);
-        assert!(fetched_analytics.get(0).unwrap().payout_amount.is_some());
         assert_eq!(
-            fetched_analytics.get(0).unwrap().payout_amount.unwrap(),
+            fetched_analytics.get(0).unwrap().value,
             UnifiedNum::from_u64(4_000_000)
         );
 
@@ -678,8 +661,10 @@ mod test {
         let fetched_analytics: Vec<FetchedAnalytics> =
             serde_json::from_slice(&json).expect("Should get analytics response");
         assert_eq!(fetched_analytics.len(), 1);
-        assert!(fetched_analytics.get(0).unwrap().payout_count.is_some());
-        assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 5);
+        assert_eq!(
+            fetched_analytics.get(0).unwrap().value,
+            UnifiedNum::from_u64(5)
+        );
 
         // Test with a limit
         let req = Request::builder()
@@ -702,8 +687,10 @@ mod test {
         let fetched_analytics: Vec<FetchedAnalytics> =
             serde_json::from_slice(&json).expect("Should get analytics response");
         assert_eq!(fetched_analytics.len(), 1);
-        assert!(fetched_analytics.get(0).unwrap().payout_count.is_some());
-        assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 2);
+        assert_eq!(
+            fetched_analytics.get(0).unwrap().value,
+            UnifiedNum::from_u64(2)
+        );
         // Test with a month timeframe
         let req = Request::builder()
             .uri(
@@ -727,8 +714,10 @@ mod test {
         let fetched_analytics: Vec<FetchedAnalytics> =
             serde_json::from_slice(&json).expect("Should get analytics response");
         assert_eq!(fetched_analytics.len(), 1);
-        assert!(fetched_analytics.get(0).unwrap().payout_count.is_some());
-        assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 6);
+        assert_eq!(
+            fetched_analytics.get(0).unwrap().value,
+            UnifiedNum::from_u64(6)
+        );
         // Test with a year timeframe
         let req = Request::builder()
             .uri("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=year")
@@ -750,10 +739,62 @@ mod test {
         let fetched_analytics: Vec<FetchedAnalytics> =
             serde_json::from_slice(&json).expect("Should get analytics response");
         assert_eq!(fetched_analytics.len(), 1);
-        assert!(fetched_analytics.get(0).unwrap().payout_count.is_some());
-        assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 7);
+        assert_eq!(
+            fetched_analytics.get(0).unwrap().value,
+            UnifiedNum::from_u64(7)
+        );
 
         // Test with start and end as timestamps
+        let start_date = DateHour::<Utc>::now() - 72;
+        // subtract 1 hour
+        let end_date = DateHour::<Utc>::now() - 1;
+        let query = AnalyticsQuery {
+            limit: 1000,
+            event_type: "CLICK".into(),
+            metric: Metric::Count,
+            timeframe: Timeframe::Day,
+            segment_by: None,
+            start: Some(AnalyticsQueryTime::Timestamp(
+                start_date.to_datetime().timestamp(),
+            )),
+            end: Some(AnalyticsQueryTime::Timestamp(
+                end_date.to_datetime().timestamp(),
+            )),
+            campaign_id: None,
+            ad_unit: None,
+            ad_slot: None,
+            ad_slot_type: None,
+            advertiser: None,
+            publisher: None,
+            hostname: None,
+            country: None,
+            os_name: None,
+        };
+        let query = serde_urlencoded::to_string(query).expect("should parse query");
+        let req = Request::builder()
+            .uri(format!("http://127.0.0.1/analytics?{}", query))
+            .body(Body::empty())
+            .expect("Should build Request");
+        let analytics_response = analytics(
+            req,
+            &app,
+            Some(vec!["country".into(), "ad_slot_type".into()]),
+            None,
+        )
+        .await
+        .expect("Should get analytics data");
+        let json = hyper::body::to_bytes(analytics_response.into_body())
+            .await
+            .expect("Should get json");
+
+        let fetched_analytics: Vec<FetchedAnalytics> =
+            serde_json::from_slice(&json).expect("Should get analytics response");
+        assert_eq!(fetched_analytics.len(), 1);
+        assert_eq!(
+            fetched_analytics.get(0).unwrap().value,
+            UnifiedNum::from_u64(3)
+        );
+        // Test with timeframe=day and start_date= 2 or more days ago to check if the results vec is split properly
     }
 
     async fn insert_mock_analytics_for_auth_routes(pool: &DbPool) {
@@ -928,8 +969,10 @@ mod test {
         let fetched_analytics: Vec<FetchedAnalytics> =
             serde_json::from_slice(&json).expect("Should get analytics response");
         assert_eq!(fetched_analytics.len(), 1);
-        assert!(fetched_analytics.get(0).unwrap().payout_count.is_some());
-        assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 4);
+        assert_eq!(
+            fetched_analytics.get(0).unwrap().value,
+            UnifiedNum::from_u64(4)
+        );
         // test for advertiser
         let req = Request::builder()
             .extension(advertiser_auth)
@@ -947,8 +990,10 @@ mod test {
         let fetched_analytics: Vec<FetchedAnalytics> =
             serde_json::from_slice(&json).expect("Should get analytics response");
         assert_eq!(fetched_analytics.len(), 1);
-        assert!(fetched_analytics.get(0).unwrap().payout_count.is_some());
-        assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 4);
+        assert_eq!(
+            fetched_analytics.get(0).unwrap().value,
+            UnifiedNum::from_u64(4)
+        );
         // test for admin
         let req = Request::builder()
             .extension(admin_auth.clone())
@@ -966,8 +1011,10 @@ mod test {
         let fetched_analytics: Vec<FetchedAnalytics> =
             serde_json::from_slice(&json).expect("Should get analytics response");
         assert_eq!(fetched_analytics.len(), 1);
-        assert!(fetched_analytics.get(0).unwrap().payout_count.is_some());
-        assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 6);
+        assert_eq!(
+            fetched_analytics.get(0).unwrap().value,
+            UnifiedNum::from_u64(6)
+        );
         // test for admin with all optional keys
         let start_date = DateHour::<Utc>::now() - 72;
         let end_date = DateHour::<Utc>::now() - 1;
@@ -1007,8 +1054,10 @@ mod test {
         let fetched_analytics: Vec<FetchedAnalytics> =
             serde_json::from_slice(&json).expect("Should get analytics response");
         assert_eq!(fetched_analytics.len(), 1);
-        assert!(fetched_analytics.get(0).unwrap().payout_count.is_some());
-        assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 1);
+        assert_eq!(
+            fetched_analytics.get(0).unwrap().value,
+            UnifiedNum::from_u64(1)
+        );
         // test with no authUid
         let req = Request::builder()
             .uri("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day")

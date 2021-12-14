@@ -203,14 +203,12 @@ pub struct Analytics {
     pub payout_count: u32,
 }
 
-// TODO: Verify this is the needed output
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct FetchedAnalytics {
     // time is represented as a timestamp
     pub time: i64,
-    pub payout_amount: Option<UnifiedNum>,
-    pub payout_count: Option<i32>,
+    pub value: UnifiedNum,
     // We can't know the exact segment type but it can always be represented as a string
     pub segment: Option<String>,
 }
