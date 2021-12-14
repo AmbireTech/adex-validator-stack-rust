@@ -11,7 +11,7 @@ pub async fn get_analytics(
     pool: &DbPool,
     start_date: &AnalyticsQueryTime,
     query: &AnalyticsQuery,
-    allowed_keys: Vec<String>,
+    allowed_keys: Vec<&str>,
     auth_as: Option<AuthenticateAs>,
     limit: u32,
 ) -> Result<Vec<FetchedAnalytics>, PoolError> {
@@ -32,7 +32,7 @@ pub async fn get_analytics(
         group_clause.push(segment_by.to_string());
     }
 
-    // TODO: Is a GROUP BY clause really needed here?
+    // TODO: Is a GROUP BY clause really needed here as we call merge_analytics() later and get the same output
     let sql_query = format!(
         "SELECT {} FROM analytics WHERE {} ORDER BY time ASC LIMIT {}",
         select_clause.join(", "),
@@ -71,7 +71,7 @@ fn analytics_query_params<'a>(
     start_date: &'a AnalyticsQueryTime,
     query: &'a AnalyticsQuery,
     auth_as: &'a Option<AuthenticateAs>,
-    allowed_keys: &[String],
+    allowed_keys: &[&str],
 ) -> (Vec<String>, Vec<&'a (dyn ToSql + Sync)>) {
     let mut where_clauses: Vec<String> = vec!["time >= $1".to_string()];
     let mut params: Vec<&(dyn ToSql + Sync)> = vec![start_date];

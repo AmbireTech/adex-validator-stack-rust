@@ -51,8 +51,6 @@ pub async fn analytics<A: Adapter>(
                 segment_by
             )));
         }
-        println!("{}", segment_by);
-        println!("{:?}", query.country);
         if query.get_key(segment_by).is_none() {
             return Err(ResponseError::BadRequest(
                 "SegmentBy is provided but a key is not passed".to_string(),
@@ -81,7 +79,22 @@ pub async fn analytics<A: Adapter>(
         _ => None,
     };
 
-    let allowed_keys = allowed_keys.unwrap_or_else(|| ALLOWED_KEYS.to_vec());
+    let allowed_keys: Vec<&str> = allowed_keys
+        .unwrap_or_else(|| ALLOWED_KEYS.to_vec())
+        .iter()
+        .map(|k| match k.as_ref() {
+            "campaignId" => "campaign_id",
+            "adUnit" => "ad_unit",
+            "adSlot" => "ad_slot",
+            "adSlotType" => "ad_slot_type",
+            "advertiser" => "advertiser",
+            "publisher" => "publisher",
+            "hostname" => "hostname",
+            "osName" => "os_name",
+            _ => "country",
+        })
+        .collect();
+
     let analytics = get_analytics(
         &app.pool,
         &start_date,
@@ -127,10 +140,9 @@ fn merge_analytics(
     metric: &Metric,
     segment: &Option<String>,
 ) -> FetchedAnalytics {
-    let mut count = 0;
-    let amount = UnifiedNum::from_u64(0);
     match metric {
         Metric::Count => {
+            let mut count = 0;
             analytics
                 .iter()
                 .for_each(|a| count += a.payout_count.unwrap());
@@ -142,8 +154,12 @@ fn merge_analytics(
             }
         }
         Metric::Paid => {
+            let mut amount = UnifiedNum::from_u64(0);
             analytics.iter().for_each(|a| {
-                amount.checked_add(&a.payout_amount.unwrap()).unwrap();
+                let amount_to_add = a.payout_amount.unwrap();
+                amount = amount
+                    .checked_add(&amount_to_add)
+                    .expect("TODO: Use Result to handle possible overflows");
             });
             FetchedAnalytics {
                 time: analytics.get(0).unwrap().time,
@@ -182,16 +198,17 @@ mod test {
         test_util::setup_dummy_app,
         ValidatorId,
     };
-    use chrono::{Utc, Timelike};
+    use chrono::{Timelike, Utc};
     use primitives::{
-        analytics::{OperatingSystem, Timeframe},
+        analytics::{AnalyticsQueryKey, OperatingSystem, Timeframe},
         sentry::UpdateAnalytics,
         util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, DUMMY_IPFS},
     };
 
     async fn insert_mock_analytics(pool: &DbPool) {
         // analytics for NOW
-        let now_date = DateHour::try_from(Utc::today().and_hms(Utc::now().hour(), 0, 0)).expect("should parse");
+        let now_date = DateHour::try_from(Utc::today().and_hms(Utc::now().hour(), 0, 0))
+            .expect("should parse");
         let analytics_now = UpdateAnalytics {
             time: now_date,
             campaign_id: DUMMY_CAMPAIGN.id,
@@ -378,7 +395,7 @@ mod test {
         // Test with start date
         let start_date = DateHour::<Utc>::now() - 1;
 
-        let query = AnalyticsQuery { 
+        let query = AnalyticsQuery {
             limit: 1000,
             event_type: "CLICK".into(),
             metric: Metric::Count,
@@ -394,7 +411,7 @@ mod test {
             publisher: None,
             hostname: None,
             country: None,
-            os_name: None
+            os_name: None,
         };
         let query = serde_urlencoded::to_string(query).expect("should parse query");
         let req = Request::builder()
@@ -422,7 +439,7 @@ mod test {
 
         // Test with end date
         let end_date = DateHour::<Utc>::now() - 1;
-        let query = AnalyticsQuery { 
+        let query = AnalyticsQuery {
             limit: 1000,
             event_type: "CLICK".into(),
             metric: Metric::Count,
@@ -438,7 +455,7 @@ mod test {
             publisher: None,
             hostname: None,
             country: None,
-            os_name: None
+            os_name: None,
         };
         let query = serde_urlencoded::to_string(query).expect("should parse query");
         let req = Request::builder()
@@ -469,7 +486,7 @@ mod test {
         let start_date = DateHour::<Utc>::now() - 72;
         // subtract 1 hour
         let end_date = DateHour::<Utc>::now() - 1;
-        let query = AnalyticsQuery { 
+        let query = AnalyticsQuery {
             limit: 1000,
             event_type: "CLICK".into(),
             metric: Metric::Count,
@@ -485,7 +502,7 @@ mod test {
             publisher: None,
             hostname: None,
             country: None,
-            os_name: None
+            os_name: None,
         };
         let query = serde_urlencoded::to_string(query).expect("should parse query");
         let req = Request::builder()
@@ -511,14 +528,14 @@ mod test {
         assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 3);
 
         // Test with segment_by
-        let query = AnalyticsQuery { 
+        let query = AnalyticsQuery {
             limit: 1000,
             event_type: "CLICK".into(),
             metric: Metric::Count,
             timeframe: Timeframe::Day,
             segment_by: Some("country".into()),
             start: None,
-            end: Some(AnalyticsQueryTime::Date(end_date)),
+            end: None,
             campaign_id: None,
             ad_unit: None,
             ad_slot: None,
@@ -526,8 +543,8 @@ mod test {
             advertiser: None,
             publisher: None,
             hostname: None,
-            country: None,
-            os_name: None
+            country: Some(AnalyticsQueryKey::String("Bulgaria".into())),
+            os_name: None,
         };
         let query = serde_urlencoded::to_string(query).expect("should parse query");
         let req = Request::builder()
@@ -551,7 +568,7 @@ mod test {
             serde_json::from_slice(&json).expect("Should get analytics response");
         assert_eq!(fetched_analytics.len(), 1);
         assert!(fetched_analytics.get(0).unwrap().payout_count.is_some());
-        assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 4);
+        assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 3);
 
         // Test with not allowed segment by
         let req = Request::builder()
@@ -741,8 +758,9 @@ mod test {
 
     async fn insert_mock_analytics_for_auth_routes(pool: &DbPool) {
         // Analytics with publisher and advertiser
-        let now_date = DateHour::try_from(Utc::today().and_hms(1, 0, 0)).expect("should parse");
-        let analytics_now = UpdateAnalytics {
+        let now_date = DateHour::try_from(Utc::today().and_hms(Utc::now().hour(), 0, 0))
+            .expect("should parse");
+        let analytics = UpdateAnalytics {
             time: now_date,
             campaign_id: DUMMY_CAMPAIGN.id,
             ad_unit: Some(DUMMY_IPFS[0]),
@@ -757,11 +775,11 @@ mod test {
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
         };
-        update_analytics(pool, analytics_now)
+        update_analytics(pool, analytics)
             .await
             .expect("Should update analytics");
         // Analytics with a different unit/slot
-        let analytics_now = UpdateAnalytics {
+        let analytics_different_slot_unit = UpdateAnalytics {
             time: now_date,
             campaign_id: DUMMY_CAMPAIGN.id,
             ad_unit: Some(DUMMY_IPFS[2]),
@@ -776,11 +794,11 @@ mod test {
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
         };
-        update_analytics(pool, analytics_now)
+        update_analytics(pool, analytics_different_slot_unit)
             .await
             .expect("Should update analytics");
         // Analytics with a different event type
-        let analytics_now = UpdateAnalytics {
+        let analytics_different_event = UpdateAnalytics {
             time: now_date,
             campaign_id: DUMMY_CAMPAIGN.id,
             ad_unit: Some(DUMMY_IPFS[0]),
@@ -795,11 +813,11 @@ mod test {
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
         };
-        update_analytics(pool, analytics_now)
+        update_analytics(pool, analytics_different_event)
             .await
             .expect("Should update analytics");
         // Analytics with no None fields
-        let analytics_now = UpdateAnalytics {
+        let analytics_all_optional_fields = UpdateAnalytics {
             time: now_date - 2,
             campaign_id: DUMMY_CAMPAIGN.id,
             ad_unit: Some(DUMMY_IPFS[0]),
@@ -814,11 +832,11 @@ mod test {
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
         };
-        update_analytics(pool, analytics_now)
+        update_analytics(pool, analytics_all_optional_fields)
             .await
             .expect("Should update analytics");
         // Analytics with different publisher
-        let analytics_now = UpdateAnalytics {
+        let analytics_different_publisher = UpdateAnalytics {
             time: now_date,
             campaign_id: DUMMY_CAMPAIGN.id,
             ad_unit: Some(DUMMY_IPFS[0]),
@@ -833,11 +851,11 @@ mod test {
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
         };
-        update_analytics(pool, analytics_now)
+        update_analytics(pool, analytics_different_publisher)
             .await
             .expect("Should update analytics");
         // Analytics with different advertiser
-        let analytics_now = UpdateAnalytics {
+        let analytics_different_advertiser = UpdateAnalytics {
             time: now_date,
             campaign_id: DUMMY_CAMPAIGN.id,
             ad_unit: Some(DUMMY_IPFS[0]),
@@ -852,11 +870,11 @@ mod test {
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
         };
-        update_analytics(pool, analytics_now)
+        update_analytics(pool, analytics_different_advertiser)
             .await
             .expect("Should update analytics");
         // Analytics with both a different publisher and advertiser
-        let analytics_now = UpdateAnalytics {
+        let analytics_different_publisher_advertiser = UpdateAnalytics {
             time: now_date,
             campaign_id: DUMMY_CAMPAIGN.id,
             ad_unit: Some(DUMMY_IPFS[0]),
@@ -871,7 +889,7 @@ mod test {
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
         };
-        update_analytics(pool, analytics_now)
+        update_analytics(pool, analytics_different_publisher_advertiser)
             .await
             .expect("Should update analytics");
     }
@@ -886,7 +904,7 @@ mod test {
         };
         let advertiser_auth = Auth {
             era: 0,
-            uid: ValidatorId::from(ADDRESSES["advertiser"]),
+            uid: ValidatorId::from(ADDRESSES["creator"]),
         };
         let admin_auth = Auth {
             era: 0,
@@ -911,7 +929,7 @@ mod test {
             serde_json::from_slice(&json).expect("Should get analytics response");
         assert_eq!(fetched_analytics.len(), 1);
         assert!(fetched_analytics.get(0).unwrap().payout_count.is_some());
-        assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 5);
+        assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 4);
         // test for advertiser
         let req = Request::builder()
             .extension(advertiser_auth)
@@ -930,7 +948,7 @@ mod test {
             serde_json::from_slice(&json).expect("Should get analytics response");
         assert_eq!(fetched_analytics.len(), 1);
         assert!(fetched_analytics.get(0).unwrap().payout_count.is_some());
-        assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 5);
+        assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 4);
         // test for admin
         let req = Request::builder()
             .extension(admin_auth.clone())
@@ -949,13 +967,33 @@ mod test {
             serde_json::from_slice(&json).expect("Should get analytics response");
         assert_eq!(fetched_analytics.len(), 1);
         assert!(fetched_analytics.get(0).unwrap().payout_count.is_some());
-        assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 7);
+        assert_eq!(fetched_analytics.get(0).unwrap().payout_count.unwrap(), 6);
         // test for admin with all optional keys
         let start_date = DateHour::<Utc>::now() - 72;
         let end_date = DateHour::<Utc>::now() - 1;
+        let query = AnalyticsQuery {
+            limit: 1000,
+            event_type: "CLICK".into(),
+            metric: Metric::Count,
+            timeframe: Timeframe::Day,
+            segment_by: Some("country".into()),
+            start: Some(AnalyticsQueryTime::Date(start_date)),
+            end: Some(AnalyticsQueryTime::Date(end_date)),
+            campaign_id: Some(AnalyticsQueryKey::CampaignId(DUMMY_CAMPAIGN.id)),
+            ad_unit: Some(AnalyticsQueryKey::IPFS(DUMMY_IPFS[0])),
+            ad_slot: Some(AnalyticsQueryKey::IPFS(DUMMY_IPFS[1])),
+            ad_slot_type: Some(AnalyticsQueryKey::String("TEST_TYPE".into())),
+            advertiser: Some(AnalyticsQueryKey::Address(ADDRESSES["creator"])),
+            publisher: Some(AnalyticsQueryKey::Address(ADDRESSES["publisher"])),
+            hostname: Some(AnalyticsQueryKey::String("localhost".into())),
+            country: Some(AnalyticsQueryKey::String("Bulgaria".into())),
+            os_name: Some(AnalyticsQueryKey::OperatingSystem(OperatingSystem::map_os(
+                "Windows",
+            ))),
+        };
+        let query = serde_urlencoded::to_string(query).expect("should parse query");
         let req = Request::builder()
-            .extension(admin_auth)
-            .uri(format!("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day&segmentBy=campaignId&start={}&end={}&campaignId={}&adUnit={}&adSlot={}&adSlotType=TEST_TYPE&advertiser={}&publisher={}&hostname=localhost&country=Bulgaria&osName=Windows", start_date, end_date, DUMMY_CAMPAIGN.id, DUMMY_IPFS[0], DUMMY_IPFS[1], ADDRESSES["creator"], ADDRESSES["publisher"]))
+            .uri(format!("http://127.0.0.1/analytics?{}", query))
             .body(Body::empty())
             .expect("Should build Request");
 

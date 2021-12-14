@@ -1,8 +1,7 @@
 use crate::{sentry::DateHour, Address, CampaignId, ValidatorId, IPFS};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use parse_display::Display;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use tokio_postgres::types::ToSql;
+use serde::{Deserialize, Deserializer, Serialize};
 
 pub const ANALYTICS_QUERY_LIMIT: u32 = 200;
 
@@ -50,11 +49,9 @@ pub mod postgres {
         ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
             match self {
                 Self::CampaignId(id) => id.to_sql(ty, w),
-                Self::AdUnit(ipfs) | Self::AdSlot(ipfs) => ipfs.to_sql(ty, w),
-                Self::AdSlotType(value) | Self::Hostname(value) | Self::Country(value) => {
-                    value.to_sql(ty, w)
-                }
-                Self::Advertiser(addr) | Self::Publisher(addr) => addr.to_sql(ty, w),
+                Self::IPFS(ipfs) => ipfs.to_sql(ty, w),
+                Self::String(value) => value.to_sql(ty, w),
+                Self::Address(addr) => addr.to_sql(ty, w),
                 Self::OperatingSystem(os_name) => os_name.to_sql(ty, w),
             }
         }
@@ -106,23 +103,14 @@ pub struct AnalyticsQuery {
     pub end: Option<AnalyticsQueryTime>,
     // #[serde(default = "default_timezone")]
     // pub timezone: String,
-    #[serde(flatten)]
     pub campaign_id: Option<AnalyticsQueryKey>,
-    #[serde(flatten)]
     pub ad_unit: Option<AnalyticsQueryKey>,
-    #[serde(flatten)]
     pub ad_slot: Option<AnalyticsQueryKey>,
-    #[serde(flatten)]
     pub ad_slot_type: Option<AnalyticsQueryKey>,
-    #[serde(flatten)]
     pub advertiser: Option<AnalyticsQueryKey>,
-    #[serde(flatten)]
     pub publisher: Option<AnalyticsQueryKey>,
-    #[serde(flatten)]
     pub hostname: Option<AnalyticsQueryKey>,
-    #[serde(flatten)]
     pub country: Option<AnalyticsQueryKey>,
-    #[serde(flatten)]
     pub os_name: Option<AnalyticsQueryKey>,
 }
 
@@ -134,21 +122,17 @@ pub enum AnalyticsQueryTime {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(untagged, rename_all = "camelCase")]
 pub enum AnalyticsQueryKey {
     CampaignId(CampaignId),
-    AdUnit(IPFS),
-    AdSlot(IPFS),
-    AdSlotType(String),
-    Advertiser(Address),
-    Publisher(Address),
-    Hostname(String),
-    Country(String),
+    IPFS(IPFS),
+    String(String),
+    Address(Address),
     OperatingSystem(OperatingSystem),
 }
 
 impl AnalyticsQuery {
-    pub fn get_key<T: ToSql>(&self, key: &str) -> Option<&T> {
+    pub fn get_key(&self, key: &str) -> Option<&AnalyticsQueryKey> {
         match key {
             "campaignId" => self.campaign_id.as_ref(),
             "adUnit" => self.ad_unit.as_ref(),

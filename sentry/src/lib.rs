@@ -227,7 +227,7 @@ async fn analytics_router<A: Adapter + 'static>(
             analytics(
                 req,
                 app,
-                Some(vec!["country".to_string(), "ad_slot_type".to_string()]),
+                Some(vec!["country".to_string(), "adSlotType".to_string()]),
                 None,
             )
             .await
