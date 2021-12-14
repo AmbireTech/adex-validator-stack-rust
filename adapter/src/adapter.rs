@@ -96,7 +96,7 @@ where
     C::Error: Into<Error>,
 {
     fn sign(&self, state_root: &str) -> Result<String, Error> {
-        Ok(state_root.to_string())
+        self.client.sign(state_root).map_err(Into::into)
     }
 
     fn get_auth(&self, intended_for: ValidatorId) -> Result<String, Error> {
