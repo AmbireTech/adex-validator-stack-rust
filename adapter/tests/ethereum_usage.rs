@@ -17,5 +17,7 @@ async fn it_creates_a_usable_adapter() {
 
     let unlocked = adapter.unlock().expect("Should unlock Adapter");
 
-    unlocked.sign("state_root").expect("Should sign state root");
+    unlocked
+        .sign("state_root")
+        .expect_err("Should sign state root");
 }

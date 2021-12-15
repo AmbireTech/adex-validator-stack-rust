@@ -1,5 +1,5 @@
 //! The [`Dummy`] client for the [`Adapter`].
-//! 
+//!
 use crate::{
     prelude::*,
     primitives::{Deposit, Session},

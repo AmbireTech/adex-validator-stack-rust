@@ -6,7 +6,7 @@ use once_cell::sync::Lazy;
 use serde_json::Value;
 use web3::signing::keccak256;
 
-use crate::{LockedState, UnlockedState, Adapter};
+use crate::{Adapter, LockedState, UnlockedState};
 
 pub use {
     client::{get_counterfactual_address, Ethereum, Options},

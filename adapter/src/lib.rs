@@ -3,8 +3,8 @@ pub use {
         state::{LockedState, UnlockedState},
         Adapter,
     },
-    error::Error,
     dummy::Dummy,
+    error::Error,
     ethereum::Ethereum,
 };
 
@@ -56,7 +56,6 @@ pub mod prelude {
 }
 
 mod adapter;
-
 
 pub mod client;
 
