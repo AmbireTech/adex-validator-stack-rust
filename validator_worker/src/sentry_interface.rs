@@ -501,7 +501,7 @@ mod test {
         let server = MockServer::start().await;
         let test_spender = Spender {
             total_deposited: UnifiedNum::from(100_000_000),
-            spender_leaf: None,
+            total_spent: None,
         };
         let mut all_spenders = HashMap::new();
         all_spenders.insert(ADDRESSES["user"], test_spender.clone());

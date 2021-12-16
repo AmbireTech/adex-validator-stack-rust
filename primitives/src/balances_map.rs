@@ -71,6 +71,10 @@ impl<K: Ord, V> Map<K, V> {
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
+
+    pub fn remove(&mut self, key: &K) -> Option<V> {
+        self.0.remove(key)
+    }
 }
 
 impl<K: Ord, V> FromIterator<(K, V)> for Map<K, V> {
