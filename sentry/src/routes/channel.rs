@@ -235,12 +235,16 @@ pub async fn get_spender_limits<A: Adapter + 'static>(
         }
     };
 
-    let mut new_state = match get_corresponding_new_state(&app.pool, &app.logger, &channel).await? {
+    let new_state = match get_corresponding_new_state(&app.pool, &app.logger, &channel).await? {
         Some(new_state) => new_state,
         None => return spender_response_without_leaf(latest_spendable.deposit.total),
     };
 
-    let total_spent = new_state.balances.spenders.remove(&spender);
+    let total_spent = new_state
+        .balances
+        .spenders
+        .get(&spender)
+        .map(|spent| spent.to_owned());
 
     // returned output
     let res = SpenderResponse {

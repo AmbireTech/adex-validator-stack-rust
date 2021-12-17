@@ -1,14 +1,8 @@
 use crate::{Address, Channel, Deposit, UnifiedNum};
 use serde::{Deserialize, Serialize};
 
-// #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
-// #[serde(rename_all = "camelCase")]
-// pub struct SpenderLeaf {
-//     pub total_spent: UnifiedNum,
-//     // merkle_proof: [u8; 32], // TODO
-// }
-
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct Spender {
     pub total_deposited: UnifiedNum,
     pub total_spent: Option<UnifiedNum>,
