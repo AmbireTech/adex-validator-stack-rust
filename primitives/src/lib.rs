@@ -22,7 +22,6 @@ pub use self::{
 
 mod ad_slot;
 mod ad_unit;
-pub mod adapter;
 pub mod address;
 pub mod analytics;
 pub mod balances;
@@ -48,7 +47,7 @@ pub mod validator;
 
 /// This module is available with the `postgres` feature
 /// Other places where you'd find `mod postgres` implementations is for many of the structs in the crate
-/// all of which implement [`tokio_postres::FromSql`], [`tokio_postres::ToSql`] or [`From<&tokio_postgres::Row>`]
+/// all of which implement [`tokio_postgres::types::FromSql`], [`tokio_postgres::types::ToSql`] or [`From<&tokio_postgres::Row>`]
 #[cfg(feature = "postgres")]
 pub mod postgres {
     use std::env::{self, VarError};
@@ -61,7 +60,7 @@ pub mod postgres {
 
     /// A Postgres pool with reasonable settings:
     /// - [`RecyclingMethod::Verified`]
-    /// - [`Pool::max_size`] = 32
+    /// - `Pool::max_size = 32`
     /// Created using environment variables, see [`POSTGRES_CONFIG`].
     pub static POSTGRES_POOL: Lazy<Pool> = Lazy::new(|| {
         let config = POSTGRES_CONFIG.clone();

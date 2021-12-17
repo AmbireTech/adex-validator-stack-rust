@@ -35,9 +35,6 @@ outpace_address = '0xabc27d46a458e2e49dabfef45ca74dedbac3dd06'
 sweeper_address = '0x7dd57c0324284102a757153e18f2cb1acdb7d2bd'
 
 ethereum_network = 'http://localhost:8545'
-# Mocked relayer
-# TODO: Remove #452 
-ethereum_adapter_relayer = 'http://localhost:8888'
 
 creators_whitelist = []
 validators_whitelist = []

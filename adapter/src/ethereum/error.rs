@@ -1,196 +1,162 @@
+use crate::Error as AdapterError;
 use primitives::{
-    adapter::{AdapterErrorKind, Error as AdapterError},
-    address::Error as AddressError,
-    big_num::ParseBigIntError,
-    Address, ChannelId,
+    address::Error as AddressError, big_num::ParseBigIntError, Address, ChannelId, ValidatorId,
 };
-use std::fmt;
+use thiserror::Error;
 
-use super::RelayerError;
+use super::ewt::Payload;
 
-#[derive(Debug)]
+impl From<Error> for AdapterError {
+    fn from(error: Error) -> Self {
+        match error {
+            err @ Error::Keystore(..) => AdapterError::adapter(err),
+            Error::WalletUnlock(err) => AdapterError::wallet_unlock(err),
+            err @ Error::Web3(..) => AdapterError::adapter(err),
+            err @ Error::InvalidChannelId { .. } => AdapterError::adapter(err),
+            err @ Error::ChannelInactive(..) => AdapterError::adapter(err),
+            err @ Error::TokenNotWhitelisted(..) => AdapterError::adapter(err),
+            err @ Error::InvalidDepositAsset(..) => AdapterError::adapter(err),
+            err @ Error::BigNumParsing(..) => AdapterError::adapter(err),
+            err @ Error::SignMessage(..) => AdapterError::adapter(err),
+            err @ Error::VerifyMessage(..) => AdapterError::adapter(err),
+            err @ Error::ContractInitialization(..) => AdapterError::adapter(err),
+            err @ Error::ContractQuerying(..) => AdapterError::adapter(err),
+            err @ Error::VerifyAddress(..) => AdapterError::adapter(err),
+            err @ Error::AuthenticationTokenNotIntendedForUs { .. } => {
+                AdapterError::authentication(err)
+            }
+            err @ Error::InsufficientAuthorizationPrivilege { .. } => {
+                AdapterError::authorization(err)
+            }
+        }
+    }
+}
+
+#[derive(Debug, Error)]
 pub enum Error {
-    Keystore(KeystoreError),
-    WalletUnlock(ethstore::Error),
-    Web3(web3::Error),
-    RelayerClient(RelayerError),
+    #[error("Keystore: {0}")]
+    Keystore(#[from] KeystoreError),
+    #[error("Wallet unlocking: {0}")]
+    /// Since [`ethstore::Error`] is not [`Sync`] we must use a [`String`] instead.
+    WalletUnlock(String),
+    #[error("Web3: {0}")]
+    Web3(#[from] web3::Error),
     /// When the ChannelId that we get from hashing the EthereumChannel with the contract address
     /// does not align with the provided Channel
+    #[error("The hashed EthereumChannel.id ({expected}) is not the same as the Channel.id ({actual}) that was provided")]
     InvalidChannelId {
         expected: ChannelId,
         actual: ChannelId,
     },
+    #[error("Channel ({0}) is not Active on the ethereum network")]
     ChannelInactive(ChannelId),
     /// Signing of the message failed
-    SignMessage(EwtSigningError),
-    VerifyMessage(EwtVerifyError),
+    #[error("Signing message: {0}")]
+    SignMessage(#[from] EwtSigningError),
+    #[error("Verifying message: {0}")]
+    VerifyMessage(#[from] EwtVerifyError),
+    #[error("Contract initialization: {0}")]
     ContractInitialization(web3::ethabi::Error),
+    #[error("Contract querying: {0}")]
     ContractQuerying(web3::contract::Error),
     /// Error occurred during verification of Signature and/or StateRoot and/or Address
-    VerifyAddress(VerifyError),
+    #[error("Verifying address: {0}")]
+    VerifyAddress(#[from] VerifyError),
+    #[error("Token not whitelisted: {0}")]
     TokenNotWhitelisted(Address),
-    InvalidDepositAsset(AddressError),
-    BigNumParsing(ParseBigIntError),
+    #[error("Deposit asset {0} is invalid")]
+    InvalidDepositAsset(#[from] AddressError),
+    #[error("Parsing BigNum: {0}")]
+    BigNumParsing(#[from] ParseBigIntError),
+    #[error("Token Payload.id({}) !== whoami({whoami}): token was not intended for us", .payload.id)]
+    AuthenticationTokenNotIntendedForUs {
+        payload: Payload,
+        whoami: ValidatorId,
+    },
+    #[error("Insufficient privilege")]
+    InsufficientAuthorizationPrivilege,
 }
 
-impl std::error::Error for Error {}
-
-impl AdapterErrorKind for Error {}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Error::*;
-
-        match self {
-                Keystore(err) => write!(f, "Keystore: {}", err),
-                WalletUnlock(err) => write!(f, "Wallet unlocking: {}", err),
-                Web3(err) => write!(f, "Web3: {}", err),
-                RelayerClient(err) => write!(f, "Relayer client: {}", err),
-                InvalidChannelId { expected, actual} => write!(f, "The hashed EthereumChannel.id ({}) is not the same as the Channel.id ({}) that was provided", expected, actual),
-                ChannelInactive(channel_id) => write!(f, "Channel ({}) is not Active on the ethereum network", channel_id),
-                SignMessage(err) => write!(f, "Signing message: {}", err),
-                VerifyMessage(err) => write!(f, "Verifying message: {}", err),
-                ContractInitialization(err) => write!(f, "Contract initialization: {}", err),
-                ContractQuerying(err) => write!(f, "Contract querying: {}", err),
-                VerifyAddress(err) => write!(f, "Verifying address: {}", err),
-                TokenNotWhitelisted(deposit_asset) => write!(f, "Token not whitelisted: {}", deposit_asset),
-                InvalidDepositAsset(err) => write!(f, "Deposit asset {} is invalid", err),
-                BigNumParsing(err) => write!(f, "Parsing BigNum: {}", err),
-            }
-    }
-}
-
-impl From<RelayerError> for Error {
-    fn from(relayer_error: RelayerError) -> Self {
-        Error::RelayerClient(relayer_error)
-    }
-}
-
-impl From<RelayerError> for AdapterError<Error> {
-    fn from(relayer_error: RelayerError) -> Self {
-        AdapterError::Adapter(Box::new(Error::RelayerClient(relayer_error)))
-    }
-}
-
-#[derive(Debug)]
+#[derive(Debug, Error)]
 /// Error returned on `eth_adapter.verify()` when the combination of
 /// (signer, state_root, signature) **doesn't align**.
 pub enum VerifyError {
-    PublicKeyRecovery(ethstore::ethkey::Error),
-    StateRootDecoding(hex::FromHexError),
-    SignatureDecoding(hex::FromHexError),
+    #[error("Recovering the public key from the signature: {0}")]
+    PublicKeyRecovery(#[from] ethstore::ethkey::Error),
+    #[error("Decoding state root: {0}")]
+    StateRootDecoding(#[source] hex::FromHexError),
+    #[error("Decoding signature: {0}")]
+    SignatureDecoding(#[source] hex::FromHexError),
+    #[error("Signature is not prefixed with `0x`")]
     SignatureNotPrefixed,
 }
 
-impl fmt::Display for VerifyError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use VerifyError::*;
-
-        match self {
-            PublicKeyRecovery(err) => {
-                write!(f, "Recovering the public key from the signature: {}", err)
-            }
-            StateRootDecoding(err) => write!(f, "Decoding state root: {}", err),
-            SignatureDecoding(err) => write!(f, "Decoding signature: {}", err),
-            SignatureNotPrefixed => write!(f, "Signature is not prefixed with `0x`"),
-        }
-    }
-}
-
-impl From<VerifyError> for AdapterError<Error> {
-    fn from(err: VerifyError) -> Self {
-        AdapterError::Adapter(Error::VerifyAddress(err).into())
-    }
-}
-
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum KeystoreError {
     /// `address` key is missing from the keystore file
+    #[error("\"address\" key missing in keystore file")]
     AddressMissing,
     /// The `address` key in the keystore file is not a valid `ValidatorId`
-    AddressInvalid(primitives::address::Error),
+    #[error("\"address\" is invalid: {0}")]
+    AddressInvalid(#[source] primitives::address::Error),
     /// reading the keystore file failed
-    ReadingFile(std::io::Error),
+    #[error("Reading keystore file: {0}")]
+    ReadingFile(#[source] std::io::Error),
     /// Deserializing the keystore file failed
-    Deserialization(serde_json::Error),
+    #[error("Deserializing keystore file: {0}")]
+    Deserialization(#[source] serde_json::Error),
 }
 
-impl std::error::Error for KeystoreError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        use KeystoreError::*;
-        match self {
-            AddressMissing => None,
-            AddressInvalid(err) => Some(err),
-            ReadingFile(err) => Some(err),
-            Deserialization(err) => Some(err),
-        }
-    }
-}
-
-impl fmt::Display for KeystoreError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use KeystoreError::*;
-
-        match self {
-            AddressMissing => write!(f, "\"address\" key missing in keystore file"),
-            AddressInvalid(err) => write!(f, "\"address\" is invalid: {}", err),
-            ReadingFile(err) => write!(f, "Reading keystore file: {}", err),
-            Deserialization(err) => write!(f, "Deserializing keystore file: {}", err),
-        }
-    }
-}
-
-impl From<KeystoreError> for AdapterError<Error> {
-    fn from(err: KeystoreError) -> Self {
-        AdapterError::Adapter(Error::Keystore(err).into())
-    }
-}
-
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum EwtSigningError {
-    HeaderSerialization(serde_json::Error),
-    PayloadSerialization(serde_json::Error),
-    SigningMessage(ethstore::Error),
-    DecodingHexSignature(hex::FromHexError),
+    #[error("Header serialization: {0}")]
+    HeaderSerialization(#[source] serde_json::Error),
+    #[error("Payload serialization: {0}")]
+    PayloadSerialization(#[source] serde_json::Error),
+    /// Since [`ethstore::Error`] is not [`Sync`] we must use a [`String`] instead.
+    #[error("Signing message: {0}")]
+    SigningMessage(String),
+    #[error("Decoding hex of Signature: {0}")]
+    DecodingHexSignature(#[from] hex::FromHexError),
 }
 
-impl fmt::Display for EwtSigningError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use EwtSigningError::*;
-
-        match self {
-            HeaderSerialization(err) => write!(f, "Header serialization: {}", err),
-            PayloadSerialization(err) => write!(f, "Payload serialization: {}", err),
-            SigningMessage(err) => write!(f, "Signing message: {}", err),
-            DecodingHexSignature(err) => write!(f, "Decoding hex of Signature: {}", err),
-        }
-    }
-}
-impl From<EwtSigningError> for AdapterError<Error> {
-    fn from(err: EwtSigningError) -> Self {
-        AdapterError::Adapter(Error::SignMessage(err).into())
-    }
-}
-
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum EwtVerifyError {
-    AddressRecovery(ethstore::ethkey::Error),
-    SignatureDecoding(base64::DecodeError),
-    PayloadDecoding(base64::DecodeError),
-    PayloadDeserialization(serde_json::Error),
-    PayloadUtf8(std::string::FromUtf8Error),
+    #[error("The Ethereum Web Token header is invalid")]
+    InvalidHeader,
+    #[error("The token length should be at least 16 characters of length")]
+    InvalidTokenLength,
+    #[error("The token does not comply to the format of header.payload.signature")]
+    InvalidToken,
+    #[error("Address recovery: {0}")]
+    AddressRecovery(#[from] ethstore::ethkey::Error),
+    #[error("Signature decoding: {0}")]
+    SignatureDecoding(#[source] base64::DecodeError),
+    /// When token is decoded but creating a Signature results in empty Signature.
+    /// Signature is encoded as RSV (V in "Electrum" notation)
+    /// See [`Signature::from_electrum`]
+    #[error("Error when decoding token signature")]
+    InvalidSignature,
+    #[error("Payload decoding: {0}")]
+    PayloadDecoding(#[source] base64::DecodeError),
+    #[error("Payload deserialization: {0}")]
+    PayloadDeserialization(#[from] serde_json::Error),
+    #[error("Payload is not a valid UTF-8 string: {0}")]
+    PayloadUtf8(#[from] std::str::Utf8Error),
 }
 
-impl fmt::Display for EwtVerifyError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use EwtVerifyError::*;
+#[cfg(test)]
+mod test {
+    use super::*;
 
-        match self {
-            AddressRecovery(err) => write!(f, "Address recovery: {}", err),
-            SignatureDecoding(err) => write!(f, "Signature decoding: {}", err),
-            PayloadDecoding(err) => write!(f, "Payload decoding: {}", err),
-            PayloadDeserialization(err) => write!(f, "Payload deserialization: {}", err),
-            PayloadUtf8(err) => write!(f, "Payload is not a valid utf8 string: {}", err),
-        }
+    fn assert_send<T: Send>() {}
+    fn assert_sync<T: Sync>() {}
+
+    #[test]
+    fn a_correct_error() {
+        // Ethereum adapter should be Send!
+        assert_send::<Error>();
+        // Ethereum adapter should be Sync!
+        assert_sync::<Error>();
     }
 }

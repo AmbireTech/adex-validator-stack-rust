@@ -7,8 +7,8 @@ use futures::future::{join_all, try_join_all, TryFutureExt};
 use reqwest::{Client, Method};
 use slog::Logger;
 
+use adapter::{prelude::*, Adapter};
 use primitives::{
-    adapter::Adapter,
     balances::{CheckedState, UncheckedState},
     sentry::{
         AccountingResponse, AllSpendersResponse, LastApprovedResponse, SuccessResponse,
@@ -48,9 +48,9 @@ pub enum Error {
     WhoamiMissing { whoami: ValidatorId },
 }
 
-#[derive(Debug, Clone)]
-pub struct SentryApi<A: Adapter, P = Validators> {
-    pub adapter: A,
+#[derive(Debug)]
+pub struct SentryApi<C: Unlocked, P = Validators> {
+    pub adapter: Adapter<C, UnlockedState>,
     pub client: Client,
     pub logger: Logger,
     pub config: Config,
@@ -59,13 +59,26 @@ pub struct SentryApi<A: Adapter, P = Validators> {
     pub propagate_to: P,
 }
 
-impl<A: Adapter + 'static> SentryApi<A, ()> {
+impl<C: Unlocked, P: Clone> Clone for SentryApi<C, P> {
+    fn clone(&self) -> Self {
+        Self {
+            adapter: self.adapter.clone(),
+            client: self.client.clone(),
+            logger: self.logger.clone(),
+            config: self.config.clone(),
+            whoami: self.whoami.clone(),
+            propagate_to: self.propagate_to.clone(),
+        }
+    }
+}
+
+impl<C: Unlocked + 'static> SentryApi<C, ()> {
     pub fn new(
-        adapter: A,
+        adapter: Adapter<C, UnlockedState>,
         logger: Logger,
         config: Config,
         whoami_validator: Validator,
-    ) -> Result<SentryApi<A, ()>, Error> {
+    ) -> Result<SentryApi<C, ()>, Error> {
         let client = Client::builder()
             .timeout(Duration::from_millis(config.fetch_timeout.into()))
             .build()
@@ -84,11 +97,11 @@ impl<A: Adapter + 'static> SentryApi<A, ()> {
     /// Initialize the [`SentryApi`] and makes sure that [`Adapter::whoami()`] is present in [`Validators`].
     /// Sets the _Who am I_ [`ApiUrl`] and the Authentication Token for calls requiring authentication.
     pub fn init(
-        adapter: A,
+        adapter: Adapter<C, UnlockedState>,
         logger: Logger,
         config: Config,
         propagate_to: Validators,
-    ) -> Result<SentryApi<A, Validators>, Error> {
+    ) -> Result<SentryApi<C, Validators>, Error> {
         let whoami = propagate_to
             .get(&adapter.whoami())
             .cloned()
@@ -104,7 +117,7 @@ impl<A: Adapter + 'static> SentryApi<A, ()> {
     /// If the _Who am I_ Validator is not found in `propagate_to` it will add it.
     /// Propagation should happen to all validators Sentry instances including _Who am I_
     /// i.e. the current validator
-    pub fn with_propagate(self, mut propagate_to: Validators) -> SentryApi<A, Validators> {
+    pub fn with_propagate(self, mut propagate_to: Validators) -> SentryApi<C, Validators> {
         let _ = propagate_to
             .entry(self.adapter.whoami())
             .or_insert_with(|| self.whoami.clone());
@@ -120,7 +133,7 @@ impl<A: Adapter + 'static> SentryApi<A, ()> {
     }
 }
 
-impl<A: Adapter + 'static, P> SentryApi<A, P> {
+impl<C: Unlocked + 'static, P> SentryApi<C, P> {
     pub async fn get_latest_msg(
         &self,
         channel: ChannelId,
@@ -282,7 +295,7 @@ impl<A: Adapter + 'static, P> SentryApi<A, P> {
                             // and also try to find the Auth token in the config
 
                             // if there was an error with any of the operations, skip this `ValidatorDesc`
-                            let auth_token = self.adapter.get_auth(&validator_desc.id);
+                            let auth_token = self.adapter.get_auth(validator_desc.id);
 
                             // only if `ApiUrl` parsing is `Ok` & Auth Token is found in the `Adapter`
                             if let (Ok(url), Ok(auth_token)) = (validator_url, auth_token) {
@@ -304,14 +317,14 @@ impl<A: Adapter + 'static, P> SentryApi<A, P> {
     }
 }
 
-impl<A: Adapter + 'static> SentryApi<A> {
+impl<C: Unlocked + 'static> SentryApi<C> {
     pub async fn propagate(
         &self,
         channel: ChannelId,
         messages: &[&MessageTypes],
     ) -> Vec<PropagationResult> {
         join_all(self.propagate_to.iter().map(|(validator_id, validator)| {
-            propagate_to::<A>(
+            propagate_to::<C>(
                 &self.client,
                 self.config.propagation_timeout,
                 channel,
@@ -323,7 +336,7 @@ impl<A: Adapter + 'static> SentryApi<A> {
     }
 }
 
-async fn propagate_to<A: Adapter>(
+async fn propagate_to<C: Unlocked>(
     client: &Client,
     timeout: u32,
     channel_id: ChannelId,
@@ -479,9 +492,8 @@ pub mod campaigns {
 #[cfg(test)]
 mod test {
     use super::*;
-    use adapter::DummyAdapter;
+    use adapter::dummy::{Adapter, Dummy, Options};
     use primitives::{
-        adapter::DummyAdapterOptions,
         config::{configuration, Environment},
         sentry::Pagination,
         util::tests::{
@@ -608,14 +620,10 @@ mod test {
         let mut config = configuration(Environment::Development, None).expect("Should get Config");
         config.spendable_find_limit = 2;
 
-        let adapter = DummyAdapter::init(
-            DummyAdapterOptions {
-                dummy_identity: IDS["leader"],
-                dummy_auth: Default::default(),
-                dummy_auth_tokens: Default::default(),
-            },
-            &config,
-        );
+        let adapter = Adapter::with_unlocked(Dummy::init(Options {
+            dummy_identity: IDS["leader"],
+            dummy_auth_tokens: Default::default(),
+        }));
         let logger = discard_logger();
 
         let sentry =

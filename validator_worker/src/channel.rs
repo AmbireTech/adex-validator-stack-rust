@@ -2,13 +2,15 @@ use crate::{
     error::{Error, TickError},
     follower, leader, SentryApi,
 };
-use primitives::{adapter::Adapter, config::Config, Channel, ChannelId};
+
+use adapter::prelude::*;
+use primitives::{config::Config, Channel, ChannelId};
 use slog::info;
 use std::time::Duration;
 use tokio::time::timeout;
 
-pub async fn channel_tick<A: Adapter + 'static>(
-    sentry: &SentryApi<A>,
+pub async fn channel_tick<C: Unlocked + 'static>(
+    sentry: &SentryApi<C>,
     config: &Config,
     channel: Channel,
 ) -> Result<(ChannelId, Box<dyn std::fmt::Debug>), Error> {

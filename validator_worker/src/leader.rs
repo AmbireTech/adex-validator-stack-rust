@@ -1,7 +1,7 @@
 use thiserror::Error;
 
+use adapter::{prelude::*, Error as AdapterError};
 use primitives::{
-    adapter::{Adapter, AdapterErrorKind, Error as AdapterError},
     balances::CheckedState,
     config::TokenInfo,
     validator::{MessageError, MessageTypes, NewState},
@@ -22,27 +22,27 @@ pub struct TickStatus {
 }
 
 #[derive(Debug, Error)]
-pub enum Error<AE: AdapterErrorKind + 'static> {
+pub enum Error {
     #[error("SentryApi: {0}")]
     SentryApi(#[from] SentryApiError),
     #[error("StateRootHash: {0}")]
     StateRootHash(#[from] GetStateRootError),
     #[error("Adapter: {0}")]
-    Adapter(#[from] AdapterError<AE>),
+    Adapter(#[from] AdapterError),
     #[error("Heartbeat: {0}")]
-    Heartbeat(#[from] HeartbeatError<AE>),
+    Heartbeat(#[from] HeartbeatError),
     #[error("NewState Balances: {0}")]
     Message(#[from] MessageError<NewState<CheckedState>>),
     #[error("Overflow")]
     Overflow,
 }
 
-pub async fn tick<A: Adapter + 'static>(
-    sentry: &SentryApi<A>,
+pub async fn tick<C: Unlocked + 'static>(
+    sentry: &SentryApi<C>,
     channel: Channel,
     accounting_balances: Balances<CheckedState>,
     token: &TokenInfo,
-) -> Result<TickStatus, Error<A::AdapterError>> {
+) -> Result<TickStatus, Error> {
     // Check if Accounting != than latest NewState (Accounting.balances != NewState.balances)
     let should_generate_new_state =
         {
@@ -102,12 +102,12 @@ pub async fn tick<A: Adapter + 'static>(
     })
 }
 
-async fn on_new_accounting<A: Adapter + 'static>(
-    sentry: &SentryApi<A>,
+async fn on_new_accounting<C: Unlocked + 'static>(
+    sentry: &SentryApi<C>,
     channel: ChannelId,
     accounting_balances: Balances<CheckedState>,
     token: &TokenInfo,
-) -> Result<Vec<PropagationResult>, Error<A::AdapterError>> {
+) -> Result<Vec<PropagationResult>, Error> {
     let state_root = accounting_balances.encode(channel, token.precision.get())?;
 
     let signature = sentry.adapter.sign(&state_root)?;

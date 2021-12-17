@@ -1,5 +1,6 @@
 use crate::{channel::channel_tick, SentryApi};
-use primitives::{adapter::Adapter, Config};
+use adapter::{prelude::*, Adapter};
+use primitives::Config;
 use slog::{error, info, Logger};
 use std::{error::Error, time::Duration};
 
@@ -10,19 +11,19 @@ use futures::{
 use tokio::{runtime::Runtime, time::sleep};
 
 #[derive(Debug, Clone)]
-pub struct Worker<A: Adapter> {
+pub struct Worker<C: Unlocked> {
     /// SentryApi with set `whoami` validator
-    /// Requires an unlocked adapter to create [`SentryApi`], use [`Worker::init_unlock`].
-    pub sentry: SentryApi<A, ()>,
+    /// Requires an unlocked adapter to create [`SentryApi`], use `Worker::init_unlock()`.
+    pub sentry: SentryApi<C, ()>,
     pub config: Config,
     /// The unlocked Adapter
-    pub adapter: A,
+    pub adapter: Adapter<C, UnlockedState>,
     pub logger: Logger,
 }
 
-impl<A: Adapter + 'static> Worker<A> {
+impl<C: Unlocked + 'static> Worker<C> {
     /// Requires an unlocked [`Adapter`]
-    pub fn from_sentry(sentry: SentryApi<A, ()>) -> Self {
+    pub fn from_sentry(sentry: SentryApi<C, ()>) -> Self {
         Self {
             config: sentry.config.clone(),
             adapter: sentry.adapter.clone(),

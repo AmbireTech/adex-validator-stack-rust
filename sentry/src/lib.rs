@@ -2,6 +2,7 @@
 #![deny(rust_2018_idioms)]
 #![allow(deprecated)]
 
+use adapter::{prelude::*, Adapter};
 use chrono::Utc;
 use hyper::{Body, Method, Request, Response, StatusCode};
 use middleware::{
@@ -12,7 +13,7 @@ use middleware::{
     Chain, Middleware,
 };
 use once_cell::sync::Lazy;
-use primitives::{adapter::Adapter, sentry::ValidationErrorResponse, Config, ValidatorId};
+use primitives::{sentry::ValidationErrorResponse, Config, ValidatorId};
 use redis::aio::MultiplexedConnection;
 use regex::Regex;
 use slog::Logger;
@@ -110,9 +111,11 @@ impl RouteParams {
     }
 }
 
-#[derive(Clone)]
-pub struct Application<A: Adapter> {
-    pub adapter: A,
+// #[derive(Clone)]
+// pub struct Application<C: Locked + 'static> {
+pub struct Application<C: Locked + 'static> {
+    /// For sentry to work properly, we need an [`adapter::Adapter`] in a [`adapter::LockedState`] state.
+    pub adapter: Adapter<C>,
     pub config: Config,
     pub logger: Logger,
     pub redis: MultiplexedConnection,
@@ -120,9 +123,12 @@ pub struct Application<A: Adapter> {
     pub campaign_remaining: CampaignRemaining,
 }
 
-impl<A: Adapter + 'static> Application<A> {
+impl<C> Application<C>
+where
+    C: Locked,
+{
     pub fn new(
-        adapter: A,
+        adapter: Adapter<C>,
         config: Config,
         logger: Logger,
         redis: MultiplexedConnection,
@@ -170,9 +176,9 @@ impl<A: Adapter + 'static> Application<A> {
     }
 }
 
-async fn campaigns_router<A: Adapter + 'static>(
+async fn campaigns_router<C: Locked + 'static>(
     mut req: Request<Body>,
-    app: &Application<A>,
+    app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
     let (path, method) = (req.uri().path(), req.method());
 
@@ -216,18 +222,16 @@ async fn campaigns_router<A: Adapter + 'static>(
             .await?;
 
         campaign::close_campaign(req, app).await
-    } else if method == Method::POST && path == "/v5/campaign/list" {
-        req = AuthRequired.call(req, app).await?;
-
+    } else if method == Method::GET && path == "/v5/campaign/list" {
         campaign_list(req, app).await
     } else {
         Err(ResponseError::NotFound)
     }
 }
 
-async fn analytics_router<A: Adapter + 'static>(
+async fn analytics_router<C: Locked + 'static>(
     mut req: Request<Body>,
-    app: &Application<A>,
+    app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
     use routes::analytics::{
         advanced_analytics, advertiser_analytics, analytics, publisher_analytics,
@@ -302,9 +306,9 @@ async fn analytics_router<A: Adapter + 'static>(
     }
 }
 
-async fn channels_router<A: Adapter + 'static>(
+async fn channels_router<C: Locked + 'static>(
     mut req: Request<Body>,
-    app: &Application<A>,
+    app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
     let (path, method) = (req.uri().path().to_owned(), req.method());
 
@@ -543,9 +547,11 @@ pub struct Auth {
 
 #[cfg(test)]
 pub mod test_util {
-    use adapter::DummyAdapter;
+    use adapter::{
+        dummy::{Dummy, Options},
+        Adapter,
+    };
     use primitives::{
-        adapter::DummyAdapterOptions,
         config::DEVELOPMENT_CONFIG,
         util::tests::{discard_logger, prep_db::IDS},
     };
@@ -561,16 +567,12 @@ pub mod test_util {
 
     /// Uses development and therefore the goerli testnet addresses of the tokens
     /// It still uses DummyAdapter.
-    pub async fn setup_dummy_app() -> Application<DummyAdapter> {
+    pub async fn setup_dummy_app() -> Application<Dummy> {
         let config = DEVELOPMENT_CONFIG.clone();
-        let adapter = DummyAdapter::init(
-            DummyAdapterOptions {
-                dummy_identity: IDS["leader"],
-                dummy_auth: Default::default(),
-                dummy_auth_tokens: Default::default(),
-            },
-            &config,
-        );
+        let adapter = Adapter::new(Dummy::init(Options {
+            dummy_identity: IDS["leader"],
+            dummy_auth_tokens: Default::default(),
+        }));
 
         let redis = TESTS_POOL.get().await.expect("Should return Object");
         let database = DATABASE_POOL.get().await.expect("Should get a DB pool");

@@ -5,7 +5,8 @@ use hyper::header::{AUTHORIZATION, REFERER};
 use hyper::{Body, Request};
 use redis::aio::MultiplexedConnection;
 
-use primitives::adapter::{Adapter, Session as AdapterSession};
+use adapter::{prelude::*, primitives::Session as AdapterSession, Adapter};
+use primitives::ValidatorId;
 
 use crate::{middleware::Middleware, Application, Auth, ResponseError, Session};
 
@@ -13,11 +14,11 @@ use crate::{middleware::Middleware, Application, Auth, ResponseError, Session};
 pub struct Authenticate;
 
 #[async_trait]
-impl<A: Adapter + 'static> Middleware<A> for Authenticate {
+impl<C: Locked + 'static> Middleware<C> for Authenticate {
     async fn call<'a>(
         &self,
         request: Request<Body>,
-        application: &'a Application<A>,
+        application: &'a Application<C>,
     ) -> Result<Request<Body>, ResponseError> {
         for_request(request, &application.adapter, &application.redis.clone())
             .await
@@ -33,11 +34,11 @@ impl<A: Adapter + 'static> Middleware<A> for Authenticate {
 pub struct AuthRequired;
 
 #[async_trait]
-impl<A: Adapter + 'static> Middleware<A> for AuthRequired {
+impl<C: Locked + 'static> Middleware<C> for AuthRequired {
     async fn call<'a>(
         &self,
         request: Request<Body>,
-        _application: &'a Application<A>,
+        _application: &'a Application<C>,
     ) -> Result<Request<Body>, ResponseError> {
         if request.extensions().get::<Auth>().is_some() {
             Ok(request)
@@ -49,9 +50,9 @@ impl<A: Adapter + 'static> Middleware<A> for AuthRequired {
 
 /// Check `Authorization` header for `Bearer` scheme with `Adapter::session_from_token`.
 /// If the `Adapter` fails to create an `AdapterSession`, `ResponseError::BadRequest` will be returned.
-async fn for_request(
+async fn for_request<C: Locked>(
     mut req: Request<Body>,
-    adapter: &impl Adapter,
+    adapter: &Adapter<C>,
     redis: &MultiplexedConnection,
 ) -> Result<Request<Body>, Box<dyn error::Error>> {
     let referrer = req
@@ -107,7 +108,7 @@ async fn for_request(
 
         let auth = Auth {
             era: adapter_session.era,
-            uid: adapter_session.uid,
+            uid: ValidatorId::from(adapter_session.uid),
         };
 
         req.extensions_mut().insert(auth);
@@ -127,12 +128,11 @@ fn get_request_ip(req: &Request<Body>) -> Option<String> {
 
 #[cfg(test)]
 mod test {
-    use adapter::DummyAdapter;
+    use adapter::dummy::{Dummy, Options};
     use hyper::Request;
     use primitives::{
-        adapter::DummyAdapterOptions,
-        config::DEVELOPMENT_CONFIG,
-        util::tests::prep_db::{AUTH, IDS},
+        test_util::{DUMMY_AUTH, LEADER},
+        util::tests::prep_db::IDS,
     };
 
     use deadpool::managed::Object;
@@ -144,16 +144,14 @@ mod test {
 
     use super::*;
 
-    async fn setup() -> (DummyAdapter, Object<Manager>) {
+    async fn setup() -> (crate::Adapter<Dummy>, Object<Manager>) {
         let connection = TESTS_POOL.get().await.expect("Should return Object");
-        let adapter_options = DummyAdapterOptions {
+        let adapter_options = Options {
             dummy_identity: IDS["leader"],
-            dummy_auth: IDS.clone(),
-            dummy_auth_tokens: AUTH.clone(),
+            dummy_auth_tokens: DUMMY_AUTH.clone(),
         };
-        let config = DEVELOPMENT_CONFIG.clone();
 
-        (DummyAdapter::init(adapter_options, &config), connection)
+        (Adapter::new(Dummy::init(adapter_options)), connection)
     }
 
     #[tokio::test]
@@ -192,7 +190,7 @@ mod test {
             .unwrap();
         match for_request(non_existent_token_req, &dummy_adapter, &database).await {
             Err(error) => {
-                assert!(error.to_string().contains("no session token for this auth: wrong-token"), "Wrong error received");
+                assert!(error.to_string().contains("No identity found that matches authentication token: wrong-token"), "Wrong error received");
             }
             _ => panic!("We shouldn't get a success response nor a different Error than BadRequest for this call"),
         };
@@ -202,7 +200,7 @@ mod test {
     async fn session_from_correct_authentication_token() {
         let (dummy_adapter, database) = setup().await;
 
-        let token = AUTH["leader"].clone();
+        let token = DUMMY_AUTH[&LEADER].clone();
         let auth_header = format!("Bearer {}", token);
         let req = Request::builder()
             .header(AUTHORIZATION, auth_header)
@@ -218,7 +216,7 @@ mod test {
             .get::<Auth>()
             .expect("There should be a Session set inside the request");
 
-        assert_eq!(IDS["leader"], auth.uid);
+        assert_eq!(*LEADER, auth.uid.to_address());
 
         let session = altered_request
             .extensions()
