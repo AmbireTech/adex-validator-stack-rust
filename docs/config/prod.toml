@@ -34,7 +34,6 @@ outpace_address = '0x333420fc6a897356e69b62417cd17ff012177d2b'
 sweeper_address = '0x333420fc6a897356e69b62417cd17ff012177d2b'
 
 ethereum_network = 'http://localhost:8545'
-ethereum_adapter_relayer = 'https://relayer.adex.network'
 
 creators_whitelist = []
 validators_whitelist = []

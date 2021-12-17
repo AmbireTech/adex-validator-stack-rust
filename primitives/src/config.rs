@@ -83,7 +83,6 @@ pub struct Config {
     #[serde(with = "SerHex::<StrictPfx>")]
     pub sweeper_address: [u8; 20],
     pub ethereum_network: String,
-    pub ethereum_adapter_relayer: String,
     pub creators_whitelist: Vec<Address>,
     pub validators_whitelist: Vec<ValidatorId>,
     #[serde(deserialize_with = "deserialize_token_whitelist")]
