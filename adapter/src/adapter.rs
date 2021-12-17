@@ -7,11 +7,6 @@ use crate::{
     Error,
 };
 
-// pub use self::state::{Locked, Unlocked};
-
-// pub type UnlockedC = Adapter<dyn Unlocked<Error = crate::Error>, state::UnlockedState>;
-// pub type LockedC = Adapter<dyn Locked<Error = crate::Error>, state::UnlockedState>;
-
 pub(crate) mod state {
     #[derive(Debug, Clone, Copy)]
     /// The `Locked` state of the [`crate::Adapter`].
@@ -40,7 +35,6 @@ pub(crate) mod state {
 pub struct Adapter<C, S = state::LockedState> {
     /// client in a specific state - Locked or Unlocked
     pub client: Arc<C>,
-    // /// We must use the `C` type from the definition
     _state: PhantomData<S>,
 }
 

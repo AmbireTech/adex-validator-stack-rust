@@ -90,8 +90,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             let ethereum =
                 Ethereum::init(keystore_options, &config).expect("failed to init Ethereum adapter");
-            // .unlock()
-            // .expect("failed to Unlock Ethereum adapter");
+
             let adapter = Adapter::new(ethereum)
                 .unlock()
                 .expect("failed to Unlock Ethereum adapter");
