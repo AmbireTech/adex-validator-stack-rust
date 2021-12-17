@@ -1,9 +1,8 @@
 use chrono::{Duration, Utc};
 
-use adapter::get_signable_state_root;
+use adapter::{prelude::*, util::get_signable_state_root, Error as AdapterError};
 use byteorder::{BigEndian, ByteOrder};
 use primitives::{
-    adapter::{Adapter, AdapterErrorKind, Error as AdapterError},
     merkle_tree::MerkleTree,
     validator::{Heartbeat, MessageTypes},
     ChannelId,
@@ -15,19 +14,19 @@ use crate::sentry_interface::{Error as SentryApiError, PropagationResult, Sentry
 pub type HeartbeatStatus = Option<Vec<PropagationResult>>;
 
 #[derive(Debug, Error)]
-pub enum Error<AE: AdapterErrorKind + 'static> {
+pub enum Error {
     #[error("MerkleTree: {0}")]
     MerkleTree(#[from] primitives::merkle_tree::Error),
     #[error("Adapter error: {0}")]
-    Adapter(#[from] AdapterError<AE>),
+    Adapter(#[from] AdapterError),
     #[error("Sentry API: {0}")]
     SentryApi(#[from] SentryApiError),
 }
 
-pub async fn heartbeat<A: Adapter + 'static>(
-    iface: &SentryApi<A>,
+pub async fn heartbeat<C: Unlocked + 'static>(
+    iface: &SentryApi<C>,
     channel: ChannelId,
-) -> Result<HeartbeatStatus, Error<A::AdapterError>> {
+) -> Result<HeartbeatStatus, Error> {
     let validator_message_response = iface.get_our_latest_msg(channel, &["Heartbeat"]).await?;
     let heartbeat_msg = match validator_message_response {
         Some(MessageTypes::Heartbeat(heartbeat)) => Some(heartbeat),
@@ -46,10 +45,10 @@ pub async fn heartbeat<A: Adapter + 'static>(
     }
 }
 
-async fn send_heartbeat<A: Adapter + 'static>(
-    iface: &SentryApi<A>,
+async fn send_heartbeat<C: Unlocked + 'static>(
+    iface: &SentryApi<C>,
     channel: ChannelId,
-) -> Result<Vec<PropagationResult>, Error<A::AdapterError>> {
+) -> Result<Vec<PropagationResult>, Error> {
     let mut timestamp_buf = [0_u8; 32];
     let milliseconds: u64 = u64::try_from(Utc::now().timestamp_millis())
         .expect("The timestamp should be able to be converted to u64");

@@ -119,7 +119,7 @@ impl Token {
 
         let mut signature = signer
             .sign(password, &message_to_sign)
-            .map_err(EwtSigningError::SigningMessage)?
+            .map_err(|err| EwtSigningError::SigningMessage(err.to_string()))?
             .into_electrum()
             .to_vec();
         signature.extend(ETH_SIGN_SUFFIX.as_slice());
@@ -217,22 +217,22 @@ impl fmt::Display for Token {
 
 #[cfg(test)]
 mod test {
+    use crate::prelude::*;
     use primitives::{
-        adapter::Adapter,
         config::GANACHE_CONFIG,
         test_util::{CREATOR, LEADER},
         ValidatorId,
     };
 
     use super::*;
-    use crate::{ethereum::test_util::KEYSTORES, EthereumAdapter};
+    use crate::ethereum::{test_util::KEYSTORES, Ethereum};
 
     #[test]
     fn should_generate_correct_ewt_sign_and_verify() {
-        let mut eth_adapter = EthereumAdapter::init(KEYSTORES[&CREATOR].clone(), &GANACHE_CONFIG)
-            .expect("should init ethereum adapter");
-
-        eth_adapter.unlock().expect("should unlock eth adapter");
+        let eth_adapter = Ethereum::init(KEYSTORES[&CREATOR].clone(), &GANACHE_CONFIG)
+            .expect("should init ethereum adapter")
+            .unlock()
+            .expect("should unlock eth adapter");
 
         let payload = Payload {
             id: ValidatorId::from(*LEADER),
@@ -240,8 +240,8 @@ mod test {
             address: eth_adapter.whoami().to_address(),
             identity: None,
         };
-        let wallet = eth_adapter.wallet.clone().expect("Unlocked adapter");
-        let token = Token::sign(&wallet, &eth_adapter.keystore_pwd, payload)
+        let wallet = eth_adapter.state.wallet.clone();
+        let token = Token::sign(&wallet, &eth_adapter.state.password, payload)
             .expect("failed to generate ewt signature");
         let expected = "eyJ0eXAiOiJKV1QiLCJhbGciOiJFVEgifQ.eyJpZCI6IjB4ODA2OTA3NTE5NjlCMjM0Njk3ZTkwNTllMDRlZDcyMTk1YzM1MDdmYSIsImVyYSI6MTAwMDAwLCJhZGRyZXNzIjoiMHhhQ0JhREEyZDU4MzBkMTg3NWFlM0QyZGUyMDdBMTM2M0IzMTZEZjJGIn0.HVZ3qD2pdY_dqgNgJZTB7vhkpKBmMDzQ1tigee1aSd0ugnA_4D12nilJtpfS0KcG7soAMRqwCXw0-1hUqDqUrxsB";
         assert_eq!(token.as_str(), expected, "generated wrong ewt signature");
