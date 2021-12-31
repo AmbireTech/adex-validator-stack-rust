@@ -2401,7 +2401,7 @@ dependencies = [
 [[package]]
 name = "postgres-derive"
 version = "0.4.1"
-source = "git+https://github.com/elpiel/rust-postgres?branch=boxed-dyn-ToSql#c516805275aaaf106e8e512f53a9b0234f707583"
+source = "git+https://github.com/elpiel/rust-postgres?branch=from-T-for-boxed-dyn-ToSql#2c9b9a6bc76d71cc8d34c02ac51bf09999728768"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2424,7 +2424,7 @@ dependencies = [
 [[package]]
 name = "postgres-protocol"
 version = "0.6.2"
-source = "git+https://github.com/elpiel/rust-postgres?branch=boxed-dyn-ToSql#c516805275aaaf106e8e512f53a9b0234f707583"
+source = "git+https://github.com/elpiel/rust-postgres?branch=from-T-for-boxed-dyn-ToSql#2c9b9a6bc76d71cc8d34c02ac51bf09999728768"
 dependencies = [
  "base64",
  "byteorder 1.4.3",
@@ -2459,7 +2459,7 @@ dependencies = [
 [[package]]
 name = "postgres-types"
 version = "0.2.2"
-source = "git+https://github.com/elpiel/rust-postgres?branch=boxed-dyn-ToSql#c516805275aaaf106e8e512f53a9b0234f707583"
+source = "git+https://github.com/elpiel/rust-postgres?branch=from-T-for-boxed-dyn-ToSql#2c9b9a6bc76d71cc8d34c02ac51bf09999728768"
 dependencies = [
  "bytes",
  "chrono",

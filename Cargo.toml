@@ -10,4 +10,4 @@ members = [
 ]
 
 [patch.crates-io]
-postgres-types = { git = "https://github.com/elpiel/rust-postgres", branch = "boxed-dyn-ToSql"}
+postgres-types = { git = "https://github.com/elpiel/rust-postgres", branch = "from-T-for-boxed-dyn-ToSql"}
