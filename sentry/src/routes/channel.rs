@@ -16,7 +16,7 @@ use primitives::{
         channel_list::ChannelListQuery, AccountingResponse, AllSpendersQuery, AllSpendersResponse,
         LastApproved, LastApprovedQuery, LastApprovedResponse, SpenderResponse, SuccessResponse,
     },
-    spender::{Spendable, Spender, SpenderLeaf},
+    spender::{Spendable, Spender},
     validator::{MessageTypes, NewState},
     Address, Channel, Deposit, UnifiedNum,
 };
@@ -190,7 +190,7 @@ fn spender_response_without_leaf(
     let res = SpenderResponse {
         spender: Spender {
             total_deposited,
-            spender_leaf: None,
+            total_spent: None,
         },
     };
     Ok(success_response(serde_json::to_string(&res)?))
@@ -240,18 +240,17 @@ pub async fn get_spender_limits<C: Locked + 'static>(
         None => return spender_response_without_leaf(latest_spendable.deposit.total),
     };
 
-    let total_spent = new_state.balances.spenders.get(&spender);
-
-    let spender_leaf = total_spent.map(|total_spent| SpenderLeaf {
-        total_spent: *total_spent,
-        //merkle_proof: [u8; 32], // TODO
-    });
+    let total_spent = new_state
+        .balances
+        .spenders
+        .get(&spender)
+        .map(|spent| spent.to_owned());
 
     // returned output
     let res = SpenderResponse {
         spender: Spender {
             total_deposited: latest_spendable.deposit.total,
-            spender_leaf,
+            total_spent,
         },
     };
     Ok(success_response(serde_json::to_string(&res)?))
@@ -284,23 +283,20 @@ pub async fn get_all_spender_limits<C: Locked + 'static>(
     // Using for loop to avoid async closures
     for spendable in all_spendables {
         let spender = spendable.spender;
-        let spender_leaf = match new_state {
+        let total_spent = match new_state {
             Some(ref new_state) => new_state.balances.spenders.get(&spender).map(|balance| {
-                SpenderLeaf {
-                    total_spent: spendable
-                        .deposit
-                        .total
-                        .checked_sub(balance)
-                        .unwrap_or_default(),
-                    // merkle_proof: [u8; 32], // TODO
-                }
+                spendable
+                    .deposit
+                    .total
+                    .checked_sub(balance)
+                    .unwrap_or_default()
             }),
             None => None,
         };
 
         let spender_info = Spender {
             total_deposited: spendable.deposit.total,
-            spender_leaf,
+            total_spent,
         };
 
         all_spender_limits.insert(spender, spender_info);

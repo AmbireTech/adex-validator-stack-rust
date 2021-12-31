@@ -604,7 +604,7 @@ mod tests {
                 Spender {
                     // Expected: 30 TOKENs
                     total_deposited: UnifiedNum::from(3_000_000_000),
-                    spender_leaf: None,
+                    total_spent: None,
                 },
             )]
             .into_iter()
