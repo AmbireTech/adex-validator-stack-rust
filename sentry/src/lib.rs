@@ -12,7 +12,12 @@ use middleware::{
     Chain, Middleware,
 };
 use once_cell::sync::Lazy;
-use primitives::{adapter::Adapter, sentry::ValidationErrorResponse, Config, ValidatorId};
+use primitives::{
+    adapter::Adapter,
+    analytics::{query::AllowedKey, AuthenticateAs},
+    sentry::ValidationErrorResponse,
+    Config, ValidatorId,
+};
 use redis::aio::MultiplexedConnection;
 use regex::Regex;
 use slog::Logger;
@@ -224,21 +229,31 @@ async fn analytics_router<A: Adapter + 'static>(
 
     match (route, method) {
         ("/analytics", &Method::GET) => {
-            analytics(
-                req,
-                app,
-                Some(vec!["country".to_string(), "adSlotType".to_string()]),
-                None,
-            )
-            .await
+            let allowed_keys_for_request = vec![AllowedKey::Country, AllowedKey::AdSlotType]
+                .into_iter()
+                .collect();
+            analytics(req, app, Some(allowed_keys_for_request), None).await
         }
         ("/analytics/for-advertiser", &Method::GET) => {
             let req = AuthRequired.call(req, app).await?;
-            analytics(req, app, None, Some("advertiser".into())).await
+
+            let authenticate_as = req
+                .extensions()
+                .get::<Auth>()
+                .map(|auth| AuthenticateAs::Advertiser(auth.uid))
+                .ok_or(ResponseError::Unauthorized)?;
+
+            analytics(req, app, None, Some(authenticate_as)).await
         }
         ("/analytics/for-publisher", &Method::GET) => {
+            let authenticate_as = req
+                .extensions()
+                .get::<Auth>()
+                .map(|auth| AuthenticateAs::Publisher(auth.uid))
+                .ok_or(ResponseError::Unauthorized)?;
+
             let req = AuthRequired.call(req, app).await?;
-            analytics(req, app, None, Some("publisher".into())).await
+            analytics(req, app, None, Some(authenticate_as)).await
         }
         ("/analytics/for-admin", &Method::GET) => {
             req = Chain::new()

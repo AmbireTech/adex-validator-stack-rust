@@ -1,17 +1,34 @@
 use crate::{sentry::DateHour, Address, CampaignId, ValidatorId, IPFS};
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{serde::ts_milliseconds_option, Utc};
 use parse_display::Display;
 use serde::{Deserialize, Deserializer, Serialize};
+
+use self::query::AllowedKey;
 
 pub const ANALYTICS_QUERY_LIMIT: u32 = 200;
 
 #[cfg(feature = "postgres")]
 pub mod postgres {
-    use super::{AnalyticsQueryKey, AnalyticsQueryTime, OperatingSystem};
+    use super::{query::AllowedKey, AnalyticsQuery, OperatingSystem};
     use bytes::BytesMut;
-    use chrono::{DateTime, NaiveDateTime, Timelike, Utc};
     use std::error::Error;
     use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
+
+    impl AnalyticsQuery {
+        pub fn get_key(&self, key: AllowedKey) -> Option<Box<dyn ToSql + Sync + Send>> {
+            match key {
+                AllowedKey::CampaignId => self.campaign_id.map(Into::into),
+                AllowedKey::AdUnit => self.ad_unit.map(Into::into),
+                AllowedKey::AdSlot => self.ad_slot.map(Into::into),
+                AllowedKey::AdSlotType => self.ad_slot_type.clone().map(Into::into),
+                AllowedKey::Advertiser => self.advertiser.map(Into::into),
+                AllowedKey::Publisher => self.publisher.map(Into::into),
+                AllowedKey::Hostname => self.hostname.clone().map(Into::into),
+                AllowedKey::Country => self.country.clone().map(Into::into),
+                AllowedKey::OsName => self.os_name.clone().map(Into::into),
+            }
+        }
+    }
 
     impl<'a> FromSql<'a> for OperatingSystem {
         fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
@@ -41,49 +58,36 @@ pub mod postgres {
         to_sql_checked!();
     }
 
-    impl ToSql for AnalyticsQueryKey {
+    impl ToSql for AllowedKey {
         fn to_sql(
             &self,
             ty: &Type,
             w: &mut BytesMut,
         ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-            match self {
-                Self::CampaignId(id) => id.to_sql(ty, w),
-                Self::IPFS(ipfs) => ipfs.to_sql(ty, w),
-                Self::String(value) => value.to_sql(ty, w),
-                Self::Address(addr) => addr.to_sql(ty, w),
-                Self::OperatingSystem(os_name) => os_name.to_sql(ty, w),
-            }
+            self.to_string().to_sql(ty, w)
         }
 
         accepts!(TEXT, VARCHAR);
         to_sql_checked!();
     }
 
-    impl ToSql for AnalyticsQueryTime {
-        fn to_sql(
-            &self,
-            ty: &Type,
-            w: &mut BytesMut,
-        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-            match self {
-                Self::Date(datehour) => datehour.to_sql(ty, w),
-                Self::Timestamp(ts) => {
-                    // Create a NaiveDateTime from the timestamp
-                    let naive = NaiveDateTime::from_timestamp(*ts, 0);
-                    // Create a normal DateTime from the NaiveDateTime
-                    let datetime: DateTime<Utc> = DateTime::from_utc(naive, Utc);
-                    datetime.date().and_hms(datetime.hour(), 0, 0).to_sql(ty, w)
-                }
-            }
+    impl<'a> FromSql<'a> for AllowedKey {
+        fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+            let allowed_key_string = String::from_sql(ty, raw)?;
+
+            let allowed_key =
+                serde_json::from_value(serde_json::Value::String(allowed_key_string))?;
+
+            Ok(allowed_key)
         }
 
-        accepts!(TIMESTAMPTZ);
-        to_sql_checked!();
+        accepts!(TEXT, VARCHAR);
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+pub mod query;
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct AnalyticsQuery {
     #[serde(default = "default_limit")]
@@ -94,31 +98,31 @@ pub struct AnalyticsQuery {
     pub metric: Metric,
     #[serde(default = "default_timeframe")]
     pub timeframe: Timeframe,
-    pub segment_by: Option<String>,
-    #[serde(default)]
-    #[serde(deserialize_with = "deserialize_query_time")]
-    pub start: Option<AnalyticsQueryTime>,
-    #[serde(default)]
-    #[serde(deserialize_with = "deserialize_query_time")]
-    pub end: Option<AnalyticsQueryTime>,
+    pub segment_by: Option<AllowedKey>,
+    /// The default value used will be [`DateHour::now`] - [`AnalyticsQuery::timeframe`]
+    /// For this query parameter you can use either:
+    /// - a string with RFC 3339 and ISO 8601 format (see [`chrono::DateTime::parse_from_rfc3339`])
+    /// - a timestamp in milliseconds
+    /// **Note:** [`DateHour`] rules should be uphold, this means that passed values should always be rounded to hours
+    /// the should not contain **minutes**, **seconds** or **nanoseconds**
+    // TODO: When deserializing AnalyticsQuery, take timeframe & timezone into account and impl Default value
+    // #[serde(default, deserialize_with = "deserialize_query_time")]
+    pub start: Option<DateHour<Utc>>,
+    // #[serde(default, deserialize_with = "deserialize_query_time")]
+    pub end: Option<DateHour<Utc>>,
+    // #[serde(flatten)]
+    // pub time: Time,
     // #[serde(default = "default_timezone")]
     // pub timezone: String,
-    pub campaign_id: Option<AnalyticsQueryKey>,
-    pub ad_unit: Option<AnalyticsQueryKey>,
-    pub ad_slot: Option<AnalyticsQueryKey>,
-    pub ad_slot_type: Option<AnalyticsQueryKey>,
-    pub advertiser: Option<AnalyticsQueryKey>,
-    pub publisher: Option<AnalyticsQueryKey>,
-    pub hostname: Option<AnalyticsQueryKey>,
-    pub country: Option<AnalyticsQueryKey>,
-    pub os_name: Option<AnalyticsQueryKey>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged, rename_all = "camelCase")]
-pub enum AnalyticsQueryTime {
-    Date(DateHour<Utc>),
-    Timestamp(i64),
+    pub campaign_id: Option<CampaignId>,
+    pub ad_unit: Option<IPFS>,
+    pub ad_slot: Option<IPFS>,
+    pub ad_slot_type: Option<String>,
+    pub advertiser: Option<Address>,
+    pub publisher: Option<Address>,
+    pub hostname: Option<String>,
+    pub country: Option<String>,
+    pub os_name: Option<OperatingSystem>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -131,23 +135,6 @@ pub enum AnalyticsQueryKey {
     OperatingSystem(OperatingSystem),
 }
 
-impl AnalyticsQuery {
-    pub fn get_key(&self, key: &str) -> Option<&AnalyticsQueryKey> {
-        match key {
-            "campaignId" => self.campaign_id.as_ref(),
-            "adUnit" => self.ad_unit.as_ref(),
-            "adSlot" => self.ad_slot.as_ref(),
-            "adSlotType" => self.ad_slot_type.as_ref(),
-            "advertiser" => self.advertiser.as_ref(),
-            "publisher" => self.publisher.as_ref(),
-            "hostname" => self.hostname.as_ref(),
-            "country" => self.country.as_ref(),
-            "osName" => self.os_name.as_ref(),
-            _ => None,
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Display, Hash, Eq)]
 #[serde(untagged, into = "String", from = "String")]
 pub enum OperatingSystem {
@@ -157,7 +144,7 @@ pub enum OperatingSystem {
     Other,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Display)]
+#[derive(Debug, Clone, Serialize, Deserialize, Display, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum Timeframe {
     Year,
@@ -181,17 +168,7 @@ pub enum AuthenticateAs {
     Publisher(ValidatorId),
 }
 
-impl AuthenticateAs {
-    pub fn try_from(key: &str, uid: ValidatorId) -> Option<Self> {
-        match key {
-            "advertiser" => Some(Self::Advertiser(uid)),
-            "publisher" => Some(Self::Publisher(uid)),
-            // TODO: Should we throw an error here
-            _ => None,
-        }
-    }
-}
-
+// TODO: Move the postgres module
 impl Metric {
     pub fn column_name(self) -> String {
         match self {
@@ -311,25 +288,37 @@ fn default_timeframe() -> Timeframe {
     Timeframe::Day
 }
 
-fn deserialize_query_time<'de, D>(deserializer: D) -> Result<Option<AnalyticsQueryTime>, D::Error>
+fn deserialize_query_time<'de, D>(deserializer: D) -> Result<Option<DateHour<Utc>>, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let date_as_str = String::deserialize(deserializer)?;
-    let naive = NaiveDateTime::parse_from_str(&date_as_str, "%Y-%m-%dT%H:%M:%SZ");
-    match naive {
-        Ok(naive) => {
-            let datetime: DateTime<Utc> = DateTime::from_utc(naive, Utc);
-            let dh = DateHour::try_from(datetime).map_err(serde::de::Error::custom)?;
-            Ok(Some(AnalyticsQueryTime::Date(dh)))
-        }
-        _ => {
-            let timestamp = date_as_str
-                .parse::<i64>()
-                .map_err(serde::de::Error::custom)?;
-            Ok(Some(AnalyticsQueryTime::Timestamp(timestamp)))
-        }
-    }
+    // let date_as_str = match Option::<&str>::deserialize(deserializer)? {
+    //     Some(value) => value,
+    //     // return early with None
+    //     None => return Ok(None),
+    // };
+
+    let datehour = match ts_milliseconds_option::deserialize(deserializer) {
+        Ok(Some(datetime)) => DateHour::try_from(datetime).map_err(serde::de::Error::custom)?,
+        // return early with None
+        Ok(None) => return Ok(None),
+        // if we have an error trying to parse the value as milliseconds
+        // try to deserialize from string
+        Err(_err) => todo!(),
+        // match Option::<&str>::deserialize(deserializer)? {
+        //     Some(value) => {
+        //         let datetime = DateTime::parse_from_rfc3339(value)
+        //             .map(|fixed| DateTime::<Utc>::from(fixed))
+        //             .map_err(serde::de::Error::custom)?;
+
+        //         DateHour::try_from(datetime).map_err(serde::de::Error::custom)?
+        //     }
+        //     // return early with None
+        //     None => return Ok(None),
+        // },
+    };
+
+    Ok(Some(datehour))
 }
 
 // fn default_timezone() -> String {

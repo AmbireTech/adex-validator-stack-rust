@@ -1,149 +1,84 @@
+use std::collections::HashSet;
+
 use crate::{db::analytics::get_analytics, success_response, Application, Auth, ResponseError};
 use hyper::{Body, Request, Response};
-use once_cell::sync::Lazy;
 use primitives::{
     adapter::Adapter,
-    analytics::{AnalyticsQuery, AnalyticsQueryTime, AuthenticateAs, ANALYTICS_QUERY_LIMIT},
-    sentry::{DateHour, FetchedAnalytics},
+    analytics::{
+        query::{AllowedKey, ALLOWED_KEYS},
+        AnalyticsQuery, AuthenticateAs, ANALYTICS_QUERY_LIMIT,
+    },
+    sentry::DateHour,
     UnifiedNum,
 };
-
-pub static ALLOWED_KEYS: Lazy<[String; 9]> = Lazy::new(|| {
-    [
-        "campaignId".to_string(),
-        "adUnit".to_string(),
-        "adSlot".to_string(),
-        "adSlotType".to_string(),
-        "advertiser".to_string(),
-        "publisher".to_string(),
-        "hostname".to_string(),
-        "country".to_string(),
-        "osName".to_string(),
-    ]
-});
 
 pub async fn analytics<A: Adapter>(
     req: Request<Body>,
     app: &Application<A>,
-    allowed_keys: Option<Vec<String>>,
-    auth_as_key: Option<String>,
+    request_allowed: Option<HashSet<AllowedKey>>,
+    authenticate_as: Option<AuthenticateAs>,
 ) -> Result<Response<Body>, ResponseError> {
-    let query = serde_urlencoded::from_str::<AnalyticsQuery>(req.uri().query().unwrap_or(""))?;
-    let period_in_hours = query.timeframe.to_hours();
-    let start_date = match query.start {
-        Some(ref start_date) => start_date.to_owned(),
-        None => AnalyticsQueryTime::Date(DateHour::now() - period_in_hours),
-    };
+    let mut query = serde_urlencoded::from_str::<AnalyticsQuery>(req.uri().query().unwrap_or(""))?;
+
+    // TODO: Deserialize with default value & timezone directly in AnalyticsQuery
+    query.start = query
+        .start
+        .or_else(|| Some(DateHour::now() - &query.timeframe));
 
     let applied_limit = query.limit.min(ANALYTICS_QUERY_LIMIT);
 
-    let not_allowed_keys = match &allowed_keys {
-        Some(keys) => ALLOWED_KEYS.iter().filter(|k| !keys.contains(k)).collect(),
-        None => vec![],
-    };
-
-    if let Some(segment_by) = &query.segment_by {
-        if not_allowed_keys.contains(&segment_by) {
-            return Err(ResponseError::BadRequest(format!(
-                "Disallowed segmentBy: {}",
-                segment_by
-            )));
-        }
-        if query.get_key(segment_by).is_none() {
-            return Err(ResponseError::BadRequest(
-                "SegmentBy is provided but a key is not passed".to_string(),
-            ));
-        }
-    }
-
-    for key in not_allowed_keys {
-        if query.get_key(key).is_some() {
-            return Err(ResponseError::BadRequest(format!(
-                "disallowed key in query: {}",
-                key
-            )));
-        }
-    }
-
-    let auth = req.extensions().get::<Auth>();
-
-    let auth_as = match (auth_as_key, auth) {
-        (Some(auth_as_key), Some(auth)) => AuthenticateAs::try_from(&auth_as_key, auth.uid),
-        (Some(_), None) => {
-            return Err(ResponseError::BadRequest(
-                "auth_as_key is provided but there is no Auth object".to_string(),
-            ))
-        }
-        _ => None,
-    };
-
-    // TODO: Clean up this logic
-    let allowed_keys: Vec<&str> = allowed_keys
-        .unwrap_or_else(|| ALLOWED_KEYS.to_vec())
-        .iter()
-        .map(|k| match k.as_ref() {
-            "campaignId" => "campaign_id",
-            "adUnit" => "ad_unit",
-            "adSlot" => "ad_slot",
-            "adSlotType" => "ad_slot_type",
-            "advertiser" => "advertiser",
-            "publisher" => "publisher",
-            "hostname" => "hostname",
-            "osName" => "os_name",
-            _ => "country",
-        })
-        .collect();
+    let allowed_keys: HashSet<AllowedKey> = request_allowed.unwrap_or_else(|| ALLOWED_KEYS.clone());
 
     let analytics = get_analytics(
         &app.pool,
-        &start_date,
-        &query,
+        query.clone(),
         allowed_keys,
-        auth_as,
+        authenticate_as,
         applied_limit,
     )
     .await?;
 
-    let output = split_entries_by_timeframe(analytics, period_in_hours, &query.segment_by);
+    // let output = split_entries_by_timeframe(analytics, query.timeframe.to_hours(), query.segment_by.clone());
 
-    Ok(success_response(serde_json::to_string(&output)?))
+    // Ok(success_response(serde_json::to_string(&output)?))
+    Ok(success_response(serde_json::to_string(&analytics)?))
 }
 
 // TODO: This logic can be simplified or done in the SQL query
-fn split_entries_by_timeframe(
-    mut analytics: Vec<FetchedAnalytics>,
-    period_in_hours: i64,
-    segment: &Option<String>,
-) -> Vec<FetchedAnalytics> {
-    let mut res: Vec<FetchedAnalytics> = vec![];
-    let period_in_hours = period_in_hours as usize;
-    // TODO: If there is an hour with no events this logic will fail
-    // FIX BEFORE MERGE!
-    while analytics.len() > period_in_hours {
-        let drain_index = analytics.len() - period_in_hours;
-        let analytics_fraction: Vec<FetchedAnalytics> = analytics.drain(drain_index..).collect();
-        let merged_analytics = merge_analytics(analytics_fraction, segment);
-        res.push(merged_analytics);
-    }
+// fn split_entries_by_timeframe(
+//     mut analytics: Vec<FetchedAnalytics>,
+//     period_in_hours: i64,
+//     segment: Option<AllowedKey>,
+// ) -> Vec<FetchedAnalytics> {
+//     let mut res: Vec<FetchedAnalytics> = vec![];
+//     let period_in_hours = period_in_hours as usize;
+//     // TODO: If there is an hour with no events this logic will fail
+//     // FIX BEFORE MERGE!
+//     while analytics.len() > period_in_hours {
+//         let drain_index = analytics.len() - period_in_hours;
+//         let analytics_fraction: Vec<FetchedAnalytics> = analytics.drain(drain_index..).collect();
+//         let merged_analytics = merge_analytics(analytics_fraction, segment);
+//         res.push(merged_analytics);
+//     }
 
-    if !analytics.is_empty() {
-        let merged_analytics = merge_analytics(analytics, segment);
-        res.push(merged_analytics);
-    }
-    res
-}
+//     if !analytics.is_empty() {
+//         let merged_analytics = merge_analytics(analytics, segment);
+//         res.push(merged_analytics);
+//     }
+//     res
+// }
 
-fn merge_analytics(analytics: Vec<FetchedAnalytics>, segment: &Option<String>) -> FetchedAnalytics {
-    let mut amount = UnifiedNum::from_u64(0);
-    analytics
-        .iter()
-        .for_each(|a| amount = amount.checked_add(&a.value).expect("TODO: Use result here"));
-    FetchedAnalytics {
-        time: analytics.get(0).unwrap().time,
-        value: amount,
-        segment: segment.clone(),
-    }
-}
+// fn merge_analytics(analytics: Vec<FetchedAnalytics>, segment: Option<AllowedKey>) -> FetchedAnalytics {
+//     let mut amount = UnifiedNum::from_u64(0);
+//     analytics
+//         .iter()
+//         .for_each(|a| amount = amount.checked_add(&a.value).expect("TODO: Use result here"));
+//     FetchedAnalytics {
+//         time: analytics.get(0).unwrap().time,
+//         value: amount,
+//         segment,
+//     }
+// }
 
 // async fn cache(
 //     redis: &MultiplexedConnection,
@@ -175,7 +110,7 @@ mod test {
     use chrono::{Timelike, Utc};
     use primitives::{
         analytics::{AnalyticsQueryKey, Metric, OperatingSystem, Timeframe},
-        sentry::UpdateAnalytics,
+        sentry::{FetchedAnalytics, UpdateAnalytics},
         util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, DUMMY_IPFS},
     };
 
@@ -351,7 +286,11 @@ mod test {
         let analytics_response = analytics(
             req,
             &app,
-            Some(vec!["country".into(), "ad_slot_type".into()]),
+            Some(
+                vec![AllowedKey::Country, AllowedKey::AdSlotType]
+                    .into_iter()
+                    .collect(),
+            ),
             None,
         )
         .await
@@ -377,7 +316,7 @@ mod test {
             metric: Metric::Count,
             timeframe: Timeframe::Day,
             segment_by: None,
-            start: Some(AnalyticsQueryTime::Date(start_date)),
+            start: Some(start_date),
             end: None,
             campaign_id: None,
             ad_unit: None,
@@ -398,7 +337,11 @@ mod test {
         let analytics_response = analytics(
             req,
             &app,
-            Some(vec!["country".into(), "ad_slot_type".into()]),
+            Some(
+                vec![AllowedKey::Country, AllowedKey::AdSlotType]
+                    .into_iter()
+                    .collect(),
+            ),
             None,
         )
         .await
@@ -424,7 +367,7 @@ mod test {
             timeframe: Timeframe::Day,
             segment_by: None,
             start: None,
-            end: Some(AnalyticsQueryTime::Date(end_date)),
+            end: Some(end_date),
             campaign_id: None,
             ad_unit: None,
             ad_slot: None,
@@ -444,7 +387,11 @@ mod test {
         let analytics_response = analytics(
             req,
             &app,
-            Some(vec!["country".into(), "ad_slot_type".into()]),
+            Some(
+                vec![AllowedKey::Country, AllowedKey::AdSlotType]
+                    .into_iter()
+                    .collect(),
+            ),
             None,
         )
         .await
@@ -472,8 +419,8 @@ mod test {
             metric: Metric::Count,
             timeframe: Timeframe::Day,
             segment_by: None,
-            start: Some(AnalyticsQueryTime::Date(start_date)),
-            end: Some(AnalyticsQueryTime::Date(end_date)),
+            start: Some(start_date),
+            end: Some(end_date),
             campaign_id: None,
             ad_unit: None,
             ad_slot: None,
@@ -492,7 +439,11 @@ mod test {
         let analytics_response = analytics(
             req,
             &app,
-            Some(vec!["country".into(), "ad_slot_type".into()]),
+            Some(
+                vec![AllowedKey::Country, AllowedKey::AdSlotType]
+                    .into_iter()
+                    .collect(),
+            ),
             None,
         )
         .await
@@ -515,7 +466,7 @@ mod test {
             event_type: "CLICK".into(),
             metric: Metric::Count,
             timeframe: Timeframe::Day,
-            segment_by: Some("country".into()),
+            segment_by: Some(AllowedKey::Country),
             start: None,
             end: None,
             campaign_id: None,
@@ -525,7 +476,7 @@ mod test {
             advertiser: None,
             publisher: None,
             hostname: None,
-            country: Some(AnalyticsQueryKey::String("Bulgaria".into())),
+            country: Some("Bulgaria".into()),
             os_name: None,
         };
         let query = serde_urlencoded::to_string(query).expect("should parse query");
@@ -537,7 +488,11 @@ mod test {
         let analytics_response = analytics(
             req,
             &app,
-            Some(vec!["country".into(), "ad_slot_type".into()]),
+            Some(
+                vec![AllowedKey::Country, AllowedKey::AdSlotType]
+                    .into_iter()
+                    .collect(),
+            ),
             None,
         )
         .await
@@ -563,7 +518,11 @@ mod test {
         let analytics_response = analytics(
             req,
             &app,
-            Some(vec!["country".into(), "ad_slot_type".into()]),
+            Some(
+                vec![AllowedKey::Country, AllowedKey::AdSlotType]
+                    .into_iter()
+                    .collect(),
+            ),
             None,
         )
         .await;
@@ -583,7 +542,11 @@ mod test {
         let analytics_response = analytics(
             req,
             &app,
-            Some(vec!["country".into(), "ad_slot_type".into()]),
+            Some(
+                vec![AllowedKey::Country, AllowedKey::AdSlotType]
+                    .into_iter()
+                    .collect(),
+            ),
             None,
         )
         .await;
@@ -603,7 +566,11 @@ mod test {
         let analytics_response = analytics(
             req,
             &app,
-            Some(vec!["country".into(), "ad_slot_type".into()]),
+            Some(
+                vec![AllowedKey::Country, AllowedKey::AdSlotType]
+                    .into_iter()
+                    .collect(),
+            ),
             None,
         )
         .await;
@@ -623,7 +590,11 @@ mod test {
         let analytics_response = analytics(
             req,
             &app,
-            Some(vec!["country".into(), "ad_slot_type".into()]),
+            Some(
+                vec![AllowedKey::Country, AllowedKey::AdSlotType]
+                    .into_iter()
+                    .collect(),
+            ),
             None,
         )
         .await
@@ -649,7 +620,11 @@ mod test {
         let analytics_response = analytics(
             req,
             &app,
-            Some(vec!["country".into(), "ad_slot_type".into()]),
+            Some(
+                vec![AllowedKey::Country, AllowedKey::AdSlotType]
+                    .into_iter()
+                    .collect(),
+            ),
             None,
         )
         .await
@@ -675,7 +650,11 @@ mod test {
         let analytics_response = analytics(
             req,
             &app,
-            Some(vec!["country".into(), "ad_slot_type".into()]),
+            Some(
+                vec![AllowedKey::Country, AllowedKey::AdSlotType]
+                    .into_iter()
+                    .collect(),
+            ),
             None,
         )
         .await
@@ -702,7 +681,11 @@ mod test {
         let analytics_response = analytics(
             req,
             &app,
-            Some(vec!["country".into(), "ad_slot_type".into()]),
+            Some(
+                vec![AllowedKey::Country, AllowedKey::AdSlotType]
+                    .into_iter()
+                    .collect(),
+            ),
             None,
         )
         .await
@@ -727,7 +710,11 @@ mod test {
         let analytics_response = analytics(
             req,
             &app,
-            Some(vec!["country".into(), "ad_slot_type".into()]),
+            Some(
+                vec![AllowedKey::Country, AllowedKey::AdSlotType]
+                    .into_iter()
+                    .collect(),
+            ),
             None,
         )
         .await
@@ -754,12 +741,8 @@ mod test {
             metric: Metric::Count,
             timeframe: Timeframe::Day,
             segment_by: None,
-            start: Some(AnalyticsQueryTime::Timestamp(
-                start_date.to_datetime().timestamp(),
-            )),
-            end: Some(AnalyticsQueryTime::Timestamp(
-                end_date.to_datetime().timestamp(),
-            )),
+            start: Some(start_date),
+            end: Some(end_date),
             campaign_id: None,
             ad_unit: None,
             ad_slot: None,
@@ -778,7 +761,11 @@ mod test {
         let analytics_response = analytics(
             req,
             &app,
-            Some(vec!["country".into(), "ad_slot_type".into()]),
+            Some(
+                vec![AllowedKey::Country, AllowedKey::AdSlotType]
+                    .into_iter()
+                    .collect(),
+            ),
             None,
         )
         .await
@@ -959,9 +946,14 @@ mod test {
             .body(Body::empty())
             .expect("Should build Request");
 
-        let analytics_response = analytics(req, &app, None, Some("publisher".to_string()))
-            .await
-            .expect("Should get analytics data");
+        let analytics_response = analytics(
+            req,
+            &app,
+            None,
+            Some(AuthenticateAs::Publisher(publisher_auth.uid)),
+        )
+        .await
+        .expect("Should get analytics data");
         let json = hyper::body::to_bytes(analytics_response.into_body())
             .await
             .expect("Should get json");
@@ -980,9 +972,14 @@ mod test {
             .body(Body::empty())
             .expect("Should build Request");
 
-        let analytics_response = analytics(req, &app, None, Some("advertiser".to_string()))
-            .await
-            .expect("Should get analytics data");
+        let analytics_response = analytics(
+            req,
+            &app,
+            None,
+            Some(AuthenticateAs::Advertiser(publisher_auth.uid)),
+        )
+        .await
+        .expect("Should get analytics data");
         let json = hyper::body::to_bytes(analytics_response.into_body())
             .await
             .expect("Should get json");
@@ -1023,20 +1020,18 @@ mod test {
             event_type: "CLICK".into(),
             metric: Metric::Count,
             timeframe: Timeframe::Day,
-            segment_by: Some("country".into()),
-            start: Some(AnalyticsQueryTime::Date(start_date)),
-            end: Some(AnalyticsQueryTime::Date(end_date)),
-            campaign_id: Some(AnalyticsQueryKey::CampaignId(DUMMY_CAMPAIGN.id)),
-            ad_unit: Some(AnalyticsQueryKey::IPFS(DUMMY_IPFS[0])),
-            ad_slot: Some(AnalyticsQueryKey::IPFS(DUMMY_IPFS[1])),
-            ad_slot_type: Some(AnalyticsQueryKey::String("TEST_TYPE".into())),
-            advertiser: Some(AnalyticsQueryKey::Address(ADDRESSES["creator"])),
-            publisher: Some(AnalyticsQueryKey::Address(ADDRESSES["publisher"])),
-            hostname: Some(AnalyticsQueryKey::String("localhost".into())),
-            country: Some(AnalyticsQueryKey::String("Bulgaria".into())),
-            os_name: Some(AnalyticsQueryKey::OperatingSystem(OperatingSystem::map_os(
-                "Windows",
-            ))),
+            segment_by: Some(AllowedKey::Country),
+            start: Some(start_date),
+            end: Some(end_date),
+            campaign_id: Some(DUMMY_CAMPAIGN.id),
+            ad_unit: Some(DUMMY_IPFS[0]),
+            ad_slot: Some(DUMMY_IPFS[1]),
+            ad_slot_type: Some("TEST_TYPE".into()),
+            advertiser: Some(ADDRESSES["creator"]),
+            publisher: Some(ADDRESSES["publisher"]),
+            hostname: Some("localhost".into()),
+            country: Some("Bulgaria".into()),
+            os_name: Some(OperatingSystem::map_os("Windows")),
         };
         let query = serde_urlencoded::to_string(query).expect("should parse query");
         let req = Request::builder()
@@ -1058,17 +1053,19 @@ mod test {
             fetched_analytics.get(0).unwrap().value,
             UnifiedNum::from_u64(1)
         );
-        // test with no authUid
-        let req = Request::builder()
-            .uri("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day")
-            .body(Body::empty())
-            .expect("Should build Request");
 
-        let analytics_response = analytics(req, &app, None, Some("publisher".to_string())).await;
-        let err_msg = "auth_as_key is provided but there is no Auth object".to_string();
-        assert!(matches!(
-            analytics_response,
-            Err(ResponseError::BadRequest(err_msg))
-        ));
+        // TODO: Move test to a analytics_router test
+        // test with no authUid
+        // let req = Request::builder()
+        //     .uri("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day")
+        //     .body(Body::empty())
+        //     .expect("Should build Request");
+
+        // let analytics_response = analytics(req, &app, None, Some(AuthenticateAs::Publisher())).await;
+        // let err_msg = "auth_as_key is provided but there is no Auth object".to_string();
+        // assert!(matches!(
+        //     analytics_response,
+        //     Err(ResponseError::BadRequest(err_msg))
+        // ));
     }
 }

@@ -1,25 +1,27 @@
+use std::collections::HashSet;
+
 use chrono::{DateTime, Utc};
+use futures::TryStreamExt;
 use primitives::{
-    analytics::{AnalyticsQuery, AnalyticsQueryTime, AuthenticateAs, Metric},
-    sentry::{Analytics, FetchedAnalytics, UpdateAnalytics},
+    analytics::{query::AllowedKey, AnalyticsQuery, AuthenticateAs, Metric},
+    sentry::{Analytics, DateHour, FetchedAnalytics, UpdateAnalytics},
     UnifiedNum,
 };
-use tokio_postgres::types::ToSql;
+use tokio_postgres::{types::ToSql, Row};
 
 use super::{DbPool, PoolError};
 
+/// If no
 pub async fn get_analytics(
     pool: &DbPool,
-    start_date: &AnalyticsQueryTime,
-    query: &AnalyticsQuery,
-    allowed_keys: Vec<&str>,
+    query: AnalyticsQuery,
+    allowed_keys: HashSet<AllowedKey>,
     auth_as: Option<AuthenticateAs>,
     limit: u32,
 ) -> Result<Vec<FetchedAnalytics>, PoolError> {
     let client = pool.get().await?;
 
-    let (where_clauses, params) =
-        analytics_query_params(start_date, query, &auth_as, &allowed_keys);
+    let (where_clauses, params) = analytics_query_params(&query, auth_as.as_ref(), &allowed_keys);
 
     let mut select_clause = vec!["time".to_string()];
     match &query.metric {
@@ -44,14 +46,16 @@ pub async fn get_analytics(
 
     // execute query
     let stmt = client.prepare(&sql_query).await?;
-    let rows = client.query(&stmt, params.as_slice()).await?;
+    let rows: Vec<Row> = client.query_raw(&stmt, params).await?.try_collect().await?;
 
     let analytics: Vec<FetchedAnalytics> = rows
         .iter()
         .map(|row| {
+            let query = query.clone();
+
             // Since segment_by is a dynamic value/type it can't be passed to from<&Row> so we're building the object here
-            let segment_value = match &query.segment_by {
-                Some(segment_by) => row.try_get(&**segment_by).ok(),
+            let segment_value = match query.segment_by.as_ref() {
+                Some(segment_by) => row.try_get(segment_by.to_string().as_str()).ok(),
                 None => None,
             };
             let time = row.get::<_, DateTime<Utc>>("time");
@@ -59,11 +63,11 @@ pub async fn get_analytics(
                 Metric::Paid => row.get("value"),
                 Metric::Count => {
                     let count: i32 = row.get("value");
-                    UnifiedNum::from_u64(count as u64)
+                    UnifiedNum::from_u64(u64::from(count.unsigned_abs()))
                 }
             };
             FetchedAnalytics {
-                time: time.timestamp(),
+                time,
                 value,
                 segment: segment_value,
             }
@@ -73,41 +77,48 @@ pub async fn get_analytics(
     Ok(analytics)
 }
 
-fn analytics_query_params<'a>(
-    start_date: &'a AnalyticsQueryTime,
-    query: &'a AnalyticsQuery,
-    auth_as: &'a Option<AuthenticateAs>,
-    allowed_keys: &[&str],
-) -> (Vec<String>, Vec<&'a (dyn ToSql + Sync)>) {
-    let mut where_clauses: Vec<String> = vec!["time >= $1".to_string()];
-    let mut params: Vec<&(dyn ToSql + Sync)> = vec![start_date];
+fn analytics_query_params(
+    query: &AnalyticsQuery,
+    auth_as: Option<&AuthenticateAs>,
+    allowed_keys: &HashSet<AllowedKey>,
+) -> (Vec<String>, Vec<Box<(dyn ToSql + Sync + Send)>>) {
+    // TODO: Use default value instead of unwrapping
+    let start_date = query
+        .start
+        .clone()
+        .unwrap_or_else(|| DateHour::now() - &query.timeframe);
 
-    allowed_keys.iter().for_each(|key| {
-        if let Some(param_value) = query.get_key(key) {
-            where_clauses.push(format!("{} = ${}", key, params.len() + 1));
-            params.push(param_value);
-        }
-    });
+    let mut where_clauses = vec!["time >= $1".to_string()];
+    let mut params: Vec<Box<(dyn ToSql + Sync + Send)>> = vec![Box::new(start_date)];
 
-    if let Some(auth_as) = auth_as {
-        match auth_as {
-            AuthenticateAs::Publisher(uid) => {
-                where_clauses.push(format!("publisher = ${}", params.len() + 1));
-                params.push(uid);
-            }
-            AuthenticateAs::Advertiser(uid) => {
-                where_clauses.push(format!("advertiser = ${}", params.len() + 1));
-                params.push(uid);
-            }
+    // for all allowed keys for this query
+    // insert parameter into the SQL if there is a value set for it
+    for allowed_key in allowed_keys.iter() {
+        let value = query.get_key(*allowed_key);
+        if let Some(value) = value {
+            where_clauses.push(format!("{} = ${}", allowed_key, params.len() + 1));
+            params.push(value);
         }
+    }
+
+    match auth_as {
+        Some(AuthenticateAs::Publisher(uid)) => {
+            where_clauses.push(format!("publisher = ${}", params.len() + 1));
+            params.push(Box::new(*uid));
+        }
+        Some(AuthenticateAs::Advertiser(uid)) => {
+            where_clauses.push(format!("advertiser = ${}", params.len() + 1));
+            params.push(Box::new(*uid));
+        }
+        _ => {}
     }
 
     if let Some(end_date) = &query.end {
         where_clauses.push(format!("time <= ${}", params.len() + 1));
-        params.push(end_date);
+        params.push(Box::new(end_date.clone()));
     }
     where_clauses.push(format!("event_type = ${}", params.len() + 1));
-    params.push(&query.event_type);
+    params.push(Box::new(query.event_type.clone()));
 
     where_clauses.push(format!("{} IS NOT NULL", query.metric.column_name()));
 
