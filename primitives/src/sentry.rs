@@ -5,7 +5,10 @@ use crate::{
     validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
     Address, Balances, BigNum, CampaignId, Channel, ChannelId, UnifiedNum, ValidatorId, IPFS,
 };
-use chrono::{Date, DateTime, Duration, NaiveDate, TimeZone, Timelike, Utc};
+use chrono::{
+    serde::ts_milliseconds, Date, DateTime, Duration, NaiveDate, TimeZone, Timelike,
+    Utc,
+};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{collections::HashMap, fmt, hash::Hash, ops::Sub};
 use thiserror::Error;
@@ -207,7 +210,8 @@ pub struct Analytics {
 #[serde(rename_all = "camelCase")]
 pub struct FetchedAnalytics {
     // time is represented as a timestamp
-    pub time: i64,
+    #[serde(with = "ts_milliseconds")]
+    pub time: DateTime<Utc>,
     pub value: UnifiedNum,
     // We can't know the exact segment type but it can always be represented as a string
     pub segment: Option<String>,
@@ -716,27 +720,6 @@ pub mod campaign_create {
         }
     }
 
-    // /// This implementation helps with test setup
-    // /// **NOTE:** It erases the CampaignId, since the creation of the campaign gives it's CampaignId
-    // impl From<Campaign> for CreateCampaign {
-    //     fn from(campaign: Campaign) -> Self {
-    //         Self {
-    //             id: Some(campaign.id),
-    //             channel: campaign.channel,
-    //             creator: campaign.creator,
-    //             budget: campaign.budget,
-    //             validators: campaign.validators,
-    //             title: campaign.title,
-    //             pricing_bounds: campaign.pricing_bounds,
-    //             event_submission: campaign.event_submission,
-    //             ad_units: campaign.ad_units,
-    //             targeting_rules: campaign.targeting_rules,
-    //             created: campaign.created,
-    //             active: campaign.active,
-    //         }
-    //     }
-    // }
-
     // All editable fields stored in one place, used for checking when a budget is changed
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     pub struct ModifyCampaign {
@@ -969,5 +952,28 @@ mod test {
             click_json,
             serde_json::to_value(click).expect("should serialize")
         );
+    }
+
+    #[test]
+    fn datehour_subtract_timeframe() {
+        // test with End of year
+        {
+            let datehour = DateHour::from_ymdh(2021, 12, 31, 22);
+
+            let yesterday = datehour - &Timeframe::Day;
+            let last_week = datehour - &Timeframe::Week;
+            let beginning_of_month = datehour - &Timeframe::Month;
+            let last_year = datehour - &Timeframe::Year;
+
+            pretty_assertions::assert_eq!(DateHour::from_ymdh(2021, 12, 30, 22), yesterday);
+            pretty_assertions::assert_eq!(DateHour::from_ymdh(2021, 12, 24, 22), last_week);
+            // Subtracting uses hours so result has different Hour!
+            pretty_assertions::assert_eq!(DateHour::from_ymdh(2021, 12, 1, 12), beginning_of_month);
+            pretty_assertions::assert_eq!(DateHour::from_ymdh(2020, 12, 31, 22), last_year);
+        }
+
+        let middle_of_month = DateHour::from_ymdh(2021, 12, 14, 12) - &Timeframe::Month;
+        // Subtracting uses hours so result has different Hour!
+        pretty_assertions::assert_eq!(DateHour::from_ymdh(2021, 11, 14, 2), middle_of_month);
     }
 }
