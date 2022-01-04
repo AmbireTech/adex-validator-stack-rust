@@ -13,7 +13,7 @@ use std::{collections::HashMap, fmt, sync::Arc};
 #[derive(Debug, Clone)]
 pub struct DummyAdapter {
     identity: ValidatorId,
-    config: Config,
+    _config: Config,
     // Auth tokens that we have verified (tokenId => session)
     session_tokens: HashMap<String, ValidatorId>,
     // Auth tokens that we've generated to authenticate with someone (address => token)
@@ -61,7 +61,7 @@ impl DummyAdapter {
     pub fn init(opts: DummyAdapterOptions, config: &Config) -> Self {
         Self {
             identity: opts.dummy_identity,
-            config: config.to_owned(),
+            _config: config.to_owned(),
             session_tokens: opts.dummy_auth,
             authorization_tokens: opts.dummy_auth_tokens,
             deposits: Default::default(),
