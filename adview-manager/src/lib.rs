@@ -6,6 +6,7 @@ use adex_primitives::{
     supermarket::units_for_slot,
     supermarket::units_for_slot::response::{AdUnit, Campaign},
     targeting::{self, input},
+    sentry::Event,
     Address, BigNum, CampaignId, ToHex, UnifiedNum, IPFS,
 };
 use async_std::{sync::RwLock, task::block_on};
@@ -70,18 +71,6 @@ pub struct HistoryEntry {
     unit_id: IPFS,
     campaign_id: CampaignId,
     slot_id: IPFS,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct Event {
-    #[serde(rename = "type")]
-    event_type: String,
-    publisher: Address,
-    ad_unit: IPFS,
-    ad_slot: IPFS,
-    #[serde(rename = "ref")]
-    referrer: String,
 }
 
 #[derive(Serialize)]
@@ -211,18 +200,22 @@ pub fn get_unit_html_with_events(
     validators: &Validators,
     no_impression: impl Into<bool>,
 ) -> String {
-    let get_body = |event_type: &str| EventBody {
-        events: vec![Event {
-            event_type: event_type.to_string(),
-            publisher: options.publisher_addr,
-            ad_unit: ad_unit.id,
-            ad_slot: options.market_slot,
-            referrer: "document.referrer".to_string(),
-        }],
-    };
-
     let get_fetch_code = |event_type: &str| -> String {
-        let body = serde_json::to_string(&get_body(event_type))
+        let event = match event_type {
+            "CLICK" => Event::Click {
+                publisher: options.publisher_addr,
+                ad_unit: Some(ad_unit.id),
+                ad_slot: Some(options.market_slot),
+                referrer: Some("document.referrer".to_string()),
+            },
+            _ => Event::Impression {
+                publisher: options.publisher_addr,
+                ad_unit: Some(ad_unit.id),
+                ad_slot: Some(options.market_slot),
+                referrer: Some("document.referrer".to_string()),
+            }
+        };
+        let body = serde_json::to_string(&vec![event])
             .expect("It should always serialize EventBody");
 
         let fetch_opts = format!("var fetchOpts = {{ method: 'POST', headers: {{ 'content-type': 'application/json' }}, body: {} }};", body);
@@ -231,7 +224,7 @@ pub fn get_unit_html_with_events(
             .iter()
             .map(|validator| {
                 let fetch_url = format!(
-                    "{}/channel/{}/events?pubAddr={}",
+                    "{}/campaign/{}/events?pubAddr={}",
                     validator.url, campaign_id, options.publisher_addr
                 );
 
