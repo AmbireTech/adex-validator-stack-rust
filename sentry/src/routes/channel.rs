@@ -1,5 +1,5 @@
 use crate::db::{
-    accounting::{get_all_accountings_for_channel, Side},
+    accounting::{get_all_accountings_for_channel, update_accounting, Side},
     event_aggregate::{latest_approve_state_v5, latest_heartbeats, latest_new_state_v5},
     insert_channel, insert_validator_messages, list_channels,
     spendable::{fetch_spendable, get_all_spendables_for_channel, update_spendable},
@@ -310,6 +310,32 @@ pub async fn get_all_spender_limits<C: Locked + 'static>(
     Ok(success_response(serde_json::to_string(&res)?))
 }
 
+/// internally, to make the validator worker to add a spender leaf in NewState we'll just update Accounting
+pub async fn add_spender_leaf<C: Locked + 'static>(
+    req: Request<Body>,
+    app: &Application<C>,
+) -> Result<Response<Body>, ResponseError> {
+    let route_params = req
+        .extensions()
+        .get::<RouteParams>()
+        .expect("request should have route params");
+    let spender = Address::from_str(&route_params.index(1))?;
+
+    let channel = req
+        .extensions()
+        .get::<Channel>()
+        .expect("Request should have Channel")
+        .to_owned();
+
+    // TODO: Taken from AIP 61 issue `{$set: { amount: "${spent}": NumberLong(0) }}`, verify this is correct
+    update_accounting(app.pool.clone(), channel.id(), spender, Side::Spender, UnifiedNum::from_u64(0)).await?;
+
+    // TODO: Should we return an updated Accounting?
+    Ok(success_response(serde_json::to_string(&SuccessResponse {
+        success: true,
+    })?))
+}
+
 async fn get_corresponding_new_state(
     pool: &DbPool,
     logger: &Logger,
@@ -595,5 +621,68 @@ mod test {
             );
             assert_eq!(expected, res.expect_err("Should return an error"));
         }
+    }
+
+    #[tokio::test]
+    async fn adds_and_retrieves_spender_leaf() {
+        let app = setup_dummy_app().await;
+        let channel = DUMMY_CAMPAIGN.channel;
+
+        insert_channel(&app.pool, channel)
+            .await
+            .expect("should insert channel");
+
+        let build_request = |channel: Channel| {
+            Request::builder()
+                .extension(channel)
+                .body(Body::empty())
+                .expect("Should build Request")
+        };
+
+        let mut balances = Balances::<CheckedState>::new();
+        balances
+            .spend(
+                ADDRESSES["creator"],
+                ADDRESSES["publisher"],
+                UnifiedNum::from_u64(200),
+            )
+            .expect("should not overflow");
+        balances
+            .spend(
+                ADDRESSES["tester"],
+                ADDRESSES["publisher2"],
+                UnifiedNum::from_u64(100),
+            )
+            .expect("Should not overflow");
+        spend_amount(app.pool.clone(), channel.id(), balances.clone())
+            .await
+            .expect("should spend");
+
+        let res = get_accounting_for_channel(build_request(channel), &app)
+            .await
+            .expect("should get response");
+        assert_eq!(StatusCode::OK, res.status());
+
+        let accounting_response = res_to_accounting_response(res).await;
+
+        assert_eq!(balances, accounting_response.balances);
+
+        let param = RouteParams(vec![channel.id().to_string(), ADDRESSES["creator"].to_string()]);
+        let req = Request::builder()
+            .extension(channel)
+            .extension(param)
+            .body(Body::empty())
+            .expect("Should build Request");
+        let res = add_spender_leaf(req, &app).await.expect("Should add");
+        assert_eq!(StatusCode::OK, res.status());
+
+        let res = get_accounting_for_channel(build_request(channel), &app)
+            .await
+            .expect("should get response");
+        assert_eq!(StatusCode::OK, res.status());
+
+        let accounting_response = res_to_accounting_response(res).await;
+
+        assert_eq!(balances.spenders.get(&ADDRESSES["creator"]), Some(&UnifiedNum::from_u64(0)));
     }
 }

@@ -26,7 +26,7 @@ use {
         cfg::config,
         channel::{
             channel_list, create_validator_messages, get_accounting_for_channel,
-            get_all_spender_limits, get_spender_limits, last_approved,
+            get_all_spender_limits, get_spender_limits, last_approved, add_spender_leaf
         },
         event_aggregate::list_channel_event_aggregates,
         validator_message::{extract_params, list_validator_messages},
@@ -396,6 +396,22 @@ async fn channels_router<C: Locked + 'static>(
             .await?;
 
         get_spender_limits(req, app).await
+    } else if let (Some(caps), &Method::POST) = (CHANNEL_SPENDER_LEAF_AND_TOTAL_DEPOSITED.captures(&path), method,)
+    {
+        let param = RouteParams(vec![
+            caps.get(1)
+                .map_or("".to_string(), |m| m.as_str().to_string()), // channel ID
+            caps.get(2)
+                .map_or("".to_string(), |m| m.as_str().to_string()), // spender addr
+        ]);
+        req.extensions_mut().insert(param);
+        req = Chain::new()
+            .chain(AuthRequired)
+            .chain(ChannelLoad)
+            .apply(req, app)
+            .await?;
+
+        add_spender_leaf(req, app).await
     } else if let (Some(caps), &Method::GET) = (CHANNEL_ALL_SPENDER_LIMITS.captures(&path), method)
     {
         let param = RouteParams(vec![caps
