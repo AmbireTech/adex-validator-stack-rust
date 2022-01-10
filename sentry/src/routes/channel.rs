@@ -645,6 +645,33 @@ mod test {
                 .body(Body::empty())
                 .expect("Should build Request")
         };
+        let param = RouteParams(vec![
+            channel.id().to_string(),
+            ADDRESSES["creator"].to_string(),
+        ]);
+        // Calling with non-existant accounting
+        let req = Request::builder()
+            .extension(channel)
+            .extension(param)
+            .body(Body::empty())
+            .expect("Should build Request");
+        let res = add_spender_leaf(req, &app).await.expect("Should add");
+
+        let res = get_accounting_for_channel(build_request(channel), &app)
+            .await
+            .expect("should get response");
+        assert_eq!(StatusCode::OK, res.status());
+
+        let accounting_response = res_to_accounting_response(res).await;
+
+        // Making sure a new entry has been created
+        assert_eq!(
+            accounting_response
+                .balances
+                .spenders
+                .get(&ADDRESSES["creator"]),
+            Some(&UnifiedNum::from_u64(0)),
+        );
 
         let mut balances = Balances::<CheckedState>::new();
         balances
@@ -673,7 +700,6 @@ mod test {
         let accounting_response = res_to_accounting_response(res).await;
 
         assert_eq!(balances, accounting_response.balances);
-
         let param = RouteParams(vec![
             channel.id().to_string(),
             ADDRESSES["creator"].to_string(),
@@ -695,10 +721,13 @@ mod test {
 
         // Balances shouldn't change
         assert_eq!(
-            accounting_response.balances.spenders.get(&ADDRESSES["creator"]),
+            accounting_response
+                .balances
+                .spenders
+                .get(&ADDRESSES["creator"]),
             balances.spenders.get(&ADDRESSES["creator"]),
         );
 
-        // TODO: Test if updated field has changed
+        // TODO: Test if updated field has changed and/or validator worker test regarding this route
     }
 }
