@@ -1,15 +1,20 @@
 use chrono::Utc;
 use once_cell::sync::Lazy;
+use parse_display::{Display, FromStr};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, fmt};
+use std::collections::HashSet;
 
 use crate::sentry::DateHour;
 
 use super::Timeframe;
 
 /// When adding new [`AllowedKey`] make sure to update the [`ALLOWED_KEYS`] static value.
-#[derive(Debug, Serialize, Deserialize, Hash, PartialEq, Eq, Clone, Copy)]
+/// When (De)Serializing we use `camelCase`,
+/// however, when displaying and parsing the value, we use `snake_case`.
+/// The later is particular useful when using the value as column in SQL.
+#[derive(Debug, Serialize, Deserialize, Hash, PartialEq, Eq, Clone, Copy, Display, FromStr)]
 #[serde(rename_all = "camelCase")]
+#[display(style = "snake_case")]
 pub enum AllowedKey {
     CampaignId,
     AdUnit,
@@ -20,17 +25,6 @@ pub enum AllowedKey {
     Hostname,
     Country,
     OsName,
-}
-
-impl fmt::Display for AllowedKey {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let json_value = serde_json::to_value(self).expect("Should never fail serialization!");
-        let string = json_value
-            .as_str()
-            .expect("Json value should always be String!");
-
-        f.write_str(&string)
-    }
 }
 
 /// All [`AllowedKey`]s should be present in this static variable.
@@ -50,20 +44,52 @@ pub static ALLOWED_KEYS: Lazy<HashSet<AllowedKey>> = Lazy::new(|| {
     .collect()
 });
 
+// fn deserialize_query_time<'de, D>(deserializer: D) -> Result<Option<DateHour<Utc>>, D::Error>
+// where
+//     D: Deserializer<'de>,
+// {
+//     // let date_as_str = match Option::<&str>::deserialize(deserializer)? {
+//     //     Some(value) => value,
+//     //     // return early with None
+//     //     None => return Ok(None),
+//     // };
+
+//     let datehour = match ts_milliseconds_option::deserialize(deserializer) {
+//         Ok(Some(datetime)) => DateHour::try_from(datetime).map_err(serde::de::Error::custom)?,
+//         // return early with None
+//         Ok(None) => return Ok(None),
+//         // if we have an error trying to parse the value as milliseconds
+//         // try to deserialize from string
+//         Err(_err) => todo!(),
+//         // match Option::<&str>::deserialize(deserializer)? {
+//         //     Some(value) => {
+//         //         let datetime = DateTime::parse_from_rfc3339(value)
+//         //             .map(|fixed| DateTime::<Utc>::from(fixed))
+//         //             .map_err(serde::de::Error::custom)?;
+
+//         //         DateHour::try_from(datetime).map_err(serde::de::Error::custom)?
+//         //     }
+//         //     // return early with None
+//         //     None => return Ok(None),
+//         // },
+//     };
+
+//     Ok(Some(datehour))
+// }
+
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
 pub struct Time {
-    // pub struct Time<Tz: chrono::TimeZone> {
-    // #[serde(default = "default_timeframe")]
+    /// Default: [`Timeframe::Day`].
     pub timeframe: Timeframe,
-    /// The default value used will be [`DateHour::now`] - [`AnalyticsQuery::timeframe`]
+    /// Default value: [`DateHour::now`] - `self.timeframe`
     /// For this query parameter you can use either:
     /// - a string with RFC 3339 and ISO 8601 format (see [`chrono::DateTime::parse_from_rfc3339`])
     /// - a timestamp in milliseconds
     /// **Note:** [`DateHour`] rules should be uphold, this means that passed values should always be rounded to hours
     /// And it should not contain **minutes**, **seconds** or **nanoseconds**
-    // TODO: When deserializing AnalyticsQuery, take timeframe & timezone into account and impl Default value
+    // TODO: Either Timestamp (number) or DateTime (string) de/serialization
     pub start: DateHour<Utc>,
-    // #[serde(default, deserialize_with = "deserialize_query_time")]
+    /// End DateHour should be after Start DateHour!
     pub end: Option<DateHour<Utc>>,
     // we can use `chrono_tz` to support more Timezones when needed.
     // #[serde(default = "default_timezone_utc")]
@@ -133,6 +159,17 @@ mod de {
 
                     let timeframe = timeframe.unwrap_or(Timeframe::Day);
                     let start = start.unwrap_or_else(|| DateHour::now() - &timeframe);
+
+                    // if there is an End time passed, check if End is > Start
+                    match end {
+                        Some(end) if start > end => {
+                            return Err(de::Error::custom(
+                                "End time should be larger than the Start time",
+                            ));
+                        }
+                        _ => {}
+                    }
+
                     Ok(Time {
                         timeframe,
                         start,
@@ -172,7 +209,91 @@ mod test {
             );
         }
 
-        // default values for some fields
-        {}
+        // `Start` default value and no `End`
+        {
+            let timeframe_only = json!({
+                "timeframe": "week",
+            });
+
+            let time = from_value::<Time>(timeframe_only).expect("Should use default for start");
+            pretty_assertions::assert_eq!(
+                time,
+                Time {
+                    timeframe: Timeframe::Week,
+                    start: DateHour::now() - &Timeframe::Week,
+                    end: None
+                }
+            );
+        }
+
+        // all fields with same timezone
+        {
+            let full = json!({
+                "timeframe": "day",
+                "start": "2021-12-1T16:00:00+02:00",
+                "end": "2021-12-31T16:00:00+02:00"
+            });
+
+            let time = from_value::<Time>(full).expect("Should use default for start");
+            pretty_assertions::assert_eq!(
+                time,
+                Time {
+                    timeframe: Timeframe::Day,
+                    start: DateHour::from_ymdh(2021, 12, 1, 14),
+                    end: Some(DateHour::from_ymdh(2021, 12, 31, 14)),
+                }
+            );
+        }
+
+        // All fields with different timezones
+        {
+            let full = json!({
+                "timeframe": "day",
+                "start": "2021-12-1T16:00:00+00:00",
+                "end": "2021-12-31T16:00:00+02:00"
+            });
+
+            let time = from_value::<Time>(full).expect("Should deserialize");
+            pretty_assertions::assert_eq!(
+                time,
+                Time {
+                    timeframe: Timeframe::Day,
+                    start: DateHour::from_ymdh(2021, 12, 1, 16),
+                    end: Some(DateHour::from_ymdh(2021, 12, 31, 14)),
+                }
+            );
+        }
+
+        // Start > End
+        {
+            let full = json!({
+                "timeframe": "day",
+                "start": "2021-12-16T16:00:00+00:00",
+                "end": "2021-12-15T16:00:00+02:00"
+            });
+
+            let err = from_value::<Time>(full).expect_err("Should error because Start > End");
+
+            assert_eq!(
+                "End time should be larger than the Start time",
+                err.to_string()
+            );
+        }
+
+        // Start = End with different timezones
+        {
+            let full = json!({
+                "timeframe": "day",
+                "start": "2021-12-16T14:00:00+00:00",
+                "end": "2021-12-16T16:00:00+02:00"
+            });
+
+            let err = from_value::<Time>(full).expect_err("Should error because Start = End");
+
+            assert_eq!(
+                "End time should be larger than the Start time",
+                err.to_string()
+            );
+        }
     }
 }

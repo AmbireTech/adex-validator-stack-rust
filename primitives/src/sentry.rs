@@ -6,11 +6,16 @@ use crate::{
     Address, Balances, BigNum, CampaignId, Channel, ChannelId, UnifiedNum, ValidatorId, IPFS,
 };
 use chrono::{
-    serde::ts_milliseconds, Date, DateTime, Duration, NaiveDate, TimeZone, Timelike,
-    Utc,
+    serde::ts_milliseconds, Date, DateTime, Duration, NaiveDate, TimeZone, Timelike, Utc,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::{collections::HashMap, fmt, hash::Hash, ops::Sub};
+use std::{
+    cmp::{Ord, Ordering},
+    collections::HashMap,
+    fmt,
+    hash::Hash,
+    ops::Sub,
+};
 use thiserror::Error;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -225,7 +230,7 @@ pub struct DateHourError {
     pub nanoseconds: u32,
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Hash)]
 /// [`DateHour`] holds the date and hour (only).
 /// It uses [`chrono::DateTime`] when serializing and deserializing.
 /// When serializing it always sets minutes and seconds to `0` (zero).
@@ -235,6 +240,37 @@ pub struct DateHour<Tz: TimeZone> {
     pub date: Date<Tz>,
     /// hour is in the range of `0 - 23`
     pub hour: u32,
+}
+
+impl<Tz: TimeZone> Eq for DateHour<Tz> {}
+
+impl<Tz: TimeZone, Tz2: TimeZone> PartialEq<DateHour<Tz2>> for DateHour<Tz> {
+    fn eq(&self, other: &DateHour<Tz2>) -> bool {
+        self.date == other.date && self.hour == other.hour
+    }
+}
+
+impl<Tz: TimeZone> Ord for DateHour<Tz> {
+    fn cmp(&self, other: &DateHour<Tz>) -> Ordering {
+        self.date.cmp(&other.date)
+    }
+}
+
+impl<Tz: TimeZone, Tz2: TimeZone> PartialOrd<DateHour<Tz2>> for DateHour<Tz> {
+    /// Compare two DateHours based on their true time, ignoring time zones
+    ///
+    /// See [`DateTime`] implementation of `PartialOrd<DateTime<Tz2>>` for more details.
+    fn partial_cmp(&self, other: &DateHour<Tz2>) -> Option<Ordering> {
+        if self.date == other.date {
+            if self.hour > other.hour {
+                Some(Ordering::Greater)
+            } else {
+                Some(Ordering::Less)
+            }
+        } else {
+            self.date.naive_utc().partial_cmp(&other.date.naive_utc())
+        }
+    }
 }
 
 impl<Tz: TimeZone> fmt::Display for DateHour<Tz>
@@ -885,7 +921,7 @@ mod postgres {
                 publisher: row.get("publisher"),
                 hostname,
                 country,
-                os_name: row.get("os"),
+                os_name: row.get("os_name"),
                 event_type: row.get("event_type"),
                 payout_amount: row.get("payout_amount"),
                 payout_count: row.get::<_, i32>("payout_count").unsigned_abs(),
@@ -929,7 +965,7 @@ mod postgres {
 mod test {
     use super::*;
     use crate::util::tests::prep_db::{ADDRESSES, DUMMY_IPFS};
-    use serde_json::json;
+    use serde_json::{json, Value};
 
     #[test]
     pub fn de_serialize_events() {
@@ -975,5 +1011,33 @@ mod test {
         let middle_of_month = DateHour::from_ymdh(2021, 12, 14, 12) - &Timeframe::Month;
         // Subtracting uses hours so result has different Hour!
         pretty_assertions::assert_eq!(DateHour::from_ymdh(2021, 11, 14, 2), middle_of_month);
+    }
+
+    #[test]
+    fn datehour_de_serialize_partial_ord_and_eq() {
+        let earlier = DateHour::from_ymdh(2021, 12, 1, 16);
+        let later = DateHour::from_ymdh(2021, 12, 31, 16);
+
+        // Partial Eq
+        assert!(earlier < later);
+        assert!(!earlier.eq(&later));
+        assert!(earlier.eq(&earlier));
+
+        // Partial Ord
+        assert_eq!(Some(Ordering::Less), earlier.partial_cmp(&later));
+        assert_eq!(Some(Ordering::Greater), later.partial_cmp(&earlier));
+
+        // Serialize & deserialize
+        let json_datetime = Value::String("2021-12-1T16:00:00+02:00".into());
+        let datehour: DateHour<Utc> =
+            serde_json::from_value(json_datetime.clone()).expect("Should deserialize");
+        assert_eq!(
+            DateHour::from_ymdh(2021, 12, 1, 12),
+            datehour,
+            "Deserialized DateHour should be 2 hours earlier to match UTC +0"
+        );
+
+        let serialized_value = serde_json::to_value(datehour).expect("Should serialize DateHour");
+        assert_eq!(json_datetime, serialized_value);
     }
 }

@@ -3,15 +3,14 @@ use std::collections::HashSet;
 use chrono::{DateTime, Utc};
 use futures::TryStreamExt;
 use primitives::{
-    analytics::{query::AllowedKey, AnalyticsQuery, AuthenticateAs, Metric},
-    sentry::{Analytics, DateHour, FetchedAnalytics, UpdateAnalytics},
+    analytics::{query::AllowedKey, AnalyticsQuery, AuthenticateAs, Metric, Timeframe},
+    sentry::{Analytics, FetchedAnalytics, UpdateAnalytics},
     UnifiedNum,
 };
 use tokio_postgres::{types::ToSql, Row};
 
 use super::{DbPool, PoolError};
 
-/// If no
 pub async fn get_analytics(
     pool: &DbPool,
     query: AnalyticsQuery,
@@ -23,29 +22,59 @@ pub async fn get_analytics(
 
     let (where_clauses, params) = analytics_query_params(&query, auth_as.as_ref(), &allowed_keys);
 
-    let mut select_clause = vec!["time".to_string()];
-    match &query.metric {
-        Metric::Paid => select_clause.push("payout_amount as value".to_string()),
-        Metric::Count => select_clause.push("payout_count as value".to_string()),
-    }
-    let mut group_clause = vec!["time".to_string()];
+    // "make_timestamp()";
+    // make_timestamptz(COALESCE(2013, 7, 15, 8, 15, 23.5, 'UTC')
 
+    let time_group = match &query.time.timeframe {
+        Timeframe::Year => "date_trunc('month', analytics.time) as timeframe_time",
+        Timeframe::Month => "date_trunc('day', analytics.time) as timeframe_time",
+        Timeframe::Week | Timeframe::Day => "date_trunc('hour', analytics.time) as timeframe_time",
+    };
+    // let time_group = {
+    //     let extract_from =
+    //         // |part: &str| -> String { format!("EXTRACT({} FROM TIMESTAMPTZ time)", part) };
+    //         |part: &str| -> String { format!("EXTRACT({} FROM time)", part) };
+
+    //     match &query.time.timeframe {
+    //         Timeframe::Year => vec![extract_from("YEAR"), extract_from("MONTH")],
+    //         Timeframe::Month => vec![
+    //             extract_from("YEAR"),
+    //             extract_from("MONTH"),
+    //             extract_from("DAY"),
+    //         ],
+    //         Timeframe::Week | Timeframe::Day => vec![
+    //             extract_from("YEAR"),
+    //             extract_from("MONTH"),
+    //             extract_from("DAY"),
+    //             extract_from("HOUR"),
+    //         ],
+    //     }
+    // };
+
+    let mut select_clause = vec![time_group.to_string()];
+    match &query.metric {
+        Metric::Paid => select_clause.push("SUM(payout_amount)::bigint as value".to_string()),
+        Metric::Count => select_clause.push("SUM(payout_count)::integer as value".to_string()),
+    }
+    // always group first by the **date_trunc** time
+    let mut group_clause = vec!["timeframe_time".to_string()];
+
+    // if segment by was passed, use it in group second & select by it
     if let Some(segment_by) = &query.segment_by {
         select_clause.push(segment_by.to_string());
         group_clause.push(segment_by.to_string());
     }
 
-    // TODO: Is a GROUP BY clause really needed here as we call merge_analytics() later and get the same output
     let sql_query = format!(
-        "SELECT {} FROM analytics WHERE {} ORDER BY time ASC LIMIT {}",
+        "SELECT {} FROM analytics WHERE {} GROUP BY {} ORDER BY timeframe_time ASC LIMIT {}",
         select_clause.join(", "),
         where_clauses.join(" AND "),
-        // group_clause.join(", "),
+        group_clause.join(", "),
         limit,
     );
 
     // execute query
-    let stmt = client.prepare(&sql_query).await?;
+    let stmt = client.prepare(dbg!(&sql_query)).await?;
     let rows: Vec<Row> = client.query_raw(&stmt, params).await?.try_collect().await?;
 
     let analytics: Vec<FetchedAnalytics> = rows
@@ -58,7 +87,7 @@ pub async fn get_analytics(
                 Some(segment_by) => row.try_get(segment_by.to_string().as_str()).ok(),
                 None => None,
             };
-            let time = row.get::<_, DateTime<Utc>>("time");
+            let time = row.get::<_, DateTime<Utc>>("timeframe_time");
             let value = match &query.metric {
                 Metric::Paid => row.get("value"),
                 Metric::Count => {
@@ -82,14 +111,8 @@ fn analytics_query_params(
     auth_as: Option<&AuthenticateAs>,
     allowed_keys: &HashSet<AllowedKey>,
 ) -> (Vec<String>, Vec<Box<(dyn ToSql + Sync + Send)>>) {
-    // TODO: Use default value instead of unwrapping
-    let start_date = query
-        .start
-        .clone()
-        .unwrap_or_else(|| DateHour::now() - &query.timeframe);
-
-    let mut where_clauses = vec!["time >= $1".to_string()];
-    let mut params: Vec<Box<(dyn ToSql + Sync + Send)>> = vec![Box::new(start_date)];
+    let mut where_clauses = vec!["\"time\" >= $1".to_string()];
+    let mut params: Vec<Box<(dyn ToSql + Sync + Send)>> = vec![Box::new(query.time.start.clone())];
 
     // for all allowed keys for this query
     // insert parameter into the SQL if there is a value set for it
@@ -101,6 +124,7 @@ fn analytics_query_params(
         }
     }
 
+    // IMPORTANT FOR SECURITY: this must be LAST so that query.publisher/query.advertiser cannot override it
     match auth_as {
         Some(AuthenticateAs::Publisher(uid)) => {
             where_clauses.push(format!("publisher = ${}", params.len() + 1));
@@ -113,8 +137,8 @@ fn analytics_query_params(
         _ => {}
     }
 
-    if let Some(end_date) = &query.end {
-        where_clauses.push(format!("time <= ${}", params.len() + 1));
+    if let Some(end_date) = &query.time.end {
+        where_clauses.push(format!("\"time\" <= ${}", params.len() + 1));
         params.push(Box::new(end_date.clone()));
     }
     where_clauses.push(format!("event_type = ${}", params.len() + 1));
@@ -132,11 +156,11 @@ pub async fn update_analytics(
 ) -> Result<Analytics, PoolError> {
     let client = pool.get().await?;
 
-    let query = "INSERT INTO analytics(campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os, event_type, payout_amount, payout_count)
+    let query = "INSERT INTO analytics(campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os_name, event_type, payout_amount, payout_count)
     VALUES ($1, date_trunc('hour', cast($2 as timestamp with time zone)), $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
     ON CONFLICT ON CONSTRAINT analytics_pkey DO UPDATE
     SET payout_amount = analytics.payout_amount + $12, payout_count = analytics.payout_count + 1
-    RETURNING campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os, event_type, payout_amount, payout_count";
+    RETURNING campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os_name, event_type, payout_amount, payout_count";
 
     let stmt = client.prepare(query).await?;
 
@@ -179,10 +203,10 @@ pub async fn update_analytics(
 mod test {
     use super::*;
     use primitives::{
-        analytics::OperatingSystem,
+        analytics::{OperatingSystem, query::{Time, ALLOWED_KEYS}},
         sentry::DateHour,
         util::tests::prep_db::{ADDRESSES, DUMMY_AD_UNITS, DUMMY_CAMPAIGN, DUMMY_IPFS},
-        UnifiedNum,
+        UnifiedNum, test_util::{PUBLISHER, CREATOR}, IPFS, AdUnit,
     };
 
     use crate::db::tests_postgres::{setup_test_migrations, DATABASE_POOL};
@@ -278,5 +302,77 @@ mod test {
             assert_eq!(insert_res.hostname, analytics_with_empty_fields.hostname);
             assert_eq!(insert_res.country, analytics_with_empty_fields.country);
         }
+    }
+
+    #[tokio::test]
+    async fn test_get_analytics() {
+        let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
+
+        let ad_unit = DUMMY_AD_UNITS[0].clone();
+        let ad_slot_ipfs = DUMMY_IPFS[0];
+        
+        setup_test_migrations(database.pool.clone())
+        .await
+        .expect("Migrations should succeed");
+
+        generate_analytics(&database.pool, &ad_unit, ad_slot_ipfs).await;
+
+        let start_date = DateHour::from_ymdh(2021, 12, 1, 14);
+        let end_date = DateHour::from_ymdh(2022, 1, 1, 0);
+
+        let query = AnalyticsQuery {
+            limit: 1000,
+            event_type: "IMPRESSION".into(),
+            metric: Metric::Count,
+            segment_by: Some(AllowedKey::Country),
+            time: Time {
+                timeframe: Timeframe::Day,
+                start: start_date,
+                end: Some(end_date),
+            },
+            campaign_id: Some(DUMMY_CAMPAIGN.id),
+            ad_unit: Some(ad_unit.ipfs),
+            ad_slot: Some(ad_slot_ipfs),
+            ad_slot_type: Some(ad_unit.ad_type.clone()),
+            advertiser: Some(*CREATOR),
+            publisher: Some(*PUBLISHER),
+            hostname: Some("localhost".into()),
+            country: Some("Bulgaria".into()),
+            os_name: Some(OperatingSystem::Linux),
+        };
+
+
+        let results = get_analytics(&database.pool, query.clone(), ALLOWED_KEYS.clone(), None, query.limit).await.expect("Should fetch");
+        dbg!(results);
+    }
+
+    async fn generate_analytics(database: &DbPool, ad_unit: &AdUnit, ad_slot: IPFS) {
+        // let start = DateHour::from_ymdh(2021, 12, 1, 0);
+        for day in 1..=31_u32 {
+            for hour in 0..=23_u32 {
+                let analytics = UpdateAnalytics {
+                    time: DateHour::from_ymdh(2021, 12, day, hour),
+                    campaign_id: DUMMY_CAMPAIGN.id,
+                    ad_unit: Some(ad_unit.ipfs),
+                    ad_slot: Some(ad_slot),
+                    ad_slot_type: Some(ad_unit.ad_type.clone()),
+                    advertiser: *CREATOR,
+                    publisher: *PUBLISHER,
+                    hostname: Some("localhost".to_string()),
+                    country: Some("Bulgaria".to_string()),
+                    os_name: OperatingSystem::Linux,
+                    event_type: "IMPRESSION".to_string(),
+                    amount_to_add: UnifiedNum::from_u64(day as u64 * hour as u64 * 1_000_000),
+                    count_to_add: hour as i32,
+                };
+        
+                update_analytics(&database.clone(), analytics.clone())
+                    .await
+                    .expect("Should insert");
+            }
+            
+        }
+
+        
     }
 }

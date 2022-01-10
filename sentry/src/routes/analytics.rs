@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::{db::analytics::get_analytics, success_response, Application, Auth, ResponseError};
+use crate::{db::analytics::get_analytics, success_response, Application, ResponseError};
 use hyper::{Body, Request, Response};
 use primitives::{
     adapter::Adapter,
@@ -8,8 +8,6 @@ use primitives::{
         query::{AllowedKey, ALLOWED_KEYS},
         AnalyticsQuery, AuthenticateAs, ANALYTICS_QUERY_LIMIT,
     },
-    sentry::DateHour,
-    UnifiedNum,
 };
 
 pub async fn analytics<A: Adapter>(
@@ -18,12 +16,7 @@ pub async fn analytics<A: Adapter>(
     request_allowed: Option<HashSet<AllowedKey>>,
     authenticate_as: Option<AuthenticateAs>,
 ) -> Result<Response<Body>, ResponseError> {
-    let mut query = serde_urlencoded::from_str::<AnalyticsQuery>(req.uri().query().unwrap_or(""))?;
-
-    // TODO: Deserialize with default value & timezone directly in AnalyticsQuery
-    query.start = query
-        .start
-        .or_else(|| Some(DateHour::now() - &query.timeframe));
+    let query = serde_urlencoded::from_str::<AnalyticsQuery>(req.uri().query().unwrap_or(""))?;
 
     let applied_limit = query.limit.min(ANALYTICS_QUERY_LIMIT);
 
@@ -105,13 +98,14 @@ mod test {
         db::{analytics::update_analytics, DbPool},
         routes::analytics::analytics,
         test_util::setup_dummy_app,
-        ValidatorId,
+        Auth, ValidatorId,
     };
     use chrono::{Timelike, Utc};
     use primitives::{
-        analytics::{AnalyticsQueryKey, Metric, OperatingSystem, Timeframe},
-        sentry::{FetchedAnalytics, UpdateAnalytics},
+        analytics::{query::Time, Metric, OperatingSystem, Timeframe},
+        sentry::{DateHour, FetchedAnalytics, UpdateAnalytics},
         util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, DUMMY_IPFS},
+        UnifiedNum,
     };
 
     async fn insert_mock_analytics(pool: &DbPool) {
@@ -314,10 +308,12 @@ mod test {
             limit: 1000,
             event_type: "CLICK".into(),
             metric: Metric::Count,
-            timeframe: Timeframe::Day,
             segment_by: None,
-            start: Some(start_date),
-            end: None,
+            time: Time {
+                timeframe: Timeframe::Day,
+                start: start_date,
+                end: None,
+            },
             campaign_id: None,
             ad_unit: None,
             ad_slot: None,
@@ -364,10 +360,12 @@ mod test {
             limit: 1000,
             event_type: "CLICK".into(),
             metric: Metric::Count,
-            timeframe: Timeframe::Day,
             segment_by: None,
-            start: None,
-            end: Some(end_date),
+            time: Time {
+                timeframe: Timeframe::Day,
+                start: DateHour::now() - &Timeframe::Day,
+                end: Some(end_date),
+            },
             campaign_id: None,
             ad_unit: None,
             ad_slot: None,
@@ -417,10 +415,12 @@ mod test {
             limit: 1000,
             event_type: "CLICK".into(),
             metric: Metric::Count,
-            timeframe: Timeframe::Day,
             segment_by: None,
-            start: Some(start_date),
-            end: Some(end_date),
+            time: Time {
+                timeframe: Timeframe::Day,
+                start: start_date,
+                end: Some(end_date),
+            },
             campaign_id: None,
             ad_unit: None,
             ad_slot: None,
@@ -465,10 +465,12 @@ mod test {
             limit: 1000,
             event_type: "CLICK".into(),
             metric: Metric::Count,
-            timeframe: Timeframe::Day,
             segment_by: Some(AllowedKey::Country),
-            start: None,
-            end: None,
+            time: Time {
+                timeframe: Timeframe::Day,
+                start: DateHour::now() - &Timeframe::Day,
+                end: None,
+            },
             campaign_id: None,
             ad_unit: None,
             ad_slot: None,
@@ -525,13 +527,13 @@ mod test {
             ),
             None,
         )
-        .await;
+        .await
+        .expect_err("Should result in segmentBy error");
 
-        let err_msg = "Disallowed segmentBy: campaignId".to_string();
-        assert!(matches!(
+        assert_eq!(
             analytics_response,
-            Err(ResponseError::BadRequest(err_msg))
-        ));
+            ResponseError::BadRequest("Disallowed segmentBy: campaignId".into())
+        );
 
         // test with not allowed key
         let req = Request::builder()
@@ -549,13 +551,13 @@ mod test {
             ),
             None,
         )
-        .await;
+        .await
+        .expect_err("Should get error for disallowed key");
 
-        let err_msg = "disallowed key in query: campaignId".to_string();
-        assert!(matches!(
+        assert_eq!(
             analytics_response,
-            Err(ResponseError::BadRequest(err_msg))
-        ));
+            ResponseError::BadRequest("disallowed key in query: campaignId".into())
+        );
 
         // test with segmentBy which is then not provided
         let req = Request::builder()
@@ -573,13 +575,13 @@ mod test {
             ),
             None,
         )
-        .await;
+        .await
+        .expect_err("Should result in error for SegmentBy with no key");
 
-        let err_msg = "SegmentBy is provided but a key is not passed".to_string();
-        assert!(matches!(
+        assert_eq!(
             analytics_response,
-            Err(ResponseError::BadRequest(err_msg))
-        ));
+            ResponseError::BadRequest("SegmentBy is provided but a key is not passed".into())
+        );
 
         // test with different metric
         let req = Request::builder()
@@ -739,10 +741,12 @@ mod test {
             limit: 1000,
             event_type: "CLICK".into(),
             metric: Metric::Count,
-            timeframe: Timeframe::Day,
             segment_by: None,
-            start: Some(start_date),
-            end: Some(end_date),
+            time: Time {
+                timeframe: Timeframe::Day,
+                start: start_date,
+                end: Some(end_date),
+            },
             campaign_id: None,
             ad_unit: None,
             ad_slot: None,
@@ -1019,10 +1023,12 @@ mod test {
             limit: 1000,
             event_type: "CLICK".into(),
             metric: Metric::Count,
-            timeframe: Timeframe::Day,
             segment_by: Some(AllowedKey::Country),
-            start: Some(start_date),
-            end: Some(end_date),
+            time: Time {
+                timeframe: Timeframe::Day,
+                start: start_date,
+                end: Some(end_date),
+            },
             campaign_id: Some(DUMMY_CAMPAIGN.id),
             ad_unit: Some(DUMMY_IPFS[0]),
             ad_slot: Some(DUMMY_IPFS[1]),
