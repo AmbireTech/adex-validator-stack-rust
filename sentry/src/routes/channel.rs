@@ -693,9 +693,12 @@ mod test {
 
         let accounting_response = res_to_accounting_response(res).await;
 
+        // Balances shouldn't change
         assert_eq!(
+            accounting_response.balances.spenders.get(&ADDRESSES["creator"]),
             balances.spenders.get(&ADDRESSES["creator"]),
-            Some(&UnifiedNum::from_u64(0))
         );
+
+        // TODO: Test if updated field has changed
     }
 }
