@@ -328,7 +328,14 @@ pub async fn add_spender_leaf<C: Locked + 'static>(
         .to_owned();
 
     // TODO: Taken from AIP 61 issue `{$set: { amount: "${spent}": NumberLong(0) }}`, verify this is correct
-    update_accounting(app.pool.clone(), channel.id(), spender, Side::Spender, UnifiedNum::from_u64(0)).await?;
+    update_accounting(
+        app.pool.clone(),
+        channel.id(),
+        spender,
+        Side::Spender,
+        UnifiedNum::from_u64(0),
+    )
+    .await?;
 
     // TODO: Should we return an updated Accounting?
     Ok(success_response(serde_json::to_string(&SuccessResponse {
@@ -667,7 +674,10 @@ mod test {
 
         assert_eq!(balances, accounting_response.balances);
 
-        let param = RouteParams(vec![channel.id().to_string(), ADDRESSES["creator"].to_string()]);
+        let param = RouteParams(vec![
+            channel.id().to_string(),
+            ADDRESSES["creator"].to_string(),
+        ]);
         let req = Request::builder()
             .extension(channel)
             .extension(param)
@@ -683,6 +693,9 @@ mod test {
 
         let accounting_response = res_to_accounting_response(res).await;
 
-        assert_eq!(balances.spenders.get(&ADDRESSES["creator"]), Some(&UnifiedNum::from_u64(0)));
+        assert_eq!(
+            balances.spenders.get(&ADDRESSES["creator"]),
+            Some(&UnifiedNum::from_u64(0))
+        );
     }
 }

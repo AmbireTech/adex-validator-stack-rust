@@ -25,8 +25,8 @@ use {
         campaign::{campaign_list, create_campaign, update_campaign},
         cfg::config,
         channel::{
-            channel_list, create_validator_messages, get_accounting_for_channel,
-            get_all_spender_limits, get_spender_limits, last_approved, add_spender_leaf
+            add_spender_leaf, channel_list, create_validator_messages, get_accounting_for_channel,
+            get_all_spender_limits, get_spender_limits, last_approved,
         },
         event_aggregate::list_channel_event_aggregates,
         validator_message::{extract_params, list_validator_messages},
@@ -396,8 +396,10 @@ async fn channels_router<C: Locked + 'static>(
             .await?;
 
         get_spender_limits(req, app).await
-    } else if let (Some(caps), &Method::POST) = (CHANNEL_SPENDER_LEAF_AND_TOTAL_DEPOSITED.captures(&path), method,)
-    {
+    } else if let (Some(caps), &Method::POST) = (
+        CHANNEL_SPENDER_LEAF_AND_TOTAL_DEPOSITED.captures(&path),
+        method,
+    ) {
         let param = RouteParams(vec![
             caps.get(1)
                 .map_or("".to_string(), |m| m.as_str().to_string()), // channel ID
