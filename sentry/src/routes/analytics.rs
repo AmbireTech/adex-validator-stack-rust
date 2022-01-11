@@ -2,18 +2,18 @@ use crate::{
     db::analytics::{advertiser_channel_ids, get_advanced_reports, get_analytics, AnalyticsType},
     success_response, Application, Auth, ResponseError, RouteParams,
 };
+use adapter::client::Locked;
 use hyper::{Body, Request, Response};
 use primitives::{
-    adapter::Adapter,
     analytics::{AnalyticsQuery, AnalyticsResponse},
     ChannelId,
 };
 use redis::aio::MultiplexedConnection;
 use slog::{error, Logger};
 
-pub async fn publisher_analytics<A: Adapter>(
+pub async fn publisher_analytics<C: Locked + 'static>(
     req: Request<Body>,
-    app: &Application<A>,
+    app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
     let auth = req
         .extensions()
@@ -28,9 +28,9 @@ pub async fn publisher_analytics<A: Adapter>(
         .map(success_response)
 }
 
-pub async fn analytics<A: Adapter>(
+pub async fn analytics<C: Locked + 'static>(
     req: Request<Body>,
-    app: &Application<A>,
+    app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
     let request_uri = req.uri().to_string();
     let redis = app.redis.clone();
@@ -61,9 +61,9 @@ pub async fn analytics<A: Adapter>(
     }
 }
 
-pub async fn advertiser_analytics<A: Adapter>(
+pub async fn advertiser_analytics<C: Locked + 'static>(
     req: Request<Body>,
-    app: &Application<A>,
+    app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
     let sess = req.extensions().get::<Auth>();
     let analytics_type = AnalyticsType::Advertiser {
@@ -75,9 +75,9 @@ pub async fn advertiser_analytics<A: Adapter>(
         .map(success_response)
 }
 
-pub async fn process_analytics<A: Adapter>(
+pub async fn process_analytics<C: Locked + 'static>(
     req: Request<Body>,
-    app: &Application<A>,
+    app: &Application<C>,
     analytics_type: AnalyticsType,
 ) -> Result<String, ResponseError> {
     let query = serde_urlencoded::from_str::<AnalyticsQuery>(req.uri().query().unwrap_or(""))?;
@@ -106,9 +106,9 @@ pub async fn process_analytics<A: Adapter>(
         .map_err(|_| ResponseError::BadRequest("error occurred; try again later".to_string()))
 }
 
-pub async fn advanced_analytics<A: Adapter>(
+pub async fn advanced_analytics<C: Locked + 'static>(
     req: Request<Body>,
-    app: &Application<A>,
+    app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
     let auth = req.extensions().get::<Auth>().expect("auth is required");
     let advertiser_channels = advertiser_channel_ids(&app.pool, &auth.uid).await?;

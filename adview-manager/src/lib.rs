@@ -29,12 +29,12 @@ use url::Url;
 const IPFS_GATEWAY: &str = "https://ipfs.moonicorn.network/ipfs/";
 
 // How much time to wait before sending out an impression event
-// Related: https://github.com/AdExNetwork/adex-adview-manager/issues/17, https://github.com/AdExNetwork/adex-adview-manager/issues/35, https://github.com/AdExNetwork/adex-adview-manager/issues/46
+// Related: <https://github.com/AdExNetwork/adex-adview-manager/issues/17>, <https://github.com/AdExNetwork/adex-adview-manager/issues/35>, <https://github.com/AdExNetwork/adex-adview-manager/issues/46>
 const WAIT_FOR_IMPRESSION: u32 = 8000;
 // The number of impressions (won auctions) kept in history
 const HISTORY_LIMIT: u32 = 50;
 
-/// Impression "stickiness" time: see https://github.com/AdExNetwork/adex-adview-manager/issues/65
+/// Impression "stickiness" time: see <https://github.com/AdExNetwork/adex-adview-manager/issues/65>
 /// 4 minutes allows ~4 campaigns to rotate, considering a default frequency cap of 15 minutes
 pub static IMPRESSION_STICKINESS_TIME: Lazy<Duration> =
     Lazy::new(|| Duration::milliseconds(240000));

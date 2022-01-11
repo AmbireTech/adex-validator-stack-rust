@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize, Serializer};
 use std::{fmt, str::FromStr};
 use thiserror::Error;
 
-use crate::{targeting::Value, DomainError, ToETHChecksum, ToHex};
+use crate::{targeting::Value, DomainError, ToETHChecksum};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -57,7 +57,7 @@ impl fmt::Display for Address {
 
 impl fmt::Debug for Address {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Address({})", self.to_hex_prefixed())
+        write!(f, "Address({})", self.to_checksum())
     }
 }
 

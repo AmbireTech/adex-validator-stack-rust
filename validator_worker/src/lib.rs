@@ -2,7 +2,7 @@
 #![deny(clippy::all)]
 #![allow(deprecated)]
 
-use adapter::{get_balance_leaf, get_signable_state_root, BalanceLeafError};
+use adapter::util::{get_balance_leaf, get_signable_state_root, BalanceLeafError};
 use primitives::{
     balances::CheckedState,
     merkle_tree::{Error as MerkleTreeError, MerkleTree},

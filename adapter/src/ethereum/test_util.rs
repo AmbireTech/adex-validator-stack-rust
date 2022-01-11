@@ -1,7 +1,7 @@
 use once_cell::sync::Lazy;
 use std::{collections::HashMap, env::current_dir, num::NonZeroU8};
 use web3::{
-    contract::{Contract, Options},
+    contract::{Contract, Options as ContractOptions},
     ethabi::Token,
     transports::Http,
     types::{H160, H256, U256},
@@ -9,33 +9,33 @@ use web3::{
 };
 
 use primitives::{
-    adapter::KeystoreOptions,
     channel::{Channel, Nonce},
     config::TokenInfo,
     test_util::{ADVERTISER, CREATOR, FOLLOWER, GUARDIAN, GUARDIAN_2, LEADER, PUBLISHER},
-    Address, BigNum, Config, ValidatorId,
+    Address, BigNum, ValidatorId,
 };
 
-use crate::EthereumAdapter;
-
-use super::{EthereumChannel, OUTPACE_ABI, SWEEPER_ABI};
+use super::{channel::EthereumChannel, client::Options, IDENTITY_ABI, OUTPACE_ABI, SWEEPER_ABI};
 
 // See `adex-eth-protocol` `contracts/mocks/Token.sol`
 /// Mocked Token ABI
 pub static MOCK_TOKEN_ABI: Lazy<&'static [u8]> =
-    Lazy::new(|| include_bytes!("../../test/resources/mock_token_abi.json"));
+    Lazy::new(|| include_bytes!("../../tests/resources/mock_token_abi.json"));
 /// Mocked Token bytecode in JSON
 pub static MOCK_TOKEN_BYTECODE: Lazy<&'static str> =
-    Lazy::new(|| include_str!("../../test/resources/mock_token_bytecode.bin"));
+    Lazy::new(|| include_str!("../../tests/resources/mock_token_bytecode.bin"));
 /// Sweeper bytecode
 pub static SWEEPER_BYTECODE: Lazy<&'static str> =
     Lazy::new(|| include_str!("../../../lib/protocol-eth/resources/bytecode/Sweeper.bin"));
 /// Outpace bytecode
 pub static OUTPACE_BYTECODE: Lazy<&'static str> =
     Lazy::new(|| include_str!("../../../lib/protocol-eth/resources/bytecode/OUTPACE.bin"));
+/// Identity bytecode
+pub static IDENTITY_BYTECODE: Lazy<&'static str> =
+    Lazy::new(|| include_str!("../../../lib/protocol-eth/resources/bytecode/Identity5.2.bin"));
 
-/// Uses local `keystore.json` file and it's address for testing and working with [`EthereumAdapter`]
-pub static KEYSTORE_IDENTITY: Lazy<(Address, KeystoreOptions)> = Lazy::new(|| {
+/// Uses local `keystore.json` file and it's address for testing and working with [`crate::Ethereum`]
+pub static KEYSTORE_IDENTITY: Lazy<(Address, Options)> = Lazy::new(|| {
     // The address of the keystore file in `adapter/test/resources/keystore.json`
     let address = Address::try_from("0x2bDeAFAE53940669DaA6F519373f686c1f3d3393")
         .expect("failed to parse id");
@@ -44,12 +44,12 @@ pub static KEYSTORE_IDENTITY: Lazy<(Address, KeystoreOptions)> = Lazy::new(|| {
     // it always starts in `adapter` folder because of the crate scope
     // even when it's in the workspace
     let mut keystore_file = full_path.parent().unwrap().to_path_buf();
-    keystore_file.push("adapter/test/resources/keystore.json");
+    keystore_file.push("adapter/tests/resources/keystore.json");
 
     (address, keystore_options("keystore.json", "adexvalidator"))
 });
 
-pub static KEYSTORES: Lazy<HashMap<Address, KeystoreOptions>> = Lazy::new(|| {
+pub static KEYSTORES: Lazy<HashMap<Address, Options>> = Lazy::new(|| {
     vec![
         (
             *LEADER,
@@ -91,14 +91,14 @@ pub const GANACHE_URL: &str = "http://localhost:8545";
 ///
 /// The `file_name` located at `adapter/test/resources`
 /// The `password` for the keystore file
-fn keystore_options(file_name: &str, password: &str) -> KeystoreOptions {
+fn keystore_options(file_name: &str, password: &str) -> Options {
     let full_path = current_dir().unwrap();
     // it always starts in `adapter` folder because of the crate scope
     // even when it's in the workspace
     let mut keystore_file = full_path.parent().unwrap().to_path_buf();
-    keystore_file.push(format!("adapter/test/resources/{}", file_name));
+    keystore_file.push(format!("adapter/tests/resources/{}", file_name));
 
-    KeystoreOptions {
+    Options {
         keystore_file: keystore_file.display().to_string(),
         keystore_pwd: password.to_string(),
     }
@@ -114,11 +114,6 @@ pub fn get_test_channel(token_address: Address) -> Channel {
     }
 }
 
-pub fn setup_eth_adapter(config: Config) -> EthereumAdapter {
-    EthereumAdapter::init(KEYSTORE_IDENTITY.1.clone(), &config)
-        .expect("should init ethereum adapter")
-}
-
 pub async fn mock_set_balance(
     token_contract: &Contract<Http>,
     from: [u8; 20],
@@ -132,7 +127,7 @@ pub async fn mock_set_balance(
             "setBalanceTo",
             (H160(address), amount),
             H160(from),
-            Options::default(),
+            ContractOptions::default(),
         )
         .await
 }
@@ -150,7 +145,7 @@ pub async fn outpace_deposit(
             "deposit",
             (channel.tokenize(), H160(to), amount),
             H160(to),
-            Options::with(|opt| {
+            ContractOptions::with(|opt| {
                 opt.gas_price = Some(1.into());
                 opt.gas = Some(6_721_975.into());
             }),
@@ -175,7 +170,7 @@ pub async fn sweeper_sweep(
                 Token::Array(vec![Token::Address(H160(depositor))]),
             ),
             from_leader_account,
-            Options::with(|opt| {
+            ContractOptions::with(|opt| {
                 opt.gas_price = Some(1.into());
                 opt.gas = Some(6_721_975.into());
             }),
@@ -183,14 +178,14 @@ pub async fn sweeper_sweep(
         .await
 }
 
-/// Deploys the Sweeper contract from `GANACHE_ADDRESS['leader']`
+/// Deploys the Sweeper contract from [`LEADER`]
 pub async fn deploy_sweeper_contract(
     web3: &Web3<Http>,
 ) -> web3::contract::Result<(Address, Contract<Http>)> {
     let sweeper_contract = Contract::deploy(web3.eth(), &SWEEPER_ABI)
         .expect("Invalid ABI of Sweeper contract")
         .confirmations(0)
-        .options(Options::with(|opt| {
+        .options(ContractOptions::with(|opt| {
             opt.gas_price = Some(1.into());
             opt.gas = Some(6_721_975.into());
         }))
@@ -202,14 +197,14 @@ pub async fn deploy_sweeper_contract(
     Ok((sweeper_address, sweeper_contract))
 }
 
-/// Deploys the Outpace contract from `GANACHE_ADDRESS['leader']`
+/// Deploys the Outpace contract from [`LEADER`]
 pub async fn deploy_outpace_contract(
     web3: &Web3<Http>,
 ) -> web3::contract::Result<(Address, Contract<Http>)> {
     let outpace_contract = Contract::deploy(web3.eth(), &OUTPACE_ABI)
         .expect("Invalid ABI of Outpace contract")
         .confirmations(0)
-        .options(Options::with(|opt| {
+        .options(ContractOptions::with(|opt| {
             opt.gas_price = Some(1.into());
             opt.gas = Some(6_721_975.into());
         }))
@@ -220,6 +215,37 @@ pub async fn deploy_outpace_contract(
     Ok((outpace_address, outpace_contract))
 }
 
+/// Deploys the Identity contract for the give `for_address`
+/// Adds privileges by the constructor for the `add_privileges_to` addresses
+pub async fn deploy_identity_contract(
+    web3: &Web3<Http>,
+    for_address: Address,
+    add_privileges_to: &[Address],
+) -> web3::contract::Result<(Address, Contract<Http>)> {
+    let add_privileges_to: Vec<_> = add_privileges_to
+        .iter()
+        .map(|a| Token::Address(H160(a.to_bytes())))
+        .collect();
+
+    let identity_contract = Contract::deploy(web3.eth(), &IDENTITY_ABI)
+        .expect("Invalid ABI of Identity contract")
+        .confirmations(0)
+        .options(ContractOptions::with(|opt| {
+            opt.gas_price = Some(1.into());
+            opt.gas = Some(6_721_975.into());
+        }))
+        .execute(
+            *IDENTITY_BYTECODE,
+            Token::Array(add_privileges_to),
+            H160(for_address.to_bytes()),
+        )
+        .await?;
+
+    let identity_address = Address::from(identity_contract.address().to_fixed_bytes());
+
+    Ok((identity_address, identity_contract))
+}
+
 /// Deploys the Mock Token contract from [`LEADER`]
 pub async fn deploy_token_contract(
     web3: &Web3<Http>,
@@ -228,7 +254,7 @@ pub async fn deploy_token_contract(
     let token_contract = Contract::deploy(web3.eth(), &MOCK_TOKEN_ABI)
         .expect("Invalid ABI of Mock Token contract")
         .confirmations(0)
-        .options(Options::with(|opt| {
+        .options(ContractOptions::with(|opt| {
             opt.gas_price = Some(1.into());
             opt.gas = Some(6_721_975.into());
         }))

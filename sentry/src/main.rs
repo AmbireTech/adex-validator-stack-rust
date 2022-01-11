@@ -1,18 +1,12 @@
 #![deny(clippy::all)]
 #![deny(rust_2018_idioms)]
 
+use adapter::{primitives::AdapterTypes, Adapter};
 use clap::{crate_version, App, Arg};
 
-use adapter::{AdapterTypes, DummyAdapter, EthereumAdapter};
 use primitives::{
-    adapter::{DummyAdapterOptions, KeystoreOptions},
-    config::configuration,
-    postgres::POSTGRES_CONFIG,
-    util::{
-        logging::new_logger,
-        tests::prep_db::{AUTH, IDS},
-    },
-    ValidatorId,
+    config::configuration, postgres::POSTGRES_CONFIG, test_util::DUMMY_AUTH,
+    util::logging::new_logger, ValidatorId,
 };
 use sentry::{
     db::{postgres_connection, redis_connection, setup_migrations, CampaignRemaining},
@@ -70,29 +64,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .expect("keystore file is required for the ethereum adapter");
             let keystore_pwd = std::env::var("KEYSTORE_PWD").expect("unable to get keystore pwd");
 
-            let options = KeystoreOptions {
+            let options = adapter::ethereum::Options {
                 keystore_file: keystore_file.to_string(),
                 keystore_pwd,
             };
-            let ethereum_adapter = EthereumAdapter::init(options, &config)
-                .expect("Should initialize ethereum adapter");
+            let ethereum_adapter = Adapter::new(
+                adapter::Ethereum::init(options, &config)
+                    .expect("Should initialize ethereum adapter"),
+            );
 
-            AdapterTypes::EthereumAdapter(Box::new(ethereum_adapter))
+            AdapterTypes::Ethereum(Box::new(ethereum_adapter))
         }
         "dummy" => {
             let dummy_identity = cli
                 .value_of("dummyIdentity")
                 .expect("Dummy identity is required for the dummy adapter");
 
-            let options = DummyAdapterOptions {
+            let options = adapter::dummy::Options {
                 dummy_identity: ValidatorId::try_from(dummy_identity)
                     .expect("failed to parse dummy identity"),
-                dummy_auth: IDS.clone(),
-                dummy_auth_tokens: AUTH.clone(),
+                dummy_auth_tokens: DUMMY_AUTH.clone(),
             };
 
-            let dummy_adapter = DummyAdapter::init(options, &config);
-            AdapterTypes::DummyAdapter(Box::new(dummy_adapter))
+            let dummy_adapter = Adapter::new(adapter::Dummy::init(options));
+            AdapterTypes::Dummy(Box::new(dummy_adapter))
         }
         _ => panic!("You can only use `ethereum` & `dummy` adapters!"),
     };
@@ -108,7 +103,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let campaign_remaining = CampaignRemaining::new(redis.clone());
 
     match adapter {
-        AdapterTypes::EthereumAdapter(adapter) => {
+        AdapterTypes::Ethereum(adapter) => {
             Application::new(
                 *adapter,
                 config,
@@ -120,7 +115,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .run(socket_addr)
             .await
         }
-        AdapterTypes::DummyAdapter(adapter) => {
+        AdapterTypes::Dummy(adapter) => {
             Application::new(
                 *adapter,
                 config,
