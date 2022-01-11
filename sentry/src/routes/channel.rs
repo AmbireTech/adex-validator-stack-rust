@@ -645,17 +645,23 @@ mod test {
                 .body(Body::empty())
                 .expect("Should build Request")
         };
-        let param = RouteParams(vec![
-            channel.id().to_string(),
-            ADDRESSES["creator"].to_string(),
-        ]);
-        // Calling with non-existant accounting
-        let req = Request::builder()
-            .extension(channel)
-            .extension(param)
-            .body(Body::empty())
-            .expect("Should build Request");
-        let res = add_spender_leaf(req, &app).await.expect("Should add");
+        let build_request_with_params = |channel: Channel| {
+            let param = RouteParams(vec![
+                channel.id().to_string(),
+                ADDRESSES["creator"].to_string(),
+            ]);
+            Request::builder()
+                .extension(channel)
+                .extension(param)
+                .body(Body::empty())
+                .expect("Should build Request")
+        };
+
+        // Calling with non existent accounting
+        let res = add_spender_leaf(build_request_with_params(channel), &app)
+            .await
+            .expect("Should add");
+        assert_eq!(StatusCode::OK, res.status());
 
         let res = get_accounting_for_channel(build_request(channel), &app)
             .await
@@ -700,16 +706,10 @@ mod test {
         let accounting_response = res_to_accounting_response(res).await;
 
         assert_eq!(balances, accounting_response.balances);
-        let param = RouteParams(vec![
-            channel.id().to_string(),
-            ADDRESSES["creator"].to_string(),
-        ]);
-        let req = Request::builder()
-            .extension(channel)
-            .extension(param)
-            .body(Body::empty())
-            .expect("Should build Request");
-        let res = add_spender_leaf(req, &app).await.expect("Should add");
+
+        let res = add_spender_leaf(build_request_with_params(channel), &app)
+            .await
+            .expect("Should add");
         assert_eq!(StatusCode::OK, res.status());
 
         let res = get_accounting_for_channel(build_request(channel), &app)
