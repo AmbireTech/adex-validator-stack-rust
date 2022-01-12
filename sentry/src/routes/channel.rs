@@ -421,6 +421,7 @@ mod test {
     use adapter::primitives::Deposit;
     use hyper::StatusCode;
     use primitives::{
+        test_util::{ADVERTISER, CREATOR, GUARDIAN, PUBLISHER},
         util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, IDS},
         BigNum,
     };
@@ -639,17 +640,14 @@ mod test {
             .await
             .expect("should insert channel");
 
-        let build_request = |channel: Channel| {
+        let get_accounting_request = |channel: Channel| {
             Request::builder()
                 .extension(channel)
                 .body(Body::empty())
                 .expect("Should build Request")
         };
-        let build_request_with_params = |channel: Channel| {
-            let param = RouteParams(vec![
-                channel.id().to_string(),
-                ADDRESSES["creator"].to_string(),
-            ]);
+        let add_spender_request = |channel: Channel| {
+            let param = RouteParams(vec![channel.id().to_string(), CREATOR.to_string()]);
             Request::builder()
                 .extension(channel)
                 .extension(param)
@@ -658,12 +656,12 @@ mod test {
         };
 
         // Calling with non existent accounting
-        let res = add_spender_leaf(build_request_with_params(channel), &app)
+        let res = add_spender_leaf(add_spender_request(channel), &app)
             .await
             .expect("Should add");
         assert_eq!(StatusCode::OK, res.status());
 
-        let res = get_accounting_for_channel(build_request(channel), &app)
+        let res = get_accounting_for_channel(get_accounting_request(channel), &app)
             .await
             .expect("should get response");
         assert_eq!(StatusCode::OK, res.status());
@@ -672,33 +670,22 @@ mod test {
 
         // Making sure a new entry has been created
         assert_eq!(
-            accounting_response
-                .balances
-                .spenders
-                .get(&ADDRESSES["creator"]),
+            accounting_response.balances.spenders.get(&CREATOR),
             Some(&UnifiedNum::from_u64(0)),
         );
 
         let mut balances = Balances::<CheckedState>::new();
         balances
-            .spend(
-                ADDRESSES["creator"],
-                ADDRESSES["publisher"],
-                UnifiedNum::from_u64(200),
-            )
+            .spend(*CREATOR, *PUBLISHER, UnifiedNum::from_u64(200))
             .expect("should not overflow");
         balances
-            .spend(
-                ADDRESSES["tester"],
-                ADDRESSES["publisher2"],
-                UnifiedNum::from_u64(100),
-            )
+            .spend(*ADVERTISER, *GUARDIAN, UnifiedNum::from_u64(100))
             .expect("Should not overflow");
         spend_amount(app.pool.clone(), channel.id(), balances.clone())
             .await
             .expect("should spend");
 
-        let res = get_accounting_for_channel(build_request(channel), &app)
+        let res = get_accounting_for_channel(get_accounting_request(channel), &app)
             .await
             .expect("should get response");
         assert_eq!(StatusCode::OK, res.status());
@@ -707,12 +694,12 @@ mod test {
 
         assert_eq!(balances, accounting_response.balances);
 
-        let res = add_spender_leaf(build_request_with_params(channel), &app)
+        let res = add_spender_leaf(add_spender_request(channel), &app)
             .await
             .expect("Should add");
         assert_eq!(StatusCode::OK, res.status());
 
-        let res = get_accounting_for_channel(build_request(channel), &app)
+        let res = get_accounting_for_channel(get_accounting_request(channel), &app)
             .await
             .expect("should get response");
         assert_eq!(StatusCode::OK, res.status());
@@ -721,13 +708,8 @@ mod test {
 
         // Balances shouldn't change
         assert_eq!(
-            accounting_response
-                .balances
-                .spenders
-                .get(&ADDRESSES["creator"]),
-            balances.spenders.get(&ADDRESSES["creator"]),
+            accounting_response.balances.spenders.get(&CREATOR),
+            balances.spenders.get(&CREATOR),
         );
-
-        // TODO: Test if updated field has changed and/or validator worker test regarding this route
     }
 }
