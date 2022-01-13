@@ -3,10 +3,10 @@
 
 use adex_primitives::{
     campaign::Validators,
+    sentry::Event,
     supermarket::units_for_slot,
     supermarket::units_for_slot::response::{AdUnit, Campaign},
     targeting::{self, input},
-    sentry::Event,
     Address, BigNum, CampaignId, ToHex, UnifiedNum, IPFS,
 };
 use async_std::{sync::RwLock, task::block_on};
@@ -213,10 +213,13 @@ pub fn get_unit_html_with_events(
                 ad_unit: Some(ad_unit.id),
                 ad_slot: Some(options.market_slot),
                 referrer: Some("document.referrer".to_string()),
-            }
+            },
         };
-        let body = serde_json::to_string(&vec![event])
-            .expect("It should always serialize EventBody");
+        let event_body = EventBody {
+            events: vec![event],
+        };
+        let body =
+            serde_json::to_string(&event_body).expect("It should always serialize EventBody");
 
         let fetch_opts = format!("var fetchOpts = {{ method: 'POST', headers: {{ 'content-type': 'application/json' }}, body: {} }};", body);
 
