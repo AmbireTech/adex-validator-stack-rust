@@ -327,7 +327,6 @@ pub async fn add_spender_leaf<C: Locked + 'static>(
         .expect("Request should have Channel")
         .to_owned();
 
-    // TODO: Taken from AIP 61 issue `{$set: { amount: "${spent}": NumberLong(0) }}`, verify this is correct
     update_accounting(
         app.pool.clone(),
         channel.id(),
@@ -337,7 +336,7 @@ pub async fn add_spender_leaf<C: Locked + 'static>(
     )
     .await?;
 
-    // TODO: Should we return an updated Accounting?
+    // TODO: Replace with SpenderResponse
     Ok(success_response(serde_json::to_string(&SuccessResponse {
         success: true,
     })?))
