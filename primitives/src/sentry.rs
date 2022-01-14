@@ -18,6 +18,8 @@ use std::{
 };
 use thiserror::Error;
 
+pub use event::{Event, EventType, CLICK, IMPRESSION};
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 /// Channel Accounting response
@@ -127,51 +129,126 @@ pub mod message {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
-#[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum Event {
-    #[serde(rename_all = "camelCase")]
-    Impression {
-        publisher: Address,
-        ad_unit: Option<IPFS>,
-        ad_slot: Option<IPFS>,
-        referrer: Option<String>,
-    },
-    #[serde(rename_all = "camelCase")]
-    Click {
-        publisher: Address,
-        ad_unit: Option<IPFS>,
-        ad_slot: Option<IPFS>,
-        referrer: Option<String>,
-    },
-}
+mod event {
+    use once_cell::sync::Lazy;
+    use parse_display::{Display, FromStr};
+    use serde::{Deserialize, Serialize};
+    use std::fmt;
 
-impl Event {
-    pub fn is_click_event(&self) -> bool {
-        matches!(self, Event::Click { .. })
+    use crate::{Address, IPFS};
+
+    pub static IMPRESSION: EventType = EventType::Impression;
+    pub static CLICK: EventType = EventType::Click;
+
+    /// We use these statics to create the `as_str()` method for a value with a `'static` lifetime
+    /// the `parse_display::Display` derive macro does not impl such methods
+    static IMPRESSION_STRING: Lazy<String> = Lazy::new(|| EventType::Impression.to_string());
+    static CLICK_STRING: Lazy<String> = Lazy::new(|| EventType::Click.to_string());
+
+    #[derive(Debug, Display, FromStr, Serialize, Deserialize, Hash, Ord, Eq, PartialEq, PartialOrd, Clone, Copy)]
+    #[display(style = "SNAKE_CASE")]
+    #[serde(rename_all="SCREAMING_SNAKE_CASE")]
+    pub enum EventType {
+        Impression,
+        Click,
     }
 
-    pub fn is_impression_event(&self) -> bool {
-        matches!(self, Event::Impression { .. })
-    }
-
-    pub fn as_str(&self) -> &str {
-        self.as_ref()
-    }
-}
-
-impl AsRef<str> for Event {
-    fn as_ref(&self) -> &str {
-        match *self {
-            Event::Impression { .. } => "IMPRESSION",
-            Event::Click { .. } => "CLICK",
+    impl EventType {
+        pub fn as_str(&self) -> &str {
+            match self {
+                EventType::Impression => IMPRESSION_STRING.as_str(),
+                EventType::Click => CLICK_STRING.as_str(),
+            }
         }
     }
-}
 
-impl fmt::Display for Event {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_ref())
+    #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
+    #[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
+    pub enum Event {
+        #[serde(rename_all = "camelCase")]
+        Impression {
+            publisher: Address,
+            ad_unit: Option<IPFS>,
+            ad_slot: Option<IPFS>,
+            referrer: Option<String>,
+        },
+        #[serde(rename_all = "camelCase")]
+        Click {
+            publisher: Address,
+            ad_unit: Option<IPFS>,
+            ad_slot: Option<IPFS>,
+            referrer: Option<String>,
+        },
+    }
+
+    impl Event {
+        pub fn is_click_event(&self) -> bool {
+            matches!(self, Event::Click { .. })
+        }
+
+        pub fn is_impression_event(&self) -> bool {
+            matches!(self, Event::Impression { .. })
+        }
+
+        pub fn as_str(&self) -> &str {
+            self.as_ref()
+        }
+
+        pub fn event_type(&self) -> EventType {
+            self.into()
+        }
+    }
+
+    impl From<&Event> for EventType {
+        fn from(event: &Event) -> Self {
+            match event {
+                Event::Impression { .. } => EventType::Impression,
+                Event::Click { .. } => EventType::Click,
+            }
+        }
+    }
+
+    impl AsRef<str> for Event {
+        fn as_ref(&self) -> &'static str {
+            match self {
+                Event::Impression { .. } => EventType::Impression.as_str(),
+                Event::Click { .. } => EventType::Click.as_str(),
+            }
+        }
+    }
+
+    impl fmt::Display for Event {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str(self.as_ref())
+        }
+    }
+
+    #[cfg(test)]
+    mod test {
+        use crate::sentry::event::{CLICK_STRING, IMPRESSION_STRING};
+
+        use super::EventType;
+
+        #[test]
+        fn event_type_parsing_and_de_serialization() {
+            let impression_parse = "IMPRESSION"
+                .parse::<EventType>()
+                .expect("Should parse IMPRESSION");
+            let click_parse = "CLICK".parse::<EventType>().expect("Should parse CLICK");
+            let impression_json =
+                serde_json::from_value::<EventType>(serde_json::Value::String("IMPRESSION".into()))
+                    .expect("Should deserialize");
+            let click_json =
+                serde_json::from_value::<EventType>(serde_json::Value::String("CLICK".into()))
+                    .expect("Should deserialize");
+
+            assert_eq!(IMPRESSION_STRING.as_str(), "IMPRESSION");
+            assert_eq!(CLICK_STRING.as_str(), "CLICK");
+            assert_eq!(EventType::Impression, impression_parse);
+            assert_eq!(EventType::Impression, impression_json);
+            assert_eq!(EventType::Click, click_parse);
+            assert_eq!(EventType::Click, click_json);
+        }
     }
 }
 
@@ -188,7 +265,7 @@ pub struct UpdateAnalytics {
     pub hostname: Option<String>,
     pub country: Option<String>,
     pub os_name: OperatingSystem,
-    pub event_type: String,
+    pub event_type: EventType,
     pub amount_to_add: UnifiedNum,
     pub count_to_add: i32,
 }
@@ -206,7 +283,7 @@ pub struct Analytics {
     pub hostname: Option<String>,
     pub country: Option<String>,
     pub os_name: OperatingSystem,
-    pub event_type: String,
+    pub event_type: EventType,
     pub payout_amount: UnifiedNum,
     pub payout_count: u32,
 }
@@ -217,9 +294,35 @@ pub struct FetchedAnalytics {
     // time is represented as a timestamp
     #[serde(with = "ts_milliseconds")]
     pub time: DateTime<Utc>,
-    pub value: UnifiedNum,
+    pub value: FetchedMetric,
     // We can't know the exact segment type but it can always be represented as a string
     pub segment: Option<String>,
+}
+
+/// The value of the requested analytics [`Metric`].
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum FetchedMetric {
+    Count(u32),
+    Paid(UnifiedNum),
+}
+
+impl FetchedMetric {
+    /// Returns the count if it's a [`FetchedMetric::Count`] or `None` otherwise.
+    pub fn get_count(&self) -> Option<u32> {
+        match self {
+            FetchedMetric::Count(count) => Some(*count),
+            FetchedMetric::Paid(_) => None,
+        }
+    }
+
+    /// Returns the paid amount if it's a [`FetchedMetric::Paid`] or `None` otherwise.
+    pub fn get_paid(&self) -> Option<UnifiedNum> {
+        match self {
+            FetchedMetric::Count(_) => None,
+            FetchedMetric::Paid(paid) => Some(*paid),
+        }
+    }
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -818,8 +921,11 @@ pub mod campaign_create {
 
 #[cfg(feature = "postgres")]
 mod postgres {
-    use super::{Analytics, DateHour, MessageResponse, ValidatorMessage};
+    use super::{
+        Analytics, DateHour, FetchedAnalytics, FetchedMetric, MessageResponse, ValidatorMessage, EventType,
+    };
     use crate::{
+        analytics::{AnalyticsQuery, Metric},
         sentry::EventAggregate,
         validator::{messages::Type as MessageType, MessageTypes},
     };
@@ -958,6 +1064,61 @@ mod postgres {
 
         accepts!(TIMESTAMPTZ);
         to_sql_checked!();
+    }
+
+    impl<'a> FromSql<'a> for EventType {
+        fn from_sql(
+            ty: &Type,
+            raw: &'a [u8],
+        ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+            let event_string = <&str as FromSql>::from_sql(ty, raw)?;
+            
+            Ok(event_string.parse()?)
+        }
+        accepts!(VARCHAR, TEXT);
+    }
+
+    impl ToSql for EventType {
+        fn to_sql(
+            &self,
+            ty: &Type,
+            w: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn std::error::Error + Sync + Send>> {
+            self.as_str().to_sql(ty, w)
+        }
+
+        accepts!(VARCHAR, TEXT);
+        to_sql_checked!();
+    }
+
+    /// This implementation handles the conversion of a fetched query [`Row`] to [`FetchedAnalytics`]
+    /// [`FetchedAnalytics`] requires additional context, apart from [`Row`], using the [`AnalyticsQuery`].
+    impl From<(&AnalyticsQuery, &Row)> for FetchedAnalytics {
+        /// # Panics
+        ///
+        /// When a field is missing in the [`Row`].
+        fn from((query, row): (&AnalyticsQuery, &Row)) -> Self {
+            // Since segment_by is a dynamic value/type it can't be passed to from<&Row> so we're building the object here
+            let segment_value = match query.segment_by.as_ref() {
+                Some(_segment_by) => row.get("segment_by"),
+                None => None,
+            };
+            let time = row.get::<_, DateTime<Utc>>("timeframe_time");
+            let value = match &query.metric {
+                Metric::Paid => FetchedMetric::Paid(row.get("value")),
+                Metric::Count => {
+                    // `integer` fields map to `i32`
+                    let count: i32 = row.get("value");
+                    // Count can only be positive, so use unsigned value
+                    FetchedMetric::Count(count.unsigned_abs())
+                }
+            };
+            FetchedAnalytics {
+                time,
+                value,
+                segment: segment_value,
+            }
+        }
     }
 }
 
