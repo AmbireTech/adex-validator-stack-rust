@@ -6,26 +6,26 @@ use crate::db::{
     DbPool,
 };
 use crate::{success_response, Application, Auth, ResponseError, RouteParams};
+use adapter::{client::Locked, Adapter};
 use futures::future::try_join_all;
 use hyper::{Body, Request, Response};
 use primitives::{
-    adapter::Adapter,
     balances::{Balances, CheckedState, UncheckedState},
     config::TokenInfo,
     sentry::{
         channel_list::ChannelListQuery, AccountingResponse, AllSpendersQuery, AllSpendersResponse,
         LastApproved, LastApprovedQuery, LastApprovedResponse, SpenderResponse, SuccessResponse,
     },
-    spender::{Spendable, Spender, SpenderLeaf},
+    spender::{Spendable, Spender},
     validator::{MessageTypes, NewState},
     Address, Channel, Deposit, UnifiedNum,
 };
 use slog::{error, Logger};
 use std::{collections::HashMap, str::FromStr};
 
-pub async fn channel_list<A: Adapter>(
+pub async fn channel_list<C: Locked + 'static>(
     req: Request<Body>,
-    app: &Application<A>,
+    app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
     let query = serde_urlencoded::from_str::<ChannelListQuery>(req.uri().query().unwrap_or(""))?;
     let skip = query
@@ -44,9 +44,9 @@ pub async fn channel_list<A: Adapter>(
     Ok(success_response(serde_json::to_string(&list_response)?))
 }
 
-pub async fn last_approved<A: Adapter>(
+pub async fn last_approved<C: Locked + 'static>(
     req: Request<Body>,
-    app: &Application<A>,
+    app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
     // get request Channel
     let channel = *req
@@ -107,9 +107,9 @@ pub async fn last_approved<A: Adapter>(
         .unwrap())
 }
 
-pub async fn create_validator_messages<A: Adapter + 'static>(
+pub async fn create_validator_messages<C: Locked + 'static>(
     req: Request<Body>,
-    app: &Application<A>,
+    app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
     let session = req
         .extensions()
@@ -147,8 +147,8 @@ pub async fn create_validator_messages<A: Adapter + 'static>(
 }
 
 /// This will make sure to insert/get the `Channel` from DB before attempting to create the `Spendable`
-async fn create_or_update_spendable_document(
-    adapter: &impl Adapter,
+async fn create_or_update_spendable_document<A: Locked>(
+    adapter: &Adapter<A>,
     token_info: &TokenInfo,
     pool: DbPool,
     channel: &Channel,
@@ -156,7 +156,7 @@ async fn create_or_update_spendable_document(
 ) -> Result<Spendable, ResponseError> {
     insert_channel(&pool, *channel).await?;
 
-    let deposit = adapter.get_deposit(channel, &spender).await?;
+    let deposit = adapter.get_deposit(channel, spender).await?;
     let total = UnifiedNum::from_precision(deposit.total, token_info.precision.get());
     let still_on_create2 =
         UnifiedNum::from_precision(deposit.still_on_create2, token_info.precision.get());
@@ -190,15 +190,15 @@ fn spender_response_without_leaf(
     let res = SpenderResponse {
         spender: Spender {
             total_deposited,
-            spender_leaf: None,
+            total_spent: None,
         },
     };
     Ok(success_response(serde_json::to_string(&res)?))
 }
 
-pub async fn get_spender_limits<A: Adapter + 'static>(
+pub async fn get_spender_limits<C: Locked + 'static>(
     req: Request<Body>,
-    app: &Application<A>,
+    app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
     let route_params = req
         .extensions()
@@ -240,26 +240,25 @@ pub async fn get_spender_limits<A: Adapter + 'static>(
         None => return spender_response_without_leaf(latest_spendable.deposit.total),
     };
 
-    let total_spent = new_state.balances.spenders.get(&spender);
-
-    let spender_leaf = total_spent.map(|total_spent| SpenderLeaf {
-        total_spent: *total_spent,
-        //merkle_proof: [u8; 32], // TODO
-    });
+    let total_spent = new_state
+        .balances
+        .spenders
+        .get(&spender)
+        .map(|spent| spent.to_owned());
 
     // returned output
     let res = SpenderResponse {
         spender: Spender {
             total_deposited: latest_spendable.deposit.total,
-            spender_leaf,
+            total_spent,
         },
     };
     Ok(success_response(serde_json::to_string(&res)?))
 }
 
-pub async fn get_all_spender_limits<A: Adapter + 'static>(
+pub async fn get_all_spender_limits<C: Locked + 'static>(
     req: Request<Body>,
-    app: &Application<A>,
+    app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
     let channel = req
         .extensions()
@@ -284,23 +283,20 @@ pub async fn get_all_spender_limits<A: Adapter + 'static>(
     // Using for loop to avoid async closures
     for spendable in all_spendables {
         let spender = spendable.spender;
-        let spender_leaf = match new_state {
+        let total_spent = match new_state {
             Some(ref new_state) => new_state.balances.spenders.get(&spender).map(|balance| {
-                SpenderLeaf {
-                    total_spent: spendable
-                        .deposit
-                        .total
-                        .checked_sub(balance)
-                        .unwrap_or_default(),
-                    // merkle_proof: [u8; 32], // TODO
-                }
+                spendable
+                    .deposit
+                    .total
+                    .checked_sub(balance)
+                    .unwrap_or_default()
             }),
             None => None,
         };
 
         let spender_info = Spender {
             total_deposited: spendable.deposit.total,
-            spender_leaf,
+            total_spent,
         };
 
         all_spender_limits.insert(spender, spender_info);
@@ -345,9 +341,9 @@ async fn get_corresponding_new_state(
     new_state
 }
 
-pub async fn get_accounting_for_channel<A: Adapter + 'static>(
+pub async fn get_accounting_for_channel<C: Locked + 'static>(
     req: Request<Body>,
-    app: &Application<A>,
+    app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
     let channel = req
         .extensions()
@@ -389,9 +385,9 @@ mod test {
     use super::*;
     use crate::db::{accounting::spend_amount, insert_channel};
     use crate::test_util::setup_dummy_app;
+    use adapter::primitives::Deposit;
     use hyper::StatusCode;
     use primitives::{
-        adapter::Deposit,
         util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, IDS},
         BigNum,
     };
@@ -413,6 +409,7 @@ mod test {
             still_on_create2: BigNum::from_str("1000000000000000000").expect("should convert"), // 1 DAI
         };
         app.adapter
+            .client
             .add_deposit_call(channel.id(), ADDRESSES["creator"], deposit.clone());
         // Making sure spendable does not yet exist
         let spendable = fetch_spendable(app.pool.clone(), &ADDRESSES["creator"], &channel.id())
@@ -454,8 +451,11 @@ mod test {
             still_on_create2: BigNum::from_str("1100000000000000000").expect("should convert"), // 1.1 DAI
         };
 
-        app.adapter
-            .add_deposit_call(channel.id(), ADDRESSES["creator"], updated_deposit.clone());
+        app.adapter.client.add_deposit_call(
+            channel.id(),
+            ADDRESSES["creator"],
+            updated_deposit.clone(),
+        );
 
         let updated_spendable = create_or_update_spendable_document(
             &app.adapter,

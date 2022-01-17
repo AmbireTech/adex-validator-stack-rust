@@ -9,13 +9,13 @@ use adapter::ethereum::{
         deploy_outpace_contract, deploy_sweeper_contract, deploy_token_contract, mock_set_balance,
         outpace_deposit, GANACHE_URL, MOCK_TOKEN_ABI,
     },
-    OUTPACE_ABI, SWEEPER_ABI,
+    Options, OUTPACE_ABI, SWEEPER_ABI,
 };
 use deposits::Deposit;
 use once_cell::sync::Lazy;
 use primitives::{
-    adapter::KeystoreOptions,
     config::TokenInfo,
+    config::GANACHE_CONFIG,
     test_util::{FOLLOWER, LEADER},
     util::ApiUrl,
     Address, Config,
@@ -23,11 +23,6 @@ use primitives::{
 use web3::{contract::Contract, transports::Http, types::H160, Web3};
 
 pub mod deposits;
-
-pub static GANACHE_CONFIG: Lazy<Config> = Lazy::new(|| {
-    Config::try_toml(include_str!("../../docs/config/ganache.toml"))
-        .expect("Failed to parse ganache.toml config file")
-});
 
 /// ganache-cli setup with deployed contracts using the snapshot directory
 /// Uses the [`GANACHE_CONFIG`] & [`GANACHE_URL`] statics to init the contracts
@@ -71,11 +66,11 @@ pub static SNAPSHOT_CONTRACTS: Lazy<Contracts> = Lazy::new(|| {
 #[derive(Debug, Clone)]
 pub struct TestValidator {
     pub address: Address,
-    pub keystore: KeystoreOptions,
+    pub keystore: Options,
     pub sentry_config: sentry::application::Config,
     /// Sentry REST API url
     pub sentry_url: ApiUrl,
-    /// Used for the _Sentry REST API_ [`sentry::Application`] as well as the _Validator worker_ [`validator_worker::worker::Args`]
+    /// Used for the _Sentry REST API_ [`sentry::Application`] as well as the _Validator worker_ [`validator_worker::Worker`]
     pub config: Config,
     /// Prefix for sentry logger
     pub sentry_logger_prefix: String,
@@ -212,12 +207,9 @@ mod tests {
     use crate::run::run_sentry_app;
 
     use super::*;
-    use adapter::ethereum::{
-        test_util::{GANACHE_URL, KEYSTORES},
-        EthereumAdapter,
-    };
+    use adapter::ethereum::test_util::{GANACHE_URL, KEYSTORES};
+    use adapter::{prelude::*, Adapter, Ethereum};
     use primitives::{
-        adapter::Adapter,
         balances::CheckedState,
         sentry::{campaign_create::CreateCampaign, AccountingResponse, Event, SuccessResponse},
         spender::Spender,
@@ -408,22 +400,28 @@ mod tests {
         let token_precision = contracts.token.0.precision.get();
 
         // We use the Advertiser's `EthereumAdapter::get_auth` for authentication!
-        let mut advertiser_adapter =
-            EthereumAdapter::init(KEYSTORES[&ADVERTISER].clone(), &GANACHE_CONFIG)
-                .expect("Should initialize creator adapter");
-        advertiser_adapter
-            .unlock()
-            .expect("Should unlock advertiser's Ethereum Adapter");
+        let advertiser_adapter = Adapter::new(
+            Ethereum::init(KEYSTORES[&ADVERTISER].clone(), &GANACHE_CONFIG)
+                .expect("Should initialize creator adapter"),
+        )
+        .unlock()
+        .expect("Should unlock advertiser's Ethereum Adapter");
         let advertiser_adapter = advertiser_adapter;
 
         // setup Sentry & returns Adapter
-        let leader_adapter = setup_sentry(&leader).await;
-        let follower_adapter = setup_sentry(&follower).await;
+        let leader_adapter = setup_sentry(&leader)
+            .await
+            .unlock()
+            .expect("Failed to unlock Leader ethereum adapter");
+        let follower_adapter = setup_sentry(&follower)
+            .await
+            .unlock()
+            .expect("Failed to unlock Follower ethereum adapter");
 
         let leader_sentry = {
             // should get self Auth from Leader's EthereumAdapter
             let leader_auth = leader_adapter
-                .get_auth(&leader_adapter.whoami())
+                .get_auth(leader_adapter.whoami())
                 .expect("Get authentication");
             let whoami_validator = Validator {
                 url: leader.sentry_url.clone(),
@@ -442,7 +440,7 @@ mod tests {
         let follower_sentry = {
             // should get self Auth from Follower's EthereumAdapter
             let follower_auth = follower_adapter
-                .get_auth(&follower_adapter.whoami())
+                .get_auth(follower_adapter.whoami())
                 .expect("Get authentication");
             let whoami_validator = Validator {
                 url: follower.sentry_url.clone(),
@@ -510,7 +508,7 @@ mod tests {
                 let eth_deposit = leader_adapter
                     .get_deposit(
                         &CAMPAIGN_1.channel,
-                        &advertiser_adapter.whoami().to_address(),
+                        advertiser_adapter.whoami().to_address(),
                     )
                     .await
                     .expect("Should get deposit for advertiser");
@@ -526,7 +524,7 @@ mod tests {
                 let eth_deposit = leader_adapter
                     .get_deposit(
                         &CAMPAIGN_2.channel,
-                        &advertiser_adapter.whoami().to_address(),
+                        advertiser_adapter.whoami().to_address(),
                     )
                     .await
                     .expect("Should get deposit for advertiser");
@@ -541,7 +539,7 @@ mod tests {
         // GET /v5/channel/{}/spender/all
         {
             let leader_auth = advertiser_adapter
-                .get_auth(&leader_adapter.whoami())
+                .get_auth(leader_adapter.whoami())
                 .expect("Get authentication");
 
             let leader_response = get_spender_all_page_0(
@@ -562,7 +560,7 @@ mod tests {
         // POST /v5/campaign
         {
             let leader_auth = advertiser_adapter
-                .get_auth(&leader_adapter.whoami())
+                .get_auth(leader_adapter.whoami())
                 .expect("Get authentication");
 
             let mut no_budget_campaign = CreateCampaign::from_campaign(CAMPAIGN_1.clone());
@@ -606,7 +604,7 @@ mod tests {
                 Spender {
                     // Expected: 30 TOKENs
                     total_deposited: UnifiedNum::from(3_000_000_000),
-                    spender_leaf: None,
+                    total_spent: None,
                 },
             )]
             .into_iter()
@@ -622,7 +620,7 @@ mod tests {
             let create_campaign_1 = CreateCampaign::from_campaign(CAMPAIGN_1.clone());
             {
                 let leader_token = advertiser_adapter
-                    .get_auth(&leader_adapter.whoami())
+                    .get_auth(leader_adapter.whoami())
                     .expect("Get authentication");
 
                 let leader_response = create_campaign(
@@ -639,7 +637,7 @@ mod tests {
 
             {
                 let follower_token = advertiser_adapter
-                    .get_auth(&follower_adapter.whoami())
+                    .get_auth(follower_adapter.whoami())
                     .expect("Get authentication");
 
                 let follower_response = create_campaign(
@@ -664,7 +662,7 @@ mod tests {
 
             {
                 let leader_token = advertiser_adapter
-                    .get_auth(&leader_adapter.whoami())
+                    .get_auth(leader_adapter.whoami())
                     .expect("Get authentication");
 
                 let leader_response = create_campaign(
@@ -682,7 +680,7 @@ mod tests {
 
             {
                 let follower_token = advertiser_adapter
-                    .get_auth(&follower_adapter.whoami())
+                    .get_auth(follower_adapter.whoami())
                     .expect("Get authentication");
 
                 let follower_response = create_campaign(
@@ -808,11 +806,11 @@ mod tests {
         }
     }
 
-    async fn setup_sentry(validator: &TestValidator) -> EthereumAdapter {
-        let mut adapter = EthereumAdapter::init(validator.keystore.clone(), &GANACHE_CONFIG)
-            .expect("EthereumAdapter::init");
-
-        adapter.unlock().expect("Unlock successfully adapter");
+    async fn setup_sentry(validator: &TestValidator) -> adapter::ethereum::LockedAdapter {
+        let adapter = Adapter::new(
+            Ethereum::init(validator.keystore.clone(), &GANACHE_CONFIG)
+                .expect("EthereumAdapter::init"),
+        );
 
         run_sentry_app(adapter.clone(), &validator)
             .await
@@ -842,8 +840,8 @@ mod tests {
     /// Used to test if it returns correct Status code on non-existing Channel.
     /// Authentication required!
     /// Asserts: [`StatusCode::OK`]
-    async fn post_new_events<A: Adapter>(
-        sentry: &SentryApi<A, ()>,
+    async fn post_new_events<C: Unlocked + 'static>(
+        sentry: &SentryApi<C, ()>,
         campaign: CampaignId,
         events: &[Event],
     ) -> anyhow::Result<SuccessResponse> {
@@ -890,7 +888,6 @@ mod tests {
 pub mod run {
     use std::{env::current_dir, net::SocketAddr, path::PathBuf};
 
-    use adapter::EthereumAdapter;
     use primitives::{
         postgres::{POSTGRES_HOST, POSTGRES_PASSWORD, POSTGRES_PORT, POSTGRES_USER},
         util::logging::new_logger,
@@ -909,7 +906,7 @@ pub mod run {
     use crate::{TestValidator, GANACHE_CONFIG};
 
     pub async fn run_sentry_app(
-        adapter: EthereumAdapter,
+        adapter: adapter::ethereum::LockedAdapter,
         validator: &TestValidator,
     ) -> anyhow::Result<()> {
         let socket_addr = SocketAddr::new(

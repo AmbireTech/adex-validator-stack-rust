@@ -3,10 +3,11 @@ use crate::{
     middleware::Middleware,
     Application, ResponseError, RouteParams,
 };
+use adapter::client::Locked;
 use futures::future::{BoxFuture, FutureExt};
 use hex::FromHex;
 use hyper::{Body, Request};
-use primitives::{adapter::Adapter, ChannelId, ValidatorId};
+use primitives::{ChannelId, ValidatorId};
 
 use async_trait::async_trait;
 
@@ -14,21 +15,21 @@ use async_trait::async_trait;
 pub struct ChannelLoad;
 
 #[async_trait]
-impl<A: Adapter + 'static> Middleware<A> for ChannelLoad {
+impl<C: Locked + 'static> Middleware<C> for ChannelLoad {
     async fn call<'a>(
         &self,
         request: Request<Body>,
-        application: &'a Application<A>,
+        application: &'a Application<C>,
     ) -> Result<Request<Body>, ResponseError> {
         channel_load(request, application).await
     }
 }
 
 /// channel_load & channel_if_exist
-fn channel_load<'a, A: Adapter + 'static>(
+fn channel_load<C: Locked>(
     mut req: Request<Body>,
-    app: &'a Application<A>,
-) -> BoxFuture<'a, Result<Request<Body>, ResponseError>> {
+    app: &Application<C>,
+) -> BoxFuture<'_, Result<Request<Body>, ResponseError>> {
     async move {
         let id = req
             .extensions()
@@ -56,20 +57,20 @@ fn channel_load<'a, A: Adapter + 'static>(
 pub struct ChannelIfActive;
 
 #[async_trait]
-impl<A: Adapter + 'static> Middleware<A> for ChannelIfActive {
+impl<C: Locked + 'static> Middleware<C> for ChannelIfActive {
     async fn call<'a>(
         &self,
         request: Request<Body>,
-        application: &'a Application<A>,
+        application: &'a Application<C>,
     ) -> Result<Request<Body>, ResponseError> {
         channel_if_active(request, application).await
     }
 }
 
-fn channel_if_active<'a, A: Adapter + 'static>(
+fn channel_if_active<C: Locked>(
     mut req: Request<Body>,
-    app: &'a Application<A>,
-) -> BoxFuture<'a, Result<Request<Body>, ResponseError>> {
+    app: &Application<C>,
+) -> BoxFuture<'_, Result<Request<Body>, ResponseError>> {
     async move {
         let route_params = req
             .extensions()
@@ -104,20 +105,20 @@ fn channel_if_active<'a, A: Adapter + 'static>(
 pub struct GetChannelId;
 
 #[async_trait]
-impl<A: Adapter + 'static> Middleware<A> for GetChannelId {
+impl<C: Locked + 'static> Middleware<C> for GetChannelId {
     async fn call<'a>(
         &self,
         request: Request<Body>,
-        application: &'a Application<A>,
+        application: &'a Application<C>,
     ) -> Result<Request<Body>, ResponseError> {
         get_channel_id(request, application).await
     }
 }
 
-fn get_channel_id<'a, A: Adapter + 'static>(
+fn get_channel_id<C: Locked>(
     mut req: Request<Body>,
-    _: &'a Application<A>,
-) -> BoxFuture<'a, Result<Request<Body>, ResponseError>> {
+    _: &Application<C>,
+) -> BoxFuture<'_, Result<Request<Body>, ResponseError>> {
     async move {
         match req.extensions().get::<RouteParams>() {
             Some(param) => {

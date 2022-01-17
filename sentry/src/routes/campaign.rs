@@ -11,11 +11,11 @@ use crate::{
     },
     success_response, Application, Auth, ResponseError,
 };
+use adapter::{prelude::*, Adapter, Error as AdaptorError};
 use deadpool_postgres::PoolError;
 use futures::future::try_join_all;
 use hyper::{Body, Request, Response};
 use primitives::{
-    adapter::{Adapter, AdapterErrorKind, Error as AdapterError},
     campaign_validator::Validator,
     config::TokenInfo,
     sentry::{
@@ -32,7 +32,7 @@ use thiserror::Error;
 use tokio_postgres::error::SqlState;
 
 #[derive(Debug, Error)]
-pub enum Error<AE: AdapterErrorKind + 'static> {
+pub enum Error {
     #[error("Error while updating campaign: {0}")]
     FailedUpdate(String),
     #[error("Error while performing calculations")]
@@ -48,7 +48,7 @@ pub enum Error<AE: AdapterErrorKind + 'static> {
     #[error("Campaign was not modified because of spending constraints")]
     CampaignNotModified,
     #[error("Error while updating spendable for creator: {0}")]
-    LatestSpendable(#[from] LatestSpendableError<AE>),
+    LatestSpendable(#[from] LatestSpendableError),
     #[error("Redis error: {0}")]
     Redis(#[from] RedisError),
     #[error("DB Pool error: {0}")]
@@ -56,9 +56,9 @@ pub enum Error<AE: AdapterErrorKind + 'static> {
 }
 
 #[derive(Debug, Error)]
-pub enum LatestSpendableError<AE: AdapterErrorKind + 'static> {
+pub enum LatestSpendableError {
     #[error("Adapter: {0}")]
-    Adapter(#[from] AdapterError<AE>),
+    Adapter(#[from] AdaptorError),
     #[error("Overflow occurred while converting native token precision to unified precision")]
     Overflow,
     #[error("DB Pool error: {0}")]
@@ -66,14 +66,17 @@ pub enum LatestSpendableError<AE: AdapterErrorKind + 'static> {
 }
 /// Gets the latest Spendable from the Adapter and updates it in the Database
 /// before returning it
-pub async fn update_latest_spendable<A: Adapter>(
-    adapter: &A,
+pub async fn update_latest_spendable<C>(
+    adapter: &Adapter<C>,
     pool: &DbPool,
     channel: Channel,
     token: &TokenInfo,
     address: Address,
-) -> Result<Spendable, LatestSpendableError<A::AdapterError>> {
-    let latest_deposit = adapter.get_deposit(&channel, &address).await?;
+) -> Result<Spendable, LatestSpendableError>
+where
+    C: Locked + 'static,
+{
+    let latest_deposit = adapter.get_deposit(&channel, address).await?;
 
     let spendable = Spendable {
         spender: address,
@@ -127,10 +130,13 @@ pub async fn fetch_campaign_ids_for_channel(
     }
 }
 
-pub async fn create_campaign<A: Adapter>(
+pub async fn create_campaign<C>(
     req: Request<Body>,
-    app: &Application<A>,
-) -> Result<Response<Body>, ResponseError> {
+    app: &Application<C>,
+) -> Result<Response<Body>, ResponseError>
+where
+    C: Locked + 'static,
+{
     let auth = req
         .extensions()
         .get::<Auth>()
@@ -214,10 +220,10 @@ pub async fn create_campaign<A: Adapter>(
         .await?
         .iter()
         .sum::<Option<UnifiedNum>>()
-        .ok_or(Error::<A::AdapterError>::Calculation)?
+        .ok_or(Error::Calculation)?
         // DO NOT FORGET to add the Campaign being created right now!
         .checked_add(&campaign.budget)
-        .ok_or(Error::<A::AdapterError>::Calculation)?;
+        .ok_or(Error::Calculation)?;
 
     // `new_campaigns_remaining <= total_remaining` should be upheld
     // `campaign.budget < total_remaining` should also be upheld!
@@ -269,9 +275,9 @@ pub async fn create_campaign<A: Adapter>(
     Ok(success_response(serde_json::to_string(&campaign)?))
 }
 
-pub async fn campaign_list<A: Adapter>(
+pub async fn campaign_list<C: Locked + 'static>(
     req: Request<Body>,
-    app: &Application<A>,
+    app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
     let query = serde_urlencoded::from_str::<CampaignListQuery>(req.uri().query().unwrap_or(""))?;
 
@@ -296,9 +302,9 @@ pub async fn campaign_list<A: Adapter>(
 /// Can only be called by creator
 /// to close a campaign, just set it's budget to what it's spent so far (so that remaining == 0)
 /// newBudget = totalSpent, i.e. newBudget = oldBudget - remaining
-pub async fn close_campaign<A: Adapter>(
+pub async fn close_campaign<C: Locked + 'static>(
     req: Request<Body>,
-    app: &Application<A>,
+    app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
     let auth = req
         .extensions()
@@ -343,9 +349,9 @@ pub mod update_campaign {
 
     use super::*;
 
-    pub async fn handle_route<A: Adapter + 'static>(
+    pub async fn handle_route<C: Locked + 'static>(
         req: Request<Body>,
-        app: &Application<A>,
+        app: &Application<C>,
     ) -> Result<Response<Body>, ResponseError> {
         let campaign_being_mutated = req
             .extensions()
@@ -373,20 +379,20 @@ pub mod update_campaign {
         Ok(success_response(serde_json::to_string(&modified_campaign)?))
     }
 
-    pub async fn modify_campaign<A: Adapter + 'static>(
-        adapter: A,
+    pub async fn modify_campaign<C: Locked + 'static>(
+        adapter: Adapter<C>,
         pool: &DbPool,
         config: &Config,
         campaign_remaining: &CampaignRemaining,
         campaign: Campaign,
         modify_campaign: ModifyCampaign,
-    ) -> Result<Campaign, Error<A::AdapterError>> {
+    ) -> Result<Campaign, Error> {
         // *NOTE*: When updating campaigns make sure sum(campaigns.map(getRemaining)) <= totalDeposited - totalSpent
         // !WARNING!: totalSpent != sum(campaign.map(c => c.spending)) therefore we must always calculate remaining funds based on total_deposit - lastApprovedNewState.spenders[user]
         // *NOTE*: To close a campaign set campaignBudget to campaignSpent so that spendable == 0
 
         let delta_budget = if let Some(new_budget) = modify_campaign.budget {
-            get_delta_budget::<A>(campaign_remaining, &campaign, new_budget).await?
+            get_delta_budget(campaign_remaining, &campaign, new_budget).await?
         } else {
             None
         };
@@ -489,11 +495,11 @@ pub mod update_campaign {
     }
 
     // TODO: Figure out a way to simplify Errors and remove the Adapter from here
-    pub(super) async fn get_delta_budget<A: Adapter + 'static>(
+    pub(super) async fn get_delta_budget(
         campaign_remaining: &CampaignRemaining,
         campaign: &Campaign,
         new_budget: UnifiedNum,
-    ) -> Result<Option<DeltaBudget<UnifiedNum>>, Error<A::AdapterError>> {
+    ) -> Result<Option<DeltaBudget<UnifiedNum>>, Error> {
         let current_budget = campaign.budget;
 
         let budget_action = match new_budget.cmp(&current_budget) {
@@ -564,9 +570,9 @@ pub mod insert_events {
         spender::fee::calculate_fee,
         Application, Auth, ResponseError, Session,
     };
+    use adapter::prelude::*;
     use hyper::{Body, Request, Response};
     use primitives::{
-        adapter::Adapter,
         balances::{Balances, CheckedState, OverflowError},
         sentry::{Event, SuccessResponse},
         Address, Campaign, CampaignId, DomainError, UnifiedNum, ValidatorDesc,
@@ -599,9 +605,9 @@ pub mod insert_events {
         CampaignOutOfBudget,
     }
 
-    pub async fn handle_route<A: Adapter + 'static>(
+    pub async fn handle_route<C: Locked + 'static>(
         req: Request<Body>,
-        app: &Application<A>,
+        app: &Application<C>,
     ) -> Result<Response<Body>, ResponseError> {
         let (req_head, req_body) = req.into_parts();
 
@@ -631,8 +637,8 @@ pub mod insert_events {
             .unwrap())
     }
 
-    async fn process_events<A: Adapter + 'static>(
-        app: &Application<A>,
+    async fn process_events<C: Locked + 'static>(
+        app: &Application<C>,
         auth: Option<&Auth>,
         session: &Session,
         campaign: &Campaign,
@@ -950,10 +956,9 @@ mod test {
     use crate::db::{fetch_campaign, redis_pool::TESTS_POOL};
     use crate::test_util::setup_dummy_app;
     use crate::update_campaign::DeltaBudget;
-    use adapter::DummyAdapter;
+    use adapter::primitives::Deposit;
     use hyper::StatusCode;
     use primitives::{
-        adapter::Deposit,
         util::tests::prep_db::{DUMMY_CAMPAIGN, IDS},
         BigNum, ChannelId, ValidatorId,
     };
@@ -969,7 +974,7 @@ mod test {
 
         // this function should be called before each creation/modification of a Campaign!
         let add_deposit_call = |channel: ChannelId, creator: Address, token: Address| {
-            app.adapter.add_deposit_call(
+            app.adapter.client.add_deposit_call(
                 channel,
                 creator,
                 Deposit {
@@ -1235,10 +1240,9 @@ mod test {
 
         // Equal budget
         {
-            let delta_budget =
-                get_delta_budget::<DummyAdapter>(&campaign_remaining, &campaign, campaign.budget)
-                    .await
-                    .expect("should get delta budget");
+            let delta_budget = get_delta_budget(&campaign_remaining, &campaign, campaign.budget)
+                .await
+                .expect("should get delta budget");
             assert!(delta_budget.is_none());
         }
         // Spent cant be higher than the new budget
@@ -1250,15 +1254,13 @@ mod test {
 
             // campaign_spent > new_budget
             let new_budget = UnifiedNum::from_u64(300 * multiplier);
-            let delta_budget =
-                get_delta_budget::<DummyAdapter>(&campaign_remaining, &campaign, new_budget).await;
+            let delta_budget = get_delta_budget(&campaign_remaining, &campaign, new_budget).await;
 
             assert!(matches!(delta_budget, Err(Error::NewBudget(_))));
 
             // campaign_spent == new_budget
             let new_budget = UnifiedNum::from_u64(400 * multiplier);
-            let delta_budget =
-                get_delta_budget::<DummyAdapter>(&campaign_remaining, &campaign, new_budget).await;
+            let delta_budget = get_delta_budget(&campaign_remaining, &campaign, new_budget).await;
 
             assert!(matches!(delta_budget, Err(Error::NewBudget(_))));
         }
@@ -1269,10 +1271,9 @@ mod test {
                 .await
                 .expect("should set");
             let new_budget = UnifiedNum::from_u64(1100 * multiplier);
-            let delta_budget =
-                get_delta_budget::<DummyAdapter>(&campaign_remaining, &campaign, new_budget)
-                    .await
-                    .expect("should get delta budget");
+            let delta_budget = get_delta_budget(&campaign_remaining, &campaign, new_budget)
+                .await
+                .expect("should get delta budget");
             assert!(delta_budget.is_some());
             let increase_by = UnifiedNum::from_u64(100 * multiplier);
 
@@ -1285,10 +1286,9 @@ mod test {
                 .await
                 .expect("should set");
             let new_budget = UnifiedNum::from_u64(800 * multiplier);
-            let delta_budget =
-                get_delta_budget::<DummyAdapter>(&campaign_remaining, &campaign, new_budget)
-                    .await
-                    .expect("should get delta budget");
+            let delta_budget = get_delta_budget(&campaign_remaining, &campaign, new_budget)
+                .await
+                .expect("should get delta budget");
             assert!(delta_budget.is_some());
             let decrease_by = UnifiedNum::from_u64(200 * multiplier);
 

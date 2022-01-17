@@ -1,11 +1,12 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
+use adapter::client::Locked;
 use hyper::{
     service::{make_service_fn, service_fn},
     Error, Server,
 };
 use once_cell::sync::Lazy;
-use primitives::{adapter::Adapter, config::Environment};
+use primitives::config::Environment;
 use redis::ConnectionInfo;
 use serde::{Deserialize, Deserializer};
 use slog::{error, info};
@@ -68,7 +69,7 @@ fn default_redis_url() -> ConnectionInfo {
     DEFAULT_REDIS_URL.clone()
 }
 
-impl<A: Adapter + 'static> Application<A> {
+impl<C: Locked + 'static> Application<C> {
     /// Starts the `hyper` `Server`.
     pub async fn run(self, socket_addr: SocketAddr) {
         let logger = self.logger.clone();
@@ -88,6 +89,19 @@ impl<A: Adapter + 'static> Application<A> {
 
         if let Err(e) = server.await {
             error!(&logger, "server error: {}", e; "main" => "run");
+        }
+    }
+}
+
+impl<C: Locked> Clone for Application<C> {
+    fn clone(&self) -> Self {
+        Self {
+            adapter: self.adapter.clone(),
+            config: self.config.clone(),
+            logger: self.logger.clone(),
+            redis: self.redis.clone(),
+            pool: self.pool.clone(),
+            campaign_remaining: self.campaign_remaining.clone(),
         }
     }
 }

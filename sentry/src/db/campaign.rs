@@ -311,7 +311,7 @@ mod campaign_remaining {
         }
 
         /// Atomic `getset` [`redis`] operation
-        /// Used to close a [`Campaign`] `POST /campaign/close`
+        /// Used to close a [`primitives::Campaign`] `POST /campaign/close`
         pub async fn getset_remaining_to_zero(
             &self,
             campaign: CampaignId,

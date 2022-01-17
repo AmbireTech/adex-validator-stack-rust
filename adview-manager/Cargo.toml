@@ -3,6 +3,7 @@ authors = ["Ambire <dev@ambire.com>", "Lachezar Lechev <lachezar@ambire.com>"]
 edition = "2021"
 name = "adview-manager"
 version = "0.1.0"
+license = "AGPL-3.0"
 
 [dependencies]
 # Domain

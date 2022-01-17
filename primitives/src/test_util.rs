@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use once_cell::sync::Lazy;
 
 use crate::Address;
@@ -82,4 +84,20 @@ pub static ADDRESS_9: Lazy<Address> = Lazy::new(|| {
     b"0x6B83e7D6B72c098d48968441e0d05658dc17Adb9"
         .try_into()
         .unwrap()
+});
+
+// Dummy adapter auth tokens
+// authorization tokens
+pub static DUMMY_AUTH: Lazy<HashMap<Address, String>> = Lazy::new(|| {
+    let mut auth = HashMap::new();
+
+    auth.insert(*LEADER, "AUTH_awesomeLeader".into());
+    auth.insert(*FOLLOWER, "AUTH_awesomeFollower".into());
+    auth.insert(*GUARDIAN, "AUTH_awesomeGuardian".into());
+    auth.insert(*CREATOR, "AUTH_awesomeCreator".into());
+    auth.insert(*ADVERTISER, "AUTH_awesomeAdvertiser".into());
+    auth.insert(*PUBLISHER, "AUTH_awesomePublisher".into());
+    auth.insert(*GUARDIAN_2, "AUTH_awesomeGuardian2".into());
+
+    auth
 });

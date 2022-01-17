@@ -32,10 +32,10 @@ impl AllowedKey {
     /// Helper function to get the [`AllowedKey`] as `camelCase`.
     pub fn to_camelCase(&self) -> String {
         serde_json::to_value(self)
-        .expect("AllowedKey should always be serializable!")
-        .as_str()
-        .expect("Serialized AllowedKey should be a string!")
-        .to_string()
+            .expect("AllowedKey should always be serializable!")
+            .as_str()
+            .expect("Serialized AllowedKey should be a string!")
+            .to_string()
     }
 }
 

@@ -1,18 +1,16 @@
 use std::collections::HashSet;
 
 use crate::{db::analytics::get_analytics, success_response, Application, ResponseError};
+use adapter::client::Locked;
 use hyper::{Body, Request, Response};
-use primitives::{
-    adapter::Adapter,
-    analytics::{
-        query::{AllowedKey, ALLOWED_KEYS},
-        AnalyticsQuery, AuthenticateAs, ANALYTICS_QUERY_LIMIT,
-    },
+use primitives::analytics::{
+    query::{AllowedKey, ALLOWED_KEYS},
+    AnalyticsQuery, AuthenticateAs, ANALYTICS_QUERY_LIMIT,
 };
 
-pub async fn analytics<A: Adapter>(
+pub async fn analytics<C: Locked + 'static>(
     req: Request<Body>,
-    app: &Application<A>,
+    app: &Application<C>,
     request_allowed: Option<HashSet<AllowedKey>>,
     authenticate_as: Option<AuthenticateAs>,
 ) -> Result<Response<Body>, ResponseError> {

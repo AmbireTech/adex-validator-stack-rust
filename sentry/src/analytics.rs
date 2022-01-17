@@ -98,6 +98,7 @@ mod test {
     use super::*;
     use primitives::{
         sentry::{Analytics, CLICK, IMPRESSION},
+        test_util::DUMMY_IPFS,
         util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN},
         UnifiedNum,
     };
@@ -117,15 +118,8 @@ mod test {
         Ok(event_analytics)
     }
 
-    #[tokio::test]
-    async fn test_analytics_recording() {
-        let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
-
-        setup_test_migrations(database.pool.clone())
-            .await
-            .expect("Migrations should succeed");
-
-        let test_events = vec![
+    fn get_test_events() -> HashMap<String, (Event, Address, UnifiedNum)> {
+        vec![
             (
                 "click_empty".into(),
                 (
@@ -152,11 +146,61 @@ mod test {
                     UnifiedNum::from_u64(1_000_000),
                 ),
             ),
+            (
+                "click_with_unit_and_slot".into(),
+                (
+                    Event::Click {
+                        publisher: ADDRESSES["publisher"],
+                        ad_unit: Some(DUMMY_IPFS[0]),
+                        ad_slot: Some(DUMMY_IPFS[1]),
+                        referrer: Some("http://127.0.0.1".into()),
+                    },
+                    ADDRESSES["publisher"],
+                    UnifiedNum::from_u64(1_000_000),
+                ),
+            ),
+            (
+                "click_with_different_data".into(),
+                (
+                    Event::Click {
+                        publisher: ADDRESSES["publisher"],
+                        ad_unit: Some(DUMMY_IPFS[2]),
+                        ad_slot: Some(DUMMY_IPFS[3]),
+                        referrer: Some("http://127.0.0.1".into()),
+                    },
+                    ADDRESSES["publisher"],
+                    UnifiedNum::from_u64(1_000_000),
+                ),
+            ),
+            (
+                "impression_with_slot_unit_and_referrer".into(),
+                (
+                    Event::Impression {
+                        publisher: ADDRESSES["publisher"],
+                        ad_unit: Some(DUMMY_IPFS[0]),
+                        ad_slot: Some(DUMMY_IPFS[1]),
+                        referrer: Some("http://127.0.0.1".into()),
+                    },
+                    ADDRESSES["publisher"],
+                    UnifiedNum::from_u64(1_000_000),
+                ),
+            ),
         ]
         .into_iter()
-        .collect::<HashMap<String, _>>();
+        .collect::<HashMap<String, _>>()
+    }
+
+    #[tokio::test]
+    async fn test_analytics_recording_with_empty_events() {
+        let test_events = get_test_events();
+        let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
+
+        setup_test_migrations(database.pool.clone())
+            .await
+            .expect("Migrations should succeed");
 
         let campaign = DUMMY_CAMPAIGN.clone();
+
         let session = Session {
             ip: None,
             country: None,
@@ -167,6 +211,7 @@ mod test {
         let input_events = vec![
             test_events["click_empty"].clone(),
             test_events["impression_empty"].clone(),
+            test_events["impression_empty"].clone(),
         ];
 
         record(&database.clone(), &campaign, &session, input_events.clone())
@@ -176,6 +221,7 @@ mod test {
         let analytics = get_all_analytics(&database.pool)
             .await
             .expect("should get all analytics");
+        assert_eq!(analytics.len(), 2);
 
         let click_analytics = analytics
             .iter()
@@ -193,35 +239,94 @@ mod test {
 
         assert_eq!(
             impression_analytics.payout_amount,
-            UnifiedNum::from_u64(1_000_000)
+            UnifiedNum::from_u64(2_000_000)
         );
-        assert_eq!(impression_analytics.payout_count, 1);
+        assert_eq!(impression_analytics.payout_count, 2);
+    }
 
-        record(&database.clone(), &campaign, &session, input_events)
+    #[tokio::test]
+    async fn test_recording_with_session() {
+        let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
+
+        setup_test_migrations(database.pool.clone())
+            .await
+            .expect("Migrations should succeed");
+
+        let test_events = get_test_events();
+
+        let campaign = DUMMY_CAMPAIGN.clone();
+
+        let session = Session {
+            ip: Default::default(),
+            country: Some("Bulgaria".into()),
+            referrer_header: Some("http://127.0.0.1".into()),
+            os: Some("Windows".into()),
+        };
+
+        let input_events = vec![
+            test_events["click_with_unit_and_slot"].clone(),
+            test_events["click_with_unit_and_slot"].clone(),
+            test_events["click_with_different_data"].clone(),
+            test_events["click_with_different_data"].clone(),
+            test_events["click_with_different_data"].clone(),
+            test_events["impression_with_slot_unit_and_referrer"].clone(),
+            test_events["impression_with_slot_unit_and_referrer"].clone(),
+            test_events["impression_with_slot_unit_and_referrer"].clone(),
+            test_events["impression_with_slot_unit_and_referrer"].clone(),
+        ];
+
+        record(&database.clone(), &campaign, &session, input_events.clone())
             .await
             .expect("should record");
 
         let analytics = get_all_analytics(&database.pool)
             .await
             .expect("should find analytics");
-        let click_analytics = analytics
-            .iter()
-            .find(|a| a.event_type == CLICK)
-            .expect("There should be a click event");
-        let impression_analytics = analytics
-            .iter()
-            .find(|a| a.event_type == IMPRESSION)
-            .expect("There should be an impression event");
-        assert_eq!(
-            click_analytics.payout_amount,
-            UnifiedNum::from_u64(2_000_000)
-        );
-        assert_eq!(click_analytics.payout_count, 2);
 
+        assert!(
+            analytics
+                .iter()
+                .all(|a| a.os_name == OperatingSystem::map_os("Windows")),
+            "all analytics should have the same os as the one in the session"
+        );
+
+        let with_slot_and_unit: Analytics = analytics
+            .iter()
+            .find(|a| {
+                a.ad_unit == Some(DUMMY_IPFS[0])
+                    && a.ad_slot == Some(DUMMY_IPFS[1])
+                    && a.event_type == CLICK
+            })
+            .expect("entry should exist")
+            .to_owned();
+        assert_eq!(with_slot_and_unit.hostname, Some("127.0.0.1".to_string()));
+        assert_eq!(with_slot_and_unit.payout_count, 2);
         assert_eq!(
-            impression_analytics.payout_amount,
+            with_slot_and_unit.payout_amount,
             UnifiedNum::from_u64(2_000_000)
         );
-        assert_eq!(impression_analytics.payout_count, 2);
+
+        let with_different_slot_and_unit: Analytics = analytics
+            .iter()
+            .find(|a| a.ad_unit == Some(DUMMY_IPFS[2]) && a.ad_slot == Some(DUMMY_IPFS[3]))
+            .expect("entry should exist")
+            .to_owned();
+        assert_eq!(with_different_slot_and_unit.payout_count, 3);
+        assert_eq!(
+            with_different_slot_and_unit.payout_amount,
+            UnifiedNum::from_u64(3_000_000)
+        );
+
+        let with_referrer: Analytics = analytics
+            .iter()
+            .find(|a| {
+                a.ad_unit == Some(DUMMY_IPFS[0])
+                    && a.ad_slot == Some(DUMMY_IPFS[1])
+                    && a.event_type == IMPRESSION
+            })
+            .expect("entry should exist")
+            .to_owned();
+        assert_eq!(with_referrer.payout_count, 4);
+        assert_eq!(with_referrer.payout_amount, UnifiedNum::from_u64(4_000_000));
     }
 }
