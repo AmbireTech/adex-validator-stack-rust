@@ -27,7 +27,7 @@ pub async fn record(
     let mut batch_update = HashMap::<Event, UpdateAnalytics>::new();
 
     for (event, _payout_addr, payout_amount) in events_with_payouts {
-        let event_type = event.to_string();
+        let event_type = event.event_type();
         let (publisher, ad_unit, referrer, ad_slot, ad_slot_type) = {
             let (publisher, event_ad_unit, referrer, ad_slot) = match &event {
                 Event::Impression {
@@ -97,7 +97,7 @@ pub async fn record(
 mod test {
     use super::*;
     use primitives::{
-        sentry::Analytics,
+        sentry::{Analytics, CLICK, IMPRESSION},
         util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN},
         UnifiedNum,
     };
@@ -179,11 +179,11 @@ mod test {
 
         let click_analytics = analytics
             .iter()
-            .find(|a| a.event_type == "CLICK")
+            .find(|a| a.event_type == CLICK)
             .expect("There should be a click Analytics");
         let impression_analytics = analytics
             .iter()
-            .find(|a| a.event_type == "IMPRESSION")
+            .find(|a| a.event_type == IMPRESSION)
             .expect("There should be an impression Analytics");
         assert_eq!(
             click_analytics.payout_amount,
@@ -206,11 +206,11 @@ mod test {
             .expect("should find analytics");
         let click_analytics = analytics
             .iter()
-            .find(|a| a.event_type == "CLICK")
+            .find(|a| a.event_type == CLICK)
             .expect("There should be a click event");
         let impression_analytics = analytics
             .iter()
-            .find(|a| a.event_type == "IMPRESSION")
+            .find(|a| a.event_type == IMPRESSION)
             .expect("There should be an impression event");
         assert_eq!(
             click_analytics.payout_amount,

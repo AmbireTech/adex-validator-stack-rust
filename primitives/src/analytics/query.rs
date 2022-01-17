@@ -27,6 +27,18 @@ pub enum AllowedKey {
     OsName,
 }
 
+impl AllowedKey {
+    #[allow(non_snake_case)]
+    /// Helper function to get the [`AllowedKey`] as `camelCase`.
+    pub fn to_camelCase(&self) -> String {
+        serde_json::to_value(self)
+        .expect("AllowedKey should always be serializable!")
+        .as_str()
+        .expect("Serialized AllowedKey should be a string!")
+        .to_string()
+    }
+}
+
 /// All [`AllowedKey`]s should be present in this static variable.
 pub static ALLOWED_KEYS: Lazy<HashSet<AllowedKey>> = Lazy::new(|| {
     vec![
@@ -89,7 +101,7 @@ pub struct Time {
     /// And it should not contain **minutes**, **seconds** or **nanoseconds**
     // TODO: Either Timestamp (number) or DateTime (string) de/serialization
     pub start: DateHour<Utc>,
-    /// End DateHour should be after Start DateHour!
+    /// The End [`DateHour`] which will fetch `analytics_time <= end` and should be after Start [`DateHour`]!
     pub end: Option<DateHour<Utc>>,
     // we can use `chrono_tz` to support more Timezones when needed.
     // #[serde(default = "default_timezone_utc")]
@@ -160,9 +172,9 @@ mod de {
                     let timeframe = timeframe.unwrap_or(Timeframe::Day);
                     let start = start.unwrap_or_else(|| DateHour::now() - &timeframe);
 
-                    // if there is an End time passed, check if End is > Start
+                    // if there is an End DateHour passed, check if End is > Start
                     match end {
-                        Some(end) if start > end => {
+                        Some(end) if start >= end => {
                             return Err(de::Error::custom(
                                 "End time should be larger than the Start time",
                             ));
@@ -178,7 +190,7 @@ mod de {
                 }
             }
 
-            const FIELDS: &'static [&'static str] = &["timeframe", "start", "end"];
+            const FIELDS: &[&str] = &["timeframe", "start", "end"];
             deserializer.deserialize_struct("Time", FIELDS, TimeVisitor)
         }
     }

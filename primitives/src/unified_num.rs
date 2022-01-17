@@ -290,8 +290,47 @@ impl Mul<&UnifiedNum> for UnifiedNum {
     }
 }
 
+impl Mul<u64> for &UnifiedNum {
+    type Output = UnifiedNum;
+
+    fn mul(self, rhs: u64) -> Self::Output {
+        UnifiedNum(self.0 * rhs)
+    }
+}
+
+impl Mul<u64> for UnifiedNum {
+    type Output = UnifiedNum;
+
+    fn mul(self, rhs: u64) -> Self::Output {
+        UnifiedNum(self.0 * rhs)
+    }
+}
+
+impl Mul<UnifiedNum> for u64 {
+    type Output = UnifiedNum;
+
+    fn mul(self, rhs: UnifiedNum) -> Self::Output {
+        UnifiedNum(self * rhs.0)
+    }
+}
+
+impl Mul<&UnifiedNum> for u64 {
+    type Output = UnifiedNum;
+
+    fn mul(self, rhs: &UnifiedNum) -> Self::Output {
+        UnifiedNum(self * rhs.0)
+    }
+}
+
 impl<'a> Sum<&'a UnifiedNum> for Option<UnifiedNum> {
     fn sum<I: Iterator<Item = &'a UnifiedNum>>(mut iter: I) -> Self {
+        iter.try_fold(0_u64, |acc, unified| acc.checked_add(unified.0))
+            .map(UnifiedNum)
+    }
+}
+
+impl<'a> Sum<UnifiedNum> for Option<UnifiedNum> {
+    fn sum<I: Iterator<Item = UnifiedNum>>(mut iter: I) -> Self {
         iter.try_fold(0_u64, |acc, unified| acc.checked_add(unified.0))
             .map(UnifiedNum)
     }

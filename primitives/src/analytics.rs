@@ -1,4 +1,7 @@
-use crate::{Address, CampaignId, ValidatorId, IPFS};
+use crate::{
+    sentry::{EventType, IMPRESSION},
+    Address, CampaignId, ValidatorId, IPFS,
+};
 use parse_display::Display;
 use serde::{Deserialize, Serialize};
 
@@ -16,13 +19,23 @@ pub mod postgres {
     impl AnalyticsQuery {
         pub fn get_key(&self, key: AllowedKey) -> Option<Box<dyn ToSql + Sync + Send>> {
             match key {
-                AllowedKey::CampaignId => self.campaign_id.map(|campaign_id| Box::new(campaign_id) as _),
+                AllowedKey::CampaignId => self
+                    .campaign_id
+                    .map(|campaign_id| Box::new(campaign_id) as _),
                 AllowedKey::AdUnit => self.ad_unit.map(|ad_unit| Box::new(ad_unit) as _),
                 AllowedKey::AdSlot => self.ad_slot.map(|ad_slot| Box::new(ad_slot) as _),
-                AllowedKey::AdSlotType => self.ad_slot_type.clone().map(|ad_slot_type| Box::new(ad_slot_type) as _),
-                AllowedKey::Advertiser => self.advertiser.map(|advertiser| Box::new(advertiser) as _),
+                AllowedKey::AdSlotType => self
+                    .ad_slot_type
+                    .clone()
+                    .map(|ad_slot_type| Box::new(ad_slot_type) as _),
+                AllowedKey::Advertiser => {
+                    self.advertiser.map(|advertiser| Box::new(advertiser) as _)
+                }
                 AllowedKey::Publisher => self.publisher.map(|publisher| Box::new(publisher) as _),
-                AllowedKey::Hostname => self.hostname.clone().map(|hostname| Box::new(hostname) as _),
+                AllowedKey::Hostname => self
+                    .hostname
+                    .clone()
+                    .map(|hostname| Box::new(hostname) as _),
                 AllowedKey::Country => self.country.clone().map(|country| Box::new(country) as _),
                 AllowedKey::OsName => self.os_name.clone().map(|os_name| Box::new(os_name) as _),
             }
@@ -89,7 +102,7 @@ pub struct AnalyticsQuery {
     #[serde(default = "default_limit")]
     pub limit: u32,
     #[serde(default = "default_event_type")]
-    pub event_type: String,
+    pub event_type: EventType,
     #[serde(default = "default_metric")]
     pub metric: Metric,
     pub segment_by: Option<AllowedKey>,
@@ -106,16 +119,6 @@ pub struct AnalyticsQuery {
     pub os_name: Option<OperatingSystem>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(untagged, rename_all = "camelCase")]
-pub enum AnalyticsQueryKey {
-    CampaignId(CampaignId),
-    IPFS(IPFS),
-    String(String),
-    Address(Address),
-    OperatingSystem(OperatingSystem),
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Display, Hash, Eq)]
 #[serde(untagged, into = "String", from = "String")]
 pub enum OperatingSystem {
@@ -128,9 +131,15 @@ pub enum OperatingSystem {
 #[derive(Debug, Clone, Serialize, Deserialize, Display, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum Timeframe {
+    /// [`Timeframe::Year`] returns analytics grouped by month.
     Year,
+    /// [`Timeframe::Month`] returns analytics grouped by day.
     Month,
+    /// [`Timeframe::Week`] returns analytics grouped by hour.
+    /// Same as [`Timeframe::Day`].
     Week,
+    /// [`Timeframe::Day`] returns analytics grouped by hour.
+    /// Same as [`Timeframe::Week`].
     Day,
 }
 
@@ -151,10 +160,13 @@ pub enum AuthenticateAs {
 
 impl Metric {
     #[cfg(feature = "postgres")]
-    pub fn column_name(self) -> String {
+    /// Returns the query column name of the [`Metric`].
+    ///
+    /// Available only when the `postgres` feature is enabled.
+    pub fn column_name(self) -> &'static str {
         match self {
-            Metric::Count => "payout_count".to_string(),
-            Metric::Paid => "payout_amount".to_string(),
+            Metric::Count => "payout_count",
+            Metric::Paid => "payout_amount",
         }
     }
 }
@@ -257,8 +269,8 @@ fn default_limit() -> u32 {
     100
 }
 
-fn default_event_type() -> String {
-    "IMPRESSION".into()
+fn default_event_type() -> EventType {
+    IMPRESSION
 }
 
 fn default_metric() -> Metric {

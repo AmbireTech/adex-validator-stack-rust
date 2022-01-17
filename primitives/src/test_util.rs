@@ -12,6 +12,7 @@ pub static CREATOR: Lazy<Address> = Lazy::new(|| *ADDRESS_3);
 pub static ADVERTISER: Lazy<Address> = Lazy::new(|| *ADDRESS_4);
 pub static PUBLISHER: Lazy<Address> = Lazy::new(|| *ADDRESS_5);
 pub static GUARDIAN_2: Lazy<Address> = Lazy::new(|| *ADDRESS_6);
+pub static PUBLISHER_2: Lazy<Address> = Lazy::new(|| *ADDRESS_7);
 
 /// passphrase: ganache0
 pub static ADDRESS_0: Lazy<Address> = Lazy::new(|| {

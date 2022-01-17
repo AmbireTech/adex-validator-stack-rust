@@ -145,9 +145,22 @@ mod event {
     static IMPRESSION_STRING: Lazy<String> = Lazy::new(|| EventType::Impression.to_string());
     static CLICK_STRING: Lazy<String> = Lazy::new(|| EventType::Click.to_string());
 
-    #[derive(Debug, Display, FromStr, Serialize, Deserialize, Hash, Ord, Eq, PartialEq, PartialOrd, Clone, Copy)]
+    #[derive(
+        Debug,
+        Display,
+        FromStr,
+        Serialize,
+        Deserialize,
+        Hash,
+        Ord,
+        Eq,
+        PartialEq,
+        PartialOrd,
+        Clone,
+        Copy,
+    )]
     #[display(style = "SNAKE_CASE")]
-    #[serde(rename_all="SCREAMING_SNAKE_CASE")]
+    #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
     pub enum EventType {
         Impression,
         Click,
@@ -300,7 +313,7 @@ pub struct FetchedAnalytics {
 }
 
 /// The value of the requested analytics [`Metric`].
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum FetchedMetric {
     Count(u32),
@@ -355,7 +368,11 @@ impl<Tz: TimeZone, Tz2: TimeZone> PartialEq<DateHour<Tz2>> for DateHour<Tz> {
 
 impl<Tz: TimeZone> Ord for DateHour<Tz> {
     fn cmp(&self, other: &DateHour<Tz>) -> Ordering {
-        self.date.cmp(&other.date)
+        match self.date.cmp(&other.date) {
+            // Only if the two dates are equal, compare the hours too!
+            Ordering::Equal => self.hour.cmp(&other.hour),
+            ordering => ordering,
+        }
     }
 }
 
@@ -365,11 +382,14 @@ impl<Tz: TimeZone, Tz2: TimeZone> PartialOrd<DateHour<Tz2>> for DateHour<Tz> {
     /// See [`DateTime`] implementation of `PartialOrd<DateTime<Tz2>>` for more details.
     fn partial_cmp(&self, other: &DateHour<Tz2>) -> Option<Ordering> {
         if self.date == other.date {
-            if self.hour > other.hour {
-                Some(Ordering::Greater)
-            } else {
-                Some(Ordering::Less)
-            }
+            self.hour.partial_cmp(&other.hour)
+            // if self.hour > other.hour {
+            //     Some(Ordering::Greater)
+            // } else if self.hour == other.hour {
+            //     Some(Ordering::Equal)
+            // } else {
+            //     Some(Ordering::Less)
+            // }
         } else {
             self.date.naive_utc().partial_cmp(&other.date.naive_utc())
         }
@@ -922,7 +942,8 @@ pub mod campaign_create {
 #[cfg(feature = "postgres")]
 mod postgres {
     use super::{
-        Analytics, DateHour, FetchedAnalytics, FetchedMetric, MessageResponse, ValidatorMessage, EventType,
+        Analytics, DateHour, EventType, FetchedAnalytics, FetchedMetric, MessageResponse,
+        ValidatorMessage,
     };
     use crate::{
         analytics::{AnalyticsQuery, Metric},
@@ -1072,7 +1093,7 @@ mod postgres {
             raw: &'a [u8],
         ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
             let event_string = <&str as FromSql>::from_sql(ty, raw)?;
-            
+
             Ok(event_string.parse()?)
         }
         accepts!(VARCHAR, TEXT);
@@ -1129,7 +1150,7 @@ mod test {
     use serde_json::{json, Value};
 
     #[test]
-    pub fn de_serialize_events() {
+    pub fn test_de_serialize_events() {
         let click = Event::Click {
             publisher: ADDRESSES["publisher"],
             ad_unit: Some(DUMMY_IPFS[0]),
@@ -1152,7 +1173,7 @@ mod test {
     }
 
     #[test]
-    fn datehour_subtract_timeframe() {
+    fn test_datehour_subtract_timeframe() {
         // test with End of year
         {
             let datehour = DateHour::from_ymdh(2021, 12, 31, 22);
@@ -1175,7 +1196,7 @@ mod test {
     }
 
     #[test]
-    fn datehour_de_serialize_partial_ord_and_eq() {
+    fn test_datehour_de_serialize_partial_ord_and_eq() {
         let earlier = DateHour::from_ymdh(2021, 12, 1, 16);
         let later = DateHour::from_ymdh(2021, 12, 31, 16);
 
@@ -1189,16 +1210,46 @@ mod test {
         assert_eq!(Some(Ordering::Greater), later.partial_cmp(&earlier));
 
         // Serialize & deserialize
-        let json_datetime = Value::String("2021-12-1T16:00:00+02:00".into());
+        let json_datetime = Value::String("2021-12-01T16:00:00+02:00".into());
         let datehour: DateHour<Utc> =
             serde_json::from_value(json_datetime.clone()).expect("Should deserialize");
         assert_eq!(
-            DateHour::from_ymdh(2021, 12, 1, 12),
+            DateHour::from_ymdh(2021, 12, 1, 14),
             datehour,
             "Deserialized DateHour should be 2 hours earlier to match UTC +0"
         );
 
         let serialized_value = serde_json::to_value(datehour).expect("Should serialize DateHour");
-        assert_eq!(json_datetime, serialized_value);
+        assert_eq!(
+            Value::String("2021-12-01T14:00:00Z".into()),
+            serialized_value,
+            "Json value should always be serialized with Z (UTC+0) timezone"
+        );
+    }
+
+    #[test]
+    fn test_partial_eq_with_same_datehour_but_different_zones() {
+        // Eq & PartialEq with different timezones
+        let json = json!({
+            "UTC+0": "2021-12-16T14:00:00+00:00",
+            "UTC+2": "2021-12-16T16:00:00+02:00",
+        });
+
+        let map: HashMap<String, DateHour<Utc>> =
+            serde_json::from_value(json).expect("Should deserialize");
+
+        assert_eq!(
+            Some(Ordering::Equal),
+            map["UTC+0"].partial_cmp(&map["UTC+2"])
+        );
+
+        assert_eq!(
+            map["UTC+0"], map["UTC+2"],
+            "DateHour should be the same after the second one is made into UTC+0"
+        );
+        assert!(
+            map["UTC+0"] >= map["UTC+2"],
+            "UTC+0 value should be equal to UTC+2"
+        );
     }
 }

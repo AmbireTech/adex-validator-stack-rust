@@ -103,7 +103,7 @@ mod test {
     use chrono::{Timelike, Utc};
     use primitives::{
         analytics::{query::Time, Metric, OperatingSystem, Timeframe},
-        sentry::{DateHour, FetchedAnalytics, UpdateAnalytics},
+        sentry::{DateHour, FetchedAnalytics, FetchedMetric, UpdateAnalytics, CLICK, IMPRESSION},
         util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, DUMMY_IPFS},
         UnifiedNum,
     };
@@ -123,7 +123,7 @@ mod test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            event_type: "CLICK".to_string(),
+            event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
         };
@@ -142,7 +142,7 @@ mod test {
             hostname: None,
             country: Some("Japan".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            event_type: "CLICK".to_string(),
+            event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
         };
@@ -161,7 +161,7 @@ mod test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            event_type: "CLICK".to_string(),
+            event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
         };
@@ -180,7 +180,7 @@ mod test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            event_type: "CLICK".to_string(),
+            event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
         };
@@ -199,7 +199,7 @@ mod test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            event_type: "CLICK".to_string(),
+            event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
         };
@@ -218,7 +218,7 @@ mod test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            event_type: "CLICK".to_string(),
+            event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
         };
@@ -237,7 +237,7 @@ mod test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            event_type: "CLICK".to_string(),
+            event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
         };
@@ -256,7 +256,7 @@ mod test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            event_type: "CLICK".to_string(),
+            event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
         };
@@ -298,7 +298,7 @@ mod test {
         assert_eq!(fetched_analytics.len(), 1);
         assert_eq!(
             fetched_analytics.get(0).unwrap().value,
-            UnifiedNum::from_u64(4)
+            FetchedMetric::Count(4)
         );
 
         // Test with start date
@@ -306,7 +306,7 @@ mod test {
 
         let query = AnalyticsQuery {
             limit: 1000,
-            event_type: "CLICK".into(),
+            event_type: CLICK,
             metric: Metric::Count,
             segment_by: None,
             time: Time {
@@ -351,14 +351,14 @@ mod test {
         assert_eq!(fetched_analytics.len(), 1);
         assert_eq!(
             fetched_analytics.get(0).unwrap().value,
-            UnifiedNum::from_u64(2)
+            FetchedMetric::Count(2)
         );
 
         // Test with end date
         let end_date = DateHour::<Utc>::now() - 1;
         let query = AnalyticsQuery {
             limit: 1000,
-            event_type: "CLICK".into(),
+            event_type: CLICK,
             metric: Metric::Count,
             segment_by: None,
             time: Time {
@@ -403,7 +403,7 @@ mod test {
         assert_eq!(fetched_analytics.len(), 1);
         assert_eq!(
             fetched_analytics.get(0).unwrap().value,
-            UnifiedNum::from_u64(2)
+            FetchedMetric::Count(2)
         );
 
         // Test with start_date and end_date
@@ -413,7 +413,7 @@ mod test {
         let end_date = DateHour::<Utc>::now() - 1;
         let query = AnalyticsQuery {
             limit: 1000,
-            event_type: "CLICK".into(),
+            event_type: CLICK,
             metric: Metric::Count,
             segment_by: None,
             time: Time {
@@ -457,13 +457,13 @@ mod test {
         assert_eq!(fetched_analytics.len(), 1);
         assert_eq!(
             fetched_analytics.get(0).unwrap().value,
-            UnifiedNum::from_u64(3)
+            FetchedMetric::Count(3)
         );
 
         // Test with segment_by
         let query = AnalyticsQuery {
             limit: 1000,
-            event_type: "CLICK".into(),
+            event_type: CLICK,
             metric: Metric::Count,
             segment_by: Some(AllowedKey::Country),
             time: Time {
@@ -508,7 +508,7 @@ mod test {
         assert_eq!(fetched_analytics.len(), 1);
         assert_eq!(
             fetched_analytics.get(0).unwrap().value,
-            UnifiedNum::from_u64(3)
+            FetchedMetric::Count(3)
         );
 
         // Test with not allowed segment by
@@ -536,255 +536,268 @@ mod test {
         );
 
         // test with not allowed key
-        let req = Request::builder()
+        {
+            let req = Request::builder()
             .uri("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day&campaignId=0x936da01f9abd4d9d80c702af85c822a8")
             .body(Body::empty())
             .expect("Should build Request");
 
-        let analytics_response = analytics(
-            req,
-            &app,
-            Some(
-                vec![AllowedKey::Country, AllowedKey::AdSlotType]
-                    .into_iter()
-                    .collect(),
-            ),
-            None,
-        )
-        .await
-        .expect_err("Should get error for disallowed key");
+            let analytics_response = analytics(
+                req,
+                &app,
+                Some(
+                    vec![AllowedKey::Country, AllowedKey::AdSlotType]
+                        .into_iter()
+                        .collect(),
+                ),
+                None,
+            )
+            .await
+            .expect_err("Should get error for disallowed key");
 
-        assert_eq!(
-            analytics_response,
-            ResponseError::BadRequest("disallowed key in query: campaignId".into())
-        );
-
+            assert_eq!(
+                analytics_response,
+                ResponseError::BadRequest("disallowed key in query: campaignId".into())
+            );
+        }
         // test with segmentBy which is then not provided
-        let req = Request::builder()
+        {
+            let req = Request::builder()
             .uri("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day&segmentBy=country")
             .body(Body::empty())
             .expect("Should build Request");
 
-        let analytics_response = analytics(
-            req,
-            &app,
-            Some(
-                vec![AllowedKey::Country, AllowedKey::AdSlotType]
-                    .into_iter()
-                    .collect(),
-            ),
-            None,
-        )
-        .await
-        .expect_err("Should result in error for SegmentBy with no key");
+            let analytics_response = analytics(
+                req,
+                &app,
+                Some(
+                    vec![AllowedKey::Country, AllowedKey::AdSlotType]
+                        .into_iter()
+                        .collect(),
+                ),
+                None,
+            )
+            .await
+            .expect_err("Should result in error for SegmentBy with no key");
 
-        assert_eq!(
-            analytics_response,
-            ResponseError::BadRequest("SegmentBy is provided but a key is not passed".into())
-        );
-
+            assert_eq!(
+                analytics_response,
+                ResponseError::BadRequest("SegmentBy is provided but a key is not passed".into())
+            );
+        }
         // test with different metric
-        let req = Request::builder()
+        {
+            let req = Request::builder()
             .uri("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=paid&timeframe=day")
             .body(Body::empty())
             .expect("Should build Request");
 
-        let analytics_response = analytics(
-            req,
-            &app,
-            Some(
-                vec![AllowedKey::Country, AllowedKey::AdSlotType]
-                    .into_iter()
-                    .collect(),
-            ),
-            None,
-        )
-        .await
-        .expect("Should get analytics data");
-        let json = hyper::body::to_bytes(analytics_response.into_body())
+            let analytics_response = analytics(
+                req,
+                &app,
+                Some(
+                    vec![AllowedKey::Country, AllowedKey::AdSlotType]
+                        .into_iter()
+                        .collect(),
+                ),
+                None,
+            )
             .await
-            .expect("Should get json");
+            .expect("Should get analytics data");
+            let json = hyper::body::to_bytes(analytics_response.into_body())
+                .await
+                .expect("Should get json");
 
-        let fetched_analytics: Vec<FetchedAnalytics> =
-            serde_json::from_slice(&json).expect("Should get analytics response");
-        assert_eq!(fetched_analytics.len(), 1);
-        assert_eq!(
-            fetched_analytics.get(0).unwrap().value,
-            UnifiedNum::from_u64(4_000_000)
-        );
-
+            let fetched_analytics: Vec<FetchedAnalytics> =
+                serde_json::from_slice(&json).expect("Should get analytics response");
+            assert_eq!(fetched_analytics.len(), 1);
+            assert_eq!(
+                fetched_analytics.get(0).unwrap().value,
+                FetchedMetric::Paid(4_000_000.into())
+            );
+        }
         // Test with different timeframe
-        let req = Request::builder()
+        {
+            let req = Request::builder()
             .uri("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=week")
             .body(Body::empty())
             .expect("Should build Request");
 
-        let analytics_response = analytics(
-            req,
-            &app,
-            Some(
-                vec![AllowedKey::Country, AllowedKey::AdSlotType]
-                    .into_iter()
-                    .collect(),
-            ),
-            None,
-        )
-        .await
-        .expect("Should get analytics data");
-        let json = hyper::body::to_bytes(analytics_response.into_body())
+            let analytics_response = analytics(
+                req,
+                &app,
+                Some(
+                    vec![AllowedKey::Country, AllowedKey::AdSlotType]
+                        .into_iter()
+                        .collect(),
+                ),
+                None,
+            )
             .await
-            .expect("Should get json");
+            .expect("Should get analytics data");
+            let json = hyper::body::to_bytes(analytics_response.into_body())
+                .await
+                .expect("Should get json");
 
-        let fetched_analytics: Vec<FetchedAnalytics> =
-            serde_json::from_slice(&json).expect("Should get analytics response");
-        assert_eq!(fetched_analytics.len(), 1);
-        assert_eq!(
-            fetched_analytics.get(0).unwrap().value,
-            UnifiedNum::from_u64(5)
-        );
-
+            let fetched_analytics: Vec<FetchedAnalytics> =
+                serde_json::from_slice(&json).expect("Should get analytics response");
+            assert_eq!(fetched_analytics.len(), 1);
+            assert_eq!(
+                fetched_analytics.get(0).unwrap().value,
+                FetchedMetric::Paid(5_000_000.into())
+            );
+        }
         // Test with a limit
-        let req = Request::builder()
-            .uri("http://127.0.0.1/analytics?limit=2&eventType=CLICK&metric=count&timeframe=day")
-            .body(Body::empty())
-            .expect("Should build Request");
+        {
+            let req = Request::builder()
+                .uri(
+                    "http://127.0.0.1/analytics?limit=2&eventType=CLICK&metric=count&timeframe=day",
+                )
+                .body(Body::empty())
+                .expect("Should build Request");
 
-        let analytics_response = analytics(
-            req,
-            &app,
-            Some(
-                vec![AllowedKey::Country, AllowedKey::AdSlotType]
-                    .into_iter()
-                    .collect(),
-            ),
-            None,
-        )
-        .await
-        .expect("Should get analytics data");
-        let json = hyper::body::to_bytes(analytics_response.into_body())
+            let analytics_response = analytics(
+                req,
+                &app,
+                Some(
+                    vec![AllowedKey::Country, AllowedKey::AdSlotType]
+                        .into_iter()
+                        .collect(),
+                ),
+                None,
+            )
             .await
-            .expect("Should get json");
+            .expect("Should get analytics data");
+            let json = hyper::body::to_bytes(analytics_response.into_body())
+                .await
+                .expect("Should get json");
 
-        let fetched_analytics: Vec<FetchedAnalytics> =
-            serde_json::from_slice(&json).expect("Should get analytics response");
-        assert_eq!(fetched_analytics.len(), 1);
-        assert_eq!(
-            fetched_analytics.get(0).unwrap().value,
-            UnifiedNum::from_u64(2)
-        );
+            let fetched_analytics: Vec<FetchedAnalytics> =
+                serde_json::from_slice(&json).expect("Should get analytics response");
+            assert_eq!(fetched_analytics.len(), 1);
+            assert_eq!(
+                fetched_analytics.get(0).unwrap().value,
+                FetchedMetric::Count(2)
+            );
+        }
         // Test with a month timeframe
-        let req = Request::builder()
+        {
+            let req = Request::builder()
             .uri(
                 "http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=month",
             )
             .body(Body::empty())
             .expect("Should build Request");
 
-        let analytics_response = analytics(
-            req,
-            &app,
-            Some(
-                vec![AllowedKey::Country, AllowedKey::AdSlotType]
-                    .into_iter()
-                    .collect(),
-            ),
-            None,
-        )
-        .await
-        .expect("Should get analytics data");
-        let json = hyper::body::to_bytes(analytics_response.into_body())
+            let analytics_response = analytics(
+                req,
+                &app,
+                Some(
+                    vec![AllowedKey::Country, AllowedKey::AdSlotType]
+                        .into_iter()
+                        .collect(),
+                ),
+                None,
+            )
             .await
-            .expect("Should get json");
+            .expect("Should get analytics data");
+            let json = hyper::body::to_bytes(analytics_response.into_body())
+                .await
+                .expect("Should get json");
 
-        let fetched_analytics: Vec<FetchedAnalytics> =
-            serde_json::from_slice(&json).expect("Should get analytics response");
-        assert_eq!(fetched_analytics.len(), 1);
-        assert_eq!(
-            fetched_analytics.get(0).unwrap().value,
-            UnifiedNum::from_u64(6)
-        );
+            let fetched_analytics: Vec<FetchedAnalytics> =
+                serde_json::from_slice(&json).expect("Should get analytics response");
+            assert_eq!(fetched_analytics.len(), 1);
+            assert_eq!(
+                fetched_analytics.get(0).unwrap().value,
+                FetchedMetric::Count(6)
+            );
+        }
         // Test with a year timeframe
-        let req = Request::builder()
+        {
+            let req = Request::builder()
             .uri("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=year")
             .body(Body::empty())
             .expect("Should build Request");
 
-        let analytics_response = analytics(
-            req,
-            &app,
-            Some(
-                vec![AllowedKey::Country, AllowedKey::AdSlotType]
-                    .into_iter()
-                    .collect(),
-            ),
-            None,
-        )
-        .await
-        .expect("Should get analytics data");
-        let json = hyper::body::to_bytes(analytics_response.into_body())
+            let analytics_response = analytics(
+                req,
+                &app,
+                Some(
+                    vec![AllowedKey::Country, AllowedKey::AdSlotType]
+                        .into_iter()
+                        .collect(),
+                ),
+                None,
+            )
             .await
-            .expect("Should get json");
+            .expect("Should get analytics data");
+            let json = hyper::body::to_bytes(analytics_response.into_body())
+                .await
+                .expect("Should get json");
 
-        let fetched_analytics: Vec<FetchedAnalytics> =
-            serde_json::from_slice(&json).expect("Should get analytics response");
-        assert_eq!(fetched_analytics.len(), 1);
-        assert_eq!(
-            fetched_analytics.get(0).unwrap().value,
-            UnifiedNum::from_u64(7)
-        );
-
+            let fetched_analytics: Vec<FetchedAnalytics> =
+                serde_json::from_slice(&json).expect("Should get analytics response");
+            assert_eq!(fetched_analytics.len(), 1);
+            assert_eq!(
+                fetched_analytics.get(0).unwrap().value,
+                FetchedMetric::Count(7)
+            );
+        }
         // Test with start and end as timestamps
-        let start_date = DateHour::<Utc>::now() - 72;
-        // subtract 1 hour
-        let end_date = DateHour::<Utc>::now() - 1;
-        let query = AnalyticsQuery {
-            limit: 1000,
-            event_type: "CLICK".into(),
-            metric: Metric::Count,
-            segment_by: None,
-            time: Time {
-                timeframe: Timeframe::Day,
-                start: start_date,
-                end: Some(end_date),
-            },
-            campaign_id: None,
-            ad_unit: None,
-            ad_slot: None,
-            ad_slot_type: None,
-            advertiser: None,
-            publisher: None,
-            hostname: None,
-            country: None,
-            os_name: None,
-        };
-        let query = serde_urlencoded::to_string(query).expect("should parse query");
-        let req = Request::builder()
-            .uri(format!("http://127.0.0.1/analytics?{}", query))
-            .body(Body::empty())
-            .expect("Should build Request");
-        let analytics_response = analytics(
-            req,
-            &app,
-            Some(
-                vec![AllowedKey::Country, AllowedKey::AdSlotType]
-                    .into_iter()
-                    .collect(),
-            ),
-            None,
-        )
-        .await
-        .expect("Should get analytics data");
-        let json = hyper::body::to_bytes(analytics_response.into_body())
+        {
+            let start_date = DateHour::<Utc>::now() - 72;
+            // subtract 1 hour
+            let end_date = DateHour::<Utc>::now() - 1;
+            let query = AnalyticsQuery {
+                limit: 1000,
+                event_type: CLICK,
+                metric: Metric::Count,
+                segment_by: None,
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: start_date,
+                    end: Some(end_date),
+                },
+                campaign_id: None,
+                ad_unit: None,
+                ad_slot: None,
+                ad_slot_type: None,
+                advertiser: None,
+                publisher: None,
+                hostname: None,
+                country: None,
+                os_name: None,
+            };
+            let query = serde_urlencoded::to_string(query).expect("should parse query");
+            let req = Request::builder()
+                .uri(format!("http://127.0.0.1/analytics?{}", query))
+                .body(Body::empty())
+                .expect("Should build Request");
+            let analytics_response = analytics(
+                req,
+                &app,
+                Some(
+                    vec![AllowedKey::Country, AllowedKey::AdSlotType]
+                        .into_iter()
+                        .collect(),
+                ),
+                None,
+            )
             .await
-            .expect("Should get json");
+            .expect("Should get analytics data");
+            let json = hyper::body::to_bytes(analytics_response.into_body())
+                .await
+                .expect("Should get json");
 
-        let fetched_analytics: Vec<FetchedAnalytics> =
-            serde_json::from_slice(&json).expect("Should get analytics response");
-        assert_eq!(fetched_analytics.len(), 1);
-        assert_eq!(
-            fetched_analytics.get(0).unwrap().value,
-            UnifiedNum::from_u64(3)
-        );
+            let fetched_analytics: Vec<FetchedAnalytics> =
+                serde_json::from_slice(&json).expect("Should get analytics response");
+            assert_eq!(fetched_analytics.len(), 1);
+            assert_eq!(
+                fetched_analytics.get(0).unwrap().value,
+                FetchedMetric::Count(3)
+            );
+        }
         // Test with timeframe=day and start_date= 2 or more days ago to check if the results vec is split properly
     }
 
@@ -803,7 +816,7 @@ mod test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            event_type: "CLICK".to_string(),
+            event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
         };
@@ -822,7 +835,7 @@ mod test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            event_type: "CLICK".to_string(),
+            event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
         };
@@ -841,7 +854,7 @@ mod test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            event_type: "IMPRESSION".to_string(),
+            event_type: IMPRESSION,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
         };
@@ -860,7 +873,7 @@ mod test {
             hostname: Some("localhost".to_string()),
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            event_type: "CLICK".to_string(),
+            event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
         };
@@ -879,7 +892,7 @@ mod test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            event_type: "CLICK".to_string(),
+            event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
         };
@@ -898,7 +911,7 @@ mod test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            event_type: "CLICK".to_string(),
+            event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
         };
@@ -917,7 +930,7 @@ mod test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            event_type: "CLICK".to_string(),
+            event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
         };
@@ -967,7 +980,7 @@ mod test {
         assert_eq!(fetched_analytics.len(), 1);
         assert_eq!(
             fetched_analytics.get(0).unwrap().value,
-            UnifiedNum::from_u64(4)
+            FetchedMetric::Count(4)
         );
         // test for advertiser
         let req = Request::builder()
@@ -993,7 +1006,7 @@ mod test {
         assert_eq!(fetched_analytics.len(), 1);
         assert_eq!(
             fetched_analytics.get(0).unwrap().value,
-            UnifiedNum::from_u64(4)
+            FetchedMetric::Count(4)
         );
         // test for admin
         let req = Request::builder()
@@ -1014,14 +1027,14 @@ mod test {
         assert_eq!(fetched_analytics.len(), 1);
         assert_eq!(
             fetched_analytics.get(0).unwrap().value,
-            UnifiedNum::from_u64(6)
+            FetchedMetric::Count(6)
         );
         // test for admin with all optional keys
         let start_date = DateHour::<Utc>::now() - 72;
         let end_date = DateHour::<Utc>::now() - 1;
         let query = AnalyticsQuery {
             limit: 1000,
-            event_type: "CLICK".into(),
+            event_type: CLICK,
             metric: Metric::Count,
             segment_by: Some(AllowedKey::Country),
             time: Time {
@@ -1057,7 +1070,7 @@ mod test {
         assert_eq!(fetched_analytics.len(), 1);
         assert_eq!(
             fetched_analytics.get(0).unwrap().value,
-            UnifiedNum::from_u64(1)
+            FetchedMetric::Count(1)
         );
 
         // TODO: Move test to a analytics_router test
