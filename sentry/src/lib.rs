@@ -27,11 +27,14 @@ use {
     routes::{
         campaign,
         campaign::{campaign_list, create_campaign, update_campaign},
-        cfg::config,
+        get_cfg,
+        get_analytics,
         channel::{
-            channel_list, create_validator_messages, get_accounting_for_channel,
-            get_all_spender_limits, get_spender_limits, last_approved,
-            validator_message::{extract_params, list_validator_messages},
+            channel_list, get_accounting_for_channel, get_all_spender_limits, get_spender_limits,
+            last_approved,
+            validator_message::{
+                create_validator_messages, extract_params, list_validator_messages,
+            },
         },
     },
 };
@@ -43,14 +46,15 @@ pub mod middleware;
 ///
 /// This module includes all routes for `Sentry` and the documentation of each Request/Response.
 pub mod routes {
-    /// `GET /analytics` request
     pub use analytics::analytics as get_analytics;
 
-    /// `GET /cfg` request
     pub use cfg::config as get_cfg;
-    pub mod analytics;
+
+    // `analytics` module has single request, so we only export these requests
+    mod analytics;
     pub mod campaign;
-    pub mod cfg;
+    // `cfg` module has single request, so we only export these requests
+    mod cfg;
     pub mod channel;
 }
 
@@ -64,7 +68,8 @@ static LAST_APPROVED_BY_CHANNEL_ID: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/last-approved/?$")
         .expect("The regex should be valid")
 });
-// Only the initial Regex to be matched.
+
+/// Only the initial Regex to be matched.
 static CHANNEL_VALIDATOR_MESSAGES: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/validator-messages(/.*)?$")
         .expect("The regex should be valid")
@@ -155,7 +160,7 @@ where
         };
 
         let mut response = match (req.uri().path(), req.method()) {
-            ("/cfg", &Method::GET) => config(req, self).await,
+            ("/cfg", &Method::GET) => get_cfg(req, self).await,
             ("/channel/list", &Method::GET) => channel_list(req, self).await,
             (route, _) if route.starts_with("/analytics") => analytics_router(req, self).await,
             // This is important because it prevents us from doing
@@ -229,7 +234,6 @@ async fn analytics_router<C: Locked + 'static>(
     mut req: Request<Body>,
     app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
-    use routes::analytics::analytics;
 
     let (route, method) = (req.uri().path(), req.method());
 
@@ -238,7 +242,7 @@ async fn analytics_router<C: Locked + 'static>(
             let allowed_keys_for_request = vec![AllowedKey::Country, AllowedKey::AdSlotType]
                 .into_iter()
                 .collect();
-            analytics(req, app, Some(allowed_keys_for_request), None).await
+            get_analytics(req, app, Some(allowed_keys_for_request), None).await
         }
         ("/analytics/for-advertiser", &Method::GET) => {
             let req = AuthRequired.call(req, app).await?;
@@ -249,7 +253,7 @@ async fn analytics_router<C: Locked + 'static>(
                 .map(|auth| AuthenticateAs::Advertiser(auth.uid))
                 .ok_or(ResponseError::Unauthorized)?;
 
-            analytics(req, app, None, Some(authenticate_as)).await
+            get_analytics(req, app, None, Some(authenticate_as)).await
         }
         ("/analytics/for-publisher", &Method::GET) => {
             let authenticate_as = req
@@ -259,7 +263,7 @@ async fn analytics_router<C: Locked + 'static>(
                 .ok_or(ResponseError::Unauthorized)?;
 
             let req = AuthRequired.call(req, app).await?;
-            analytics(req, app, None, Some(authenticate_as)).await
+            get_analytics(req, app, None, Some(authenticate_as)).await
         }
         ("/analytics/for-admin", &Method::GET) => {
             req = Chain::new()
@@ -267,7 +271,7 @@ async fn analytics_router<C: Locked + 'static>(
                 .chain(IsAdmin)
                 .apply(req, app)
                 .await?;
-            analytics(req, app, None, None).await
+            get_analytics(req, app, None, None).await
         }
         _ => Err(ResponseError::NotFound),
     }
@@ -483,7 +487,7 @@ pub fn epoch() -> f64 {
     Utc::now().timestamp() as f64 / 2_628_000_000.0
 }
 
-/// sentry Application Session
+/// Sentry [`Application`] Session
 #[derive(Debug, Clone)]
 pub struct Session {
     pub ip: Option<String>,
@@ -492,7 +496,7 @@ pub struct Session {
     pub os: Option<String>,
 }
 
-/// Sentry application Auth (Authentication)
+/// Sentry [`Application`] Auth (Authentication)
 #[derive(Debug, Clone)]
 pub struct Auth {
     pub era: i64,

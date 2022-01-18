@@ -1,4 +1,4 @@
-//! "/analytics" routes
+//! `/v5/analytics` routes
 //!
 
 use std::collections::HashSet;
@@ -11,8 +11,8 @@ use primitives::analytics::{
     AnalyticsQuery, AuthenticateAs, ANALYTICS_QUERY_LIMIT,
 };
 
-/// GET "/analytics"
-/// Request query parameters: [`primitives::analytics::AnalyticsQuery`].
+/// `GET /analytics` request
+/// with query parameters: [`primitives::analytics::AnalyticsQuery`].
 pub async fn analytics<C: Locked + 'static>(
     req: Request<Body>,
     app: &Application<C>,

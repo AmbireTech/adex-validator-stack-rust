@@ -1,4 +1,4 @@
-//! "/campaign" routes
+//! `/v5/campaign` routes
 use crate::{
     db::{
         accounting::{get_accounting, Side},
