@@ -1,3 +1,5 @@
+//! "/campaign" routes
+//! 
 use std::collections::HashSet;
 
 use crate::{db::analytics::get_analytics, success_response, Application, ResponseError};
@@ -8,6 +10,9 @@ use primitives::analytics::{
     AnalyticsQuery, AuthenticateAs, ANALYTICS_QUERY_LIMIT,
 };
 
+/// GET "/analytics"
+/// GET Query parameters: [`primitives::analytics::AnalyticsQuery`].
+/// 
 pub async fn analytics<C: Locked + 'static>(
     req: Request<Body>,
     app: &Application<C>,

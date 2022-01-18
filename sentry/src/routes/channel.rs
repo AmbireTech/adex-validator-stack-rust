@@ -1,3 +1,4 @@
+//! "/channel" routes
 use crate::db::{
     accounting::{get_all_accountings_for_channel, Side},
     event_aggregate::{latest_approve_state_v5, latest_heartbeats, latest_new_state_v5},

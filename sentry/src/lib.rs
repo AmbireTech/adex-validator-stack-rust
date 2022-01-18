@@ -41,6 +41,8 @@ pub mod analytics;
 pub mod middleware;
 
 pub mod routes {
+    pub use analytics::analytics as get_analytics;
+    pub use cfg::config as get_config;
     pub mod analytics;
     pub mod campaign;
     pub mod cfg;
