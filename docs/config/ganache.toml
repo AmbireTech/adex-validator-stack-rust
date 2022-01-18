@@ -38,7 +38,7 @@ ethereum_network = 'http://localhost:8545'
 
 creators_whitelist = []
 validators_whitelist = []
-
+admins = ['0x80690751969B234697e9059e04ed72195c3507fa']
 
 [[token_address_whitelist]]
 # Mocked TOKEN

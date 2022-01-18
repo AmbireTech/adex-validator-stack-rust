@@ -1,40 +1,43 @@
-use crate::{ChannelId, DomainError};
+use crate::{
+    sentry::{EventType, IMPRESSION},
+    Address, CampaignId, ValidatorId, IPFS,
+};
 use parse_display::Display;
 use serde::{Deserialize, Serialize};
 
+use self::query::{AllowedKey, Time};
+
 pub const ANALYTICS_QUERY_LIMIT: u32 = 200;
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AnalyticsData {
-    pub time: f64,
-    pub value: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub channel_id: Option<ChannelId>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AnalyticsResponse {
-    pub aggr: Vec<AnalyticsData>,
-    pub limit: u32,
-}
 
 #[cfg(feature = "postgres")]
 pub mod postgres {
-    use super::{AnalyticsData, OperatingSystem};
+    use super::{query::AllowedKey, AnalyticsQuery, OperatingSystem};
     use bytes::BytesMut;
     use std::error::Error;
-    use tokio_postgres::{
-        types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type},
-        Row,
-    };
+    use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
 
-    impl From<&Row> for AnalyticsData {
-        fn from(row: &Row) -> Self {
-            Self {
-                time: row.get("time"),
-                value: row.get("value"),
-                channel_id: row.try_get("channel_id").ok(),
+    impl AnalyticsQuery {
+        pub fn get_key(&self, key: AllowedKey) -> Option<Box<dyn ToSql + Sync + Send>> {
+            match key {
+                AllowedKey::CampaignId => self
+                    .campaign_id
+                    .map(|campaign_id| Box::new(campaign_id) as _),
+                AllowedKey::AdUnit => self.ad_unit.map(|ad_unit| Box::new(ad_unit) as _),
+                AllowedKey::AdSlot => self.ad_slot.map(|ad_slot| Box::new(ad_slot) as _),
+                AllowedKey::AdSlotType => self
+                    .ad_slot_type
+                    .clone()
+                    .map(|ad_slot_type| Box::new(ad_slot_type) as _),
+                AllowedKey::Advertiser => {
+                    self.advertiser.map(|advertiser| Box::new(advertiser) as _)
+                }
+                AllowedKey::Publisher => self.publisher.map(|publisher| Box::new(publisher) as _),
+                AllowedKey::Hostname => self
+                    .hostname
+                    .clone()
+                    .map(|hostname| Box::new(hostname) as _),
+                AllowedKey::Country => self.country.clone().map(|country| Box::new(country) as _),
+                AllowedKey::OsName => self.os_name.clone().map(|os_name| Box::new(os_name) as _),
             }
         }
     }
@@ -66,20 +69,54 @@ pub mod postgres {
         accepts!(TEXT, VARCHAR);
         to_sql_checked!();
     }
+
+    impl ToSql for AllowedKey {
+        fn to_sql(
+            &self,
+            ty: &Type,
+            w: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+            self.to_string().to_sql(ty, w)
+        }
+
+        accepts!(TEXT, VARCHAR);
+        to_sql_checked!();
+    }
+
+    impl<'a> FromSql<'a> for AllowedKey {
+        fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+            let allowed_key_str = <&'a str as FromSql>::from_sql(ty, raw)?;
+
+            Ok(allowed_key_str.parse()?)
+        }
+
+        accepts!(TEXT, VARCHAR);
+    }
 }
 
-#[derive(Debug, Deserialize)]
+pub mod query;
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct AnalyticsQuery {
     #[serde(default = "default_limit")]
     pub limit: u32,
     #[serde(default = "default_event_type")]
-    pub event_type: String,
+    pub event_type: EventType,
     #[serde(default = "default_metric")]
-    pub metric: String,
-    #[serde(default = "default_timeframe")]
-    pub timeframe: String,
-    pub segment_by_channel: Option<String>,
+    pub metric: Metric,
+    pub segment_by: Option<AllowedKey>,
+    #[serde(flatten)]
+    pub time: Time,
+    pub campaign_id: Option<CampaignId>,
+    pub ad_unit: Option<IPFS>,
+    pub ad_slot: Option<IPFS>,
+    pub ad_slot_type: Option<String>,
+    pub advertiser: Option<Address>,
+    pub publisher: Option<Address>,
+    pub hostname: Option<String>,
+    pub country: Option<String>,
+    pub os_name: Option<OperatingSystem>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Display, Hash, Eq)]
@@ -89,6 +126,63 @@ pub enum OperatingSystem {
     #[display("{0}")]
     Whitelisted(String),
     Other,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Display, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum Timeframe {
+    /// [`Timeframe::Year`] returns analytics grouped by month.
+    Year,
+    /// [`Timeframe::Month`] returns analytics grouped by day.
+    Month,
+    /// [`Timeframe::Week`] returns analytics grouped by hour.
+    /// Same as [`Timeframe::Day`].
+    Week,
+    /// [`Timeframe::Day`] returns analytics grouped by hour.
+    /// Same as [`Timeframe::Week`].
+    Day,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Display)]
+#[serde(rename_all = "camelCase")]
+pub enum Metric {
+    Count,
+    Paid,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Display)]
+pub enum AuthenticateAs {
+    #[display("{0}")]
+    Advertiser(ValidatorId),
+    #[display("{0}")]
+    Publisher(ValidatorId),
+}
+
+impl Metric {
+    #[cfg(feature = "postgres")]
+    /// Returns the query column name of the [`Metric`].
+    ///
+    /// Available only when the `postgres` feature is enabled.
+    pub fn column_name(self) -> &'static str {
+        match self {
+            Metric::Count => "payout_count",
+            Metric::Paid => "payout_amount",
+        }
+    }
+}
+
+impl Timeframe {
+    pub fn to_hours(&self) -> i64 {
+        let hour = 1;
+        let day = 24 * hour;
+        let year = 365 * day;
+        match self {
+            Timeframe::Day => day,
+            Timeframe::Week => 7 * day,
+            Timeframe::Month => year / 12,
+            Timeframe::Year => year,
+        }
+    }
 }
 
 impl Default for OperatingSystem {
@@ -171,52 +265,16 @@ impl OperatingSystem {
     }
 }
 
-impl AnalyticsQuery {
-    pub fn is_valid(&self) -> Result<(), DomainError> {
-        let valid_event_types = ["IMPRESSION", "CLICK"];
-        let valid_metric = ["eventPayouts", "eventCounts"];
-        let valid_timeframe = ["year", "month", "week", "day", "hour"];
-
-        if !valid_event_types.contains(&self.event_type.as_str()) {
-            Err(DomainError::InvalidArgument(format!(
-                "invalid event_type, possible values are: {}",
-                valid_event_types.join(" ,")
-            )))
-        } else if !valid_metric.contains(&self.metric.as_str()) {
-            Err(DomainError::InvalidArgument(format!(
-                "invalid metric, possible values are: {}",
-                valid_metric.join(" ,")
-            )))
-        } else if !valid_timeframe.contains(&self.timeframe.as_str()) {
-            Err(DomainError::InvalidArgument(format!(
-                "invalid timeframe, possible values are: {}",
-                valid_timeframe.join(" ,")
-            )))
-        } else if self.limit > ANALYTICS_QUERY_LIMIT {
-            Err(DomainError::InvalidArgument(format!(
-                "invalid limit {}, maximum value 200",
-                self.limit
-            )))
-        } else {
-            Ok(())
-        }
-    }
-}
-
 fn default_limit() -> u32 {
     100
 }
 
-fn default_event_type() -> String {
-    "IMPRESSION".into()
+fn default_event_type() -> EventType {
+    IMPRESSION
 }
 
-fn default_metric() -> String {
-    "eventCounts".into()
-}
-
-fn default_timeframe() -> String {
-    "hour".into()
+fn default_metric() -> Metric {
+    Metric::Count
 }
 
 #[cfg(test)]

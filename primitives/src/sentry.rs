@@ -1,14 +1,24 @@
 use crate::{
-    analytics::OperatingSystem,
+    analytics::{OperatingSystem, Timeframe},
     balances::BalancesState,
     spender::Spender,
     validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
     Address, Balances, BigNum, CampaignId, Channel, ChannelId, UnifiedNum, ValidatorId, IPFS,
 };
-use chrono::{Date, DateTime, NaiveDate, TimeZone, Timelike, Utc};
+use chrono::{
+    serde::ts_milliseconds, Date, DateTime, Duration, NaiveDate, TimeZone, Timelike, Utc,
+};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::{collections::HashMap, fmt, hash::Hash};
+use std::{
+    cmp::{Ord, Ordering},
+    collections::HashMap,
+    fmt,
+    hash::Hash,
+    ops::Sub,
+};
 use thiserror::Error;
+
+pub use event::{Event, EventType, CLICK, IMPRESSION};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -119,51 +129,139 @@ pub mod message {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
-#[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum Event {
-    #[serde(rename_all = "camelCase")]
-    Impression {
-        publisher: Address,
-        ad_unit: Option<IPFS>,
-        ad_slot: Option<IPFS>,
-        referrer: Option<String>,
-    },
-    #[serde(rename_all = "camelCase")]
-    Click {
-        publisher: Address,
-        ad_unit: Option<IPFS>,
-        ad_slot: Option<IPFS>,
-        referrer: Option<String>,
-    },
-}
+mod event {
+    use once_cell::sync::Lazy;
+    use parse_display::{Display, FromStr};
+    use serde::{Deserialize, Serialize};
+    use std::fmt;
 
-impl Event {
-    pub fn is_click_event(&self) -> bool {
-        matches!(self, Event::Click { .. })
+    use crate::{Address, IPFS};
+
+    pub static IMPRESSION: EventType = EventType::Impression;
+    pub static CLICK: EventType = EventType::Click;
+
+    /// We use these statics to create the `as_str()` method for a value with a `'static` lifetime
+    /// the `parse_display::Display` derive macro does not impl such methods
+    static IMPRESSION_STRING: Lazy<String> = Lazy::new(|| EventType::Impression.to_string());
+    static CLICK_STRING: Lazy<String> = Lazy::new(|| EventType::Click.to_string());
+
+    #[derive(
+        Debug,
+        Display,
+        FromStr,
+        Serialize,
+        Deserialize,
+        Hash,
+        Ord,
+        Eq,
+        PartialEq,
+        PartialOrd,
+        Clone,
+        Copy,
+    )]
+    #[display(style = "SNAKE_CASE")]
+    #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+    pub enum EventType {
+        Impression,
+        Click,
     }
 
-    pub fn is_impression_event(&self) -> bool {
-        matches!(self, Event::Impression { .. })
-    }
-
-    pub fn as_str(&self) -> &str {
-        self.as_ref()
-    }
-}
-
-impl AsRef<str> for Event {
-    fn as_ref(&self) -> &str {
-        match *self {
-            Event::Impression { .. } => "IMPRESSION",
-            Event::Click { .. } => "CLICK",
+    impl EventType {
+        pub fn as_str(&self) -> &str {
+            match self {
+                EventType::Impression => IMPRESSION_STRING.as_str(),
+                EventType::Click => CLICK_STRING.as_str(),
+            }
         }
     }
-}
 
-impl fmt::Display for Event {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_ref())
+    #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
+    #[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
+    pub enum Event {
+        #[serde(rename_all = "camelCase")]
+        Impression {
+            publisher: Address,
+            ad_unit: Option<IPFS>,
+            ad_slot: Option<IPFS>,
+            referrer: Option<String>,
+        },
+        #[serde(rename_all = "camelCase")]
+        Click {
+            publisher: Address,
+            ad_unit: Option<IPFS>,
+            ad_slot: Option<IPFS>,
+            referrer: Option<String>,
+        },
+    }
+
+    impl Event {
+        pub fn is_click_event(&self) -> bool {
+            matches!(self, Event::Click { .. })
+        }
+
+        pub fn is_impression_event(&self) -> bool {
+            matches!(self, Event::Impression { .. })
+        }
+
+        pub fn as_str(&self) -> &str {
+            self.as_ref()
+        }
+
+        pub fn event_type(&self) -> EventType {
+            self.into()
+        }
+    }
+
+    impl From<&Event> for EventType {
+        fn from(event: &Event) -> Self {
+            match event {
+                Event::Impression { .. } => EventType::Impression,
+                Event::Click { .. } => EventType::Click,
+            }
+        }
+    }
+
+    impl AsRef<str> for Event {
+        fn as_ref(&self) -> &'static str {
+            match self {
+                Event::Impression { .. } => EventType::Impression.as_str(),
+                Event::Click { .. } => EventType::Click.as_str(),
+            }
+        }
+    }
+
+    impl fmt::Display for Event {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str(self.as_ref())
+        }
+    }
+
+    #[cfg(test)]
+    mod test {
+        use crate::sentry::event::{CLICK_STRING, IMPRESSION_STRING};
+
+        use super::EventType;
+
+        #[test]
+        fn event_type_parsing_and_de_serialization() {
+            let impression_parse = "IMPRESSION"
+                .parse::<EventType>()
+                .expect("Should parse IMPRESSION");
+            let click_parse = "CLICK".parse::<EventType>().expect("Should parse CLICK");
+            let impression_json =
+                serde_json::from_value::<EventType>(serde_json::Value::String("IMPRESSION".into()))
+                    .expect("Should deserialize");
+            let click_json =
+                serde_json::from_value::<EventType>(serde_json::Value::String("CLICK".into()))
+                    .expect("Should deserialize");
+
+            assert_eq!(IMPRESSION_STRING.as_str(), "IMPRESSION");
+            assert_eq!(CLICK_STRING.as_str(), "CLICK");
+            assert_eq!(EventType::Impression, impression_parse);
+            assert_eq!(EventType::Impression, impression_json);
+            assert_eq!(EventType::Click, click_parse);
+            assert_eq!(EventType::Click, click_json);
+        }
     }
 }
 
@@ -180,7 +278,7 @@ pub struct UpdateAnalytics {
     pub hostname: Option<String>,
     pub country: Option<String>,
     pub os_name: OperatingSystem,
-    pub event_type: String,
+    pub event_type: EventType,
     pub amount_to_add: UnifiedNum,
     pub count_to_add: i32,
 }
@@ -198,9 +296,46 @@ pub struct Analytics {
     pub hostname: Option<String>,
     pub country: Option<String>,
     pub os_name: OperatingSystem,
-    pub event_type: String,
+    pub event_type: EventType,
     pub payout_amount: UnifiedNum,
     pub payout_count: u32,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct FetchedAnalytics {
+    // time is represented as a timestamp
+    #[serde(with = "ts_milliseconds")]
+    pub time: DateTime<Utc>,
+    pub value: FetchedMetric,
+    // We can't know the exact segment type but it can always be represented as a string
+    pub segment: Option<String>,
+}
+
+/// The value of the requested analytics [`Metric`].
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum FetchedMetric {
+    Count(u32),
+    Paid(UnifiedNum),
+}
+
+impl FetchedMetric {
+    /// Returns the count if it's a [`FetchedMetric::Count`] or `None` otherwise.
+    pub fn get_count(&self) -> Option<u32> {
+        match self {
+            FetchedMetric::Count(count) => Some(*count),
+            FetchedMetric::Paid(_) => None,
+        }
+    }
+
+    /// Returns the paid amount if it's a [`FetchedMetric::Paid`] or `None` otherwise.
+    pub fn get_paid(&self) -> Option<UnifiedNum> {
+        match self {
+            FetchedMetric::Count(_) => None,
+            FetchedMetric::Paid(paid) => Some(*paid),
+        }
+    }
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -211,7 +346,7 @@ pub struct DateHourError {
     pub nanoseconds: u32,
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Hash)]
 /// [`DateHour`] holds the date and hour (only).
 /// It uses [`chrono::DateTime`] when serializing and deserializing.
 /// When serializing it always sets minutes and seconds to `0` (zero).
@@ -221,6 +356,55 @@ pub struct DateHour<Tz: TimeZone> {
     pub date: Date<Tz>,
     /// hour is in the range of `0 - 23`
     pub hour: u32,
+}
+
+impl<Tz: TimeZone> Eq for DateHour<Tz> {}
+
+impl<Tz: TimeZone, Tz2: TimeZone> PartialEq<DateHour<Tz2>> for DateHour<Tz> {
+    fn eq(&self, other: &DateHour<Tz2>) -> bool {
+        self.date == other.date && self.hour == other.hour
+    }
+}
+
+impl<Tz: TimeZone> Ord for DateHour<Tz> {
+    fn cmp(&self, other: &DateHour<Tz>) -> Ordering {
+        match self.date.cmp(&other.date) {
+            // Only if the two dates are equal, compare the hours too!
+            Ordering::Equal => self.hour.cmp(&other.hour),
+            ordering => ordering,
+        }
+    }
+}
+
+impl<Tz: TimeZone, Tz2: TimeZone> PartialOrd<DateHour<Tz2>> for DateHour<Tz> {
+    /// Compare two DateHours based on their true time, ignoring time zones
+    ///
+    /// See [`DateTime`] implementation of `PartialOrd<DateTime<Tz2>>` for more details.
+    fn partial_cmp(&self, other: &DateHour<Tz2>) -> Option<Ordering> {
+        if self.date == other.date {
+            self.hour.partial_cmp(&other.hour)
+            // if self.hour > other.hour {
+            //     Some(Ordering::Greater)
+            // } else if self.hour == other.hour {
+            //     Some(Ordering::Equal)
+            // } else {
+            //     Some(Ordering::Less)
+            // }
+        } else {
+            self.date.naive_utc().partial_cmp(&other.date.naive_utc())
+        }
+    }
+}
+
+impl<Tz: TimeZone> fmt::Display for DateHour<Tz>
+where
+    Tz::Offset: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let datetime = self.to_datetime();
+
+        datetime.fmt(f)
+    }
 }
 
 impl DateHour<Utc> {
@@ -290,6 +474,33 @@ impl<Tz: TimeZone> TryFrom<DateTime<Tz>> for DateHour<Tz> {
                 seconds: datetime.second(),
                 nanoseconds: datetime.nanosecond(),
             }),
+        }
+    }
+}
+
+impl<Tz: TimeZone> Sub<&Timeframe> for DateHour<Tz> {
+    type Output = DateHour<Tz>;
+
+    fn sub(self, rhs: &Timeframe) -> Self::Output {
+        let result = self.to_datetime() - Duration::hours(rhs.to_hours());
+
+        DateHour {
+            date: result.date(),
+            hour: result.hour(),
+        }
+    }
+}
+
+/// Subtracts **X** hours from the [`DateHour`]
+impl<Tz: TimeZone> Sub<i64> for DateHour<Tz> {
+    type Output = DateHour<Tz>;
+
+    fn sub(self, rhs: i64) -> Self::Output {
+        let result = self.to_datetime() - Duration::hours(rhs);
+
+        DateHour {
+            date: result.date(),
+            hour: result.hour(),
         }
     }
 }
@@ -668,27 +879,6 @@ pub mod campaign_create {
         }
     }
 
-    // /// This implementation helps with test setup
-    // /// **NOTE:** It erases the CampaignId, since the creation of the campaign gives it's CampaignId
-    // impl From<Campaign> for CreateCampaign {
-    //     fn from(campaign: Campaign) -> Self {
-    //         Self {
-    //             id: Some(campaign.id),
-    //             channel: campaign.channel,
-    //             creator: campaign.creator,
-    //             budget: campaign.budget,
-    //             validators: campaign.validators,
-    //             title: campaign.title,
-    //             pricing_bounds: campaign.pricing_bounds,
-    //             event_submission: campaign.event_submission,
-    //             ad_units: campaign.ad_units,
-    //             targeting_rules: campaign.targeting_rules,
-    //             created: campaign.created,
-    //             active: campaign.active,
-    //         }
-    //     }
-    // }
-
     // All editable fields stored in one place, used for checking when a budget is changed
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     pub struct ModifyCampaign {
@@ -751,8 +941,12 @@ pub mod campaign_create {
 
 #[cfg(feature = "postgres")]
 mod postgres {
-    use super::{Analytics, DateHour, MessageResponse, ValidatorMessage};
+    use super::{
+        Analytics, DateHour, EventType, FetchedAnalytics, FetchedMetric, MessageResponse,
+        ValidatorMessage,
+    };
     use crate::{
+        analytics::{AnalyticsQuery, Metric},
         sentry::EventAggregate,
         validator::{messages::Type as MessageType, MessageTypes},
     };
@@ -854,7 +1048,7 @@ mod postgres {
                 publisher: row.get("publisher"),
                 hostname,
                 country,
-                os_name: row.get("os"),
+                os_name: row.get("os_name"),
                 event_type: row.get("event_type"),
                 payout_amount: row.get("payout_amount"),
                 payout_count: row.get::<_, i32>("payout_count").unsigned_abs(),
@@ -892,6 +1086,61 @@ mod postgres {
         accepts!(TIMESTAMPTZ);
         to_sql_checked!();
     }
+
+    impl<'a> FromSql<'a> for EventType {
+        fn from_sql(
+            ty: &Type,
+            raw: &'a [u8],
+        ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+            let event_string = <&str as FromSql>::from_sql(ty, raw)?;
+
+            Ok(event_string.parse()?)
+        }
+        accepts!(VARCHAR, TEXT);
+    }
+
+    impl ToSql for EventType {
+        fn to_sql(
+            &self,
+            ty: &Type,
+            w: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn std::error::Error + Sync + Send>> {
+            self.as_str().to_sql(ty, w)
+        }
+
+        accepts!(VARCHAR, TEXT);
+        to_sql_checked!();
+    }
+
+    /// This implementation handles the conversion of a fetched query [`Row`] to [`FetchedAnalytics`]
+    /// [`FetchedAnalytics`] requires additional context, apart from [`Row`], using the [`AnalyticsQuery`].
+    impl From<(&AnalyticsQuery, &Row)> for FetchedAnalytics {
+        /// # Panics
+        ///
+        /// When a field is missing in the [`Row`].
+        fn from((query, row): (&AnalyticsQuery, &Row)) -> Self {
+            // Since segment_by is a dynamic value/type it can't be passed to from<&Row> so we're building the object here
+            let segment_value = match query.segment_by.as_ref() {
+                Some(_segment_by) => row.get("segment_by"),
+                None => None,
+            };
+            let time = row.get::<_, DateTime<Utc>>("timeframe_time");
+            let value = match &query.metric {
+                Metric::Paid => FetchedMetric::Paid(row.get("value")),
+                Metric::Count => {
+                    // `integer` fields map to `i32`
+                    let count: i32 = row.get("value");
+                    // Count can only be positive, so use unsigned value
+                    FetchedMetric::Count(count.unsigned_abs())
+                }
+            };
+            FetchedAnalytics {
+                time,
+                value,
+                segment: segment_value,
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -901,10 +1150,10 @@ mod test {
         postgres::POSTGRES_POOL,
         util::tests::prep_db::{ADDRESSES, DUMMY_IPFS},
     };
-    use serde_json::json;
+    use serde_json::{json, Value};
 
     #[test]
-    pub fn de_serialize_events() {
+    pub fn test_de_serialize_events() {
         let click = Event::Click {
             publisher: ADDRESSES["publisher"],
             ad_unit: Some(DUMMY_IPFS[0]),
@@ -923,6 +1172,87 @@ mod test {
         pretty_assertions::assert_eq!(
             click_json,
             serde_json::to_value(click).expect("should serialize")
+        );
+    }
+
+    #[test]
+    fn test_datehour_subtract_timeframe() {
+        // test with End of year
+        {
+            let datehour = DateHour::from_ymdh(2021, 12, 31, 22);
+
+            let yesterday = datehour - &Timeframe::Day;
+            let last_week = datehour - &Timeframe::Week;
+            let beginning_of_month = datehour - &Timeframe::Month;
+            let last_year = datehour - &Timeframe::Year;
+
+            pretty_assertions::assert_eq!(DateHour::from_ymdh(2021, 12, 30, 22), yesterday);
+            pretty_assertions::assert_eq!(DateHour::from_ymdh(2021, 12, 24, 22), last_week);
+            // Subtracting uses hours so result has different Hour!
+            pretty_assertions::assert_eq!(DateHour::from_ymdh(2021, 12, 1, 12), beginning_of_month);
+            pretty_assertions::assert_eq!(DateHour::from_ymdh(2020, 12, 31, 22), last_year);
+        }
+
+        let middle_of_month = DateHour::from_ymdh(2021, 12, 14, 12) - &Timeframe::Month;
+        // Subtracting uses hours so result has different Hour!
+        pretty_assertions::assert_eq!(DateHour::from_ymdh(2021, 11, 14, 2), middle_of_month);
+    }
+
+    #[test]
+    fn test_datehour_de_serialize_partial_ord_and_eq() {
+        let earlier = DateHour::from_ymdh(2021, 12, 1, 16);
+        let later = DateHour::from_ymdh(2021, 12, 31, 16);
+
+        // Partial Eq
+        assert!(earlier < later);
+        assert!(!earlier.eq(&later));
+        assert!(earlier.eq(&earlier));
+
+        // Partial Ord
+        assert_eq!(Some(Ordering::Less), earlier.partial_cmp(&later));
+        assert_eq!(Some(Ordering::Greater), later.partial_cmp(&earlier));
+
+        // Serialize & deserialize
+        let json_datetime = Value::String("2021-12-01T16:00:00+02:00".into());
+        let datehour: DateHour<Utc> =
+            serde_json::from_value(json_datetime.clone()).expect("Should deserialize");
+        assert_eq!(
+            DateHour::from_ymdh(2021, 12, 1, 14),
+            datehour,
+            "Deserialized DateHour should be 2 hours earlier to match UTC +0"
+        );
+
+        let serialized_value = serde_json::to_value(datehour).expect("Should serialize DateHour");
+        assert_eq!(
+            Value::String("2021-12-01T14:00:00Z".into()),
+            serialized_value,
+            "Json value should always be serialized with Z (UTC+0) timezone"
+        );
+    }
+
+    #[test]
+    fn test_partial_eq_with_same_datehour_but_different_zones() {
+        // Eq & PartialEq with different timezones
+        let json = json!({
+            "UTC+0": "2021-12-16T14:00:00+00:00",
+            "UTC+2": "2021-12-16T16:00:00+02:00",
+        });
+
+        let map: HashMap<String, DateHour<Utc>> =
+            serde_json::from_value(json).expect("Should deserialize");
+
+        assert_eq!(
+            Some(Ordering::Equal),
+            map["UTC+0"].partial_cmp(&map["UTC+2"])
+        );
+
+        assert_eq!(
+            map["UTC+0"], map["UTC+2"],
+            "DateHour should be the same after the second one is made into UTC+0"
+        );
+        assert!(
+            map["UTC+0"] >= map["UTC+2"],
+            "UTC+0 value should be equal to UTC+2"
         );
     }
 

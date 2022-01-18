@@ -36,6 +36,7 @@ ethereum_network = 'http://localhost:8545'
 
 creators_whitelist = []
 validators_whitelist = []
+admins = ['0xce07CbB7e054514D590a0262C93070D838bFBA2e']
 
 [[token_address_whitelist]]
 # DAI
