@@ -74,10 +74,6 @@ static CHANNEL_VALIDATOR_MESSAGES: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/validator-messages(/.*)?$")
         .expect("The regex should be valid")
 });
-static CHANNEL_EVENTS_AGGREGATES: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/events-aggregates/?$")
-        .expect("The regex should be valid")
-});
 static CHANNEL_SPENDER_LEAF_AND_TOTAL_DEPOSITED: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/spender/0x([a-zA-Z0-9]{40})/?$")
         .expect("This regex should be valid")
