@@ -39,6 +39,7 @@ use {
 
 pub mod analytics;
 pub mod middleware;
+
 pub mod routes {
     pub mod analytics;
     pub mod campaign;
@@ -49,7 +50,6 @@ pub mod routes {
 }
 
 pub mod access;
-pub mod analytics_recorder;
 pub mod application;
 pub mod db;
 pub mod payout;
