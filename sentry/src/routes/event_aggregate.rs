@@ -1,8 +1,9 @@
+use adapter::client::Locked;
 use chrono::{serde::ts_milliseconds_option, DateTime, Utc};
 use hyper::{Body, Request, Response};
 use serde::Deserialize;
 
-use primitives::{adapter::Adapter, sentry::EventAggregateResponse, Channel};
+use primitives::{sentry::EventAggregateResponse, Channel};
 
 use crate::{success_response, Application, Auth, ResponseError};
 
@@ -13,9 +14,9 @@ pub struct EventAggregatesQuery {
     after: Option<DateTime<Utc>>,
 }
 #[deprecated = "V5 - Double check what is need from the event aggregates from V4"]
-pub async fn list_channel_event_aggregates<A: Adapter>(
+pub async fn list_channel_event_aggregates<C: Locked + 'static>(
     req: Request<Body>,
-    _app: &Application<A>,
+    _app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
     let channel = *req
         .extensions()

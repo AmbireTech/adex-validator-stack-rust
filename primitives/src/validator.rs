@@ -1,8 +1,12 @@
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use std::{borrow::Borrow, convert::TryFrom, fmt, str::FromStr};
+use std::{borrow::Borrow, fmt, str::FromStr};
 
 use crate::{
-    address::Error, targeting::Value, Address, DomainError, ToETHChecksum, ToHex, UnifiedNum,
+    address::Error,
+    targeting::Value,
+    util::{api::Error as ApiUrlError, ApiUrl},
+    Address, DomainError, ToETHChecksum, ToHex, UnifiedNum,
 };
 
 pub use messages::*;
@@ -42,6 +46,14 @@ impl From<&Address> for ValidatorId {
 impl From<Address> for ValidatorId {
     fn from(address: Address) -> Self {
         Self(address)
+    }
+}
+
+impl From<&Lazy<Address>> for ValidatorId {
+    fn from(address: &Lazy<Address>) -> Self {
+        // once for the reference of &Lazy into Lazy
+        // and once for moving out of Lazy into Address
+        Self(**address)
     }
 }
 
@@ -96,15 +108,27 @@ impl TryFrom<Value> for ValidatorId {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
+/// A Validator description which includes the identity, fee (pro milles) and the Sentry URL.
 pub struct ValidatorDesc {
     pub id: ValidatorId,
     /// The validator fee in pro milles (per 1000)
+    ///
+    /// Each fee is calculated based on the payout for an event.
+    ///
+    /// payout * fee / 1000 = event fee payoout
     pub fee: UnifiedNum,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     /// The address which will receive the fees
     pub fee_addr: Option<Address>,
-    /// The url of the Validator on which is the API
+    /// The url of the Validator where Sentry API is running
     pub url: String,
+}
+
+impl ValidatorDesc {
+    /// Tries to create an [`ApiUrl`] from the `url` field.
+    pub fn try_api_url(&self) -> Result<ApiUrl, ApiUrlError> {
+        self.url.parse()
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -133,7 +157,7 @@ impl<T> Borrow<T> for Validator<T> {
 
 /// Validator Message Types
 pub mod messages {
-    use std::{any::type_name, convert::TryFrom, fmt, marker::PhantomData};
+    use std::{any::type_name, fmt, marker::PhantomData};
     use thiserror::Error;
 
     use crate::balances::{Balances, BalancesState, CheckedState, UncheckedState};
@@ -349,9 +373,8 @@ pub mod postgres {
     use super::ValidatorId;
     use crate::ToETHChecksum;
     use bytes::BytesMut;
-    use postgres_types::{FromSql, IsNull, ToSql, Type};
-    use std::convert::TryFrom;
     use std::error::Error;
+    use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
     impl<'a> FromSql<'a> for ValidatorId {
         fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {

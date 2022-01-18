@@ -2,10 +2,13 @@
 name = "validator_worker"
 version = "0.2.0"
 authors = [
-  "Lachezar Lechev <lachezar@adex.network>",
-  "Samparsky <sam@adex.network>",
+  "Ambire <dev@ambire.com>",
+  "Lachezar Lechev <lachezar@ambire.com>",
+  "Samparsky <sam@ambire.com>",
+  "Simeon Nakov <simeon@ambire.com>",
 ]
-edition = "2018"
+edition = "2021"
+license = "AGPL-3.0"
 
 [lib]
 name = "validator_worker"
@@ -13,8 +16,8 @@ path = "src/lib.rs"
 
 [dependencies]
 # Primitve
-primitives = { path = "../primitives" }
-adapter = { version = "0.1", path = "../adapter" }
+primitives = { path = "../primitives", features = ["test-util"] }
+adapter = { version = "0.2", path = "../adapter" }
 chrono = { version = "0.4", features = ["serde"] }
 num = "0.4"
 num-traits = "0.2"
@@ -30,7 +33,6 @@ tokio = { version = "1", features = ["time", "rt-multi-thread"] }
 # API client
 reqwest = { version = "0.11", features = ["json"] }
 # Other
-lazy_static = "^1.4"
 thiserror = "^1.0"
 # (De)Serialization
 serde = { version = "^1.0", features = ["derive"] }
@@ -39,3 +41,6 @@ serde_urlencoded = "0.7"
 toml = "0.5"
 # CLI
 clap = "^2.33"
+
+[dev-dependencies]
+wiremock = "0.5"

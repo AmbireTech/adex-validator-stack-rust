@@ -3,15 +3,16 @@
 
 use adex_primitives::{
     campaign::Validators,
+    sentry::Event,
     supermarket::units_for_slot,
     supermarket::units_for_slot::response::{AdUnit, Campaign},
     targeting::{self, input},
     Address, BigNum, CampaignId, ToHex, UnifiedNum, IPFS,
 };
 use async_std::{sync::RwLock, task::block_on};
-use chrono::{DateTime, Utc};
-use lazy_static::lazy_static;
+use chrono::{DateTime, Duration, Utc};
 use num_integer::Integer;
+use once_cell::sync::Lazy;
 use rand::Rng;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
@@ -19,7 +20,6 @@ use slog::{error, Logger};
 use std::{
     cmp::Ordering,
     collections::VecDeque,
-    convert::TryFrom,
     ops::{Add, Mul},
     sync::Arc,
 };
@@ -29,16 +29,15 @@ use url::Url;
 const IPFS_GATEWAY: &str = "https://ipfs.moonicorn.network/ipfs/";
 
 // How much time to wait before sending out an impression event
-// Related: https://github.com/AdExNetwork/adex-adview-manager/issues/17, https://github.com/AdExNetwork/adex-adview-manager/issues/35, https://github.com/AdExNetwork/adex-adview-manager/issues/46
+// Related: <https://github.com/AdExNetwork/adex-adview-manager/issues/17>, <https://github.com/AdExNetwork/adex-adview-manager/issues/35>, <https://github.com/AdExNetwork/adex-adview-manager/issues/46>
 const WAIT_FOR_IMPRESSION: u32 = 8000;
 // The number of impressions (won auctions) kept in history
 const HISTORY_LIMIT: u32 = 50;
 
-lazy_static! {
-// Impression "stickiness" time: see https://github.com/AdExNetwork/adex-adview-manager/issues/65
-// 4 minutes allows ~4 campaigns to rotate, considering a default frequency cap of 15 minutes
-    pub static ref IMPRESSION_STICKINESS_TIME: chrono::Duration = chrono::Duration::milliseconds(240000);
-}
+/// Impression "stickiness" time: see <https://github.com/AdExNetwork/adex-adview-manager/issues/65>
+/// 4 minutes allows ~4 campaigns to rotate, considering a default frequency cap of 15 minutes
+pub static IMPRESSION_STICKINESS_TIME: Lazy<Duration> =
+    Lazy::new(|| Duration::milliseconds(240000));
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -72,18 +71,6 @@ pub struct HistoryEntry {
     unit_id: IPFS,
     campaign_id: CampaignId,
     slot_id: IPFS,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct Event {
-    #[serde(rename = "type")]
-    event_type: String,
-    publisher: Address,
-    ad_unit: IPFS,
-    ad_slot: IPFS,
-    #[serde(rename = "ref")]
-    referrer: String,
 }
 
 #[derive(Serialize)]
@@ -213,19 +200,26 @@ pub fn get_unit_html_with_events(
     validators: &Validators,
     no_impression: impl Into<bool>,
 ) -> String {
-    let get_body = |event_type: &str| EventBody {
-        events: vec![Event {
-            event_type: event_type.to_string(),
-            publisher: options.publisher_addr,
-            ad_unit: ad_unit.id,
-            ad_slot: options.market_slot,
-            referrer: "document.referrer".to_string(),
-        }],
-    };
-
     let get_fetch_code = |event_type: &str| -> String {
-        let body = serde_json::to_string(&get_body(event_type))
-            .expect("It should always serialize EventBody");
+        let event = match event_type {
+            "CLICK" => Event::Click {
+                publisher: options.publisher_addr,
+                ad_unit: Some(ad_unit.id),
+                ad_slot: Some(options.market_slot),
+                referrer: Some("document.referrer".to_string()),
+            },
+            _ => Event::Impression {
+                publisher: options.publisher_addr,
+                ad_unit: Some(ad_unit.id),
+                ad_slot: Some(options.market_slot),
+                referrer: Some("document.referrer".to_string()),
+            },
+        };
+        let event_body = EventBody {
+            events: vec![event],
+        };
+        let body =
+            serde_json::to_string(&event_body).expect("It should always serialize EventBody");
 
         let fetch_opts = format!("var fetchOpts = {{ method: 'POST', headers: {{ 'content-type': 'application/json' }}, body: {} }};", body);
 
@@ -233,7 +227,7 @@ pub fn get_unit_html_with_events(
             .iter()
             .map(|validator| {
                 let fetch_url = format!(
-                    "{}/channel/{}/events?pubAddr={}",
+                    "{}/campaign/{}/events?pubAddr={}",
                     validator.url, campaign_id, options.publisher_addr
                 );
 
@@ -314,7 +308,7 @@ impl Manager {
             .rev()
             .find_map(|h| {
                 if h.campaign_id == campaign_id {
-                    let last_impression: chrono::Duration = Utc::now() - h.time;
+                    let last_impression: Duration = Utc::now() - h.time;
 
                     u64::try_from(last_impression.num_seconds()).ok()
                 } else {
@@ -601,7 +595,7 @@ mod test {
 
     fn get_ad_unit(media_mime: &str) -> AdUnit {
         AdUnit {
-            id: DUMMY_IPFS[0].clone(),
+            id: DUMMY_IPFS[0],
             media_url: "".to_string(),
             media_mime: media_mime.to_string(),
             target_url: "".to_string(),
@@ -610,8 +604,8 @@ mod test {
 
     #[test]
     fn test_is_video() {
-        assert_eq!(true, is_video(&get_ad_unit("video/avi")));
-        assert_eq!(false, is_video(&get_ad_unit("image/jpeg")));
+        assert!(is_video(&get_ad_unit("video/avi")));
+        assert!(!is_video(&get_ad_unit("image/jpeg")));
     }
 
     #[test]
@@ -634,7 +628,7 @@ mod test {
         #[test]
         fn test_randomized_position() {
             let ad_unit = AdUnit {
-                id: DUMMY_IPFS[0].clone(),
+                id: DUMMY_IPFS[0],
                 media_url: "ipfs://QmWWQSuPMS6aXCbZKpEjPHPUZN2NjB3YrhJTHsV4X3vb2t".to_string(),
                 media_mime: "image/jpeg".to_string(),
                 target_url: "https://google.com".to_string(),

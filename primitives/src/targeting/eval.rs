@@ -2,7 +2,6 @@ use crate::UnifiedNum;
 use serde::{Deserialize, Serialize};
 use serde_json::{value::Value as SerdeValue, Number};
 use std::{
-    convert::TryFrom,
     fmt,
     ops::{Add, Div, Mul, Rem, Sub},
     str::FromStr,
@@ -1228,8 +1227,8 @@ fn math_operator(lhs: Number, rhs: Number, ops: MathOperator) -> Result<Number, 
 pub mod postgres {
     use super::*;
     use bytes::BytesMut;
-    use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
     use std::error::Error;
+    use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
 
     impl ToSql for Rules {
         fn to_sql(

@@ -22,7 +22,6 @@ pub use self::{
 
 mod ad_slot;
 mod ad_unit;
-pub mod adapter;
 pub mod address;
 pub mod analytics;
 pub mod balances;
@@ -41,8 +40,85 @@ pub mod sentry;
 pub mod spender;
 pub mod supermarket;
 pub mod targeting;
+#[cfg(feature = "test-util")]
+pub mod test_util;
 mod unified_num;
 pub mod validator;
+
+/// This module is available with the `postgres` feature
+/// Other places where you'd find `mod postgres` implementations is for many of the structs in the crate
+/// all of which implement [`tokio_postgres::types::FromSql`], [`tokio_postgres::types::ToSql`] or [`From<&tokio_postgres::Row>`]
+#[cfg(feature = "postgres")]
+pub mod postgres {
+    use std::env::{self, VarError};
+
+    use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
+    use once_cell::sync::Lazy;
+    use tokio_postgres::{Config, NoTls};
+
+    pub type DbPool = deadpool_postgres::Pool;
+
+    /// A Postgres pool with reasonable settings:
+    /// - [`RecyclingMethod::Verified`]
+    /// - `Pool::max_size = 32`
+    /// Created using environment variables, see [`POSTGRES_CONFIG`].
+    pub static POSTGRES_POOL: Lazy<Pool> = Lazy::new(|| {
+        let config = POSTGRES_CONFIG.clone();
+
+        let mgr_config = ManagerConfig {
+            recycling_method: RecyclingMethod::Verified,
+        };
+        let mgr = Manager::from_config(config, NoTls, mgr_config);
+
+        Pool::new(mgr, 42)
+    });
+
+    /// `POSTGRES_USER` environment variable - default: `postgres`
+    pub static POSTGRES_USER: Lazy<String> =
+        Lazy::new(|| env::var("POSTGRES_USER").unwrap_or_else(|_| String::from("postgres")));
+
+    /// `POSTGRES_PASSWORD` environment variable - default: `postgres`
+    pub static POSTGRES_PASSWORD: Lazy<String> =
+        Lazy::new(|| env::var("POSTGRES_PASSWORD").unwrap_or_else(|_| String::from("postgres")));
+
+    /// `POSTGRES_HOST` environment variable - default: `localhost`
+    pub static POSTGRES_HOST: Lazy<String> =
+        Lazy::new(|| env::var("POSTGRES_HOST").unwrap_or_else(|_| String::from("localhost")));
+
+    /// `POSTGRES_PORT` environment variable - default: `5432`
+    pub static POSTGRES_PORT: Lazy<u16> = Lazy::new(|| {
+        env::var("POSTGRES_PORT")
+            .unwrap_or_else(|_| String::from("5432"))
+            .parse()
+            .unwrap()
+    });
+
+    /// `POSTGRES_DB` environment variable - default: `POSTGRES_USER`
+    pub static POSTGRES_DB: Lazy<String> = Lazy::new(|| match env::var("POSTGRES_DB") {
+        Ok(database) => database,
+        Err(VarError::NotPresent) => POSTGRES_USER.clone(),
+        Err(err) => panic!("{}", err),
+    });
+
+    /// Postgres configuration derived from the environment variables:
+    /// - POSTGRES_USER
+    /// - POSTGRES_PASSWORD
+    /// - POSTGRES_HOST
+    /// - POSTGRES_PORT
+    /// - POSTGRES_DB
+    pub static POSTGRES_CONFIG: Lazy<Config> = Lazy::new(|| {
+        let mut config = Config::new();
+
+        config
+            .user(POSTGRES_USER.as_str())
+            .password(POSTGRES_PASSWORD.as_str())
+            .host(POSTGRES_HOST.as_str())
+            .port(*POSTGRES_PORT)
+            .dbname(POSTGRES_DB.as_ref());
+
+        config
+    });
+}
 
 mod deposit {
     use crate::{BigNum, UnifiedNum};

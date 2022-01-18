@@ -2,7 +2,7 @@
 #![deny(clippy::all)]
 #![allow(deprecated)]
 
-use adapter::{get_balance_leaf, get_signable_state_root, BalanceLeafError};
+use adapter::util::{get_balance_leaf, get_signable_state_root, BalanceLeafError};
 use primitives::{
     balances::CheckedState,
     merkle_tree::{Error as MerkleTreeError, MerkleTree},
@@ -11,6 +11,7 @@ use primitives::{
 use thiserror::Error;
 
 pub use self::sentry_interface::SentryApi;
+pub use worker::Worker;
 
 pub mod channel;
 pub mod error;
@@ -18,6 +19,7 @@ pub mod follower;
 pub mod heartbeat;
 pub mod leader;
 pub mod sentry_interface;
+pub mod worker;
 
 pub mod core {
     pub mod follower_rules;

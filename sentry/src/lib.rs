@@ -2,18 +2,22 @@
 #![deny(rust_2018_idioms)]
 #![allow(deprecated)]
 
+use adapter::{prelude::*, Adapter};
 use chrono::Utc;
 use hyper::{Body, Method, Request, Response, StatusCode};
-use lazy_static::lazy_static;
 use middleware::{
-    auth::{AuthRequired, Authenticate},
-    campaign::CampaignLoad,
-    channel::{ChannelLoad, GetChannelId},
+    auth::{AuthRequired, Authenticate, IsAdmin},
+    campaign::{CalledByCreator, CampaignLoad},
+    channel::ChannelLoad,
     cors::{cors, Cors},
     Chain, Middleware,
 };
 use once_cell::sync::Lazy;
-use primitives::{adapter::Adapter, sentry::ValidationErrorResponse, Config, ValidatorId};
+use primitives::{
+    analytics::{query::AllowedKey, AuthenticateAs},
+    sentry::ValidationErrorResponse,
+    Config, ValidatorId,
+};
 use redis::aio::MultiplexedConnection;
 use regex::Regex;
 use slog::Logger;
@@ -33,6 +37,7 @@ use {
     },
 };
 
+pub mod analytics;
 pub mod middleware;
 pub mod routes {
     pub mod analytics;
@@ -45,37 +50,37 @@ pub mod routes {
 
 pub mod access;
 pub mod analytics_recorder;
+pub mod application;
 pub mod db;
-// TODO AIP#61: remove the even aggregator once we've taken out the logic for AIP#61
-// pub mod event_aggregator;
-// TODO AIP#61: Remove even reducer or alter depending on our needs
-// pub mod event_reducer;
 pub mod payout;
 pub mod spender;
 
-lazy_static! {
-    static ref CHANNEL_GET_BY_ID: Regex =
-        Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
-    static ref LAST_APPROVED_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/last-approved/?$").expect("The regex should be valid");
-    static ref CHANNEL_STATUS_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/status/?$").expect("The regex should be valid");
-    // Only the initial Regex to be matched.
-    static ref CHANNEL_VALIDATOR_MESSAGES: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/validator-messages(/.*)?$").expect("The regex should be valid");
-    static ref CHANNEL_EVENTS_AGGREGATES: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events-aggregates/?$").expect("The regex should be valid");
-    static ref ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
-    static ref ADVERTISER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-advertiser/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
-    static ref PUBLISHER_ANALYTICS_BY_CHANNEL_ID: Regex = Regex::new(r"^/analytics/for-publisher/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid");
-    static ref CREATE_EVENTS_BY_CHANNEL_ID: Regex = Regex::new(r"^/channel/0x([a-zA-Z0-9]{64})/events/?$").expect("The regex should be valid");
-    static ref CHANNEL_SPENDER_LEAF_AND_TOTAL_DEPOSITED: Regex = Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/spender/0x([a-zA-Z0-9]{40})/?$").expect("This regex should be valid");
-}
+static LAST_APPROVED_BY_CHANNEL_ID: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/last-approved/?$")
+        .expect("The regex should be valid")
+});
+// Only the initial Regex to be matched.
+static CHANNEL_VALIDATOR_MESSAGES: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/validator-messages(/.*)?$")
+        .expect("The regex should be valid")
+});
+static CHANNEL_EVENTS_AGGREGATES: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/events-aggregates/?$")
+        .expect("The regex should be valid")
+});
+static CHANNEL_SPENDER_LEAF_AND_TOTAL_DEPOSITED: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/spender/0x([a-zA-Z0-9]{40})/?$")
+        .expect("This regex should be valid")
+});
 
 static INSERT_EVENTS_BY_CAMPAIGN_ID: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/v5/campaign/0x([a-zA-Z0-9]{32})/events/?$").expect("The regex should be valid")
+    Regex::new(r"^/v5/campaign/(0x[a-zA-Z0-9]{32})/events/?$").expect("The regex should be valid")
 });
 static CLOSE_CAMPAIGN_BY_CAMPAIGN_ID: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/v5/campaign/0x([a-zA-Z0-9]{32})/close/?$").expect("The regex should be valid")
+    Regex::new(r"^/v5/campaign/(0x[a-zA-Z0-9]{32})/close/?$").expect("The regex should be valid")
 });
 static CAMPAIGN_UPDATE_BY_ID: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/v5/campaign/0x([a-zA-Z0-9]{32})/?$").expect("The regex should be valid")
+    Regex::new(r"^/v5/campaign/(0x[a-zA-Z0-9]{32})/?$").expect("The regex should be valid")
 });
 static CHANNEL_ALL_SPENDER_LIMITS: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/spender/all/?$")
@@ -99,9 +104,11 @@ impl RouteParams {
     }
 }
 
-#[derive(Clone)]
-pub struct Application<A: Adapter> {
-    pub adapter: A,
+// #[derive(Clone)]
+// pub struct Application<C: Locked + 'static> {
+pub struct Application<C: Locked + 'static> {
+    /// For sentry to work properly, we need an [`adapter::Adapter`] in a [`adapter::LockedState`] state.
+    pub adapter: Adapter<C>,
     pub config: Config,
     pub logger: Logger,
     pub redis: MultiplexedConnection,
@@ -109,9 +116,12 @@ pub struct Application<A: Adapter> {
     pub campaign_remaining: CampaignRemaining,
 }
 
-impl<A: Adapter + 'static> Application<A> {
+impl<C> Application<C>
+where
+    C: Locked,
+{
     pub fn new(
-        adapter: A,
+        adapter: Adapter<C>,
         config: Config,
         logger: Logger,
         redis: MultiplexedConnection,
@@ -144,17 +154,6 @@ impl<A: Adapter + 'static> Application<A> {
         let mut response = match (req.uri().path(), req.method()) {
             ("/cfg", &Method::GET) => config(req, self).await,
             ("/channel/list", &Method::GET) => channel_list(req, self).await,
-            // For creating campaigns
-            ("/v5/campaign", &Method::POST) => {
-                let req = match AuthRequired.call(req, self).await {
-                    Ok(req) => req,
-                    Err(error) => {
-                        return map_response_error(error);
-                    }
-                };
-
-                create_campaign(req, self).await
-            }
             (route, _) if route.starts_with("/analytics") => analytics_router(req, self).await,
             // This is important because it prevents us from doing
             // expensive regex matching for routes without /channel
@@ -170,9 +169,9 @@ impl<A: Adapter + 'static> Application<A> {
     }
 }
 
-async fn campaigns_router<A: Adapter + 'static>(
+async fn campaigns_router<C: Locked + 'static>(
     mut req: Request<Body>,
-    app: &Application<A>,
+    app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
     let (path, method) = (req.uri().path(), req.method());
 
@@ -182,7 +181,12 @@ async fn campaigns_router<A: Adapter + 'static>(
 
         create_campaign(req, app).await
     } else if let (Some(_caps), &Method::POST) = (CAMPAIGN_UPDATE_BY_ID.captures(path), method) {
-        let req = CampaignLoad.call(req, app).await?;
+        let req = Chain::new()
+            .chain(AuthRequired)
+            .chain(CampaignLoad)
+            .chain(CalledByCreator)
+            .apply(req, app)
+            .await?;
 
         update_campaign::handle_route(req, app).await
     } else if let (Some(caps), &Method::POST) =
@@ -196,112 +200,79 @@ async fn campaigns_router<A: Adapter + 'static>(
         let req = CampaignLoad.call(req, app).await?;
 
         campaign::insert_events::handle_route(req, app).await
-    } else if let (Some(_caps), &Method::POST) =
+    } else if let (Some(caps), &Method::POST) =
         (CLOSE_CAMPAIGN_BY_CAMPAIGN_ID.captures(path), method)
     {
-        // TODO AIP#61: Close campaign:
-        // - only by creator
-        // - sets redis remaining = 0 (`newBudget = totalSpent`, i.e. `newBudget = oldBudget - remaining`)
+        let param = RouteParams(vec![caps
+            .get(1)
+            .map_or("".to_string(), |m| m.as_str().to_string())]);
+        req.extensions_mut().insert(param);
 
-        // let (is_creator, auth_uid) = match auth {
-        // Some(auth) => (auth.uid == channel.creator, auth.uid.to_string()),
-        // None => (false, Default::default()),
-        // };
-        // Closing a campaign is allowed only by the creator
-        // if has_close_event && is_creator {
-        //     return Ok(());
-        // }
+        req = Chain::new()
+            .chain(AuthRequired)
+            .chain(CampaignLoad)
+            .apply(req, app)
+            .await?;
 
-        Err(ResponseError::NotFound)
-    } else if method == Method::POST && path == "/v5/campaign/list" {
-        req = AuthRequired.call(req, app).await?;
-
+        campaign::close_campaign(req, app).await
+    } else if method == Method::GET && path == "/v5/campaign/list" {
         campaign_list(req, app).await
     } else {
         Err(ResponseError::NotFound)
     }
 }
 
-async fn analytics_router<A: Adapter + 'static>(
+async fn analytics_router<C: Locked + 'static>(
     mut req: Request<Body>,
-    app: &Application<A>,
+    app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
-    use routes::analytics::{
-        advanced_analytics, advertiser_analytics, analytics, publisher_analytics,
-    };
+    use routes::analytics::analytics;
 
     let (route, method) = (req.uri().path(), req.method());
 
     match (route, method) {
-        ("/analytics", &Method::GET) => analytics(req, app).await,
-        ("/analytics/advanced", &Method::GET) => {
-            let req = AuthRequired.call(req, app).await?;
-
-            advanced_analytics(req, app).await
+        ("/analytics", &Method::GET) => {
+            let allowed_keys_for_request = vec![AllowedKey::Country, AllowedKey::AdSlotType]
+                .into_iter()
+                .collect();
+            analytics(req, app, Some(allowed_keys_for_request), None).await
         }
         ("/analytics/for-advertiser", &Method::GET) => {
             let req = AuthRequired.call(req, app).await?;
-            advertiser_analytics(req, app).await
+
+            let authenticate_as = req
+                .extensions()
+                .get::<Auth>()
+                .map(|auth| AuthenticateAs::Advertiser(auth.uid))
+                .ok_or(ResponseError::Unauthorized)?;
+
+            analytics(req, app, None, Some(authenticate_as)).await
         }
         ("/analytics/for-publisher", &Method::GET) => {
+            let authenticate_as = req
+                .extensions()
+                .get::<Auth>()
+                .map(|auth| AuthenticateAs::Publisher(auth.uid))
+                .ok_or(ResponseError::Unauthorized)?;
+
             let req = AuthRequired.call(req, app).await?;
-
-            publisher_analytics(req, app).await
+            analytics(req, app, None, Some(authenticate_as)).await
         }
-        (route, &Method::GET) => {
-            if let Some(caps) = ANALYTICS_BY_CHANNEL_ID.captures(route) {
-                let param = RouteParams(vec![caps
-                    .get(1)
-                    .map_or("".to_string(), |m| m.as_str().to_string())]);
-                req.extensions_mut().insert(param);
-
-                // apply middlewares
-                req = Chain::new()
-                    .chain(ChannelLoad)
-                    .chain(GetChannelId)
-                    .apply(req, app)
-                    .await?;
-
-                analytics(req, app).await
-            } else if let Some(caps) = ADVERTISER_ANALYTICS_BY_CHANNEL_ID.captures(route) {
-                let param = RouteParams(vec![caps
-                    .get(1)
-                    .map_or("".to_string(), |m| m.as_str().to_string())]);
-                req.extensions_mut().insert(param);
-
-                // apply middlewares
-                req = Chain::new()
-                    .chain(AuthRequired)
-                    .chain(GetChannelId)
-                    .apply(req, app)
-                    .await?;
-
-                advertiser_analytics(req, app).await
-            } else if let Some(caps) = PUBLISHER_ANALYTICS_BY_CHANNEL_ID.captures(route) {
-                let param = RouteParams(vec![caps
-                    .get(1)
-                    .map_or("".to_string(), |m| m.as_str().to_string())]);
-                req.extensions_mut().insert(param);
-
-                // apply middlewares
-                req = Chain::new()
-                    .chain(AuthRequired)
-                    .chain(GetChannelId)
-                    .apply(req, app)
-                    .await?;
-
-                publisher_analytics(req, app).await
-            } else {
-                Err(ResponseError::NotFound)
-            }
+        ("/analytics/for-admin", &Method::GET) => {
+            req = Chain::new()
+                .chain(AuthRequired)
+                .chain(IsAdmin)
+                .apply(req, app)
+                .await?;
+            analytics(req, app, None, None).await
         }
         _ => Err(ResponseError::NotFound),
     }
 }
 
-async fn channels_router<A: Adapter + 'static>(
+async fn channels_router<C: Locked + 'static>(
     mut req: Request<Body>,
-    app: &Application<A>,
+    app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
     let (path, method) = (req.uri().path().to_owned(), req.method());
 
@@ -493,7 +464,7 @@ pub fn bad_validation_response(response_body: String) -> Response<Body> {
         validation: vec![response_body],
     };
 
-    let body = Body::from(serde_json::to_string(&error_response).expect("serialise err response"));
+    let body = Body::from(serde_json::to_string(&error_response).expect("serialize err response"));
 
     let mut response = Response::new(body);
     response
@@ -540,10 +511,12 @@ pub struct Auth {
 
 #[cfg(test)]
 pub mod test_util {
-    use adapter::DummyAdapter;
+    use adapter::{
+        dummy::{Dummy, Options},
+        Adapter,
+    };
     use primitives::{
-        adapter::DummyAdapterOptions,
-        config::configuration,
+        config::DEVELOPMENT_CONFIG,
         util::tests::{discard_logger, prep_db::IDS},
     };
 
@@ -556,17 +529,14 @@ pub mod test_util {
         Application,
     };
 
-    /// Uses development and therefore the goreli testnet addresses of the tokens
-    pub async fn setup_dummy_app() -> Application<DummyAdapter> {
-        let config = configuration("development", None).expect("Should get Config");
-        let adapter = DummyAdapter::init(
-            DummyAdapterOptions {
-                dummy_identity: IDS["leader"],
-                dummy_auth: Default::default(),
-                dummy_auth_tokens: Default::default(),
-            },
-            &config,
-        );
+    /// Uses development and therefore the goerli testnet addresses of the tokens
+    /// It still uses DummyAdapter.
+    pub async fn setup_dummy_app() -> Application<Dummy> {
+        let config = DEVELOPMENT_CONFIG.clone();
+        let adapter = Adapter::new(Dummy::init(Options {
+            dummy_identity: IDS["leader"],
+            dummy_auth_tokens: Default::default(),
+        }));
 
         let redis = TESTS_POOL.get().await.expect("Should return Object");
         let database = DATABASE_POOL.get().await.expect("Should get a DB pool");

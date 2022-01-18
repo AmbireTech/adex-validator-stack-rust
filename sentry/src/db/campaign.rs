@@ -1,8 +1,11 @@
 use crate::db::{DbPool, PoolError, TotalCount};
 use chrono::{DateTime, Utc};
 use primitives::{
-    sentry::{campaign::CampaignListResponse, Pagination},
-    Address, Campaign, CampaignId, ChannelId, ValidatorId,
+    sentry::{
+        campaign::{CampaignListResponse, ValidatorParam},
+        Pagination,
+    },
+    Address, Campaign, CampaignId, ChannelId,
 };
 use tokio_postgres::types::{Json, ToSql};
 
@@ -67,14 +70,12 @@ pub async fn list_campaigns(
     skip: u64,
     limit: u32,
     creator: Option<Address>,
-    validator: Option<ValidatorId>,
-    is_leader: Option<bool>,
+    validator: Option<ValidatorParam>,
     active_to_ge: &DateTime<Utc>,
 ) -> Result<CampaignListResponse, PoolError> {
     let client = pool.get().await?;
 
-    let (where_clauses, params) =
-        campaign_list_query_params(&creator, &validator, is_leader, active_to_ge);
+    let (where_clauses, params) = campaign_list_query_params(&creator, &validator, active_to_ge);
     let total_count_params = (where_clauses.clone(), params.clone());
 
     // To understand why we use Order by, see Postgres Documentation: https://www.postgresql.org/docs/8.1/queries-limit.html
@@ -106,8 +107,7 @@ pub async fn list_campaigns(
 
 fn campaign_list_query_params<'a>(
     creator: &'a Option<Address>,
-    validator: &'a Option<ValidatorId>,
-    is_leader: Option<bool>,
+    validator: &'a Option<ValidatorParam>,
     active_to_ge: &'a DateTime<Utc>,
 ) -> (Vec<String>, Vec<&'a (dyn ToSql + Sync)>) {
     let mut where_clauses = vec!["active_to >= $1".to_string()];
@@ -119,17 +119,17 @@ fn campaign_list_query_params<'a>(
     }
 
     // if clause for is_leader is true, the other clause is also always true
-    match (validator, is_leader) {
-        (Some(validator), Some(true)) => {
+    match validator {
+        Some(ValidatorParam::Leader(validator_id)) => {
             where_clauses.push(format!("channels.leader = ${}", params.len() + 1));
-            params.push(validator);
+            params.push(validator_id);
         }
-        (Some(validator), _) => {
+        Some(ValidatorParam::Validator(validator_id)) => {
             where_clauses.push(format!(
                 "(channels.leader = ${x} OR channels.follower = ${x})",
                 x = params.len() + 1,
             ));
-            params.push(validator);
+            params.push(validator_id);
         }
         _ => (),
     }
@@ -137,7 +137,7 @@ fn campaign_list_query_params<'a>(
     (where_clauses, params)
 }
 
-async fn list_campaigns_total_count<'a>(
+pub async fn list_campaigns_total_count<'a>(
     pool: &DbPool,
     (where_clauses, params): (&'a [String], Vec<&'a (dyn ToSql + Sync)>),
 ) -> Result<u64, PoolError> {
@@ -153,26 +153,28 @@ async fn list_campaigns_total_count<'a>(
     Ok(row.get::<_, TotalCount>(0).0)
 }
 
-// TODO: We might need to use LIMIT to implement pagination
 /// ```text
-/// SELECT campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to,
-/// channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce
-/// FROM campaigns INNER JOIN channels
-/// ON campaigns.channel_id=channels.id WHERE campaigns.channel_id = $1
+/// SELECT id FROM campaigns WHERE channel_id = $1 ORDER BY created ASC LIMIT {} OFFSET {}
 /// ```
-pub async fn get_campaigns_by_channel(
+pub async fn get_campaign_ids_by_channel(
     pool: &DbPool,
     channel_id: &ChannelId,
-) -> Result<Vec<Campaign>, PoolError> {
+    limit: u64,
+    skip: u64,
+) -> Result<Vec<CampaignId>, PoolError> {
     let client = pool.get().await?;
-    let statement = client.prepare("SELECT campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM campaigns INNER JOIN channels
-    ON campaigns.channel_id=channels.id WHERE campaigns.channel_id = $1").await?;
+
+    let query = format!(
+        "SELECT id FROM campaigns WHERE channel_id = $1 ORDER BY created ASC LIMIT {} OFFSET {}",
+        limit, skip
+    );
+
+    let statement = client.prepare(&query).await?;
 
     let rows = client.query(&statement, &[&channel_id]).await?;
+    let campaign_ids = rows.iter().map(CampaignId::from).collect();
 
-    let campaigns = rows.iter().map(Campaign::from).collect();
-
-    Ok(campaigns)
+    Ok(campaign_ids)
 }
 
 /// ```text
@@ -304,6 +306,19 @@ mod campaign_remaining {
             redis::cmd("DECRBY")
                 .arg(&key)
                 .arg(amount.to_u64())
+                .query_async(&mut self.redis.clone())
+                .await
+        }
+
+        /// Atomic `getset` [`redis`] operation
+        /// Used to close a [`primitives::Campaign`] `POST /campaign/close`
+        pub async fn getset_remaining_to_zero(
+            &self,
+            campaign: CampaignId,
+        ) -> Result<u64, RedisError> {
+            redis::cmd("GETSET")
+                .arg(&Self::get_key(campaign))
+                .arg(0)
                 .query_async(&mut self.redis.clone())
                 .await
         }
@@ -495,9 +510,9 @@ mod test {
         util::tests::prep_db::{
             ADDRESSES, DUMMY_AD_UNITS, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER, IDS,
         },
-        EventSubmission, UnifiedNum, ValidatorDesc,
+        EventSubmission, UnifiedNum, ValidatorDesc, ValidatorId,
     };
-    use std::{convert::TryFrom, time::Duration};
+    use std::time::Duration;
     use tokio_postgres::error::SqlState;
 
     use super::*;
@@ -650,8 +665,7 @@ mod test {
             2,
             Some(ADDRESSES["creator"]),
             None,
-            None,
-            &Utc::now(),
+            &DUMMY_CAMPAIGN.created,
         )
         .await
         .expect("should fetch");
@@ -667,8 +681,7 @@ mod test {
             2,
             Some(ADDRESSES["creator"]),
             None,
-            None,
-            &Utc::now(),
+            &DUMMY_CAMPAIGN.created,
         )
         .await
         .expect("should fetch");
@@ -681,8 +694,7 @@ mod test {
             2,
             Some(ADDRESSES["creator"]),
             None,
-            None,
-            &Utc::now(),
+            &DUMMY_CAMPAIGN.created,
         )
         .await
         .expect("should fetch");
@@ -695,8 +707,7 @@ mod test {
             2,
             Some(ADDRESSES["tester"]),
             None,
-            None,
-            &Utc::now(),
+            &DUMMY_CAMPAIGN.created,
         )
         .await
         .expect("should fetch");
@@ -708,9 +719,8 @@ mod test {
             0,
             5,
             None,
-            Some(IDS["follower"]),
-            None,
-            &Utc::now(),
+            Some(ValidatorParam::Validator(IDS["follower"])),
+            &DUMMY_CAMPAIGN.created,
         )
         .await
         .expect("should fetch");
@@ -724,15 +734,14 @@ mod test {
             ]
         );
 
-        // Test with validator and is_leader
+        // Test with leader validator
         let first_page = list_campaigns(
             &database.pool,
             0,
             5,
             None,
-            Some(IDS["leader"]),
-            Some(true),
-            &Utc::now(),
+            Some(ValidatorParam::Leader(IDS["leader"])),
+            &DUMMY_CAMPAIGN.created,
         )
         .await
         .expect("should fetch");
@@ -745,65 +754,40 @@ mod test {
             ]
         );
 
-        // Test with a different validator and is_leader
+        // Test with a different leader validator
         let first_page = list_campaigns(
             &database.pool,
             0,
             5,
             None,
-            Some(IDS["user"]),
-            Some(true),
-            &Utc::now(),
+            Some(ValidatorParam::Leader(IDS["user"])),
+            &DUMMY_CAMPAIGN.created,
         )
         .await
         .expect("should fetch");
         assert_eq!(first_page.campaigns, vec![campaign_new_leader.clone()]);
 
-        // Test with validator and is_leader but validator isn't the leader of any campaign
+        // Test with leader validator but validator isn't the leader of any campaign
         let first_page = list_campaigns(
             &database.pool,
             0,
             5,
             None,
-            Some(IDS["follower"]),
-            Some(true),
-            &Utc::now(),
+            Some(ValidatorParam::Leader(IDS["follower"])),
+            &DUMMY_CAMPAIGN.created,
         )
         .await
         .expect("should fetch");
         assert_eq!(first_page.campaigns.len(), 0);
 
-        // Test with is_leader set to false
-        let first_page = list_campaigns(
-            &database.pool,
-            0,
-            5,
-            None,
-            Some(IDS["follower"]),
-            Some(false),
-            &Utc::now(),
-        )
-        .await
-        .expect("should fetch");
-        assert_eq!(
-            first_page.campaigns,
-            vec![
-                campaign_new_leader.clone(),
-                campaign_new_creator.clone(),
-                campaign_new_id.clone(),
-                campaign.clone()
-            ]
-        );
-
-        // Test with creator, provided validator and is_leader set to true
+        // Test with creator and provided leader validator
         let first_page = list_campaigns(
             &database.pool,
             0,
             5,
             Some(ADDRESSES["creator"]),
-            Some(IDS["leader"]),
-            Some(true),
-            &Utc::now(),
+            Some(ValidatorParam::Leader(IDS["leader"])),
+            &DUMMY_CAMPAIGN.created,
         )
         .await
         .expect("should fetch");

@@ -5,8 +5,8 @@ use primitives::{sentry::Pagination, spender::Spendable, Address, ChannelId};
 use super::{DbPool, PoolError};
 
 /// ```text
-/// INSERT INTO spendable (spender, channel_id, total, still_on_create2)
-/// values ('0xce07CbB7e054514D590a0262C93070D838bFBA2e', '0x061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088', 10.00000000, 2.00000000);
+/// INSERT INTO spendable (spender, channel_id, total, still_on_create2, created)
+/// values ('0xce07CbB7e054514D590a0262C93070D838bFBA2e', '0x061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088', 10.00000000, 2.00000000, NOW());
 /// ```
 pub async fn insert_spendable(pool: DbPool, spendable: &Spendable) -> Result<bool, PoolError> {
     let client = pool.get().await?;
@@ -45,8 +45,6 @@ pub async fn fetch_spendable(
     Ok(row.as_ref().map(Spendable::from))
 }
 
-static GET_ALL_SPENDERS_STATEMENT: &str = "SELECT spender, total, still_on_create2, spendable.created, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM spendable INNER JOIN channels ON channels.id = spendable.channel_id WHERE channel_id = $1 ORDER BY spendable.created ASC LIMIT $2 OFFSET $3";
-
 pub async fn get_all_spendables_for_channel(
     pool: DbPool,
     channel_id: &ChannelId,
@@ -54,14 +52,11 @@ pub async fn get_all_spendables_for_channel(
     limit: u64,
 ) -> Result<(Vec<Spendable>, Pagination), PoolError> {
     let client = pool.get().await?;
-    let statement = client.prepare(GET_ALL_SPENDERS_STATEMENT).await?;
+    let query = format!("SELECT spender, total, still_on_create2, spendable.created, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM spendable INNER JOIN channels ON channels.id = spendable.channel_id WHERE channel_id = $1 ORDER BY spendable.created ASC LIMIT {} OFFSET {}", limit, skip);
 
-    let rows = client
-        .query(
-            &statement,
-            &[channel_id, &limit.to_string(), &skip.to_string()],
-        )
-        .await?;
+    let statement = client.prepare(&query).await?;
+
+    let rows = client.query(&statement, &[channel_id]).await?;
     let spendables = rows.iter().map(Spendable::from).collect();
 
     let total_count = list_spendable_total_count(&pool, channel_id).await?;
@@ -110,8 +105,7 @@ async fn list_spendable_total_count<'a>(
 ) -> Result<u64, PoolError> {
     let client = pool.get().await?;
 
-    let statement =
-        "SELECT COUNT(spendable.id)::varchar FROM spendable INNER JOIN channels ON spendable.channel_id=channels.id WHERE spendable.channel_id = $1";
+    let statement = "SELECT COUNT(spendable)::varchar FROM spendable WHERE channel_id = $1";
     let stmt = client.prepare(statement).await?;
     let row = client.query_one(&stmt, &[&channel_id]).await?;
 
@@ -120,8 +114,11 @@ async fn list_spendable_total_count<'a>(
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashMap;
+
     use primitives::{
         spender::Spendable,
+        test_util::{ADVERTISER, CREATOR, FOLLOWER, GUARDIAN, GUARDIAN_2, PUBLISHER},
         util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN},
         Deposit, UnifiedNum,
     };
@@ -130,6 +127,7 @@ mod test {
         insert_channel,
         tests_postgres::{setup_test_migrations, DATABASE_POOL},
     };
+    use tokio::time::{sleep, Duration};
 
     use super::*;
 
@@ -143,7 +141,7 @@ mod test {
 
         let spendable = Spendable {
             spender: ADDRESSES["user"],
-            channel: DUMMY_CAMPAIGN.channel.clone(),
+            channel: DUMMY_CAMPAIGN.channel,
             deposit: Deposit {
                 total: UnifiedNum::from(100_000_000),
                 still_on_create2: UnifiedNum::from(500_000),
@@ -157,6 +155,7 @@ mod test {
         let is_inserted = insert_spendable(database.pool.clone(), &spendable)
             .await
             .expect("Should succeed");
+        sleep(Duration::from_millis(100)).await;
 
         assert!(is_inserted);
 
@@ -169,7 +168,150 @@ mod test {
         .expect("Should fetch successfully");
 
         assert_eq!(Some(spendable), fetched_spendable);
+    }
 
-        // TODO: Update spendable
+    fn new_spendable_with(spender: &Address) -> Spendable {
+        Spendable {
+            spender: *spender,
+            channel: DUMMY_CAMPAIGN.channel,
+            deposit: Deposit {
+                total: UnifiedNum::from(100_000_000),
+                still_on_create2: UnifiedNum::from(500_000),
+            },
+        }
+    }
+
+    #[tokio::test]
+    async fn insert_and_get_single_spendable_for_channel() {
+        let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
+
+        setup_test_migrations(database.pool.clone())
+            .await
+            .expect("Migrations should succeed");
+
+        let channel = DUMMY_CAMPAIGN.channel;
+
+        insert_channel(&database, channel)
+            .await
+            .expect("Should insert");
+
+        // Test for 0 records
+        let (spendables, pagination) =
+            get_all_spendables_for_channel(database.clone(), &channel.id(), 0, 2)
+                .await
+                .expect("should get result");
+        assert!(spendables.is_empty());
+        assert_eq!(pagination.total_pages, 1);
+
+        // Test for 1 pages
+        let spendable_user = new_spendable_with(&FOLLOWER);
+
+        insert_spendable(database.pool.clone(), &spendable_user)
+            .await
+            .expect("should insert spendable");
+        sleep(Duration::from_millis(100)).await;
+
+        let (spendables, pagination) =
+            get_all_spendables_for_channel(database.clone(), &channel.id(), 0, 2)
+                .await
+                .expect("should get result");
+        let expected_spendables = vec![spendable_user.clone()];
+        let expected_pagination = Pagination {
+            page: 0,
+            total_pages: 1,
+        };
+        pretty_assertions::assert_eq!(spendables, expected_spendables);
+        pretty_assertions::assert_eq!(pagination, expected_pagination);
+    }
+
+    #[tokio::test]
+    async fn gets_multiple_pages_of_spendables_for_channel() {
+        let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
+
+        setup_test_migrations(database.pool.clone())
+            .await
+            .expect("Migrations should succeed");
+
+        let channel = DUMMY_CAMPAIGN.channel;
+
+        insert_channel(&database, channel)
+            .await
+            .expect("Should insert");
+
+        let create_spendables: Vec<(Address, Spendable)> = vec![
+            (*PUBLISHER, new_spendable_with(&PUBLISHER)),
+            (*ADVERTISER, new_spendable_with(&ADVERTISER)),
+            (*CREATOR, new_spendable_with(&CREATOR)),
+            (*GUARDIAN, new_spendable_with(&GUARDIAN)),
+            (*GUARDIAN_2, new_spendable_with(&GUARDIAN_2)),
+        ];
+
+        // insert all spendables
+        for (address, spendable) in create_spendables.iter() {
+            insert_spendable(database.pool.clone(), spendable)
+                .await
+                .expect(&format!(
+                    "Failed to insert spendable for {:?} with Spendable: {:?}",
+                    address, spendable
+                ));
+            // use sleep to make all spendables with different time
+            // they will follow the order in which they were defined in the variable
+            sleep(Duration::from_millis(100)).await;
+        }
+
+        let spendables = create_spendables.into_iter().collect::<HashMap<_, _>>();
+
+        let expected_pages = vec![
+            (
+                vec![&spendables[&PUBLISHER], &spendables[&ADVERTISER]],
+                Pagination {
+                    page: 0,
+                    total_pages: 3,
+                },
+            ),
+            (
+                vec![&spendables[&CREATOR], &spendables[&GUARDIAN]],
+                Pagination {
+                    page: 1,
+                    total_pages: 3,
+                },
+            ),
+            (
+                vec![&spendables[&GUARDIAN_2]],
+                Pagination {
+                    page: 2,
+                    total_pages: 3,
+                },
+            ),
+        ];
+
+        for (expected_spendables, expected_pagination) in expected_pages.iter() {
+            // for page = 0; skip = 0
+            // for page = 1; skip = 2
+            // etc.
+            let limit = 2;
+            let skip = expected_pagination.page * limit;
+
+            let debug_msg = format!(
+                "{:?} page = {} with skip = {} & limit = {}",
+                channel.id(),
+                expected_pagination.page,
+                skip,
+                limit
+            );
+
+            let (spendables, pagination) =
+                get_all_spendables_for_channel(database.clone(), &channel.id(), skip, limit)
+                    .await
+                    .expect(&format!("could not fetch spendables {}", debug_msg));
+
+            pretty_assertions::assert_eq!(
+                &pagination,
+                expected_pagination,
+                "Unexpected pagination for {}",
+                debug_msg
+            );
+            pretty_assertions::assert_eq!(&spendables, expected_spendables);
+        }
     }
 }

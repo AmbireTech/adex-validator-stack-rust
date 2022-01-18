@@ -1,9 +1,9 @@
 use hex::{FromHex, FromHexError};
 use serde::{Deserialize, Serialize, Serializer};
-use std::{convert::TryFrom, fmt, str::FromStr};
+use std::{fmt, str::FromStr};
 use thiserror::Error;
 
-use crate::{targeting::Value, DomainError, ToETHChecksum, ToHex};
+use crate::{targeting::Value, DomainError, ToETHChecksum};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -26,6 +26,10 @@ pub struct Address(
 );
 
 impl Address {
+    pub fn to_bytes(&self) -> [u8; 20] {
+        self.0
+    }
+
     pub fn as_bytes(&self) -> &[u8; 20] {
         &self.0
     }
@@ -53,7 +57,7 @@ impl fmt::Display for Address {
 
 impl fmt::Debug for Address {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Address({})", self.to_hex_prefixed())
+        write!(f, "Address({})", self.to_checksum())
     }
 }
 
@@ -65,8 +69,20 @@ impl From<&[u8; 20]> for Address {
     }
 }
 
+impl From<[u8; 20]> for Address {
+    fn from(bytes: [u8; 20]) -> Self {
+        Self(bytes)
+    }
+}
+
 impl AsRef<[u8]> for Address {
     fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl AsRef<[u8; 20]> for Address {
+    fn as_ref(&self) -> &[u8; 20] {
         &self.0
     }
 }
@@ -75,7 +91,7 @@ impl FromStr for Address {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self(from_bytes(s, Prefix::Insensitive)?))
+        Ok(Self(parse_bytes(s, Prefix::Insensitive)?))
     }
 }
 
@@ -83,7 +99,29 @@ impl TryFrom<&str> for Address {
     type Error = Error;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Ok(Self(from_bytes(value, Prefix::Insensitive)?))
+        Ok(Self(parse_bytes(value, Prefix::Insensitive)?))
+    }
+}
+
+/// When we have a string literal (&str) representation of the Address in the form of bytes.
+/// Useful for creating static values from strings for testing, configuration, etc.
+///
+/// You can find a test setup example in the [`crate::test_util`] module.
+///
+/// # Example
+/// ```
+/// use once_cell::sync::Lazy;
+/// use primitives::Address;
+///
+/// static ADDRESS_0: Lazy<Address> = Lazy::new(|| b"0x80690751969B234697e9059e04ed72195c3507fa".try_into().unwrap());
+///
+/// println!("Address: {}", *ADDRESS_0);
+/// ```
+impl TryFrom<&'static [u8; 42]> for Address {
+    type Error = Error;
+
+    fn try_from(value: &'static [u8; 42]) -> Result<Self, Self::Error> {
+        Ok(Self(parse_bytes(value, Prefix::With)?))
     }
 }
 
@@ -99,7 +137,7 @@ impl TryFrom<&[u8]> for Address {
     type Error = Error;
 
     fn try_from(slice: &[u8]) -> Result<Self, Self::Error> {
-        Ok(Self(from_bytes(slice, Prefix::Insensitive)?))
+        Ok(Self(parse_bytes(slice, Prefix::Insensitive)?))
     }
 }
 
@@ -116,7 +154,7 @@ impl TryFrom<Value> for Address {
 }
 
 mod de {
-    use super::{from_bytes, Prefix};
+    use super::{parse_bytes, Prefix};
     use serde::{Deserialize, Deserializer};
 
     /// Deserializes the bytes with our without a `0x` prefix (insensitive)
@@ -126,7 +164,7 @@ mod de {
     {
         let address = String::deserialize(deserializer)?;
 
-        from_bytes(address, Prefix::Insensitive).map_err(serde::de::Error::custom)
+        parse_bytes(address, Prefix::Insensitive).map_err(serde::de::Error::custom)
     }
 }
 
@@ -139,7 +177,7 @@ pub enum Prefix {
     Insensitive,
 }
 
-pub fn from_bytes<T: AsRef<[u8]>>(from: T, prefix: Prefix) -> Result<[u8; 20], Error> {
+pub fn parse_bytes<T: AsRef<[u8]>>(from: T, prefix: Prefix) -> Result<[u8; 20], Error> {
     let bytes = from.as_ref();
 
     let from_hex =
@@ -161,8 +199,8 @@ pub mod postgres {
     use super::Address;
     use crate::ToETHChecksum;
     use bytes::BytesMut;
-    use postgres_types::{FromSql, IsNull, ToSql, Type};
     use std::error::Error;
+    use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
     impl<'a> FromSql<'a> for Address {
         fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {

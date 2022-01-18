@@ -29,7 +29,7 @@ mod campaign_id {
     use thiserror::Error;
     use uuid::Uuid;
 
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     /// an Id of 16 bytes, (de)serialized as a `0x` prefixed hex
     /// In this implementation of the `CampaignId` the value is generated from a `Uuid::new_v4().to_simple()`
     pub struct CampaignId([u8; 16]);
@@ -142,6 +142,15 @@ mod campaign_id {
         use serde_json::{to_value, Value};
 
         use super::*;
+
+        #[test]
+        fn parse_and_display_campaign_id() {
+            let str_id = "0x936da01f9abd4d9d80c702af85c822a8";
+
+            let campaign_id: CampaignId = str_id.parse().expect("Should parse");
+
+            assert_eq!(str_id, &campaign_id.to_string())
+        }
 
         #[test]
         fn de_serializes_campaign_id() {
@@ -278,6 +287,8 @@ mod pricing {
 }
 /// Campaign Validators
 pub mod validators {
+    use std::ops::Index;
+
     use crate::{ValidatorDesc, ValidatorId};
     use serde::{Deserialize, Serialize};
 
@@ -308,6 +319,17 @@ pub mod validators {
     impl From<(ValidatorDesc, ValidatorDesc)> for Validators {
         fn from(validators: (ValidatorDesc, ValidatorDesc)) -> Self {
             Self(validators.0, validators.1)
+        }
+    }
+
+    impl Index<usize> for Validators {
+        type Output = ValidatorDesc;
+        fn index(&self, index: usize) -> &Self::Output {
+            match index {
+                0 => &self.0,
+                1 => &self.1,
+                _ => panic!("Validators index is out of bound"),
+            }
         }
     }
 
@@ -362,8 +384,8 @@ mod postgres {
 
     use super::{Active, Campaign, CampaignId, PricingBounds, Validators};
     use bytes::BytesMut;
-    use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
     use std::error::Error;
+    use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type};
     use tokio_postgres::Row;
 
     impl From<&Row> for Campaign {
@@ -396,6 +418,12 @@ mod postgres {
         }
 
         accepts!(TEXT, VARCHAR);
+    }
+
+    impl From<&Row> for CampaignId {
+        fn from(row: &Row) -> Self {
+            row.get("id")
+        }
     }
 
     impl ToSql for CampaignId {

@@ -169,7 +169,7 @@ mod test {
 
     use chrono::TimeZone;
     use primitives::{
-        config::configuration,
+        config::DEVELOPMENT_CONFIG,
         event_submission::{RateLimit, Rule},
         sentry::Event,
         util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, IDS},
@@ -187,7 +187,7 @@ mod test {
 
     async fn setup() -> (Config, Object<Manager>) {
         let connection = TESTS_POOL.get().await.expect("Should return Object");
-        let config = configuration("development", None).expect("Failed to get dev configuration");
+        let config = DEVELOPMENT_CONFIG.clone();
 
         (config, connection)
     }
@@ -360,222 +360,6 @@ mod test {
         assert_eq!(Err(Error::CampaignIsExpired), err_response);
     }
 
-    // #[tokio::test]
-    // async fn check_access_close_event_in_withdraw_period() {
-    //     let (config, database) = setup().await;
-
-    //     let auth = Auth {
-    //         era: 0,
-    //         uid: IDS["follower"],
-    //     };
-
-    //     let session = Session {
-    //         ip: Default::default(),
-    //         referrer_header: None,
-    //         country: None,
-    //         os: None,
-    //     };
-
-    //     let rule = Rule {
-    //         uids: None,
-    //         rate_limit: Some(RateLimit {
-    //             limit_type: "ip".to_string(),
-    //             time_frame: Duration::from_millis(1),
-    //         }),
-    //     };
-    //     let mut channel = get_channel(rule);
-    //     channel.spec.withdraw_period_start = Utc.ymd(1970, 1, 1).and_hms(12, 0, 9);
-
-    //     let ok_response = check_access(
-    //         &database,
-    //         &session,
-    //         Some(&auth),
-    //         &config.ip_rate_limit,
-    //         &channel,
-    //         &get_close_events(1),
-    //     )
-    //     .await;
-
-    //     assert_eq!(Ok(()), ok_response);
-    // }
-
-    // #[tokio::test]
-    // async fn check_access_close_event_and_is_creator() {
-    //     let (config, database) = setup().await;
-
-    //     let auth = Auth {
-    //         era: 0,
-    //         uid: IDS["follower"],
-    //     };
-
-    //     let session = Session {
-    //         ip: Default::default(),
-    //         referrer_header: None,
-    //         country: None,
-    //         os: None,
-    //     };
-
-    //     let rule = Rule {
-    //         uids: None,
-    //         rate_limit: Some(RateLimit {
-    //             limit_type: "ip".to_string(),
-    //             time_frame: Duration::from_millis(1),
-    //         }),
-    //     };
-    //     let mut channel = get_channel(rule);
-    //     channel.creator = IDS["follower"];
-
-    //     let ok_response = check_access(
-    //         &database,
-    //         &session,
-    //         Some(&auth),
-    //         &config.ip_rate_limit,
-    //         &channel,
-    //         &get_close_events(1),
-    //     )
-    //     .await;
-
-    //     assert_eq!(Ok(()), ok_response);
-    // }
-
-    // #[tokio::test]
-    // async fn check_access_update_targeting_event_and_is_creator() {
-    //     let (config, database) = setup().await;
-
-    //     let auth = Auth {
-    //         era: 0,
-    //         uid: IDS["follower"],
-    //     };
-
-    //     let session = Session {
-    //         ip: Default::default(),
-    //         referrer_header: None,
-    //         country: None,
-    //         os: None,
-    //     };
-
-    //     let rule = Rule {
-    //         uids: None,
-    //         rate_limit: Some(RateLimit {
-    //             limit_type: "ip".to_string(),
-    //             time_frame: Duration::from_millis(1),
-    //         }),
-    //     };
-    //     let mut channel = get_channel(rule);
-    //     channel.creator = IDS["follower"];
-
-    //     let ok_response = check_access(
-    //         &database,
-    //         &session,
-    //         Some(&auth),
-    //         &config.ip_rate_limit,
-    //         &channel,
-    //         &get_update_targeting_events(1),
-    //     )
-    //     .await;
-
-    //     assert_eq!(Ok(()), ok_response);
-    // }
-
-    // #[tokio::test]
-    // async fn not_creator_and_there_are_close_events() {
-    //     let (config, database) = setup().await;
-
-    //     let auth = Auth {
-    //         era: 0,
-    //         uid: IDS["follower"],
-    //     };
-
-    //     let session = Session {
-    //         ip: Default::default(),
-    //         referrer_header: None,
-    //         country: None,
-    //         os: None,
-    //     };
-
-    //     let rule = Rule {
-    //         uids: None,
-    //         rate_limit: Some(RateLimit {
-    //             limit_type: "ip".to_string(),
-    //             time_frame: Duration::from_millis(1),
-    //         }),
-    //     };
-    //     let mut channel = get_channel(rule);
-    //     channel.creator = IDS["leader"];
-    //     let mixed_events = vec![
-    //         Event::Impression {
-    //             publisher: ADDRESSES["publisher2"],
-    //             ad_unit: None,
-    //             ad_slot: None,
-    //             referrer: None,
-    //         },
-    //         Event::Close,
-    //         Event::UpdateTargeting {
-    //             targeting_rules: Rules::new(),
-    //         },
-    //     ];
-    //     let err_response = check_access(
-    //         &database,
-    //         &session,
-    //         Some(&auth),
-    //         &config.ip_rate_limit,
-    //         &channel,
-    //         &mixed_events,
-    //     )
-    //     .await;
-
-    //     assert_eq!(Err(Error::OnlyCreatorCanCloseChannel), err_response);
-    // }
-
-    // #[tokio::test]
-    // async fn not_creator_and_there_are_update_targeting_events() {
-    //     let (config, database) = setup().await;
-
-    //     let auth = Auth {
-    //         era: 0,
-    //         uid: IDS["follower"],
-    //     };
-
-    //     let session = Session {
-    //         ip: Default::default(),
-    //         referrer_header: None,
-    //         country: None,
-    //         os: None,
-    //     };
-
-    //     let rule = Rule {
-    //         uids: None,
-    //         rate_limit: Some(RateLimit {
-    //             limit_type: "ip".to_string(),
-    //             time_frame: Duration::from_millis(1),
-    //         }),
-    //     };
-    //     let mut channel = get_channel(rule);
-    //     channel.creator = IDS["leader"];
-    //     let mixed_events = vec![
-    //         Event::Impression {
-    //             publisher: ADDRESSES["publisher2"],
-    //             ad_unit: None,
-    //             ad_slot: None,
-    //             referrer: None,
-    //         },
-    //         Event::UpdateTargeting {
-    //             targeting_rules: Rules::new(),
-    //         },
-    //     ];
-    //     let err_response = check_access(
-    //         &database,
-    //         &session,
-    //         Some(&auth),
-    //         &config.ip_rate_limit,
-    //         &channel,
-    //         &mixed_events,
-    //     )
-    //     .await;
-
-    //     assert_eq!(Err(Error::OnlyCreatorCanUpdateTargetingRules), err_response);
-    // }
-
     #[tokio::test]
     async fn with_forbidden_country() {
         let (config, database) = setup().await;
@@ -606,7 +390,7 @@ mod test {
             &session,
             Some(&auth),
             &config.ip_rate_limit,
-            &&campaign,
+            &campaign,
             &get_impression_events(2),
         )
         .await;

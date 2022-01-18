@@ -1,5 +1,4 @@
 use std::{
-    convert::TryFrom,
     fmt,
     iter::Sum,
     ops::{Add, AddAssign, Div, Mul, Sub},
@@ -52,6 +51,26 @@ impl BigNum {
 
     pub fn from_bytes_be(buf: &[u8]) -> Self {
         Self(BigUint::from_bytes_be(buf))
+    }
+
+    /// With this method you can easily create a [`BigNum`] from a whole number
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use primitives::BigNum;
+    /// let dai_precision = 18;
+    /// let whole_number = 15;
+    ///
+    /// let bignum = BigNum::with_precision(whole_number, dai_precision);
+    /// let expected = "15000000000000000000";
+    ///
+    /// assert_eq!(expected, &bignum.to_string());
+    /// ```
+    pub fn with_precision(whole_number: u64, with_precision: u8) -> Self {
+        let multiplier = 10_u64.pow(with_precision.into());
+
+        BigNum::from(whole_number).mul(&multiplier)
     }
 }
 
@@ -209,6 +228,15 @@ impl Mul<&BigNum> for BigNum {
     }
 }
 
+impl Mul<&u64> for BigNum {
+    type Output = BigNum;
+
+    fn mul(self, rhs: &u64) -> Self::Output {
+        let big_uint = &self.0 * rhs;
+        BigNum(big_uint)
+    }
+}
+
 impl<'a> Sum<&'a BigNum> for BigNum {
     fn sum<I: Iterator<Item = &'a BigNum>>(iter: I) -> Self {
         let sum_uint = iter.map(|big_num| &big_num.0).sum();
@@ -294,13 +322,11 @@ where
 pub mod postgres {
     use super::BigNum;
     use bytes::BytesMut;
-    use postgres_types::{FromSql, IsNull, ToSql, Type};
     use std::error::Error;
+    use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
     impl<'a> FromSql<'a> for BigNum {
         fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<BigNum, Box<dyn Error + Sync + Send>> {
-            use std::convert::TryInto;
-
             let str_slice = <&str as FromSql>::from_sql(ty, raw)?;
 
             Ok(str_slice.try_into()?)

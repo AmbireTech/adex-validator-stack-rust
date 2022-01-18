@@ -298,8 +298,8 @@ pub mod postgres {
     use super::{Channel, ChannelId, Nonce};
     use bytes::BytesMut;
     use hex::FromHex;
-    use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
     use std::error::Error;
+    use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
     use tokio_postgres::Row;
 
     impl<'a> FromSql<'a> for ChannelId {
@@ -324,7 +324,7 @@ pub mod postgres {
             ty: &Type,
             w: &mut BytesMut,
         ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-            let string = format!("0x{}", hex::encode(self));
+            let string = self.to_string();
 
             <String as ToSql>::to_sql(&string, ty, w)
         }
@@ -375,7 +375,7 @@ pub mod postgres {
 
     #[cfg(test)]
     mod test {
-        use crate::{channel::Nonce, util::tests::prep_db::postgres::POSTGRES_POOL};
+        use crate::{channel::Nonce, postgres::POSTGRES_POOL};
         #[tokio::test]
         async fn nonce_to_from_sql() {
             let client = POSTGRES_POOL.get().await.unwrap();

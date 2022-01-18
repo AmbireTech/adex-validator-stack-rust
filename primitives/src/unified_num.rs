@@ -7,7 +7,6 @@ use parse_display::{Display, FromStr, ParseError};
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
-    convert::TryFrom,
     fmt,
     iter::Sum,
     ops::{Add, AddAssign, Div, Mul, Sub},
@@ -59,6 +58,7 @@ use std::{
     FromStr,
     Serialize,
     Deserialize,
+    Hash,
 )]
 #[serde(into = "String", try_from = "String")]
 pub struct UnifiedNum(u64);
@@ -290,8 +290,47 @@ impl Mul<&UnifiedNum> for UnifiedNum {
     }
 }
 
+impl Mul<u64> for &UnifiedNum {
+    type Output = UnifiedNum;
+
+    fn mul(self, rhs: u64) -> Self::Output {
+        UnifiedNum(self.0 * rhs)
+    }
+}
+
+impl Mul<u64> for UnifiedNum {
+    type Output = UnifiedNum;
+
+    fn mul(self, rhs: u64) -> Self::Output {
+        UnifiedNum(self.0 * rhs)
+    }
+}
+
+impl Mul<UnifiedNum> for u64 {
+    type Output = UnifiedNum;
+
+    fn mul(self, rhs: UnifiedNum) -> Self::Output {
+        UnifiedNum(self * rhs.0)
+    }
+}
+
+impl Mul<&UnifiedNum> for u64 {
+    type Output = UnifiedNum;
+
+    fn mul(self, rhs: &UnifiedNum) -> Self::Output {
+        UnifiedNum(self * rhs.0)
+    }
+}
+
 impl<'a> Sum<&'a UnifiedNum> for Option<UnifiedNum> {
     fn sum<I: Iterator<Item = &'a UnifiedNum>>(mut iter: I) -> Self {
+        iter.try_fold(0_u64, |acc, unified| acc.checked_add(unified.0))
+            .map(UnifiedNum)
+    }
+}
+
+impl<'a> Sum<UnifiedNum> for Option<UnifiedNum> {
+    fn sum<I: Iterator<Item = UnifiedNum>>(mut iter: I) -> Self {
         iter.try_fold(0_u64, |acc, unified| acc.checked_add(unified.0))
             .map(UnifiedNum)
     }
@@ -429,15 +468,11 @@ mod test {
 }
 
 #[cfg(feature = "postgres")]
-// TODO: Test UnifiedNum postgres impl
 mod postgres {
     use super::UnifiedNum;
     use bytes::BytesMut;
-    use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
-    use std::{
-        convert::{TryFrom, TryInto},
-        error::Error,
-    };
+    use std::error::Error;
+    use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
 
     impl<'a> FromSql<'a> for UnifiedNum {
         fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<UnifiedNum, Box<dyn Error + Sync + Send>> {
@@ -466,7 +501,7 @@ mod postgres {
     #[cfg(test)]
     mod test {
         use super::*;
-        use crate::util::tests::prep_db::postgres::POSTGRES_POOL;
+        use crate::postgres::POSTGRES_POOL;
 
         #[tokio::test]
         async fn from_and_to_sql() {

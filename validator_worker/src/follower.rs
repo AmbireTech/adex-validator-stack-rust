@@ -1,7 +1,7 @@
-use std::{collections::HashMap, convert::TryFrom, fmt};
+use std::{collections::HashMap, fmt};
 
+use adapter::{prelude::*, Error as AdapterError};
 use primitives::{
-    adapter::{Adapter, AdapterErrorKind, Error as AdapterError},
     balances,
     balances::{Balances, CheckedState, UncheckedState},
     config::TokenInfo,
@@ -20,7 +20,7 @@ use chrono::Utc;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum Error<AE: AdapterErrorKind + 'static> {
+pub enum Error {
     #[error("overflow placeholder")]
     Overflow,
     #[error("The Channel's Token is not whitelisted")]
@@ -28,11 +28,11 @@ pub enum Error<AE: AdapterErrorKind + 'static> {
     #[error("Couldn't get state root hash of the proposed balances")]
     StateRootHash(#[from] GetStateRootError),
     #[error("Adapter error: {0}")]
-    Adapter(#[from] AdapterError<AE>),
+    Adapter(#[from] AdapterError),
     #[error("Sentry API: {0}")]
     SentryApi(#[from] SentryApiError),
     #[error("Heartbeat: {0}")]
-    Heartbeat(#[from] crate::heartbeat::Error<AE>),
+    Heartbeat(#[from] crate::heartbeat::Error),
 }
 
 #[derive(Debug)]
@@ -83,13 +83,13 @@ pub struct TickStatus {
     pub approve_state: ApproveStateResult,
 }
 
-pub async fn tick<A: Adapter + 'static>(
-    sentry: &SentryApi<A>,
+pub async fn tick<C: Unlocked + 'static>(
+    sentry: &SentryApi<C>,
     channel: Channel,
     all_spenders: HashMap<Address, Spender>,
     accounting_balances: Balances<CheckedState>,
     token: &TokenInfo,
-) -> Result<TickStatus, Error<A::AdapterError>> {
+) -> Result<TickStatus, Error> {
     let from = channel.leader;
     let channel_id = channel.id();
 
@@ -143,14 +143,14 @@ pub async fn tick<A: Adapter + 'static>(
     })
 }
 
-async fn on_new_state<'a, A: Adapter + 'static>(
-    sentry: &'a SentryApi<A>,
+async fn on_new_state<'a, C: Unlocked + 'static>(
+    sentry: &'a SentryApi<C>,
     channel: Channel,
     accounting_balances: Balances<CheckedState>,
     new_state: NewState<UncheckedState>,
     token_info: &TokenInfo,
     all_spenders_sum: UnifiedNum,
-) -> Result<ApproveStateResult, Error<A::AdapterError>> {
+) -> Result<ApproveStateResult, Error> {
     let proposed_balances = match new_state.balances.clone().check() {
         Ok(balances) => balances,
         // TODO: Should we show the Payout Mismatch between Spent & Earned?
@@ -271,8 +271,8 @@ async fn on_new_state<'a, A: Adapter + 'static>(
     Ok(ApproveStateResult::Sent(Some(propagation_result)))
 }
 
-async fn on_error<'a, A: Adapter + 'static>(
-    sentry: &'a SentryApi<A>,
+async fn on_error<'a, C: Unlocked + 'static>(
+    sentry: &'a SentryApi<C>,
     channel: ChannelId,
     new_state: NewState<UncheckedState>,
     status: InvalidNewState,

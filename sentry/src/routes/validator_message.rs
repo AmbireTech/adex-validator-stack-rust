@@ -1,7 +1,7 @@
 use crate::db::get_validator_messages;
 use crate::{success_response, Application, ResponseError};
+use adapter::client::Locked;
 use hyper::{Body, Request, Response};
-use primitives::adapter::Adapter;
 use primitives::sentry::ValidatorMessageResponse;
 use primitives::{Channel, DomainError, ValidatorId};
 use serde::Deserialize;
@@ -39,9 +39,9 @@ pub fn extract_params(from_path: &str) -> Result<(Option<ValidatorId>, Vec<Strin
     Ok((validator_id, message_types.unwrap_or_default()))
 }
 
-pub async fn list_validator_messages<A: Adapter>(
+pub async fn list_validator_messages<C: Locked + 'static>(
     req: Request<Body>,
-    app: &Application<A>,
+    app: &Application<C>,
     validator_id: &Option<ValidatorId>,
     message_types: &[String],
 ) -> Result<Response<Body>, ResponseError> {
