@@ -1,3 +1,5 @@
+//! GET "/cfg" request module
+
 use crate::Application;
 use crate::ResponseError;
 use adapter::client::Locked;

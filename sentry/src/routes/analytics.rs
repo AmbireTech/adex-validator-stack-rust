@@ -1,5 +1,6 @@
-//! "/campaign" routes
-//! 
+//! "/analytics" routes
+//!
+
 use std::collections::HashSet;
 
 use crate::{db::analytics::get_analytics, success_response, Application, ResponseError};
@@ -11,8 +12,7 @@ use primitives::analytics::{
 };
 
 /// GET "/analytics"
-/// GET Query parameters: [`primitives::analytics::AnalyticsQuery`].
-/// 
+/// Request query parameters: [`primitives::analytics::AnalyticsQuery`].
 pub async fn analytics<C: Locked + 'static>(
     req: Request<Body>,
     app: &Application<C>,

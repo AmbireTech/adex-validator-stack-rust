@@ -31,24 +31,27 @@ use {
         channel::{
             channel_list, create_validator_messages, get_accounting_for_channel,
             get_all_spender_limits, get_spender_limits, last_approved,
+            validator_message::{extract_params, list_validator_messages},
         },
-        event_aggregate::list_channel_event_aggregates,
-        validator_message::{extract_params, list_validator_messages},
     },
 };
 
 pub mod analytics;
 pub mod middleware;
 
+/// Rest API requests
+///
+/// This module includes all routes for `Sentry` and the documentation of each Request/Response.
 pub mod routes {
+    /// `GET /analytics` request
     pub use analytics::analytics as get_analytics;
-    pub use cfg::config as get_config;
+
+    /// `GET /cfg` request
+    pub use cfg::config as get_cfg;
     pub mod analytics;
     pub mod campaign;
     pub mod cfg;
     pub mod channel;
-    pub mod event_aggregate;
-    pub mod validator_message;
 }
 
 pub mod access;
@@ -66,10 +69,7 @@ static CHANNEL_VALIDATOR_MESSAGES: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/validator-messages(/.*)?$")
         .expect("The regex should be valid")
 });
-static CHANNEL_EVENTS_AGGREGATES: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/events-aggregates/?$")
-        .expect("The regex should be valid")
-});
+
 static CHANNEL_SPENDER_LEAF_AND_TOTAL_DEPOSITED: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/spender/0x([a-zA-Z0-9]{40})/?$")
         .expect("This regex should be valid")
@@ -93,6 +93,8 @@ static CHANNEL_ACCOUNTING: Lazy<Regex> = Lazy::new(|| {
         .expect("The regex should be valid")
 });
 
+/// Regex extracted parameters.
+/// This struct is created manually on each of the matched routes.
 #[derive(Debug, Clone)]
 pub struct RouteParams(pub Vec<String>);
 
@@ -106,8 +108,7 @@ impl RouteParams {
     }
 }
 
-// #[derive(Clone)]
-// pub struct Application<C: Locked + 'static> {
+/// The Sentry REST web application
 pub struct Application<C: Locked + 'static> {
     /// For sentry to work properly, we need an [`adapter::Adapter`] in a [`adapter::LockedState`] state.
     pub adapter: Adapter<C>,
@@ -330,20 +331,6 @@ async fn channels_router<C: Locked + 'static>(
             .await?;
 
         create_validator_messages(req, app).await
-    } else if let (Some(caps), &Method::GET) = (CHANNEL_EVENTS_AGGREGATES.captures(&path), method) {
-        req = AuthRequired.call(req, app).await?;
-
-        let param = RouteParams(vec![
-            caps.get(1)
-                .map_or("".to_string(), |m| m.as_str().to_string()),
-            caps.get(2)
-                .map_or("".to_string(), |m| m.as_str().trim_matches('/').to_string()),
-        ]);
-        req.extensions_mut().insert(param);
-
-        req = ChannelLoad.call(req, app).await?;
-
-        list_channel_event_aggregates(req, app).await
     } else if let (Some(caps), &Method::GET) = (
         CHANNEL_SPENDER_LEAF_AND_TOTAL_DEPOSITED.captures(&path),
         method,
@@ -496,7 +483,7 @@ pub fn epoch() -> f64 {
     Utc::now().timestamp() as f64 / 2_628_000_000.0
 }
 
-// @TODO: Make pub(crate)
+/// sentry Application Session
 #[derive(Debug, Clone)]
 pub struct Session {
     pub ip: Option<String>,
@@ -505,6 +492,7 @@ pub struct Session {
     pub os: Option<String>,
 }
 
+/// Sentry application Auth (Authentication)
 #[derive(Debug, Clone)]
 pub struct Auth {
     pub era: i64,
