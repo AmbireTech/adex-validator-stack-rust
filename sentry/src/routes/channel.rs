@@ -15,7 +15,7 @@ use primitives::{
     config::TokenInfo,
     sentry::{
         channel_list::ChannelListQuery, AccountingResponse, AllSpendersQuery, AllSpendersResponse,
-        LastApproved, LastApprovedQuery, LastApprovedResponse, SpenderResponse,
+        LastApproved, LastApprovedQuery, LastApprovedResponse, SpenderResponse, SuccessResponse,
     },
     spender::{Spendable, Spender},
     validator::NewState,
