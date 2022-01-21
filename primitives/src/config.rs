@@ -52,10 +52,6 @@ pub struct Config {
     pub campaigns_find_limit: u32,
     pub spendable_find_limit: u32,
     pub wait_time: u32,
-    #[deprecated = "redundant V4 value. No aggregates are needed for V5"]
-    pub aggr_throttle: u32,
-    #[deprecated = "For V5 this should probably be part of the Analytics"]
-    pub events_find_limit: u32,
     pub msgs_find_limit: u32,
     pub analytics_find_limit_v5: u32,
     /// In milliseconds
