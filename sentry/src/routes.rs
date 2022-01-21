@@ -79,7 +79,7 @@
 //! 
 //! Authentication: **required** to validate `Campaign.creator == Auth.uid`
 //! 
-//! Request Body: `CreateCampaign` (json)
+//! Request Body: [`primitives::sentry::campaign_create::CreateCampaign`] (json)
 //! 
 //!  `POST /v5/campaign/:id/close` (auth required)
 //! 
