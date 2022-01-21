@@ -1,4 +1,6 @@
-//! `/v5/channel` routes
+//! Channel - `/v5/channel` routes
+//! 
+
 use crate::db::{
     accounting::{get_all_accountings_for_channel, update_accounting, Side},
     event_aggregate::{latest_approve_state_v5, latest_heartbeats, latest_new_state_v5},

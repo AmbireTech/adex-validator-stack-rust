@@ -41,23 +41,7 @@ use {
 
 pub mod analytics;
 pub mod middleware;
-
-/// Rest API requests
-///
-/// This module includes all routes for `Sentry` and the documentation of each Request/Response.
-pub mod routes {
-    pub use analytics::analytics as get_analytics;
-
-    pub use cfg::config as get_cfg;
-
-    // `analytics` module has single request, so we only export these requests
-    mod analytics;
-    pub mod campaign;
-    // `cfg` module has single request, so we only export these requests
-    mod cfg;
-    pub mod channel;
-}
-
+pub mod routes;
 pub mod access;
 pub mod application;
 pub mod db;

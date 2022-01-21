@@ -1,5 +1,15 @@
 # Sentry
 
+## REST API documentation for AdEx Protocol V5
+
+For full details see [AIP #61](https://github.com/AmbireTech/aips/issues/61) and the tracking issue for this implementation https://github.com/AmbireTech/adex-validator-stack-rust/issues/377.
+
+REST API documentation can be generated using `rustdoc`:
+
+`cargo doc --all-features --open --lib`
+
+and checking the `sentry::routes` module.
+
 ## Development
 
 ### Migrations
