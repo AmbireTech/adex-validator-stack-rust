@@ -63,7 +63,6 @@ pub async fn record(
             (None, None) => None,
         };
 
-        // TODO: tidy up this operation
         batch_update
             .entry(event)
             .and_modify(|analytics| {
