@@ -1100,7 +1100,8 @@ mod tests {
             assert_eq!(propagation_result.len(), 1);
             assert_eq!(
                 propagation_result.get(0).unwrap().as_ref().unwrap(),
-                &CAMPAIGN_1.channel.leader
+                &CAMPAIGN_1.channel.leader,
+                "The propagation result should be from the leader"
             );
             assert!(tick_status.heartbeat.is_none(), "No heartbeat message should be generated because the last one was generated in less time than config.heartbeat_time");
         }
