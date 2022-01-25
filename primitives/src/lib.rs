@@ -12,6 +12,7 @@ pub use self::{
     big_num::BigNum,
     campaign::{Campaign, CampaignId},
     channel::{Channel, ChannelId},
+    chain::{Chain, ChainId},
     config::Config,
     deposit::Deposit,
     event_submission::EventSubmission,
@@ -44,6 +45,7 @@ pub mod targeting;
 pub mod test_util;
 mod unified_num;
 pub mod validator;
+mod chain;
 
 /// This module is available with the `postgres` feature
 /// Other places where you'd find `mod postgres` implementations is for many of the structs in the crate
