@@ -565,6 +565,7 @@ pub mod insert_events {
 
     use crate::{
         access::{self, check_access},
+        analytics,
         db::{accounting::spend_amount, CampaignRemaining, DbPool, PoolError, RedisError},
         payout::get_payout,
         spender::fee::calculate_fee,
@@ -577,6 +578,7 @@ pub mod insert_events {
         sentry::{Event, SuccessResponse},
         Address, Campaign, CampaignId, DomainError, UnifiedNum, ValidatorDesc,
     };
+    use slog::error;
     use thiserror::Error;
 
     #[derive(Debug, Error)]
@@ -674,34 +676,58 @@ pub mod insert_events {
 
         let mut events_success = vec![];
         for event in events.into_iter() {
-            let result: Result<Option<()>, Error> = {
+            let event_payout = {
                 // calculate earners payouts
                 let payout = get_payout(&app.logger, campaign, &event, session)?;
 
                 match payout {
-                    Some((earner, payout)) => spend_for_event(
-                        &app.pool,
-                        &app.campaign_remaining,
-                        campaign,
-                        earner,
-                        leader,
-                        follower,
-                        payout,
-                    )
-                    .await
-                    .map(Some),
-                    None => Ok(None),
+                    Some((earner, payout)) => {
+                        let spending_result = spend_for_event(
+                            &app.pool,
+                            &app.campaign_remaining,
+                            campaign,
+                            earner,
+                            leader,
+                            follower,
+                            payout,
+                        )
+                        .await;
+
+                        // Log unsuccessfully spending
+                        match spending_result {
+                            Ok(()) => Some((event, earner, payout)),
+                            Err(err) => {
+                                error!(&app.logger, "Payout spending failed: {}", err; "campaign" => ?campaign, "event" => ?event, "earner" => ?earner, "unpaid amount" => %payout, "err" => ?err);
+
+                                None
+                            }
+                        }
+                    }
+                    // if None, then ad was never show
+                    None => None,
                 }
             };
 
-            events_success.push((event, result));
+            if let Some(event_payout) = event_payout {
+                events_success.push(event_payout);
+            }
         }
 
-        // TODO AIP#61 - aggregate Events and put into analytics
+        // Record successfully paid out events to Analytics
+        if let Err(err) = analytics::record(&app.pool, campaign, session, events_success).await {
+            error!(&app.logger, "Analytics recording failed: {}", err; "campaign" => ?campaign, "err" => ?err)
+        }
 
         Ok(true)
     }
 
+    /// This function calculates the fee for each validator.
+    ///
+    /// It then spends the given amounts for:
+    ///
+    /// - `Publisher` - payout
+    ///
+    /// `Leader` and `Follower` - Validator fees
     pub async fn spend_for_event(
         pool: &DbPool,
         campaign_remaining: &CampaignRemaining,

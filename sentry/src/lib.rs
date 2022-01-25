@@ -6,14 +6,18 @@ use adapter::{prelude::*, Adapter};
 use chrono::Utc;
 use hyper::{Body, Method, Request, Response, StatusCode};
 use middleware::{
-    auth::{AuthRequired, Authenticate},
+    auth::{AuthRequired, Authenticate, IsAdmin},
     campaign::{CalledByCreator, CampaignLoad},
-    channel::{ChannelLoad, GetChannelId},
+    channel::ChannelLoad,
     cors::{cors, Cors},
     Chain, Middleware,
 };
 use once_cell::sync::Lazy;
-use primitives::{sentry::ValidationErrorResponse, Config, ValidatorId};
+use primitives::{
+    analytics::{query::AllowedKey, AuthenticateAs},
+    sentry::ValidationErrorResponse,
+    Config, ValidatorId,
+};
 use redis::aio::MultiplexedConnection;
 use regex::Regex;
 use slog::Logger;
@@ -62,17 +66,6 @@ static CHANNEL_VALIDATOR_MESSAGES: Lazy<Regex> = Lazy::new(|| {
 });
 static CHANNEL_EVENTS_AGGREGATES: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/events-aggregates/?$")
-        .expect("The regex should be valid")
-});
-static ANALYTICS_BY_CHANNEL_ID: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/analytics/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid")
-});
-static ADVERTISER_ANALYTICS_BY_CHANNEL_ID: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/analytics/for-advertiser/0x([a-zA-Z0-9]{64})/?$")
-        .expect("The regex should be valid")
-});
-static PUBLISHER_ANALYTICS_BY_CHANNEL_ID: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/analytics/for-publisher/0x([a-zA-Z0-9]{64})/?$")
         .expect("The regex should be valid")
 });
 static CHANNEL_SPENDER_LEAF_AND_TOTAL_DEPOSITED: Lazy<Regex> = Lazy::new(|| {
@@ -233,74 +226,45 @@ async fn analytics_router<C: Locked + 'static>(
     mut req: Request<Body>,
     app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
-    use routes::analytics::{
-        advanced_analytics, advertiser_analytics, analytics, publisher_analytics,
-    };
+    use routes::analytics::analytics;
 
     let (route, method) = (req.uri().path(), req.method());
 
     match (route, method) {
-        ("/analytics", &Method::GET) => analytics(req, app).await,
-        ("/analytics/advanced", &Method::GET) => {
-            let req = AuthRequired.call(req, app).await?;
-
-            advanced_analytics(req, app).await
+        ("/analytics", &Method::GET) => {
+            let allowed_keys_for_request = vec![AllowedKey::Country, AllowedKey::AdSlotType]
+                .into_iter()
+                .collect();
+            analytics(req, app, Some(allowed_keys_for_request), None).await
         }
         ("/analytics/for-advertiser", &Method::GET) => {
             let req = AuthRequired.call(req, app).await?;
-            advertiser_analytics(req, app).await
+
+            let authenticate_as = req
+                .extensions()
+                .get::<Auth>()
+                .map(|auth| AuthenticateAs::Advertiser(auth.uid))
+                .ok_or(ResponseError::Unauthorized)?;
+
+            analytics(req, app, None, Some(authenticate_as)).await
         }
         ("/analytics/for-publisher", &Method::GET) => {
+            let authenticate_as = req
+                .extensions()
+                .get::<Auth>()
+                .map(|auth| AuthenticateAs::Publisher(auth.uid))
+                .ok_or(ResponseError::Unauthorized)?;
+
             let req = AuthRequired.call(req, app).await?;
-
-            publisher_analytics(req, app).await
+            analytics(req, app, None, Some(authenticate_as)).await
         }
-        (route, &Method::GET) => {
-            if let Some(caps) = ANALYTICS_BY_CHANNEL_ID.captures(route) {
-                let param = RouteParams(vec![caps
-                    .get(1)
-                    .map_or("".to_string(), |m| m.as_str().to_string())]);
-                req.extensions_mut().insert(param);
-
-                // apply middlewares
-                req = Chain::new()
-                    .chain(ChannelLoad)
-                    .chain(GetChannelId)
-                    .apply(req, app)
-                    .await?;
-
-                analytics(req, app).await
-            } else if let Some(caps) = ADVERTISER_ANALYTICS_BY_CHANNEL_ID.captures(route) {
-                let param = RouteParams(vec![caps
-                    .get(1)
-                    .map_or("".to_string(), |m| m.as_str().to_string())]);
-                req.extensions_mut().insert(param);
-
-                // apply middlewares
-                req = Chain::new()
-                    .chain(AuthRequired)
-                    .chain(GetChannelId)
-                    .apply(req, app)
-                    .await?;
-
-                advertiser_analytics(req, app).await
-            } else if let Some(caps) = PUBLISHER_ANALYTICS_BY_CHANNEL_ID.captures(route) {
-                let param = RouteParams(vec![caps
-                    .get(1)
-                    .map_or("".to_string(), |m| m.as_str().to_string())]);
-                req.extensions_mut().insert(param);
-
-                // apply middlewares
-                req = Chain::new()
-                    .chain(AuthRequired)
-                    .chain(GetChannelId)
-                    .apply(req, app)
-                    .await?;
-
-                publisher_analytics(req, app).await
-            } else {
-                Err(ResponseError::NotFound)
-            }
+        ("/analytics/for-admin", &Method::GET) => {
+            req = Chain::new()
+                .chain(AuthRequired)
+                .chain(IsAdmin)
+                .apply(req, app)
+                .await?;
+            analytics(req, app, None, None).await
         }
         _ => Err(ResponseError::NotFound),
     }

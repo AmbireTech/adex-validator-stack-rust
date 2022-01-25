@@ -27,7 +27,7 @@ pub async fn record(
     let mut batch_update = HashMap::<Event, UpdateAnalytics>::new();
 
     for (event, _payout_addr, payout_amount) in events_with_payouts {
-        let event_type = event.to_string();
+        let event_type = event.event_type();
         let (publisher, ad_unit, referrer, ad_slot, ad_slot_type) = {
             let (publisher, event_ad_unit, referrer, ad_slot) = match &event {
                 Event::Impression {
@@ -97,8 +97,9 @@ pub async fn record(
 mod test {
     use super::*;
     use primitives::{
-        sentry::Analytics,
-        util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, DUMMY_IPFS},
+        sentry::{Analytics, CLICK, IMPRESSION},
+        test_util::DUMMY_IPFS,
+        util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN},
         UnifiedNum,
     };
 
@@ -224,11 +225,11 @@ mod test {
 
         let click_analytics = analytics
             .iter()
-            .find(|a| a.event_type == "CLICK")
+            .find(|a| a.event_type == CLICK)
             .expect("There should be a click Analytics");
         let impression_analytics = analytics
             .iter()
-            .find(|a| a.event_type == "IMPRESSION")
+            .find(|a| a.event_type == IMPRESSION)
             .expect("There should be an impression Analytics");
         assert_eq!(
             click_analytics.payout_amount,
@@ -280,15 +281,8 @@ mod test {
 
         let analytics = get_all_analytics(&database.pool)
             .await
-            .expect("should get all analytics");
-        assert_eq!(analytics.len(), 3);
+            .expect("should find analytics");
 
-        assert!(
-            analytics
-                .iter()
-                .all(|a| a.country == Some("Bulgaria".into())),
-            "all analytics should have the same country as the one in the session"
-        );
         assert!(
             analytics
                 .iter()
@@ -301,7 +295,7 @@ mod test {
             .find(|a| {
                 a.ad_unit == Some(DUMMY_IPFS[0])
                     && a.ad_slot == Some(DUMMY_IPFS[1])
-                    && a.event_type == "CLICK".to_string()
+                    && a.event_type == CLICK
             })
             .expect("entry should exist")
             .to_owned();
@@ -328,7 +322,7 @@ mod test {
             .find(|a| {
                 a.ad_unit == Some(DUMMY_IPFS[0])
                     && a.ad_slot == Some(DUMMY_IPFS[1])
-                    && a.event_type == "IMPRESSION".to_string()
+                    && a.event_type == IMPRESSION
             })
             .expect("entry should exist")
             .to_owned();
