@@ -907,6 +907,38 @@ mod tests {
             .await
             .unlock()
             .expect("Failed to unlock Follower ethereum adapter");
+        let create_campaign_1 = CreateCampaign::from_campaign(CAMPAIGN_1.clone());
+        let api_client = reqwest::Client::new();
+        let advertiser_adapter = Adapter::new(
+            Ethereum::init(KEYSTORES[&ADVERTISER].clone(), &GANACHE_CONFIG)
+                .expect("Should initialize creator adapter"),
+        )
+        .unlock()
+        .expect("Should unlock advertiser's Ethereum Adapter");
+        let leader_token = advertiser_adapter
+            .get_auth(leader_adapter.whoami())
+            .expect("Get authentication");
+
+        let follower_token = advertiser_adapter
+            .get_auth(follower_adapter.whoami())
+            .expect("Get authentication");
+        create_campaign(
+            &api_client,
+            &leader.sentry_url,
+            &leader_token,
+            &create_campaign_1,
+        )
+        .await
+        .expect("Should return Response");
+
+        create_campaign(
+            &api_client,
+            &follower.sentry_url,
+            &follower_token,
+            &create_campaign_1,
+        )
+        .await
+        .expect("Should return Response");
 
         let leader_sentry = {
             // should get self Auth from Leader's EthereumAdapter
@@ -969,40 +1001,6 @@ mod tests {
                 .clone()
                 .with_propagate(all_channels_validators.1)
         };
-
-        let api_client = reqwest::Client::new();
-        let advertiser_adapter = Adapter::new(
-            Ethereum::init(KEYSTORES[&ADVERTISER].clone(), &GANACHE_CONFIG)
-                .expect("Should initialize creator adapter"),
-        )
-        .unlock()
-        .expect("Should unlock advertiser's Ethereum Adapter");
-        let leader_token = advertiser_adapter
-            .get_auth(leader_adapter.whoami())
-            .expect("Get authentication");
-
-        let follower_token = advertiser_adapter
-            .get_auth(follower_adapter.whoami())
-            .expect("Get authentication");
-        let create_campaign_1 = CreateCampaign::from_campaign(CAMPAIGN_1.clone());
-
-        create_campaign(
-            &api_client,
-            &leader.sentry_url,
-            &leader_token,
-            &create_campaign_1,
-        )
-        .await
-        .expect("Should return Response");
-
-        create_campaign(
-            &api_client,
-            &follower.sentry_url,
-            &follower_token,
-            &create_campaign_1,
-        )
-        .await
-        .expect("Should return Response");
 
         // Testing leader tick
         // Balances is empty
