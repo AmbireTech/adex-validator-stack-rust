@@ -5,6 +5,7 @@ authors = [
   "Ambire <dev@ambire.com>",
   "Lachezar Lechev <lachezar@ambire.com>",
   "Omidiora Samuel <sam@ambire.com>",
+  "Simeon Nakov <simeon@ambire.com>",
 ]
 edition = "2021"
 
@@ -56,4 +57,3 @@ once_cell = "1.5.2"
 
 [dev-dependencies]
 pretty_assertions = "1"
-

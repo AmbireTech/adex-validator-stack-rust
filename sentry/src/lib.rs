@@ -6,14 +6,18 @@ use adapter::{prelude::*, Adapter};
 use chrono::Utc;
 use hyper::{Body, Method, Request, Response, StatusCode};
 use middleware::{
-    auth::{AuthRequired, Authenticate},
+    auth::{AuthRequired, Authenticate, IsAdmin},
     campaign::{CalledByCreator, CampaignLoad},
-    channel::{ChannelLoad, GetChannelId},
+    channel::ChannelLoad,
     cors::{cors, Cors},
     Chain, Middleware,
 };
 use once_cell::sync::Lazy;
-use primitives::{sentry::ValidationErrorResponse, Config, ValidatorId};
+use primitives::{
+    analytics::{query::AllowedKey, AuthenticateAs},
+    sentry::ValidationErrorResponse,
+    Config, ValidatorId,
+};
 use redis::aio::MultiplexedConnection;
 use regex::Regex;
 use slog::Logger;
@@ -23,29 +27,22 @@ use {
     routes::{
         campaign,
         campaign::{campaign_list, create_campaign, update_campaign},
-        cfg::config,
+        get_cfg,
+        get_analytics,
         channel::{
-            channel_list, create_validator_messages, get_accounting_for_channel,
-            get_all_spender_limits, get_spender_limits, last_approved,
+            add_spender_leaf, channel_list, get_accounting_for_channel, get_all_spender_limits,
+            get_spender_limits, last_approved,
+            validator_message::{
+                create_validator_messages, extract_params, list_validator_messages,
+            },
         },
-        event_aggregate::list_channel_event_aggregates,
-        validator_message::{extract_params, list_validator_messages},
     },
 };
 
 pub mod analytics;
 pub mod middleware;
-pub mod routes {
-    pub mod analytics;
-    pub mod campaign;
-    pub mod cfg;
-    pub mod channel;
-    pub mod event_aggregate;
-    pub mod validator_message;
-}
-
+pub mod routes;
 pub mod access;
-pub mod analytics_recorder;
 pub mod application;
 pub mod db;
 pub mod payout;
@@ -55,24 +52,10 @@ static LAST_APPROVED_BY_CHANNEL_ID: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/last-approved/?$")
         .expect("The regex should be valid")
 });
-// Only the initial Regex to be matched.
+
+/// Only the initial Regex to be matched.
 static CHANNEL_VALIDATOR_MESSAGES: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/validator-messages(/.*)?$")
-        .expect("The regex should be valid")
-});
-static CHANNEL_EVENTS_AGGREGATES: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/events-aggregates/?$")
-        .expect("The regex should be valid")
-});
-static ANALYTICS_BY_CHANNEL_ID: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/analytics/0x([a-zA-Z0-9]{64})/?$").expect("The regex should be valid")
-});
-static ADVERTISER_ANALYTICS_BY_CHANNEL_ID: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/analytics/for-advertiser/0x([a-zA-Z0-9]{64})/?$")
-        .expect("The regex should be valid")
-});
-static PUBLISHER_ANALYTICS_BY_CHANNEL_ID: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^/analytics/for-publisher/0x([a-zA-Z0-9]{64})/?$")
         .expect("The regex should be valid")
 });
 static CHANNEL_SPENDER_LEAF_AND_TOTAL_DEPOSITED: Lazy<Regex> = Lazy::new(|| {
@@ -98,6 +81,8 @@ static CHANNEL_ACCOUNTING: Lazy<Regex> = Lazy::new(|| {
         .expect("The regex should be valid")
 });
 
+/// Regex extracted parameters.
+/// This struct is created manually on each of the matched routes.
 #[derive(Debug, Clone)]
 pub struct RouteParams(pub Vec<String>);
 
@@ -111,8 +96,7 @@ impl RouteParams {
     }
 }
 
-// #[derive(Clone)]
-// pub struct Application<C: Locked + 'static> {
+/// The Sentry REST web application
 pub struct Application<C: Locked + 'static> {
     /// For sentry to work properly, we need an [`adapter::Adapter`] in a [`adapter::LockedState`] state.
     pub adapter: Adapter<C>,
@@ -159,7 +143,7 @@ where
         };
 
         let mut response = match (req.uri().path(), req.method()) {
-            ("/cfg", &Method::GET) => config(req, self).await,
+            ("/cfg", &Method::GET) => get_cfg(req, self).await,
             ("/channel/list", &Method::GET) => channel_list(req, self).await,
             (route, _) if route.starts_with("/analytics") => analytics_router(req, self).await,
             // This is important because it prevents us from doing
@@ -233,74 +217,44 @@ async fn analytics_router<C: Locked + 'static>(
     mut req: Request<Body>,
     app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
-    use routes::analytics::{
-        advanced_analytics, advertiser_analytics, analytics, publisher_analytics,
-    };
 
     let (route, method) = (req.uri().path(), req.method());
 
     match (route, method) {
-        ("/analytics", &Method::GET) => analytics(req, app).await,
-        ("/analytics/advanced", &Method::GET) => {
-            let req = AuthRequired.call(req, app).await?;
-
-            advanced_analytics(req, app).await
+        ("/analytics", &Method::GET) => {
+            let allowed_keys_for_request = vec![AllowedKey::Country, AllowedKey::AdSlotType]
+                .into_iter()
+                .collect();
+            get_analytics(req, app, Some(allowed_keys_for_request), None).await
         }
         ("/analytics/for-advertiser", &Method::GET) => {
             let req = AuthRequired.call(req, app).await?;
-            advertiser_analytics(req, app).await
+
+            let authenticate_as = req
+                .extensions()
+                .get::<Auth>()
+                .map(|auth| AuthenticateAs::Advertiser(auth.uid))
+                .ok_or(ResponseError::Unauthorized)?;
+
+            get_analytics(req, app, None, Some(authenticate_as)).await
         }
         ("/analytics/for-publisher", &Method::GET) => {
+            let authenticate_as = req
+                .extensions()
+                .get::<Auth>()
+                .map(|auth| AuthenticateAs::Publisher(auth.uid))
+                .ok_or(ResponseError::Unauthorized)?;
+
             let req = AuthRequired.call(req, app).await?;
-
-            publisher_analytics(req, app).await
+            get_analytics(req, app, None, Some(authenticate_as)).await
         }
-        (route, &Method::GET) => {
-            if let Some(caps) = ANALYTICS_BY_CHANNEL_ID.captures(route) {
-                let param = RouteParams(vec![caps
-                    .get(1)
-                    .map_or("".to_string(), |m| m.as_str().to_string())]);
-                req.extensions_mut().insert(param);
-
-                // apply middlewares
-                req = Chain::new()
-                    .chain(ChannelLoad)
-                    .chain(GetChannelId)
-                    .apply(req, app)
-                    .await?;
-
-                analytics(req, app).await
-            } else if let Some(caps) = ADVERTISER_ANALYTICS_BY_CHANNEL_ID.captures(route) {
-                let param = RouteParams(vec![caps
-                    .get(1)
-                    .map_or("".to_string(), |m| m.as_str().to_string())]);
-                req.extensions_mut().insert(param);
-
-                // apply middlewares
-                req = Chain::new()
-                    .chain(AuthRequired)
-                    .chain(GetChannelId)
-                    .apply(req, app)
-                    .await?;
-
-                advertiser_analytics(req, app).await
-            } else if let Some(caps) = PUBLISHER_ANALYTICS_BY_CHANNEL_ID.captures(route) {
-                let param = RouteParams(vec![caps
-                    .get(1)
-                    .map_or("".to_string(), |m| m.as_str().to_string())]);
-                req.extensions_mut().insert(param);
-
-                // apply middlewares
-                req = Chain::new()
-                    .chain(AuthRequired)
-                    .chain(GetChannelId)
-                    .apply(req, app)
-                    .await?;
-
-                publisher_analytics(req, app).await
-            } else {
-                Err(ResponseError::NotFound)
-            }
+        ("/analytics/for-admin", &Method::GET) => {
+            req = Chain::new()
+                .chain(AuthRequired)
+                .chain(IsAdmin)
+                .apply(req, app)
+                .await?;
+            get_analytics(req, app, None, None).await
         }
         _ => Err(ResponseError::NotFound),
     }
@@ -364,20 +318,6 @@ async fn channels_router<C: Locked + 'static>(
             .await?;
 
         create_validator_messages(req, app).await
-    } else if let (Some(caps), &Method::GET) = (CHANNEL_EVENTS_AGGREGATES.captures(&path), method) {
-        req = AuthRequired.call(req, app).await?;
-
-        let param = RouteParams(vec![
-            caps.get(1)
-                .map_or("".to_string(), |m| m.as_str().to_string()),
-            caps.get(2)
-                .map_or("".to_string(), |m| m.as_str().trim_matches('/').to_string()),
-        ]);
-        req.extensions_mut().insert(param);
-
-        req = ChannelLoad.call(req, app).await?;
-
-        list_channel_event_aggregates(req, app).await
     } else if let (Some(caps), &Method::GET) = (
         CHANNEL_SPENDER_LEAF_AND_TOTAL_DEPOSITED.captures(&path),
         method,
@@ -396,6 +336,24 @@ async fn channels_router<C: Locked + 'static>(
             .await?;
 
         get_spender_limits(req, app).await
+    } else if let (Some(caps), &Method::POST) = (
+        CHANNEL_SPENDER_LEAF_AND_TOTAL_DEPOSITED.captures(&path),
+        method,
+    ) {
+        let param = RouteParams(vec![
+            caps.get(1)
+                .map_or("".to_string(), |m| m.as_str().to_string()), // channel ID
+            caps.get(2)
+                .map_or("".to_string(), |m| m.as_str().to_string()), // spender addr
+        ]);
+        req.extensions_mut().insert(param);
+        req = Chain::new()
+            .chain(AuthRequired)
+            .chain(ChannelLoad)
+            .apply(req, app)
+            .await?;
+
+        add_spender_leaf(req, app).await
     } else if let (Some(caps), &Method::GET) = (CHANNEL_ALL_SPENDER_LIMITS.captures(&path), method)
     {
         let param = RouteParams(vec![caps
@@ -530,7 +488,7 @@ pub fn epoch() -> f64 {
     Utc::now().timestamp() as f64 / 2_628_000_000.0
 }
 
-// @TODO: Make pub(crate)
+/// Sentry [`Application`] Session
 #[derive(Debug, Clone)]
 pub struct Session {
     pub ip: Option<String>,
@@ -539,6 +497,7 @@ pub struct Session {
     pub os: Option<String>,
 }
 
+/// Sentry [`Application`] Auth (Authentication)
 #[derive(Debug, Clone)]
 pub struct Auth {
     pub era: i64,

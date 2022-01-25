@@ -1,228 +1,106 @@
-use crate::{epoch, Auth};
-use chrono::Utc;
+use std::collections::HashSet;
+
+use futures::TryStreamExt;
 use primitives::{
-    analytics::{AnalyticsData, AnalyticsQuery, ANALYTICS_QUERY_LIMIT},
-    sentry::{
-        AdvancedAnalyticsResponse, Analytics, ChannelReport, PublisherReport, UpdateAnalytics,
-    },
-    ChannelId, ValidatorId,
+    analytics::{query::AllowedKey, AnalyticsQuery, AuthenticateAs, Metric, Timeframe},
+    sentry::{Analytics, FetchedAnalytics, UpdateAnalytics},
 };
-use redis::{aio::MultiplexedConnection, cmd};
-use std::collections::HashMap;
-use tokio_postgres::types::ToSql;
+use tokio_postgres::{types::ToSql, Row};
 
 use super::{DbPool, PoolError};
 
-pub enum AnalyticsType {
-    Advertiser { auth: Auth },
-    Global,
-    Publisher { auth: Auth },
-}
-
-pub async fn advertiser_channel_ids(
-    pool: &DbPool,
-    creator: &ValidatorId,
-) -> Result<Vec<ChannelId>, PoolError> {
-    let client = pool.get().await?;
-
-    let stmt = client
-        .prepare("SELECT id FROM channels WHERE creator = $1")
-        .await?;
-    let rows = client.query(&stmt, &[creator]).await?;
-
-    let channel_ids: Vec<ChannelId> = rows.iter().map(ChannelId::from).collect();
-    Ok(channel_ids)
-}
-
-fn metric_to_column(metric: &str) -> String {
-    match metric {
-        "eventCounts" => "count".to_string(),
-        "eventPayouts" => "payout".to_string(),
-        _ => "count".to_string(),
-    }
-}
-
 pub async fn get_analytics(
-    query: AnalyticsQuery,
     pool: &DbPool,
-    analytics_type: AnalyticsType,
-    segment_by_channel: bool,
-    channel_id: Option<&ChannelId>,
-) -> Result<Vec<AnalyticsData>, PoolError> {
+    query: AnalyticsQuery,
+    allowed_keys: HashSet<AllowedKey>,
+    auth_as: Option<AuthenticateAs>,
+    limit: u32,
+) -> Result<Vec<FetchedAnalytics>, PoolError> {
     let client = pool.get().await?;
 
-    // converts metric to column
-    let metric = metric_to_column(&query.metric);
+    let (where_clauses, params) = analytics_query_params(&query, auth_as.as_ref(), &allowed_keys);
 
-    let mut params = Vec::<&(dyn ToSql + Sync)>::new();
-    let applied_limit = query.limit.min(ANALYTICS_QUERY_LIMIT);
-    let (interval, period) = get_time_frame(&query.timeframe);
-    let time_limit = Utc::now().timestamp() - period;
-
-    let mut where_clauses = vec![format!("created > to_timestamp({})", time_limit)];
-
-    params.push(&query.event_type);
-
-    where_clauses.extend(vec![
-        format!("event_type = ${}", params.len()),
-        format!("{} IS NOT NULL", metric),
-    ]);
-
-    if let Some(id) = channel_id {
-        where_clauses.push(format!("channel_id = '{}'", id));
-    }
-
-    let mut group_clause = "time".to_string();
-    let mut select_clause = match analytics_type {
-        AnalyticsType::Advertiser { auth } => {
-            if channel_id.is_none() {
-                where_clauses.push(format!(
-                    "channel_id IN (SELECT id FROM channels WHERE creator = '{}')",
-                    auth.uid
-                ));
-            }
-
-            format!(
-                "SUM({}::numeric)::varchar as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time", 
-                metric, interval
-            )
-        }
-        AnalyticsType::Global => {
-            where_clauses.push("earner IS NULL".to_string());
-
-            format!(
-                "SUM({}::numeric)::varchar as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time", 
-                metric, interval
-            )
-        }
-        AnalyticsType::Publisher { auth } => {
-            where_clauses.push(format!("earner = '{}'", auth.uid));
-
-            format!(
-                "SUM({}::numeric)::varchar as value, (extract(epoch from created) - (MOD( CAST (extract(epoch from created) AS NUMERIC), {}))) as time", 
-                metric, interval
-            )
-        }
+    let time_group = match &query.time.timeframe {
+        Timeframe::Year => "date_trunc('month', analytics.time) as timeframe_time",
+        Timeframe::Month => "date_trunc('day', analytics.time) as timeframe_time",
+        Timeframe::Week | Timeframe::Day => "date_trunc('hour', analytics.time) as timeframe_time",
     };
 
-    if segment_by_channel {
-        select_clause = format!("{}, channel_id", select_clause);
-        group_clause = format!("{}, channel_id", group_clause);
+    let mut select_clause = vec![time_group.to_string()];
+    match &query.metric {
+        Metric::Paid => select_clause.push("SUM(payout_amount)::bigint as value".to_string()),
+        Metric::Count => select_clause.push("SUM(payout_count)::integer as value".to_string()),
+    }
+    // always group first by the **date_trunc** time
+    let mut group_clause = vec!["timeframe_time".to_string()];
+
+    // if segment by was passed, use it in group second & select by it
+    if let Some(segment_by) = &query.segment_by {
+        select_clause.push(format!("{} as segment_by", segment_by));
+        group_clause.push("segment_by".into());
     }
 
     let sql_query = format!(
-        "SELECT {} FROM event_aggregates WHERE {} GROUP BY {} LIMIT {}",
-        select_clause,
+        "SELECT {} FROM analytics WHERE {} GROUP BY {} ORDER BY timeframe_time ASC LIMIT {}",
+        select_clause.join(", "),
         where_clauses.join(" AND "),
-        group_clause,
-        applied_limit,
+        group_clause.join(", "),
+        limit,
     );
 
-    // execute query
+    // Prepare SQL statement
     let stmt = client.prepare(&sql_query).await?;
-    let rows = client.query(&stmt, &params).await?;
+    // Execute query
+    let rows: Vec<Row> = client.query_raw(&stmt, params).await?.try_collect().await?;
 
-    let analytics: Vec<AnalyticsData> = rows.iter().map(AnalyticsData::from).collect();
+    // FetchedAnalytics requires context using the `AnalyticsQuery`
+    // this is why we use `impl From<(&AnalyticsQuery, &Row)>`
+    let analytics = rows
+        .iter()
+        .map(|row| FetchedAnalytics::from((&query, row)))
+        .collect();
 
     Ok(analytics)
 }
 
-fn get_time_frame(timeframe: &str) -> (i64, i64) {
-    let minute = 60 * 1000;
-    let hour = 60 * minute;
-    let day = 24 * hour;
+fn analytics_query_params(
+    query: &AnalyticsQuery,
+    auth_as: Option<&AuthenticateAs>,
+    allowed_keys: &HashSet<AllowedKey>,
+) -> (Vec<String>, Vec<Box<(dyn ToSql + Sync + Send)>>) {
+    let mut where_clauses = vec!["\"time\" >= $1".to_string()];
+    let mut params: Vec<Box<(dyn ToSql + Sync + Send)>> = vec![Box::new(query.time.start.clone())];
 
-    match timeframe {
-        "year" => (30 * day, 365 * day),
-        "month" => (day, 30 * day),
-        "week" => (6 * hour, 7 * day),
-        "day" => (hour, day),
-        "hour" => (minute, hour),
-        _ => (hour, day),
-    }
-}
-
-async fn stat_pair(
-    mut conn: MultiplexedConnection,
-    key: &str,
-) -> Result<HashMap<String, f64>, Box<dyn std::error::Error>> {
-    let data = cmd("ZRANGE")
-        .arg(key)
-        .arg(0_u64)
-        .arg(-1_i64)
-        .arg("WITHSCORES")
-        .query_async::<_, Vec<String>>(&mut conn)
-        .await?;
-
-    Ok(data
-        .chunks(2)
-        .map(|chunk: &[String]| {
-            (
-                chunk[0].clone(),
-                chunk[1].parse::<f64>().expect("should parse value"),
-            )
-        })
-        .collect())
-}
-
-pub async fn get_advanced_reports(
-    redis: &MultiplexedConnection,
-    event_type: &str,
-    publisher: &ValidatorId,
-    channel_ids: &[ChannelId],
-) -> Result<AdvancedAnalyticsResponse, Box<dyn std::error::Error>> {
-    let publisher_reports = [
-        PublisherReport::AdUnit,
-        PublisherReport::AdSlot,
-        PublisherReport::AdSlotPay,
-        PublisherReport::Country,
-        PublisherReport::Hostname,
-    ];
-
-    let mut publisher_stats: HashMap<PublisherReport, HashMap<String, f64>> = HashMap::new();
-
-    for publisher_report in publisher_reports.iter() {
-        let pair = match publisher_report {
-            PublisherReport::Country => format!(
-                "{}:{}:{}:{}",
-                epoch().floor(),
-                publisher_report,
-                event_type,
-                publisher
-            ),
-            _ => format!("{}:{}:{}", publisher_report, event_type, publisher),
+    // for all allowed keys of this query
+    // insert parameter into the SQL if there is a value set for it
+    for allowed_key in allowed_keys.iter() {
+        // IMPORTANT FOR SECURITY: AuthenticateAs must OVERRIDE the value passed to either query.publisher or query.advertiser respectively
+        let value = match (allowed_key, auth_as) {
+            (AllowedKey::Advertiser, Some(AuthenticateAs::Advertiser(advertiser))) => {
+                Some(Box::new(*advertiser) as _)
+            }
+            (AllowedKey::Publisher, Some(AuthenticateAs::Publisher(publisher))) => {
+                Some(Box::new(*publisher) as _)
+            }
+            _ => query.get_key(*allowed_key),
         };
-        let result = stat_pair(redis.clone(), &pair).await?;
-        publisher_stats.insert(publisher_report.clone(), result);
-    }
 
-    let mut by_channel_stats = HashMap::new();
-
-    let channel_reports = [
-        ChannelReport::AdUnit,
-        ChannelReport::Hostname,
-        ChannelReport::HostnamePay,
-    ];
-
-    for channel_id in channel_ids {
-        let mut channel_stat = HashMap::new();
-
-        for channel_report in channel_reports.iter() {
-            let result = stat_pair(
-                redis.clone(),
-                &format!("{}:{}:{}", channel_report, event_type, channel_id),
-            )
-            .await?;
-            channel_stat.insert(channel_report.clone(), result);
+        if let Some(value) = value {
+            where_clauses.push(format!("{} = ${}", allowed_key, params.len() + 1));
+            params.push(value);
         }
-
-        by_channel_stats.insert(channel_id.to_owned(), channel_stat);
     }
 
-    Ok(AdvancedAnalyticsResponse {
-        by_channel_stats,
-        publisher_stats,
-    })
+    if let Some(end_date) = &query.time.end {
+        where_clauses.push(format!("\"time\" <= ${}", params.len() + 1));
+        params.push(Box::new(end_date.clone()));
+    }
+    where_clauses.push(format!("event_type = ${}", params.len() + 1));
+    params.push(Box::new(query.event_type.clone()));
+
+    where_clauses.push(format!("{} IS NOT NULL", query.metric.column_name()));
+
+    (where_clauses, params)
 }
 
 /// This will update a record when it's present by incrementing its payout_amount and payout_count fields
@@ -232,11 +110,11 @@ pub async fn update_analytics(
 ) -> Result<Analytics, PoolError> {
     let client = pool.get().await?;
 
-    let query = "INSERT INTO analytics(campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os, event_type, payout_amount, payout_count)
+    let query = "INSERT INTO analytics(campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os_name, event_type, payout_amount, payout_count)
     VALUES ($1, date_trunc('hour', cast($2 as timestamp with time zone)), $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
     ON CONFLICT ON CONSTRAINT analytics_pkey DO UPDATE
     SET payout_amount = analytics.payout_amount + $12, payout_count = analytics.payout_count + 1
-    RETURNING campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os, event_type, payout_amount, payout_count";
+    RETURNING campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os_name, event_type, payout_amount, payout_count";
 
     let stmt = client.prepare(query).await?;
 
@@ -277,12 +155,18 @@ pub async fn update_analytics(
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashMap;
+
     use super::*;
     use primitives::{
-        analytics::OperatingSystem,
-        sentry::DateHour,
+        analytics::{
+            query::{Time, ALLOWED_KEYS},
+            OperatingSystem,
+        },
+        sentry::{DateHour, CLICK, IMPRESSION},
+        test_util::{CREATOR, PUBLISHER, PUBLISHER_2},
         util::tests::prep_db::{ADDRESSES, DUMMY_AD_UNITS, DUMMY_CAMPAIGN, DUMMY_IPFS},
-        UnifiedNum,
+        AdUnit, UnifiedNum, ValidatorId, IPFS,
     };
 
     use crate::db::tests_postgres::{setup_test_migrations, DATABASE_POOL};
@@ -311,7 +195,7 @@ mod test {
                 hostname: Some("localhost".to_string()),
                 country: Some("Bulgaria".to_string()),
                 os_name: OperatingSystem::Linux,
-                event_type: "IMPRESSION".to_string(),
+                event_type: IMPRESSION,
                 amount_to_add: UnifiedNum::from_u64(1_000_000),
                 count_to_add: 1,
             };
@@ -359,7 +243,7 @@ mod test {
                 hostname: None,
                 country: None,
                 os_name: OperatingSystem::Linux,
-                event_type: "IMPRESSION".to_string(),
+                event_type: IMPRESSION,
                 amount_to_add: UnifiedNum::from_u64(1_000_000),
                 count_to_add: 1,
             };
@@ -377,6 +261,645 @@ mod test {
             );
             assert_eq!(insert_res.hostname, analytics_with_empty_fields.hostname);
             assert_eq!(insert_res.country, analytics_with_empty_fields.country);
+        }
+    }
+
+    fn days_count<const N: usize>(_days: &[u8; N], count_per_day: u32) -> u32 {
+        u32::try_from(N).expect("Array size should be < u32::MAX") * count_per_day
+    }
+
+    // TODO: Move to separate test; days_count can be generalized (Whoop whoop, maybe w/ chrono::Date)
+    #[test]
+    fn test_days_count() {
+        let hours_in_day = 0..=23_u32;
+        assert_eq!(
+            hours_in_day.sum::<u32>(),
+            276,
+            "Sum of all hours 0 + 1 + 2 .. + 23 = 276"
+        );
+
+        // days in the form of e.g. 2.12.2021 & 3.12.2021
+        let two_days = days_count(&[2, 3], 276);
+        assert_eq!(two_days, 2 * 276);
+    }
+
+    #[tokio::test]
+    async fn test_get_analytics_in_december() {
+        let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
+
+        let ad_unit = DUMMY_AD_UNITS[0].clone();
+        let ad_unit_2 = DUMMY_AD_UNITS[1].clone();
+        let ad_slot_ipfs = DUMMY_IPFS[0];
+
+        setup_test_migrations(database.pool.clone())
+            .await
+            .expect("Migrations should succeed");
+
+        let start_date = DateHour::from_ymdh(2021, 12, 1, 0);
+        let end_date = DateHour::from_ymdh(2022, 12, 31, 23);
+
+        let december_days = 1..=31_u32;
+        let hours = 0..=23_u32;
+
+        generate_analytics_for_december_2021(&database.pool, &ad_unit, ad_slot_ipfs).await;
+        //
+        //
+        // TODO: throw a few more analytics in specific DateHours w/ unique Query and check if it filters the analytics correctly
+        let other_analytics: HashMap<&str, Analytics> = {
+            // 5.12.2021 16:00
+            let mut click_germany = make_click_analytics(&ad_unit, ad_slot_ipfs, 5, 16);
+            click_germany.country = Some("Germany".into());
+            let click_germany = update_analytics(&database.pool, click_germany)
+                .await
+                .expect("Should update");
+
+            // 6.12.2021 9:00
+            let impression_ad_unit_2 = make_impression_analytics(&ad_unit_2, ad_slot_ipfs, 6, 9);
+            let impression_ad_unit_2 = update_analytics(&database.pool, impression_ad_unit_2)
+                .await
+                .expect("Should update");
+
+            // 7.12.2021 21:00
+            let mut impression_publisher_2 =
+                make_impression_analytics(&ad_unit, ad_slot_ipfs, 7, 21);
+            impression_publisher_2.publisher = *PUBLISHER_2;
+            let impression_publisher_2 = update_analytics(&database.pool, impression_publisher_2)
+                .await
+                .expect("Should update");
+
+            vec![
+                ("click_germany", click_germany),
+                ("impression_ad_unit_2", impression_ad_unit_2),
+                ("impression_publisher_2", impression_publisher_2),
+            ]
+            .into_iter()
+            .collect()
+        };
+        //
+        //
+
+        let amount_per_day: UnifiedNum = hours
+            .clone()
+            .map(|hour| UnifiedNum::from(hour as u64 * 100_000_000))
+            .sum::<Option<_>>()
+            .expect("Should not overflow");
+        let amount_for_month: UnifiedNum = december_days
+            .clone()
+            .map(|day_n| UnifiedNum::from(amount_per_day * day_n as u64))
+            .sum::<Option<UnifiedNum>>()
+            .expect("Should not overflow");
+
+        let count_sum = |fetched_analytics: &[FetchedAnalytics]| -> u32 {
+            fetched_analytics
+                .iter()
+                .map(|analytics| analytics.value.get_count().expect("Should be Count"))
+                .sum()
+        };
+
+        let count_per_day: u32 = hours.sum();
+        // 276 events per day
+        assert_eq!(276, count_per_day);
+
+        let impression_query = AnalyticsQuery {
+            limit: 1000,
+            event_type: IMPRESSION,
+            metric: Metric::Count,
+            segment_by: Some(AllowedKey::Country),
+            time: Time {
+                timeframe: Timeframe::Month,
+                start: start_date,
+                end: Some(end_date),
+            },
+            campaign_id: Some(DUMMY_CAMPAIGN.id),
+            ad_unit: Some(ad_unit.ipfs),
+            ad_slot: Some(ad_slot_ipfs),
+            ad_slot_type: Some(ad_unit.ad_type.clone()),
+            advertiser: Some(*CREATOR),
+            publisher: Some(*PUBLISHER),
+            hostname: Some("localhost".into()),
+            country: Some("Bulgaria".into()),
+            os_name: Some(OperatingSystem::Linux),
+        };
+
+        // Impression query - should count all inserted Analytics
+        {
+            let count_impressions = get_analytics(
+                &database.pool,
+                impression_query.clone(),
+                ALLOWED_KEYS.clone(),
+                None,
+                impression_query.limit,
+            )
+            .await
+            .expect("Should fetch");
+
+            // check at least 1 day of the month to validate the expected count
+            let first_day_count = count_impressions
+                .get(0)
+                .expect("Should have index 0")
+                .value
+                .get_count()
+                .expect("Should be Count");
+
+            assert_eq!(count_per_day, first_day_count);
+
+            // All Counts for 31 days should match
+            assert_eq!(31 * count_per_day, count_sum(&count_impressions));
+
+            // Check 2 days in the month
+            // 2.12.2021 & 3.12.2021
+            let two_days_fetched_count = count_impressions
+                // indices should match with 2nd and 3rd December
+                .get(2..=3)
+                .expect("Should have indices of the range")
+                .iter()
+                .map(|fetched| {
+                    fetched
+                        .value
+                        .get_count()
+                        .expect("Should be a Metric::Count")
+                })
+                .sum::<u32>();
+
+            assert_eq!(2 * count_per_day, two_days_fetched_count);
+
+            let mut paid_impressions_query = impression_query.clone();
+            paid_impressions_query.metric = Metric::Paid;
+
+            let paid_impressions = get_analytics(
+                &database.pool,
+                paid_impressions_query,
+                ALLOWED_KEYS.clone(),
+                None,
+                impression_query.limit,
+            )
+            .await
+            .expect("Should fetch Metric::Paid of Impressions");
+
+            assert_eq!(
+                paid_impressions.iter()
+                .map(|analytics| analytics.value.get_paid().expect("Should be Metric::Paid"))
+                    .sum::<Option<UnifiedNum>>()
+                    .expect("Should not overflow"),
+                amount_for_month,
+                "The sum of all the Fetched Analytics paid out values should match with the expected for this month"
+            );
+
+            // Check 3 days of the month
+            // 14.12.2021 & 15.12.2021 & 16.12.2021
+            let three_days_fetched_paid = paid_impressions
+                // indices should match with 14th, 15th and 16th of December
+                .get(13..=15)
+                .expect("Should have indices of the range")
+                .iter()
+                .map(|fetched| fetched.value.get_paid().expect("Should be a Metric::Paid"))
+                .sum::<Option<UnifiedNum>>()
+                .expect("Should not overflow");
+
+            assert_eq!(
+                14 * amount_per_day + 15 * amount_per_day + 16 * amount_per_day,
+                three_days_fetched_paid
+            );
+        }
+
+        let click_query = AnalyticsQuery {
+            limit: 1000,
+            event_type: CLICK,
+            metric: Metric::Count,
+            segment_by: Some(AllowedKey::Country),
+            time: Time {
+                timeframe: Timeframe::Month,
+                start: start_date,
+                end: Some(end_date),
+            },
+            campaign_id: Some(DUMMY_CAMPAIGN.id),
+            ad_unit: Some(ad_unit.ipfs),
+            ad_slot: Some(ad_slot_ipfs),
+            ad_slot_type: Some(ad_unit.ad_type.clone()),
+            advertiser: Some(*CREATOR),
+            publisher: Some(*PUBLISHER),
+            hostname: Some("localhost".into()),
+            country: Some("Estonia".into()),
+            os_name: Some(OperatingSystem::Linux),
+        };
+
+        // Click query - should count all inserted Analytics
+        {
+            let count_clicks = get_analytics(
+                &database.pool,
+                click_query.clone(),
+                ALLOWED_KEYS.clone(),
+                None,
+                click_query.limit,
+            )
+            .await
+            .expect("Should fetch");
+
+            // check at least 1 day of the month to validate the expected count
+            let second_day_count = count_clicks
+                .get(1)
+                .expect("Should have index 1 corresponding to 2.12.2021")
+                .value
+                .get_count()
+                .expect("Should be Count");
+
+            assert_eq!(count_per_day, second_day_count);
+
+            // All Counts for 31 days should match
+            assert_eq!(31 * count_per_day, count_sum(&count_clicks));
+
+            // Check 2 days in the month
+            // 5.12.2021 & 6.12.2021
+            let two_days_fetched_count = count_clicks
+                // indices should match with 5nd and 6rd December
+                .get(5..=6)
+                .expect("Should have indices of the range")
+                .iter()
+                .map(|fetched| {
+                    fetched
+                        .value
+                        .get_count()
+                        .expect("Should be a Metric::Count")
+                })
+                .sum::<u32>();
+
+            assert_eq!(2 * count_per_day, two_days_fetched_count);
+
+            let mut paid_clicks_query = impression_query.clone();
+            paid_clicks_query.metric = Metric::Paid;
+
+            let paid_impressions = get_analytics(
+                &database.pool,
+                paid_clicks_query,
+                ALLOWED_KEYS.clone(),
+                None,
+                impression_query.limit,
+            )
+            .await
+            .expect("Should fetch Metric::Paid of Impressions");
+
+            assert_eq!(
+                paid_impressions.iter()
+                .map(|analytics| analytics.value.get_paid().expect("Should be Metric::Paid"))
+                    .sum::<Option<UnifiedNum>>()
+                    .expect("Should not overflow"),
+                amount_for_month,
+                "The sum of all the Fetched Analytics paid out values should match with the expected for this month"
+            );
+
+            // Check 6 days in the month
+            // 10, 11, 12, 13, 14.12.2021 & 15.12.2021
+            let six_days_fetched_paid = paid_impressions
+                // indices don't match with dates, because they start at index 0
+                .get(9..=14)
+                .expect("Should have indices of the range")
+                .iter()
+                .map(|fetched| fetched.value.get_paid().expect("Should be a Metric::Paid"))
+                .sum::<Option<UnifiedNum>>()
+                .expect("Should not overflow");
+
+            assert_eq!(
+                10 * amount_per_day
+                    + 11 * amount_per_day
+                    + 12 * amount_per_day
+                    + 13 * amount_per_day
+                    + 14 * amount_per_day
+                    + 15 * amount_per_day,
+                six_days_fetched_paid
+            );
+        }
+
+        // Filter by country: Germany
+        // Type: Click
+        // DateHour 5.12.2021 16:00
+        // Only a single analytics should show for this day
+        {
+            let mut click_germany_query = click_query.clone();
+            click_germany_query.time = Time {
+                timeframe: Timeframe::Day,
+                start: DateHour::from_ymdh(2021, 12, 5, 0),
+                end: Some(DateHour::from_ymdh(2021, 12, 6, 0)),
+            };
+            click_germany_query.country = Some("Germany".into());
+
+            let count_clicks = get_analytics(
+                &database.pool,
+                click_germany_query.clone(),
+                ALLOWED_KEYS.clone(),
+                None,
+                click_germany_query.limit,
+            )
+            .await
+            .expect("Should fetch");
+
+            assert_eq!(1, count_clicks.len(), "Only single analytics is expected");
+            let fetched = count_clicks.get(0).expect("Should have index 0");
+            assert_eq!(
+                16,
+                fetched.value.get_count().expect("Should be Metric::Count"),
+                "The fetched count should be the same as the hour of the Analytics"
+            );
+            assert_eq!(
+                other_analytics["click_germany"].time.to_datetime(),
+                fetched.time,
+                "The fetched analytics time (with hour) should be the same as the inserted Analytics"
+            );
+        }
+
+        // Filter only by AdUnit 2
+        // Type: Impression
+        // DateHour 6.12.2021 9:00
+        // Only a single analytics should show
+        {
+            let ad_unit_2_query = AnalyticsQuery {
+                limit: 1000,
+                event_type: IMPRESSION,
+                metric: Metric::Count,
+                segment_by: Some(AllowedKey::Country),
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: start_date,
+                    end: Some(end_date),
+                },
+                campaign_id: None,
+                ad_unit: Some(ad_unit_2.ipfs),
+                ad_slot: None,
+                ad_slot_type: None,
+                advertiser: None,
+                publisher: None,
+                hostname: None,
+                country: None,
+                os_name: None,
+            };
+
+            let count_impressions = get_analytics(
+                &database.pool,
+                ad_unit_2_query.clone(),
+                ALLOWED_KEYS.clone(),
+                None,
+                ad_unit_2_query.limit,
+            )
+            .await
+            .expect("Should fetch");
+
+            assert_eq!(
+                1,
+                count_impressions.len(),
+                "Only single analytics is expected"
+            );
+            let fetched = count_impressions.get(0).expect("Should have index 0");
+            assert_eq!(
+                9,
+                fetched.value.get_count().expect("Should be Metric::Count"),
+                "The fetched count should be the same as the hour of the Analytics"
+            );
+            assert_eq!(
+                other_analytics["impression_ad_unit_2"].time.to_datetime(),
+                fetched.time,
+                "The fetched analytics date should be the same as the inserted Analytics, but with no hour because Timeframe::Day"
+            );
+        }
+
+        // Filter by PUBLISHER_2
+        //
+        // Type: Impression
+        // DateHour 7.12.2021 21:00
+        // Only a single analytics should show
+        {
+            let filter_by_publisher_2_query = AnalyticsQuery {
+                limit: 1000,
+                event_type: IMPRESSION,
+                metric: Metric::Count,
+                segment_by: Some(AllowedKey::Publisher),
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: DateHour::from_ymdh(2021, 12, 7, 0),
+                    end: Some(DateHour::from_ymdh(2021, 12, 7, 23)),
+                },
+                campaign_id: None,
+                ad_unit: None,
+                ad_slot: None,
+                ad_slot_type: None,
+                advertiser: None,
+                publisher: Some(*PUBLISHER_2),
+                hostname: None,
+                country: None,
+                os_name: None,
+            };
+
+            let count_impressions = get_analytics(
+                &database.pool,
+                filter_by_publisher_2_query.clone(),
+                ALLOWED_KEYS.clone(),
+                None,
+                filter_by_publisher_2_query.limit,
+            )
+            .await
+            .expect("Should fetch");
+
+            assert_eq!(
+                1,
+                count_impressions.len(),
+                "Should fetch the single analytics with different publisher"
+            );
+            assert_eq!(
+                21,
+                count_impressions
+                    .get(0)
+                    .expect("Should get index 0")
+                    .value
+                    .get_count()
+                    .expect("Should be Metric::Count"),
+                "Count value of Analytics should be the same as it's hour value"
+            );
+        }
+
+        // AuthenticateAs by PUBLISHER, should override the query value of `publisher`
+        //
+        // Type: Impression
+        // DateHour 7.12.2021 21:00
+        // Only a single analytics should show
+        {
+            let authenticate_as_publisher_2_query = AnalyticsQuery {
+                limit: 1000,
+                event_type: IMPRESSION,
+                metric: Metric::Count,
+                segment_by: Some(AllowedKey::Publisher),
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: DateHour::from_ymdh(2021, 12, 7, 0),
+                    end: Some(DateHour::from_ymdh(2021, 12, 7, 23)),
+                },
+                campaign_id: None,
+                ad_unit: None,
+                ad_slot: None,
+                ad_slot_type: None,
+                advertiser: None,
+                // AuthenticateAs should override this value!
+                publisher: Some(*PUBLISHER),
+                hostname: None,
+                country: None,
+                os_name: None,
+            };
+
+            let count_impressions = get_analytics(
+                &database.pool,
+                authenticate_as_publisher_2_query.clone(),
+                ALLOWED_KEYS.clone(),
+                Some(AuthenticateAs::Publisher(ValidatorId::from(*PUBLISHER_2))),
+                authenticate_as_publisher_2_query.limit,
+            )
+            .await
+            .expect("Should fetch");
+
+            assert_eq!(
+                1,
+                count_impressions.len(),
+                "Should fetch the single analytics with different publisher"
+            );
+            assert_eq!(
+                21,
+                count_impressions
+                    .get(0)
+                    .expect("Should get index 0")
+                    .value
+                    .get_count()
+                    .expect("Should be Metric::Count"),
+                "Count value of Analytics should be the same as it's hour value"
+            );
+        }
+
+        // Segment by AdUnit
+        // Type: Impression
+        // DateHour for AdUnit 2: 6.12.2021 9:00
+        // we should get 2 distinct AdUnits:
+        // - Analytics generated for the full month
+        // - One for a single DateHour that adds single Analytics
+        {
+            let segment_ad_units_query = AnalyticsQuery {
+                limit: 1000,
+                event_type: IMPRESSION,
+                metric: Metric::Count,
+                segment_by: Some(AllowedKey::AdUnit),
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: DateHour::from_ymdh(2021, 12, 6, 0),
+                    end: Some(DateHour::from_ymdh(2021, 12, 6, 23)),
+                },
+                campaign_id: None,
+                ad_unit: None,
+                ad_slot: None,
+                ad_slot_type: None,
+                advertiser: None,
+                publisher: None,
+                hostname: None,
+                country: None,
+                os_name: None,
+            };
+
+            let count_impressions = get_analytics(
+                &database.pool,
+                segment_ad_units_query.clone(),
+                ALLOWED_KEYS.clone(),
+                None,
+                segment_ad_units_query.limit,
+            )
+            .await
+            .expect("Should fetch");
+
+            assert_eq!(
+                25,
+                count_impressions.len(),
+                "We expect a total of 24 + 1 (with different AdUnit) analytics"
+            );
+            let find_ad_unit_2 = count_impressions
+                .iter()
+                .find(|fetched| fetched.segment == Some(ad_unit_2.ipfs.to_string()))
+                .expect("There should be a single FetchedAnalytics with different AdUnit");
+
+            assert_eq!(
+                9,
+                find_ad_unit_2
+                    .value
+                    .get_count()
+                    .expect("Should be Metric::Count"),
+                "It's count should be == to the hour"
+            )
+        }
+    }
+
+    /// Makes an [`IMPRESSION`] [`UpdateAnalytics`] for testing.
+    /// Country "Bulgaria"
+    /// Everything else is the same as [`make_click_analytics`].
+    fn make_impression_analytics(
+        ad_unit: &AdUnit,
+        ad_slot: IPFS,
+        day: u32,
+        hour: u32,
+    ) -> UpdateAnalytics {
+        UpdateAnalytics {
+            time: DateHour::from_ymdh(2021, 12, day, hour),
+            campaign_id: DUMMY_CAMPAIGN.id,
+            ad_unit: Some(ad_unit.ipfs),
+            ad_slot: Some(ad_slot),
+            ad_slot_type: Some(ad_unit.ad_type.clone()),
+            advertiser: *CREATOR,
+            publisher: *PUBLISHER,
+            hostname: Some("localhost".to_string()),
+            country: Some("Bulgaria".to_string()),
+            os_name: OperatingSystem::Linux,
+            event_type: IMPRESSION,
+            amount_to_add: UnifiedNum::from_u64(day as u64 * hour as u64 * 100_000_000),
+            count_to_add: hour as i32,
+        }
+    }
+
+    /// Makes an [`CLICK`] [`UpdateAnalytics`] for testing.
+    /// Country "Estonia"
+    /// Everything else is the same as [`make_click_analytics`].
+    fn make_click_analytics(
+        ad_unit: &AdUnit,
+        ad_slot: IPFS,
+        day: u32,
+        hour: u32,
+    ) -> UpdateAnalytics {
+        UpdateAnalytics {
+            time: DateHour::from_ymdh(2021, 12, day, hour),
+            campaign_id: DUMMY_CAMPAIGN.id,
+            ad_unit: Some(ad_unit.ipfs),
+            ad_slot: Some(ad_slot),
+            ad_slot_type: Some(ad_unit.ad_type.clone()),
+            advertiser: *CREATOR,
+            publisher: *PUBLISHER,
+            hostname: Some("localhost".to_string()),
+            country: Some("Estonia".to_string()),
+            os_name: OperatingSystem::Linux,
+            event_type: CLICK,
+            amount_to_add: UnifiedNum::from_u64(day as u64 * hour as u64 * 100_000_000),
+            count_to_add: hour as i32,
+        }
+    }
+
+    /// Creates Impression & Click analytics for each hour of December
+    async fn generate_analytics_for_december_2021(
+        database: &DbPool,
+        ad_unit: &AdUnit,
+        ad_slot: IPFS,
+    ) {
+        for day in 1..=31_u32 {
+            for hour in 0..=23_u32 {
+                let impression_analytics = make_impression_analytics(ad_unit, ad_slot, day, hour);
+
+                update_analytics(&database.clone(), impression_analytics)
+                    .await
+                    .expect("Should insert");
+
+                let click_analytics = make_click_analytics(ad_unit, ad_slot, day, hour);
+
+                update_analytics(&database.clone(), click_analytics)
+                    .await
+                    .expect("Should insert");
+            }
         }
     }
 }
