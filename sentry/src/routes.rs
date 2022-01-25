@@ -6,14 +6,23 @@
 //! 
 //! - [`GET /v5/channel/list`](crate::routes::channel::channel_list)
 //! 
-//! - [`GET /v5/channel/:id/accounting`](channel::get_accounting_for_channel) (auth required)
+//! todo
+//! 
+//! - [`GET /v5/channel/:id/accounting`](channel::get_accounting_for_channel)
+//! 
+//! todo
 //! 
 //! - [`GET /v5/channel/:id/spender/:addr`](channel::get_spender_limits) (auth required)
 //! 
+//! todo
+//! 
 //! - [`POST /v5/channel/:id/spender/:addr`](channel::add_spender_leaf) (auth required)
+//! 
+//! todo
 //! 
 //! - [`GET /v5/channel/:id/spender/all`](channel::get_all_spender_limits) (auth required)
 //! 
+//! todo
 //! 
 //! - [`GET /v5/channel/:id/validator-messages`](channel::validator_message::list_validator_messages)
 //! 
@@ -25,6 +34,12 @@
 //! Response: [primitives::sentry::ValidatorMessageResponse]
 //! 
 //! - [`POST /v5/channel/:id/validator-messages`](channel::validator_message::create_validator_messages) (auth required)
+//! 
+//! todo
+//! 
+//! - [`POST /v5/channel/:id/last-approved`](channel::last_approved)
+//! 
+//! todo
 //! 
 //! - `POST /v5/channel/:id/pay` (auth required)
 //! 
@@ -73,6 +88,7 @@
 //! 
 //! 
 //! - `POST /v5/campaign` (auth required)
+//! 
 //! Create a new Campaign.
 //! 
 //! It will make sure the `Channel` is created if new and it will update the spendable amount using the `Adapter::get_deposit()`.
@@ -83,15 +99,24 @@
 //! 
 //!  `POST /v5/campaign/:id/close` (auth required)
 //! 
-//! # Analytics
+//! todo
+//! 
+//! ## Analytics
+//! 
+//! - `GET /v5/analytics`
+//! 
+//! todo
 //! 
 //! - `GET /v5/analytics/for-publisher` (auth required)
+//! 
 //! todo
 //! 
 //! - `GET /v5/analytics/for-advertiser` (auth required)
+//! 
 //! todo
 //! 
 //! - `GET /v5/analytics/for-admin` (auth required)
+//! 
 //! todo
 //! 
 pub use analytics::analytics as get_analytics;
