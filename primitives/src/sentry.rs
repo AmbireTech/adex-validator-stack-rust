@@ -312,7 +312,7 @@ pub struct FetchedAnalytics {
     pub segment: Option<String>,
 }
 
-/// The value of the requested analytics [`Metric`].
+/// The value of the requested analytics [`crate::analytics::Metric`].
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum FetchedMetric {

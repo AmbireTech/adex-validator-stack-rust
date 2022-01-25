@@ -1,9 +1,12 @@
+//! `GET /cfg` request
+
 use crate::Application;
 use crate::ResponseError;
 use adapter::client::Locked;
 use hyper::header::CONTENT_TYPE;
 use hyper::{Body, Request, Response};
 
+/// `GET /cfg` request
 pub async fn config<C: Locked + 'static>(
     _: Request<Body>,
     app: &Application<C>,

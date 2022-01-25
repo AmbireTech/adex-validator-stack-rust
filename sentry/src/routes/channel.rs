@@ -1,11 +1,14 @@
+//! Channel - `/v5/channel` routes
+//! 
+
 use crate::db::{
     accounting::{get_all_accountings_for_channel, update_accounting, Side},
     event_aggregate::{latest_approve_state_v5, latest_heartbeats, latest_new_state_v5},
-    insert_channel, insert_validator_messages, list_channels,
+    insert_channel, list_channels,
     spendable::{fetch_spendable, get_all_spendables_for_channel, update_spendable},
     DbPool,
 };
-use crate::{success_response, Application, Auth, ResponseError, RouteParams};
+use crate::{success_response, Application, ResponseError, RouteParams};
 use adapter::{client::Locked, Adapter};
 use futures::future::try_join_all;
 use hyper::{Body, Request, Response};
@@ -17,7 +20,7 @@ use primitives::{
         LastApproved, LastApprovedQuery, LastApprovedResponse, SpenderResponse, SuccessResponse,
     },
     spender::{Spendable, Spender},
-    validator::{MessageTypes, NewState},
+    validator::NewState,
     Address, Channel, Deposit, UnifiedNum,
 };
 use slog::{error, Logger};
@@ -105,45 +108,6 @@ pub async fn last_approved<C: Locked + 'static>(
             .into(),
         )
         .unwrap())
-}
-
-pub async fn create_validator_messages<C: Locked + 'static>(
-    req: Request<Body>,
-    app: &Application<C>,
-) -> Result<Response<Body>, ResponseError> {
-    let session = req
-        .extensions()
-        .get::<Auth>()
-        .expect("auth request session")
-        .to_owned();
-
-    let channel = req
-        .extensions()
-        .get::<Channel>()
-        .expect("Request should have Channel")
-        .to_owned();
-
-    let into_body = req.into_body();
-    let body = hyper::body::to_bytes(into_body).await?;
-
-    let request_body = serde_json::from_slice::<HashMap<String, Vec<MessageTypes>>>(&body)?;
-    let messages = request_body
-        .get("messages")
-        .ok_or_else(|| ResponseError::BadRequest("missing messages body".to_string()))?;
-
-    match channel.find_validator(session.uid) {
-        None => Err(ResponseError::Unauthorized),
-        _ => {
-            try_join_all(messages.iter().map(|message| {
-                insert_validator_messages(&app.pool, &channel, &session.uid, message)
-            }))
-            .await?;
-
-            Ok(success_response(serde_json::to_string(&SuccessResponse {
-                success: true,
-            })?))
-        }
-    }
 }
 
 /// This will make sure to insert/get the `Channel` from DB before attempting to create the `Spendable`
@@ -373,6 +337,9 @@ async fn get_corresponding_new_state(
     new_state
 }
 
+/// `GET /v5/channel/0xXXX.../accounting` request
+///
+/// Response: [`AccountingResponse::<CheckedState>`]
 pub async fn get_accounting_for_channel<C: Locked + 'static>(
     req: Request<Body>,
     app: &Application<C>,
@@ -410,6 +377,146 @@ pub async fn get_accounting_for_channel<C: Locked + 'static>(
 
     let res = AccountingResponse::<CheckedState> { balances };
     Ok(success_response(serde_json::to_string(&res)?))
+}
+
+/// [`Channel`] [validator messages](primitives::validator::MessageTypes) routes
+/// starting with `/v5/channel/0xXXX.../validator-messages`
+///
+pub mod validator_message {
+    use std::collections::HashMap;
+
+    use crate::{
+        db::{get_validator_messages, insert_validator_messages},
+        Auth,
+    };
+    use crate::{success_response, Application, ResponseError};
+    use adapter::client::Locked;
+    use futures::future::try_join_all;
+    use hyper::{Body, Request, Response};
+    use primitives::{
+        sentry::{SuccessResponse, ValidatorMessageResponse},
+        validator::MessageTypes,
+    };
+    use primitives::{Channel, DomainError, ValidatorId};
+    use serde::Deserialize;
+
+    #[derive(Deserialize)]
+    pub struct ValidatorMessagesListQuery {
+        limit: Option<u64>,
+    }
+
+    pub fn extract_params(
+        from_path: &str,
+    ) -> Result<(Option<ValidatorId>, Vec<String>), DomainError> {
+        // trim the `/` at the beginning & end if there is one or more
+        // and split the rest of the string at the `/`
+        let split: Vec<&str> = from_path.trim_matches('/').split('/').collect();
+
+        if split.len() > 2 {
+            return Err(DomainError::InvalidArgument(
+                "Too many parameters".to_string(),
+            ));
+        }
+
+        let validator_id = split
+            .get(0)
+            // filter an empty string
+            .filter(|string| !string.is_empty())
+            // then try to map it to ValidatorId
+            .map(|string| string.parse())
+            // Transpose in order to check for an error from the conversion
+            .transpose()?;
+
+        let message_types = split
+            .get(1)
+            .filter(|string| !string.is_empty())
+            .map(|string| string.split('+').map(|s| s.to_string()).collect());
+
+        Ok((validator_id, message_types.unwrap_or_default()))
+    }
+
+    /// `GET /v5/channel/0xXXX.../validator-messages`
+    /// with query parameters: [`ValidatorMessagesListQuery`].
+    pub async fn list_validator_messages<C: Locked + 'static>(
+        req: Request<Body>,
+        app: &Application<C>,
+        validator_id: &Option<ValidatorId>,
+        message_types: &[String],
+    ) -> Result<Response<Body>, ResponseError> {
+        let query = serde_urlencoded::from_str::<ValidatorMessagesListQuery>(
+            req.uri().query().unwrap_or(""),
+        )?;
+
+        let channel = req
+            .extensions()
+            .get::<Channel>()
+            .expect("Request should have Channel");
+
+        let config_limit = app.config.msgs_find_limit as u64;
+        let limit = query
+            .limit
+            .filter(|n| *n >= 1)
+            .unwrap_or(config_limit)
+            .min(config_limit);
+
+        let validator_messages =
+            get_validator_messages(&app.pool, &channel.id(), validator_id, message_types, limit)
+                .await?;
+
+        let response = ValidatorMessageResponse { validator_messages };
+
+        Ok(success_response(serde_json::to_string(&response)?))
+    }
+
+    /// `POST /v5/channel/0xXXX.../validator-messages` with Request body (json):
+    /// ```json
+    /// {
+    ///     "messages": [
+    ///         /// validator messages
+    ///         ...
+    ///     ]
+    /// }
+    /// ```
+    ///
+    /// Validator messages: [`MessageTypes`]
+    pub async fn create_validator_messages<C: Locked + 'static>(
+        req: Request<Body>,
+        app: &Application<C>,
+    ) -> Result<Response<Body>, ResponseError> {
+        let session = req
+            .extensions()
+            .get::<Auth>()
+            .expect("auth request session")
+            .to_owned();
+
+        let channel = req
+            .extensions()
+            .get::<Channel>()
+            .expect("Request should have Channel")
+            .to_owned();
+
+        let into_body = req.into_body();
+        let body = hyper::body::to_bytes(into_body).await?;
+
+        let request_body = serde_json::from_slice::<HashMap<String, Vec<MessageTypes>>>(&body)?;
+        let messages = request_body
+            .get("messages")
+            .ok_or_else(|| ResponseError::BadRequest("missing messages body".to_string()))?;
+
+        match channel.find_validator(session.uid) {
+            None => Err(ResponseError::Unauthorized),
+            _ => {
+                try_join_all(messages.iter().map(|message| {
+                    insert_validator_messages(&app.pool, &channel, &session.uid, message)
+                }))
+                .await?;
+
+                Ok(success_response(serde_json::to_string(&SuccessResponse {
+                    success: true,
+                })?))
+            }
+        }
+    }
 }
 
 #[cfg(test)]
