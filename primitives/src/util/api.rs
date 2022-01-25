@@ -64,6 +64,10 @@ impl ApiUrl {
     pub fn to_url(&self) -> Url {
         self.0.clone()
     }
+
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
 }
 
 impl fmt::Debug for ApiUrl {
