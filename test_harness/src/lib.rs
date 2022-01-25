@@ -209,16 +209,21 @@ mod tests {
     use super::*;
     use adapter::ethereum::test_util::{GANACHE_URL, KEYSTORES};
     use adapter::{prelude::*, Adapter, Ethereum};
+    use chrono::Utc;
     use primitives::{
-        balances::CheckedState,
+        balances::{CheckedState, UncheckedState},
         sentry::{campaign_create::CreateCampaign, AccountingResponse, Event, SuccessResponse},
         spender::Spender,
         test_util::{ADVERTISER, DUMMY_AD_UNITS, DUMMY_IPFS, GUARDIAN, GUARDIAN_2, PUBLISHER},
         util::{logging::new_logger, ApiUrl},
+        validator::{ApproveState, MessageTypes, NewState},
         Balances, BigNum, Campaign, CampaignId, Channel, ChannelId, UnifiedNum,
     };
     use reqwest::{Client, StatusCode};
-    use validator_worker::{sentry_interface::Validator, worker::Worker, SentryApi};
+    use validator_worker::{
+        follower, follower::ApproveStateResult, leader, sentry_interface::Validator,
+        worker::Worker, GetStateRoot, SentryApi,
+    };
 
     #[tokio::test]
     #[ignore = "We use a snapshot, however, we have left this test for convenience"]
@@ -230,7 +235,7 @@ mod tests {
     }
 
     static CAMPAIGN_1: Lazy<Campaign> = Lazy::new(|| {
-        use chrono::{TimeZone, Utc};
+        use chrono::TimeZone;
         use primitives::{
             campaign::{Active, Pricing, PricingBounds, Validators},
             targeting::Rules,
@@ -310,10 +315,10 @@ mod tests {
     /// This Campaign's Channel has switched leader & follower compared to [`CAMPAIGN_1`]
     ///
     /// `Channel.leader = VALIDATOR["follower"].address`
-    /// `Channel.follower = VALIDATOR["leader"],address`
+    /// `Channel.follower = VALIDATOR["leader"].address`
     /// See [`VALIDATORS`] for more details.
     static CAMPAIGN_2: Lazy<Campaign> = Lazy::new(|| {
-        use chrono::{TimeZone, Utc};
+        use chrono::TimeZone;
         use primitives::{
             campaign::{Active, Pricing, PricingBounds, Validators},
             targeting::Rules,
@@ -883,6 +888,379 @@ mod tests {
             .bearer_auth(token)
             .send()
             .await?)
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn leader_and_follower_tick_test() {
+        // Use snapshot contracts
+        let contracts = SNAPSHOT_CONTRACTS.clone();
+
+        let leader = VALIDATORS[&LEADER].clone();
+        let follower = VALIDATORS[&FOLLOWER].clone();
+
+        // setup Sentry & returns Adapter
+        let leader_adapter = setup_sentry(&leader)
+            .await
+            .unlock()
+            .expect("Failed to unlock Leader ethereum adapter");
+        let follower_adapter = setup_sentry(&follower)
+            .await
+            .unlock()
+            .expect("Failed to unlock Follower ethereum adapter");
+
+        let leader_sentry = {
+            // should get self Auth from Leader's EthereumAdapter
+            let leader_auth = leader_adapter
+                .get_auth(leader_adapter.whoami())
+                .expect("Get authentication");
+            let whoami_validator = Validator {
+                url: leader.sentry_url.clone(),
+                token: leader_auth,
+            };
+
+            SentryApi::new(
+                leader_adapter.clone(),
+                new_logger(&leader.worker_logger_prefix),
+                leader.config.clone(),
+                whoami_validator,
+            )
+            .expect("Should create new SentryApi for the Leader Worker")
+        };
+
+        // leader::tick() accepts a sentry instance with validators to propagate to
+        let leader_sentry_with_propagate = {
+            let all_channels_validators = leader_sentry
+                .collect_channels()
+                .await
+                .expect("Should collect channels");
+
+            leader_sentry
+                .clone()
+                .with_propagate(all_channels_validators.1)
+        };
+
+        let follower_sentry = {
+            // should get self Auth from Follower's EthereumAdapter
+            let follower_auth = follower_adapter
+                .get_auth(follower_adapter.whoami())
+                .expect("Get authentication");
+            let whoami_validator = Validator {
+                url: follower.sentry_url.clone(),
+                token: follower_auth,
+            };
+
+            SentryApi::new(
+                follower_adapter.clone(),
+                new_logger(&follower.worker_logger_prefix),
+                follower.config.clone(),
+                whoami_validator,
+            )
+            .expect("Should create new SentryApi for the Leader Worker")
+        };
+
+        // follower::tick() accepts a sentry instance with validators to propagate to
+        let follower_sentry_with_propagate = {
+            let all_channels_validators = follower_sentry
+                .collect_channels()
+                .await
+                .expect("Should collect channels");
+
+            follower_sentry
+                .clone()
+                .with_propagate(all_channels_validators.1)
+        };
+
+        let api_client = reqwest::Client::new();
+        let advertiser_adapter = Adapter::new(
+            Ethereum::init(KEYSTORES[&ADVERTISER].clone(), &GANACHE_CONFIG)
+                .expect("Should initialize creator adapter"),
+        )
+        .unlock()
+        .expect("Should unlock advertiser's Ethereum Adapter");
+        let leader_token = advertiser_adapter
+            .get_auth(leader_adapter.whoami())
+            .expect("Get authentication");
+
+        let follower_token = advertiser_adapter
+            .get_auth(follower_adapter.whoami())
+            .expect("Get authentication");
+        let create_campaign_1 = CreateCampaign::from_campaign(CAMPAIGN_1.clone());
+
+        create_campaign(
+            &api_client,
+            &leader.sentry_url,
+            &leader_token,
+            &create_campaign_1,
+        )
+        .await
+        .expect("Should return Response");
+
+        create_campaign(
+            &api_client,
+            &follower.sentry_url,
+            &follower_token,
+            &create_campaign_1,
+        )
+        .await
+        .expect("Should return Response");
+
+        // Testing leader tick
+        // Balances is empty
+        // We are just testing if all the calls in the tick function go through for now
+        // New state should be none because we haven't propagated any message
+        // a heartbeat will be generated because there isn't an existing one
+        {
+            let balances = Balances::new();
+            let tick_status = leader::tick(
+                &leader_sentry_with_propagate,
+                CAMPAIGN_1.channel,
+                balances,
+                &contracts.token.0,
+            )
+            .await
+            .expect("should tick");
+            assert!(tick_status.new_state.is_none());
+            assert!(tick_status.heartbeat.is_some());
+        }
+
+        // Testing leader tick with existing balances but conditions to generate NewState aren't met
+        // should_generate_new_state can also be false if accounting_balance
+        // for spender is ≤ new_state.balances for spender AND the same is true for earners.
+        // No new heartbeat will be generated because we have the heartbeat from the previous test case
+        // A new heartbeat will be generated only if the old one is older than config.heartbeat_time
+        {
+            let accounting_balances = get_test_accounting_balances();
+
+            let new_state = get_new_state_msg(
+                &leader_sentry,
+                &accounting_balances,
+                contracts.token.0.precision.get(),
+            );
+
+            leader_sentry_with_propagate
+                .propagate(
+                    CAMPAIGN_1.channel.id(),
+                    &[&MessageTypes::NewState(new_state)],
+                )
+                .await;
+
+            let tick_status = leader::tick(
+                &leader_sentry_with_propagate,
+                CAMPAIGN_1.channel,
+                accounting_balances,
+                &contracts.token.0,
+            )
+            .await
+            .expect("should tick");
+
+            assert!(
+                tick_status.new_state.is_none(),
+                "No new_state message should be generated because balances haven't changed"
+            );
+            assert!(tick_status.heartbeat.is_none(), "No heartbeat message should be generated because the last one was generated in less time than config.heartbeat_time");
+        }
+
+        // Verify new_state and heartbeats are as expected after on_new_accounting() is called
+        {
+            let mut accounting_balances = get_test_accounting_balances();
+
+            let new_state = get_new_state_msg(
+                &leader_sentry,
+                &accounting_balances,
+                contracts.token.0.precision.get(),
+            );
+
+            leader_sentry_with_propagate
+                .propagate(
+                    CAMPAIGN_1.channel.id(),
+                    &[&MessageTypes::NewState(new_state)],
+                )
+                .await;
+
+            // Balances are being changed since the last propagated message ensuring that a new NewState will be generated
+            accounting_balances
+                .spend(CAMPAIGN_1.creator, *PUBLISHER, UnifiedNum::from(9_000))
+                .expect("Should spend for Publisher");
+
+            let tick_status = leader::tick(
+                &leader_sentry_with_propagate,
+                CAMPAIGN_1.channel,
+                accounting_balances,
+                &contracts.token.0,
+            )
+            .await
+            .expect("should tick");
+
+            assert!(
+                tick_status.new_state.is_some(),
+                "A NewState message should be generated because the balances will differ"
+            );
+
+            let propagation_result = tick_status.new_state.unwrap();
+            assert_eq!(propagation_result.len(), 1);
+            assert_eq!(
+                propagation_result.get(0).unwrap().as_ref().unwrap(),
+                &CAMPAIGN_1.channel.leader
+            );
+            assert!(tick_status.heartbeat.is_none(), "No heartbeat message should be generated because the last one was generated in less time than config.heartbeat_time");
+        }
+
+        // Testing follower tick
+        // Test case where the new state state_root matches the latest and a heartbeat is generated
+        {
+            let accounting_balances = get_test_accounting_balances();
+
+            let new_state = get_new_state_msg(
+                &leader_sentry,
+                &accounting_balances,
+                contracts.token.0.precision.get(),
+            );
+
+            let approve_state = ApproveState {
+                state_root: new_state.state_root.clone(),
+                signature: new_state.signature.clone(),
+                is_healthy: true,
+            };
+
+            // Propagating a NewState message to the leader sentry
+            leader_sentry_with_propagate
+                .propagate(
+                    CAMPAIGN_1.channel.id(),
+                    &[&MessageTypes::NewState(new_state.clone())],
+                )
+                .await;
+
+            // Propagating an NewState/ApproveState pair to the follower sentry
+            follower_sentry_with_propagate
+                .propagate(
+                    CAMPAIGN_1.channel.id(),
+                    &[
+                        &MessageTypes::ApproveState(approve_state),
+                        &MessageTypes::NewState(new_state),
+                    ],
+                )
+                .await;
+
+            let tick_result = follower::tick(
+                &follower_sentry_with_propagate,
+                CAMPAIGN_1.channel,
+                HashMap::new(),
+                accounting_balances,
+                &contracts.token.0,
+            )
+            .await
+            .expect("should tick");
+
+            assert!(tick_result.heartbeat.is_some(), "A heartbeat should be generated because one hasn't been generated yet for the follower");
+            assert!(matches!(
+                tick_result.approve_state,
+                ApproveStateResult::Sent(None),
+            ), "State roots for latest NewState and ApproveState should match therefore we don't need to approve a NewState");
+        }
+
+        // Testing follower tick
+        // Test case where there is no ApproveState for the follower so one has to be generated
+        {
+            let mut accounting_balances = get_test_accounting_balances();
+
+            let new_state = get_new_state_msg(
+                &leader_sentry,
+                &accounting_balances,
+                contracts.token.0.precision.get(),
+            );
+
+            let approve_state = ApproveState {
+                state_root: new_state.state_root.clone(),
+                signature: new_state.signature.clone(),
+                is_healthy: true,
+            };
+
+            leader_sentry_with_propagate
+                .propagate(
+                    CAMPAIGN_1.channel.id(),
+                    &[&MessageTypes::NewState(new_state)],
+                )
+                .await;
+
+            follower_sentry_with_propagate
+                .propagate(
+                    CAMPAIGN_1.channel.id(),
+                    &[&MessageTypes::ApproveState(approve_state)],
+                )
+                .await;
+
+            accounting_balances
+                .spend(CAMPAIGN_1.creator, *PUBLISHER, UnifiedNum::from(9_000))
+                .expect("Should spend for Publisher");
+
+            // Propagating a new NewState so that the follower has to generate an ApproveState message
+            let new_state = get_new_state_msg(
+                &leader_sentry,
+                &accounting_balances,
+                contracts.token.0.precision.get(),
+            );
+
+            leader_sentry_with_propagate
+                .propagate(
+                    CAMPAIGN_1.channel.id(),
+                    &[&MessageTypes::NewState(new_state)],
+                )
+                .await;
+
+            let tick_result = follower::tick(
+                &follower_sentry_with_propagate,
+                CAMPAIGN_1.channel,
+                HashMap::new(),
+                accounting_balances,
+                &contracts.token.0,
+            )
+            .await
+            .expect("should tick");
+
+            assert!(tick_result.heartbeat.is_none(), "No heartbeat should be sent as a recent one has already been generated for the followe");
+            assert!(
+                matches!(tick_result.approve_state, ApproveStateResult::Sent(Some(_))),
+                "ApproveState has been sent successfully"
+            );
+        }
+    }
+
+    fn get_new_state_msg<C: Unlocked + 'static>(
+        sentry: &SentryApi<C, ()>,
+        accounting_balances: &Balances,
+        precision: u8,
+    ) -> NewState<UncheckedState> {
+        let state_root = accounting_balances
+            .encode(CAMPAIGN_1.channel.id(), precision)
+            .expect("should encode");
+        let signature = sentry.adapter.sign(&state_root).expect("should sign");
+        NewState {
+            state_root: state_root.to_string(),
+            signature,
+            balances: accounting_balances.clone().into_unchecked(),
+        }
+    }
+
+    fn get_test_accounting_balances() -> Balances {
+        let mut accounting_balances = Balances::new();
+        accounting_balances
+            .spend(
+                CAMPAIGN_1.creator,
+                CAMPAIGN_1.channel.leader.to_address(),
+                UnifiedNum::from(27_000),
+            )
+            .expect("Should spend for Leader");
+        accounting_balances
+            .spend(
+                CAMPAIGN_1.creator,
+                CAMPAIGN_1.channel.follower.to_address(),
+                UnifiedNum::from(18_000),
+            )
+            .expect("Should spend for Follower");
+        accounting_balances
+            .spend(CAMPAIGN_1.creator, *PUBLISHER, UnifiedNum::from(9_000))
+            .expect("Should spend for Publisher");
+        accounting_balances
     }
 }
 pub mod run {

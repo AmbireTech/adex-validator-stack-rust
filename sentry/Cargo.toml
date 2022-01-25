@@ -27,13 +27,21 @@ hex = "0.4"
 clap = "^2.33"
 # Server
 tokio = { version = "1", features = ["macros", "time", "rt-multi-thread"] }
-hyper = { version = "0.14", features = ["stream", "runtime", "http1", "server"] }
+hyper = { version = "0.14", features = [
+  "stream",
+  "runtime",
+  "http1",
+  "server",
+] }
 regex = "1"
 # Database
 redis = { version = "0.20", features = ["aio", "tokio-comp"] }
 deadpool = "0.8.0"
 deadpool-postgres = "0.9.0"
-tokio-postgres = { version = "0.7.0", features = ["with-chrono-0_4", "with-serde_json-1"] }
+tokio-postgres = { version = "0.7.0", features = [
+  "with-chrono-0_4",
+  "with-serde_json-1",
+] }
 postgres-types = { version = "0.2.1", features = [
   "derive",
   "with-chrono-0_4",
@@ -56,4 +64,3 @@ once_cell = "1.5.2"
 
 [dev-dependencies]
 pretty_assertions = "1"
-
