@@ -5,7 +5,7 @@ use primitives::{
     balances::CheckedState,
     config::TokenInfo,
     validator::{MessageError, MessageTypes, NewState},
-    Balances, Channel, ChannelId,
+    Balances, Channel,
 };
 
 use crate::{
@@ -91,24 +91,24 @@ pub async fn tick<C: Unlocked + 'static>(
 
     // Create a `NewState` if balances have changed
     let new_state = if should_generate_new_state {
-        Some(on_new_accounting(sentry, channel.id(), accounting_balances, token).await?)
+        Some(on_new_accounting(sentry, channel, accounting_balances, token).await?)
     } else {
         None
     };
 
     Ok(TickStatus {
-        heartbeat: heartbeat(sentry, channel.id()).await?,
+        heartbeat: heartbeat(sentry, channel).await?,
         new_state,
     })
 }
 
 async fn on_new_accounting<C: Unlocked + 'static>(
     sentry: &SentryApi<C>,
-    channel: ChannelId,
+    channel: Channel,
     accounting_balances: Balances<CheckedState>,
     token: &TokenInfo,
 ) -> Result<Vec<PropagationResult>, Error> {
-    let state_root = accounting_balances.encode(channel, token.precision.get())?;
+    let state_root = accounting_balances.encode(channel.id(), token.precision.get())?;
 
     let signature = sentry.adapter.sign(&state_root)?;
 
