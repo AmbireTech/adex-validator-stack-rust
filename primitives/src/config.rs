@@ -10,14 +10,6 @@ use thiserror::Error;
 
 pub use toml::de::Error as TomlError;
 
-#[deprecated = "Use Ganache instead!"]
-pub static DEVELOPMENT_CONFIG: Lazy<Config> = Lazy::new(|| GANACHE_CONFIG.clone());
-
-pub static GOERLI_CONFIG: Lazy<Config> = Lazy::new(|| {
-    toml::from_str(include_str!("../../docs/config/goerli.toml"))
-        .expect("Failed to parse dev.toml config file")
-});
-
 pub static PRODUCTION_CONFIG: Lazy<Config> = Lazy::new(|| {
     toml::from_str(include_str!("../../docs/config/prod.toml"))
         .expect("Failed to parse prod.toml config file")
@@ -33,6 +25,7 @@ pub static GANACHE_CONFIG: Lazy<Config> = Lazy::new(|| {
 /// The environment in which the application is running
 /// Defaults to [`Environment::Development`]
 pub enum Environment {
+    /// The default development setup is running `ganache-cli` locally.
     Development,
     Production,
 }
@@ -113,15 +106,6 @@ impl Config {
                 .values()
                 .find(|token_info| token_info.address == token)
                 .map(|token_info| ChainOf::new(chain_info.chain.clone(), token_info.clone()))
-            // if let Some(token_info) = chain_info
-            //     .tokens
-            //     .values()
-            //     .find(|token_info| token_info.address == token)
-            // {
-            //     Some(ChainOf::new(chain_info.chain.clone(), token_info.clone()))
-            // } else {
-            //     None
-            // }
         })
     }
 }
