@@ -990,13 +990,10 @@ mod tests {
 
             // Propagating the NewState message to both validators
             leader_sentry_with_propagate
-                .propagate(
-                    new_channel.id(),
-                    &[&MessageTypes::NewState(new_state.clone())],
-                )
+                .propagate(new_channel, &[&MessageTypes::NewState(new_state.clone())])
                 .await;
             follower_sentry_with_propagate
-                .propagate(new_channel.id(), &[&MessageTypes::NewState(new_state)])
+                .propagate(new_channel, &[&MessageTypes::NewState(new_state)])
                 .await;
 
             // leader single worker tick
@@ -1073,13 +1070,10 @@ mod tests {
 
             // Propagating a new NewState so that we can verify it updates properly
             leader_sentry_with_propagate
-                .propagate(
-                    new_channel.id(),
-                    &[&MessageTypes::NewState(new_state.clone())],
-                )
+                .propagate(new_channel, &[&MessageTypes::NewState(new_state.clone())])
                 .await;
             follower_sentry_with_propagate
-                .propagate(new_channel.id(), &[&MessageTypes::NewState(new_state)])
+                .propagate(new_channel, &[&MessageTypes::NewState(new_state)])
                 .await;
 
             let newstate = leader_sentry_with_propagate
@@ -1160,7 +1154,7 @@ mod tests {
             // Propagating a NewState message to the leader sentry
             leader_sentry_with_propagate
                 .propagate(
-                    campaign.channel.id(),
+                    campaign.channel,
                     &[&MessageTypes::NewState(new_state.clone())],
                 )
                 .await;
@@ -1168,7 +1162,7 @@ mod tests {
             // Propagating an NewState and ApproveState  to the follower sentry
             follower_sentry_with_propagate
                 .propagate(
-                    campaign.channel.id(),
+                    campaign.channel,
                     &[
                         &MessageTypes::ApproveState(approve_state),
                         &MessageTypes::NewState(new_state),
@@ -1220,13 +1214,13 @@ mod tests {
 
             leader_sentry_with_propagate
                 .propagate(
-                    campaign.channel.id(),
+                    campaign.channel,
                     &[&MessageTypes::NewState(new_state.clone())],
                 )
                 .await;
             follower_sentry_with_propagate
                 .propagate(
-                    campaign.channel.id(),
+                    campaign.channel,
                     &[
                         &MessageTypes::NewState(new_state),
                         &MessageTypes::ApproveState(approve_state),
