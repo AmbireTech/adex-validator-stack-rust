@@ -223,10 +223,7 @@ mod tests {
         Balances, BigNum, Campaign, CampaignId, Channel, ChannelId, UnifiedNum,
     };
     use reqwest::{Client, StatusCode};
-    use validator_worker::{
-        follower, follower::ApproveStateResult, leader, sentry_interface::Validator,
-        worker::Worker, GetStateRoot, SentryApi,
-    };
+    use validator_worker::{sentry_interface::Validator, worker::Worker, GetStateRoot, SentryApi};
 
     #[tokio::test]
     #[ignore = "We use a snapshot, however, we have left this test for convenience"]
@@ -814,11 +811,13 @@ mod tests {
         }
 
         // Running validator worker tests
-        leader_and_follower_tick_test(
+        test_leader_and_follower_loop(
             leader_sentry,
             follower_sentry,
             leader_adapter,
             follower_adapter,
+            leader_worker,
+            follower_worker,
         )
         .await;
     }
@@ -902,11 +901,14 @@ mod tests {
             .await?)
     }
 
-    async fn leader_and_follower_tick_test<C: Unlocked + 'static>(
+    // Potential TODO's: Merge both test cases into one and find a way to retrieve heartbeats
+    async fn test_leader_and_follower_loop<C: Unlocked + 'static>(
         leader_sentry: SentryApi<C, ()>,
         follower_sentry: SentryApi<C, ()>,
         leader_adapter: Adapter<Ethereum<UnlockedWallet>, UnlockedState>,
         follower_adapter: Adapter<Ethereum<UnlockedWallet>, UnlockedState>,
+        leader_worker: Worker<Ethereum<UnlockedWallet>>,
+        follower_worker: Worker<Ethereum<UnlockedWallet>>,
     ) {
         let mut new_channel = CAMPAIGN_1.channel.clone();
         new_channel.nonce = 1_u64.into();
@@ -975,63 +977,8 @@ mod tests {
                 .with_propagate(all_channels_validators.1)
         };
 
-        // Testing leader tick
-        // Balances is empty
-        // We are just testing if all the calls in the tick function go through for now
-        // New state should be none because we haven't propagated any message
-        // a heartbeat will be generated because there isn't an existing one
-        {
-            let balances = Balances::new();
-            let tick_status = leader::tick(
-                &leader_sentry_with_propagate,
-                campaign.channel,
-                balances,
-                &contracts.token.0,
-            )
-            .await
-            .expect("should tick");
-            assert!(
-                tick_status.new_state.is_none(),
-                "No new state will be generated"
-            );
-            assert!(tick_status.heartbeat.is_some(), "This is the first Heartbeat for this channel on this validator so it will be propagated");
-        }
-
-        // Testing leader tick with existing balances but conditions to generate NewState aren't met
-        // should_generate_new_state can also be false if accounting_balance
-        // for spender is ≤ new_state.balances for spender AND the same is true for earners.
-        // No new heartbeat will be generated because we have the heartbeat from the previous test case
-        // A new heartbeat will be generated only if the old one is older than config.heartbeat_time
-        {
-            let accounting_balances = get_test_accounting_balances();
-
-            let new_state = get_new_state_msg(
-                &leader_sentry,
-                &accounting_balances,
-                contracts.token.0.precision.get(),
-            );
-
-            leader_sentry_with_propagate
-                .propagate(campaign.channel.id(), &[&MessageTypes::NewState(new_state)])
-                .await;
-
-            let tick_status = leader::tick(
-                &leader_sentry_with_propagate,
-                campaign.channel,
-                accounting_balances,
-                &contracts.token.0,
-            )
-            .await
-            .expect("should tick");
-
-            assert!(
-                tick_status.new_state.is_none(),
-                "No new_state message should be generated because balances haven't changed"
-            );
-            assert!(tick_status.heartbeat.is_none(), "No heartbeat message should be generated because the last one was generated in less time than config.heartbeat_time");
-        }
-
-        // Verify new_state and heartbeats are as expected after on_new_accounting() is called
+        // Testing propagation and retrieval of NewState messages, verification of balances
+        // We make a NewState message, propagate it, update the balances and send a second message with the new balances
         {
             let mut accounting_balances = get_test_accounting_balances();
 
@@ -1041,49 +988,162 @@ mod tests {
                 contracts.token.0.precision.get(),
             );
 
+            // Propagating the NewState message to both validators
             leader_sentry_with_propagate
-                .propagate(campaign.channel.id(), &[&MessageTypes::NewState(new_state)])
+                .propagate(
+                    new_channel.id(),
+                    &[&MessageTypes::NewState(new_state.clone())],
+                )
                 .await;
+            follower_sentry_with_propagate
+                .propagate(new_channel.id(), &[&MessageTypes::NewState(new_state)])
+                .await;
+
+            // leader single worker tick
+            leader_worker.all_channels_tick().await;
+            // follower single worker tick
+            follower_worker.all_channels_tick().await;
+
+            // Retrieving the NewState message from both validators
+            let newstate = leader_sentry_with_propagate
+                .get_our_latest_msg(new_channel.id(), &["NewState"])
+                .await
+                .expect("should fetch")
+                .unwrap();
+            let newstate_follower = follower_sentry_with_propagate
+                .get_our_latest_msg(new_channel.id(), &["NewState"])
+                .await
+                .expect("should fetch")
+                .unwrap();
+
+            let newstate = NewState::<CheckedState>::try_from(newstate).expect("Should convert");
+            let newstate_follower =
+                NewState::<CheckedState>::try_from(newstate_follower).expect("Should convert");
+
+            assert_eq!(
+                newstate.state_root, newstate_follower.state_root,
+                "Leader/Follower NewStates match"
+            );
+            assert_eq!(
+                newstate
+                    .balances
+                    .spenders
+                    .get(&CAMPAIGN_1.creator)
+                    .expect("Should retrieve spender balance"),
+                &UnifiedNum::from_u64(54000),
+                "Verifying correct spender balance for campaign creator"
+            );
+            assert_eq!(
+                newstate
+                    .balances
+                    .earners
+                    .get(&CAMPAIGN_1.channel.leader.to_address())
+                    .expect("Should retrieve earner balance"),
+                &UnifiedNum::from_u64(27000),
+                "Verifying correct earner balance for leader"
+            );
+            assert_eq!(
+                newstate
+                    .balances
+                    .earners
+                    .get(&CAMPAIGN_1.channel.follower.to_address())
+                    .expect("Should retrieve earner balance"),
+                &UnifiedNum::from_u64(18000),
+                "Verifying correct earner balance for follower"
+            );
+            assert_eq!(
+                newstate
+                    .balances
+                    .earners
+                    .get(&*PUBLISHER)
+                    .expect("Should retrieve earner balance"),
+                &UnifiedNum::from_u64(9000),
+                "Verifying correct earner balance for publisher"
+            );
 
             // Balances are being changed since the last propagated message ensuring that a new NewState will be generated
             accounting_balances
                 .spend(campaign.creator, *PUBLISHER, UnifiedNum::from(9_000))
                 .expect("Should spend for Publisher");
-
-            let tick_status = leader::tick(
-                &leader_sentry_with_propagate,
-                campaign.channel,
-                accounting_balances,
-                &contracts.token.0,
-            )
-            .await
-            .expect("should tick");
-
-            assert!(
-                tick_status.new_state.is_some(),
-                "A NewState message should be generated because the balances will differ"
+            let new_state = get_new_state_msg(
+                &leader_sentry,
+                &accounting_balances,
+                contracts.token.0.precision.get(),
             );
 
-            let propagation_result = tick_status.new_state.unwrap();
+            // Propagating a new NewState so that we can verify it updates properly
+            leader_sentry_with_propagate
+                .propagate(
+                    new_channel.id(),
+                    &[&MessageTypes::NewState(new_state.clone())],
+                )
+                .await;
+            follower_sentry_with_propagate
+                .propagate(new_channel.id(), &[&MessageTypes::NewState(new_state)])
+                .await;
+
+            let newstate = leader_sentry_with_propagate
+                .get_our_latest_msg(new_channel.id(), &["NewState"])
+                .await
+                .expect("should fetch")
+                .unwrap();
+
+            let newstate_follower = follower_sentry_with_propagate
+                .get_our_latest_msg(new_channel.id(), &["NewState"])
+                .await
+                .expect("should fetch")
+                .unwrap();
+
+            let newstate = NewState::<CheckedState>::try_from(newstate).expect("Should convert");
+            let newstate_follower =
+                NewState::<CheckedState>::try_from(newstate_follower).expect("Should convert");
+
             assert_eq!(
-                propagation_result.len(),
-                2,
-                "There should be 2 results - one for the leader and one for the follower"
+                newstate.state_root, newstate_follower.state_root,
+                "Stateroots of the new messages match"
             );
-            propagation_result.into_iter().for_each(|r| {
-                let validator_id = r.expect("There should be a ValidatorId");
-                assert!(
-                    validator_id == campaign.channel.leader
-                        || validator_id == campaign.channel.follower
-                );
-            });
-            assert!(tick_status.heartbeat.is_none(), "No heartbeat message should be generated because the last one was generated in less time than config.heartbeat_time");
+            assert_eq!(
+                newstate
+                    .balances
+                    .spenders
+                    .get(&CAMPAIGN_1.creator)
+                    .expect("Should retrieve spender balance"),
+                &UnifiedNum::from_u64(63000),
+                "Campaign creator spender balances have been updated"
+            );
+            assert_eq!(
+                newstate
+                    .balances
+                    .earners
+                    .get(&CAMPAIGN_1.channel.leader.to_address())
+                    .expect("Should retrieve earner balance"),
+                &UnifiedNum::from_u64(27000),
+                "Leader earner balances have stayed the same"
+            );
+            assert_eq!(
+                newstate
+                    .balances
+                    .earners
+                    .get(&CAMPAIGN_1.channel.follower.to_address())
+                    .expect("Should retrieve earner balance"),
+                &UnifiedNum::from_u64(18000),
+                "Follower earner balances have stayed the same"
+            );
+            assert_eq!(
+                newstate
+                    .balances
+                    .earners
+                    .get(&*PUBLISHER)
+                    .expect("Should retrieve earner balance"),
+                &UnifiedNum::from_u64(18000),
+                "Publisher earner balances have been updated"
+            );
         }
 
-        // Testing follower tick
-        // Test case where the new state state_root matches the latest and a heartbeat is generated
+        // Testing ApproveState propagation, ensures the validator worker and follower are running properly
+        // We propagate a NewState/ApproveState pair, verify they match, then we update
         {
-            let accounting_balances = get_test_accounting_balances();
+            let mut accounting_balances = get_test_accounting_balances();
 
             let new_state = get_new_state_msg(
                 &leader_sentry,
@@ -1105,7 +1165,7 @@ mod tests {
                 )
                 .await;
 
-            // Propagating an NewState/ApproveState pair to the follower sentry
+            // Propagating an NewState and ApproveState  to the follower sentry
             follower_sentry_with_propagate
                 .propagate(
                     campaign.channel.id(),
@@ -1115,96 +1175,88 @@ mod tests {
                     ],
                 )
                 .await;
+            // leader single worker tick
+            leader_worker.all_channels_tick().await;
+            // follower single worker tick
+            follower_worker.all_channels_tick().await;
 
-            let tick_status = follower::tick(
-                &follower_sentry_with_propagate,
-                campaign.channel,
-                HashMap::new(),
-                accounting_balances,
-                &contracts.token.0,
-            )
-            .await
-            .expect("should tick");
+            let res = follower_sentry_with_propagate
+                .get_last_approved(new_channel.id())
+                .await
+                .expect("should retrieve");
+            assert!(res.last_approved.is_some(), "We have a last_approved pair");
+            let last_approved = res.last_approved.unwrap();
+            assert!(
+                last_approved.new_state.is_some(),
+                "We have a new_state in last_approved"
+            );
+            assert!(
+                last_approved.approve_state.is_some(),
+                "We have approve_state in last_approved"
+            );
+            let new_state_root = &last_approved.new_state.unwrap().msg.state_root;
+            let approve_state_root = &last_approved.approve_state.unwrap().msg.state_root;
+            assert_eq!(
+                new_state_root, approve_state_root,
+                "NewState and ApproveState state roots match"
+            );
 
-            assert!(tick_status.heartbeat.is_some(), "This is the first Heartbeat for this channel on this validator so it will be propagated");
-            assert!(matches!(
-                tick_status.approve_state,
-                ApproveStateResult::Sent(None),
-            ), "State roots for latest NewState and ApproveState should match therefore we don't need to approve a NewState");
+            accounting_balances
+                .spend(campaign.creator, *PUBLISHER, UnifiedNum::from(9_000))
+                .expect("Should spend for Publisher");
+
+            // Propagating a new NewState so that the follower has to generate an ApproveState message
+            let new_state = get_new_state_msg(
+                &leader_sentry,
+                &accounting_balances,
+                contracts.token.0.precision.get(),
+            );
+
+            let approve_state = ApproveState {
+                state_root: new_state.state_root.clone(),
+                signature: new_state.signature.clone(),
+                is_healthy: true,
+            };
+
+            leader_sentry_with_propagate
+                .propagate(
+                    campaign.channel.id(),
+                    &[&MessageTypes::NewState(new_state.clone())],
+                )
+                .await;
+            follower_sentry_with_propagate
+                .propagate(
+                    campaign.channel.id(),
+                    &[
+                        &MessageTypes::NewState(new_state),
+                        &MessageTypes::ApproveState(approve_state),
+                    ],
+                )
+                .await;
+
+            // leader single worker tick
+            leader_worker.all_channels_tick().await;
+            // follower single worker tick
+            follower_worker.all_channels_tick().await;
+
+            let res = follower_sentry_with_propagate
+                .get_last_approved(new_channel.id())
+                .await
+                .expect("should retrieve");
+            assert!(res.last_approved.is_some(), "We have a last_approved");
+            let new_last_approved = res.last_approved.unwrap();
+
+            assert_ne!(
+                &new_last_approved.new_state.unwrap().msg.state_root,
+                new_state_root,
+                "NewState is different from the last pair"
+            );
+            assert_ne!(
+                &new_last_approved.approve_state.unwrap().msg.state_root,
+                approve_state_root,
+                "ApproveState is different from the last pair"
+            );
         }
-
-        // Note: The way the 2nd NewState message is generated makes it not pass the checks in on_new_state(), leaving test case commented out for now
-        // Testing follower tick
-        // Test case where there is no ApproveState for the follower so one has to be generated
-        // {
-        //     let mut accounting_balances = get_test_accounting_balances();
-
-        //     let new_state = get_new_state_msg(
-        //         &leader_sentry,
-        //         &accounting_balances,
-        //         contracts.token.0.precision.get(),
-        //     );
-
-        //     let approve_state = ApproveState {
-        //         state_root: new_state.state_root.clone(),
-        //         signature: new_state.signature.clone(),
-        //         is_healthy: true,
-        //     };
-
-        //     leader_sentry_with_propagate
-        //         .propagate(
-        //             campaign.channel.id(),
-        //             &[&MessageTypes::NewState(new_state.clone())],
-        //         )
-        //         .await;
-
-        //     follower_sentry_with_propagate
-        //         .propagate(
-        //             campaign.channel.id(),
-        //             &[
-        //                 &MessageTypes::NewState(new_state),
-        //                 &MessageTypes::ApproveState(approve_state),
-        //             ],
-        //         )
-        //         .await;
-
-        //     accounting_balances
-        //         .spend(campaign.creator, *PUBLISHER, UnifiedNum::from(9_000))
-        //         .expect("Should spend for Publisher");
-
-        //     // Propagating a new NewState so that the follower has to generate an ApproveState message
-        //     let new_state = get_new_state_msg(
-        //         &leader_sentry,
-        //         &accounting_balances,
-        //         contracts.token.0.precision.get(),
-        //     );
-
-        //     leader_sentry_with_propagate
-        //         .propagate(
-        //             campaign.channel.id(),
-        //             &[&MessageTypes::NewState(new_state.clone())],
-        //         )
-        //         .await;
-        //     follower_sentry_with_propagate
-        //         .propagate(campaign.channel.id(), &[&MessageTypes::NewState(new_state)])
-        //         .await;
-
-        //     let tick_status = follower::tick(
-        //         &follower_sentry_with_propagate,
-        //         campaign.channel,
-        //         HashMap::new(),
-        //         accounting_balances,
-        //         &contracts.token.0,
-        //     )
-        //     .await
-        //     .expect("should tick");
-
-        //     assert!(tick_status.heartbeat.is_none(), "No heartbeat should be sent as a recent one has already been generated for the followe");
-        //     assert!(
-        //         matches!(tick_status.approve_state, ApproveStateResult::Sent(Some(_))),
-        //         "ApproveState has been sent successfully"
-        //     );
-        // }
     }
 
     fn get_new_state_msg<C: Unlocked + 'static>(
