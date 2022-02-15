@@ -22,39 +22,65 @@ channel_tick_timeout = 5000
 ip_rate_limit = { type = 'ip', timeframe = 20000 }
 sid_rate_limit = { type = 'sid', timeframe = 20000 }
 
-# TODO: Replace with real contract address
-outpace_address = '0x333420fc6a897356e69b62417cd17ff012177d2b'
-# TODO: Replace with real contract address
-sweeper_address = '0x333420fc6a897356e69b62417cd17ff012177d2b'
-
-ethereum_network = 'http://localhost:8545'
-
 creators_whitelist = []
 validators_whitelist = []
 admins = ['0xce07CbB7e054514D590a0262C93070D838bFBA2e']
 
-[[token_address_whitelist]]
-# DAI
-address = '0x73967c6a0904aa032c103b4104747e88c566b1a2'
-# 1 * 10^-10 = 0.0_000_000_001
-min_token_units_for_deposit = '100000000'
-min_validator_fee = '100000000'
-precision = 18
+# Ethereum mainnet tokens
+[chain."Ethereum Mainnet"]
+# Ethereum Mainnet for testing
+chain_id = 1
+rpc = "http://localhost:8545"
+# Start TODO: Replace with Both addresss with the real contracts addresses
+outpace = '0x333420fc6a897356e69b62417cd17ff012177d2b'
+sweeper = '0x333420fc6a897356e69b62417cd17ff012177d2b'
+# End TODO
 
-[[token_address_whitelist]]
-# USDT
-address = '0x509ee0d083ddf8ac028f2a56731412edd63223b9'
-# 1.000_000
-min_token_units_for_deposit = '1000000'
-# 0.001
-min_validator_fee = '1000'
-precision = 6
+    [chain."Ethereum Mainnet".token.DAI]
+    address = '0x6B175474E89094C44Da98b954EedeAC495271d0F' # checked
+    precision = 18
+    # 1 * 10^-10 = 0.0_000_000_001
+    min_token_units_for_deposit = '100000000'
+    min_validator_fee = '100000000'
 
-[[token_address_whitelist]]
-# USDC
-address = '0x44dcfcead37be45206af6079648988b29284b2c6'
-# 1.000_000
-min_token_units_for_deposit = '100000000'
-# 0.001
-min_validator_fee = '1000'
-precision = 6
+    [chain."Ethereum Mainnet".token.USDT]
+    address = '0xdAC17F958D2ee523a2206206994597C13D831ec7' # checked
+    precision = 6
+    # 1.000_000
+    min_token_units_for_deposit = '1000000'
+    # 0.001
+    min_validator_fee = '1000'
+
+    [chain."Ethereum Mainnet".token.USDC]
+    address = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' # checked
+    precision = 6
+    # 1.000_000
+    min_token_units_for_deposit = '1000000'
+    # 0.001
+    min_validator_fee = '1000'
+
+
+[chain."Ethereum Ropsten"]
+chain_id = 3
+rpc = "http://localhost:8546"
+# Start TODO: Replace with Both addresss with the real contracts addresses
+outpace = '0x333420fc6a897356e69b62417cd17ff012177d2b'
+sweeper = '0x333420fc6a897356e69b62417cd17ff012177d2b'
+# End TODO
+
+    [chain."Ethereum Ropsten".token.DAI]
+    address = '0x65600c50Ea42e225368Ded6c3789a539284aA62C' # checked
+    precision = 18
+    # 1 * 10^-10 = 0.0_000_000_001
+    min_token_units_for_deposit = '100000000'
+    min_validator_fee = '100000000'
+
+    # [chain."Ethereum Ropsten".token.USDT]
+    # address = '0xaF5DcEBba2f8bEc8729117336b2FE8B4E0D99b0B'
+    # [chain."Ethereum Ropsten".token.USDC]
+    # address = '0x8b544241B8115B5Da36d6fa644262e7FE60fE67F'
+
+# [chain."Binance Smart Chain Mainnet"]
+# chain_id = 56
+# rpc = "http://localhost:8545"
+

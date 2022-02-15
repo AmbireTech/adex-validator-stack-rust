@@ -169,7 +169,7 @@ mod test {
 
     use chrono::TimeZone;
     use primitives::{
-        config::DEVELOPMENT_CONFIG,
+        config::GANACHE_CONFIG,
         event_submission::{RateLimit, Rule},
         sentry::Event,
         util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, IDS},
@@ -187,7 +187,7 @@ mod test {
 
     async fn setup() -> (Config, Object<Manager>) {
         let connection = TESTS_POOL.get().await.expect("Should return Object");
-        let config = DEVELOPMENT_CONFIG.clone();
+        let config = GANACHE_CONFIG.clone();
 
         (config, connection)
     }
@@ -217,9 +217,23 @@ mod test {
     async fn session_uid_rate_limit() {
         let (config, database) = setup().await;
 
+        let rule = Rule {
+            uids: None,
+            rate_limit: Some(RateLimit {
+                limit_type: "sid".to_string(),
+                time_frame: Duration::from_millis(20_000),
+            }),
+        };
+        let campaign = get_campaign(rule);
+
+        let chain_context = config
+            .find_chain_token(campaign.channel.token)
+            .expect("Campaign's Channel.token should be set in config");
+
         let auth = Auth {
             era: 0,
             uid: IDS["follower"],
+            chain: chain_context.chain.clone(),
         };
 
         let session = Session {
@@ -229,15 +243,7 @@ mod test {
             os: None,
         };
 
-        let rule = Rule {
-            uids: None,
-            rate_limit: Some(RateLimit {
-                limit_type: "sid".to_string(),
-                time_frame: Duration::from_millis(20_000),
-            }),
-        };
         let events = get_impression_events(2);
-        let campaign = get_campaign(rule);
 
         let response = check_access(
             &database,
@@ -271,9 +277,24 @@ mod test {
     async fn ip_rate_limit() {
         let (config, database) = setup().await;
 
+        let rule = Rule {
+            uids: None,
+            rate_limit: Some(RateLimit {
+                limit_type: "ip".to_string(),
+                time_frame: Duration::from_millis(1),
+            }),
+        };
+
+        let campaign = get_campaign(rule);
+
+        let chain_context = config
+            .find_chain_token(campaign.channel.token)
+            .expect("Campaign's Channel.token should be set in config");
+
         let auth = Auth {
             era: 0,
             uid: IDS["follower"],
+            chain: chain_context.chain.clone(),
         };
 
         let session = Session {
@@ -282,15 +303,6 @@ mod test {
             country: None,
             os: None,
         };
-
-        let rule = Rule {
-            uids: None,
-            rate_limit: Some(RateLimit {
-                limit_type: "ip".to_string(),
-                time_frame: Duration::from_millis(1),
-            }),
-        };
-        let campaign = get_campaign(rule);
 
         let err_response = check_access(
             &database,
@@ -325,18 +337,6 @@ mod test {
     async fn check_access_past_channel_valid_until() {
         let (config, database) = setup().await;
 
-        let auth = Auth {
-            era: 0,
-            uid: IDS["follower"],
-        };
-
-        let session = Session {
-            ip: Default::default(),
-            referrer_header: None,
-            country: None,
-            os: None,
-        };
-
         let rule = Rule {
             uids: None,
             rate_limit: Some(RateLimit {
@@ -346,6 +346,23 @@ mod test {
         };
         let mut campaign = get_campaign(rule);
         campaign.active.to = Utc.ymd(1970, 1, 1).and_hms(12, 00, 9);
+
+        let chain_context = config
+            .find_chain_token(campaign.channel.token)
+            .expect("Campaign's Channel.token should be set in config");
+
+        let auth = Auth {
+            era: 0,
+            uid: IDS["follower"],
+            chain: chain_context.chain.clone(),
+        };
+
+        let session = Session {
+            ip: Default::default(),
+            referrer_header: None,
+            country: None,
+            os: None,
+        };
 
         let err_response = check_access(
             &database,
@@ -364,18 +381,6 @@ mod test {
     async fn with_forbidden_country() {
         let (config, database) = setup().await;
 
-        let auth = Auth {
-            era: 0,
-            uid: IDS["follower"],
-        };
-
-        let session = Session {
-            ip: Default::default(),
-            referrer_header: None,
-            country: Some("XX".into()),
-            os: None,
-        };
-
         let rule = Rule {
             uids: None,
             rate_limit: Some(RateLimit {
@@ -384,6 +389,23 @@ mod test {
             }),
         };
         let campaign = get_campaign(rule);
+
+        let chain_context = config
+            .find_chain_token(campaign.channel.token)
+            .expect("Campaign's Channel.token should be set in config");
+
+        let auth = Auth {
+            era: 0,
+            uid: IDS["follower"],
+            chain: chain_context.chain.clone(),
+        };
+
+        let session = Session {
+            ip: Default::default(),
+            referrer_header: None,
+            country: Some("XX".into()),
+            os: None,
+        };
 
         let err_response = check_access(
             &database,
@@ -402,18 +424,6 @@ mod test {
     async fn with_forbidden_referrer() {
         let (config, database) = setup().await;
 
-        let auth = Auth {
-            era: 0,
-            uid: IDS["follower"],
-        };
-
-        let session = Session {
-            ip: Default::default(),
-            referrer_header: Some("http://127.0.0.1".into()),
-            country: None,
-            os: None,
-        };
-
         let rule = Rule {
             uids: None,
             rate_limit: Some(RateLimit {
@@ -422,6 +432,23 @@ mod test {
             }),
         };
         let campaign = get_campaign(rule);
+
+        let chain_context = config
+            .find_chain_token(campaign.channel.token)
+            .expect("Campaign's Channel.token should be set in config");
+
+        let auth = Auth {
+            era: 0,
+            uid: IDS["follower"],
+            chain: chain_context.chain.clone(),
+        };
+
+        let session = Session {
+            ip: Default::default(),
+            referrer_header: Some("http://127.0.0.1".into()),
+            country: None,
+            os: None,
+        };
 
         let err_response = check_access(
             &database,
@@ -440,9 +467,20 @@ mod test {
     async fn no_rate_limit() {
         let (config, database) = setup().await;
 
+        let rule = Rule {
+            uids: None,
+            rate_limit: None,
+        };
+        let campaign = get_campaign(rule);
+
+        let chain_context = config
+            .find_chain_token(campaign.channel.token)
+            .expect("Campaign's Channel.token should be set in config");
+
         let auth = Auth {
             era: 0,
             uid: IDS["follower"],
+            chain: chain_context.chain.clone(),
         };
 
         let session = Session {
@@ -451,12 +489,6 @@ mod test {
             country: None,
             os: None,
         };
-
-        let rule = Rule {
-            uids: None,
-            rate_limit: None,
-        };
-        let campaign = get_campaign(rule);
 
         let ok_response = check_access(
             &database,
@@ -475,18 +507,6 @@ mod test {
     async fn applied_rules() {
         let (config, mut database) = setup().await;
 
-        let auth = Auth {
-            era: 0,
-            uid: IDS["follower"],
-        };
-
-        let session = Session {
-            ip: Default::default(),
-            referrer_header: None,
-            country: None,
-            os: None,
-        };
-
         let rule = Rule {
             uids: None,
             rate_limit: Some(RateLimit {
@@ -495,6 +515,23 @@ mod test {
             }),
         };
         let campaign = get_campaign(rule);
+
+        let chain_context = config
+            .find_chain_token(campaign.channel.token)
+            .expect("Campaign's Channel.token should be set in config");
+
+        let auth = Auth {
+            era: 0,
+            uid: IDS["follower"],
+            chain: chain_context.chain.clone(),
+        };
+
+        let session = Session {
+            ip: Default::default(),
+            referrer_header: None,
+            country: None,
+            os: None,
+        };
 
         let ok_response = check_access(
             &database,

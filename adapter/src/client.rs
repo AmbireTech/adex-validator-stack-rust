@@ -6,7 +6,7 @@
 
 use crate::primitives::{Deposit, Session};
 use async_trait::async_trait;
-use primitives::{Address, Channel, ValidatorId};
+use primitives::{Address, ChainId, ChainOf, Channel, ValidatorId};
 
 #[async_trait]
 /// Available methods for Locked clients.
@@ -30,7 +30,7 @@ pub trait Locked: Sync + Send {
 
     async fn get_deposit(
         &self,
-        channel: &Channel,
+        channel_context: &ChainOf<Channel>,
         depositor_address: Address,
     ) -> Result<Deposit, Self::Error>;
 
@@ -48,6 +48,7 @@ pub trait Locked: Sync + Send {
 }
 
 /// Available methods for Unlocked clients.
+///
 /// Unlocked clients should also implement [`Locked`].
 #[async_trait]
 pub trait Unlocked: Locked {
@@ -55,7 +56,11 @@ pub trait Unlocked: Locked {
     fn sign(&self, state_root: &str) -> Result<String, Self::Error>;
 
     // requires Unlocked
-    fn get_auth(&self, intended_for: ValidatorId) -> Result<String, Self::Error>;
+    fn get_auth(
+        &self,
+        for_chain: ChainId,
+        intended_for: ValidatorId,
+    ) -> Result<String, Self::Error>;
 }
 
 /// A client that can be `unlock()`ed

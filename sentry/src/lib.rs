@@ -27,8 +27,6 @@ use {
     routes::{
         campaign,
         campaign::{campaign_list, create_campaign, update_campaign},
-        get_cfg,
-        get_analytics,
         channel::{
             add_spender_leaf, channel_list, get_accounting_for_channel, get_all_spender_limits,
             get_spender_limits, last_approved,
@@ -36,16 +34,17 @@ use {
                 create_validator_messages, extract_params, list_validator_messages,
             },
         },
+        get_analytics, get_cfg,
     },
 };
 
-pub mod analytics;
-pub mod middleware;
-pub mod routes;
 pub mod access;
+pub mod analytics;
 pub mod application;
 pub mod db;
+pub mod middleware;
 pub mod payout;
+pub mod routes;
 pub mod spender;
 
 static LAST_APPROVED_BY_CHANNEL_ID: Lazy<Regex> = Lazy::new(|| {
@@ -217,7 +216,6 @@ async fn analytics_router<C: Locked + 'static>(
     mut req: Request<Body>,
     app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
-
     let (route, method) = (req.uri().path(), req.method());
 
     match (route, method) {
@@ -497,11 +495,13 @@ pub struct Session {
     pub os: Option<String>,
 }
 
-/// Sentry [`Application`] Auth (Authentication)
+/// Validated Authentication for the Sentry [`Application`].
 #[derive(Debug, Clone)]
 pub struct Auth {
     pub era: i64,
     pub uid: ValidatorId,
+    /// The Chain for which this authentication was validated
+    pub chain: primitives::Chain,
 }
 
 #[cfg(test)]
@@ -511,7 +511,7 @@ pub mod test_util {
         Adapter,
     };
     use primitives::{
-        config::DEVELOPMENT_CONFIG,
+        config::GANACHE_CONFIG,
         util::tests::{discard_logger, prep_db::IDS},
     };
 
@@ -527,10 +527,16 @@ pub mod test_util {
     /// Uses development and therefore the goerli testnet addresses of the tokens
     /// It still uses DummyAdapter.
     pub async fn setup_dummy_app() -> Application<Dummy> {
-        let config = DEVELOPMENT_CONFIG.clone();
+        let config = GANACHE_CONFIG.clone();
         let adapter = Adapter::new(Dummy::init(Options {
             dummy_identity: IDS["leader"],
-            dummy_auth_tokens: Default::default(),
+            dummy_auth_tokens: vec![
+                (IDS["creator"].to_address(), "AUTH_Creator".into()),
+                (IDS["leader"].to_address(), "AUTH_Leader".into()),
+                (IDS["follower"].to_address(), "AUTH_Follower".into()),
+            ]
+            .into_iter()
+            .collect(),
         }));
 
         let redis = TESTS_POOL.get().await.expect("Should return Object");

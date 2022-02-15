@@ -1,5 +1,5 @@
 //! Channel - `/v5/channel` routes
-//! 
+//!
 
 use crate::db::{
     accounting::{get_all_accountings_for_channel, update_accounting, Side},
@@ -14,14 +14,13 @@ use futures::future::try_join_all;
 use hyper::{Body, Request, Response};
 use primitives::{
     balances::{Balances, CheckedState, UncheckedState},
-    config::TokenInfo,
     sentry::{
         channel_list::ChannelListQuery, AccountingResponse, AllSpendersQuery, AllSpendersResponse,
         LastApproved, LastApprovedQuery, LastApprovedResponse, SpenderResponse, SuccessResponse,
     },
     spender::{Spendable, Spender},
     validator::NewState,
-    Address, Channel, Deposit, UnifiedNum,
+    Address, ChainOf, Channel, Deposit, UnifiedNum,
 };
 use slog::{error, Logger};
 use std::{collections::HashMap, str::FromStr};
@@ -52,10 +51,11 @@ pub async fn last_approved<C: Locked + 'static>(
     app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
     // get request Channel
-    let channel = *req
+    let channel = req
         .extensions()
-        .get::<Channel>()
-        .ok_or(ResponseError::NotFound)?;
+        .get::<ChainOf<Channel>>()
+        .ok_or(ResponseError::NotFound)?
+        .context;
 
     let default_response = Response::builder()
         .header("Content-type", "application/json")
@@ -113,17 +113,18 @@ pub async fn last_approved<C: Locked + 'static>(
 /// This will make sure to insert/get the `Channel` from DB before attempting to create the `Spendable`
 async fn create_or_update_spendable_document<A: Locked>(
     adapter: &Adapter<A>,
-    token_info: &TokenInfo,
     pool: DbPool,
-    channel: &Channel,
+    channel_context: &ChainOf<Channel>,
     spender: Address,
 ) -> Result<Spendable, ResponseError> {
-    insert_channel(&pool, *channel).await?;
+    insert_channel(&pool, channel_context.context).await?;
 
-    let deposit = adapter.get_deposit(channel, spender).await?;
-    let total = UnifiedNum::from_precision(deposit.total, token_info.precision.get());
-    let still_on_create2 =
-        UnifiedNum::from_precision(deposit.still_on_create2, token_info.precision.get());
+    let deposit = adapter.get_deposit(channel_context, spender).await?;
+    let total = UnifiedNum::from_precision(deposit.total, channel_context.token.precision.get());
+    let still_on_create2 = UnifiedNum::from_precision(
+        deposit.still_on_create2,
+        channel_context.token.precision.get(),
+    );
     let (total, still_on_create2) = match (total, still_on_create2) {
         (Some(total), Some(still_on_create2)) => (total, still_on_create2),
         _ => {
@@ -134,7 +135,7 @@ async fn create_or_update_spendable_document<A: Locked>(
     };
 
     let spendable = Spendable {
-        channel: *channel,
+        channel: channel_context.context,
         deposit: Deposit {
             total,
             still_on_create2,
@@ -169,30 +170,24 @@ pub async fn get_spender_limits<C: Locked + 'static>(
         .get::<RouteParams>()
         .expect("request should have route params");
 
-    let channel = req
+    let channel_context = req
         .extensions()
-        .get::<Channel>()
-        .expect("Request should have Channel")
+        .get::<ChainOf<Channel>>()
+        .expect("Request should have Channel & Chain/TokenInfo")
         .to_owned();
+    let channel = &channel_context.context;
 
     let spender = Address::from_str(&route_params.index(1))?;
 
     let latest_spendable = fetch_spendable(app.pool.clone(), &spender, &channel.id()).await?;
-
-    let token_info = app
-        .config
-        .token_address_whitelist
-        .get(&channel.token)
-        .ok_or_else(|| ResponseError::FailedValidation("Unsupported Channel Token".to_string()))?;
 
     let latest_spendable = match latest_spendable {
         Some(spendable) => spendable,
         None => {
             create_or_update_spendable_document(
                 &app.adapter,
-                token_info,
                 app.pool.clone(),
-                &channel,
+                &channel_context,
                 spender,
             )
             .await?
@@ -226,9 +221,9 @@ pub async fn get_all_spender_limits<C: Locked + 'static>(
 ) -> Result<Response<Body>, ResponseError> {
     let channel = req
         .extensions()
-        .get::<Channel>()
+        .get::<ChainOf<Channel>>()
         .expect("Request should have Channel")
-        .to_owned();
+        .context;
 
     let query = serde_urlencoded::from_str::<AllSpendersQuery>(req.uri().query().unwrap_or(""))?;
     let limit = app.config.spendable_find_limit;
@@ -287,9 +282,9 @@ pub async fn add_spender_leaf<C: Locked + 'static>(
 
     let channel = req
         .extensions()
-        .get::<Channel>()
-        .expect("Request should have Channel")
-        .to_owned();
+        .get::<ChainOf<Channel>>()
+        .ok_or(ResponseError::NotFound)?
+        .context;
 
     update_accounting(
         app.pool.clone(),
@@ -346,9 +341,9 @@ pub async fn get_accounting_for_channel<C: Locked + 'static>(
 ) -> Result<Response<Body>, ResponseError> {
     let channel = req
         .extensions()
-        .get::<Channel>()
-        .expect("Request should have Channel")
-        .to_owned();
+        .get::<ChainOf<Channel>>()
+        .ok_or(ResponseError::NotFound)?
+        .context;
 
     let accountings = get_all_accountings_for_channel(app.pool.clone(), channel.id()).await?;
 
@@ -396,6 +391,7 @@ pub mod validator_message {
     use primitives::{
         sentry::{SuccessResponse, ValidatorMessageResponse},
         validator::MessageTypes,
+        ChainOf,
     };
     use primitives::{Channel, DomainError, ValidatorId};
     use serde::Deserialize;
@@ -449,8 +445,9 @@ pub mod validator_message {
 
         let channel = req
             .extensions()
-            .get::<Channel>()
-            .expect("Request should have Channel");
+            .get::<ChainOf<Channel>>()
+            .ok_or(ResponseError::NotFound)?
+            .context;
 
         let config_limit = app.config.msgs_find_limit as u64;
         let limit = query
@@ -491,9 +488,9 @@ pub mod validator_message {
 
         let channel = req
             .extensions()
-            .get::<Channel>()
-            .expect("Request should have Channel")
-            .to_owned();
+            .get::<ChainOf<Channel>>()
+            .ok_or(ResponseError::NotFound)?
+            .context;
 
         let into_body = req.into_body();
         let body = hyper::body::to_bytes(into_body).await?;
@@ -536,14 +533,17 @@ mod test {
     async fn create_and_fetch_spendable() {
         let app = setup_dummy_app().await;
 
-        let channel = DUMMY_CAMPAIGN.channel;
+        let (channel_context, channel) = {
+            let channel = DUMMY_CAMPAIGN.channel;
+            let channel_context = app
+                .config
+                .find_chain_token(DUMMY_CAMPAIGN.channel.token)
+                .expect("should retrieve Chain & token");
 
-        let token_info = app
-            .config
-            .token_address_whitelist
-            .get(&channel.token)
-            .expect("should retrieve address");
-        let precision: u8 = token_info.precision.into();
+            (channel_context.with_channel(channel), channel)
+        };
+
+        let precision: u8 = channel_context.token.precision.into();
         let deposit = Deposit {
             total: BigNum::from_str("100000000000000000000").expect("should convert"), // 100 DAI
             still_on_create2: BigNum::from_str("1000000000000000000").expect("should convert"), // 1 DAI
@@ -559,9 +559,8 @@ mod test {
         // Call create_or_update_spendable
         let new_spendable = create_or_update_spendable_document(
             &app.adapter,
-            token_info,
             app.pool.clone(),
-            &channel,
+            &channel_context,
             ADDRESSES["creator"],
         )
         .await
@@ -599,9 +598,8 @@ mod test {
 
         let updated_spendable = create_or_update_spendable_document(
             &app.adapter,
-            token_info,
             app.pool.clone(),
-            &channel,
+            &channel_context,
             ADDRESSES["creator"],
         )
         .await
@@ -632,19 +630,24 @@ mod test {
     #[tokio::test]
     async fn get_accountings_for_channel() {
         let app = setup_dummy_app().await;
-        let channel = DUMMY_CAMPAIGN.channel;
-        insert_channel(&app.pool, channel)
+        let channel_context = app
+            .config
+            .find_chain_token(DUMMY_CAMPAIGN.channel.token)
+            .expect("Dummy channel Token should be present in config!")
+            .with(DUMMY_CAMPAIGN.channel);
+
+        insert_channel(&app.pool, channel_context.context)
             .await
             .expect("should insert channel");
-        let build_request = |channel: Channel| {
+        let build_request = |channel_context: &ChainOf<Channel>| {
             Request::builder()
-                .extension(channel)
+                .extension(channel_context.clone())
                 .body(Body::empty())
                 .expect("Should build Request")
         };
         // Testing for no accounting yet
         {
-            let res = get_accounting_for_channel(build_request(channel), &app)
+            let res = get_accounting_for_channel(build_request(&channel_context), &app)
                 .await
                 .expect("should get response");
             assert_eq!(StatusCode::OK, res.status());
@@ -671,11 +674,15 @@ mod test {
                     UnifiedNum::from_u64(100),
                 )
                 .expect("Should not overflow");
-            spend_amount(app.pool.clone(), channel.id(), balances.clone())
-                .await
-                .expect("should spend");
+            spend_amount(
+                app.pool.clone(),
+                channel_context.context.id(),
+                balances.clone(),
+            )
+            .await
+            .expect("should spend");
 
-            let res = get_accounting_for_channel(build_request(channel), &app)
+            let res = get_accounting_for_channel(build_request(&channel_context), &app)
                 .await
                 .expect("should get response");
             assert_eq!(StatusCode::OK, res.status());
@@ -706,9 +713,12 @@ mod test {
                 .await
                 .expect("should spend");
 
-            let res = get_accounting_for_channel(build_request(second_channel), &app)
-                .await
-                .expect("should get response");
+            let res = get_accounting_for_channel(
+                build_request(&channel_context.clone().with(second_channel)),
+                &app,
+            )
+            .await
+            .expect("should get response");
             assert_eq!(StatusCode::OK, res.status());
 
             let accounting_response = res_to_accounting_response(res).await;
@@ -725,11 +735,11 @@ mod test {
             balances
                 .spenders
                 .insert(ADDRESSES["creator"], UnifiedNum::from_u64(200));
-            spend_amount(app.pool.clone(), channel.id(), balances)
+            spend_amount(app.pool.clone(), channel_context.context.id(), balances)
                 .await
                 .expect("should spend");
 
-            let res = get_accounting_for_channel(build_request(channel), &app).await;
+            let res = get_accounting_for_channel(build_request(&channel_context), &app).await;
             let expected = ResponseError::FailedValidation(
                 "Earners sum is not equal to spenders sum for channel".to_string(),
             );
@@ -740,34 +750,41 @@ mod test {
     #[tokio::test]
     async fn adds_and_retrieves_spender_leaf() {
         let app = setup_dummy_app().await;
-        let channel = DUMMY_CAMPAIGN.channel;
+        let channel_context = app
+            .config
+            .find_chain_token(DUMMY_CAMPAIGN.channel.token)
+            .expect("Dummy channel Token should be present in config!")
+            .with(DUMMY_CAMPAIGN.channel);
 
-        insert_channel(&app.pool, channel)
+        insert_channel(&app.pool, channel_context.context)
             .await
             .expect("should insert channel");
 
-        let get_accounting_request = |channel: Channel| {
+        let get_accounting_request = |channel_context: &ChainOf<Channel>| {
             Request::builder()
-                .extension(channel)
+                .extension(channel_context.clone())
                 .body(Body::empty())
                 .expect("Should build Request")
         };
-        let add_spender_request = |channel: Channel| {
-            let param = RouteParams(vec![channel.id().to_string(), CREATOR.to_string()]);
+        let add_spender_request = |channel_context: &ChainOf<Channel>| {
+            let param = RouteParams(vec![
+                channel_context.context.id().to_string(),
+                CREATOR.to_string(),
+            ]);
             Request::builder()
-                .extension(channel)
+                .extension(channel_context.clone())
                 .extension(param)
                 .body(Body::empty())
                 .expect("Should build Request")
         };
 
         // Calling with non existent accounting
-        let res = add_spender_leaf(add_spender_request(channel), &app)
+        let res = add_spender_leaf(add_spender_request(&channel_context), &app)
             .await
             .expect("Should add");
         assert_eq!(StatusCode::OK, res.status());
 
-        let res = get_accounting_for_channel(get_accounting_request(channel), &app)
+        let res = get_accounting_for_channel(get_accounting_request(&channel_context), &app)
             .await
             .expect("should get response");
         assert_eq!(StatusCode::OK, res.status());
@@ -787,11 +804,15 @@ mod test {
         balances
             .spend(*ADVERTISER, *GUARDIAN, UnifiedNum::from_u64(100))
             .expect("Should not overflow");
-        spend_amount(app.pool.clone(), channel.id(), balances.clone())
-            .await
-            .expect("should spend");
+        spend_amount(
+            app.pool.clone(),
+            channel_context.context.id(),
+            balances.clone(),
+        )
+        .await
+        .expect("should spend");
 
-        let res = get_accounting_for_channel(get_accounting_request(channel), &app)
+        let res = get_accounting_for_channel(get_accounting_request(&channel_context), &app)
             .await
             .expect("should get response");
         assert_eq!(StatusCode::OK, res.status());
@@ -800,12 +821,12 @@ mod test {
 
         assert_eq!(balances, accounting_response.balances);
 
-        let res = add_spender_leaf(add_spender_request(channel), &app)
+        let res = add_spender_leaf(add_spender_request(&channel_context), &app)
             .await
             .expect("Should add");
         assert_eq!(StatusCode::OK, res.status());
 
-        let res = get_accounting_for_channel(get_accounting_request(channel), &app)
+        let res = get_accounting_for_channel(get_accounting_request(&channel_context), &app)
             .await
             .expect("should get response");
         assert_eq!(StatusCode::OK, res.status());

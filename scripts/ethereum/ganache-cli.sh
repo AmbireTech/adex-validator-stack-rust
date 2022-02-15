@@ -37,6 +37,7 @@
 # gasLimit = 4503599627370495 (0xfffffffffffff)
 #
 node /app/ganache-core.docker.cli.js --gasLimit 0xfffffffffffff \
+  --chainId=1337 \
   --db="./snapshot" \
   --deterministic \
   --mnemonic="diary west sketch curious expose decade symptom height minor layer carry man" \

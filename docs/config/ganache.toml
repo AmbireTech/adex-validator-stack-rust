@@ -29,24 +29,46 @@ channel_tick_timeout = 10000
 ip_rate_limit = { type = 'ip', timeframe = 1200000 }
 sid_rate_limit = { type = 'sid', timeframe = 0 }
 
-# Ganache Snapshot address
-outpace_address = '0xabc27d46a458e2e49dabfef45ca74dedbac3dd06'
-# Ganache Snapshot address
-sweeper_address = '0x7dd57c0324284102a757153e18f2cb1acdb7d2bd'
-
-ethereum_network = 'http://localhost:8545'
-
 creators_whitelist = []
 validators_whitelist = []
 admins = ['0x80690751969B234697e9059e04ed72195c3507fa']
 
-[[token_address_whitelist]]
-# Mocked TOKEN
-address = '0x2bcaf6968aec8a3b5126fbfab5fd419da6e8ad8e'
-# 1 * 10^18 = 1.0000 TOKEN
-min_token_units_for_deposit = '1000000000000000000'
-# multiplier = 10^13 - 10^18 (token precision) = 10^-5
-# min_validator_fee = 1 * 10^-5 = 0.000_01
-min_validator_fee = '10000000000000'
-precision = 18
+# Ethereum mainnet tokens
+# [chain."Ganache #1"]
+# # Ethereum Mainnet for testing
+# chain_id = 1
+# rpc = 'http://localhost:8546'
+# # Ganache Snapshot address
+# outpace = '0x0000000000000000000000000000000000000000'
+# # Ganache Snapshot address
+# sweeper = '0x0000000000000000000000000000000000000000'
+
+#     [chain."Ganache #1".token."Mocked TOKEN"]
+#     address = '0x2bcaf6968aec8a3b5126fbfab5fd419da6e8ad8e' # checked
+#     precision = 18
+#     # Minimum token units for the Create2 deposits to count
+#     # 1 * 10^18 = 1.0000 TOKEN
+#     min_token_units_for_deposit = '1000000000000000000'
+#     # multiplier = 10^12 - 10^18 (token precision) = 10^-6
+#     # min_validator_fee = 1 * 10^-6 = 0.000_001
+#     min_validator_fee = '1000000000000'
+
+[chain."Ganache #1337"]
+# Ganache default chain id for testing
+chain_id = 1337
+rpc = 'http://localhost:8545'
+# Ganache Snapshot address
+outpace = '0xAbc27d46a458E2e49DaBfEf45ca74dEDBAc3DD06'
+# Ganache Snapshot address
+sweeper = '0x7dD57C0324284102A757153E18F2Cb1ACdB7d2bD'
+
+    [chain."Ganache #1337".token."Mocked TOKEN"]
+    address = '0x2bcaf6968aec8a3b5126fbfab5fd419da6e8ad8e' # checked
+    precision = 18
+    # Minimum token units for the Create2 deposits to count
+    # 1 * 10^18 = 1.0000 TOKEN
+    min_token_units_for_deposit = '1000000000000000000'
+    # multiplier = 10^12 - 10^18 (token precision) = 10^-6
+    # min_validator_fee = 1 * 10^-6 = 0.000_001
+    min_validator_fee = '1000000000000'
 

@@ -13,7 +13,10 @@ pub use {
 pub mod primitives {
     use serde::{Deserialize, Serialize};
 
-    pub use ::primitives::{Address, BigNum, Channel, ValidatorId};
+    pub use ::primitives::{
+        config::{ChainInfo, Config, TokenInfo},
+        Address, BigNum, Chain, ChainId, Channel, ValidatorId,
+    };
 
     use crate::ethereum::WalletState;
 
@@ -43,7 +46,10 @@ pub mod primitives {
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct Session {
         pub era: i64,
+        /// Authenticated as [`Address`].
         pub uid: Address,
+        /// Authenticated for [`Chain`].
+        pub chain: Chain,
     }
 }
 

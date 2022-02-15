@@ -1,5 +1,6 @@
 use crate::primitives::*;
 use async_trait::async_trait;
+use primitives::{ChainId, ChainOf, Channel};
 use std::{marker::PhantomData, sync::Arc};
 
 use crate::{
@@ -93,8 +94,10 @@ where
         self.client.sign(state_root).map_err(Into::into)
     }
 
-    fn get_auth(&self, intended_for: ValidatorId) -> Result<String, Error> {
-        self.client.get_auth(intended_for).map_err(Into::into)
+    fn get_auth(&self, for_chain: ChainId, intended_for: ValidatorId) -> Result<String, Error> {
+        self.client
+            .get_auth(for_chain, intended_for)
+            .map_err(Into::into)
     }
 }
 
@@ -134,11 +137,11 @@ where
 
     async fn get_deposit(
         &self,
-        channel: &Channel,
+        channel_context: &ChainOf<Channel>,
         depositor_address: Address,
     ) -> Result<Deposit, Error> {
         self.client
-            .get_deposit(channel, depositor_address)
+            .get_deposit(channel_context, depositor_address)
             .await
             .map_err(Into::into)
     }

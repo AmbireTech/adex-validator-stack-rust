@@ -75,6 +75,7 @@ mod test {
         test_util::setup_dummy_app,
         Auth, ValidatorId,
     };
+    use adapter::dummy::DUMMY_CHAIN;
     use chrono::{Timelike, Utc};
     use primitives::{
         analytics::{query::Time, Metric, OperatingSystem, Timeframe},
@@ -980,15 +981,18 @@ mod test {
         let publisher_auth = Auth {
             era: 0,
             uid: ValidatorId::from(*PUBLISHER),
+            chain: DUMMY_CHAIN.clone(),
         };
         let advertiser_auth = Auth {
             era: 0,
             uid: ValidatorId::from(*CREATOR),
+            chain: DUMMY_CHAIN.clone(),
         };
         let admin_auth = Auth {
             era: 0,
             uid: ValidatorId::try_from("0xce07CbB7e054514D590a0262C93070D838bFBA2e")
                 .expect("should create"),
+            chain: DUMMY_CHAIN.clone(),
         };
         // test for publisher
         {

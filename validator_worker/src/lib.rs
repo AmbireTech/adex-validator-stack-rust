@@ -75,12 +75,21 @@ fn get_state_root_hash(
 mod test {
     use super::*;
 
-    use primitives::util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, DUMMY_CHANNEL_ID};
+    use primitives::{channel::Nonce, test_util::IDS, util::tests::prep_db::ADDRESSES, Channel};
 
     #[test]
     // TODO: Double check this test - encoded value! after introducing `spenders` ("spender", address, amount)
     fn get_state_root_hash_returns_correct_hash() {
-        let channel = DUMMY_CAMPAIGN.channel;
+        let channel = Channel {
+            leader: IDS["leader"],
+            follower: IDS["follower"],
+            guardian: IDS["tester"].to_address(),
+            // DAI on goerli
+            token: "0x73967c6a0904aa032c103b4104747e88c566b1a2"
+                .parse()
+                .expect("Valid DAI token address"),
+            nonce: Nonce::from(987_654_321_u32),
+        };
 
         let mut balances = Balances::<CheckedState>::default();
 
@@ -103,7 +112,9 @@ mod test {
     /// we re-use it in order to double check if we haven't change anything with the `get_state_root_hash()` changes
     /// when we introduced `spenders` `("spender", address, amount)` & `UnifiedNum`
     fn get_state_root_hash_returns_correct_hash_for_added_address_to_spenders() {
-        let channel = *DUMMY_CHANNEL_ID;
+        let channel = "061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088"
+            .parse()
+            .expect("Valid ChannelId");
 
         let mut balances = Balances::<CheckedState>::default();
         balances.add_earner(ADDRESSES["publisher"]);

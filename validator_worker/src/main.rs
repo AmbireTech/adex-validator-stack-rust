@@ -5,14 +5,14 @@ use std::error::Error;
 
 use clap::{crate_version, App, Arg};
 
-use adapter::{prelude::*, primitives::AdapterTypes, Adapter, Dummy, Ethereum};
+use adapter::{primitives::AdapterTypes, Adapter, Dummy, Ethereum};
 use primitives::{
     config::{configuration, Environment},
     test_util::DUMMY_AUTH,
     util::logging::new_logger,
     ValidatorId,
 };
-use validator_worker::{sentry_interface::Validator, SentryApi, Worker};
+use validator_worker::{SentryApi, Worker};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let cli = App::new("Validator worker")
@@ -117,27 +117,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     match unlocked_adapter {
         AdapterTypes::Ethereum(eth_adapter) => {
-            let whoami = Validator {
-                url: sentry_url,
-                token: eth_adapter
-                    .get_auth(eth_adapter.whoami())
-                    .expect("Failed to get Authentication token for Who am I"),
-            };
-
-            let sentry = SentryApi::new(*eth_adapter, logger.clone(), config, whoami)
+            let sentry = SentryApi::new(*eth_adapter, logger.clone(), config, sentry_url)
                 .expect("Should create the SentryApi");
 
             Worker::from_sentry(sentry).run(is_single_tick)
         }
         AdapterTypes::Dummy(dummy_adapter) => {
-            let whoami = Validator {
-                url: sentry_url,
-                token: dummy_adapter
-                    .get_auth(dummy_adapter.whoami())
-                    .expect("Failed to get Authentication token for Who am I"),
-            };
-
-            let sentry = SentryApi::new(*dummy_adapter, logger.clone(), config, whoami)
+            let sentry = SentryApi::new(*dummy_adapter, logger.clone(), config, sentry_url)
                 .expect("Should create the SentryApi");
 
             Worker::from_sentry(sentry).run(is_single_tick)

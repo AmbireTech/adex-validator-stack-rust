@@ -70,7 +70,7 @@ impl fmt::Display for Inner {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.source {
             // Writes: "Kind: Error message here"
-            Some(source) => write!(f, "{}: {}", self.kind, source.to_string()),
+            Some(source) => write!(f, "{}: {}", self.kind, source),
             // Writes: "Kind"
             None => write!(f, "{}", self.kind),
         }
