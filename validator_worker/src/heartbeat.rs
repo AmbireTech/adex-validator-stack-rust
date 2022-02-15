@@ -5,7 +5,7 @@ use byteorder::{BigEndian, ByteOrder};
 use primitives::{
     merkle_tree::MerkleTree,
     validator::{Heartbeat, MessageTypes},
-    ChannelId,
+    Channel,
 };
 use thiserror::Error;
 
@@ -25,9 +25,9 @@ pub enum Error {
 
 pub async fn heartbeat<C: Unlocked + 'static>(
     iface: &SentryApi<C>,
-    channel: ChannelId,
+    channel: Channel,
 ) -> Result<HeartbeatStatus, Error> {
-    let validator_message_response = iface.get_our_latest_msg(channel, &["Heartbeat"]).await?;
+    let validator_message_response = iface.get_our_latest_msg(channel.id(), &["Heartbeat"]).await?;
     let heartbeat_msg = match validator_message_response {
         Some(MessageTypes::Heartbeat(heartbeat)) => Some(heartbeat),
         _ => None,
@@ -47,7 +47,7 @@ pub async fn heartbeat<C: Unlocked + 'static>(
 
 async fn send_heartbeat<C: Unlocked + 'static>(
     iface: &SentryApi<C>,
-    channel: ChannelId,
+    channel: Channel,
 ) -> Result<Vec<PropagationResult>, Error> {
     let mut timestamp_buf = [0_u8; 32];
     let milliseconds: u64 = u64::try_from(Utc::now().timestamp_millis())
@@ -56,7 +56,7 @@ async fn send_heartbeat<C: Unlocked + 'static>(
 
     let merkle_tree = MerkleTree::new(&[timestamp_buf])?;
 
-    let state_root_raw = get_signable_state_root(channel.as_ref(), &merkle_tree.root());
+    let state_root_raw = get_signable_state_root(channel.id().as_ref(), &merkle_tree.root());
     let state_root = hex::encode(state_root_raw);
 
     let signature = iface.adapter.sign(&state_root)?;

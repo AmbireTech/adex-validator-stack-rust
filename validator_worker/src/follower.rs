@@ -7,7 +7,7 @@ use primitives::{
     config::TokenInfo,
     spender::Spender,
     validator::{ApproveState, MessageTypes, NewState, RejectState},
-    Address, Channel, ChannelId, UnifiedNum,
+    Address, Channel, UnifiedNum,
 };
 
 use crate::{
@@ -138,7 +138,7 @@ pub async fn tick<C: Unlocked + 'static>(
     };
 
     Ok(TickStatus {
-        heartbeat: heartbeat(sentry, channel_id).await?,
+        heartbeat: heartbeat(sentry, channel).await?,
         approve_state: approve_state_result,
     })
 }
@@ -155,7 +155,7 @@ async fn on_new_state<'a, C: Unlocked + 'static>(
         Ok(balances) => balances,
         // TODO: Should we show the Payout Mismatch between Spent & Earned?
         Err(balances::Error::PayoutMismatch { .. }) => {
-            return Ok(on_error(sentry, channel.id(), new_state, InvalidNewState::Transition).await)
+            return Ok(on_error(sentry, channel, new_state, InvalidNewState::Transition).await)
         }
         // TODO: Add context for `proposed_balances.check()` overflow error
         Err(_) => return Err(Error::Overflow),
@@ -164,14 +164,14 @@ async fn on_new_state<'a, C: Unlocked + 'static>(
     let proposed_state_root = new_state.state_root.clone();
 
     if proposed_state_root != proposed_balances.encode(channel.id(), token_info.precision.get())? {
-        return Ok(on_error(sentry, channel.id(), new_state, InvalidNewState::RootHash).await);
+        return Ok(on_error(sentry, channel, new_state, InvalidNewState::RootHash).await);
     }
 
     if !sentry
         .adapter
         .verify(channel.leader, &proposed_state_root, &new_state.signature)?
     {
-        return Ok(on_error(sentry, channel.id(), new_state, InvalidNewState::Signature).await);
+        return Ok(on_error(sentry, channel, new_state, InvalidNewState::Signature).await);
     }
 
     let last_approve_response = sentry.get_last_approved(channel.id()).await?;
@@ -185,7 +185,7 @@ async fn on_new_state<'a, C: Unlocked + 'static>(
         Ok(None) => Default::default(),
         // TODO: Add Context for Transition error
         Err(_err) => {
-            return Ok(on_error(sentry, channel.id(), new_state, InvalidNewState::Transition).await)
+            return Ok(on_error(sentry, channel, new_state, InvalidNewState::Transition).await)
         }
     };
 
@@ -202,7 +202,7 @@ async fn on_new_state<'a, C: Unlocked + 'static>(
     .ok_or(Error::Overflow)?
     {
         // TODO: Add context for error in Spenders transition
-        return Ok(on_error(sentry, channel.id(), new_state, InvalidNewState::Transition).await);
+        return Ok(on_error(sentry, channel, new_state, InvalidNewState::Transition).await);
     }
 
     // 2. Check the transition of previous and proposed Earners maps
@@ -218,7 +218,7 @@ async fn on_new_state<'a, C: Unlocked + 'static>(
     .ok_or(Error::Overflow)?
     {
         // TODO: Add context for error in Earners transition
-        return Ok(on_error(sentry, channel.id(), new_state, InvalidNewState::Transition).await);
+        return Ok(on_error(sentry, channel, new_state, InvalidNewState::Transition).await);
     }
 
     let health_earners = get_health(
@@ -230,7 +230,7 @@ async fn on_new_state<'a, C: Unlocked + 'static>(
     if health_earners < u64::from(sentry.config.health_unsignable_promilles) {
         return Ok(on_error(
             sentry,
-            channel.id(),
+            channel,
             new_state,
             InvalidNewState::Health(Health::Earners(health_earners)),
         )
@@ -246,7 +246,7 @@ async fn on_new_state<'a, C: Unlocked + 'static>(
     if health_spenders < u64::from(sentry.config.health_unsignable_promilles) {
         return Ok(on_error(
             sentry,
-            channel.id(),
+            channel,
             new_state,
             InvalidNewState::Health(Health::Spenders(health_spenders)),
         )
@@ -259,7 +259,7 @@ async fn on_new_state<'a, C: Unlocked + 'static>(
 
     let propagation_result = sentry
         .propagate(
-            channel.id(),
+            channel,
             &[&MessageTypes::ApproveState(ApproveState {
                 state_root: proposed_state_root,
                 signature,
@@ -273,7 +273,7 @@ async fn on_new_state<'a, C: Unlocked + 'static>(
 
 async fn on_error<'a, C: Unlocked + 'static>(
     sentry: &'a SentryApi<C>,
-    channel: ChannelId,
+    channel: Channel,
     new_state: NewState<UncheckedState>,
     status: InvalidNewState,
 ) -> ApproveStateResult {

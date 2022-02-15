@@ -320,19 +320,20 @@ impl<C: Unlocked + 'static, P> SentryApi<C, P> {
 impl<C: Unlocked + 'static> SentryApi<C> {
     pub async fn propagate(
         &self,
-        channel: ChannelId,
+        channel: Channel,
         messages: &[&MessageTypes],
     ) -> Vec<PropagationResult> {
-        join_all(self.propagate_to.iter().map(|(validator_id, validator)| {
+        join_all(self.propagate_to.iter().filter(|(validator_id, _)| {
+            channel.leader == **validator_id || channel.follower == **validator_id
+        }).map(|(validator_id, validator)| {
             propagate_to::<C>(
                 &self.client,
                 self.config.propagation_timeout,
-                channel,
+                channel.id(),
                 (*validator_id, validator),
                 messages,
             )
-        }))
-        .await
+        })).await
     }
 }
 
