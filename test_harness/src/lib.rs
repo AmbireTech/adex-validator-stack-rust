@@ -7,7 +7,7 @@ use adapter::ethereum::{
     get_counterfactual_address,
     test_util::{
         deploy_outpace_contract, deploy_sweeper_contract, deploy_token_contract, mock_set_balance,
-        outpace_deposit, GANACHE_INFO_1337, GANACHE_URL, MOCK_TOKEN_ABI,
+        outpace_deposit, GANACHE_INFO_1337, MOCK_TOKEN_ABI,
     },
     Options, OUTPACE_ABI, SWEEPER_ABI,
 };
