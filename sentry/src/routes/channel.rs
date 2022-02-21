@@ -3,9 +3,9 @@
 
 use crate::db::{
     accounting::{get_all_accountings_for_channel, update_accounting, Side},
-    event_aggregate::{latest_approve_state_v5, latest_heartbeats, latest_new_state_v5},
     insert_channel, list_channels,
     spendable::{fetch_spendable, get_all_spendables_for_channel, update_spendable},
+    validator_message::{latest_approve_state, latest_heartbeats, latest_new_state},
     DbPool,
 };
 use crate::{success_response, Application, ResponseError, RouteParams};
@@ -25,6 +25,11 @@ use primitives::{
 use slog::{error, Logger};
 use std::{collections::HashMap, str::FromStr};
 
+/// `GET /v5/channel/list` request
+///
+/// Query: [`ChannelListQuery`]
+///
+/// Response: [`ChannelListResponse`](primitives::sentry::channel_list::ChannelListResponse)
 pub async fn channel_list<C: Locked + 'static>(
     req: Request<Body>,
     app: &Application<C>,
@@ -46,6 +51,11 @@ pub async fn channel_list<C: Locked + 'static>(
     Ok(success_response(serde_json::to_string(&list_response)?))
 }
 
+/// `GET /v5/channel/0xXXX.../last-approved` request
+///
+/// Query: [`LastApprovedQuery`]
+///
+/// Response: [`LastApprovedResponse`]
 pub async fn last_approved<C: Locked + 'static>(
     req: Request<Body>,
     app: &Application<C>,
@@ -68,14 +78,14 @@ pub async fn last_approved<C: Locked + 'static>(
         )
         .expect("should build response");
 
-    let approve_state = match latest_approve_state_v5(&app.pool, &channel).await? {
+    let approve_state = match latest_approve_state(&app.pool, &channel).await? {
         Some(approve_state) => approve_state,
         None => return Ok(default_response),
     };
 
     let state_root = approve_state.msg.state_root.clone();
 
-    let new_state = latest_new_state_v5(&app.pool, &channel, &state_root).await?;
+    let new_state = latest_new_state(&app.pool, &channel, &state_root).await?;
     if new_state.is_none() {
         return Ok(default_response);
     }
@@ -161,6 +171,9 @@ fn spender_response_without_leaf(
     Ok(success_response(serde_json::to_string(&res)?))
 }
 
+/// `GET /v5/channel/0xXXX.../spender/0xXXX...` request
+///
+/// Response: [`SpenderResponse`]
 pub async fn get_spender_limits<C: Locked + 'static>(
     req: Request<Body>,
     app: &Application<C>,
@@ -215,6 +228,9 @@ pub async fn get_spender_limits<C: Locked + 'static>(
     Ok(success_response(serde_json::to_string(&res)?))
 }
 
+/// `GET /v5/channel/0xXXX.../spender/all` request
+///
+/// Response: [`AllSpendersResponse`]
 pub async fn get_all_spender_limits<C: Locked + 'static>(
     req: Request<Body>,
     app: &Application<C>,
@@ -269,6 +285,8 @@ pub async fn get_all_spender_limits<C: Locked + 'static>(
     Ok(success_response(serde_json::to_string(&res)?))
 }
 
+/// `POST /v5/channel/0xXXX.../spender/0xXXX...` request
+///
 /// internally, to make the validator worker to add a spender leaf in NewState we'll just update Accounting
 pub async fn add_spender_leaf<C: Locked + 'static>(
     req: Request<Body>,
@@ -306,14 +324,14 @@ async fn get_corresponding_new_state(
     logger: &Logger,
     channel: &Channel,
 ) -> Result<Option<NewState<CheckedState>>, ResponseError> {
-    let approve_state = match latest_approve_state_v5(pool, channel).await? {
+    let approve_state = match latest_approve_state(pool, channel).await? {
         Some(approve_state) => approve_state,
         None => return Ok(None),
     };
 
     let state_root = approve_state.msg.state_root.clone();
 
-    let new_state = match latest_new_state_v5(pool, channel, &state_root).await? {
+    let new_state = match latest_new_state(pool, channel, &state_root).await? {
         Some(new_state) => {
             let new_state = new_state.msg.into_inner().try_checked().map_err(|err| {
                 error!(&logger, "Balances are not aligned in an approved NewState: {}", &err; "module" => "get_spender_limits");
@@ -381,7 +399,7 @@ pub mod validator_message {
     use std::collections::HashMap;
 
     use crate::{
-        db::{get_validator_messages, insert_validator_messages},
+        db::validator_message::{get_validator_messages, insert_validator_messages},
         Auth,
     };
     use crate::{success_response, Application, ResponseError};
@@ -466,6 +484,7 @@ pub mod validator_message {
     }
 
     /// `POST /v5/channel/0xXXX.../validator-messages` with Request body (json):
+    ///
     /// ```json
     /// {
     ///     "messages": [
@@ -476,6 +495,8 @@ pub mod validator_message {
     /// ```
     ///
     /// Validator messages: [`MessageTypes`]
+    ///
+    /// Response: [`SuccessResponse`]
     pub async fn create_validator_messages<C: Locked + 'static>(
         req: Request<Body>,
         app: &Application<C>,
@@ -623,7 +644,7 @@ mod test {
             .expect("Should get json");
 
         let accounting_response: AccountingResponse<CheckedState> =
-            serde_json::from_slice(&json).expect("Should get AccouuntingResponse");
+            serde_json::from_slice(&json).expect("Should get AccountingResponse");
         accounting_response
     }
 

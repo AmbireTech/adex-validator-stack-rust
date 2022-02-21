@@ -1,20 +1,28 @@
 //! Sentry REST API documentation
 //!
 //! ## Channel
-//!
 //! All routes are implemented under module [channel].
+//!
+//! Route parameters:
+//!
+//! Paths which include these parameters are validated as follow:
+//!
+//! - `:id` - [`ChannelId`][ChannelId]
+//! - `:addr` - either an [`Address`][Address] or [`ValidatorId`][ValidatorId].
 //!
 //! - [`GET /v5/channel/list`](crate::routes::channel::channel_list)
 //!
-//! todo
+//! Query: [`ChannelListQuery`](primitives::sentry::channel_list::ChannelListQuery)
+//!
+//! Response: [`ChannelListResponse`](primitives::sentry::channel_list::ChannelListResponse)
 //!
 //! - [`GET /v5/channel/:id/accounting`](channel::get_accounting_for_channel)
 //!
-//! todo
+//! Response: [`AccountingResponse::<CheckedState>`](primitives::sentry::AccountingResponse)
 //!
 //! - [`GET /v5/channel/:id/spender/:addr`](channel::get_spender_limits) (auth required)
 //!
-//! todo
+//! Response: [`SpenderResponse`](primitives::sentry::SpenderResponse)
 //!
 //! - [`POST /v5/channel/:id/spender/:addr`](channel::add_spender_leaf) (auth required)
 //!
@@ -22,22 +30,40 @@
 //!
 //! - [`GET /v5/channel/:id/spender/all`](channel::get_all_spender_limits) (auth required)
 //!
-//! todo
+//! Response: [`AllSpendersResponse`](primitives::sentry::AllSpendersResponse)
 //!
-//! - [`GET /v5/channel/:id/validator-messages`](channel::validator_message::list_validator_messages)
+//! - [`GET /v5/channel/:id/validator-messages`][list_validator_messages]
 //!
-//!   - `GET /v5/channel/:id/validator-messages/:ValidatorId` - filter by ValidatorId
-//!   - `GET /v5/channel/:id/validator-messages/:ValidatorId/NewState+ApproveState` - filters by a given [`primitives::ValidatorId`] and a
+//!   - [`GET /v5/channel/:id/validator-messages/:addr`][list_validator_messages] - filter by the given [`ValidatorId`][ValidatorId]
+//!   - [`GET /v5/channel/:id/validator-messages/:addr/:validator_messages`][list_validator_messages] - filters by the given [`ValidatorId`][ValidatorId] and a
 //!     [`Validator message types`](primitives::validator::MessageTypes).
+//!      - `:validator_messages` - url encoded list of [`Validator message types`][MessageTypes] separated by a `+`
+//!         E.g. `NewState+ApproveState` becomes `NewState%2BApproveState`
 //!
-//! Request query parameters: [channel::validator_message::ValidatorMessagesListQuery]
-//! Response: [primitives::sentry::ValidatorMessageResponse]
+//! Request query parameters: [ValidatorMessagesListQuery](channel::validator_message::ValidatorMessagesListQuery)
+//! Response: [ValidatorMessageResponse](primitives::sentry::ValidatorMessageResponse)
+//!
+//! [list_validator_messages]: channel::validator_message::list_validator_messages
 //!
 //! - [`POST /v5/channel/:id/validator-messages`](channel::validator_message::create_validator_messages) (auth required)
 //!
-//! todo
+//! Request body (json):
+//! ```json
+//! {
+//!     "messages": [
+//!         /// validator messages
+//!         ...
+//!     ]
+//! }
+//! ```
+//!
+//! Validator messages: [`MessageTypes`]
 //!
 //! - [`POST /v5/channel/:id/last-approved`](channel::last_approved)
+//!
+//! Query: [`LastApprovedQuery`][primitives::sentry::LastApprovedQuery]
+//!
+//! Response: [`LastApprovedResponse`][primitives::sentry::LastApprovedResponse]
 //!
 //! todo
 //!
@@ -97,7 +123,7 @@
 //!
 //! Request Body: [`primitives::sentry::campaign_create::CreateCampaign`] (json)
 //!
-//!  `POST /v5/campaign/:id/close` (auth required)
+//! - `POST /v5/campaign/:id/close` (auth required)
 //!
 //! todo
 //!
@@ -119,6 +145,10 @@
 //!
 //! todo
 //!
+//! [ChannelId]: primitives::ChannelId
+//! [Address]: primitives::Address
+//! [ValidatorId]: primitives::ValidatorId
+//! [MessageTypes]: primitives::validator::MessageTypes
 pub use analytics::analytics as get_analytics;
 
 pub use cfg::config as get_cfg;

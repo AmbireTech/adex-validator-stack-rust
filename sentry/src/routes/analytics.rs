@@ -11,7 +11,7 @@ use primitives::analytics::{
     AnalyticsQuery, AuthenticateAs, ANALYTICS_QUERY_LIMIT,
 };
 
-/// `GET /analytics` request
+/// `GET /v5/analytics` request
 /// with query parameters: [`primitives::analytics::AnalyticsQuery`].
 pub async fn analytics<C: Locked + 'static>(
     req: Request<Body>,
@@ -250,7 +250,7 @@ mod test {
         // Test with no optional values
         {
             let req = Request::builder()
-            .uri("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day")
+            .uri("http://127.0.0.1/v5/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day")
             .body(Body::empty())
             .expect("Should build Request");
 
@@ -311,7 +311,7 @@ mod test {
             };
             let query = serde_urlencoded::to_string(query).expect("should parse query");
             let req = Request::builder()
-                .uri(format!("http://127.0.0.1/analytics?{}", query))
+                .uri(format!("http://127.0.0.1/v5/analytics?{}", query))
                 .body(Body::empty())
                 .expect("Should build Request");
 
@@ -366,7 +366,7 @@ mod test {
             };
             let query = serde_urlencoded::to_string(query).expect("should parse query");
             let req = Request::builder()
-                .uri(format!("http://127.0.0.1/analytics?{}", query))
+                .uri(format!("http://127.0.0.1/v5/analytics?{}", query))
                 .body(Body::empty())
                 .expect("Should build Request");
 
@@ -425,7 +425,7 @@ mod test {
             };
             let query = serde_urlencoded::to_string(query).expect("should serialize query");
             let req = Request::builder()
-                .uri(format!("http://127.0.0.1/analytics?{}", query))
+                .uri(format!("http://127.0.0.1/v5/analytics?{}", query))
                 .body(Body::empty())
                 .expect("Should build Request");
             let analytics_response = analytics(
@@ -485,7 +485,7 @@ mod test {
             };
             let query = serde_urlencoded::to_string(query).expect("should parse query");
             let req = Request::builder()
-                .uri(format!("http://127.0.0.1/analytics?{}", query))
+                .uri(format!("http://127.0.0.1/v5/analytics?{}", query))
                 .body(Body::empty())
                 .expect("Should build Request");
 
@@ -531,7 +531,7 @@ mod test {
         // Test with not allowed segment by
         {
             let req = Request::builder()
-            .uri("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day&segmentBy=campaignId&campaignId=0x936da01f9abd4d9d80c702af85c822a8")
+            .uri("http://127.0.0.1/v5/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day&segmentBy=campaignId&campaignId=0x936da01f9abd4d9d80c702af85c822a8")
             .body(Body::empty())
             .expect("Should build Request");
 
@@ -557,7 +557,7 @@ mod test {
         // test with not allowed key
         {
             let req = Request::builder()
-            .uri("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day&campaignId=0x936da01f9abd4d9d80c702af85c822a8")
+            .uri("http://127.0.0.1/v5/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day&campaignId=0x936da01f9abd4d9d80c702af85c822a8")
             .body(Body::empty())
             .expect("Should build Request");
 
@@ -583,7 +583,7 @@ mod test {
         // test with different metric
         {
             let req = Request::builder()
-            .uri("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=paid&timeframe=day")
+            .uri("http://127.0.0.1/v5/analytics?limit=100&eventType=CLICK&metric=paid&timeframe=day")
             .body(Body::empty())
             .expect("Should build Request");
 
@@ -622,7 +622,7 @@ mod test {
         // Test with different timeframe
         {
             let req = Request::builder()
-            .uri("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=week")
+            .uri("http://127.0.0.1/v5/analytics?limit=100&eventType=CLICK&metric=count&timeframe=week")
             .body(Body::empty())
             .expect("Should build Request");
 
@@ -663,7 +663,7 @@ mod test {
         {
             let req = Request::builder()
                 .uri(
-                    "http://127.0.0.1/analytics?limit=2&eventType=CLICK&metric=count&timeframe=day",
+                    "http://127.0.0.1/v5/analytics?limit=2&eventType=CLICK&metric=count&timeframe=day",
                 )
                 .body(Body::empty())
                 .expect("Should build Request");
@@ -700,7 +700,7 @@ mod test {
         {
             let req = Request::builder()
             .uri(
-                "http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=month",
+                "http://127.0.0.1/v5/analytics?limit=100&eventType=CLICK&metric=count&timeframe=month",
             )
             .body(Body::empty())
             .expect("Should build Request");
@@ -740,7 +740,7 @@ mod test {
         // Test with a year timeframe
         {
             let req = Request::builder()
-            .uri("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=year")
+            .uri("http://127.0.0.1/v5/analytics?limit=100&eventType=CLICK&metric=count&timeframe=year")
             .body(Body::empty())
             .expect("Should build Request");
 
@@ -799,7 +799,7 @@ mod test {
             };
             let query = serde_urlencoded::to_string(query).expect("should parse query");
             let req = Request::builder()
-                .uri(format!("http://127.0.0.1/analytics?{}", query))
+                .uri(format!("http://127.0.0.1/v5/analytics?{}", query))
                 .body(Body::empty())
                 .expect("Should build Request");
             let analytics_response = analytics(
@@ -998,7 +998,7 @@ mod test {
         {
             let req = Request::builder()
             .extension(publisher_auth.clone())
-            .uri("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day")
+            .uri("http://127.0.0.1/v5/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day")
             .body(Body::empty())
             .expect("Should build Request");
 
@@ -1029,7 +1029,7 @@ mod test {
         {
             let req = Request::builder()
             .extension(advertiser_auth.clone())
-            .uri("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day")
+            .uri("http://127.0.0.1/v5/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day")
             .body(Body::empty())
             .expect("Should build Request");
 
@@ -1060,7 +1060,7 @@ mod test {
         {
             let req = Request::builder()
             .extension(admin_auth.clone())
-            .uri("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day")
+            .uri("http://127.0.0.1/v5/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day")
             .body(Body::empty())
             .expect("Should build Request");
 
@@ -1109,7 +1109,7 @@ mod test {
             };
             let query = serde_urlencoded::to_string(query).expect("should parse query");
             let req = Request::builder()
-                .uri(format!("http://127.0.0.1/analytics?{}", query))
+                .uri(format!("http://127.0.0.1/v5/analytics?{}", query))
                 .body(Body::empty())
                 .expect("Should build Request");
 
@@ -1132,7 +1132,7 @@ mod test {
         // TODO: Move test to a analytics_router test
         // test with no authUid
         // let req = Request::builder()
-        //     .uri("http://127.0.0.1/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day")
+        //     .uri("http://127.0.0.1/v5/analytics?limit=100&eventType=CLICK&metric=count&timeframe=day")
         //     .body(Body::empty())
         //     .expect("Should build Request");
 

@@ -143,8 +143,7 @@ where
 
         let mut response = match (req.uri().path(), req.method()) {
             ("/cfg", &Method::GET) => get_cfg(req, self).await,
-            ("/channel/list", &Method::GET) => channel_list(req, self).await,
-            (route, _) if route.starts_with("/analytics") => analytics_router(req, self).await,
+            (route, _) if route.starts_with("/v5/analytics") => analytics_router(req, self).await,
             // This is important because it prevents us from doing
             // expensive regex matching for routes without /channel
             (path, _) if path.starts_with("/v5/channel") => channels_router(req, self).await,
@@ -219,13 +218,13 @@ async fn analytics_router<C: Locked + 'static>(
     let (route, method) = (req.uri().path(), req.method());
 
     match (route, method) {
-        ("/analytics", &Method::GET) => {
+        ("/v5/analytics", &Method::GET) => {
             let allowed_keys_for_request = vec![AllowedKey::Country, AllowedKey::AdSlotType]
                 .into_iter()
                 .collect();
             get_analytics(req, app, Some(allowed_keys_for_request), None).await
         }
-        ("/analytics/for-advertiser", &Method::GET) => {
+        ("/v5/analytics/for-advertiser", &Method::GET) => {
             let req = AuthRequired.call(req, app).await?;
 
             let authenticate_as = req
@@ -236,7 +235,7 @@ async fn analytics_router<C: Locked + 'static>(
 
             get_analytics(req, app, None, Some(authenticate_as)).await
         }
-        ("/analytics/for-publisher", &Method::GET) => {
+        ("/v5/analytics/for-publisher", &Method::GET) => {
             let authenticate_as = req
                 .extensions()
                 .get::<Auth>()
@@ -246,7 +245,7 @@ async fn analytics_router<C: Locked + 'static>(
             let req = AuthRequired.call(req, app).await?;
             get_analytics(req, app, None, Some(authenticate_as)).await
         }
-        ("/analytics/for-admin", &Method::GET) => {
+        ("/v5/analytics/for-admin", &Method::GET) => {
             req = Chain::new()
                 .chain(AuthRequired)
                 .chain(IsAdmin)
@@ -258,22 +257,25 @@ async fn analytics_router<C: Locked + 'static>(
     }
 }
 
+// TODO AIP#61: Add routes for:
+// - POST /channel/:id/pay
+// #[serde(rename_all = "camelCase")]
+// Pay { payout: BalancesMap },
+//
+// - GET /channel/:id/get-leaf
 async fn channels_router<C: Locked + 'static>(
     mut req: Request<Body>,
     app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
     let (path, method) = (req.uri().path().to_owned(), req.method());
 
-    // TODO AIP#61: Add routes for:
-    // - POST /channel/:id/pay
-    // #[serde(rename_all = "camelCase")]
-    // Pay { payout: BalancesMap },
-    //
-    // - GET /channel/:id/spender/:addr
-    // - GET /channel/:id/spender/all
-    // - POST /channel/:id/spender/:addr
-    // - GET /channel/:id/get-leaf
-    if let (Some(caps), &Method::GET) = (LAST_APPROVED_BY_CHANNEL_ID.captures(&path), method) {
+    // `GET /v5/channel/list`
+    if let ("/v5/channel/list", &Method::GET) = (path.as_str(), method) {
+        channel_list(req, app).await
+    }
+    // `GET /v5/channel/:id/last-approved`
+    else if let (Some(caps), &Method::GET) = (LAST_APPROVED_BY_CHANNEL_ID.captures(&path), method)
+    {
         let param = RouteParams(vec![caps
             .get(1)
             .map_or("".to_string(), |m| m.as_str().to_string())]);
@@ -282,7 +284,9 @@ async fn channels_router<C: Locked + 'static>(
         req = ChannelLoad.call(req, app).await?;
 
         last_approved(req, app).await
-    } else if let (Some(caps), &Method::GET) = (CHANNEL_VALIDATOR_MESSAGES.captures(&path), method)
+    }
+    // `GET /v5/channel/:id/validator-messages`
+    else if let (Some(caps), &Method::GET) = (CHANNEL_VALIDATOR_MESSAGES.captures(&path), method)
     {
         let param = RouteParams(vec![caps
             .get(1)
@@ -301,7 +305,9 @@ async fn channels_router<C: Locked + 'static>(
         };
 
         list_validator_messages(req, app, &extract_params.0, &extract_params.1).await
-    } else if let (Some(caps), &Method::POST) = (CHANNEL_VALIDATOR_MESSAGES.captures(&path), method)
+    }
+    // `POST /v5/channel/:id/validator-messages`
+    else if let (Some(caps), &Method::POST) = (CHANNEL_VALIDATOR_MESSAGES.captures(&path), method)
     {
         let param = RouteParams(vec![caps
             .get(1)
@@ -316,7 +322,9 @@ async fn channels_router<C: Locked + 'static>(
             .await?;
 
         create_validator_messages(req, app).await
-    } else if let (Some(caps), &Method::GET) = (
+    }
+    // `GET /v5/channel/:id/spender/:addr`
+    else if let (Some(caps), &Method::GET) = (
         CHANNEL_SPENDER_LEAF_AND_TOTAL_DEPOSITED.captures(&path),
         method,
     ) {
@@ -334,7 +342,9 @@ async fn channels_router<C: Locked + 'static>(
             .await?;
 
         get_spender_limits(req, app).await
-    } else if let (Some(caps), &Method::POST) = (
+    }
+    // `POST /v5/channel/:id/spender/:addr`
+    else if let (Some(caps), &Method::POST) = (
         CHANNEL_SPENDER_LEAF_AND_TOTAL_DEPOSITED.captures(&path),
         method,
     ) {
@@ -352,7 +362,9 @@ async fn channels_router<C: Locked + 'static>(
             .await?;
 
         add_spender_leaf(req, app).await
-    } else if let (Some(caps), &Method::GET) = (CHANNEL_ALL_SPENDER_LIMITS.captures(&path), method)
+    }
+    // `GET /v5/channel/:id/spender/all`
+    else if let (Some(caps), &Method::GET) = (CHANNEL_ALL_SPENDER_LIMITS.captures(&path), method)
     {
         let param = RouteParams(vec![caps
             .get(1)
@@ -366,7 +378,9 @@ async fn channels_router<C: Locked + 'static>(
             .await?;
 
         get_all_spender_limits(req, app).await
-    } else if let (Some(caps), &Method::GET) = (CHANNEL_ACCOUNTING.captures(&path), method) {
+    }
+    // `GET /v5/channel/:id/accounting`
+    else if let (Some(caps), &Method::GET) = (CHANNEL_ACCOUNTING.captures(&path), method) {
         let param = RouteParams(vec![caps
             .get(1)
             .map_or("".to_string(), |m| m.as_str().to_string())]);
