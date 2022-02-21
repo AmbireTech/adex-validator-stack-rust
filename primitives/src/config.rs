@@ -78,7 +78,7 @@ pub struct Config {
     /// - To get a [`ChainInfo`] only by a [`ChainId`] use [`Config::find_chain()`].
     ///
     /// **NOTE:** Make sure that a Token [`Address`] is unique across all Chains,
-    /// otherwise `Config::find_chain_token` will fetch only one of them and cause unexpected problems.
+    /// otherwise [`Config::find_chain_token()`] will fetch only one of them and cause unexpected problems.
     #[serde(rename = "chain")]
     pub chains: HashMap<String, ChainInfo>,
 }

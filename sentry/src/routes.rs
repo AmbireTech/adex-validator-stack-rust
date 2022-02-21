@@ -3,12 +3,15 @@
 //! ## Channel
 //! All routes are implemented under module [channel].
 //!
-//! Route parameters:
+//! ### Route parameters
 //!
 //! Paths which include these parameters are validated as follow:
 //!
+//! 
 //! - `:id` - [`ChannelId`][ChannelId]
 //! - `:addr` - either an [`Address`][Address] or [`ValidatorId`][ValidatorId].
+//!
+//! ### Routes
 //!
 //! - [`GET /v5/channel/list`](crate::routes::channel::channel_list)
 //!
