@@ -722,7 +722,6 @@ mod test {
 
         let spender = *CREATOR;
 
-        // todo: Clean up
         let (config, chain_context) = {
             let mut init_chain = GANACHE_1337.clone();
             init_chain.outpace = outpace.0;

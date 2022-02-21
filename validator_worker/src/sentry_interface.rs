@@ -156,7 +156,7 @@ impl<C: Unlocked + 'static> SentryApi<C, ()> {
         sentry_api.with_propagate(propagate_to)
     }
 
-    /// If the _Who am I_ Validator is not found in `propagate_to` it will added.
+    /// If the _Who am I_ Validator is not found in `propagate_to` it will be added.
     /// Propagation should happen to all validators Sentry instances including _Who am I_
     /// i.e. the current validator.
     /// If a Chain in propagate_to is not setup ([`SentryApi::whoami`]) for this instance, an error is returned.
