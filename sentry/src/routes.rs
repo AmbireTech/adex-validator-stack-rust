@@ -57,7 +57,7 @@
 //! }
 //! ```
 //!
-//! Validator messages: [`MessageTypes`]
+//! Validator messages: [`MessageTypes`][MessageTypes]
 //!
 //! - [`POST /v5/channel/:id/last-approved`](channel::last_approved)
 //!

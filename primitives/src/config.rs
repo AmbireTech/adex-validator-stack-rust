@@ -73,9 +73,9 @@ pub struct Config {
     /// The key of this map is a human-readable text of the Chain name
     /// for readability in the configuration file.
     ///
-    /// - To get the chain of a token address use [`Config::find_token_chain`].
+    /// - To get the chain of a token address use [`Config::find_chain_token()`].
     ///
-    /// - To get a chain RPC use [`Config::find_chain_rpc`].
+    /// - To get a [`ChainInfo`] only by a [`ChainId`] use [`Config::find_chain()`].
     ///
     /// **NOTE:** Make sure that a Token [`Address`] is unique across all Chains,
     /// otherwise `Config::find_chain_token` will fetch only one of them and cause unexpected problems.
