@@ -8,7 +8,7 @@ use adapter::client::Locked;
 use hyper::{Body, Request, Response};
 use primitives::analytics::{
     query::{AllowedKey, ALLOWED_KEYS},
-    AnalyticsQuery, AuthenticateAs, ANALYTICS_QUERY_LIMIT,
+    AnalyticsQuery, AuthenticateAs,
 };
 
 /// `GET /v5/analytics` request
@@ -21,7 +21,7 @@ pub async fn analytics<C: Locked + 'static>(
 ) -> Result<Response<Body>, ResponseError> {
     let query = serde_urlencoded::from_str::<AnalyticsQuery>(req.uri().query().unwrap_or(""))?;
 
-    let applied_limit = query.limit.min(ANALYTICS_QUERY_LIMIT);
+    let applied_limit = query.limit.min(app.config.analytics_find_limit);
 
     let route_allowed_keys: HashSet<AllowedKey> =
         request_allowed.unwrap_or_else(|| ALLOWED_KEYS.clone());
@@ -54,14 +54,30 @@ pub async fn analytics<C: Locked + 'static>(
         )));
     }
 
-    let analytics = get_analytics(
-        &app.pool,
-        query.clone(),
-        route_allowed_keys,
-        authenticate_as,
-        applied_limit,
+    let analytics_maxtime = std::time::Duration::from_millis(app.config.analytics_maxtime.into());
+
+    let analytics = match tokio::time::timeout(
+        analytics_maxtime,
+        get_analytics(
+            &app.pool,
+            query.clone(),
+            route_allowed_keys,
+            authenticate_as,
+            applied_limit,
+        ),
     )
-    .await?;
+    .await
+    {
+        Ok(Ok(analytics)) => analytics,
+        // Error getting the analytics
+        Ok(Err(err)) => return Err(err.into()),
+        // Timeout error
+        Err(_elapsed) => {
+            return Err(ResponseError::BadRequest(
+                "Timeout when fetching analytics data".into(),
+            ))
+        }
+    };
 
     Ok(success_response(serde_json::to_string(&analytics)?))
 }

@@ -46,9 +46,12 @@ pub struct Config {
     pub spendable_find_limit: u32,
     pub wait_time: u32,
     pub msgs_find_limit: u32,
-    pub analytics_find_limit_v5: u32,
+    /// The maximum analytic results you can receive per request.
+    pub analytics_find_limit: u32,
+    /// A timeout to be used when collecting the Analytics for a request.
     /// In milliseconds
-    pub analytics_maxtime_v5: u32,
+    pub analytics_maxtime: u32,
+    /// The amount of time between heartbeats.
     /// In milliseconds
     pub heartbeat_time: u32,
     pub health_threshold_promilles: u32,

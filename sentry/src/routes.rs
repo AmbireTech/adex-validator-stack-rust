@@ -7,7 +7,7 @@
 //!
 //! Paths which include these parameters are validated as follow:
 //!
-//! 
+//!
 //! - `:id` - [`ChannelId`][ChannelId]
 //! - `:addr` - either an [`Address`][Address] or [`ValidatorId`][ValidatorId].
 //!
