@@ -8,10 +8,27 @@ use crate::{
 use async_trait::async_trait;
 use dashmap::{mapref::entry::Entry, DashMap};
 
-use primitives::{Address, Channel, ChannelId, ToETHChecksum, ValidatorId};
+use once_cell::sync::Lazy;
+use primitives::{
+    Address, Chain, ChainId, ChainOf, Channel, ChannelId, ToETHChecksum, ValidatorId,
+};
 use std::{collections::HashMap, sync::Arc};
 
 pub type Adapter<S> = crate::Adapter<Dummy, S>;
+
+/// The Dummy Chain to be used with this adapter
+/// The Chain is not applicable to the adapter, however, it is required for
+/// applications because of the `authentication` & [`Channel`] interactions.
+pub static DUMMY_CHAIN: Lazy<Chain> = Lazy::new(|| Chain {
+    chain_id: ChainId::new(1),
+    rpc: "http://dummy.com".parse().expect("Should parse ApiUrl"),
+    outpace: "0x0000000000000000000000000000000000000000"
+        .parse()
+        .unwrap(),
+    sweeper: "0x0000000000000000000000000000000000000000"
+        .parse()
+        .unwrap(),
+});
 
 /// Dummy adapter implementation intended for testing.
 #[derive(Debug, Clone)]
@@ -86,6 +103,9 @@ impl Locked for Dummy {
     }
 
     /// Verify, based on the signature & state_root, that the signer is the same
+    ///
+    /// Splits the signature by `" "` (whitespace) and takes
+    /// the last part of it which contains the signer [`Address`].
     fn verify(
         &self,
         signer: ValidatorId,
@@ -102,8 +122,8 @@ impl Locked for Dummy {
         Ok(is_same)
     }
 
-    /// Creates a `Session` from a provided Token by calling the Contract.
-    /// Does **not** cache the (`Token`, `Session`) pair.
+    /// Finds the authorization token from the configured values
+    /// and creates a [`Session`] out of it using a [`ChainId`] of `1`.
     async fn session_from_token(&self, token: &str) -> Result<Session, crate::Error> {
         let identity = self
             .authorization_tokens
@@ -114,6 +134,7 @@ impl Locked for Dummy {
             Some((address, _token)) => Ok(Session {
                 uid: *address,
                 era: 0,
+                chain: DUMMY_CHAIN.clone(),
             }),
             None => Err(Error::authentication(format!(
                 "No identity found that matches authentication token: {}",
@@ -124,11 +145,11 @@ impl Locked for Dummy {
 
     async fn get_deposit(
         &self,
-        channel: &Channel,
+        channel_context: &ChainOf<Channel>,
         depositor_address: Address,
     ) -> Result<Deposit, crate::Error> {
         self.deposits
-            .get_next_deposit(channel.id(), depositor_address)
+            .get_next_deposit(channel_context.context.id(), depositor_address)
             .ok_or_else(|| {
                 Error::adapter(format!(
                     "No more mocked deposits found for depositor {:?}",
@@ -151,7 +172,7 @@ impl Unlocked for Dummy {
     }
 
     // requires Unlocked
-    fn get_auth(&self, _intended_for: ValidatorId) -> Result<String, Error> {
+    fn get_auth(&self, _for_chain: ChainId, _intended_for: ValidatorId) -> Result<String, Error> {
         self.authorization_tokens
             .get(&self.identity.to_address())
             .cloned()
@@ -174,9 +195,12 @@ impl Unlockable for Dummy {
 
 #[cfg(test)]
 mod test {
+    use std::num::NonZeroU8;
+
     use primitives::{
+        config::TokenInfo,
         util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, IDS},
-        BigNum,
+        BigNum, ChainOf, UnifiedNum,
     };
 
     use super::*;
@@ -184,6 +208,18 @@ mod test {
     #[tokio::test]
     async fn test_deposits_calls() {
         let channel = DUMMY_CAMPAIGN.channel;
+
+        let channel_context = ChainOf {
+            context: channel,
+            token: TokenInfo {
+                min_token_units_for_deposit: 1_u64.into(),
+                min_validator_fee: 1_u64.into(),
+                precision: NonZeroU8::new(UnifiedNum::PRECISION).expect("Non zero u8"),
+                address: channel.token,
+            },
+            chain: DUMMY_CHAIN.clone(),
+        };
+
         let dummy_client = Dummy::init(Options {
             dummy_identity: IDS["leader"],
             dummy_auth_tokens: Default::default(),
@@ -193,7 +229,7 @@ mod test {
 
         // no mocked deposit calls should cause an Error
         {
-            let result = dummy_client.get_deposit(&channel, address).await;
+            let result = dummy_client.get_deposit(&channel_context, address).await;
 
             assert!(result.is_err());
         }
@@ -211,25 +247,25 @@ mod test {
             dummy_client.add_deposit_call(channel.id(), address, deposits[1].clone());
 
             let first_call = dummy_client
-                .get_deposit(&channel, address)
+                .get_deposit(&channel_context, address)
                 .await
                 .expect("Should get first mocked deposit");
             assert_eq!(&deposits[0], &first_call);
 
             // should not affect the Mocked deposit calls and should cause an error
             let different_address_call = dummy_client
-                .get_deposit(&channel, ADDRESSES["leader"])
+                .get_deposit(&channel_context, ADDRESSES["leader"])
                 .await;
             assert!(different_address_call.is_err());
 
             let second_call = dummy_client
-                .get_deposit(&channel, address)
+                .get_deposit(&channel_context, address)
                 .await
                 .expect("Should get second mocked deposit");
             assert_eq!(&deposits[1], &second_call);
 
             // Third call should error, we've only mocked 2 calls!
-            let third_call = dummy_client.get_deposit(&channel, address).await;
+            let third_call = dummy_client.get_deposit(&channel_context, address).await;
             assert!(third_call.is_err());
         }
     }

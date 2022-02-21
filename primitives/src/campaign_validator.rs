@@ -1,14 +1,16 @@
 use crate::{
-    campaign::Validators,
-    config::{Config, TokenInfo},
-    Address, Campaign, UnifiedNum, ValidatorId,
+    campaign::Validators, config::Config, Address, Campaign, ChainOf, UnifiedNum, ValidatorId,
 };
 use chrono::Utc;
-use std::{cmp::PartialEq, collections::HashMap};
+use std::cmp::PartialEq;
 use thiserror::Error;
 
 pub trait Validator {
-    fn validate(&self, config: &Config, validator_identity: &ValidatorId) -> Result<(), Error>;
+    fn validate(
+        self,
+        config: &Config,
+        validator_identity: &ValidatorId,
+    ) -> Result<ChainOf<Campaign>, Error>;
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -42,7 +44,11 @@ impl From<Validation> for Error {
 }
 
 impl Validator for Campaign {
-    fn validate(&self, config: &Config, validator_identity: &ValidatorId) -> Result<(), Error> {
+    fn validate(
+        self,
+        config: &Config,
+        validator_identity: &ValidatorId,
+    ) -> Result<ChainOf<Campaign>, Error> {
         // check if the channel validators include our adapter identity
         let whoami_validator = match self.find_validator(validator_identity) {
             Some(role) => role.into_inner(),
@@ -57,19 +63,20 @@ impl Validator for Campaign {
             return Err(Validation::UnlistedValidator.into());
         }
 
-        if !creator_listed(self, &config.creators_whitelist) {
+        if !creator_listed(&self, &config.creators_whitelist) {
             return Err(Validation::UnlistedCreator.into());
         }
 
-        // Check if the token is listed in the Configuration
-        let token_info = config
-            .token_address_whitelist
-            .get(&self.channel.token)
+        // Check if Channel token is listed in the configuration token Chain ID & Address
+        let chain_context = config
+            .find_chain_token(self.channel.token)
             .ok_or(Validation::UnlistedAsset)?;
 
         // Check if the campaign budget is above the minimum deposit configured
-        if self.budget.to_precision(token_info.precision.get())
-            < token_info.min_token_units_for_deposit
+        if self
+            .budget
+            .to_precision(chain_context.token.precision.get())
+            < chain_context.token.min_token_units_for_deposit
         {
             return Err(Validation::MinimumDepositNotMet.into());
         }
@@ -77,8 +84,8 @@ impl Validator for Campaign {
         // Check if the validator fee is greater than the minimum configured fee
         if whoami_validator
             .fee
-            .to_precision(token_info.precision.get())
-            < token_info.min_validator_fee
+            .to_precision(chain_context.token.precision.get())
+            < chain_context.token.min_validator_fee
         {
             return Err(Validation::MinimumValidatorFeeNotMet.into());
         }
@@ -95,7 +102,7 @@ impl Validator for Campaign {
             return Err(Validation::FeeConstraintViolated.into());
         }
 
-        Ok(())
+        Ok(chain_context.with_campaign(self))
     }
 }
 
@@ -123,28 +130,18 @@ pub fn creator_listed(campaign: &Campaign, whitelist: &[Address]) -> bool {
             .any(|allowed| allowed.eq(&campaign.creator))
 }
 
-pub fn asset_listed(campaign: &Campaign, whitelist: &HashMap<Address, TokenInfo>) -> bool {
-    // if the list is empty, return true, as we don't have a whitelist to restrict us to
-    // or if we have a list, check if it includes the `channel.deposit_asset`
-    whitelist.is_empty()
-        || whitelist
-            .keys()
-            .any(|allowed| allowed == &campaign.channel.token)
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::{
-        config,
+        config::{self, GANACHE_CONFIG},
         util::tests::prep_db::{
             ADDRESSES, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, IDS,
-            TOKENS,
         },
         BigNum,
     };
     use chrono::{TimeZone, Utc};
-    use std::{num::NonZeroU8, str::FromStr};
+    use std::str::FromStr;
 
     #[test]
     fn are_validators_listed() {
@@ -189,89 +186,93 @@ mod test {
     }
 
     #[test]
-    fn is_asset_listed() {
+    fn chain_and_token_whitelist_validation() {
         let campaign = DUMMY_CAMPAIGN.clone();
 
-        let mut assets = HashMap::new();
-        // empty hashmap
-        let is_listed = asset_listed(&campaign, &assets);
-        assert!(is_listed);
+        // no configured Chains & Tokens
+        {
+            let mut config = GANACHE_CONFIG.clone();
+            config.chains.clear();
 
-        // not listed
+            let result = campaign.clone().validate(&config, &campaign.channel.leader);
 
-        assets.insert(
-            TOKENS["USDC"],
-            TokenInfo {
-                min_token_units_for_deposit: BigNum::from(0),
-                min_validator_fee: BigNum::from(0),
-                precision: NonZeroU8::new(6).expect("should create NonZeroU8"),
-            },
-        );
-        let is_listed = asset_listed(&campaign, &assets);
-        assert!(!is_listed);
+            assert!(matches!(
+                result,
+                Err(Error::Validation(Validation::UnlistedAsset))
+            ));
+        }
 
-        // listed
-        assets.insert(
-            TOKENS["DAI"],
-            TokenInfo {
-                min_token_units_for_deposit: BigNum::from(0),
-                min_validator_fee: BigNum::from(0),
-                precision: NonZeroU8::new(18).expect("should create NonZeroU8"),
-            },
-        );
-        let is_listed = asset_listed(&campaign, &assets);
-        assert!(is_listed);
+        {
+            let config = GANACHE_CONFIG.clone();
+
+            let _campaign_context = campaign
+                .clone()
+                .validate(&config, &campaign.channel.leader)
+                .expect(
+                    "Default development config should contain the dummy campaign.channel.token",
+                );
+        }
     }
 
     #[test]
     fn are_campaigns_validated() {
-        let config = config::DEVELOPMENT_CONFIG.clone();
+        let config = config::GANACHE_CONFIG.clone();
 
         // Validator not in campaign
         {
             let campaign = DUMMY_CAMPAIGN.clone();
-            let is_validated = campaign.validate(&config, &IDS["tester"]);
-            assert!(matches!(
-                is_validated,
-                Err(Error::Validation(Validation::AdapterNotIncluded))
-            ));
+
+            let validation_error = campaign
+                .validate(&config, &IDS["tester"])
+                .expect_err("Should trigger validation error");
+            assert_eq!(
+                Error::Validation(Validation::AdapterNotIncluded),
+                validation_error,
+            );
         }
 
         // active.to has passed
         {
             let mut campaign = DUMMY_CAMPAIGN.clone();
             campaign.active.to = Utc.ymd(2019, 1, 30).and_hms(0, 0, 0);
-            let is_validated = campaign.validate(&config, &IDS["leader"]);
-            assert!(matches!(
-                is_validated,
-                Err(Error::Validation(Validation::InvalidActiveTo))
-            ));
+
+            let validation_error = campaign
+                .validate(&config, &IDS["leader"])
+                .expect_err("Should trigger validation error");
+            assert_eq!(
+                Error::Validation(Validation::InvalidActiveTo),
+                validation_error,
+            );
         }
 
         // all_validators not listed
         {
             let campaign = DUMMY_CAMPAIGN.clone();
-            let mut config = config::DEVELOPMENT_CONFIG.clone();
+            let mut config = config::GANACHE_CONFIG.clone();
             config.validators_whitelist = vec![IDS["leader"], IDS["tester"]];
 
-            let is_validated = campaign.validate(&config, &IDS["leader"]);
-            assert!(matches!(
-                is_validated,
-                Err(Error::Validation(Validation::UnlistedValidator))
-            ));
+            let validation_error = campaign
+                .validate(&config, &IDS["leader"])
+                .expect_err("Should trigger validation error");
+            assert_eq!(
+                Error::Validation(Validation::UnlistedValidator),
+                validation_error,
+            );
         }
 
         // creator not listed
         {
             let campaign = DUMMY_CAMPAIGN.clone();
-            let mut config = config::DEVELOPMENT_CONFIG.clone();
+            let mut config = config::GANACHE_CONFIG.clone();
             config.creators_whitelist = vec![ADDRESSES["tester"]];
 
-            let is_validated = campaign.validate(&config, &IDS["leader"]);
-            assert!(matches!(
-                is_validated,
-                Err(Error::Validation(Validation::UnlistedCreator))
-            ));
+            let validation_error = campaign
+                .validate(&config, &IDS["leader"])
+                .expect_err("Should trigger validation error");
+            assert_eq!(
+                Error::Validation(Validation::UnlistedCreator),
+                validation_error,
+            );
         }
 
         // token not listed
@@ -281,11 +282,13 @@ mod test {
                 .parse::<Address>()
                 .expect("Should parse");
 
-            let is_validated = campaign.validate(&config, &IDS["leader"]);
-            assert!(matches!(
-                is_validated,
-                Err(Error::Validation(Validation::UnlistedAsset))
-            ));
+            let validation_error = campaign
+                .validate(&config, &IDS["leader"])
+                .expect_err("Should trigger validation error");
+            assert_eq!(
+                Error::Validation(Validation::UnlistedAsset),
+                validation_error,
+            );
         }
 
         // budget < min_deposit
@@ -293,63 +296,161 @@ mod test {
             let mut campaign = DUMMY_CAMPAIGN.clone();
             campaign.budget = UnifiedNum::from_u64(0);
 
-            let is_validated = campaign.validate(&config, &IDS["leader"]);
-            assert!(matches!(
-                is_validated,
-                Err(Error::Validation(Validation::MinimumDepositNotMet))
-            ));
+            let validation_error = campaign
+                .validate(&config, &IDS["leader"])
+                .expect_err("Should trigger validation error");
+            assert_eq!(
+                Error::Validation(Validation::MinimumDepositNotMet),
+                validation_error,
+            );
         }
 
         // validator_fee < min_fee
         {
             let campaign = DUMMY_CAMPAIGN.clone();
-            let mut config = config::DEVELOPMENT_CONFIG.clone();
+            let mut config = config::GANACHE_CONFIG.clone();
 
-            config.token_address_whitelist.insert(
-                TOKENS["DAI"],
-                TokenInfo {
-                    min_token_units_for_deposit: BigNum::from(0),
-                    min_validator_fee: BigNum::from_str("999999999999999999999999999999999999")
-                        .expect("should get BigNum"),
-                    precision: NonZeroU8::new(18).expect("should create NonZeroU8"),
-                },
+            let mut token_info = config
+                .chains
+                .values_mut()
+                .find_map(|chain_info| {
+                    chain_info
+                        .tokens
+                        .values_mut()
+                        .find(|token_info| token_info.address == campaign.channel.token)
+                })
+                .expect("Should find Dummy campaign.channel.token");
+            token_info.min_validator_fee = BigNum::from_str("999999999999999999999999999999999999")
+                .expect("Should parse BigNum");
+
+            let validation_error = campaign
+                .validate(&config, &IDS["leader"])
+                .expect_err("Should trigger validation error");
+            assert_eq!(
+                Error::Validation(Validation::MinimumValidatorFeeNotMet),
+                validation_error,
             );
-
-            let is_validated = campaign.validate(&config, &IDS["leader"]);
-            assert!(matches!(
-                is_validated,
-                Err(Error::Validation(Validation::MinimumValidatorFeeNotMet))
-            ));
         }
 
+        let sum_fees = |validators: &Validators| -> UnifiedNum {
+            validators
+                .iter()
+                .map(|validator| validator.fee)
+                .sum::<Option<_>>()
+                .expect("Validators sum of fees should not overflow")
+        };
+
         // total_fee > budget
+        // budget = total_fee - 1
         {
             let mut campaign = DUMMY_CAMPAIGN.clone();
-            campaign.budget = UnifiedNum::from_u64(150); // both fees are 100, so this won't cover them
+            let campaign_token = config
+                .find_chain_token(campaign.channel.token)
+                .unwrap()
+                .token;
 
-            let is_validated = campaign.validate(&config, &IDS["leader"]);
-            assert!(matches!(
-                is_validated,
-                Err(Error::Validation(Validation::FeeConstraintViolated))
-            ));
+            // makes the sum of all validator fees = 2 * min token units for deposit
+            campaign.validators = {
+                let new_validators = campaign
+                    .validators
+                    .iter()
+                    .map(|validator| {
+                        let mut new_validator = validator.clone();
+                        new_validator.fee = UnifiedNum::from_precision(
+                            campaign_token.min_token_units_for_deposit.clone(),
+                            campaign_token.precision.into(),
+                        )
+                        .expect("Should not overflow");
+
+                        new_validator
+                    })
+                    .collect::<Vec<_>>();
+
+                assert_eq!(
+                    2,
+                    new_validators.len(),
+                    "Dummy Campaign validators should always be 2 - a leader & a follower"
+                );
+
+                Validators::new((new_validators[0].clone(), new_validators[1].clone()))
+            };
+
+            campaign.budget = sum_fees(&campaign.validators) - UnifiedNum::from(1);
+
+            let validation_error = campaign
+                .validate(&config, &IDS["leader"])
+                .expect_err("Should trigger validation error");
+            assert_eq!(
+                Error::Validation(Validation::FeeConstraintViolated),
+                validation_error,
+            );
         }
 
         // total_fee = budget
         {
             let mut campaign = DUMMY_CAMPAIGN.clone();
-            campaign.budget = UnifiedNum::from_u64(200);
 
-            let is_validated = campaign.validate(&config, &IDS["leader"]);
-            assert!(matches!(
-                is_validated,
-                Err(Error::Validation(Validation::FeeConstraintViolated))
-            ));
+            let campaign_token = config
+                .find_chain_token(campaign.channel.token)
+                .unwrap()
+                .token;
+
+            // makes the sum of all validator fees = 2 * min token units for deposit
+            campaign.validators = {
+                let new_validators = campaign
+                    .validators
+                    .iter()
+                    .map(|validator| {
+                        let mut new_validator = validator.clone();
+                        new_validator.fee = UnifiedNum::from_precision(
+                            campaign_token.min_token_units_for_deposit.clone(),
+                            campaign_token.precision.into(),
+                        )
+                        .expect("Should not overflow");
+
+                        new_validator
+                    })
+                    .collect::<Vec<_>>();
+
+                assert_eq!(
+                    2,
+                    new_validators.len(),
+                    "Dummy Campaign validators should always be 2 - a leader & a follower"
+                );
+
+                Validators::new((new_validators[0].clone(), new_validators[1].clone()))
+            };
+
+            campaign.budget = sum_fees(&campaign.validators);
+
+            let validation_error = campaign
+                .validate(&config, &IDS["leader"])
+                .expect_err("Should trigger validation error");
+            assert_eq!(
+                Error::Validation(Validation::FeeConstraintViolated),
+                validation_error,
+            );
         }
+
         // should validate
         {
             let campaign = DUMMY_CAMPAIGN.clone();
-            let is_validated = campaign.validate(&config, &IDS["leader"]);
-            assert!(is_validated.is_ok());
+            let _campaign_context = campaign
+                .validate(&config, &IDS["leader"])
+                .expect("Should pass validation");
+        }
+    }
+
+    #[test]
+    fn test_valid_campaign() {
+        let config = config::GANACHE_CONFIG.clone();
+        // 1000000000000
+        // 10000000000000
+        {
+            let campaign = DUMMY_CAMPAIGN.clone();
+            let _campaign_context = campaign
+                .validate(&config, &IDS["leader"])
+                .expect("Should pass validation");
         }
     }
 }

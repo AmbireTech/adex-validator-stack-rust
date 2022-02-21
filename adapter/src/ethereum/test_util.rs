@@ -10,12 +10,16 @@ use web3::{
 
 use primitives::{
     channel::{Channel, Nonce},
-    config::TokenInfo,
+    config::{ChainInfo, TokenInfo, GANACHE_CONFIG},
     test_util::{ADVERTISER, CREATOR, FOLLOWER, GUARDIAN, GUARDIAN_2, LEADER, PUBLISHER},
-    Address, BigNum, ValidatorId,
+    Address, BigNum, Chain, ValidatorId,
 };
 
-use super::{channel::EthereumChannel, client::Options, IDENTITY_ABI, OUTPACE_ABI, SWEEPER_ABI};
+use super::{
+    channel::EthereumChannel,
+    client::{ChainTransport, Options},
+    IDENTITY_ABI, OUTPACE_ABI, SWEEPER_ABI,
+};
 
 // See `adex-eth-protocol` `contracts/mocks/Token.sol`
 /// Mocked Token ABI
@@ -86,6 +90,38 @@ pub static KEYSTORES: Lazy<HashMap<Address, Options>> = Lazy::new(|| {
 
 /// Local `ganache` is running at:
 pub const GANACHE_URL: &str = "http://localhost:8545";
+
+// /// [`Chain`] of the locally running `ganache-cli` chain with id #1
+// pub static GANACHE_1: Lazy<Chain> = Lazy::new(|| GANACHE_INFO_1.chain.clone());
+
+// /// [`ChainInfo`] of the locally running `ganache-cli` chain with id #1
+// pub static GANACHE_INFO_1: Lazy<ChainInfo> = Lazy::new(|| {
+//     GANACHE_CONFIG
+//         .chains
+//         .get("Ganache #1")
+//         .expect("Ganache Local chain 1 not found")
+//         .clone()
+// });
+
+/// [`Chain`] of the locally running `ganache-cli` chain with id #1337
+pub static GANACHE_1337: Lazy<Chain> = Lazy::new(|| GANACHE_INFO_1337.chain.clone());
+
+/// [`ChainInfo`] of the locally running `ganache-cli` chain with id #1337
+pub static GANACHE_INFO_1337: Lazy<ChainInfo> = Lazy::new(|| {
+    GANACHE_CONFIG
+        .chains
+        .get("Ganache #1337")
+        .expect("Ganache Local chain 1337 not found")
+        .clone()
+});
+
+/// Initialized Ganache [`Web3`] instance using a Http transport for usage in tests.
+/// It uses the [`GANACHE_1337`] to initialize the client.
+pub static GANACHE_WEB3: Lazy<Web3<Http>> = Lazy::new(|| {
+    GANACHE_1337
+        .init_web3()
+        .expect("Should init the Web3 client")
+});
 
 /// This helper function generates the correct path to the keystore file from this file.
 ///
@@ -255,20 +291,21 @@ pub async fn deploy_token_contract(
         .expect("Invalid ABI of Mock Token contract")
         .confirmations(0)
         .options(ContractOptions::with(|opt| {
-            opt.gas_price = Some(1.into());
-            opt.gas = Some(6_721_975.into());
+            opt.gas_price = Some(1_i32.into());
+            opt.gas = Some(6_721_975_i32.into());
         }))
         .execute(*MOCK_TOKEN_BYTECODE, (), H160(LEADER.to_bytes()))
         .await?;
 
+    let token_address = Address::from(token_contract.address().to_fixed_bytes());
+
     let token_info = TokenInfo {
         min_token_units_for_deposit: BigNum::from(min_token_units),
         precision: NonZeroU8::new(18).expect("should create NonZeroU8"),
-        // 0.000_1
-        min_validator_fee: BigNum::from(100_000_000_000_000),
+        // 0.000_001
+        min_validator_fee: BigNum::from(1_000_000_000_000),
+        address: token_address,
     };
-
-    let token_address = Address::from(token_contract.address().to_fixed_bytes());
 
     Ok((token_info, token_address, token_contract))
 }

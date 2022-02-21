@@ -31,7 +31,26 @@ impl<C: Locked + 'static> Middleware<C> for CampaignLoad {
             .await?
             .ok_or(ResponseError::NotFound)?;
 
-        request.extensions_mut().insert(campaign);
+        let campaign_context = application
+            .config
+            .find_chain_token(campaign.channel.token)
+            .ok_or(ResponseError::BadRequest(
+                "Channel token not whitelisted".to_string(),
+            ))?
+            .with_campaign(campaign);
+
+        // If this is an authenticated call
+        // Check if the Campaign's Channel context (Chain Id) aligns with the Authentication token Chain id
+        match request.extensions().get::<Auth>() {
+            // If Chain Ids differ, the requester hasn't generated Auth token
+            // to access the Channel in it's Chain Id.
+            Some(auth) if auth.chain.chain_id != campaign_context.chain.chain_id => {
+                return Err(ResponseError::Forbidden("Authentication token is generated for different Chain and differs from the Campaign's Channel Chain".into()))
+            }
+            _ => {},
+        }
+
+        request.extensions_mut().insert(campaign_context);
 
         Ok(request)
     }
@@ -68,7 +87,7 @@ impl<C: Locked + 'static> Middleware<C> for CalledByCreator {
 
 #[cfg(test)]
 mod test {
-    use primitives::{util::tests::prep_db::DUMMY_CAMPAIGN, Campaign};
+    use primitives::{util::tests::prep_db::DUMMY_CAMPAIGN, Campaign, ChainOf};
 
     use crate::{
         db::{insert_campaign, insert_channel},
@@ -134,7 +153,14 @@ mod test {
                 .await
                 .expect("Should load campaign");
 
-            assert_eq!(Some(&campaign), request.extensions().get::<Campaign>());
+            assert_eq!(
+                campaign,
+                request
+                    .extensions()
+                    .get::<ChainOf<Campaign>>()
+                    .expect("Should get Campaign with Chain context")
+                    .context
+            );
         }
     }
 }

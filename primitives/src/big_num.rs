@@ -14,7 +14,19 @@ use crate::UnifiedNum;
 /// Re-export of the [`num::bigint::ParseBigIntError`] when using [`BigNum`]
 pub use num::bigint::ParseBigIntError;
 #[derive(
-    Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, NumOps, One, Zero, Num, Default,
+    Serialize,
+    Deserialize,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    NumOps,
+    One,
+    Zero,
+    Num,
+    Default,
+    Hash,
 )]
 pub struct BigNum(
     #[serde(
@@ -168,10 +180,28 @@ impl Pow<u8> for BigNum {
     }
 }
 
+impl Add<&BigNum> for BigNum {
+    type Output = BigNum;
+
+    fn add(self, rhs: &BigNum) -> Self::Output {
+        let big_uint = &self.0 + &rhs.0;
+        BigNum(big_uint)
+    }
+}
+
 impl Add<&BigNum> for &BigNum {
     type Output = BigNum;
 
     fn add(self, rhs: &BigNum) -> Self::Output {
+        let big_uint = &self.0 + &rhs.0;
+        BigNum(big_uint)
+    }
+}
+
+impl Add<BigNum> for &BigNum {
+    type Output = BigNum;
+
+    fn add(self, rhs: BigNum) -> Self::Output {
         let big_uint = &self.0 + &rhs.0;
         BigNum(big_uint)
     }

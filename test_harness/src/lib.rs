@@ -7,7 +7,7 @@ use adapter::ethereum::{
     get_counterfactual_address,
     test_util::{
         deploy_outpace_contract, deploy_sweeper_contract, deploy_token_contract, mock_set_balance,
-        outpace_deposit, GANACHE_URL, MOCK_TOKEN_ABI,
+        outpace_deposit, GANACHE_INFO_1337, MOCK_TOKEN_ABI,
     },
     Options, OUTPACE_ABI, SWEEPER_ABI,
 };
@@ -18,38 +18,49 @@ use primitives::{
     config::GANACHE_CONFIG,
     test_util::{FOLLOWER, LEADER},
     util::ApiUrl,
-    Address, Config,
+    Address, Chain, Config,
 };
 use web3::{contract::Contract, transports::Http, types::H160, Web3};
 
 pub mod deposits;
 
 /// ganache-cli setup with deployed contracts using the snapshot directory
-/// Uses the [`GANACHE_CONFIG`] & [`GANACHE_URL`] statics to init the contracts
+/// NOTE: Current the snapshot and test setup use a single Chain.
+///
+/// Uses Chain #1337 from the [`GANACHE_CONFIG`] static to init the contracts
 pub static SNAPSHOT_CONTRACTS: Lazy<Contracts> = Lazy::new(|| {
-    let web3 = Web3::new(Http::new(GANACHE_URL).expect("failed to init transport"));
+    let ganache_chain_info = GANACHE_INFO_1337.clone();
 
-    let (token_address, token_info) = GANACHE_CONFIG
-        .token_address_whitelist
-        .iter()
-        .next()
-        .expect("Shanpshot token should be included in Ganache config");
+    let web3 = Web3::new(
+        Http::new(ganache_chain_info.chain.rpc.as_str()).expect("failed to init transport"),
+    );
+
+    let token_info = ganache_chain_info
+        .tokens
+        .get("Mocked TOKEN")
+        .expect("Ganache config should contain for Chain #1337 the Mocked TOKEN");
+    let chain = ganache_chain_info.chain.clone();
 
     let token = (
         // use Ganache Config
         token_info.clone(),
-        *token_address,
-        Contract::from_json(web3.eth(), H160(token_address.to_bytes()), &MOCK_TOKEN_ABI).unwrap(),
+        token_info.address,
+        Contract::from_json(
+            web3.eth(),
+            H160(token_info.address.to_bytes()),
+            &MOCK_TOKEN_ABI,
+        )
+        .unwrap(),
     );
 
-    let sweeper_address = Address::from(GANACHE_CONFIG.sweeper_address);
+    let sweeper_address = Address::from(ganache_chain_info.chain.sweeper);
 
     let sweeper = (
         sweeper_address,
         Contract::from_json(web3.eth(), H160(sweeper_address.to_bytes()), &SWEEPER_ABI).unwrap(),
     );
 
-    let outpace_address = Address::from(GANACHE_CONFIG.outpace_address);
+    let outpace_address = Address::from(ganache_chain_info.chain.outpace);
 
     let outpace = (
         outpace_address,
@@ -60,6 +71,7 @@ pub static SNAPSHOT_CONTRACTS: Lazy<Contracts> = Lazy::new(|| {
         token,
         sweeper,
         outpace,
+        chain,
     }
 });
 
@@ -128,7 +140,7 @@ pub static VALIDATORS: Lazy<HashMap<Address, TestValidator>> = Lazy::new(|| {
 });
 
 pub struct Setup {
-    pub web3: Web3<Http>,
+    pub chain: Chain,
 }
 
 #[derive(Debug, Clone)]
@@ -136,22 +148,27 @@ pub struct Contracts {
     pub token: (TokenInfo, Address, Contract<Http>),
     pub sweeper: (Address, Contract<Http>),
     pub outpace: (Address, Contract<Http>),
+    pub chain: Chain,
 }
 
 impl Setup {
     pub async fn deploy_contracts(&self) -> Contracts {
+        let transport = Http::new(self.chain.rpc.as_str()).expect("Invalid RPC for chain!");
+
+        let web3 = Web3::new(transport);
+
         // deploy contracts
         // TOKEN contract is with precision 18 (like DAI)
         // set the minimum token units to 1 TOKEN
-        let token = deploy_token_contract(&self.web3, 10_u64.pow(18))
+        let token = deploy_token_contract(&web3, 10_u64.pow(18))
             .await
             .expect("Correct parameters are passed to the Token constructor.");
 
-        let sweeper = deploy_sweeper_contract(&self.web3)
+        let sweeper = deploy_sweeper_contract(&web3)
             .await
             .expect("Correct parameters are passed to the Sweeper constructor.");
 
-        let outpace = deploy_outpace_contract(&self.web3)
+        let outpace = deploy_outpace_contract(&web3)
             .await
             .expect("Correct parameters are passed to the OUTPACE constructor.");
 
@@ -159,6 +176,7 @@ impl Setup {
             token,
             sweeper,
             outpace,
+            chain: self.chain.clone(),
         }
     }
 
@@ -207,7 +225,7 @@ mod tests {
     use crate::run::run_sentry_app;
 
     use super::*;
-    use adapter::ethereum::test_util::{GANACHE_URL, KEYSTORES};
+    use adapter::ethereum::test_util::{GANACHE_1337, KEYSTORES};
     use adapter::{prelude::*, Adapter, Ethereum};
     use primitives::{
         balances::CheckedState,
@@ -215,16 +233,17 @@ mod tests {
         spender::Spender,
         test_util::{ADVERTISER, DUMMY_AD_UNITS, DUMMY_IPFS, GUARDIAN, GUARDIAN_2, PUBLISHER},
         util::{logging::new_logger, ApiUrl},
-        Balances, BigNum, Campaign, CampaignId, Channel, ChannelId, UnifiedNum,
+        Balances, BigNum, Campaign, CampaignId, ChainOf, Channel, ChannelId, UnifiedNum,
     };
     use reqwest::{Client, StatusCode};
-    use validator_worker::{sentry_interface::Validator, worker::Worker, SentryApi};
+    use validator_worker::{worker::Worker, SentryApi};
 
     #[tokio::test]
     #[ignore = "We use a snapshot, however, we have left this test for convenience"]
     async fn deploy_contracts() {
-        let web3 = Web3::new(Http::new(GANACHE_URL).expect("failed to init transport"));
-        let setup = Setup { web3 };
+        let setup = Setup {
+            chain: GANACHE_1337.clone(),
+        };
         // deploy contracts
         let _contracts = setup.deploy_contracts().await;
     }
@@ -388,8 +407,20 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn run_full_test() {
-        let web3 = Web3::new(Http::new(GANACHE_URL).expect("failed to init transport"));
-        let setup = Setup { web3 };
+        // for now we are running tests only on a single Chain!
+        // It is safe to use a single ChainOf for both Campaigns
+        let chain = GANACHE_1337.clone();
+        assert_eq!(CAMPAIGN_1.channel.token, CAMPAIGN_2.channel.token);
+
+        let token_chain = GANACHE_CONFIG
+            .find_chain_token(CAMPAIGN_1.channel.token)
+            .expect("Should find CAMPAIGN_1 channel token address in Config!");
+
+        assert_eq!(&token_chain.chain, &chain, "CAMPAIGN_1 & CAMPAIGN_2 should be both using the same Chain which is setup in the Ganache Config");
+        let setup = Setup {
+            chain: chain.clone(),
+        };
+
         // Use snapshot contracts
         let contracts = SNAPSHOT_CONTRACTS.clone();
         // let contracts = setup.deploy_contracts().await;
@@ -418,43 +449,21 @@ mod tests {
             .unlock()
             .expect("Failed to unlock Follower ethereum adapter");
 
-        let leader_sentry = {
-            // should get self Auth from Leader's EthereumAdapter
-            let leader_auth = leader_adapter
-                .get_auth(leader_adapter.whoami())
-                .expect("Get authentication");
-            let whoami_validator = Validator {
-                url: leader.sentry_url.clone(),
-                token: leader_auth,
-            };
+        let leader_sentry = SentryApi::new(
+            leader_adapter.clone(),
+            new_logger(&leader.worker_logger_prefix),
+            leader.config.clone(),
+            leader.sentry_url.clone(),
+        )
+        .expect("Should create new SentryApi for the Leader Worker");
 
-            SentryApi::new(
-                leader_adapter.clone(),
-                new_logger(&leader.worker_logger_prefix),
-                leader.config.clone(),
-                whoami_validator,
-            )
-            .expect("Should create new SentryApi for the Leader Worker")
-        };
-
-        let follower_sentry = {
-            // should get self Auth from Follower's EthereumAdapter
-            let follower_auth = follower_adapter
-                .get_auth(follower_adapter.whoami())
-                .expect("Get authentication");
-            let whoami_validator = Validator {
-                url: follower.sentry_url.clone(),
-                token: follower_auth,
-            };
-
-            SentryApi::new(
-                follower_adapter.clone(),
-                new_logger(&follower.worker_logger_prefix),
-                follower.config.clone(),
-                whoami_validator,
-            )
-            .expect("Should create new SentryApi for the Leader Worker")
-        };
+        let follower_sentry = SentryApi::new(
+            follower_adapter.clone(),
+            new_logger(&follower.worker_logger_prefix),
+            follower.config.clone(),
+            follower.sentry_url.clone(),
+        )
+        .expect("Should create new SentryApi for the Leader Worker");
 
         // check Campaign Leader & Follower urls
         // they should be the same as the test validators
@@ -507,7 +516,7 @@ mod tests {
                 // make sure we have the expected deposit returned from EthereumAdapter
                 let eth_deposit = leader_adapter
                     .get_deposit(
-                        &CAMPAIGN_1.channel,
+                        &token_chain.clone().with_channel(CAMPAIGN_1.channel),
                         advertiser_adapter.whoami().to_address(),
                     )
                     .await
@@ -523,7 +532,7 @@ mod tests {
                 // make sure we have the expected deposit returned from EthereumAdapter
                 let eth_deposit = leader_adapter
                     .get_deposit(
-                        &CAMPAIGN_2.channel,
+                        &token_chain.clone().with_channel(CAMPAIGN_2.channel),
                         advertiser_adapter.whoami().to_address(),
                     )
                     .await
@@ -539,7 +548,7 @@ mod tests {
         // GET /v5/channel/{}/spender/all
         {
             let leader_auth = advertiser_adapter
-                .get_auth(leader_adapter.whoami())
+                .get_auth(chain.chain_id, leader_adapter.whoami())
                 .expect("Get authentication");
 
             let leader_response = get_spender_all_page_0(
@@ -560,7 +569,7 @@ mod tests {
         // POST /v5/campaign
         {
             let leader_auth = advertiser_adapter
-                .get_auth(leader_adapter.whoami())
+                .get_auth(chain.chain_id, leader_adapter.whoami())
                 .expect("Get authentication");
 
             let mut no_budget_campaign = CreateCampaign::from_campaign(CAMPAIGN_1.clone());
@@ -595,7 +604,7 @@ mod tests {
         // GET /v5/channel/{}/spender/all
         {
             let leader_response = leader_sentry
-                .get_all_spenders(CAMPAIGN_1.channel.id())
+                .get_all_spenders(&token_chain.clone().with_channel(CAMPAIGN_1.channel))
                 .await
                 .expect("Should return Response");
 
@@ -620,7 +629,7 @@ mod tests {
             let create_campaign_1 = CreateCampaign::from_campaign(CAMPAIGN_1.clone());
             {
                 let leader_token = advertiser_adapter
-                    .get_auth(leader_adapter.whoami())
+                    .get_auth(chain.chain_id, leader_adapter.whoami())
                     .expect("Get authentication");
 
                 let leader_response = create_campaign(
@@ -637,7 +646,7 @@ mod tests {
 
             {
                 let follower_token = advertiser_adapter
-                    .get_auth(follower_adapter.whoami())
+                    .get_auth(chain.chain_id, follower_adapter.whoami())
                     .expect("Get authentication");
 
                 let follower_response = create_campaign(
@@ -662,7 +671,7 @@ mod tests {
 
             {
                 let leader_token = advertiser_adapter
-                    .get_auth(leader_adapter.whoami())
+                    .get_auth(chain.chain_id, leader_adapter.whoami())
                     .expect("Get authentication");
 
                 let leader_response = create_campaign(
@@ -680,7 +689,7 @@ mod tests {
 
             {
                 let follower_token = advertiser_adapter
-                    .get_auth(follower_adapter.whoami())
+                    .get_auth(token_chain.chain.chain_id, follower_adapter.whoami())
                     .expect("Get authentication");
 
                 let follower_response = create_campaign(
@@ -710,7 +719,7 @@ mod tests {
                 balances: Balances::<CheckedState>::new(),
             };
             let actual_accounting = leader_sentry
-                .get_accounting(CAMPAIGN_1.channel.id())
+                .get_accounting(&token_chain.clone().with_channel(CAMPAIGN_1.channel))
                 .await
                 .expect("Should get Channel Accounting");
 
@@ -746,9 +755,13 @@ mod tests {
                 },
             ];
 
-            let response = post_new_events(&leader_sentry, CAMPAIGN_1.id, &events)
-                .await
-                .expect("Posted events");
+            let response = post_new_events(
+                &leader_sentry,
+                token_chain.clone().with(CAMPAIGN_1.id),
+                &events,
+            )
+            .await
+            .expect("Posted events");
 
             assert_eq!(SuccessResponse { success: true }, response)
         }
@@ -798,7 +811,7 @@ mod tests {
             };
 
             let actual_accounting = leader_sentry
-                .get_accounting(CAMPAIGN_1.channel.id())
+                .get_accounting(&token_chain.with_channel(CAMPAIGN_1.channel))
                 .await
                 .expect("Should get Channel Accounting");
 
@@ -842,24 +855,27 @@ mod tests {
     /// Asserts: [`StatusCode::OK`]
     async fn post_new_events<C: Unlocked + 'static>(
         sentry: &SentryApi<C, ()>,
-        campaign: CampaignId,
+        campaign_context: ChainOf<CampaignId>,
         events: &[Event],
     ) -> anyhow::Result<SuccessResponse> {
         let endpoint_url = sentry
-            .whoami
-            .url
-            .join(&format!("v5/campaign/{}/events", campaign))
+            .sentry_url
+            .join(&format!("v5/campaign/{}/events", campaign_context.context))
             .expect("valid endpoint");
 
         let request_body = vec![("events".to_string(), events)]
             .into_iter()
             .collect::<HashMap<_, _>>();
 
+        let auth_token = sentry
+            .adapter
+            .get_auth(campaign_context.chain.chain_id, sentry.adapter.whoami())?;
+
         let response = sentry
             .client
             .post(endpoint_url)
             .json(&request_body)
-            .bearer_auth(&sentry.whoami.token)
+            .bearer_auth(&auth_token)
             .send()
             .await?;
 

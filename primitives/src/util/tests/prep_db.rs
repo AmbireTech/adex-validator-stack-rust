@@ -1,12 +1,12 @@
 use crate::{
     campaign::{Active, Pricing, PricingBounds, Validators},
     channel::Nonce,
+    config::GANACHE_CONFIG,
     targeting::Rules,
-    AdUnit, Address, Campaign, Channel, ChannelId, EventSubmission, UnifiedNum, ValidatorDesc,
-    ValidatorId, IPFS,
+    AdUnit, Address, Campaign, Channel, EventSubmission, UnifiedNum, ValidatorDesc, ValidatorId,
+    IPFS,
 };
 use chrono::{TimeZone, Utc};
-use hex::FromHex;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 
@@ -96,31 +96,6 @@ pub static ADDRESSES: Lazy<HashMap<String, Address>> = Lazy::new(|| {
     addresses
 });
 
-// These are the Goerli testnet [`Addresses`] of the following stablecoins:
-pub static TOKENS: Lazy<HashMap<String, Address>> = Lazy::new(|| {
-    let mut tokens = HashMap::new();
-
-    tokens.insert(
-        "DAI".into(),
-        "0x73967c6a0904aa032c103b4104747e88c566b1a2"
-            .parse::<Address>()
-            .expect("Should parse"),
-    );
-    tokens.insert(
-        "USDT".into(),
-        "0x509ee0d083ddf8ac028f2a56731412edd63223b9"
-            .parse::<Address>()
-            .expect("failed to parse id"),
-    );
-    tokens.insert(
-        "USDC".into(),
-        "0x44dcfcead37be45206af6079648988b29284b2c6"
-            .parse::<Address>()
-            .expect("failed to parse id"),
-    );
-    tokens
-});
-
 // Dummy adapter auth tokens
 // authorization tokens
 pub static AUTH: Lazy<HashMap<String, String>> = Lazy::new(|| {
@@ -156,7 +131,16 @@ pub static DUMMY_VALIDATOR_FOLLOWER: Lazy<ValidatorDesc> = Lazy::new(|| Validato
     fee_addr: None,
 });
 
+/// Dummy Campaign uses Ganache #1337 with the mocked token
 pub static DUMMY_CAMPAIGN: Lazy<Campaign> = Lazy::new(|| {
+    let token_info = GANACHE_CONFIG
+        .chains
+        .get("Ganache #1337")
+        .unwrap()
+        .tokens
+        .get("Mocked TOKEN")
+        .unwrap();
+
     Campaign {
         id: "0x936da01f9abd4d9d80c702af85c822a8"
             .parse()
@@ -165,7 +149,7 @@ pub static DUMMY_CAMPAIGN: Lazy<Campaign> = Lazy::new(|| {
             leader: IDS["leader"],
             follower: IDS["follower"],
             guardian: IDS["tester"].to_address(),
-            token: TOKENS["DAI"],
+            token: token_info.address,
             nonce: Nonce::from(987_654_321_u32),
         },
         creator: IDS["creator"].to_address(),
@@ -195,11 +179,6 @@ pub static DUMMY_CAMPAIGN: Lazy<Campaign> = Lazy::new(|| {
             from: None,
         },
     }
-});
-
-pub static DUMMY_CHANNEL_ID: Lazy<ChannelId> = Lazy::new(|| {
-    ChannelId::from_hex("061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088")
-        .expect("prep_db: failed to deserialize channel id")
 });
 
 pub static DUMMY_AD_UNITS: Lazy<[AdUnit; 4]> = Lazy::new(|| {

@@ -3,9 +3,8 @@ use thiserror::Error;
 use adapter::{prelude::*, Error as AdapterError};
 use primitives::{
     balances::CheckedState,
-    config::TokenInfo,
     validator::{MessageError, MessageTypes, NewState},
-    Balances, Channel,
+    Balances, ChainOf, Channel,
 };
 
 use crate::{
@@ -39,10 +38,11 @@ pub enum Error {
 
 pub async fn tick<C: Unlocked + 'static>(
     sentry: &SentryApi<C>,
-    channel: Channel,
+    channel_context: &ChainOf<Channel>,
     accounting_balances: Balances<CheckedState>,
-    token: &TokenInfo,
 ) -> Result<TickStatus, Error> {
+    let channel = channel_context.context;
+
     // Check if Accounting != than latest NewState (Accounting.balances != NewState.balances)
     let should_generate_new_state =
         {
@@ -91,37 +91,39 @@ pub async fn tick<C: Unlocked + 'static>(
 
     // Create a `NewState` if balances have changed
     let new_state = if should_generate_new_state {
-        Some(on_new_accounting(sentry, channel, accounting_balances, token).await?)
+        Some(on_new_accounting(sentry, channel_context, accounting_balances).await?)
     } else {
         None
     };
 
     Ok(TickStatus {
-        heartbeat: heartbeat(sentry, channel).await?,
+        heartbeat: heartbeat(sentry, channel_context).await?,
         new_state,
     })
 }
 
 async fn on_new_accounting<C: Unlocked + 'static>(
     sentry: &SentryApi<C>,
-    channel: Channel,
+    channel_context: &ChainOf<Channel>,
     accounting_balances: Balances<CheckedState>,
-    token: &TokenInfo,
 ) -> Result<Vec<PropagationResult>, Error> {
-    let state_root = accounting_balances.encode(channel.id(), token.precision.get())?;
+    let state_root = accounting_balances.encode(
+        channel_context.context.id(),
+        channel_context.token.precision.get(),
+    )?;
 
     let signature = sentry.adapter.sign(&state_root)?;
 
     let propagation_results = sentry
         .propagate(
-            channel,
+            channel_context,
             &[&MessageTypes::NewState(NewState {
                 state_root,
                 signature,
                 balances: accounting_balances.into_unchecked(),
             })],
         )
-        .await;
+        .await?;
 
     Ok(propagation_results)
 }

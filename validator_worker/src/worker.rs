@@ -58,19 +58,27 @@ impl<C: Unlocked + 'static> Worker<C> {
     pub async fn all_channels_tick(&self) {
         let logger = &self.logger;
 
-        let (channels, validators) = match self.sentry.collect_channels().await {
+        let (channels_context, validators) = match self.sentry.collect_channels().await {
             Ok(res) => res,
             Err(err) => {
                 error!(logger, "Error collecting all channels for tick"; "collect_channels" => ?err, "main" => "all_channels_tick");
                 return;
             }
         };
-        let channels_size = channels.len();
+        let channels_size = channels_context.len();
 
-        let sentry_with_propagate = self.sentry.clone().with_propagate(validators);
+        let sentry_with_propagate = match self.sentry.clone().with_propagate(validators) {
+            Ok(sentry) => sentry,
+            Err(err) => {
+                error!(logger, "Failed to set propagation validators: {err}"; "err" => ?err, "main" => "all_channels_tick");
+                return;
+            }
+        };
 
-        let tick_results = join_all(channels.into_iter().map(|channel| {
-            channel_tick(&sentry_with_propagate, &self.config, channel)
+        let tick_results = join_all(channels_context.into_iter().map(|channel_context| {
+            let channel = channel_context.context;
+
+            channel_tick(&sentry_with_propagate, &self.config, channel_context)
                 .map_err(move |err| (channel, err))
         }))
         .await;

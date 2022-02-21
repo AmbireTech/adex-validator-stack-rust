@@ -133,6 +133,7 @@ async fn for_request<C: Locked>(
         let auth = Auth {
             era: adapter_session.era,
             uid: ValidatorId::from(adapter_session.uid),
+            chain: adapter_session.chain,
         };
 
         req.extensions_mut().insert(auth);

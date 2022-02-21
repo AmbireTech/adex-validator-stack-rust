@@ -11,6 +11,7 @@ pub use self::{
     balances_map::{BalancesMap, UnifiedMap},
     big_num::BigNum,
     campaign::{Campaign, CampaignId},
+    chain::{Chain, ChainId, ChainOf},
     channel::{Channel, ChannelId},
     config::Config,
     deposit::Deposit,
@@ -29,6 +30,7 @@ pub mod balances_map;
 pub mod big_num;
 pub mod campaign;
 pub mod campaign_validator;
+mod chain;
 pub mod channel;
 pub mod config;
 mod eth_checksum;

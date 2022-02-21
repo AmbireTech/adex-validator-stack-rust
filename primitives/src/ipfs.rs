@@ -25,7 +25,7 @@ impl slog::Value for IPFS {
 
 impl fmt::Debug for IPFS {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "IPFS({})", self.0.to_string())
+        write!(f, "IPFS({})", self.0)
     }
 }
 
@@ -209,7 +209,7 @@ impl fmt::Display for Url {
 
 impl fmt::Debug for Url {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Url({})", self.to_string())
+        write!(f, "Url({})", self)
     }
 }
 

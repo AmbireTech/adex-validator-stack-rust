@@ -7,11 +7,6 @@ spendable_find_limit = 512
 
 wait_time = 40000
 
-# V4 Deprecated
-aggr_throttle = 0
-
-events_find_limit = 100
-
 msgs_find_limit = 10
 analytics_find_limit_v5 = 5000
 analytics_maxtime_v5 = 15000
