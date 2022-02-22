@@ -44,3 +44,7 @@ clap = "^2.33"
 
 [dev-dependencies]
 wiremock = "0.5"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

@@ -1,6 +1,9 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
-#![allow(deprecated)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
+
+
 use std::{error, fmt};
 
 pub use self::{
@@ -43,14 +46,17 @@ pub mod spender;
 pub mod supermarket;
 pub mod targeting;
 #[cfg(feature = "test-util")]
+#[cfg_attr(docsrs, doc(cfg(feature = "test-util")))]
 pub mod test_util;
 mod unified_num;
 pub mod validator;
 
-/// This module is available with the `postgres` feature
+/// This module is available with the `postgres` feature.
+///
 /// Other places where you'd find `mod postgres` implementations is for many of the structs in the crate
 /// all of which implement [`tokio_postgres::types::FromSql`], [`tokio_postgres::types::ToSql`] or [`From<&tokio_postgres::Row>`]
 #[cfg(feature = "postgres")]
+#[cfg_attr(docsrs, doc(cfg(feature = "postgres")))]
 pub mod postgres {
     use std::env::{self, VarError};
 

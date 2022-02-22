@@ -136,6 +136,7 @@ pub async fn setup_migrations(environment: Environment) {
 }
 
 #[cfg(feature = "test-util")]
+#[cfg_attr(docsrs, doc(cfg(feature = "test-util")))]
 pub mod tests_postgres {
     use std::{
         ops::{Deref, DerefMut},
@@ -432,6 +433,7 @@ pub mod tests_postgres {
 }
 
 #[cfg(feature = "test-util")]
+#[cfg_attr(docsrs, doc(cfg(feature = "test-util")))]
 pub mod redis_pool {
 
     use dashmap::DashMap;

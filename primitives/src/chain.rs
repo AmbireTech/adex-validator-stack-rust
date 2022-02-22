@@ -52,8 +52,9 @@ pub struct Chain {
 }
 
 /// Context of [`TokenInfo`] & [`Chain`] information for given [`Channel`] or [`Campaign`].
-/// The additional context of [`Channel`] is known after checking if the Channel token's
-/// Chain & Address are whitelisted in the configuration.
+///
+/// The additional context of [`Channel`] is known after checking if the `Channel` token's
+/// `Chain` & `Address` are whitelisted in the configuration.
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Hash, Clone)]
 pub struct ChainOf<T = ()> {
     pub context: T,

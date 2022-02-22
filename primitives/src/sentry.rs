@@ -348,6 +348,7 @@ pub struct DateHourError {
 
 #[derive(Clone, Hash)]
 /// [`DateHour`] holds the date and hour (only).
+///
 /// It uses [`chrono::DateTime`] when serializing and deserializing.
 /// When serializing it always sets minutes and seconds to `0` (zero).
 /// When deserializing the minutes and seconds should always be set to `0` (zero),
@@ -584,8 +585,21 @@ pub struct ValidatorMessage {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct ValidatorMessageResponse {
-    pub validator_messages: Vec<ValidatorMessage>,
+pub struct ValidatorMessagesListResponse {
+    pub messages: Vec<ValidatorMessage>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ValidatorMessagesCreateRequest {
+    pub messages: Vec<MessageTypes>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ValidatorMessagesListQuery {
+    /// Will apply the lower limit of: `query.limit` and `Config::msgs_find_limit`
+    pub limit: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -615,7 +629,6 @@ pub mod channel_list {
         #[serde(default)]
         // default is `u64::default()` = `0`
         pub page: u64,
-        pub creator: Option<String>,
         /// filters the channels containing a specific validator if provided
         pub validator: Option<ValidatorId>,
     }

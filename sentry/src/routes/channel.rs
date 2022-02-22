@@ -396,8 +396,6 @@ pub async fn get_accounting_for_channel<C: Locked + 'static>(
 /// starting with `/v5/channel/0xXXX.../validator-messages`
 ///
 pub mod validator_message {
-    use std::collections::HashMap;
-
     use crate::{
         db::validator_message::{get_validator_messages, insert_validator_messages},
         Auth,
@@ -407,17 +405,12 @@ pub mod validator_message {
     use futures::future::try_join_all;
     use hyper::{Body, Request, Response};
     use primitives::{
-        sentry::{SuccessResponse, ValidatorMessageResponse},
-        validator::MessageTypes,
-        ChainOf,
+        sentry::{
+            SuccessResponse, ValidatorMessagesCreateRequest, ValidatorMessagesListQuery,
+            ValidatorMessagesListResponse,
+        },
+        ChainOf, Channel, DomainError, ValidatorId,
     };
-    use primitives::{Channel, DomainError, ValidatorId};
-    use serde::Deserialize;
-
-    #[derive(Deserialize)]
-    pub struct ValidatorMessagesListQuery {
-        limit: Option<u64>,
-    }
 
     pub fn extract_params(
         from_path: &str,
@@ -478,12 +471,17 @@ pub mod validator_message {
             get_validator_messages(&app.pool, &channel.id(), validator_id, message_types, limit)
                 .await?;
 
-        let response = ValidatorMessageResponse { validator_messages };
+        let response = ValidatorMessagesListResponse {
+            messages: validator_messages,
+        };
 
         Ok(success_response(serde_json::to_string(&response)?))
     }
 
-    /// `POST /v5/channel/0xXXX.../validator-messages` with Request body (json):
+    /// `POST /v5/channel/0xXXX.../validator-messages`
+    /// with Request body (json): [ValidatorMessagesCreateRequest]
+    ///
+    /// # Example
     ///
     /// ```json
     /// {
@@ -494,7 +492,7 @@ pub mod validator_message {
     /// }
     /// ```
     ///
-    /// Validator messages: [`MessageTypes`]
+    /// Validator messages: [`MessageTypes`][primitives::validator::MessageTypes]
     ///
     /// Response: [`SuccessResponse`]
     pub async fn create_validator_messages<C: Locked + 'static>(
@@ -504,7 +502,7 @@ pub mod validator_message {
         let session = req
             .extensions()
             .get::<Auth>()
-            .expect("auth request session")
+            .ok_or(ResponseError::Unauthorized)?
             .to_owned();
 
         let channel = req
@@ -516,15 +514,13 @@ pub mod validator_message {
         let into_body = req.into_body();
         let body = hyper::body::to_bytes(into_body).await?;
 
-        let request_body = serde_json::from_slice::<HashMap<String, Vec<MessageTypes>>>(&body)?;
-        let messages = request_body
-            .get("messages")
-            .ok_or_else(|| ResponseError::BadRequest("missing messages body".to_string()))?;
+        let create_request = serde_json::from_slice::<ValidatorMessagesCreateRequest>(&body)
+            .map_err(|_err| ResponseError::BadRequest("Bad Request body json".to_string()))?;
 
         match channel.find_validator(session.uid) {
             None => Err(ResponseError::Unauthorized),
             _ => {
-                try_join_all(messages.iter().map(|message| {
+                try_join_all(create_request.messages.iter().map(|message| {
                     insert_validator_messages(&app.pool, &channel, &session.uid, message)
                 }))
                 .await?;
