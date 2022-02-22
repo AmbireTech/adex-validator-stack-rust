@@ -19,9 +19,8 @@ use hyper::{Body, Request, Response};
 use primitives::{
     campaign_validator::Validator,
     sentry::{
-        campaign::CampaignListQuery,
-        campaign_create::{CreateCampaign, ModifyCampaign},
-        SuccessResponse,
+        campaign_create::CreateCampaign, campaign_list::CampaignListQuery,
+        campaign_modify::ModifyCampaign, SuccessResponse,
     },
     spender::Spendable,
     Address, Campaign, CampaignId, ChainOf, Channel, ChannelId, Deposit, UnifiedNum,

@@ -2,8 +2,6 @@
 #![deny(clippy::all)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-
-
 use std::{error, fmt};
 
 pub use self::{

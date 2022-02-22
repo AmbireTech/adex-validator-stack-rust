@@ -634,7 +634,7 @@ pub mod channel_list {
     }
 }
 
-pub mod campaign {
+pub mod campaign_list {
     use crate::{Address, Campaign, ValidatorId};
     use chrono::{serde::ts_seconds, DateTime, Utc};
     use serde::{Deserialize, Serialize};
@@ -822,6 +822,16 @@ pub mod campaign_create {
             Self::from_campaign_erased(campaign, id)
         }
     }
+}
+
+pub mod campaign_modify {
+    use serde::{Deserialize, Serialize};
+
+    use crate::{
+        campaign::{PricingBounds, Validators},
+        targeting::Rules,
+        AdUnit, Campaign, EventSubmission, UnifiedNum,
+    };
 
     // All editable fields stored in one place, used for checking when a budget is changed
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

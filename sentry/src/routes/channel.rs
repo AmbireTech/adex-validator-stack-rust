@@ -1,4 +1,4 @@
-//! Channel - `/v5/channel` routes
+//! `/v5/channel` routes
 //!
 
 use crate::db::{

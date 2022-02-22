@@ -559,7 +559,7 @@ pub mod campaigns {
     use chrono::Utc;
     use futures::future::try_join_all;
     use primitives::{
-        sentry::campaign::{CampaignListQuery, CampaignListResponse, ValidatorParam},
+        sentry::campaign_list::{CampaignListQuery, CampaignListResponse, ValidatorParam},
         util::ApiUrl,
         Campaign, ValidatorId,
     };
