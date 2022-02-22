@@ -796,7 +796,7 @@ mod test {
             // make sure 1 TOKEN is the minimum set in Config
             let config_token = eth_adapter
                 .config
-                .find_chain_token(channel.token)
+                .find_chain_of(channel.token)
                 .expect("Channel token should be present in Config")
                 .token;
 

@@ -6,8 +6,7 @@
 //!
 //! ### Route parameters
 //!
-//! Paths which include these parameters are validated as follow:
-//!
+//! Paths which include these parameters are validated as follows:
 //!
 //! - `:id` - [`ChannelId`]
 //! - `:addr` - a valid [`Address`] or [`ValidatorId`].
@@ -205,7 +204,7 @@
 //! [`ALLOWED_KEYS`]: primitives::analytics::query::ALLOWED_KEYS
 //! [`ApproveState`]: primitives::validator::ApproveState
 //! [`Accounting`]: crate::db::accounting::Accounting
-//! [`AccountingResponse`]: sentry::db::accounting::Accounting
+//! [`AccountingResponse`]: primitives::sentry::AccountingResponse
 //! [`Campaign`]: primitives::Campaign
 //! [`CampaignId`]: primitives::CampaignId
 //! [`ChannelId`]: primitives::ChannelId

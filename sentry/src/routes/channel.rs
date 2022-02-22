@@ -554,7 +554,7 @@ mod test {
             let channel = DUMMY_CAMPAIGN.channel;
             let channel_context = app
                 .config
-                .find_chain_token(DUMMY_CAMPAIGN.channel.token)
+                .find_chain_of(DUMMY_CAMPAIGN.channel.token)
                 .expect("should retrieve Chain & token");
 
             (channel_context.with_channel(channel), channel)
@@ -649,7 +649,7 @@ mod test {
         let app = setup_dummy_app().await;
         let channel_context = app
             .config
-            .find_chain_token(DUMMY_CAMPAIGN.channel.token)
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
             .expect("Dummy channel Token should be present in config!")
             .with(DUMMY_CAMPAIGN.channel);
 
@@ -769,7 +769,7 @@ mod test {
         let app = setup_dummy_app().await;
         let channel_context = app
             .config
-            .find_chain_token(DUMMY_CAMPAIGN.channel.token)
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
             .expect("Dummy channel Token should be present in config!")
             .with(DUMMY_CAMPAIGN.channel);
 

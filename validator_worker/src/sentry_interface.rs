@@ -352,7 +352,7 @@ impl<C: Unlocked + 'static, P> SentryApi<C, P> {
         let (validators, channels) = campaigns.into_iter().fold(
             (ChainsValidators::new(), HashSet::<ChainOf<Channel>>::new()),
             |(mut validators, mut channels), campaign| {
-                let channel_context = match self.config.find_chain_token(campaign.channel.token) {
+                let channel_context = match self.config.find_chain_of(campaign.channel.token) {
                     Some(chain_of) => chain_of.with_channel(campaign.channel),
                     // Skip the current Channel as the Chain/Token is not configured
                     None => return (validators, channels),
@@ -758,7 +758,7 @@ mod test {
         let logger = discard_logger();
 
         let channel_context = config
-            .find_chain_token(DUMMY_CAMPAIGN.channel.token)
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
             .expect("Should find Dummy campaign token in config")
             .with_channel(DUMMY_CAMPAIGN.channel);
 

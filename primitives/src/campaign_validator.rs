@@ -69,7 +69,7 @@ impl Validator for Campaign {
 
         // Check if Channel token is listed in the configuration token Chain ID & Address
         let chain_context = config
-            .find_chain_token(self.channel.token)
+            .find_chain_of(self.channel.token)
             .ok_or(Validation::UnlistedAsset)?;
 
         // Check if the campaign budget is above the minimum deposit configured
@@ -345,7 +345,7 @@ mod test {
         {
             let mut campaign = DUMMY_CAMPAIGN.clone();
             let campaign_token = config
-                .find_chain_token(campaign.channel.token)
+                .find_chain_of(campaign.channel.token)
                 .unwrap()
                 .token;
 
@@ -391,7 +391,7 @@ mod test {
             let mut campaign = DUMMY_CAMPAIGN.clone();
 
             let campaign_token = config
-                .find_chain_token(campaign.channel.token)
+                .find_chain_of(campaign.channel.token)
                 .unwrap()
                 .token;
 

@@ -76,12 +76,12 @@ pub struct Config {
     /// The key of this map is a human-readable text of the Chain name
     /// for readability in the configuration file.
     ///
-    /// - To get the chain of a token address use [`Config::find_chain_token()`].
+    /// - To get the chain of a token address use [`Config::find_chain_of()`].
     ///
     /// - To get a [`ChainInfo`] only by a [`ChainId`] use [`Config::find_chain()`].
     ///
     /// **NOTE:** Make sure that a Token [`Address`] is unique across all Chains,
-    /// otherwise [`Config::find_chain_token()`] will fetch only one of them and cause unexpected problems.
+    /// otherwise [`Config::find_chain_of()`] will fetch only one of them and cause unexpected problems.
     #[serde(rename = "chain")]
     pub chains: HashMap<String, ChainInfo>,
 }
@@ -102,7 +102,7 @@ impl Config {
     }
 
     /// Finds the pair of Chain & Token, given only a token [`Address`].
-    pub fn find_chain_token(&self, token: Address) -> Option<ChainOf<()>> {
+    pub fn find_chain_of(&self, token: Address) -> Option<ChainOf<()>> {
         self.chains.values().find_map(|chain_info| {
             chain_info
                 .tokens
