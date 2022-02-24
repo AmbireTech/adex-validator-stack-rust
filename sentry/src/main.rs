@@ -99,7 +99,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     setup_migrations(env_config.env).await;
 
     // use the environmental variables to setup the Postgres connection
-    let postgres = postgres_connection(42, POSTGRES_CONFIG.clone()).await;
+    let postgres = match postgres_connection(42, POSTGRES_CONFIG.clone()).await {
+        Ok(pool) => pool,
+        Err(build_err) => panic!("Failed to build postgres database pool: {build_err}"),
+    };
+
     let campaign_remaining = CampaignRemaining::new(redis.clone());
 
     match adapter {
