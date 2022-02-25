@@ -2,7 +2,7 @@
 #![deny(rust_2018_idioms)]
 
 use adapter::{primitives::AdapterTypes, Adapter};
-use clap::{crate_version, App, Arg};
+use clap::{crate_version, Arg, Command};
 
 use primitives::{
     config::configuration, postgres::POSTGRES_CONFIG, test_util::DUMMY_AUTH,
@@ -17,17 +17,17 @@ use std::{env, net::SocketAddr};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let cli = App::new("Sentry")
+    let cli = Command::new("Sentry")
         .version(crate_version!())
         .arg(
-            Arg::with_name("config")
+            Arg::new("config")
                 .help("the config file for the validator worker")
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("adapter")
+            Arg::new("adapter")
                 .long("adapter")
-                .short("a")
+                .short('a')
                 .help("the adapter for authentication and signing")
                 .required(true)
                 .default_value("ethereum")
@@ -35,16 +35,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("keystoreFile")
+            Arg::new("keystoreFile")
                 .long("keystoreFile")
-                .short("k")
+                .short('k')
                 .help("path to the JSON Ethereum Keystore file")
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("dummyIdentity")
+            Arg::new("dummyIdentity")
                 .long("dummyIdentity")
-                .short("i")
+                .short('i')
                 .help("the identity to use with the dummy adapter")
                 .takes_value(true),
         )
