@@ -70,5 +70,5 @@ async fn send_heartbeat<C: Unlocked + 'static>(
         timestamp: Utc::now(),
     });
 
-    Ok(iface.propagate(channel_context, &[&message_types]).await?)
+    Ok(iface.propagate(channel_context, &[message_types]).await?)
 }

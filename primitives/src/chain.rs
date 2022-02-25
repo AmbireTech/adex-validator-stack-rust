@@ -7,7 +7,7 @@ use crate::{config::TokenInfo, util::ApiUrl, Address, Campaign, Channel};
 ///
 /// # Ethereum Virtual Machine
 ///
-/// For all the EVM-compatible Chain IDs visit https://chainid.network
+/// For all the EVM-compatible Chain IDs visit <https://chainid.network>
 #[derive(Serialize, Deserialize, Hash, Clone, Copy, Eq, PartialEq)]
 #[serde(transparent)]
 pub struct ChainId(u32);
@@ -42,8 +42,8 @@ pub struct Chain {
     /// RPC url of the chain which will be used for Blockchain interactions.
     ///
     /// # Ethereum Virtual Machine
-    /// Check out the metadata for all EVM-chains: https://github.com/ethereum-lists/chains
-    /// Or in json: https://chainid.network/chains.json
+    /// Check out the metadata for all EVM-chains: <https://github.com/ethereum-lists/chains>
+    /// Or in json: <https://chainid.network/chains.json>
     pub rpc: ApiUrl,
     /// The OUTPACE contract address on this Chain
     pub outpace: Address,
@@ -52,8 +52,9 @@ pub struct Chain {
 }
 
 /// Context of [`TokenInfo`] & [`Chain`] information for given [`Channel`] or [`Campaign`].
-/// The additional context of [`Channel`] is known after checking if the Channel token's
-/// Chain & Address are whitelisted in the configuration.
+///
+/// The additional context of [`Channel`] is known after checking if the `Channel` token's
+/// `Chain` & `Address` are whitelisted in the configuration.
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Hash, Clone)]
 pub struct ChainOf<T = ()> {
     pub context: T,

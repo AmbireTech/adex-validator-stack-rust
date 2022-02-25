@@ -4,12 +4,12 @@ max_channels = 512
 channels_find_limit = 512
 campaigns_find_limit = 512
 spendable_find_limit = 512
-
 wait_time = 40000
 
 msgs_find_limit = 10
-analytics_find_limit_v5 = 5000
-analytics_maxtime_v5 = 15000
+analytics_find_limit = 5000
+# in milliseconds
+analytics_maxtime = 15000
 
 heartbeat_time = 60000
 health_threshold_promilles = 970
@@ -22,13 +22,6 @@ channel_tick_timeout = 10000
 
 ip_rate_limit = { type = 'ip', timeframe = 1200000 }
 sid_rate_limit = { type = 'sid', timeframe = 0 }
-
-# TODO: Replace with real contract address
-outpace_address = '0x333420fc6a897356e69b62417cd17ff012177d2b'
-# TODO: Replace with real contract address
-sweeper_address = '0x333420fc6a897356e69b62417cd17ff012177d2b'
-
-ethereum_network = 'http://localhost:8545'
 
 creators_whitelist = []
 validators_whitelist = []

@@ -3,7 +3,7 @@ use crate::{
     balances::BalancesState,
     spender::Spender,
     validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
-    Address, Balances, BigNum, CampaignId, Channel, ChannelId, UnifiedNum, ValidatorId, IPFS,
+    Address, Balances, CampaignId, UnifiedNum, ValidatorId, IPFS,
 };
 use chrono::{
     serde::ts_milliseconds, Date, DateTime, Duration, NaiveDate, TimeZone, Timelike, Utc,
@@ -348,6 +348,7 @@ pub struct DateHourError {
 
 #[derive(Clone, Hash)]
 /// [`DateHour`] holds the date and hour (only).
+///
 /// It uses [`chrono::DateTime`] when serializing and deserializing.
 /// When serializing it always sets minutes and seconds to `0` (zero).
 /// When deserializing the minutes and seconds should always be set to `0` (zero),
@@ -525,22 +526,6 @@ impl<'de> Deserialize<'de> for DateHour<Utc> {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct EventAggregate {
-    pub channel_id: ChannelId,
-    pub created: DateTime<Utc>,
-    pub events: HashMap<String, AggregateEvents>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct AggregateEvents {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub event_counts: Option<HashMap<Address, BigNum>>,
-    pub event_payouts: HashMap<Address, BigNum>,
-}
-
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Pagination {
@@ -600,14 +585,21 @@ pub struct ValidatorMessage {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct ValidatorMessageResponse {
-    pub validator_messages: Vec<ValidatorMessage>,
+pub struct ValidatorMessagesListResponse {
+    pub messages: Vec<ValidatorMessage>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct EventAggregateResponse {
-    pub channel: Channel,
-    pub events: Vec<EventAggregate>,
+#[serde(rename_all = "camelCase")]
+pub struct ValidatorMessagesCreateRequest {
+    pub messages: Vec<MessageTypes>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ValidatorMessagesListQuery {
+    /// Will apply the lower limit of: `query.limit` and `Config::msgs_find_limit`
+    pub limit: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -616,53 +608,6 @@ pub struct ValidationErrorResponse {
     pub status_code: u64,
     pub message: String,
     pub validation: Vec<String>,
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AdvancedAnalyticsResponse {
-    pub by_channel_stats: HashMap<ChannelId, HashMap<ChannelReport, HashMap<String, f64>>>,
-    pub publisher_stats: HashMap<PublisherReport, HashMap<String, f64>>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Hash, PartialEq, Eq, Clone)]
-#[serde(rename_all = "camelCase")]
-pub enum PublisherReport {
-    AdUnit,
-    AdSlot,
-    AdSlotPay,
-    Country,
-    Hostname,
-}
-
-impl fmt::Display for PublisherReport {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            PublisherReport::AdUnit => write!(f, "reportPublisherToAdUnit"),
-            PublisherReport::AdSlot => write!(f, "reportPublisherToAdSlot"),
-            PublisherReport::AdSlotPay => write!(f, "reportPublisherToAdSlotPay"),
-            PublisherReport::Country => write!(f, "reportPublisherToCountry"),
-            PublisherReport::Hostname => write!(f, "reportPublisherToHostname"),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Hash, PartialEq, Eq, Clone)]
-#[serde(rename_all = "camelCase")]
-pub enum ChannelReport {
-    AdUnit,
-    Hostname,
-    HostnamePay,
-}
-
-impl fmt::Display for ChannelReport {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            ChannelReport::AdUnit => write!(f, "reportPublisherToAdUnit"),
-            ChannelReport::Hostname => write!(f, "reportChannelToHostname"),
-            ChannelReport::HostnamePay => write!(f, "reportChannelToHostnamePay"),
-        }
-    }
 }
 
 pub mod channel_list {
@@ -684,13 +629,12 @@ pub mod channel_list {
         #[serde(default)]
         // default is `u64::default()` = `0`
         pub page: u64,
-        pub creator: Option<String>,
         /// filters the channels containing a specific validator if provided
         pub validator: Option<ValidatorId>,
     }
 }
 
-pub mod campaign {
+pub mod campaign_list {
     use crate::{Address, Campaign, ValidatorId};
     use chrono::{serde::ts_seconds, DateTime, Utc};
     use serde::{Deserialize, Serialize};
@@ -878,6 +822,16 @@ pub mod campaign_create {
             Self::from_campaign_erased(campaign, id)
         }
     }
+}
+
+pub mod campaign_modify {
+    use serde::{Deserialize, Serialize};
+
+    use crate::{
+        campaign::{PricingBounds, Validators},
+        targeting::Rules,
+        AdUnit, Campaign, EventSubmission, UnifiedNum,
+    };
 
     // All editable fields stored in one place, used for checking when a budget is changed
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -947,7 +901,6 @@ mod postgres {
     };
     use crate::{
         analytics::{AnalyticsQuery, Metric},
-        sentry::EventAggregate,
         validator::{messages::Type as MessageType, MessageTypes},
     };
     use bytes::BytesMut;
@@ -957,16 +910,6 @@ mod postgres {
         types::{accepts, to_sql_checked, FromSql, IsNull, Json, ToSql, Type},
         Error, Row,
     };
-
-    impl From<&Row> for EventAggregate {
-        fn from(row: &Row) -> Self {
-            Self {
-                channel_id: row.get("channel_id"),
-                created: row.get("created"),
-                events: row.get::<_, Json<_>>("events").0,
-            }
-        }
-    }
 
     impl From<&Row> for ValidatorMessage {
         fn from(row: &Row) -> Self {

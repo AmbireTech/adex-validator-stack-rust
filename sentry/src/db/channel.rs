@@ -1,5 +1,4 @@
-use chrono::Utc;
-use primitives::{validator::MessageTypes, Channel, ChannelId, ValidatorId};
+use primitives::{Channel, ChannelId, ValidatorId};
 
 pub use list_channels::list_channels;
 
@@ -70,27 +69,6 @@ pub async fn insert_channel(pool: &DbPool, channel: Channel) -> Result<Channel, 
         .await?;
 
     Ok(Channel::from(&row))
-}
-
-pub async fn insert_validator_messages(
-    pool: &DbPool,
-    channel: &Channel,
-    from: &ValidatorId,
-    validator_message: &MessageTypes,
-) -> Result<bool, PoolError> {
-    let client = pool.get().await?;
-
-    let stmt = client.prepare("INSERT INTO validator_messages (channel_id, \"from\", msg, received) values ($1, $2, $3, $4)").await?;
-
-    let row = client
-        .execute(
-            &stmt,
-            &[&channel.id(), &from, &validator_message, &Utc::now()],
-        )
-        .await?;
-
-    let inserted = row == 1;
-    Ok(inserted)
 }
 
 mod list_channels {

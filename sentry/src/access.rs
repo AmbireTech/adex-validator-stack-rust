@@ -227,7 +227,7 @@ mod test {
         let campaign = get_campaign(rule);
 
         let chain_context = config
-            .find_chain_token(campaign.channel.token)
+            .find_chain_of(campaign.channel.token)
             .expect("Campaign's Channel.token should be set in config");
 
         let auth = Auth {
@@ -288,7 +288,7 @@ mod test {
         let campaign = get_campaign(rule);
 
         let chain_context = config
-            .find_chain_token(campaign.channel.token)
+            .find_chain_of(campaign.channel.token)
             .expect("Campaign's Channel.token should be set in config");
 
         let auth = Auth {
@@ -348,7 +348,7 @@ mod test {
         campaign.active.to = Utc.ymd(1970, 1, 1).and_hms(12, 00, 9);
 
         let chain_context = config
-            .find_chain_token(campaign.channel.token)
+            .find_chain_of(campaign.channel.token)
             .expect("Campaign's Channel.token should be set in config");
 
         let auth = Auth {
@@ -391,7 +391,7 @@ mod test {
         let campaign = get_campaign(rule);
 
         let chain_context = config
-            .find_chain_token(campaign.channel.token)
+            .find_chain_of(campaign.channel.token)
             .expect("Campaign's Channel.token should be set in config");
 
         let auth = Auth {
@@ -434,7 +434,7 @@ mod test {
         let campaign = get_campaign(rule);
 
         let chain_context = config
-            .find_chain_token(campaign.channel.token)
+            .find_chain_of(campaign.channel.token)
             .expect("Campaign's Channel.token should be set in config");
 
         let auth = Auth {
@@ -474,7 +474,7 @@ mod test {
         let campaign = get_campaign(rule);
 
         let chain_context = config
-            .find_chain_token(campaign.channel.token)
+            .find_chain_of(campaign.channel.token)
             .expect("Campaign's Channel.token should be set in config");
 
         let auth = Auth {
@@ -517,7 +517,7 @@ mod test {
         let campaign = get_campaign(rule);
 
         let chain_context = config
-            .find_chain_token(campaign.channel.token)
+            .find_chain_of(campaign.channel.token)
             .expect("Campaign's Channel.token should be set in config");
 
         let auth = Auth {

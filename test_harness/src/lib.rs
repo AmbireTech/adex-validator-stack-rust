@@ -413,7 +413,7 @@ mod tests {
         assert_eq!(CAMPAIGN_1.channel.token, CAMPAIGN_2.channel.token);
 
         let token_chain = GANACHE_CONFIG
-            .find_chain_token(CAMPAIGN_1.channel.token)
+            .find_chain_of(CAMPAIGN_1.channel.token)
             .expect("Should find CAMPAIGN_1 channel token address in Config!");
 
         assert_eq!(&token_chain.chain, &chain, "CAMPAIGN_1 & CAMPAIGN_2 should be both using the same Chain which is setup in the Ganache Config");

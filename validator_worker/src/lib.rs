@@ -1,6 +1,6 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
-#![allow(deprecated)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 use adapter::util::{get_balance_leaf, get_signable_state_root, BalanceLeafError};
 use primitives::{

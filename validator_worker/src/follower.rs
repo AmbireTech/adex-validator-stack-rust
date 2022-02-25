@@ -296,7 +296,7 @@ async fn on_new_state<'a, C: Unlocked + 'static>(
     let propagation_result = sentry
         .propagate(
             channel_context,
-            &[&MessageTypes::ApproveState(ApproveState {
+            &[MessageTypes::ApproveState(ApproveState {
                 state_root: proposed_state_root,
                 signature,
                 is_healthy,
@@ -316,7 +316,7 @@ async fn on_error<'a, C: Unlocked + 'static>(
     let propagation = sentry
         .propagate(
             channel_context,
-            &[&MessageTypes::RejectState(RejectState {
+            &[MessageTypes::RejectState(RejectState {
                 reason: status.to_string(),
                 state_root: new_state.state_root.clone(),
                 signature: new_state.signature.clone(),
