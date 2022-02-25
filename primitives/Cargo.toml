@@ -43,7 +43,7 @@ ethereum-types = "0.11"
 # Macro for easier derive of Display & FromStr
 parse-display = "^0.5.0"
 # CID & multihash / multibase
-cid = "0.7"
+cid = "0.8"
 hex = "0.4"
 merkletree = "0.10.0"
 tiny-keccak = { version = "^2.0", features = ["keccak"] }
