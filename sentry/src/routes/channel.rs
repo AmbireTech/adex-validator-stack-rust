@@ -541,8 +541,8 @@ mod test {
     use adapter::primitives::Deposit;
     use hyper::StatusCode;
     use primitives::{
-        test_util::{ADVERTISER, CREATOR, GUARDIAN, PUBLISHER},
-        util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, IDS},
+        test_util::{ADVERTISER, CREATOR, GUARDIAN, PUBLISHER, PUBLISHER_2},
+        test_util::{DUMMY_CAMPAIGN, IDS},
         BigNum,
     };
 
@@ -567,9 +567,9 @@ mod test {
         };
         app.adapter
             .client
-            .add_deposit_call(channel.id(), ADDRESSES["creator"], deposit.clone());
+            .add_deposit_call(channel.id(), *CREATOR, deposit.clone());
         // Making sure spendable does not yet exist
-        let spendable = fetch_spendable(app.pool.clone(), &ADDRESSES["creator"], &channel.id())
+        let spendable = fetch_spendable(app.pool.clone(), &CREATOR, &channel.id())
             .await
             .expect("should return None");
         assert!(spendable.is_none());
@@ -578,7 +578,7 @@ mod test {
             &app.adapter,
             app.pool.clone(),
             &channel_context,
-            ADDRESSES["creator"],
+            *CREATOR,
         )
         .await
         .expect("should create a new spendable");
@@ -594,10 +594,10 @@ mod test {
             new_spendable.deposit.still_on_create2,
             still_on_create2_unified
         );
-        assert_eq!(new_spendable.spender, ADDRESSES["creator"]);
+        assert_eq!(new_spendable.spender, *CREATOR);
 
         // Make sure spendable NOW exists
-        let spendable = fetch_spendable(app.pool.clone(), &ADDRESSES["creator"], &channel.id())
+        let spendable = fetch_spendable(app.pool.clone(), &CREATOR, &channel.id())
             .await
             .expect("should return a spendable");
         assert!(spendable.is_some());
@@ -607,17 +607,15 @@ mod test {
             still_on_create2: BigNum::from_str("1100000000000000000").expect("should convert"), // 1.1 DAI
         };
 
-        app.adapter.client.add_deposit_call(
-            channel.id(),
-            ADDRESSES["creator"],
-            updated_deposit.clone(),
-        );
+        app.adapter
+            .client
+            .add_deposit_call(channel.id(), *CREATOR, updated_deposit.clone());
 
         let updated_spendable = create_or_update_spendable_document(
             &app.adapter,
             app.pool.clone(),
             &channel_context,
-            ADDRESSES["creator"],
+            *CREATOR,
         )
         .await
         .expect("should update spendable");
@@ -631,7 +629,7 @@ mod test {
             updated_spendable.deposit.still_on_create2,
             still_on_create2_unified
         );
-        assert_eq!(updated_spendable.spender, ADDRESSES["creator"]);
+        assert_eq!(updated_spendable.spender, *CREATOR);
     }
 
     async fn res_to_accounting_response(res: Response<Body>) -> AccountingResponse<CheckedState> {
@@ -678,18 +676,10 @@ mod test {
         {
             let mut balances = Balances::<CheckedState>::new();
             balances
-                .spend(
-                    ADDRESSES["creator"],
-                    ADDRESSES["publisher"],
-                    UnifiedNum::from_u64(200),
-                )
+                .spend(*CREATOR, *PUBLISHER, UnifiedNum::from_u64(200))
                 .expect("should not overflow");
             balances
-                .spend(
-                    ADDRESSES["tester"],
-                    ADDRESSES["publisher2"],
-                    UnifiedNum::from_u64(100),
-                )
+                .spend(*CREATOR, *PUBLISHER_2, UnifiedNum::from_u64(100))
                 .expect("Should not overflow");
             spend_amount(
                 app.pool.clone(),
@@ -712,18 +702,18 @@ mod test {
         // Testing for 2 accountings - second channel (same address is both an earner and a spender)
         {
             let mut second_channel = DUMMY_CAMPAIGN.channel;
-            second_channel.leader = IDS["user"]; // channel.id() will be different now
+            second_channel.leader = IDS[&ADVERTISER]; // channel.id() will be different now
             insert_channel(&app.pool, second_channel)
                 .await
                 .expect("should insert channel");
 
             let mut balances = Balances::<CheckedState>::new();
             balances
-                .spend(ADDRESSES["tester"], ADDRESSES["publisher"], 300.into())
+                .spend(*CREATOR, *PUBLISHER, 300.into())
                 .expect("Should not overflow");
 
             balances
-                .spend(ADDRESSES["publisher"], ADDRESSES["user"], 300.into())
+                .spend(*PUBLISHER, *ADVERTISER, 300.into())
                 .expect("Should not overflow");
 
             spend_amount(app.pool.clone(), second_channel.id(), balances.clone())
@@ -748,10 +738,10 @@ mod test {
             let mut balances = Balances::<CheckedState>::new();
             balances
                 .earners
-                .insert(ADDRESSES["publisher"], UnifiedNum::from_u64(100));
+                .insert(*PUBLISHER, UnifiedNum::from_u64(100));
             balances
                 .spenders
-                .insert(ADDRESSES["creator"], UnifiedNum::from_u64(200));
+                .insert(*CREATOR, UnifiedNum::from_u64(200));
             spend_amount(app.pool.clone(), channel_context.context.id(), balances)
                 .await
                 .expect("should spend");

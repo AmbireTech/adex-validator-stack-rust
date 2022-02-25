@@ -97,7 +97,7 @@ mod test {
         analytics::{query::Time, Metric, OperatingSystem, Timeframe},
         sentry::{DateHour, FetchedAnalytics, FetchedMetric, UpdateAnalytics, CLICK, IMPRESSION},
         test_util::{ADVERTISER, CREATOR, PUBLISHER, PUBLISHER_2},
-        util::tests::prep_db::{DUMMY_CAMPAIGN, DUMMY_IPFS},
+        test_util::{DUMMY_CAMPAIGN, DUMMY_IPFS},
         UnifiedNum,
     };
 

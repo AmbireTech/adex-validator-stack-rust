@@ -19,7 +19,7 @@ pub mod primitives {
 
     pub use ::primitives::{
         config::{ChainInfo, Config, TokenInfo},
-        Address, BigNum, Chain, ChainId, Channel, ValidatorId,
+        Address, BigNum, Chain, ChainId, ChainOf, Channel, ValidatorId,
     };
 
     use crate::ethereum::WalletState;

@@ -199,7 +199,7 @@ mod test {
 
     use primitives::{
         config::TokenInfo,
-        util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, IDS},
+        test_util::{CREATOR, DUMMY_CAMPAIGN, IDS, LEADER},
         BigNum, ChainOf, UnifiedNum,
     };
 
@@ -221,11 +221,11 @@ mod test {
         };
 
         let dummy_client = Dummy::init(Options {
-            dummy_identity: IDS["leader"],
+            dummy_identity: IDS[&LEADER],
             dummy_auth_tokens: Default::default(),
         });
 
-        let address = ADDRESSES["creator"];
+        let address = *CREATOR;
 
         // no mocked deposit calls should cause an Error
         {
@@ -253,9 +253,7 @@ mod test {
             assert_eq!(&deposits[0], &first_call);
 
             // should not affect the Mocked deposit calls and should cause an error
-            let different_address_call = dummy_client
-                .get_deposit(&channel_context, ADDRESSES["leader"])
-                .await;
+            let different_address_call = dummy_client.get_deposit(&channel_context, *LEADER).await;
             assert!(different_address_call.is_err());
 
             let second_call = dummy_client

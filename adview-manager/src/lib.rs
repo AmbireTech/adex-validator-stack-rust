@@ -592,7 +592,7 @@ pub struct StickyAdUnit {
 #[cfg(test)]
 mod test {
     use super::*;
-    use adex_primitives::util::tests::prep_db::DUMMY_IPFS;
+    use adex_primitives::test_util::DUMMY_IPFS;
 
     fn get_ad_unit(media_mime: &str) -> AdUnit {
         AdUnit {

@@ -676,7 +676,7 @@ pub mod campaign_list {
     #[cfg(test)]
     mod test {
         use super::*;
-        use crate::util::tests::prep_db::{ADDRESSES, IDS};
+        use crate::test_util::{CREATOR, FOLLOWER, IDS, LEADER};
         use chrono::TimeZone;
 
         #[test]
@@ -684,13 +684,13 @@ pub mod campaign_list {
             let query_leader = CampaignListQuery {
                 page: 0,
                 active_to_ge: Utc.ymd(2021, 2, 1).and_hms(7, 0, 0),
-                creator: Some(ADDRESSES["creator"]),
-                validator: Some(ValidatorParam::Leader(IDS["leader"])),
+                creator: Some(*CREATOR),
+                validator: Some(ValidatorParam::Leader(IDS[&LEADER])),
             };
 
             let query_leader_string = format!(
                 "page=0&activeTo=1612162800&creator={}&leader={}",
-                ADDRESSES["creator"], ADDRESSES["leader"]
+                *CREATOR, *LEADER
             );
             let query_leader_encoded =
                 serde_urlencoded::from_str::<CampaignListQuery>(&query_leader_string)
@@ -701,12 +701,12 @@ pub mod campaign_list {
             let query_validator = CampaignListQuery {
                 page: 0,
                 active_to_ge: Utc.ymd(2021, 2, 1).and_hms(7, 0, 0),
-                creator: Some(ADDRESSES["creator"]),
-                validator: Some(ValidatorParam::Validator(IDS["follower"])),
+                creator: Some(*CREATOR),
+                validator: Some(ValidatorParam::Validator(IDS[&FOLLOWER])),
             };
             let query_validator_string = format!(
                 "page=0&activeTo=1612162800&creator={}&validator={}",
-                ADDRESSES["creator"], ADDRESSES["follower"]
+                *CREATOR, *FOLLOWER
             );
             let query_validator_encoded =
                 serde_urlencoded::from_str::<CampaignListQuery>(&query_validator_string)
@@ -717,14 +717,12 @@ pub mod campaign_list {
             let query_no_validator = CampaignListQuery {
                 page: 0,
                 active_to_ge: Utc.ymd(2021, 2, 1).and_hms(7, 0, 0),
-                creator: Some(ADDRESSES["creator"]),
+                creator: Some(*CREATOR),
                 validator: None,
             };
 
-            let query_no_validator_string = format!(
-                "page=0&activeTo=1612162800&creator={}",
-                ADDRESSES["creator"]
-            );
+            let query_no_validator_string =
+                format!("page=0&activeTo=1612162800&creator={}", *CREATOR);
             let query_no_validator_encoded =
                 serde_urlencoded::from_str::<CampaignListQuery>(&query_no_validator_string)
                     .expect("should encode");
@@ -1091,14 +1089,14 @@ mod test {
     use super::*;
     use crate::{
         postgres::POSTGRES_POOL,
-        util::tests::prep_db::{ADDRESSES, DUMMY_IPFS},
+        test_util::{DUMMY_IPFS, PUBLISHER},
     };
     use serde_json::{json, Value};
 
     #[test]
     pub fn test_de_serialize_events() {
         let click = Event::Click {
-            publisher: ADDRESSES["publisher"],
+            publisher: *PUBLISHER,
             ad_unit: Some(DUMMY_IPFS[0]),
             ad_slot: Some(DUMMY_IPFS[1]),
             referrer: Some("some_referrer".to_string()),
@@ -1106,7 +1104,7 @@ mod test {
 
         let click_json = json!({
             "type": "CLICK",
-            "publisher": "0xB7d3F81E857692d13e9D63b232A90F4A1793189E",
+            "publisher": "0xE882ebF439207a70dDcCb39E13CA8506c9F45fD9",
             "adUnit": "QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR",
             "adSlot": "Qmasg8FrbuSQpjFu3kRnZF9beg8rEBFrqgi1uXDRwCbX5f",
             "referrer": "some_referrer"

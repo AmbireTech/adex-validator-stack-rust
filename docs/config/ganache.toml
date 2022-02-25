@@ -25,8 +25,8 @@ sid_rate_limit = { type = 'sid', timeframe = 0 }
 
 creators_whitelist = []
 validators_whitelist = []
-# Leader - 0xce07CbB7e054514D590a0262C93070D838bFBA2e
-admins = ['0xce07CbB7e054514D590a0262C93070D838bFBA2e']
+# Leader - 0x80690751969B234697e9059e04ed72195c3507fa
+admins = ['0x80690751969B234697e9059e04ed72195c3507fa']
 
 # Ethereum mainnet tokens
 # [chain."Ganache #1"]

@@ -527,7 +527,7 @@ pub mod test_util {
     };
     use primitives::{
         config::GANACHE_CONFIG,
-        util::tests::{discard_logger, prep_db::IDS},
+        test_util::{discard_logger, CREATOR, FOLLOWER, IDS, LEADER},
     };
 
     use crate::{
@@ -544,11 +544,11 @@ pub mod test_util {
     pub async fn setup_dummy_app() -> Application<Dummy> {
         let config = GANACHE_CONFIG.clone();
         let adapter = Adapter::new(Dummy::init(Options {
-            dummy_identity: IDS["leader"],
+            dummy_identity: IDS[&LEADER],
             dummy_auth_tokens: vec![
-                (IDS["creator"].to_address(), "AUTH_Creator".into()),
-                (IDS["leader"].to_address(), "AUTH_Leader".into()),
-                (IDS["follower"].to_address(), "AUTH_Follower".into()),
+                (*CREATOR, "AUTH_Creator".into()),
+                (*LEADER, "AUTH_Leader".into()),
+                (*FOLLOWER, "AUTH_Follower".into()),
             ]
             .into_iter()
             .collect(),

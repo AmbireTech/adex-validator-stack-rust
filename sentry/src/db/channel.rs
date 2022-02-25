@@ -162,7 +162,7 @@ mod list_channels {
 
 #[cfg(test)]
 mod test {
-    use primitives::util::tests::prep_db::DUMMY_CAMPAIGN;
+    use primitives::test_util::DUMMY_CAMPAIGN;
 
     use crate::db::{
         insert_channel,

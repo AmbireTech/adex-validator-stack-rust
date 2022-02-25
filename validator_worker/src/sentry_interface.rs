@@ -623,9 +623,9 @@ mod test {
     use primitives::{
         config::{configuration, Environment},
         sentry::Pagination,
-        util::tests::{
-            discard_logger,
-            prep_db::{ADDRESSES, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_LEADER, IDS},
+        test_util::{
+            discard_logger, ADVERTISER, ADVERTISER_2, CREATOR, DUMMY_CAMPAIGN,
+            DUMMY_VALIDATOR_LEADER, IDS, LEADER, PUBLISHER, PUBLISHER_2,
         },
         UnifiedNum,
     };
@@ -643,24 +643,21 @@ mod test {
             total_spent: None,
         };
         let mut all_spenders = HashMap::new();
-        all_spenders.insert(ADDRESSES["user"], test_spender.clone());
-        all_spenders.insert(ADDRESSES["publisher"], test_spender.clone());
-        all_spenders.insert(ADDRESSES["publisher2"], test_spender.clone());
-        all_spenders.insert(ADDRESSES["creator"], test_spender.clone());
-        all_spenders.insert(ADDRESSES["tester"], test_spender.clone());
+        all_spenders.insert(*ADVERTISER, test_spender.clone());
+        all_spenders.insert(*PUBLISHER, test_spender.clone());
+        all_spenders.insert(*PUBLISHER_2, test_spender.clone());
+        all_spenders.insert(*ADVERTISER_2, test_spender.clone());
+        all_spenders.insert(*CREATOR, test_spender.clone());
 
         let first_page_response = AllSpendersResponse {
             spenders: vec![
                 (
-                    ADDRESSES["user"],
-                    all_spenders.get(&ADDRESSES["user"]).unwrap().to_owned(),
+                    *ADVERTISER,
+                    all_spenders.get(&ADVERTISER).unwrap().to_owned(),
                 ),
                 (
-                    ADDRESSES["publisher"],
-                    all_spenders
-                        .get(&ADDRESSES["publisher"])
-                        .unwrap()
-                        .to_owned(),
+                    *PUBLISHER,
+                    all_spenders.get(&*PUBLISHER).unwrap().to_owned(),
                 ),
             ]
             .into_iter()
@@ -674,15 +671,12 @@ mod test {
         let second_page_response = AllSpendersResponse {
             spenders: vec![
                 (
-                    ADDRESSES["publisher2"],
-                    all_spenders
-                        .get(&ADDRESSES["publisher2"])
-                        .unwrap()
-                        .to_owned(),
+                    *PUBLISHER_2,
+                    all_spenders.get(&PUBLISHER_2).unwrap().to_owned(),
                 ),
                 (
-                    ADDRESSES["creator"],
-                    all_spenders.get(&ADDRESSES["creator"]).unwrap().to_owned(),
+                    *ADVERTISER_2,
+                    all_spenders.get(&ADVERTISER_2).unwrap().to_owned(),
                 ),
             ]
             .into_iter()
@@ -694,12 +688,9 @@ mod test {
         };
 
         let third_page_response = AllSpendersResponse {
-            spenders: vec![(
-                ADDRESSES["tester"],
-                all_spenders.get(&ADDRESSES["tester"]).unwrap().to_owned(),
-            )]
-            .into_iter()
-            .collect(),
+            spenders: vec![(*CREATOR, all_spenders.get(&*CREATOR).unwrap().to_owned())]
+                .into_iter()
+                .collect(),
             pagination: Pagination {
                 page: 2,
                 total_pages: 3,
@@ -750,8 +741,8 @@ mod test {
         config.spendable_find_limit = 2;
 
         let adapter = Adapter::with_unlocked(Dummy::init(Options {
-            dummy_identity: IDS["leader"],
-            dummy_auth_tokens: vec![(IDS["leader"].to_address(), "AUTH_Leader".into())]
+            dummy_identity: IDS[&LEADER],
+            dummy_auth_tokens: vec![(IDS[&LEADER].to_address(), "AUTH_Leader".into())]
                 .into_iter()
                 .collect(),
         }));
@@ -771,23 +762,20 @@ mod test {
             .expect("should get response");
 
         // Checks for page 1
-        let res_user = res.remove(&ADDRESSES["user"]);
-        let res_publisher = res.remove(&ADDRESSES["publisher"]);
-        assert!(res_user.is_some() && res_publisher.is_some());
-        assert_eq!(res_user.unwrap(), test_spender);
-        assert_eq!(res_publisher.unwrap(), test_spender);
+        let res_advertiser = res.remove(&ADVERTISER);
+        let res_publisher = res.remove(&*PUBLISHER);
+        assert_eq!(res_advertiser.expect("Should have value"), test_spender);
+        assert_eq!(res_publisher.expect("Should have value"), test_spender);
 
         // Checks for page 2
-        let res_publisher2 = res.remove(&ADDRESSES["publisher2"]);
-        let res_creator = res.remove(&ADDRESSES["creator"]);
-        assert!(res_publisher2.is_some() && res_creator.is_some());
-        assert_eq!(res_publisher2.unwrap(), test_spender);
-        assert_eq!(res_creator.unwrap(), test_spender);
+        let res_publisher2 = res.remove(&PUBLISHER_2);
+        let res_advertiser_2 = res.remove(&ADVERTISER_2);
+        assert_eq!(res_publisher2.expect("Should have value"), test_spender);
+        assert_eq!(res_advertiser_2.expect("Should have value"), test_spender);
 
         // Checks for page 3
-        let res_tester = res.remove(&ADDRESSES["tester"]);
-        assert!(res_tester.is_some());
-        assert_eq!(res_tester.unwrap(), test_spender);
+        let res_creator = res.remove(&*CREATOR);
+        assert_eq!(res_creator.expect("Should have value"), test_spender);
 
         // There should be no remaining elements
         assert_eq!(res.len(), 0)
