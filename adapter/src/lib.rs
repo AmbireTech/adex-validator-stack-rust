@@ -1,3 +1,7 @@
+#![deny(rust_2018_idioms)]
+#![deny(clippy::all)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
 pub use {
     self::adapter::{
         state::{LockedState, UnlockedState},

@@ -1,11 +1,11 @@
-//! Channel - `/v5/channel` routes
+//! `/v5/channel` routes
 //!
 
 use crate::db::{
     accounting::{get_all_accountings_for_channel, update_accounting, Side},
-    event_aggregate::{latest_approve_state_v5, latest_heartbeats, latest_new_state_v5},
     insert_channel, list_channels,
     spendable::{fetch_spendable, get_all_spendables_for_channel, update_spendable},
+    validator_message::{latest_approve_state, latest_heartbeats, latest_new_state},
     DbPool,
 };
 use crate::{success_response, Application, ResponseError, RouteParams};
@@ -25,6 +25,11 @@ use primitives::{
 use slog::{error, Logger};
 use std::{collections::HashMap, str::FromStr};
 
+/// `GET /v5/channel/list` request
+///
+/// Query: [`ChannelListQuery`]
+///
+/// Response: [`ChannelListResponse`](primitives::sentry::channel_list::ChannelListResponse)
 pub async fn channel_list<C: Locked + 'static>(
     req: Request<Body>,
     app: &Application<C>,
@@ -46,6 +51,11 @@ pub async fn channel_list<C: Locked + 'static>(
     Ok(success_response(serde_json::to_string(&list_response)?))
 }
 
+/// `GET /v5/channel/0xXXX.../last-approved` request
+///
+/// Query: [`LastApprovedQuery`]
+///
+/// Response: [`LastApprovedResponse`]
 pub async fn last_approved<C: Locked + 'static>(
     req: Request<Body>,
     app: &Application<C>,
@@ -68,14 +78,14 @@ pub async fn last_approved<C: Locked + 'static>(
         )
         .expect("should build response");
 
-    let approve_state = match latest_approve_state_v5(&app.pool, &channel).await? {
+    let approve_state = match latest_approve_state(&app.pool, &channel).await? {
         Some(approve_state) => approve_state,
         None => return Ok(default_response),
     };
 
     let state_root = approve_state.msg.state_root.clone();
 
-    let new_state = latest_new_state_v5(&app.pool, &channel, &state_root).await?;
+    let new_state = latest_new_state(&app.pool, &channel, &state_root).await?;
     if new_state.is_none() {
         return Ok(default_response);
     }
@@ -161,6 +171,9 @@ fn spender_response_without_leaf(
     Ok(success_response(serde_json::to_string(&res)?))
 }
 
+/// `GET /v5/channel/0xXXX.../spender/0xXXX...` request
+///
+/// Response: [`SpenderResponse`]
 pub async fn get_spender_limits<C: Locked + 'static>(
     req: Request<Body>,
     app: &Application<C>,
@@ -215,6 +228,9 @@ pub async fn get_spender_limits<C: Locked + 'static>(
     Ok(success_response(serde_json::to_string(&res)?))
 }
 
+/// `GET /v5/channel/0xXXX.../spender/all` request
+///
+/// Response: [`AllSpendersResponse`]
 pub async fn get_all_spender_limits<C: Locked + 'static>(
     req: Request<Body>,
     app: &Application<C>,
@@ -269,6 +285,8 @@ pub async fn get_all_spender_limits<C: Locked + 'static>(
     Ok(success_response(serde_json::to_string(&res)?))
 }
 
+/// `POST /v5/channel/0xXXX.../spender/0xXXX...` request
+///
 /// internally, to make the validator worker to add a spender leaf in NewState we'll just update Accounting
 pub async fn add_spender_leaf<C: Locked + 'static>(
     req: Request<Body>,
@@ -306,14 +324,14 @@ async fn get_corresponding_new_state(
     logger: &Logger,
     channel: &Channel,
 ) -> Result<Option<NewState<CheckedState>>, ResponseError> {
-    let approve_state = match latest_approve_state_v5(pool, channel).await? {
+    let approve_state = match latest_approve_state(pool, channel).await? {
         Some(approve_state) => approve_state,
         None => return Ok(None),
     };
 
     let state_root = approve_state.msg.state_root.clone();
 
-    let new_state = match latest_new_state_v5(pool, channel, &state_root).await? {
+    let new_state = match latest_new_state(pool, channel, &state_root).await? {
         Some(new_state) => {
             let new_state = new_state.msg.into_inner().try_checked().map_err(|err| {
                 error!(&logger, "Balances are not aligned in an approved NewState: {}", &err; "module" => "get_spender_limits");
@@ -378,10 +396,8 @@ pub async fn get_accounting_for_channel<C: Locked + 'static>(
 /// starting with `/v5/channel/0xXXX.../validator-messages`
 ///
 pub mod validator_message {
-    use std::collections::HashMap;
-
     use crate::{
-        db::{get_validator_messages, insert_validator_messages},
+        db::validator_message::{get_validator_messages, insert_validator_messages},
         Auth,
     };
     use crate::{success_response, Application, ResponseError};
@@ -389,17 +405,12 @@ pub mod validator_message {
     use futures::future::try_join_all;
     use hyper::{Body, Request, Response};
     use primitives::{
-        sentry::{SuccessResponse, ValidatorMessageResponse},
-        validator::MessageTypes,
-        ChainOf,
+        sentry::{
+            SuccessResponse, ValidatorMessagesCreateRequest, ValidatorMessagesListQuery,
+            ValidatorMessagesListResponse,
+        },
+        ChainOf, Channel, DomainError, ValidatorId,
     };
-    use primitives::{Channel, DomainError, ValidatorId};
-    use serde::Deserialize;
-
-    #[derive(Deserialize)]
-    pub struct ValidatorMessagesListQuery {
-        limit: Option<u64>,
-    }
 
     pub fn extract_params(
         from_path: &str,
@@ -460,12 +471,18 @@ pub mod validator_message {
             get_validator_messages(&app.pool, &channel.id(), validator_id, message_types, limit)
                 .await?;
 
-        let response = ValidatorMessageResponse { validator_messages };
+        let response = ValidatorMessagesListResponse {
+            messages: validator_messages,
+        };
 
         Ok(success_response(serde_json::to_string(&response)?))
     }
 
-    /// `POST /v5/channel/0xXXX.../validator-messages` with Request body (json):
+    /// `POST /v5/channel/0xXXX.../validator-messages`
+    /// with Request body (json): [ValidatorMessagesCreateRequest]
+    ///
+    /// # Example
+    ///
     /// ```json
     /// {
     ///     "messages": [
@@ -475,7 +492,9 @@ pub mod validator_message {
     /// }
     /// ```
     ///
-    /// Validator messages: [`MessageTypes`]
+    /// Validator messages: [`MessageTypes`][primitives::validator::MessageTypes]
+    ///
+    /// Response: [`SuccessResponse`]
     pub async fn create_validator_messages<C: Locked + 'static>(
         req: Request<Body>,
         app: &Application<C>,
@@ -483,7 +502,7 @@ pub mod validator_message {
         let session = req
             .extensions()
             .get::<Auth>()
-            .expect("auth request session")
+            .ok_or(ResponseError::Unauthorized)?
             .to_owned();
 
         let channel = req
@@ -495,15 +514,13 @@ pub mod validator_message {
         let into_body = req.into_body();
         let body = hyper::body::to_bytes(into_body).await?;
 
-        let request_body = serde_json::from_slice::<HashMap<String, Vec<MessageTypes>>>(&body)?;
-        let messages = request_body
-            .get("messages")
-            .ok_or_else(|| ResponseError::BadRequest("missing messages body".to_string()))?;
+        let create_request = serde_json::from_slice::<ValidatorMessagesCreateRequest>(&body)
+            .map_err(|_err| ResponseError::BadRequest("Bad Request body json".to_string()))?;
 
         match channel.find_validator(session.uid) {
             None => Err(ResponseError::Unauthorized),
             _ => {
-                try_join_all(messages.iter().map(|message| {
+                try_join_all(create_request.messages.iter().map(|message| {
                     insert_validator_messages(&app.pool, &channel, &session.uid, message)
                 }))
                 .await?;
@@ -537,7 +554,7 @@ mod test {
             let channel = DUMMY_CAMPAIGN.channel;
             let channel_context = app
                 .config
-                .find_chain_token(DUMMY_CAMPAIGN.channel.token)
+                .find_chain_of(DUMMY_CAMPAIGN.channel.token)
                 .expect("should retrieve Chain & token");
 
             (channel_context.with_channel(channel), channel)
@@ -623,7 +640,7 @@ mod test {
             .expect("Should get json");
 
         let accounting_response: AccountingResponse<CheckedState> =
-            serde_json::from_slice(&json).expect("Should get AccouuntingResponse");
+            serde_json::from_slice(&json).expect("Should get AccountingResponse");
         accounting_response
     }
 
@@ -632,7 +649,7 @@ mod test {
         let app = setup_dummy_app().await;
         let channel_context = app
             .config
-            .find_chain_token(DUMMY_CAMPAIGN.channel.token)
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
             .expect("Dummy channel Token should be present in config!")
             .with(DUMMY_CAMPAIGN.channel);
 
@@ -752,7 +769,7 @@ mod test {
         let app = setup_dummy_app().await;
         let channel_context = app
             .config
-            .find_chain_token(DUMMY_CAMPAIGN.channel.token)
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
             .expect("Dummy channel Token should be present in config!")
             .with(DUMMY_CAMPAIGN.channel);
 

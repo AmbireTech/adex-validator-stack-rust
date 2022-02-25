@@ -33,7 +33,7 @@ impl<C: Locked + 'static> Middleware<C> for CampaignLoad {
 
         let campaign_context = application
             .config
-            .find_chain_token(campaign.channel.token)
+            .find_chain_of(campaign.channel.token)
             .ok_or(ResponseError::BadRequest(
                 "Channel token not whitelisted".to_string(),
             ))?

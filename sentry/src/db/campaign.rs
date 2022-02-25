@@ -2,7 +2,7 @@ use crate::db::{DbPool, PoolError, TotalCount};
 use chrono::{DateTime, Utc};
 use primitives::{
     sentry::{
-        campaign::{CampaignListResponse, ValidatorParam},
+        campaign_list::{CampaignListResponse, ValidatorParam},
         Pagination,
     },
     Address, Campaign, CampaignId, ChannelId,
@@ -505,7 +505,7 @@ mod test {
         campaign,
         campaign::Validators,
         event_submission::{RateLimit, Rule},
-        sentry::campaign_create::ModifyCampaign,
+        sentry::campaign_modify::ModifyCampaign,
         targeting::Rules,
         util::tests::prep_db::{
             ADDRESSES, DUMMY_AD_UNITS, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER, IDS,

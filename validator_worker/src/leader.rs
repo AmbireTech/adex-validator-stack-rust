@@ -117,7 +117,7 @@ async fn on_new_accounting<C: Unlocked + 'static>(
     let propagation_results = sentry
         .propagate(
             channel_context,
-            &[&MessageTypes::NewState(NewState {
+            &[MessageTypes::NewState(NewState {
                 state_root,
                 signature,
                 balances: accounting_balances.into_unchecked(),

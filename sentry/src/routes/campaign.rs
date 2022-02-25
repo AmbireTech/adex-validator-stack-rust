@@ -19,9 +19,8 @@ use hyper::{Body, Request, Response};
 use primitives::{
     campaign_validator::Validator,
     sentry::{
-        campaign::CampaignListQuery,
-        campaign_create::{CreateCampaign, ModifyCampaign},
-        SuccessResponse,
+        campaign_create::CreateCampaign, campaign_list::CampaignListQuery,
+        campaign_modify::ModifyCampaign, SuccessResponse,
     },
     spender::Spendable,
     Address, Campaign, CampaignId, ChainOf, Channel, ChannelId, Deposit, UnifiedNum,
@@ -1000,7 +999,7 @@ mod test {
     #[tokio::test]
     /// Test single campaign creation and modification
     // &
-    /// Test with multiple campaigns (because of Budget) a modification of campaign
+    /// Test with multiple campaigns (because of Budget) and modifications
     async fn create_and_modify_with_multiple_campaigns() {
         let app = setup_dummy_app().await;
 
@@ -1008,7 +1007,7 @@ mod test {
         let dummy_channel = DUMMY_CAMPAIGN.channel;
         let channel_chain = app
             .config
-            .find_chain_token(dummy_channel.token)
+            .find_chain_of(dummy_channel.token)
             .expect("Channel token should be whitelisted in config!");
         let channel_context = channel_chain.with_channel(dummy_channel);
 
@@ -1336,7 +1335,7 @@ mod test {
 
         let campaign_context = app
             .config
-            .find_chain_token(campaign.channel.token)
+            .find_chain_of(campaign.channel.token)
             .expect("Config should have the Dummy campaign.channel.token")
             .with(campaign.clone());
 

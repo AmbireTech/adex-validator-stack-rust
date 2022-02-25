@@ -12,7 +12,7 @@ use primitives::{
     balances::{CheckedState, UncheckedState},
     sentry::{
         AccountingResponse, AllSpendersResponse, LastApprovedResponse, SuccessResponse,
-        ValidatorMessageResponse,
+        ValidatorMessagesCreateRequest, ValidatorMessagesListResponse,
     },
     spender::Spender,
     util::ApiUrl,
@@ -208,15 +208,15 @@ impl<C: Unlocked + 'static, P> SentryApi<C, P> {
             ))
             .expect("Should not error when creating endpoint url");
 
-        let result = self
+        let response = self
             .client
             .get(endpoint)
             .send()
             .await?
-            .json::<ValidatorMessageResponse>()
+            .json::<ValidatorMessagesListResponse>()
             .await?;
 
-        Ok(result.validator_messages.into_iter().next().map(|m| m.msg))
+        Ok(response.messages.into_iter().next().map(|m| m.msg))
     }
 
     pub async fn get_our_latest_msg(
@@ -352,7 +352,7 @@ impl<C: Unlocked + 'static, P> SentryApi<C, P> {
         let (validators, channels) = campaigns.into_iter().fold(
             (ChainsValidators::new(), HashSet::<ChainOf<Channel>>::new()),
             |(mut validators, mut channels), campaign| {
-                let channel_context = match self.config.find_chain_token(campaign.channel.token) {
+                let channel_context = match self.config.find_chain_of(campaign.channel.token) {
                     Some(chain_of) => chain_of.with_channel(campaign.channel),
                     // Skip the current Channel as the Chain/Token is not configured
                     None => return (validators, channels),
@@ -416,7 +416,7 @@ impl<C: Unlocked + 'static> SentryApi<C> {
     pub async fn propagate(
         &self,
         channel_context: &ChainOf<Channel>,
-        messages: &[&MessageTypes],
+        messages: &[MessageTypes],
     ) -> Result<Vec<PropagationResult>, Error> {
         let chain_validators = self
             .propagate_to
@@ -470,21 +470,22 @@ async fn propagate_to<C: Unlocked>(
     timeout: u32,
     channel_id: ChannelId,
     (validator_id, validator): (ValidatorId, &Validator),
-    messages: &[&MessageTypes],
+    messages: &[MessageTypes],
 ) -> PropagationResult {
     let endpoint = validator
         .url
         .join(&format!("v5/channel/{}/validator-messages", channel_id))
         .expect("Should not error when creating endpoint url");
 
-    let mut body = HashMap::new();
-    body.insert("messages", messages);
+    let request_body = ValidatorMessagesCreateRequest {
+        messages: messages.to_vec(),
+    };
 
     let _response: SuccessResponse = client
         .request(Method::POST, endpoint)
         .timeout(Duration::from_millis(timeout.into()))
         .bearer_auth(&validator.token)
-        .json(&body)
+        .json(&request_body)
         .send()
         .await
         .map_err(|e| (validator_id, Error::Request(e)))?
@@ -536,7 +537,6 @@ pub mod channels {
     ) -> Result<ChannelListResponse, reqwest::Error> {
         let query = ChannelListQuery {
             page,
-            creator: None,
             validator: Some(validator),
         };
 
@@ -559,7 +559,7 @@ pub mod campaigns {
     use chrono::Utc;
     use futures::future::try_join_all;
     use primitives::{
-        sentry::campaign::{CampaignListQuery, CampaignListResponse, ValidatorParam},
+        sentry::campaign_list::{CampaignListQuery, CampaignListResponse, ValidatorParam},
         util::ApiUrl,
         Campaign, ValidatorId,
     };
@@ -758,7 +758,7 @@ mod test {
         let logger = discard_logger();
 
         let channel_context = config
-            .find_chain_token(DUMMY_CAMPAIGN.channel.token)
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
             .expect("Should find Dummy campaign token in config")
             .with_channel(DUMMY_CAMPAIGN.channel);
 

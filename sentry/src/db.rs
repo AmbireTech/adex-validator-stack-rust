@@ -14,14 +14,11 @@ pub mod accounting;
 pub mod analytics;
 pub mod campaign;
 mod channel;
-pub mod event_aggregate;
 pub mod spendable;
-mod validator_message;
+pub mod validator_message;
 
 pub use self::campaign::*;
 pub use self::channel::*;
-pub use self::event_aggregate::*;
-pub use self::validator_message::*;
 
 // Re-export the Postgres Config
 pub use tokio_postgres::Config as PostgresConfig;
@@ -139,6 +136,7 @@ pub async fn setup_migrations(environment: Environment) {
 }
 
 #[cfg(feature = "test-util")]
+#[cfg_attr(docsrs, doc(cfg(feature = "test-util")))]
 pub mod tests_postgres {
     use std::{
         ops::{Deref, DerefMut},
@@ -435,6 +433,7 @@ pub mod tests_postgres {
 }
 
 #[cfg(feature = "test-util")]
+#[cfg_attr(docsrs, doc(cfg(feature = "test-util")))]
 pub mod redis_pool {
 
     use dashmap::DashMap;

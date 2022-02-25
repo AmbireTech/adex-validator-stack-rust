@@ -7,8 +7,9 @@ spendable_find_limit = 200
 wait_time = 500
 
 msgs_find_limit = 10
-analytics_find_limit_v5 = 5000
-analytics_maxtime_v5 = 20000
+analytics_find_limit = 5000
+# in milliseconds
+analytics_maxtime = 20000
 
 heartbeat_time = 30000
 health_threshold_promilles = 950

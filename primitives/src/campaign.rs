@@ -31,6 +31,7 @@ mod campaign_id {
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     /// an Id of 16 bytes, (de)serialized as a `0x` prefixed hex
+    ///
     /// In this implementation of the `CampaignId` the value is generated from a `Uuid::new_v4().to_simple()`
     pub struct CampaignId([u8; 16]);
 

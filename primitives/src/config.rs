@@ -46,9 +46,12 @@ pub struct Config {
     pub spendable_find_limit: u32,
     pub wait_time: u32,
     pub msgs_find_limit: u32,
-    pub analytics_find_limit_v5: u32,
+    /// The maximum analytic results you can receive per request.
+    pub analytics_find_limit: u32,
+    /// A timeout to be used when collecting the Analytics for a request.
     /// In milliseconds
-    pub analytics_maxtime_v5: u32,
+    pub analytics_maxtime: u32,
+    /// The amount of time between heartbeats.
     /// In milliseconds
     pub heartbeat_time: u32,
     pub health_threshold_promilles: u32,
@@ -73,12 +76,12 @@ pub struct Config {
     /// The key of this map is a human-readable text of the Chain name
     /// for readability in the configuration file.
     ///
-    /// - To get the chain of a token address use [`Config::find_token_chain`].
+    /// - To get the chain of a token address use [`Config::find_chain_of()`].
     ///
-    /// - To get a chain RPC use [`Config::find_chain_rpc`].
+    /// - To get a [`ChainInfo`] only by a [`ChainId`] use [`Config::find_chain()`].
     ///
     /// **NOTE:** Make sure that a Token [`Address`] is unique across all Chains,
-    /// otherwise `Config::find_chain_token` will fetch only one of them and cause unexpected problems.
+    /// otherwise [`Config::find_chain_of()`] will fetch only one of them and cause unexpected problems.
     #[serde(rename = "chain")]
     pub chains: HashMap<String, ChainInfo>,
 }
@@ -99,7 +102,7 @@ impl Config {
     }
 
     /// Finds the pair of Chain & Token, given only a token [`Address`].
-    pub fn find_chain_token(&self, token: Address) -> Option<ChainOf<()>> {
+    pub fn find_chain_of(&self, token: Address) -> Option<ChainOf<()>> {
         self.chains.values().find_map(|chain_info| {
             chain_info
                 .tokens
