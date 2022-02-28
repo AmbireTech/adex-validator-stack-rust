@@ -76,7 +76,10 @@ pub mod postgres {
         };
         let mgr = Manager::from_config(config, NoTls, mgr_config);
 
-        Pool::new(mgr, 42)
+        Pool::builder(mgr)
+            .max_size(42)
+            .build()
+            .expect("Should build test postgres pool")
     });
 
     /// `POSTGRES_USER` environment variable - default: `postgres`
@@ -167,18 +170,6 @@ pub mod util {
     pub use api::ApiUrl;
 
     pub mod api;
-    pub mod tests {
-        use slog::{o, Discard, Drain, Logger};
-
-        pub mod prep_db;
-        pub mod time;
-
-        pub fn discard_logger() -> Logger {
-            let drain = Discard.fuse();
-
-            Logger::root(drain, o!())
-        }
-    }
 
     pub mod logging;
 }

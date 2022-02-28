@@ -17,13 +17,7 @@ pub enum Error {
 
 #[derive(Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[serde(transparent)]
-pub struct Address(
-    #[serde(
-        deserialize_with = "de::from_bytes_insensitive",
-        serialize_with = "SerHex::<StrictPfx>::serialize"
-    )]
-    [u8; 20],
-);
+pub struct Address(#[serde(deserialize_with = "de::from_bytes_insensitive")] [u8; 20]);
 
 impl Address {
     pub fn to_bytes(&self) -> [u8; 20] {
@@ -234,5 +228,53 @@ pub mod postgres {
         ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
             self.to_checksum().to_sql_checked(ty, out)
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_de_serialization_of_address() {
+        let prefixed_checksum = "0x80690751969B234697e9059e04ed72195c3507fa";
+        let prefixed_lower = prefixed_checksum.to_lowercase();
+        let no_prefix_checksum = &prefixed_checksum[2..];
+        let no_prefix_lower = no_prefix_checksum.to_lowercase();
+
+        let address = prefixed_checksum.parse::<Address>().expect("Valid Address");
+
+        // prefixed checksum
+        {
+            let json = serde_json::to_value(address).expect("Should serialize");
+
+            assert_eq!(
+                serde_json::Value::String(prefixed_checksum.to_string()),
+                json
+            );
+            let from_json = serde_json::from_value(json).expect("Should deserialize");
+
+            assert_eq!(address, from_json);
+        }
+
+        // prefixed lower
+        assert_eq!(
+            prefixed_lower.parse::<Address>().expect("Valid Address"),
+            address
+        );
+
+        // no prefix checksum
+        assert_eq!(
+            no_prefix_checksum
+                .parse::<Address>()
+                .expect("Valid Address"),
+            address
+        );
+
+        // no prefix lower case
+        assert_eq!(
+            no_prefix_lower.parse::<Address>().expect("Valid Address"),
+            address
+        );
     }
 }

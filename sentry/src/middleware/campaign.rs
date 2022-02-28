@@ -87,7 +87,7 @@ impl<C: Locked + 'static> Middleware<C> for CalledByCreator {
 
 #[cfg(test)]
 mod test {
-    use primitives::{util::tests::prep_db::DUMMY_CAMPAIGN, Campaign, ChainOf};
+    use primitives::{test_util::DUMMY_CAMPAIGN, Campaign, ChainOf};
 
     use crate::{
         db::{insert_campaign, insert_channel},

@@ -11,7 +11,7 @@ edition = "2021"
 
 [features]
 
-test-util = ["primitives/test-util", "adapter/test-util"]
+test-util = ["primitives/test-util", "adapter/test-util", "dashmap"]
 
 [dependencies]
 # Futures
@@ -22,19 +22,21 @@ async-trait = "^0.1"
 primitives = { path = "../primitives", features = ["postgres", "test-util"] }
 adapter = { version = "0.2", path = "../adapter", features = ["test-util"] }
 chrono = { version = "0.4", features = ["serde"] }
-dashmap = "4"
+# used for redis test pool
+dashmap = { version = "5", optional = true }
 hex = "0.4"
 # CLI
-clap = "^2.33"
+clap = { version = "3.1", features = ["cargo"] }
 # Server
 tokio = { version = "1", features = ["macros", "time", "rt-multi-thread"] }
 hyper = { version = "0.14", features = ["stream", "runtime", "http1", "server"] }
 regex = "1"
 # Database
-redis = { version = "0.20", features = ["aio", "tokio-comp"] }
-deadpool = "0.8.0"
-deadpool-postgres = "0.9.0"
-tokio-postgres = { version = "0.7.0", features = ["with-chrono-0_4", "with-serde_json-1"] }
+redis = { version = "0.21", features = ["aio", "tokio-comp"] }
+deadpool = "0.9"
+deadpool-postgres = "0.10"
+# Should be the same version as in `primitives` and `deadpool-postgres`!
+tokio-postgres = { version = "0.7", features = ["with-chrono-0_4", "with-serde_json-1"] }
 postgres-types = { version = "0.2.1", features = [
   "derive",
   "with-chrono-0_4",

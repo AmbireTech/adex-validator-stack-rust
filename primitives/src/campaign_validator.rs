@@ -9,7 +9,7 @@ pub trait Validator {
     fn validate(
         self,
         config: &Config,
-        validator_identity: &ValidatorId,
+        validator_identity: ValidatorId,
     ) -> Result<ChainOf<Campaign>, Error>;
 }
 
@@ -47,10 +47,10 @@ impl Validator for Campaign {
     fn validate(
         self,
         config: &Config,
-        validator_identity: &ValidatorId,
+        validator_identity: ValidatorId,
     ) -> Result<ChainOf<Campaign>, Error> {
         // check if the channel validators include our adapter identity
-        let whoami_validator = match self.find_validator(validator_identity) {
+        let whoami_validator = match self.find_validator(&validator_identity) {
             Some(role) => role.into_inner(),
             None => return Err(Validation::AdapterNotIncluded.into()),
         };
@@ -135,8 +135,9 @@ mod test {
     use super::*;
     use crate::{
         config::{self, GANACHE_CONFIG},
-        util::tests::prep_db::{
-            ADDRESSES, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, IDS,
+        test_util::{
+            ADVERTISER, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, FOLLOWER,
+            GUARDIAN, IDS, LEADER, PUBLISHER,
         },
         BigNum,
     };
@@ -154,16 +155,23 @@ mod test {
         let are_listed = all_validators_listed(&validators, &[]);
         assert!(are_listed);
         // no validators listed
-        let are_listed = all_validators_listed(&validators, &[IDS["user"], IDS["tester"]]);
+        let are_listed = all_validators_listed(&validators, &[IDS[&ADVERTISER], IDS[&GUARDIAN]]);
         assert!(!are_listed);
         // one validator listed
-        let are_listed =
-            all_validators_listed(&validators, &[IDS["user"], IDS["tester"], IDS["leader"]]);
+        let are_listed = all_validators_listed(
+            &validators,
+            &[IDS[&ADVERTISER], IDS[&GUARDIAN], IDS[&LEADER]],
+        );
         assert!(!are_listed);
         // both validators lister
         let are_listed = all_validators_listed(
             &validators,
-            &[IDS["user"], IDS["tester"], IDS["leader"], IDS["follower"]],
+            &[
+                IDS[&ADVERTISER],
+                IDS[&GUARDIAN],
+                IDS[&LEADER],
+                IDS[&FOLLOWER],
+            ],
         );
         assert!(are_listed);
     }
@@ -177,11 +185,11 @@ mod test {
         assert!(is_listed);
 
         // not listed
-        let is_listed = creator_listed(&campaign, &[ADDRESSES["tester"]]);
+        let is_listed = creator_listed(&campaign, &[*PUBLISHER]);
         assert!(!is_listed);
 
         // listed
-        let is_listed = creator_listed(&campaign, &[ADDRESSES["tester"], campaign.creator]);
+        let is_listed = creator_listed(&campaign, &[*PUBLISHER, campaign.creator]);
         assert!(is_listed);
     }
 
@@ -194,7 +202,7 @@ mod test {
             let mut config = GANACHE_CONFIG.clone();
             config.chains.clear();
 
-            let result = campaign.clone().validate(&config, &campaign.channel.leader);
+            let result = campaign.clone().validate(&config, campaign.channel.leader);
 
             assert!(matches!(
                 result,
@@ -207,7 +215,7 @@ mod test {
 
             let _campaign_context = campaign
                 .clone()
-                .validate(&config, &campaign.channel.leader)
+                .validate(&config, campaign.channel.leader)
                 .expect(
                     "Default development config should contain the dummy campaign.channel.token",
                 );
@@ -223,7 +231,7 @@ mod test {
             let campaign = DUMMY_CAMPAIGN.clone();
 
             let validation_error = campaign
-                .validate(&config, &IDS["tester"])
+                .validate(&config, IDS[&GUARDIAN])
                 .expect_err("Should trigger validation error");
             assert_eq!(
                 Error::Validation(Validation::AdapterNotIncluded),
@@ -237,7 +245,7 @@ mod test {
             campaign.active.to = Utc.ymd(2019, 1, 30).and_hms(0, 0, 0);
 
             let validation_error = campaign
-                .validate(&config, &IDS["leader"])
+                .validate(&config, IDS[&LEADER])
                 .expect_err("Should trigger validation error");
             assert_eq!(
                 Error::Validation(Validation::InvalidActiveTo),
@@ -249,10 +257,10 @@ mod test {
         {
             let campaign = DUMMY_CAMPAIGN.clone();
             let mut config = config::GANACHE_CONFIG.clone();
-            config.validators_whitelist = vec![IDS["leader"], IDS["tester"]];
+            config.validators_whitelist = vec![IDS[&LEADER], IDS[&GUARDIAN]];
 
             let validation_error = campaign
-                .validate(&config, &IDS["leader"])
+                .validate(&config, IDS[&LEADER])
                 .expect_err("Should trigger validation error");
             assert_eq!(
                 Error::Validation(Validation::UnlistedValidator),
@@ -264,10 +272,10 @@ mod test {
         {
             let campaign = DUMMY_CAMPAIGN.clone();
             let mut config = config::GANACHE_CONFIG.clone();
-            config.creators_whitelist = vec![ADDRESSES["tester"]];
+            config.creators_whitelist = vec![*PUBLISHER];
 
             let validation_error = campaign
-                .validate(&config, &IDS["leader"])
+                .validate(&config, IDS[&LEADER])
                 .expect_err("Should trigger validation error");
             assert_eq!(
                 Error::Validation(Validation::UnlistedCreator),
@@ -283,7 +291,7 @@ mod test {
                 .expect("Should parse");
 
             let validation_error = campaign
-                .validate(&config, &IDS["leader"])
+                .validate(&config, IDS[&LEADER])
                 .expect_err("Should trigger validation error");
             assert_eq!(
                 Error::Validation(Validation::UnlistedAsset),
@@ -297,7 +305,7 @@ mod test {
             campaign.budget = UnifiedNum::from_u64(0);
 
             let validation_error = campaign
-                .validate(&config, &IDS["leader"])
+                .validate(&config, IDS[&LEADER])
                 .expect_err("Should trigger validation error");
             assert_eq!(
                 Error::Validation(Validation::MinimumDepositNotMet),
@@ -324,7 +332,7 @@ mod test {
                 .expect("Should parse BigNum");
 
             let validation_error = campaign
-                .validate(&config, &IDS["leader"])
+                .validate(&config, IDS[&LEADER])
                 .expect_err("Should trigger validation error");
             assert_eq!(
                 Error::Validation(Validation::MinimumValidatorFeeNotMet),
@@ -344,10 +352,7 @@ mod test {
         // budget = total_fee - 1
         {
             let mut campaign = DUMMY_CAMPAIGN.clone();
-            let campaign_token = config
-                .find_chain_of(campaign.channel.token)
-                .unwrap()
-                .token;
+            let campaign_token = config.find_chain_of(campaign.channel.token).unwrap().token;
 
             // makes the sum of all validator fees = 2 * min token units for deposit
             campaign.validators = {
@@ -378,7 +383,7 @@ mod test {
             campaign.budget = sum_fees(&campaign.validators) - UnifiedNum::from(1);
 
             let validation_error = campaign
-                .validate(&config, &IDS["leader"])
+                .validate(&config, IDS[&LEADER])
                 .expect_err("Should trigger validation error");
             assert_eq!(
                 Error::Validation(Validation::FeeConstraintViolated),
@@ -390,10 +395,7 @@ mod test {
         {
             let mut campaign = DUMMY_CAMPAIGN.clone();
 
-            let campaign_token = config
-                .find_chain_of(campaign.channel.token)
-                .unwrap()
-                .token;
+            let campaign_token = config.find_chain_of(campaign.channel.token).unwrap().token;
 
             // makes the sum of all validator fees = 2 * min token units for deposit
             campaign.validators = {
@@ -424,7 +426,7 @@ mod test {
             campaign.budget = sum_fees(&campaign.validators);
 
             let validation_error = campaign
-                .validate(&config, &IDS["leader"])
+                .validate(&config, IDS[&LEADER])
                 .expect_err("Should trigger validation error");
             assert_eq!(
                 Error::Validation(Validation::FeeConstraintViolated),
@@ -436,20 +438,7 @@ mod test {
         {
             let campaign = DUMMY_CAMPAIGN.clone();
             let _campaign_context = campaign
-                .validate(&config, &IDS["leader"])
-                .expect("Should pass validation");
-        }
-    }
-
-    #[test]
-    fn test_valid_campaign() {
-        let config = config::GANACHE_CONFIG.clone();
-        // 1000000000000
-        // 10000000000000
-        {
-            let campaign = DUMMY_CAMPAIGN.clone();
-            let _campaign_context = campaign
-                .validate(&config, &IDS["leader"])
+                .validate(&config, IDS[&LEADER])
                 .expect("Should pass validation");
         }
     }

@@ -155,7 +155,7 @@ where
         .into_campaign()
         // Validate the campaign as soon as a valid JSON was passed.
         // This will validate the Context - Chain & Token are whitelisted!
-        .validate(&app.config, &app.adapter.whoami())
+        .validate(&app.config, app.adapter.whoami())
         .map_err(|err| ResponseError::FailedValidation(err.to_string()))?;
     let campaign = &campaign_context.context;
 
@@ -801,7 +801,7 @@ pub mod insert_events {
 
     #[cfg(test)]
     mod test {
-        use primitives::util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN};
+        use primitives::test_util::{DUMMY_CAMPAIGN, PUBLISHER};
         use redis::aio::MultiplexedConnection;
 
         use crate::db::{
@@ -913,7 +913,7 @@ pub mod insert_events {
                 .await
                 .expect("It should insert Channel");
 
-            let publisher = ADDRESSES["publisher"];
+            let publisher = *PUBLISHER;
 
             let leader = campaign.leader().unwrap();
             let follower = campaign.follower().unwrap();
@@ -992,7 +992,7 @@ mod test {
     use adapter::primitives::Deposit;
     use hyper::StatusCode;
     use primitives::{
-        util::tests::prep_db::{DUMMY_CAMPAIGN, IDS},
+        test_util::{DUMMY_CAMPAIGN, IDS, LEADER},
         BigNum, ValidatorId,
     };
 
@@ -1384,7 +1384,7 @@ mod test {
         {
             let auth = Auth {
                 era: 0,
-                uid: IDS["leader"],
+                uid: IDS[&LEADER],
                 chain: campaign_context.chain.clone(),
             };
 

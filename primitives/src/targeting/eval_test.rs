@@ -3,7 +3,7 @@ use chrono::{TimeZone, Utc};
 use super::*;
 use crate::{
     targeting::input,
-    util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, DUMMY_IPFS},
+    test_util::{DUMMY_CAMPAIGN, DUMMY_IPFS, LEADER},
     UnifiedMap,
 };
 
@@ -19,7 +19,7 @@ fn get_default_input() -> Input {
         global: input::Global {
             ad_slot_id: "ad_slot_id Value".to_string(),
             ad_slot_type: "ad_slot_type Value".to_string(),
-            publisher_id: ADDRESSES["leader"],
+            publisher_id: *LEADER,
             country: Some("bg".to_string()),
             event_type: "IMPRESSION".to_string(),
             seconds_since_epoch: Utc.ymd(2020, 11, 6).and_hms(12, 0, 0),
@@ -271,7 +271,7 @@ mod dsl_test {
     #[test]
     fn test_set_eval() {
         use crate::campaign::{Pricing, PricingBounds};
-        use crate::util::tests::prep_db::DUMMY_CAMPAIGN;
+        use crate::test_util::DUMMY_CAMPAIGN;
 
         let mut campaign = DUMMY_CAMPAIGN.clone();
         campaign.pricing_bounds = Some(PricingBounds {

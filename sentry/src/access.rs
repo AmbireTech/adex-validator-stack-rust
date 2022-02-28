@@ -172,7 +172,7 @@ mod test {
         config::GANACHE_CONFIG,
         event_submission::{RateLimit, Rule},
         sentry::Event,
-        util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, IDS},
+        test_util::{DUMMY_CAMPAIGN, FOLLOWER, IDS, PUBLISHER_2},
         Config, EventSubmission,
     };
 
@@ -205,7 +205,7 @@ mod test {
     fn get_impression_events(count: i8) -> Vec<Event> {
         (0..count)
             .map(|_| Event::Impression {
-                publisher: ADDRESSES["publisher2"],
+                publisher: *PUBLISHER_2,
                 ad_unit: None,
                 ad_slot: None,
                 referrer: None,
@@ -232,7 +232,7 @@ mod test {
 
         let auth = Auth {
             era: 0,
-            uid: IDS["follower"],
+            uid: IDS[&FOLLOWER],
             chain: chain_context.chain.clone(),
         };
 
@@ -293,7 +293,7 @@ mod test {
 
         let auth = Auth {
             era: 0,
-            uid: IDS["follower"],
+            uid: IDS[&FOLLOWER],
             chain: chain_context.chain.clone(),
         };
 
@@ -353,7 +353,7 @@ mod test {
 
         let auth = Auth {
             era: 0,
-            uid: IDS["follower"],
+            uid: IDS[&FOLLOWER],
             chain: chain_context.chain.clone(),
         };
 
@@ -396,7 +396,7 @@ mod test {
 
         let auth = Auth {
             era: 0,
-            uid: IDS["follower"],
+            uid: IDS[&FOLLOWER],
             chain: chain_context.chain.clone(),
         };
 
@@ -439,7 +439,7 @@ mod test {
 
         let auth = Auth {
             era: 0,
-            uid: IDS["follower"],
+            uid: IDS[&FOLLOWER],
             chain: chain_context.chain.clone(),
         };
 
@@ -479,7 +479,7 @@ mod test {
 
         let auth = Auth {
             era: 0,
-            uid: IDS["follower"],
+            uid: IDS[&FOLLOWER],
             chain: chain_context.chain.clone(),
         };
 
@@ -522,7 +522,7 @@ mod test {
 
         let auth = Auth {
             era: 0,
-            uid: IDS["follower"],
+            uid: IDS[&FOLLOWER],
             chain: chain_context.chain.clone(),
         };
 

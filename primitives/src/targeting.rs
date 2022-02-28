@@ -107,7 +107,7 @@ mod test {
     #[allow(clippy::float_cmp)]
     fn test_output_from_channel() {
         use crate::campaign::{Pricing, PricingBounds};
-        use crate::util::tests::prep_db::DUMMY_CAMPAIGN;
+        use crate::test_util::DUMMY_CAMPAIGN;
 
         let mut campaign = DUMMY_CAMPAIGN.clone();
         campaign.pricing_bounds = Some(PricingBounds {
