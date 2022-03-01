@@ -1,14 +1,19 @@
 //! Channel - `/v5/channel` routes
-//! 
+//!
 
 use crate::db::{
-    accounting::{get_all_accountings_for_channel, update_accounting, Side},
+    accounting::{
+        get_accounting, get_all_accountings_for_channel, spend_amount, update_accounting, Side,
+    },
     event_aggregate::{latest_approve_state_v5, latest_heartbeats, latest_new_state_v5},
     insert_channel, list_channels,
     spendable::{fetch_spendable, get_all_spendables_for_channel, update_spendable},
     DbPool,
 };
-use crate::{success_response, Application, ResponseError, RouteParams};
+use crate::{
+    campaign::fetch_campaign_ids_for_channel, success_response, Application, ResponseError,
+    RouteParams,
+};
 use adapter::{client::Locked, Adapter};
 use futures::future::try_join_all;
 use hyper::{Body, Request, Response};
@@ -17,7 +22,8 @@ use primitives::{
     config::TokenInfo,
     sentry::{
         channel_list::ChannelListQuery, AccountingResponse, AllSpendersQuery, AllSpendersResponse,
-        LastApproved, LastApprovedQuery, LastApprovedResponse, SpenderResponse, SuccessResponse,
+        ChannelPayBody, LastApproved, LastApprovedQuery, LastApprovedResponse, SpenderResponse,
+        SuccessResponse,
     },
     spender::{Spendable, Spender},
     validator::NewState,
@@ -379,6 +385,83 @@ pub async fn get_accounting_for_channel<C: Locked + 'static>(
     Ok(success_response(serde_json::to_string(&res)?))
 }
 
+pub async fn channel_payout<C: Locked + 'static>(
+    req: Request<Body>,
+    app: &Application<C>,
+) -> Result<Response<Body>, ResponseError> {
+    let channel = req
+        .extensions()
+        .get::<Channel>()
+        .expect("Request should have Channel")
+        .to_owned();
+
+    let body = hyper::body::to_bytes(req.into_body()).await?;
+
+    let body = serde_json::from_slice::<ChannelPayBody>(&body)
+        .map_err(|e| ResponseError::FailedValidation(e.to_string()))?;
+
+    let channel_campaigns =
+        fetch_campaign_ids_for_channel(&app.pool, &channel.id(), app.config.campaigns_find_limit)
+            .await?;
+
+    let campaigns_remaining_sum = app
+        .campaign_remaining
+        .get_multiple(channel_campaigns.as_slice())
+        .await?
+        .iter()
+        .sum::<Option<UnifiedNum>>()
+        .ok_or_else(|| ResponseError::BadRequest(
+            "Couldn't sum remaining amount for all campaigns".to_string(),
+        ))?;
+
+    // A campaign is closed when its remaining == 0
+    // therefore for all campaigns for a channel to be closed their total remaining sum should be 0
+    if campaigns_remaining_sum.ge(&UnifiedNum::from_u64(0)) {
+        return Err(ResponseError::BadRequest(
+            "Not all campaigns are closed!".to_string(),
+        ));
+    }
+
+    let mut unchecked_balances: Balances<UncheckedState> = Balances::default();
+    for (address, amount) in body.payouts {
+        let accounting =
+            get_accounting(app.pool.clone(), channel.id(), address, Side::Spender).await?;
+        match accounting {
+            Some(accounting) => {
+                // We need to check if the amount this spender has is available for withdrawal
+                if accounting.amount.lt(&amount) {
+                    return Err(ResponseError::BadRequest(format!(
+                        "Spender amount for {} is less than the requested withdrawal amount",
+                        address
+                    )));
+                }
+                // If so, we add it to the earner balances for the same address
+                unchecked_balances
+                    .earners
+                    .insert(accounting.address, accounting.amount);
+            }
+            None => {
+                return Err(ResponseError::BadRequest(
+                    "No accounting earner entry for channel/address pair".to_string(),
+                ));
+            }
+        }
+    }
+
+    let balances = match unchecked_balances.check() {
+        Ok(balances) => balances,
+        Err(error) => {
+            error!(&app.logger, "{}", &error; "module" => "channel_payout");
+            return Err(ResponseError::FailedValidation(
+                "Earners sum is not equal to spenders sum for channel".to_string(),
+            ));
+        }
+    };
+
+    let res = spend_amount(app.pool.clone(), channel.id(), balances).await?;
+
+    Ok(success_response(serde_json::to_string(&res)?))
+}
 /// [`Channel`] [validator messages](primitives::validator::MessageTypes) routes
 /// starting with `/v5/channel/0xXXX.../validator-messages`
 ///
@@ -522,7 +605,7 @@ pub mod validator_message {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::db::{accounting::spend_amount, insert_channel};
+    use crate::db::insert_channel;
     use crate::test_util::setup_dummy_app;
     use adapter::primitives::Deposit;
     use hyper::StatusCode;

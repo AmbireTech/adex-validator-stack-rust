@@ -27,7 +27,9 @@ pub async fn heartbeat<C: Unlocked + 'static>(
     iface: &SentryApi<C>,
     channel: Channel,
 ) -> Result<HeartbeatStatus, Error> {
-    let validator_message_response = iface.get_our_latest_msg(channel.id(), &["Heartbeat"]).await?;
+    let validator_message_response = iface
+        .get_our_latest_msg(channel.id(), &["Heartbeat"])
+        .await?;
     let heartbeat_msg = match validator_message_response {
         Some(MessageTypes::Heartbeat(heartbeat)) => Some(heartbeat),
         _ => None,

@@ -9,6 +9,7 @@ use tokio_postgres::{
 };
 
 use super::{DbPool, PoolError};
+use serde::Serialize;
 use thiserror::Error;
 
 static UPDATE_ACCOUNTING_STATEMENT: &str = "INSERT INTO accounting(channel_id, side, address, amount, updated, created) VALUES($1, $2, $3, $4, $5, $6) ON CONFLICT ON CONSTRAINT accounting_pkey DO UPDATE SET amount = accounting.amount + $4, updated = $6 WHERE accounting.channel_id = $1 AND accounting.side = $2 AND accounting.address = $3 RETURNING channel_id, side, address, amount, updated, created";
@@ -27,7 +28,7 @@ impl From<tokio_postgres::Error> for Error {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Accounting {
     pub channel_id: ChannelId,
     pub side: Side,
@@ -50,7 +51,7 @@ impl From<&Row> for Accounting {
     }
 }
 
-#[derive(Debug, Clone, Copy, ToSql, FromSql, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, ToSql, FromSql, PartialEq, Eq, Serialize)]
 #[postgres(name = "accountingside")]
 pub enum Side {
     Earner,

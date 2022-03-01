@@ -591,6 +591,11 @@ pub struct AllSpendersQuery {
     pub page: u64,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ChannelPayBody {
+    pub payouts: HashMap<Address, UnifiedNum>,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ValidatorMessage {
     pub from: ValidatorId,
