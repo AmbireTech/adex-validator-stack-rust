@@ -1,6 +1,8 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
+// TODO: Remove once stabled and upstream num::Integer::div_floor(...) is fixed
+#[allow(unstable_name_collisions)]
 
 use std::{error, fmt};
 
