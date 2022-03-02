@@ -1,7 +1,7 @@
 use crate::{
     db::{get_channel_by_id, get_channel_by_id_and_validator},
     middleware::Middleware,
-    Application, ResponseError, RouteParams,
+    Application, Auth, ResponseError, RouteParams,
 };
 use adapter::client::Locked;
 use futures::future::{BoxFuture, FutureExt};
@@ -45,7 +45,20 @@ fn channel_load<C: Locked>(
             .await?
             .ok_or(ResponseError::NotFound)?;
 
-        req.extensions_mut().insert(channel);
+        let channel_context = app.config.find_chain_of(channel.token).ok_or(ResponseError::FailedValidation("Channel token is not whitelisted in this validator".into()))?.with_channel(channel);
+
+        // If this is an authenticated call
+        // Check if the Channel context (Chain Id) aligns with the Authentication token Chain id
+        match req.extensions().get::<Auth>() {
+            // If Chain Ids differ, the requester hasn't generated Auth token
+            // to access the Channel in it's Chain Id.
+            Some(auth) if auth.chain.chain_id != channel_context.chain.chain_id => {
+                return Err(ResponseError::Forbidden("Authentication token is generated for different Chain and differs from the Channel's Chain".into()))
+            }
+            _ => {},
+        }
+
+        req.extensions_mut().insert(channel_context);
 
         Ok(req)
     }

@@ -2,7 +2,7 @@ use crate::db::{DbPool, PoolError, TotalCount};
 use chrono::{DateTime, Utc};
 use primitives::{
     sentry::{
-        campaign::{CampaignListResponse, ValidatorParam},
+        campaign_list::{CampaignListResponse, ValidatorParam},
         Pagination,
     },
     Address, Campaign, CampaignId, ChannelId,
@@ -326,7 +326,7 @@ mod campaign_remaining {
 
     #[cfg(test)]
     mod test {
-        use primitives::util::tests::prep_db::DUMMY_CAMPAIGN;
+        use primitives::test_util::DUMMY_CAMPAIGN;
 
         use crate::db::redis_pool::TESTS_POOL;
 
@@ -505,10 +505,11 @@ mod test {
         campaign,
         campaign::Validators,
         event_submission::{RateLimit, Rule},
-        sentry::campaign_create::ModifyCampaign,
+        sentry::campaign_modify::ModifyCampaign,
         targeting::Rules,
-        util::tests::prep_db::{
-            ADDRESSES, DUMMY_AD_UNITS, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER, IDS,
+        test_util::{
+            ADVERTISER, ADVERTISER_2, CREATOR, DUMMY_AD_UNITS, DUMMY_CAMPAIGN,
+            DUMMY_VALIDATOR_FOLLOWER, FOLLOWER, IDS, LEADER,
         },
         EventSubmission, UnifiedNum, ValidatorDesc, ValidatorId,
     };
@@ -611,7 +612,7 @@ mod test {
 
         let campaign = DUMMY_CAMPAIGN.clone();
         let mut channel_with_different_leader = DUMMY_CAMPAIGN.channel;
-        channel_with_different_leader.leader = IDS["user"];
+        channel_with_different_leader.leader = IDS[&ADVERTISER_2];
 
         insert_channel(&database, DUMMY_CAMPAIGN.channel)
             .await
@@ -627,7 +628,7 @@ mod test {
         // campaign with a different creator
         let mut campaign_new_creator = DUMMY_CAMPAIGN.clone();
         campaign_new_creator.id = CampaignId::new();
-        campaign_new_creator.creator = ADDRESSES["tester"];
+        campaign_new_creator.creator = *ADVERTISER;
         campaign_new_creator.created = Utc.ymd(2019, 2, 1).and_hms(7, 0, 0); // 1 year before previous
 
         let mut campaign_new_leader = DUMMY_CAMPAIGN.clone();
@@ -663,7 +664,7 @@ mod test {
             &database.pool,
             0,
             2,
-            Some(ADDRESSES["creator"]),
+            Some(*CREATOR),
             None,
             &DUMMY_CAMPAIGN.created,
         )
@@ -679,7 +680,7 @@ mod test {
             &database.pool,
             2,
             2,
-            Some(ADDRESSES["creator"]),
+            Some(*CREATOR),
             None,
             &DUMMY_CAMPAIGN.created,
         )
@@ -692,7 +693,7 @@ mod test {
             &database.pool,
             4,
             2,
-            Some(ADDRESSES["creator"]),
+            Some(*CREATOR),
             None,
             &DUMMY_CAMPAIGN.created,
         )
@@ -705,7 +706,7 @@ mod test {
             &database.pool,
             0,
             2,
-            Some(ADDRESSES["tester"]),
+            Some(*ADVERTISER),
             None,
             &DUMMY_CAMPAIGN.created,
         )
@@ -719,7 +720,7 @@ mod test {
             0,
             5,
             None,
-            Some(ValidatorParam::Validator(IDS["follower"])),
+            Some(ValidatorParam::Validator(IDS[&FOLLOWER])),
             &DUMMY_CAMPAIGN.created,
         )
         .await
@@ -740,7 +741,7 @@ mod test {
             0,
             5,
             None,
-            Some(ValidatorParam::Leader(IDS["leader"])),
+            Some(ValidatorParam::Leader(IDS[&LEADER])),
             &DUMMY_CAMPAIGN.created,
         )
         .await
@@ -760,7 +761,7 @@ mod test {
             0,
             5,
             None,
-            Some(ValidatorParam::Leader(IDS["user"])),
+            Some(ValidatorParam::Leader(IDS[&ADVERTISER_2])),
             &DUMMY_CAMPAIGN.created,
         )
         .await
@@ -773,7 +774,7 @@ mod test {
             0,
             5,
             None,
-            Some(ValidatorParam::Leader(IDS["follower"])),
+            Some(ValidatorParam::Leader(IDS[&FOLLOWER])),
             &DUMMY_CAMPAIGN.created,
         )
         .await
@@ -785,8 +786,8 @@ mod test {
             &database.pool,
             0,
             5,
-            Some(ADDRESSES["creator"]),
-            Some(ValidatorParam::Leader(IDS["leader"])),
+            Some(*CREATOR),
+            Some(ValidatorParam::Leader(IDS[&LEADER])),
             &DUMMY_CAMPAIGN.created,
         )
         .await

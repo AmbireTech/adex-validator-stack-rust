@@ -1,7 +1,7 @@
 use self::campaign::FullCampaign;
 
 use super::{Error, Value};
-use crate::{Address, ToETHChecksum, IPFS};
+use crate::{Address, IPFS};
 use chrono::{serde::ts_seconds, DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -160,7 +160,7 @@ impl GetField for Global {
         match field {
             field::Global::AdSlotId => Some(Value::String(self.ad_slot_id.clone())),
             field::Global::AdSlotType => Some(Value::String(self.ad_slot_type.clone())),
-            field::Global::PublisherId => Some(Value::String(self.publisher_id.to_checksum())),
+            field::Global::PublisherId => Some(Value::String(self.publisher_id.to_string())),
             field::Global::Country => self.country.clone().map(Value::String),
             field::Global::EventType => Some(Value::String(self.event_type.clone())),
             field::Global::SecondsSinceEpoch => {
@@ -238,10 +238,8 @@ pub mod campaign {
         fn get(&self, field: &Self::Field) -> Self::Output {
             match field {
                 field::Campaign::AdvertiserId => Some(Value::String(match self {
-                    Get::Getter(FullCampaign { campaign, .. }) => {
-                        campaign.creator.to_hex_prefixed()
-                    }
-                    Get::Value(Values { advertiser_id, .. }) => advertiser_id.to_hex_prefixed(),
+                    Get::Getter(FullCampaign { campaign, .. }) => campaign.creator.to_string(),
+                    Get::Value(Values { advertiser_id, .. }) => advertiser_id.to_string(),
                 })),
                 field::Campaign::CampaignId => Some(Value::String(match self {
                     Get::Getter(FullCampaign { campaign, .. }) => campaign.id.to_hex_prefixed(),
@@ -371,8 +369,9 @@ pub mod balances {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::test_util::{LEADER, PUBLISHER};
     pub use crate::{
-        util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN as CAMPAIGN, DUMMY_IPFS as IPFS},
+        test_util::{DUMMY_CAMPAIGN as CAMPAIGN, DUMMY_IPFS as IPFS},
         AdUnit, UnifiedMap,
     };
     use chrono::{TimeZone, Utc};
@@ -387,7 +386,7 @@ mod test {
             "adView.navigatorLanguage": "en",
             "adSlotId": "QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR",
             "adSlotType": "legacy_300x100",
-            "publisherId": "0xB7d3F81E857692d13e9D63b232A90F4A1793189E",
+            "publisherId": "0xE882ebF439207a70dDcCb39E13CA8506c9F45fD9",
             "country": "BG",
             "eventType": "IMPRESSION",
             // 06/06/2020 @ 12:00pm (UTC)
@@ -396,7 +395,7 @@ mod test {
             "userAgentBrowserFamily": "Firefox",
             // Global scope, accessible everywhere, campaign-dependant
             "adUnitId": "Qmasg8FrbuSQpjFu3kRnZF9beg8rEBFrqgi1uXDRwCbX5f",
-            "advertiserId": "0x033ed90e0fec3f3ea1c9b005c724d704501e0196",
+            "advertiserId": "0xaCBaDA2d5830d1875ae3D2de207A1363B316Df2F",
             "campaignId": "0x936da01f9abd4d9d80c702af85c822a8",
             "campaignTotalSpent": "40",
             "campaignSecondsActive": 40633521,
@@ -413,12 +412,9 @@ mod test {
 
         let actual_date = Utc.ymd(2020, 6, 6).and_hms(12, 0, 0);
 
-        let balances: UnifiedMap = vec![
-            (ADDRESSES["publisher"], 30.into()),
-            (ADDRESSES["leader"], 10.into()),
-        ]
-        .into_iter()
-        .collect();
+        let balances: UnifiedMap = vec![(*PUBLISHER, 30.into()), (*LEADER, 10.into())]
+            .into_iter()
+            .collect();
 
         let full_input = Input {
             ad_view: Some(AdView {
@@ -429,7 +425,7 @@ mod test {
             global: Global {
                 ad_slot_id: IPFS[0].to_string(),
                 ad_slot_type: "legacy_300x100".into(),
-                publisher_id: ADDRESSES["publisher"],
+                publisher_id: *PUBLISHER,
                 country: Some("BG".into()),
                 event_type: "IMPRESSION".into(),
                 seconds_since_epoch: actual_date,
@@ -458,7 +454,7 @@ mod test {
             })),
             balances: Some(Get::Getter(balances::Getter {
                 balances,
-                publisher_id: ADDRESSES["publisher"],
+                publisher_id: *PUBLISHER,
             })),
             ad_unit_id: Some(IPFS[1]),
             ad_slot: Some(AdSlot {

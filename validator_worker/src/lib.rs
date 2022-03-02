@@ -1,6 +1,6 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
-#![allow(deprecated)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 use adapter::util::{get_balance_leaf, get_signable_state_root, BalanceLeafError};
 use primitives::{
@@ -75,17 +75,30 @@ fn get_state_root_hash(
 mod test {
     use super::*;
 
-    use primitives::util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN, DUMMY_CHANNEL_ID};
+    use primitives::{
+        channel::Nonce,
+        test_util::{CREATOR, FOLLOWER, GUARDIAN, IDS, LEADER, PUBLISHER},
+        Channel,
+    };
 
     #[test]
     // TODO: Double check this test - encoded value! after introducing `spenders` ("spender", address, amount)
     fn get_state_root_hash_returns_correct_hash() {
-        let channel = DUMMY_CAMPAIGN.channel;
+        let channel = Channel {
+            leader: IDS[&LEADER],
+            follower: IDS[&FOLLOWER],
+            guardian: IDS[&GUARDIAN].to_address(),
+            // DAI on goerli
+            token: "0x73967c6a0904aa032c103b4104747e88c566b1a2"
+                .parse()
+                .expect("Valid DAI token address"),
+            nonce: Nonce::from(987_654_321_u32),
+        };
 
         let mut balances = Balances::<CheckedState>::default();
 
         balances
-            .spend(ADDRESSES["tester"], ADDRESSES["publisher"], 3.into())
+            .spend(*CREATOR, *PUBLISHER, 3.into())
             .expect("Should spend amount successfully");
 
         // 18 - DAI
@@ -93,7 +106,7 @@ mod test {
             get_state_root_hash(channel.id(), &balances, 18).expect("should get state root hash");
 
         assert_eq!(
-            "b80c1ac35ca5a6cf99996bfaaf0a9b1b446ed6f0157c9102e7b2d035519ae03d",
+            "15be990a567fe035369e3c308ca28d84a944a8acba484634249c0c4259d17162",
             hex::encode(actual_hash)
         );
     }
@@ -103,17 +116,19 @@ mod test {
     /// we re-use it in order to double check if we haven't change anything with the `get_state_root_hash()` changes
     /// when we introduced `spenders` `("spender", address, amount)` & `UnifiedNum`
     fn get_state_root_hash_returns_correct_hash_for_added_address_to_spenders() {
-        let channel = *DUMMY_CHANNEL_ID;
+        let channel = "061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088"
+            .parse()
+            .expect("Valid ChannelId");
 
         let mut balances = Balances::<CheckedState>::default();
-        balances.add_earner(ADDRESSES["publisher"]);
+        balances.add_earner(*PUBLISHER);
 
         // 18 - DAI
         let actual_hash =
             get_state_root_hash(channel, &balances, 18).expect("should get state root hash");
 
         assert_eq!(
-            "4fad5375c3ef5f8a9d23a8276fed0151164dea72a5891cec8b43e1d190ed430e",
+            "7cca99ab2dfa751aaf53b8d52ca903f2095d06879f86a8c383294d15b797912c",
             hex::encode(actual_hash)
         );
     }

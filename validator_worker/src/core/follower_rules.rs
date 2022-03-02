@@ -42,7 +42,7 @@ pub fn get_health(
 
 #[cfg(test)]
 mod test {
-    use primitives::util::tests::prep_db::ADDRESSES;
+    use primitives::test_util::{PUBLISHER, PUBLISHER_2};
 
     use super::*;
 
@@ -63,9 +63,7 @@ mod test {
 
     #[test]
     fn is_valid_transition_a_valid_transition() {
-        let next = vec![(ADDRESSES["publisher"], 100.into())]
-            .into_iter()
-            .collect();
+        let next = vec![(*PUBLISHER, 100.into())].into_iter().collect();
 
         assert!(
             is_valid_transition(UnifiedNum::from_u64(100), &UnifiedMap::default(), &next)
@@ -76,12 +74,9 @@ mod test {
 
     #[test]
     fn is_valid_transition_more_funds_than_all_spenders_sum() {
-        let next = vec![
-            (ADDRESSES["publisher"], 51.into()),
-            (ADDRESSES["publisher2"], 50.into()),
-        ]
-        .into_iter()
-        .collect();
+        let next = vec![(*PUBLISHER, 51.into()), (*PUBLISHER_2, 50.into())]
+            .into_iter()
+            .collect();
 
         assert!(
             !is_valid_transition(UnifiedNum::from_u64(100), &UnifiedMap::default(), &next)
@@ -92,13 +87,9 @@ mod test {
 
     #[test]
     fn is_valid_transition_single_value_is_lower() {
-        let prev = vec![(ADDRESSES["publisher"], 55.into())]
-            .into_iter()
-            .collect();
+        let prev = vec![(*PUBLISHER, 55.into())].into_iter().collect();
 
-        let next = vec![(ADDRESSES["publisher"], 54.into())]
-            .into_iter()
-            .collect();
+        let next = vec![(*PUBLISHER, 54.into())].into_iter().collect();
 
         assert!(
             !is_valid_transition(UnifiedNum::from_u64(100), &prev, &next).expect("No overflow"),
@@ -108,16 +99,11 @@ mod test {
 
     #[test]
     fn is_valid_transition_a_value_is_lower_but_overall_sum_is_higher() {
-        let prev = vec![(ADDRESSES["publisher"], 55.into())]
+        let prev = vec![(*PUBLISHER, 55.into())].into_iter().collect();
+
+        let next = vec![(*PUBLISHER, 54.into()), (*PUBLISHER_2, 3.into())]
             .into_iter()
             .collect();
-
-        let next = vec![
-            (ADDRESSES["publisher"], 54.into()),
-            (ADDRESSES["publisher2"], 3.into()),
-        ]
-        .into_iter()
-        .collect();
 
         assert!(
             !is_valid_transition(UnifiedNum::from_u64(100), &prev, &next).expect("No overflow"),
@@ -127,16 +113,11 @@ mod test {
 
     #[test]
     fn is_valid_transition_overall_sum_is_lower() {
-        let prev = vec![
-            (ADDRESSES["publisher"], 54.into()),
-            (ADDRESSES["publisher2"], 3.into()),
-        ]
-        .into_iter()
-        .collect();
-
-        let next = vec![(ADDRESSES["publisher"], 54.into())]
+        let prev = vec![(*PUBLISHER, 54.into()), (*PUBLISHER_2, 3.into())]
             .into_iter()
             .collect();
+
+        let next = vec![(*PUBLISHER, 54.into())].into_iter().collect();
 
         assert!(
             !is_valid_transition(UnifiedNum::from_u64(100), &prev, &next).expect("No overflow"),
@@ -146,16 +127,11 @@ mod test {
 
     #[test]
     fn is_valid_transition_overall_sum_is_the_same_but_we_remove_an_entry() {
-        let prev = vec![
-            (ADDRESSES["publisher"], 54.into()),
-            (ADDRESSES["publisher2"], 3.into()),
-        ]
-        .into_iter()
-        .collect();
-
-        let next = vec![(ADDRESSES["publisher"], 57.into())]
+        let prev = vec![(*PUBLISHER, 54.into()), (*PUBLISHER_2, 3.into())]
             .into_iter()
             .collect();
+
+        let next = vec![(*PUBLISHER, 57.into())].into_iter().collect();
 
         assert!(
             !is_valid_transition(UnifiedNum::from_u64(100), &prev, &next).expect("No overflow"),
@@ -166,9 +142,7 @@ mod test {
     #[test]
     fn get_health_the_approved_balance_tree_gte_our_accounting_is_healthy() {
         let all_spenders_sum = UnifiedNum::from(50);
-        let our = vec![(ADDRESSES["publisher"], 50.into())]
-            .into_iter()
-            .collect();
+        let our = vec![(*PUBLISHER, 50.into())].into_iter().collect();
         assert!(
             get_health(all_spenders_sum, &our, &our).expect("Should not overflow")
                 >= HEALTH_THRESHOLD
@@ -178,9 +152,7 @@ mod test {
             get_health(
                 all_spenders_sum,
                 &our,
-                &vec![(ADDRESSES["publisher"], 60.into())]
-                    .into_iter()
-                    .collect()
+                &vec![(*PUBLISHER, 60.into())].into_iter().collect()
             )
             .expect("Should not overflow")
                 >= HEALTH_THRESHOLD
@@ -189,9 +161,7 @@ mod test {
 
     #[test]
     fn get_health_the_approved_balance_tree_is_positive_our_accounting_is_0_and_it_is_healthy() {
-        let approved = vec![(ADDRESSES["publisher"], 50.into())]
-            .into_iter()
-            .collect();
+        let approved = vec![(*PUBLISHER, 50.into())].into_iter().collect();
 
         assert!(
             get_health(UnifiedNum::from(50), &UnifiedMap::default(), &approved)
@@ -207,12 +177,8 @@ mod test {
         assert!(
             get_health(
                 all_spenders_sum,
-                &vec![(ADDRESSES["publisher"], 80.into())]
-                    .into_iter()
-                    .collect(),
-                &vec![(ADDRESSES["publisher"], 79.into())]
-                    .into_iter()
-                    .collect()
+                &vec![(*PUBLISHER, 80.into())].into_iter().collect(),
+                &vec![(*PUBLISHER, 79.into())].into_iter().collect()
             )
             .expect("Should not overflow")
                 >= HEALTH_THRESHOLD
@@ -221,12 +187,8 @@ mod test {
         assert!(
             get_health(
                 all_spenders_sum,
-                &vec![(ADDRESSES["publisher"], 2.into())]
-                    .into_iter()
-                    .collect(),
-                &vec![(ADDRESSES["publisher"], 1.into())]
-                    .into_iter()
-                    .collect()
+                &vec![(*PUBLISHER, 2.into())].into_iter().collect(),
+                &vec![(*PUBLISHER, 1.into())].into_iter().collect()
             )
             .expect("Should not overflow")
                 >= HEALTH_THRESHOLD
@@ -238,12 +200,8 @@ mod test {
         assert!(
             get_health(
                 UnifiedNum::from(80),
-                &vec![(ADDRESSES["publisher"], 80.into())]
-                    .into_iter()
-                    .collect(),
-                &vec![(ADDRESSES["publisher"], 70.into())]
-                    .into_iter()
-                    .collect()
+                &vec![(*PUBLISHER, 80.into())].into_iter().collect(),
+                &vec![(*PUBLISHER, 70.into())].into_iter().collect()
             )
             .expect("Should not overflow")
                 < HEALTH_THRESHOLD
@@ -257,10 +215,18 @@ mod test {
         assert!(
             get_health(
                 all_spenders_sum,
-                &vec![(ADDRESSES["publisher"], 80.into())]
-                    .into_iter()
-                    .collect(),
-                &vec![(ADDRESSES["publisher2"], 80.into())]
+                &vec![(*PUBLISHER, 80.into())].into_iter().collect(),
+                &vec![(*PUBLISHER_2, 80.into())].into_iter().collect()
+            )
+            .expect("Should not overflow")
+                < HEALTH_THRESHOLD
+        );
+
+        assert!(
+            get_health(
+                all_spenders_sum,
+                &vec![(*PUBLISHER, 80.into())].into_iter().collect(),
+                &vec![(*PUBLISHER_2, 40.into()), (*PUBLISHER, 40.into())]
                     .into_iter()
                     .collect()
             )
@@ -271,15 +237,10 @@ mod test {
         assert!(
             get_health(
                 all_spenders_sum,
-                &vec![(ADDRESSES["publisher"], 80.into())]
+                &vec![(*PUBLISHER, 80.into())].into_iter().collect(),
+                &vec![(*PUBLISHER_2, 20.into()), (*PUBLISHER, 60.into())]
                     .into_iter()
-                    .collect(),
-                &vec![
-                    (ADDRESSES["publisher2"], 40.into()),
-                    (ADDRESSES["publisher"], 40.into())
-                ]
-                .into_iter()
-                .collect()
+                    .collect()
             )
             .expect("Should not overflow")
                 < HEALTH_THRESHOLD
@@ -288,32 +249,10 @@ mod test {
         assert!(
             get_health(
                 all_spenders_sum,
-                &vec![(ADDRESSES["publisher"], 80.into())]
+                &vec![(*PUBLISHER, 80.into())].into_iter().collect(),
+                &vec![(*PUBLISHER_2, 2.into()), (*PUBLISHER, 78.into())]
                     .into_iter()
-                    .collect(),
-                &vec![
-                    (ADDRESSES["publisher2"], 20.into()),
-                    (ADDRESSES["publisher"], 60.into())
-                ]
-                .into_iter()
-                .collect()
-            )
-            .expect("Should not overflow")
-                < HEALTH_THRESHOLD
-        );
-
-        assert!(
-            get_health(
-                all_spenders_sum,
-                &vec![(ADDRESSES["publisher"], 80.into())]
-                    .into_iter()
-                    .collect(),
-                &vec![
-                    (ADDRESSES["publisher2"], 2.into()),
-                    (ADDRESSES["publisher"], 78.into())
-                ]
-                .into_iter()
-                .collect()
+                    .collect()
             )
             .expect("Should not overflow")
                 >= HEALTH_THRESHOLD
@@ -322,15 +261,10 @@ mod test {
         assert!(
             get_health(
                 all_spenders_sum,
-                &vec![
-                    (ADDRESSES["publisher"], 100.into()),
-                    (ADDRESSES["publisher2"], 1.into())
-                ]
-                .into_iter()
-                .collect(),
-                &vec![(ADDRESSES["publisher"], 100.into())]
+                &vec![(*PUBLISHER, 100.into()), (*PUBLISHER_2, 1.into())]
                     .into_iter()
-                    .collect()
+                    .collect(),
+                &vec![(*PUBLISHER, 100.into())].into_iter().collect()
             )
             .expect("Should not overflow")
                 >= HEALTH_THRESHOLD

@@ -14,14 +14,11 @@ pub mod accounting;
 pub mod analytics;
 pub mod campaign;
 mod channel;
-pub mod event_aggregate;
 pub mod spendable;
-mod validator_message;
+pub mod validator_message;
 
 pub use self::campaign::*;
 pub use self::channel::*;
-pub use self::event_aggregate::*;
-pub use self::validator_message::*;
 
 // Re-export the Postgres Config
 pub use tokio_postgres::Config as PostgresConfig;
@@ -56,14 +53,17 @@ pub async fn redis_connection(
     client.get_multiplexed_async_connection().await
 }
 
-pub async fn postgres_connection(max_size: usize, config: tokio_postgres::Config) -> DbPool {
+pub async fn postgres_connection(
+    max_size: usize,
+    config: tokio_postgres::Config,
+) -> Result<DbPool, deadpool_postgres::BuildError> {
     let mgr_config = ManagerConfig {
         recycling_method: RecyclingMethod::Verified,
     };
 
     let manager = Manager::from_config(config, NoTls, mgr_config);
 
-    DbPool::new(manager, max_size)
+    DbPool::builder(manager).max_size(max_size).build()
 }
 
 /// Sets the migrations using the `POSTGRES_*` environment variables
@@ -139,38 +139,49 @@ pub async fn setup_migrations(environment: Environment) {
 }
 
 #[cfg(feature = "test-util")]
+#[cfg_attr(docsrs, doc(cfg(feature = "test-util")))]
 pub mod tests_postgres {
     use std::{
         ops::{Deref, DerefMut},
         sync::atomic::{AtomicUsize, Ordering},
     };
 
-    use deadpool::managed::{Manager as ManagerTrait, RecycleResult};
+    use deadpool::managed::{Manager as ManagerTrait, RecycleError, RecycleResult};
     use deadpool_postgres::ManagerConfig;
     use once_cell::sync::Lazy;
     use primitives::postgres::POSTGRES_CONFIG;
     use tokio_postgres::{NoTls, SimpleQueryMessage};
 
     use async_trait::async_trait;
+    use thiserror::Error;
 
     use super::{DbPool, PoolError};
 
     pub type Pool = deadpool::managed::Pool<Manager>;
 
-    pub static DATABASE_POOL: Lazy<Pool> = Lazy::new(|| create_pool("test"));
+    pub static DATABASE_POOL: Lazy<Pool> =
+        Lazy::new(|| create_pool("test").expect("Should create test pool"));
 
     /// we must have a duplication of the migration because of how migrant is handling migrations
     /// we need to separately setup test migrations
     pub static MIGRATIONS: &[&str] = &["20190806011140_initial-tables"];
 
-    fn create_pool(db_prefix: &str) -> Pool {
+    fn create_pool(db_prefix: &str) -> Result<Pool, Error> {
         let manager_config = ManagerConfig {
             // to guarantee that `is_closed()` & test query will be ran to determine bad connections
             recycling_method: deadpool_postgres::RecyclingMethod::Verified,
         };
-        let manager = Manager::new(POSTGRES_CONFIG.clone(), manager_config, db_prefix);
+        let manager = Manager::new(POSTGRES_CONFIG.clone(), manager_config, db_prefix)?;
 
-        Pool::new(manager, 15)
+        Ok(Pool::builder(manager)
+            .max_size(15)
+            .build()
+            .map_err(|err| match err {
+                deadpool::managed::BuildError::Backend(err) => err,
+                deadpool::managed::BuildError::NoRuntimeSpecified(message) => {
+                    Error::Build(deadpool::managed::BuildError::NoRuntimeSpecified(message))
+                }
+            })?)
     }
 
     /// A Database is used to isolate test runs from each other
@@ -215,6 +226,21 @@ pub mod tests_postgres {
         }
     }
 
+    /// Manager Error
+    #[derive(Debug, Error)]
+    pub enum Error {
+        #[error(transparent)]
+        Build(#[from] deadpool::managed::BuildError<tokio_postgres::Error>),
+        #[error(transparent)]
+        Pool(#[from] PoolError),
+    }
+
+    impl From<tokio_postgres::Error> for Error {
+        fn from(err: tokio_postgres::Error) -> Self {
+            Error::Pool(PoolError::Backend(err))
+        }
+    }
+
     /// Base Pool and Config are used to create a new DATABASE and later on
     /// create the actual connection to the database with default options set
     pub struct Manager {
@@ -230,16 +256,23 @@ pub mod tests_postgres {
             base_config: tokio_postgres::Config,
             manager_config: ManagerConfig,
             db_prefix: &str,
-        ) -> Self {
+        ) -> Result<Self, Error> {
             // We need to create the schema with a temporary connection, in order to use it for the real Test Pool
             let base_manager = deadpool_postgres::Manager::from_config(
                 base_config.clone(),
                 NoTls,
                 manager_config.clone(),
             );
-            let base_pool = deadpool_postgres::Pool::new(base_manager, 15);
+            let base_pool = deadpool_postgres::Pool::builder(base_manager)
+                .max_size(15)
+                .build()?;
 
-            Self::new_with_pool(base_pool, base_config, manager_config, db_prefix)
+            Ok(Self::new_with_pool(
+                base_pool,
+                base_config,
+                manager_config,
+                db_prefix,
+            ))
         }
 
         pub fn new_with_pool(
@@ -262,7 +295,7 @@ pub mod tests_postgres {
     impl ManagerTrait for Manager {
         type Type = Database;
 
-        type Error = PoolError;
+        type Error = Error;
 
         async fn create(&self) -> Result<Self::Type, Self::Error> {
             let pool_index = self.index.fetch_add(1, Ordering::SeqCst);
@@ -316,7 +349,17 @@ pub mod tests_postgres {
 
             let manager =
                 deadpool_postgres::Manager::from_config(config, NoTls, self.manager_config.clone());
-            let pool = deadpool_postgres::Pool::new(manager, 15);
+
+            // TODO: Fix error mapping
+            let pool = deadpool_postgres::Pool::builder(manager)
+                .max_size(15)
+                .build()
+                .map_err(|err| match err {
+                    deadpool::managed::BuildError::Backend(err) => PoolError::Backend(err),
+                    deadpool::managed::BuildError::NoRuntimeSpecified(_err) => {
+                        PoolError::NoRuntimeSpecified
+                    }
+                })?;
 
             // this will make sure the connection succeeds
             // Instead of making a connection the Pool returns directly.
@@ -340,16 +383,19 @@ pub mod tests_postgres {
                     self.manager_config.clone(),
                 );
 
-                deadpool_postgres::Pool::new(manager, 15)
+                deadpool_postgres::Pool::builder(manager)
+                    .max_size(15)
+                    .build()
+                    .map_err(|err| RecycleError::Backend(Error::Build(err)))?
             };
 
             let result = database
                 .pool
                 .get()
-                .await?
+                .await
+                .map_err(|err| RecycleError::Backend(Error::Pool(err)))?
                 .simple_query(queries)
                 .await
-                .map_err(PoolError::Backend)
                 .expect("Should not error");
             assert_eq!(2, result.len());
             assert!(matches!(result[0], SimpleQueryMessage::CommandComplete(..)));
@@ -387,7 +433,7 @@ pub mod tests_postgres {
         #[tokio::test]
         /// Does not use the `DATABASE_POOL` as other tests can interfere with the pool objects!
         async fn test_postgres_pool() {
-            let pool = create_pool("testing_pool");
+            let pool = create_pool("testing_pool").expect("Should create testing_pool");
 
             let database_1 = pool.get().await.expect("Should get");
             let status = pool.status();
@@ -435,6 +481,7 @@ pub mod tests_postgres {
 }
 
 #[cfg(feature = "test-util")]
+#[cfg_attr(docsrs, doc(cfg(feature = "test-util")))]
 pub mod redis_pool {
 
     use dashmap::DashMap;
@@ -453,8 +500,12 @@ pub mod redis_pool {
 
     pub type Pool = deadpool::managed::Pool<Manager>;
 
-    pub static TESTS_POOL: Lazy<Pool> =
-        Lazy::new(|| Pool::new(Manager::new(), Manager::CONNECTIONS.into()));
+    pub static TESTS_POOL: Lazy<Pool> = Lazy::new(|| {
+        Pool::builder(Manager::new())
+            .max_size(Manager::CONNECTIONS.into())
+            .build()
+            .expect("Should build Pools for tests")
+    });
 
     #[derive(Clone)]
     pub struct Database {

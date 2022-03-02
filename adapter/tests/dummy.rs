@@ -1,3 +1,5 @@
+use std::num::NonZeroU8;
+
 use adapter::{
     prelude::*,
     primitives::{Deposit, Session},
@@ -6,8 +8,9 @@ use adapter::{
 use async_trait::async_trait;
 
 use primitives::{
+    config::TokenInfo,
     test_util::{ADDRESS_1, DUMMY_CAMPAIGN},
-    Address, BigNum, Channel, ValidatorId,
+    Address, BigNum, Chain, ChainId, ChainOf, Channel, ValidatorId,
 };
 
 #[derive(Debug, Clone)]
@@ -41,7 +44,7 @@ impl Locked for Dummy {
 
     async fn get_deposit(
         &self,
-        _channel: &Channel,
+        _channel_context: &ChainOf<Channel>,
         _depositor_address: Address,
     ) -> Result<Deposit, crate::Error> {
         Ok(Deposit {
@@ -59,7 +62,7 @@ impl Unlocked for Dummy {
     }
 
     // requires Unlocked
-    fn get_auth(&self, intended_for: ValidatorId) -> Result<String, Error> {
+    fn get_auth(&self, _for_chain: ChainId, intended_for: ValidatorId) -> Result<String, Error> {
         Ok(intended_for.to_string())
     }
 }
@@ -76,13 +79,36 @@ impl Unlockable for Dummy {
 async fn main() {
     let dummy = Dummy { _whoami: () };
 
+    // A dummy Channel Context, with dummy Chain & Token
+    let channel_context = ChainOf {
+        context: DUMMY_CAMPAIGN.channel,
+        token: TokenInfo {
+            min_token_units_for_deposit: 1_u64.into(),
+            min_validator_fee: 1_u64.into(),
+            precision: NonZeroU8::new(18).unwrap(),
+            address: "0x6B83e7D6B72c098d48968441e0d05658dc17Adb9"
+                .parse()
+                .unwrap(),
+        },
+        chain: Chain {
+            chain_id: ChainId::new(1),
+            rpc: "http://dummy.com".parse().unwrap(),
+            outpace: "0x0000000000000000000000000000000000000000"
+                .parse()
+                .unwrap(),
+            sweeper: "0x0000000000000000000000000000000000000000"
+                .parse()
+                .unwrap(),
+        },
+    };
+
     // With new Locked Adapter
     {
         let locked_adapter = Adapter::new(dummy.clone());
 
         // Should be able to call get_deposit before unlocking!
         locked_adapter
-            .get_deposit(&DUMMY_CAMPAIGN.channel, *ADDRESS_1)
+            .get_deposit(&channel_context, *ADDRESS_1)
             .await
             .expect("Should get deposit");
 
@@ -96,7 +122,7 @@ async fn main() {
 
         // Should be able to call get_deposit after unlocking!
         unlocked_adapter
-            .get_deposit(&DUMMY_CAMPAIGN.channel, *ADDRESS_1)
+            .get_deposit(&channel_context, *ADDRESS_1)
             .await
             .expect("Should get deposit");
     }
@@ -107,7 +133,7 @@ async fn main() {
 
         // Should be able to call `get_deposit()` on unlocked adapter
         unlocked_adapter
-            .get_deposit(&DUMMY_CAMPAIGN.channel, *ADDRESS_1)
+            .get_deposit(&channel_context, *ADDRESS_1)
             .await
             .expect("Should get deposit");
 

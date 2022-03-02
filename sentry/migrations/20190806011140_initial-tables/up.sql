@@ -62,25 +62,6 @@ CREATE INDEX idx_validator_messages_msg_type ON validator_messages ((msg ->> 'ty
 
 CREATE INDEX idx_validator_messages_msg_state_root ON validator_messages ((msg ->> 'stateRoot'));
 
--- TODO: AIP#61 Alter Event Aggregates
--- CREATE TABLE event_aggregates (
---     channel_id varchar(66) NOT NULL, -- REFERENCES channels (id) ON DELETE RESTRICT,
---     created timestamp(2) with time zone NOT NULL DEFAULT NOW(),
---     event_type varchar(255) NOT NULL,
---     earner varchar(42),
---     -- todo: AIP#61 check the count and payout
---     count varchar NOT NULL,
---     payout varchar NOT NULL
--- );
--- CREATE INDEX idx_event_aggregates_created ON event_aggregates (created);
--- CREATE INDEX idx_event_aggregates_channel ON event_aggregates (channel_id);
--- CREATE INDEX idx_event_aggregates_event_type ON event_aggregates (event_type);
-CREATE AGGREGATE jsonb_object_agg (jsonb) (
-    SFUNC = 'jsonb_concat',
-    STYPE = jsonb,
-    INITCOND = '{}'
-);
-
 CREATE TYPE AccountingSide AS ENUM (
     'Earner',
     'Spender'

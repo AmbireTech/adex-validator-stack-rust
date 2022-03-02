@@ -18,14 +18,12 @@ use futures::future::try_join_all;
 use hyper::{Body, Request, Response};
 use primitives::{
     campaign_validator::Validator,
-    config::TokenInfo,
     sentry::{
-        campaign::CampaignListQuery,
-        campaign_create::{CreateCampaign, ModifyCampaign},
-        SuccessResponse,
+        campaign_create::CreateCampaign, campaign_list::CampaignListQuery,
+        campaign_modify::ModifyCampaign, SuccessResponse,
     },
     spender::Spendable,
-    Address, Campaign, CampaignId, Channel, ChannelId, Deposit, UnifiedNum,
+    Address, Campaign, CampaignId, ChainOf, Channel, ChannelId, Deposit, UnifiedNum,
 };
 use slog::error;
 use std::cmp::{max, Ordering};
@@ -70,20 +68,22 @@ pub enum LatestSpendableError {
 pub async fn update_latest_spendable<C>(
     adapter: &Adapter<C>,
     pool: &DbPool,
-    channel: Channel,
-    token: &TokenInfo,
+    channel_context: &ChainOf<Channel>,
     address: Address,
 ) -> Result<Spendable, LatestSpendableError>
 where
     C: Locked + 'static,
 {
-    let latest_deposit = adapter.get_deposit(&channel, address).await?;
+    let latest_deposit = adapter.get_deposit(&channel_context, address).await?;
 
     let spendable = Spendable {
         spender: address,
-        channel,
-        deposit: Deposit::<UnifiedNum>::from_precision(latest_deposit, token.precision.get())
-            .ok_or(LatestSpendableError::Overflow)?,
+        channel: channel_context.context,
+        deposit: Deposit::<UnifiedNum>::from_precision(
+            latest_deposit,
+            channel_context.token.precision.get(),
+        )
+        .ok_or(LatestSpendableError::Overflow)?,
     };
 
     Ok(update_spendable(pool.clone(), &spendable).await?)
@@ -91,14 +91,17 @@ where
 
 pub async fn fetch_campaign_ids_for_channel(
     pool: &DbPool,
-    channel_id: &ChannelId,
+    channel_id: ChannelId,
     limit: u32,
 ) -> Result<Vec<CampaignId>, ResponseError> {
-    let campaign_ids = get_campaign_ids_by_channel(pool, channel_id, limit.into(), 0).await?;
+    let campaign_ids = get_campaign_ids_by_channel(pool, &channel_id, limit.into(), 0).await?;
 
     let total_count = list_campaigns_total_count(
         pool,
-        (&["campaigns.channel_id = $1".to_string()], vec![channel_id]),
+        (
+            &["campaigns.channel_id = $1".to_string()],
+            vec![&channel_id],
+        ),
     )
     .await?;
 
@@ -115,7 +118,7 @@ pub async fn fetch_campaign_ids_for_channel(
         let other_pages: Vec<Vec<CampaignId>> = try_join_all((1..total_pages).map(|i| {
             get_campaign_ids_by_channel(
                 pool,
-                channel_id,
+                &channel_id,
                 limit.into(),
                 i.checked_mul(limit.into()).expect("TODO"),
             )
@@ -146,27 +149,21 @@ where
 
     let body = hyper::body::to_bytes(req.into_body()).await?;
 
-    let campaign = serde_json::from_slice::<CreateCampaign>(&body)
+    let campaign_context = serde_json::from_slice::<CreateCampaign>(&body)
         .map_err(|e| ResponseError::FailedValidation(e.to_string()))?
         // create the actual `Campaign` with a randomly generated `CampaignId` or the set `CampaignId`
-        .into_campaign();
-
-    // Validate the campaign as soon as a valid JSON was passed.
-    campaign
-        .validate(&app.config, &app.adapter.whoami())
+        .into_campaign()
+        // Validate the campaign as soon as a valid JSON was passed.
+        // This will validate the Context - Chain & Token are whitelisted!
+        .validate(&app.config, app.adapter.whoami())
         .map_err(|err| ResponseError::FailedValidation(err.to_string()))?;
+    let campaign = &campaign_context.context;
 
     if auth.uid.to_address() != campaign.creator {
         return Err(ResponseError::Forbidden(
             "Request not sent by campaign creator".to_string(),
         ));
     }
-
-    let token = app
-        .config
-        .token_address_whitelist
-        .get(&campaign.channel.token)
-        .ok_or_else(|| ResponseError::BadRequest("Channel token is not whitelisted".to_string()))?;
 
     // make sure that the Channel is available in the DB
     // insert Channel
@@ -192,8 +189,7 @@ where
         let latest_spendable = update_latest_spendable(
             &app.adapter,
             &app.pool,
-            campaign.channel,
-            token,
+            &campaign_context.of_channel(),
             campaign.creator,
         )
         .await
@@ -210,7 +206,7 @@ where
 
     let channel_campaigns = fetch_campaign_ids_for_channel(
         &app.pool,
-        &campaign.channel.id(),
+        campaign.channel.id(),
         app.config.campaigns_find_limit,
     )
     .await?;
@@ -312,11 +308,12 @@ pub async fn close_campaign<C: Locked + 'static>(
         .get::<Auth>()
         .expect("Auth should be present");
 
-    let mut campaign = req
+    let campaign_context = req
         .extensions()
-        .get::<Campaign>()
+        .get::<ChainOf<Campaign>>()
         .expect("We must have a campaign in extensions")
         .to_owned();
+    let mut campaign = campaign_context.context;
 
     if auth.uid.to_address() != campaign.creator {
         Err(ResponseError::Forbidden(
@@ -333,7 +330,7 @@ pub async fn close_campaign<C: Locked + 'static>(
             .budget
             .checked_sub(&UnifiedNum::from(old_remaining))
             .ok_or_else(|| {
-                ResponseError::BadRequest("Campaign budget overflows/underflows".to_string())
+                ResponseError::BadRequest("Campaign budget overflow/underflow".to_string())
             })?;
         update_campaign(&app.pool, &campaign).await?;
 
@@ -356,9 +353,9 @@ pub mod update_campaign {
     ) -> Result<Response<Body>, ResponseError> {
         let campaign_being_mutated = req
             .extensions()
-            .get::<Campaign>()
+            .get::<ChainOf<Campaign>>()
             .expect("We must have a campaign in extensions")
-            .to_owned();
+            .clone();
 
         let body = hyper::body::to_bytes(req.into_body()).await?;
 
@@ -371,7 +368,7 @@ pub mod update_campaign {
             &app.pool,
             &app.config,
             &app.campaign_remaining,
-            campaign_being_mutated,
+            &campaign_being_mutated,
             modify_campaign_fields,
         )
         .await
@@ -385,9 +382,10 @@ pub mod update_campaign {
         pool: &DbPool,
         config: &Config,
         campaign_remaining: &CampaignRemaining,
-        campaign: Campaign,
+        campaign_context: &ChainOf<Campaign>,
         modify_campaign: ModifyCampaign,
     ) -> Result<Campaign, Error> {
+        let campaign = &campaign_context.context;
         // *NOTE*: When updating campaigns make sure sum(campaigns.map(getRemaining)) <= totalDeposited - totalSpent
         // !WARNING!: totalSpent != sum(campaign.map(c => c.spending)) therefore we must always calculate remaining funds based on total_deposit - lastApprovedNewState.spenders[user]
         // *NOTE*: To close a campaign set campaignBudget to campaignSpent so that spendable == 0
@@ -413,14 +411,13 @@ pub mod update_campaign {
             .map(|accounting| accounting.amount)
             .unwrap_or_default();
 
-            let token = config
-                .token_address_whitelist
-                .get(&campaign.channel.token)
-                .ok_or(Error::ChannelTokenNotWhitelisted)?;
-
-            let latest_spendable =
-                update_latest_spendable(&adapter, pool, campaign.channel, token, campaign.creator)
-                    .await?;
+            let latest_spendable = update_latest_spendable(
+                &adapter,
+                pool,
+                &campaign_context.of_channel(),
+                campaign.creator,
+            )
+            .await?;
 
             // Gets the latest Spendable for this (spender, channelId) pair
             let total_deposited = latest_spendable.deposit.total;
@@ -431,7 +428,7 @@ pub mod update_campaign {
 
             let channel_campaigns = fetch_campaign_ids_for_channel(
                 pool,
-                &campaign.channel.id(),
+                campaign.channel.id(),
                 config.campaigns_find_limit,
             )
             .await
@@ -479,7 +476,7 @@ pub mod update_campaign {
             };
         }
 
-        let modified_campaign = modify_campaign.apply(campaign);
+        let modified_campaign = modify_campaign.apply(campaign.clone());
         update_campaign(pool, &modified_campaign).await?;
 
         Ok(modified_campaign)
@@ -577,7 +574,7 @@ pub mod insert_events {
     use primitives::{
         balances::{Balances, CheckedState, OverflowError},
         sentry::{Event, SuccessResponse},
-        Address, Campaign, CampaignId, DomainError, UnifiedNum, ValidatorDesc,
+        Address, Campaign, CampaignId, ChainOf, DomainError, UnifiedNum, ValidatorDesc,
     };
     use slog::error;
     use thiserror::Error;
@@ -620,9 +617,9 @@ pub mod insert_events {
             .get::<Session>()
             .expect("request should have session");
 
-        let campaign = req_head
+        let campaign_context = req_head
             .extensions
-            .get::<Campaign>()
+            .get::<ChainOf<Campaign>>()
             .expect("request should have a Campaign loaded");
 
         let body_bytes = hyper::body::to_bytes(req_body).await?;
@@ -632,7 +629,7 @@ pub mod insert_events {
             .remove("events")
             .ok_or_else(|| ResponseError::BadRequest("invalid request".to_string()))?;
 
-        let processed = process_events(app, auth, session, campaign, events).await?;
+        let processed = process_events(app, auth, session, campaign_context, events).await?;
 
         Ok(Response::builder()
             .header("Content-type", "application/json")
@@ -644,16 +641,18 @@ pub mod insert_events {
         app: &Application<C>,
         auth: Option<&Auth>,
         session: &Session,
-        campaign: &Campaign,
+        campaign_context: &ChainOf<Campaign>,
         events: Vec<Event>,
     ) -> Result<bool, ResponseError> {
+        let campaign = &campaign_context.context;
+
         // handle events - check access
         check_access(
             &app.redis,
             session,
             auth,
             &app.config.ip_rate_limit,
-            campaign,
+            &campaign_context.context,
             &events,
         )
         .await
@@ -679,14 +678,14 @@ pub mod insert_events {
         for event in events.into_iter() {
             let event_payout = {
                 // calculate earners payouts
-                let payout = get_payout(&app.logger, campaign, &event, session)?;
+                let payout = get_payout(&app.logger, &campaign_context.context, &event, session)?;
 
                 match payout {
                     Some((earner, payout)) => {
                         let spending_result = spend_for_event(
                             &app.pool,
                             &app.campaign_remaining,
-                            campaign,
+                            &campaign_context.context,
                             earner,
                             leader,
                             follower,
@@ -698,7 +697,7 @@ pub mod insert_events {
                         match spending_result {
                             Ok(()) => Some((event, earner, payout)),
                             Err(err) => {
-                                error!(&app.logger, "Payout spending failed: {}", err; "campaign" => ?campaign, "event" => ?event, "earner" => ?earner, "unpaid amount" => %payout, "err" => ?err);
+                                error!(&app.logger, "Payout spending failed: {}", err; "campaign" => ?campaign_context, "event" => ?event, "earner" => ?earner, "unpaid amount" => %payout, "err" => ?err);
 
                                 None
                             }
@@ -715,8 +714,15 @@ pub mod insert_events {
         }
 
         // Record successfully paid out events to Analytics
-        if let Err(err) = analytics::record(&app.pool, campaign, session, events_success).await {
-            error!(&app.logger, "Analytics recording failed: {}", err; "campaign" => ?campaign, "err" => ?err)
+        if let Err(err) = analytics::record(
+            &app.pool,
+            &campaign_context.context,
+            session,
+            events_success,
+        )
+        .await
+        {
+            error!(&app.logger, "Analytics recording failed: {}", err; "campaign" => ?campaign_context, "err" => ?err)
         }
 
         Ok(true)
@@ -795,7 +801,7 @@ pub mod insert_events {
 
     #[cfg(test)]
     mod test {
-        use primitives::util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN};
+        use primitives::test_util::{DUMMY_CAMPAIGN, PUBLISHER};
         use redis::aio::MultiplexedConnection;
 
         use crate::db::{
@@ -907,7 +913,7 @@ pub mod insert_events {
                 .await
                 .expect("It should insert Channel");
 
-            let publisher = ADDRESSES["publisher"];
+            let publisher = *PUBLISHER;
 
             let leader = campaign.leader().unwrap();
             let follower = campaign.follower().unwrap();
@@ -986,34 +992,37 @@ mod test {
     use adapter::primitives::Deposit;
     use hyper::StatusCode;
     use primitives::{
-        util::tests::prep_db::{DUMMY_CAMPAIGN, IDS},
-        BigNum, ChannelId, ValidatorId,
+        test_util::{DUMMY_CAMPAIGN, IDS, LEADER},
+        BigNum, ValidatorId,
     };
 
     #[tokio::test]
     /// Test single campaign creation and modification
     // &
-    /// Test with multiple campaigns (because of Budget) a modification of campaign
+    /// Test with multiple campaigns (because of Budget) and modifications
     async fn create_and_modify_with_multiple_campaigns() {
         let app = setup_dummy_app().await;
-        let dummy_campaign = DUMMY_CAMPAIGN.clone();
+
+        // Create a new Campaign with different CampaignId
+        let dummy_channel = DUMMY_CAMPAIGN.channel;
+        let channel_chain = app
+            .config
+            .find_chain_of(dummy_channel.token)
+            .expect("Channel token should be whitelisted in config!");
+        let channel_context = channel_chain.with_channel(dummy_channel);
+
         let multiplier = 10_u64.pow(UnifiedNum::PRECISION.into());
 
         // this function should be called before each creation/modification of a Campaign!
-        let add_deposit_call = |channel: ChannelId, creator: Address, token: Address| {
+        let add_deposit_call = |channel_context: &ChainOf<Channel>, for_address: Address| {
             app.adapter.client.add_deposit_call(
-                channel,
-                creator,
+                channel_context.context.id(),
+                for_address,
                 Deposit {
                     // a deposit 4 times larger than the Campaign Budget
-                    total: UnifiedNum::from(200_000_000_000).to_precision(
-                        app.config
-                            .token_address_whitelist
-                            .get(&token)
-                            .expect("Should get token")
-                            .precision
-                            .get(),
-                    ),
+                    // I.e. 4 TOKENS
+                    total: UnifiedNum::from(200_000_000_000)
+                        .to_precision(channel_context.token.precision.get()),
                     still_on_create2: BigNum::from(0),
                 },
             )
@@ -1023,6 +1032,7 @@ mod test {
             let auth = Auth {
                 era: 0,
                 uid: ValidatorId::from(create_campaign.creator),
+                chain: channel_context.chain.clone(),
             };
 
             let body =
@@ -1034,12 +1044,12 @@ mod test {
                 .expect("Should build Request")
         };
 
-        let campaign: Campaign = {
+        let campaign_context: ChainOf<Campaign> = {
             // erases the CampaignId for the CreateCampaign request
-            let mut create = CreateCampaign::from_campaign_erased(dummy_campaign, None);
+            let mut create = CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
             create.budget = UnifiedNum::from(500 * multiplier);
             // prepare for Campaign creation
-            add_deposit_call(create.channel.id(), create.creator, create.channel.token);
+            add_deposit_call(&channel_context, create.creator);
 
             let create_response = create_campaign(build_request(create), &app)
                 .await
@@ -1067,7 +1077,8 @@ mod test {
                 UnifiedNum::from(50_000_000_000),
                 UnifiedNum::from(remaining.unsigned_abs())
             );
-            campaign
+
+            channel_context.clone().with(campaign)
         };
 
         // modify campaign
@@ -1083,18 +1094,14 @@ mod test {
                 targeting_rules: None,
             };
             // prepare for Campaign modification
-            add_deposit_call(
-                campaign.channel.id(),
-                campaign.creator,
-                campaign.channel.token,
-            );
+            add_deposit_call(&channel_context, campaign_context.context.creator);
 
             let modified_campaign = modify_campaign(
                 app.adapter.clone(),
                 &app.pool,
                 &app.config,
                 &app.campaign_remaining,
-                campaign.clone(),
+                &campaign_context,
                 modify,
             )
             .await
@@ -1103,7 +1110,7 @@ mod test {
             assert_eq!(new_budget, modified_campaign.budget);
             assert_eq!(Some("Updated title".to_string()), modified_campaign.title);
 
-            modified_campaign
+            channel_context.clone().with(modified_campaign)
         };
 
         // we have 1000 left from our deposit, so we are using half of it
@@ -1114,11 +1121,7 @@ mod test {
             create_second.budget = UnifiedNum::from(500 * multiplier);
 
             // prepare for Campaign creation
-            add_deposit_call(
-                create_second.channel.id(),
-                create_second.creator,
-                create_second.channel.token,
-            );
+            add_deposit_call(&channel_context, create_second.creator);
 
             let create_response = create_campaign(build_request(create_second), &app)
                 .await
@@ -1144,7 +1147,7 @@ mod test {
             create.budget = UnifiedNum::from(600 * multiplier);
 
             // prepare for Campaign creation
-            add_deposit_call(create.channel.id(), create.creator, create.channel.token);
+            add_deposit_call(&channel_context, create.creator);
 
             let create_err = create_campaign(build_request(create), &app)
                 .await
@@ -1172,18 +1175,14 @@ mod test {
             };
 
             // prepare for Campaign modification
-            add_deposit_call(
-                modified.channel.id(),
-                modified.creator,
-                modified.channel.token,
-            );
+            add_deposit_call(&channel_context, modified.context.creator);
 
             let modified_campaign = modify_campaign(
                 app.adapter.clone(),
                 &app.pool,
                 &app.config,
                 &app.campaign_remaining,
-                modified,
+                &modified,
                 modify,
             )
             .await
@@ -1191,7 +1190,7 @@ mod test {
 
             assert_eq!(lower_budget, modified_campaign.budget);
 
-            modified_campaign
+            modified.clone().with(modified_campaign)
         };
 
         // Just enough budget to create this Campaign
@@ -1203,7 +1202,7 @@ mod test {
             create.budget = UnifiedNum::from(600 * multiplier);
 
             // prepare for Campaign creation
-            add_deposit_call(create.channel.id(), create.creator, create.channel.token);
+            add_deposit_call(&channel_context, create.creator);
 
             let create_response = create_campaign(build_request(create), &app)
                 .await
@@ -1234,18 +1233,14 @@ mod test {
             };
 
             // prepare for Campaign modification
-            add_deposit_call(
-                modified.channel.id(),
-                modified.creator,
-                modified.channel.token,
-            );
+            add_deposit_call(&channel_context, modified.context.creator);
 
             let modify_err = modify_campaign(
                 app.adapter.clone(),
                 &app.pool,
                 &app.config,
                 &app.campaign_remaining,
-                modified,
+                &modified,
                 modify,
             )
             .await
@@ -1325,7 +1320,9 @@ mod test {
 
     #[tokio::test]
     async fn campaign_is_closed_properly() {
-        let campaign = DUMMY_CAMPAIGN.clone();
+        // create a new campaign with a new CampaignId
+        let campaign =
+            CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None).into_campaign();
 
         let app = setup_dummy_app().await;
 
@@ -1335,6 +1332,12 @@ mod test {
         insert_campaign(&app.pool, &campaign)
             .await
             .expect("Should insert dummy campaign");
+
+        let campaign_context = app
+            .config
+            .find_chain_of(campaign.channel.token)
+            .expect("Config should have the Dummy campaign.channel.token")
+            .with(campaign.clone());
 
         // Test if remaining is set to 0
         {
@@ -1346,11 +1349,12 @@ mod test {
             let auth = Auth {
                 era: 0,
                 uid: ValidatorId::from(campaign.creator),
+                chain: campaign_context.chain.clone(),
             };
 
             let req = Request::builder()
                 .extension(auth)
-                .extension(campaign.clone())
+                .extension(campaign_context.clone())
                 .body(Body::empty())
                 .expect("Should build Request");
 
@@ -1380,12 +1384,13 @@ mod test {
         {
             let auth = Auth {
                 era: 0,
-                uid: IDS["leader"],
+                uid: IDS[&LEADER],
+                chain: campaign_context.chain.clone(),
             };
 
             let req = Request::builder()
                 .extension(auth)
-                .extension(campaign.clone())
+                .extension(campaign_context.clone())
                 .body(Body::empty())
                 .expect("Should build Request");
 

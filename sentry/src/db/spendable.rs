@@ -118,8 +118,8 @@ mod test {
 
     use primitives::{
         spender::Spendable,
+        test_util::DUMMY_CAMPAIGN,
         test_util::{ADVERTISER, CREATOR, FOLLOWER, GUARDIAN, GUARDIAN_2, PUBLISHER},
-        util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN},
         Deposit, UnifiedNum,
     };
 
@@ -140,7 +140,7 @@ mod test {
             .expect("Migrations should succeed");
 
         let spendable = Spendable {
-            spender: ADDRESSES["user"],
+            spender: *ADVERTISER,
             channel: DUMMY_CAMPAIGN.channel,
             deposit: Deposit {
                 total: UnifiedNum::from(100_000_000),

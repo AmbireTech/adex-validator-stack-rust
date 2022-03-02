@@ -1,6 +1,7 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
-#![allow(deprecated)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
 use std::{error, fmt};
 
 pub use self::{
@@ -11,6 +12,7 @@ pub use self::{
     balances_map::{BalancesMap, UnifiedMap},
     big_num::BigNum,
     campaign::{Campaign, CampaignId},
+    chain::{Chain, ChainId, ChainOf},
     channel::{Channel, ChannelId},
     config::Config,
     deposit::Deposit,
@@ -29,6 +31,7 @@ pub mod balances_map;
 pub mod big_num;
 pub mod campaign;
 pub mod campaign_validator;
+mod chain;
 pub mod channel;
 pub mod config;
 mod eth_checksum;
@@ -41,14 +44,17 @@ pub mod spender;
 pub mod supermarket;
 pub mod targeting;
 #[cfg(feature = "test-util")]
+#[cfg_attr(docsrs, doc(cfg(feature = "test-util")))]
 pub mod test_util;
 mod unified_num;
 pub mod validator;
 
-/// This module is available with the `postgres` feature
+/// This module is available with the `postgres` feature.
+///
 /// Other places where you'd find `mod postgres` implementations is for many of the structs in the crate
 /// all of which implement [`tokio_postgres::types::FromSql`], [`tokio_postgres::types::ToSql`] or [`From<&tokio_postgres::Row>`]
 #[cfg(feature = "postgres")]
+#[cfg_attr(docsrs, doc(cfg(feature = "postgres")))]
 pub mod postgres {
     use std::env::{self, VarError};
 
@@ -70,7 +76,10 @@ pub mod postgres {
         };
         let mgr = Manager::from_config(config, NoTls, mgr_config);
 
-        Pool::new(mgr, 42)
+        Pool::builder(mgr)
+            .max_size(42)
+            .build()
+            .expect("Should build test postgres pool")
     });
 
     /// `POSTGRES_USER` environment variable - default: `postgres`
@@ -161,18 +170,6 @@ pub mod util {
     pub use api::ApiUrl;
 
     pub mod api;
-    pub mod tests {
-        use slog::{o, Discard, Drain, Logger};
-
-        pub mod prep_db;
-        pub mod time;
-
-        pub fn discard_logger() -> Logger {
-            let drain = Discard.fuse();
-
-            Logger::root(drain, o!())
-        }
-    }
 
     pub mod logging;
 }

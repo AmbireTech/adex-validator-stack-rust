@@ -186,7 +186,9 @@ pub async fn spend_amount(
 
 #[cfg(test)]
 mod test {
-    use primitives::util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN};
+    use primitives::test_util::{
+        ADVERTISER, ADVERTISER_2, CREATOR, DUMMY_CAMPAIGN, PUBLISHER, PUBLISHER_2,
+    };
 
     use crate::db::{
         insert_channel,
@@ -208,8 +210,8 @@ mod test {
             .expect("Should insert");
 
         let channel_id = channel.id();
-        let earner = ADDRESSES["publisher"];
-        let spender = ADDRESSES["creator"];
+        let earner = *PUBLISHER;
+        let spender = *CREATOR;
 
         let amount = UnifiedNum::from(100_000_000);
         let update_amount = UnifiedNum::from(200_000_000);
@@ -404,10 +406,10 @@ mod test {
             .expect("Should insert");
 
         let channel_id = channel.id();
-        let earner = ADDRESSES["publisher"];
-        let spender = ADDRESSES["creator"];
+        let earner = *PUBLISHER;
+        let spender = *CREATOR;
         let spender_as_earner = spender;
-        let other_spender = ADDRESSES["tester"];
+        let other_spender = *ADVERTISER;
 
         let cases = [
             // Spender & Earner insert
@@ -491,12 +493,12 @@ mod test {
             .expect("Should insert");
 
         let channel_id = channel.id();
-        let earner = ADDRESSES["publisher"];
-        let other_earner = ADDRESSES["publisher2"];
-        let spender = ADDRESSES["creator"];
+        let earner = *PUBLISHER;
+        let other_earner = *PUBLISHER_2;
+        let spender = *CREATOR;
         let spender_as_earner = spender;
-        let other_spender = ADDRESSES["tester"];
-        let third_spender = ADDRESSES["user"];
+        let other_spender = *ADVERTISER;
+        let third_spender = *ADVERTISER_2;
 
         // Spenders & Earners insert
         {
