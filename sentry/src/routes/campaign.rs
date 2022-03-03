@@ -934,12 +934,12 @@ pub mod insert_events {
 
                 assert!(
                     matches!(
-                        spend_event,
+                        &spend_event,
                         Err(Error::Event(
                             EventError::CampaignRemainingNotEnoughForPayout
                         ))
                     ),
-                    "Campaign budget has no remaining funds to spend"
+                    "Campaign budget has no remaining funds to spend, result: {spend_event:?}"
                 );
             }
 
@@ -1247,7 +1247,8 @@ mod test {
             .expect_err("Should return Error response");
 
             assert!(
-                matches!(modify_err, Error::NewBudget(string) if string == "Not enough deposit left for the campaign's new budget")
+                matches!(&modify_err, Error::NewBudget(string) if string == "Not enough deposit left for the campaign's new budget"),
+                "Found error: {modify_err}"
             );
         }
     }
@@ -1278,13 +1279,13 @@ mod test {
             let new_budget = UnifiedNum::from_u64(300 * multiplier);
             let delta_budget = get_delta_budget(&campaign_remaining, &campaign, new_budget).await;
 
-            assert!(matches!(delta_budget, Err(Error::NewBudget(_))));
+            assert!(matches!(&delta_budget, Err(Error::NewBudget(_))), "Got result: {delta_budget:?}");
 
             // campaign_spent == new_budget
             let new_budget = UnifiedNum::from_u64(400 * multiplier);
             let delta_budget = get_delta_budget(&campaign_remaining, &campaign, new_budget).await;
 
-            assert!(matches!(delta_budget, Err(Error::NewBudget(_))));
+            assert!(matches!(&delta_budget, Err(Error::NewBudget(_))), "Got result: {delta_budget:?}");
         }
         // Increasing budget
         {
