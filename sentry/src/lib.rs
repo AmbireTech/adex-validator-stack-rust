@@ -7,20 +7,17 @@ use adapter::{prelude::*, Adapter};
 use chrono::Utc;
 use hyper::{Body, Method, Request, Response, StatusCode};
 use middleware::{
-    auth::{AuthRequired, Authenticate, IsAdmin},
+    auth::{AuthRequired, Authenticate},
     campaign::{CalledByCreator, CampaignLoad},
     channel::ChannelLoad,
     cors::{cors, Cors},
     Chain, Middleware,
 };
 use once_cell::sync::Lazy;
-use primitives::{
-    analytics::{query::AllowedKey, AuthenticateAs},
-    sentry::ValidationErrorResponse,
-    Config, ValidatorId,
-};
+use primitives::{sentry::ValidationErrorResponse, Config, ValidatorId};
 use redis::aio::MultiplexedConnection;
 use regex::Regex;
+use routes::routers::analytics_router;
 use slog::Logger;
 use std::collections::HashMap;
 use {
@@ -35,7 +32,7 @@ use {
                 create_validator_messages, extract_params, list_validator_messages,
             },
         },
-        get_analytics, get_cfg,
+        get_cfg,
     },
 };
 
@@ -209,52 +206,6 @@ async fn campaigns_router<C: Locked + 'static>(
         campaign_list(req, app).await
     } else {
         Err(ResponseError::NotFound)
-    }
-}
-
-async fn analytics_router<C: Locked + 'static>(
-    mut req: Request<Body>,
-    app: &Application<C>,
-) -> Result<Response<Body>, ResponseError> {
-    let (route, method) = (req.uri().path(), req.method());
-
-    match (route, method) {
-        ("/v5/analytics", &Method::GET) => {
-            let allowed_keys_for_request = vec![AllowedKey::Country, AllowedKey::AdSlotType]
-                .into_iter()
-                .collect();
-            get_analytics(req, app, Some(allowed_keys_for_request), None).await
-        }
-        ("/v5/analytics/for-advertiser", &Method::GET) => {
-            let req = AuthRequired.call(req, app).await?;
-
-            let authenticate_as = req
-                .extensions()
-                .get::<Auth>()
-                .map(|auth| AuthenticateAs::Advertiser(auth.uid))
-                .ok_or(ResponseError::Unauthorized)?;
-
-            get_analytics(req, app, None, Some(authenticate_as)).await
-        }
-        ("/v5/analytics/for-publisher", &Method::GET) => {
-            let authenticate_as = req
-                .extensions()
-                .get::<Auth>()
-                .map(|auth| AuthenticateAs::Publisher(auth.uid))
-                .ok_or(ResponseError::Unauthorized)?;
-
-            let req = AuthRequired.call(req, app).await?;
-            get_analytics(req, app, None, Some(authenticate_as)).await
-        }
-        ("/v5/analytics/for-admin", &Method::GET) => {
-            req = Chain::new()
-                .chain(AuthRequired)
-                .chain(IsAdmin)
-                .apply(req, app)
-                .await?;
-            get_analytics(req, app, None, None).await
-        }
-        _ => Err(ResponseError::NotFound),
     }
 }
 
