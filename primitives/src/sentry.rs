@@ -3,7 +3,7 @@ use crate::{
     balances::BalancesState,
     spender::Spender,
     validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
-    Address, Balances, CampaignId, UnifiedNum, ValidatorId, IPFS,
+    Address, Balances, CampaignId, UnifiedMap, UnifiedNum, ValidatorId, IPFS,
 };
 use chrono::{
     serde::ts_milliseconds, Date, DateTime, Duration, NaiveDate, TimeZone, Timelike, Utc,
@@ -577,8 +577,8 @@ pub struct AllSpendersQuery {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ChannelPayBody {
-    pub payouts: HashMap<Address, UnifiedNum>,
+pub struct ChannelPayRequest {
+    pub payouts: UnifiedMap,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
