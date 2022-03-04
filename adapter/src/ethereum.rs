@@ -32,6 +32,7 @@ mod error;
 pub mod ewt;
 
 #[cfg(any(test, feature = "test-util"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "test-util")))]
 pub mod test_util;
 
 pub static OUTPACE_ABI: Lazy<&'static [u8]> =
