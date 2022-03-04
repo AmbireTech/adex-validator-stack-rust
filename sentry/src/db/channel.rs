@@ -21,21 +21,6 @@ pub async fn get_channel_by_id(
     Ok(row.as_ref().map(Channel::from))
 }
 
-pub async fn get_channel_by_id_and_validator(
-    pool: &DbPool,
-    id: ChannelId,
-    validator: ValidatorId,
-) -> Result<Option<Channel>, PoolError> {
-    let client = pool.get().await?;
-
-    let query = "SELECT leader, follower, guardian, token, nonce FROM channels WHERE id = $1 AND (leader = $2 OR follower = $2) LIMIT 1";
-    let select = client.prepare(query).await?;
-
-    let row = client.query_opt(&select, &[&id, &validator]).await?;
-
-    Ok(row.as_ref().map(Channel::from))
-}
-
 /// Used to insert/get Channel when creating a Campaign
 /// If channel already exists it will return it instead.
 /// This call should never trigger a `SqlState::UNIQUE_VIOLATION`
