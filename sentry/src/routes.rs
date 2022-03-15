@@ -231,3 +231,5 @@ pub mod campaign;
 // `cfg` module has single request, so we only export this request
 mod cfg;
 pub mod channel;
+
+pub mod routers;

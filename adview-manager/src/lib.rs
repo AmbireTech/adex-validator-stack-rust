@@ -8,16 +8,17 @@ use adex_primitives::{
     supermarket::units_for_slot,
     supermarket::units_for_slot::response::{AdUnit, Campaign},
     targeting::{self, input},
+    util::ApiUrl,
     Address, BigNum, CampaignId, ToHex, UnifiedNum, IPFS,
 };
 use async_std::{sync::RwLock, task::block_on};
 use chrono::{DateTime, Duration, Utc};
+use log::error;
 use num_integer::Integer;
 use once_cell::sync::Lazy;
 use rand::Rng;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
-use slog::{error, Logger};
 use std::{
     cmp::Ordering,
     collections::VecDeque,
@@ -25,12 +26,16 @@ use std::{
     sync::Arc,
 };
 use thiserror::Error;
-use url::Url;
+
+pub use url::Url;
 
 const IPFS_GATEWAY: &str = "https://ipfs.moonicorn.network/ipfs/";
 
-// How much time to wait before sending out an impression event
-// Related: <https://github.com/AdExNetwork/adex-adview-manager/issues/17>, <https://github.com/AdExNetwork/adex-adview-manager/issues/35>, <https://github.com/AdExNetwork/adex-adview-manager/issues/46>
+/// How much time to wait before sending out an impression event (in milliseconds)
+///
+/// Related: <https://github.com/AdExNetwork/adex-adview-manager/issues/17>, <https://github.com/AdExNetwork/adex-adview-manager/issues/35>, <https://github.com/AdExNetwork/adex-adview-manager/issues/46>
+///
+/// Used for JS [setTimeout](https://developer.mozilla.org/en-US/docs/Web/API/setTimeout) function
 const WAIT_FOR_IMPRESSION: u32 = 8000;
 // The number of impressions (won auctions) kept in history
 const HISTORY_LIMIT: u32 = 50;
@@ -38,32 +43,39 @@ const HISTORY_LIMIT: u32 = 50;
 /// Impression "stickiness" time: see <https://github.com/AdExNetwork/adex-adview-manager/issues/65>
 /// 4 minutes allows ~4 campaigns to rotate, considering a default frequency cap of 15 minutes
 pub static IMPRESSION_STICKINESS_TIME: Lazy<Duration> =
-    Lazy::new(|| Duration::milliseconds(240000));
+    Lazy::new(|| Duration::milliseconds(240_000));
 
-#[derive(Serialize, Deserialize)]
+// AdSlot size `width x height` in `pixels` (`px`)
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
+pub struct Size {
+    pub width: u64,
+    pub height: u64,
+}
+
+impl Size {
+    pub fn new(width: u64, height: u64) -> Self {
+        Self { width, height }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 // TODO: Add Default Ops somehow?
 pub struct Options {
     // Defaulted via defaultOpts
     #[serde(rename = "marketURL")]
-    pub market_url: Url,
+    pub market_url: ApiUrl,
     pub market_slot: IPFS,
     pub publisher_addr: Address,
     // All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared
-    pub whitelisted_tokens: Vec<String>,
-    pub width: Option<u64>,
-    pub height: Option<u64>,
+    pub whitelisted_tokens: Vec<Address>,
+    pub size: Option<Size>,
     pub navigator_language: Option<String>,
     /// Defaulted
+    #[serde(default)]
     pub disabled_video: bool,
+    #[serde(default)]
     pub disabled_sticky: bool,
-}
-
-impl Options {
-    pub fn size(&self) -> Option<(u64, u64)> {
-        self.width
-            .and_then(|width| self.height.map(|height| (width, height)))
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -87,33 +99,23 @@ fn normalize_url(url: &str) -> String {
     }
 }
 
-fn image_html(on_load: &str, size: &Option<(u64, u64)>, image_url: &str) -> String {
+fn image_html(on_load: &str, size: Option<Size>, image_url: &str) -> String {
     let size = size
-        .map(|(width, height)| format!("width=\"{}\" height=\"{}\"", width, height))
-        .unwrap_or_else(|| "".to_string());
+        .map(|Size { width, height }| format!("width=\"{width}\" height=\"{height}\""))
+        .unwrap_or_default();
 
-    format!("<img loading=\"lazy\" src=\"{image_url}\" alt=\"AdEx ad\" rel=\"nofollow\" onload=\"{on_load}\" {size}>",
-            image_url = image_url, on_load = on_load, size = size)
+    format!("<img loading=\"lazy\" src=\"{image_url}\" alt=\"AdEx ad\" rel=\"nofollow\" onload=\"{on_load}\" {size}>")
 }
 
-fn video_html(
-    on_load: &str,
-    size: &Option<(u64, u64)>,
-    image_url: &str,
-    media_mime: &str,
-) -> String {
+fn video_html(on_load: &str, size: Option<Size>, image_url: &str, media_mime: &str) -> String {
     let size = size
-        .map(|(width, height)| format!("width=\"{}\" height=\"{}\"", width, height))
-        .unwrap_or_else(|| "".to_string());
+        .map(|Size { width, height }| format!("width=\"{width}\" height=\"{height}\""))
+        .unwrap_or_default();
 
     format!(
         "<video {size} loop autoplay onloadeddata=\"{on_load}\" muted>
             <source src=\"{image_url}\" type=\"{media_mime}\">
         </video>",
-        size = size,
-        on_load = on_load,
-        image_url = image_url,
-        media_mime = media_mime
     )
 }
 
@@ -152,18 +154,22 @@ fn randomized_sort_pos(ad_unit: &AdUnit, seed: BigNum) -> BigNum {
 }
 
 fn get_unit_html(
-    size: &Option<(u64, u64)>,
+    size: Option<Size>,
     ad_unit: &AdUnit,
     hostname: &str,
     on_load: &str,
     on_click: &str,
 ) -> String {
+    // replace all `"` quotes with a single quote `'`
+    // these values are used inside `onclick` & `onload` html attributes
+    let on_load = on_load.replace("\"", "'");
+    let on_click = on_click.replace("\"", "'");
     let image_url = normalize_url(&ad_unit.media_url);
 
     let element_html = if is_video(ad_unit) {
-        video_html(on_load, size, &image_url, &ad_unit.media_mime)
+        video_html(&on_load, size, &image_url, &ad_unit.media_mime)
     } else {
-        image_html(on_load, size, &image_url)
+        image_html(&on_load, size, &image_url)
     };
 
     // @TODO click protection page
@@ -172,25 +178,22 @@ fn get_unit_html(
         &format!("utm_source=AdEx+({hostname})", hostname = hostname),
     );
 
-    let max_min_size = match size {
-        Some((width, height)) => {
+    let max_min_size = size
+        .map(|Size { width, height }| {
             format!(
-                "max-width: {}px; min-width: {min_width}px; height: {}px;",
-                width,
-                height,
+                "max-width: {width}px; min-width: {min_width}px; height: {height}px;",
                 // u64 / 2 will floor the result!
                 min_width = width / 2
             )
-        }
-        None => String::new(),
-    };
+        })
+        .unwrap_or_default();
 
     format!("<div style=\"position: relative; overflow: hidden; {style}\">
         <a href=\"{final_target_url}\" target=\"_blank\" onclick=\"{on_click}\" rel=\"noopener noreferrer\">
         {element_html}
         </a>
         {adex_icon}
-        </div>", style=max_min_size, adex_icon=adex_icon(), final_target_url=final_target_url, on_click = on_click, element_html=element_html)
+        </div>", style=max_min_size, adex_icon=adex_icon())
 }
 
 pub fn get_unit_html_with_events(
@@ -222,6 +225,7 @@ pub fn get_unit_html_with_events(
         let body =
             serde_json::to_string(&event_body).expect("It should always serialize EventBody");
 
+        // TODO: check whether the JSON body with `''` quotes executes correctly!
         let fetch_opts = format!("var fetchOpts = {{ method: 'POST', headers: {{ 'content-type': 'application/json' }}, body: {} }};", body);
 
         let validators: String = validators
@@ -235,9 +239,9 @@ pub fn get_unit_html_with_events(
                 format!("fetch('{}', fetchOpts)", fetch_url)
             })
             .collect::<Vec<_>>()
-            .join(";");
+            .join("; ");
 
-        format!("{}{}", fetch_opts, validators)
+        format!("{fetch_opts} {validators}")
     };
 
     let get_timeout_code = |event_type: &str| -> String {
@@ -255,7 +259,7 @@ pub fn get_unit_html_with_events(
     };
 
     get_unit_html(
-        &options.size(),
+        options.size,
         ad_unit,
         hostname,
         &on_load,
@@ -266,7 +270,7 @@ pub fn get_unit_html_with_events(
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("Request to the Market failed: status {status} at url {url}")]
-    Market { status: StatusCode, url: String },
+    Market { status: StatusCode, url: Url },
     #[error(transparent)]
     Request(#[from] reqwest::Error),
 }
@@ -277,22 +281,16 @@ pub struct Manager {
     /// It always trims to HISTORY_LIMIT, removing the oldest (firstly inserted) elements from the History
     history: Arc<RwLock<VecDeque<HistoryEntry>>>,
     client: reqwest::Client,
-    logger: Logger,
 }
 
 impl Manager {
-    pub fn new(
-        options: Options,
-        history: VecDeque<HistoryEntry>,
-        logger: Logger,
-    ) -> Result<Self, Error> {
+    pub fn new(options: Options, history: VecDeque<HistoryEntry>) -> Result<Self, Error> {
         let client = reqwest::Client::builder().build()?;
 
         Ok(Self {
             options,
             history: Arc::new(RwLock::new(history)),
             client,
-            logger,
         })
     }
 
@@ -405,23 +403,24 @@ impl Manager {
             .collect::<Vec<_>>()
             .join("&");
 
-        // Url adds a trailing `/`
-        let url = format!(
-            "{}units-for-slot/{}?pubPrefix={}&{}",
-            self.options.market_url, self.options.market_slot, pub_prefix, deposit_asset
-        );
+        // ApiUrl handles endpoint path (with or without `/`)
+        let url = self
+            .options
+            .market_url
+            .join(&format!(
+                "units-for-slot/{ad_slot}?pubPrefix={pub_prefix}&{deposit_asset}",
+                ad_slot = self.options.market_slot
+            ))
+            .expect("Valid URL endpoint!");
 
-        let market_response = self.client.get(&url).send().await?;
+        let market_response = self.client.get(url.clone()).send().await?;
 
-        if market_response.status() != StatusCode::OK {
-            Err(Error::Market {
+        match market_response.status() {
+            StatusCode::OK => Ok(market_response.json().await?),
+            _ => Err(Error::Market {
                 status: market_response.status(),
                 url,
-            })
-        } else {
-            let units_for_slot_response = market_response.json().await?;
-
-            Ok(units_for_slot_response)
+            }),
         }
     }
 
@@ -482,7 +481,7 @@ impl Manager {
                                 .collect(),
                         };
 
-                        let on_type_error = |error, rule| error!(&self.logger, "Rule evaluation error for {:?}", campaign_id; "error" => ?error, "rule" => ?rule);
+                        let on_type_error = |type_error, rule| error!(target: "rule-evaluation", "Rule evaluation error for {campaign_id:?}, {rule:?} with error: {type_error:?}");
 
                         targeting::eval_with_callback(
                             &m_campaign.campaign.targeting_rules,
@@ -562,7 +561,7 @@ impl Manager {
                 html,
             }))
         } else if let Some(fallback_unit) = fallback_unit {
-            let html = get_unit_html(&self.options.size(), &fallback_unit, &hostname, "", "");
+            let html = get_unit_html(self.options.size, &fallback_unit, &hostname, "", "");
             Ok(Some(NextAdUnit {
                 unit: fallback_unit,
                 price: 0.into(),

@@ -6,7 +6,7 @@ use crate::{
     Address, Balances, CampaignId, UnifiedMap, UnifiedNum, ValidatorId, IPFS,
 };
 use chrono::{
-    serde::ts_milliseconds, Date, DateTime, Duration, NaiveDate, TimeZone, Timelike, Utc,
+    serde::ts_milliseconds, Date, DateTime, Datelike, Duration, NaiveDate, TimeZone, Timelike, Utc,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
@@ -433,6 +433,10 @@ impl DateHour<Utc> {
         })
     }
 
+    pub fn from_date_hour_opt(date: Date<Utc>, hour: u32) -> Option<Self> {
+        Self::from_ymdh_opt(date.year(), date.month(), date.day(), hour)
+    }
+
     pub fn now() -> Self {
         let datetime = Utc::now();
 
@@ -440,6 +444,16 @@ impl DateHour<Utc> {
             date: datetime.date(),
             hour: datetime.hour(),
         }
+    }
+
+    pub fn with_hour(&self, hour: u32) -> Option<Self> {
+        Self::from_date_hour_opt(self.date, hour)
+    }
+
+    pub fn with_day(&self, day: u32) -> Option<Self> {
+        let with_day = self.date.with_day(day)?;
+
+        Self::from_date_hour_opt(with_day, self.hour)
     }
 }
 
