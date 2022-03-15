@@ -262,10 +262,6 @@ async fn analytics_router<C: Locked + 'static>(
 }
 
 // TODO AIP#61: Add routes for:
-// - POST /channel/:id/pay
-// #[serde(rename_all = "camelCase")]
-// Pay { payout: BalancesMap },
-//
 // - GET /channel/:id/get-leaf
 async fn channels_router<C: Locked + 'static>(
     mut req: Request<Body>,
