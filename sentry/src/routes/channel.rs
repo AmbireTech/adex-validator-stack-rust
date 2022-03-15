@@ -434,7 +434,7 @@ pub async fn channel_payout<C: Locked + 'static>(
 
     let campaigns_remaining_sum = app
         .campaign_remaining
-        .get_multiple(channel_campaigns.as_slice())
+        .get_multiple(&channel_campaigns)
         .await?
         .iter()
         .sum::<Option<UnifiedNum>>()
@@ -444,7 +444,7 @@ pub async fn channel_payout<C: Locked + 'static>(
 
     // A campaign is closed when its remaining == 0
     // therefore for all campaigns for a channel to be closed their total remaining sum should be 0
-    if campaigns_remaining_sum.gt(&UnifiedNum::from_u64(0)) {
+    if campaigns_remaining_sum > UnifiedNum::from_u64(0) {
         return Err(ResponseError::FailedValidation(
             "All campaigns should be closed or have no budget left".to_string(),
         ));
@@ -476,10 +476,11 @@ pub async fn channel_payout<C: Locked + 'static>(
     let total_deposited = latest_spendable.deposit.total;
 
     let available_for_return = total_deposited
-        .checked_sub(&accounting_spent)
-        .ok_or_else(|| ResponseError::FailedValidation("No more budget remaining".to_string()))?
         .checked_add(&accounting_earned)
+        .ok_or_else(|| ResponseError::FailedValidation("No more budget remaining".to_string()))?
+        .checked_sub(&accounting_spent)
         .ok_or_else(|| ResponseError::FailedValidation("No more budget remaining".to_string()))?;
+
 
     let total_to_pay = to_pay
         .payouts
@@ -487,7 +488,7 @@ pub async fn channel_payout<C: Locked + 'static>(
         .sum::<Option<UnifiedNum>>()
         .ok_or_else(|| ResponseError::FailedValidation("Payouts amount overflow".to_string()))?;
 
-    if total_to_pay.gt(&available_for_return) {
+    if total_to_pay > available_for_return {
         return Err(ResponseError::FailedValidation(
             "Total payout amount exceeds the available for return".to_string(),
         ));

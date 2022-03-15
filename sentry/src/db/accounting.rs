@@ -28,7 +28,7 @@ impl From<tokio_postgres::Error> for Error {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Accounting {
     pub channel_id: ChannelId,
     pub side: Side,
@@ -51,7 +51,7 @@ impl From<&Row> for Accounting {
     }
 }
 
-#[derive(Debug, Clone, Copy, ToSql, FromSql, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, ToSql, FromSql, PartialEq, Eq)]
 #[postgres(name = "accountingside")]
 pub enum Side {
     Earner,
