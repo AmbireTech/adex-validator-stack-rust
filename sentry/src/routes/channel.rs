@@ -477,9 +477,17 @@ pub async fn channel_payout<C: Locked + 'static>(
 
     let available_for_return = total_deposited
         .checked_add(&accounting_earned)
-        .ok_or_else(|| ResponseError::FailedValidation("No more budget remaining".to_string()))?
+        .ok_or_else(|| {
+            ResponseError::FailedValidation(
+                "Overflow while calculating available for return".to_string(),
+            )
+        })?
         .checked_sub(&accounting_spent)
-        .ok_or_else(|| ResponseError::FailedValidation("No more budget remaining".to_string()))?;
+        .ok_or_else(|| {
+            ResponseError::FailedValidation(
+                "Underflow while calculating available for return".to_string(),
+            )
+        })?;
 
     let total_to_pay = to_pay
         .payouts
