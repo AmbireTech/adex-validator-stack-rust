@@ -481,7 +481,6 @@ pub async fn channel_payout<C: Locked + 'static>(
         .checked_sub(&accounting_spent)
         .ok_or_else(|| ResponseError::FailedValidation("No more budget remaining".to_string()))?;
 
-
     let total_to_pay = to_pay
         .payouts
         .values()
