@@ -425,6 +425,13 @@ pub async fn channel_payout<C: Locked + 'static>(
     let to_pay = serde_json::from_slice::<ChannelPayRequest>(&body)
         .map_err(|e| ResponseError::FailedValidation(e.to_string()))?;
 
+    // Handling the case where a request with an empty body comes through
+    if to_pay.payouts.len() == 0 {
+        return Err(ResponseError::FailedValidation(
+            "Request has an empty body".to_string(),
+        ));
+    }
+
     let channel_campaigns = fetch_campaign_ids_for_channel(
         &app.pool,
         channel_context.context.id(),
@@ -1058,11 +1065,12 @@ mod test {
             .expect("Should update spendable");
 
         // Test with no body
-        // TODO: Discuss expected response for that case.
         let res =
             channel_payout(build_request(&channel_context, UnifiedMap::default()), &app).await;
-        assert!(res.is_ok(), "Request with no JSON body and edge cases");
-
+        assert!(
+            matches!(res, Err(ResponseError::FailedValidation(..))),
+            "Failed validation because request body is empty"
+        );
         // add another deposit to the DUMMY adapter before calling channel_payout
         app.adapter.client.add_deposit_call(
             channel_context.context.id(),
