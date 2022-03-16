@@ -1015,17 +1015,6 @@ mod test {
                 .expect("Should build Request")
         };
 
-        // Adding a deposit to the DUMMY adapter
-        let deposit = Deposit {
-            total: BigNum::from_str("1000").expect("should convert"), // 1000 DAI
-            still_on_create2: BigNum::from_str("0").expect("should convert"), // 0 DAI
-        };
-        app.adapter.client.add_deposit_call(
-            channel_context.context.id(),
-            auth.uid.to_address(),
-            deposit.clone(),
-        );
-
         // Add accounting for spender -> 500
         update_accounting(
             app.pool.clone(),
@@ -1071,12 +1060,6 @@ mod test {
             matches!(res, Err(ResponseError::FailedValidation(..))),
             "Failed validation because request body is empty"
         );
-        // add another deposit to the DUMMY adapter before calling channel_payout
-        app.adapter.client.add_deposit_call(
-            channel_context.context.id(),
-            auth.uid.to_address(),
-            deposit.clone(),
-        );
         // make a normal request and get accounting to see if its as expected
 
         let mut payouts = UnifiedMap::default();
@@ -1112,12 +1095,6 @@ mod test {
         )
         .await
         .expect("should update"); // total spent: 500 + 1000
-                                  // add another deposit to the DUMMY adapter before calling channel_payout
-        app.adapter.client.add_deposit_call(
-            channel_context.context.id(),
-            auth.uid.to_address(),
-            deposit.clone(),
-        );
 
         let res =
             channel_payout(build_request(&channel_context, UnifiedMap::default()), &app).await;
@@ -1128,11 +1105,7 @@ mod test {
 
         // make a request where "total_to_pay" will exceed available
         payouts.insert(*CREATOR, UnifiedNum::from_u64(1000));
-        app.adapter.client.add_deposit_call(
-            channel_context.context.id(),
-            auth.uid.to_address(),
-            deposit.clone(),
-        );
+
         let res = channel_payout(build_request(&channel_context, payouts.clone()), &app).await;
         assert!(
             matches!(res, Err(ResponseError::FailedValidation(..))),
@@ -1144,11 +1117,6 @@ mod test {
             .increase_by(DUMMY_CAMPAIGN.id, UnifiedNum::from_u64(1000))
             .await
             .expect("Should set value in redis");
-        app.adapter.client.add_deposit_call(
-            channel_context.context.id(),
-            auth.uid.to_address(),
-            deposit.clone(),
-        );
 
         let res =
             channel_payout(build_request(&channel_context, UnifiedMap::default()), &app).await;
