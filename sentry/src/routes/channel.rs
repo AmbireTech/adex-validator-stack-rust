@@ -398,7 +398,7 @@ pub async fn get_accounting_for_channel<C: Locked + 'static>(
     Ok(success_response(serde_json::to_string(&res)?))
 }
 
-/// `GET /v5/channel/0xXXX.../pay` request
+/// `POST /v5/channel/0xXXX.../pay` request
 ///
 /// Body: [`ChannelPayRequest`]
 ///
@@ -428,7 +428,7 @@ pub async fn channel_payout<C: Locked + 'static>(
     // Handling the case where a request with an empty body comes through
     if to_pay.payouts.len() == 0 {
         return Err(ResponseError::FailedValidation(
-            "Request has an empty body".to_string(),
+            "Request has empty payouts".to_string(),
         ));
     }
 
@@ -479,20 +479,20 @@ pub async fn channel_payout<C: Locked + 'static>(
         fetch_spendable(app.pool.clone(), &spender, &channel_context.context.id())
             .await
             .map_err(|err| ResponseError::BadRequest(err.to_string()))?
-            .ok_or(ResponseError::BadRequest("Spendable not found".to_string()))?;
+            .ok_or(ResponseError::BadRequest("There is no spendable amount for the spender in this Channel.".to_string()))?;
     let total_deposited = latest_spendable.deposit.total;
 
-    let available_for_return = total_deposited
+    let available_for_payout = total_deposited
         .checked_add(&accounting_earned)
         .ok_or_else(|| {
             ResponseError::FailedValidation(
-                "Overflow while calculating available for return".to_string(),
+                "Overflow while calculating available for payout".to_string(),
             )
         })?
         .checked_sub(&accounting_spent)
         .ok_or_else(|| {
             ResponseError::FailedValidation(
-                "Underflow while calculating available for return".to_string(),
+                "Underflow while calculating available for payout".to_string(),
             )
         })?;
 
@@ -502,9 +502,9 @@ pub async fn channel_payout<C: Locked + 'static>(
         .sum::<Option<UnifiedNum>>()
         .ok_or_else(|| ResponseError::FailedValidation("Payouts amount overflow".to_string()))?;
 
-    if total_to_pay > available_for_return {
+    if total_to_pay > available_for_payout {
         return Err(ResponseError::FailedValidation(
-            "Total payout amount exceeds the available for return".to_string(),
+            "The total requested payout amount exceeds the available payout".to_string(),
         ));
     }
 
@@ -1015,6 +1015,17 @@ mod test {
                 .expect("Should build Request")
         };
 
+        // TODO: Add Body for this test
+        // Testing before Accounting/Spendable are inserted
+        // let res =
+        // channel_payout(build_request(&channel_context, UnifiedMap::default()), &app).await;
+        // assert!(
+        //     res.is_err(),
+        //     "Should return an error when there is no Accounting/Spendable"
+        // );
+        // let err = res.unwrap_err();
+        // assert_eq!(err, ResponseError::FailedValidation("Request has empty payouts".to_string()), "Failed validation because payouts are empty");
+
         // Add accounting for spender -> 500
         update_accounting(
             app.pool.clone(),
@@ -1057,34 +1068,62 @@ mod test {
         let res =
             channel_payout(build_request(&channel_context, UnifiedMap::default()), &app).await;
         assert!(
-            matches!(res, Err(ResponseError::FailedValidation(..))),
-            "Failed validation because request body is empty"
+            res.is_err(),
+            "Should return an error when payouts are empty"
         );
+        let err = res.unwrap_err();
+        assert_eq!(err, ResponseError::FailedValidation("Request has empty payouts".to_string()), "Failed validation because payouts are empty");
         // make a normal request and get accounting to see if its as expected
 
         let mut payouts = UnifiedMap::default();
         payouts.insert(*PUBLISHER, UnifiedNum::from_u64(500));
 
         let res = channel_payout(build_request(&channel_context, payouts.clone()), &app).await;
+        assert!(res.is_ok(), "This request shouldn't result in an error");
+
+        let json = hyper::body::to_bytes(res.unwrap().into_body())
+            .await
+            .expect("Should get json");
+
+        let res: SuccessResponse = serde_json::from_slice(&json).expect("Should get SuccessResponse");
         assert!(
-            res.is_ok(),
+            matches!(res,
+            SuccessResponse { success: true }),
             "Request with JSON body with one address and no errors triggered on purpose"
         );
-        let accounting = get_accounting(
-            app.pool.clone(),
-            channel_context.context.id(),
-            *PUBLISHER,
-            Side::Earner,
-        )
-        .await
-        .expect("should get accounting")
-        .expect("Should be some");
-        assert_eq!(
-            accounting.amount,
-            UnifiedNum::from_u64(500),
-            "Accounting is updated to reflect the publisher's earnings"
-        );
 
+        // Checking if Earner/Spender balances have been updated by looking up the Accounting in the database
+        {
+            let accounting = get_accounting(
+                app.pool.clone(),
+                channel_context.context.id(),
+                *PUBLISHER,
+                Side::Earner,
+            )
+            .await
+            .expect("should get accounting")
+            .expect("Should be some");
+            assert_eq!(
+                accounting.amount,
+                UnifiedNum::from_u64(500),
+                "Accounting is updated to reflect the publisher's earnings"
+            );
+
+            let accounting = get_accounting(
+                app.pool.clone(),
+                channel_context.context.id(),
+                auth.uid.to_address(),
+                Side::Spender,
+            )
+            .await
+            .expect("should get accounting")
+            .expect("Should be some");
+            assert_eq!(
+                accounting.amount,
+                UnifiedNum::from_u64(500),
+                "Accounting is updated to reflect the amount deducted from the spender"
+            );
+        }
         // make a request where total - spent + earned will be a negative balance resulting in an error
         update_accounting(
             app.pool.clone(),
@@ -1099,19 +1138,22 @@ mod test {
         let res =
             channel_payout(build_request(&channel_context, UnifiedMap::default()), &app).await;
         assert!(
-            matches!(res, Err(ResponseError::FailedValidation(..))),
-            "Failed validation because available_for_return is negative"
+            res.is_err(),
+            "Should return err when available_for_payout is negative"
         );
+        let err = res.unwrap_err();
+        assert_eq!(err, ResponseError::FailedValidation("a".to_string()), "Failed validation because available_for_payout is negative");
 
         // make a request where "total_to_pay" will exceed available
         payouts.insert(*CREATOR, UnifiedNum::from_u64(1000));
 
         let res = channel_payout(build_request(&channel_context, payouts.clone()), &app).await;
         assert!(
-            matches!(res, Err(ResponseError::FailedValidation(..))),
-            "Failed validation because total_to_pay > available_for_return"
+           res.is_err(),
+            "Should return an error when total_to_pay > available_for_payout"
         );
-
+        let err = res.unwrap_err();
+        assert_eq!(err, ResponseError::FailedValidation("b".to_string()), "Failed validation because total_to_pay > available_for_payout");
         // make a request where campaigns will have available remaining
         campaign_remaining
             .increase_by(DUMMY_CAMPAIGN.id, UnifiedNum::from_u64(1000))
@@ -1121,8 +1163,10 @@ mod test {
         let res =
             channel_payout(build_request(&channel_context, UnifiedMap::default()), &app).await;
         assert!(
-            matches!(res, Err(ResponseError::FailedValidation(..))),
-            "Failed validation because the campaign has remaining funds"
+            res.is_err(),
+            "Should return an error when a campaign has remaining funds"
         );
+        let err = res.unwrap_err();
+        assert_eq!(err, ResponseError::FailedValidation("c".to_string()), "Failed validation because the campaign has remaining funds");
     }
 }

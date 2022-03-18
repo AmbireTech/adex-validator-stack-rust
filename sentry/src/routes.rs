@@ -76,7 +76,7 @@
 //!
 //! Response: [`LastApprovedResponse`][primitives::sentry::LastApprovedResponse]
 //!
-//! - [`POST /v5/channel/:id/pay`](channel::channel_payout)(auth required)
+//! - [`POST /v5/channel/:id/pay`](channel::channel_payout) (auth required)
 //!
 //! Channel Payout with authentication of the spender.
 //!
@@ -89,8 +89,6 @@
 //!
 //! Response: [`SuccessResponse`](primitives::sentry::SuccessResponse)
 //!
-//!
-//! Withdrawals of advertiser funds - re-introduces the PAY event with a separate route.
 //!
 //! - `GET /v5/channel/:id/get-leaf`
 //!
