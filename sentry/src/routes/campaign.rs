@@ -28,7 +28,7 @@ use slog::error;
 use std::cmp::{max, Ordering};
 use thiserror::Error;
 use tokio_postgres::error::SqlState;
-use futures::{future::try_join_all};
+use futures::{future::try_join_all, TryFutureExt};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -115,32 +115,23 @@ pub async fn fetch_campaign_ids_for_channel(
     if total_pages < 2 {
         Ok(campaign_ids)
     } else {
-        // let mut other_pages: Vec<Vec<CampaignId>> = Vec::new();
-        // for i in 1..total_pages {
-        //     let skip = i
-        //         .checked_mul(limit.into())
-        //         .ok_or(ResponseError::FailedValidation(
-        //             "Calculating skip while fetching campaign ids results in an overflow"
-        //                 .to_string(),
-        //         ))?;
-        //     let res = get_campaign_ids_by_channel(pool, &channel_id, limit.into(), skip).await?;
-        //     other_pages.push(res);
-        // }
-        // let all_campaigns = other_pages.into_iter().flatten().collect();
+        let pages_skip: Vec<u64> = (1..total_pages).map(|i| {
+            i.checked_mul(limit.into()).ok_or_else(|| {
+                ResponseError::FailedValidation("Calculating skip while fetching campaign ids results in an overflow".to_string())
+            })
+        }).collect::<Result<_, _>>()?;
 
-        let other_pages: Vec<Vec<CampaignId>> = try_join_all((1..total_pages).map(|i| {
-            let skip = match i.checked_mul(limit.into()) {
-                Some(skip) => skip,
-                None => return Err(ResponseError::FailedValidation("Calculating skip while fetching campaign ids results in an overflow".to_string()))
-            };
-            get_campaign_ids_by_channel(pool, &channel_id, limit.into(), skip)
+
+        let other_pages = try_join_all(pages_skip.into_iter().map(|skip| {
+            get_campaign_ids_by_channel(pool, &channel_id, limit.into(), skip).map_err(|e| ResponseError::BadRequest(e.to_string()))
         }))
         .await?;
 
-        let all_campaigns: Vec<CampaignId> = std::iter::once(campaign_ids)
+        let all_campaigns = std::iter::once(campaign_ids)
             .chain(other_pages.into_iter())
             .flat_map(|campaign_ids| campaign_ids.into_iter())
             .collect();
+
         Ok(all_campaigns)
     }
 }
