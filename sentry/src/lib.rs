@@ -6,23 +6,23 @@
 use adapter::{prelude::*, Adapter};
 use chrono::Utc;
 use hyper::{Body, Method, Request, Response, StatusCode};
-use middleware::{
-    auth::{AuthRequired, Authenticate},
-    campaign::{CalledByCreator, CampaignLoad},
-    channel::ChannelLoad,
-    cors::{cors, Cors},
-    Chain, Middleware,
-};
 use once_cell::sync::Lazy;
 use primitives::{sentry::ValidationErrorResponse, Config, ValidatorId};
 use redis::aio::MultiplexedConnection;
 use regex::Regex;
-use routes::routers::analytics_router;
 use slog::Logger;
 use std::collections::HashMap;
 use {
+    middleware::{
+        auth::{AuthRequired, Authenticate},
+        campaign::{CalledByCreator, CampaignLoad},
+        channel::ChannelLoad,
+        cors::{cors, Cors},
+        Chain, Middleware,
+    },
     db::{CampaignRemaining, DbPool},
     routes::{
+        routers::analytics_router,
         campaign,
         campaign::{campaign_list, create_campaign, update_campaign},
         channel::{
@@ -34,6 +34,7 @@ use {
         },
         get_cfg,
     },
+    platform::PlatformApi,
 };
 
 pub mod access;
@@ -42,6 +43,7 @@ pub mod application;
 pub mod db;
 pub mod middleware;
 pub mod payout;
+pub mod platform;
 pub mod routes;
 pub mod spender;
 
@@ -102,6 +104,7 @@ pub struct Application<C: Locked + 'static> {
     pub redis: MultiplexedConnection,
     pub pool: DbPool,
     pub campaign_remaining: CampaignRemaining,
+    pub platform_api: PlatformApi,
 }
 
 impl<C> Application<C>
@@ -115,6 +118,7 @@ where
         redis: MultiplexedConnection,
         pool: DbPool,
         campaign_remaining: CampaignRemaining,
+        platform_api: PlatformApi,
     ) -> Self {
         Self {
             adapter,
@@ -123,6 +127,7 @@ where
             redis,
             pool,
             campaign_remaining,
+            platform_api
         }
     }
 
@@ -389,6 +394,7 @@ pub fn map_response_error(error: ResponseError) -> Response<Body> {
         ResponseError::Conflict(e) => bad_response(e, StatusCode::CONFLICT),
         ResponseError::TooManyRequests(e) => bad_response(e, StatusCode::TOO_MANY_REQUESTS),
         ResponseError::FailedValidation(e) => bad_validation_response(e),
+        
     }
 }
 
@@ -487,7 +493,7 @@ pub mod test_util {
             tests_postgres::{setup_test_migrations, DATABASE_POOL},
             CampaignRemaining,
         },
-        Application,
+        Application, platform::PlatformApi,
     };
 
     /// Uses development and therefore the goerli testnet addresses of the tokens
@@ -511,16 +517,24 @@ pub mod test_util {
         setup_test_migrations(database.pool.clone())
             .await
             .expect("Migrations should succeed");
+            
+        let logger = discard_logger();
 
         let campaign_remaining = CampaignRemaining::new(redis.connection.clone());
+
+        // TODO: Should we get from wiremock?
+        let platform_url = "http://change-me.tm".parse().expect("Bad ApiUrl!");
+        // Configure keep_alive_interval!
+        let platform_api = PlatformApi::new(platform_url, std::time::Duration::from_secs(3), logger.clone()).expect("should build test PlatformApi");
 
         let app = Application::new(
             adapter,
             config,
-            discard_logger(),
+            logger,
             redis.connection.clone(),
             database.pool.clone(),
             campaign_remaining,
+            platform_api
         );
 
         app

@@ -14,6 +14,24 @@ use adapter::prelude::*;
 use hyper::{Body, Method, Request, Response};
 use primitives::analytics::{query::AllowedKey, AuthenticateAs};
 
+use super::units_for_slot::post_units_for_slot;
+
+pub async fn units_for_slot_router<C: Locked + 'static>(
+    req: Request<Body>,
+    app: &Application<C>,
+) -> Result<Response<Body>, ResponseError> {
+    let (route, method) = (req.uri().path(), req.method());
+
+    match (method, route) {
+        (&Method::POST, "/v5/units-for-slot") => {
+
+            post_units_for_slot(req, app).await
+        }
+
+        _ => Err(ResponseError::NotFound),
+    }
+}
+
 /// `/v5/analytics` router
 pub async fn analytics_router<C: Locked + 'static>(
     mut req: Request<Body>,
