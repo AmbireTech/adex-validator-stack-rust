@@ -14,6 +14,7 @@ use crate::{
 };
 use adapter::{prelude::*, Adapter, Error as AdaptorError};
 use deadpool_postgres::PoolError;
+use futures::{future::try_join_all, TryFutureExt};
 use hyper::{Body, Request, Response};
 use primitives::{
     campaign_validator::Validator,
@@ -28,7 +29,6 @@ use slog::error;
 use std::cmp::{max, Ordering};
 use thiserror::Error;
 use tokio_postgres::error::SqlState;
-use futures::{future::try_join_all, TryFutureExt};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -115,15 +115,20 @@ pub async fn fetch_campaign_ids_for_channel(
     if total_pages < 2 {
         Ok(campaign_ids)
     } else {
-        let pages_skip: Vec<u64> = (1..total_pages).map(|i| {
-            i.checked_mul(limit.into()).ok_or_else(|| {
-                ResponseError::FailedValidation("Calculating skip while fetching campaign ids results in an overflow".to_string())
+        let pages_skip: Vec<u64> = (1..total_pages)
+            .map(|i| {
+                i.checked_mul(limit.into()).ok_or_else(|| {
+                    ResponseError::FailedValidation(
+                        "Calculating skip while fetching campaign ids results in an overflow"
+                            .to_string(),
+                    )
+                })
             })
-        }).collect::<Result<_, _>>()?;
-
+            .collect::<Result<_, _>>()?;
 
         let other_pages = try_join_all(pages_skip.into_iter().map(|skip| {
-            get_campaign_ids_by_channel(pool, &channel_id, limit.into(), skip).map_err(|e| ResponseError::BadRequest(e.to_string()))
+            get_campaign_ids_by_channel(pool, &channel_id, limit.into(), skip)
+                .map_err(|e| ResponseError::BadRequest(e.to_string()))
         }))
         .await?;
 
