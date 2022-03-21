@@ -23,9 +23,17 @@ impl PlatformApi {
     }
 
     // todo: Instead of associate function, use a builder
-    pub fn new(platform_url: ApiUrl, keep_alive_interval: Duration, logger: Logger) -> Result<Self> {
+    pub fn new(
+        platform_url: ApiUrl,
+        keep_alive_interval: Duration,
+        logger: Logger,
+    ) -> Result<Self> {
         Ok(Self {
-            inner: Arc::new(PlatformApiInner::new(platform_url, keep_alive_interval, logger)?),
+            inner: Arc::new(PlatformApiInner::new(
+                platform_url,
+                keep_alive_interval,
+                logger,
+            )?),
         })
     }
 
@@ -78,7 +86,11 @@ impl PlatformApiInner {
     /// Duration specified will be the time to remain idle before sending a TCP keepalive probe.
     /// Sets [`reqwest::Client`]'s [`reqwest::ClientBuilder::tcp_keepalive`](reqwest::ClientBuilder::tcp_keepalive))
     // @TODO: maybe add timeout too?
-    pub fn new(platform_url: ApiUrl, keep_alive_interval: Duration, logger: Logger) -> Result<Self> {
+    pub fn new(
+        platform_url: ApiUrl,
+        keep_alive_interval: Duration,
+        logger: Logger,
+    ) -> Result<Self> {
         let client = Client::builder()
             .tcp_keepalive(keep_alive_interval)
             .cookie_store(true)

@@ -92,7 +92,11 @@ where
         alexa_rank: Some(1.0),
     };
 
-    let units = match app.platform_api.fetch_units(&request_body.ad_slot.ad_type).await {
+    let units = match app
+        .platform_api
+        .fetch_units(&request_body.ad_slot.ad_type)
+        .await
+    {
         Ok(units) => units,
         Err(error) => {
             error!(&logger, "Error fetching AdUnits for AdSlot"; "AdSlot" => ?ad_slot, "error" => ?error);
@@ -379,4 +383,3 @@ async fn apply_targeting(
     //         })
     //         .collect()
 }
-

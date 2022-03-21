@@ -914,7 +914,8 @@ pub mod run {
             postgres_connection, redis_connection, redis_pool::Manager,
             tests_postgres::setup_test_migrations, CampaignRemaining,
         },
-        Application, platform::PlatformApi,
+        platform::PlatformApi,
+        Application,
     };
     use slog::info;
     use subprocess::{Popen, PopenConfig, Redirection};
@@ -954,9 +955,16 @@ pub mod run {
         let campaign_remaining = CampaignRemaining::new(redis.clone());
 
         // todo: Make platform_url configurable! Load from config or pass with env. variable
-    let platform_url = "https://todo-local-platform".parse().expect("Bad ApiUrl, load from Config?");
-    // todo: Make keep_alive_interval configurable!
-    let platform_api = PlatformApi::new(platform_url, std::time::Duration::from_secs(3), logger.clone()).expect("Should make PlatformApi");
+        let platform_url = "https://todo-local-platform"
+            .parse()
+            .expect("Bad ApiUrl, load from Config?");
+        // todo: Make keep_alive_interval configurable!
+        let platform_api = PlatformApi::new(
+            platform_url,
+            std::time::Duration::from_secs(3),
+            logger.clone(),
+        )
+        .expect("Should make PlatformApi");
 
         let app = Application::new(
             adapter,
@@ -965,7 +973,7 @@ pub mod run {
             redis.clone(),
             postgres.clone(),
             campaign_remaining,
-            platform_api
+            platform_api,
         );
 
         // Before the tests, make sure to flush the DB from previous run of `sentry` tests

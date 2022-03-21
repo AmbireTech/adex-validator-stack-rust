@@ -23,10 +23,7 @@ pub async fn units_for_slot_router<C: Locked + 'static>(
     let (route, method) = (req.uri().path(), req.method());
 
     match (method, route) {
-        (&Method::POST, "/v5/units-for-slot") => {
-
-            post_units_for_slot(req, app).await
-        }
+        (&Method::POST, "/v5/units-for-slot") => post_units_for_slot(req, app).await,
 
         _ => Err(ResponseError::NotFound),
     }

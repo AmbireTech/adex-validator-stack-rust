@@ -102,7 +102,7 @@ impl<C: Locked> Clone for Application<C> {
             redis: self.redis.clone(),
             pool: self.pool.clone(),
             campaign_remaining: self.campaign_remaining.clone(),
-            platform_api: self.platform_api.clone()
+            platform_api: self.platform_api.clone(),
         }
     }
 }

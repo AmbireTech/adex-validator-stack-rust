@@ -13,6 +13,7 @@ use regex::Regex;
 use slog::Logger;
 use std::collections::HashMap;
 use {
+    db::{CampaignRemaining, DbPool},
     middleware::{
         auth::{AuthRequired, Authenticate},
         campaign::{CalledByCreator, CampaignLoad},
@@ -20,9 +21,8 @@ use {
         cors::{cors, Cors},
         Chain, Middleware,
     },
-    db::{CampaignRemaining, DbPool},
+    platform::PlatformApi,
     routes::{
-        routers::analytics_router,
         campaign,
         campaign::{campaign_list, create_campaign, update_campaign},
         channel::{
@@ -33,8 +33,8 @@ use {
             },
         },
         get_cfg,
+        routers::analytics_router,
     },
-    platform::PlatformApi,
 };
 
 pub mod access;
@@ -127,7 +127,7 @@ where
             redis,
             pool,
             campaign_remaining,
-            platform_api
+            platform_api,
         }
     }
 
@@ -394,7 +394,6 @@ pub fn map_response_error(error: ResponseError) -> Response<Body> {
         ResponseError::Conflict(e) => bad_response(e, StatusCode::CONFLICT),
         ResponseError::TooManyRequests(e) => bad_response(e, StatusCode::TOO_MANY_REQUESTS),
         ResponseError::FailedValidation(e) => bad_validation_response(e),
-        
     }
 }
 
@@ -493,7 +492,8 @@ pub mod test_util {
             tests_postgres::{setup_test_migrations, DATABASE_POOL},
             CampaignRemaining,
         },
-        Application, platform::PlatformApi,
+        platform::PlatformApi,
+        Application,
     };
 
     /// Uses development and therefore the goerli testnet addresses of the tokens
@@ -517,7 +517,7 @@ pub mod test_util {
         setup_test_migrations(database.pool.clone())
             .await
             .expect("Migrations should succeed");
-            
+
         let logger = discard_logger();
 
         let campaign_remaining = CampaignRemaining::new(redis.connection.clone());
@@ -525,7 +525,12 @@ pub mod test_util {
         // TODO: Should we get from wiremock?
         let platform_url = "http://change-me.tm".parse().expect("Bad ApiUrl!");
         // Configure keep_alive_interval!
-        let platform_api = PlatformApi::new(platform_url, std::time::Duration::from_secs(3), logger.clone()).expect("should build test PlatformApi");
+        let platform_api = PlatformApi::new(
+            platform_url,
+            std::time::Duration::from_secs(3),
+            logger.clone(),
+        )
+        .expect("should build test PlatformApi");
 
         let app = Application::new(
             adapter,
@@ -534,7 +539,7 @@ pub mod test_util {
             redis.connection.clone(),
             database.pool.clone(),
             campaign_remaining,
-            platform_api
+            platform_api,
         );
 
         app
