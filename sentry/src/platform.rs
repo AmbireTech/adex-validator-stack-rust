@@ -72,13 +72,12 @@ impl fmt::Display for Statuses<'_> {
 struct PlatformApiInner {
     platform_url: ApiUrl,
     client: Client,
-    logger: Logger,
 }
 
 impl PlatformApiInner {
-    /// The limit of Campaigns per page when fetching
-    /// Limit the value to MAX(500)
-    const MARKET_CAMPAIGNS_LIMIT: u64 = 500;
+    // /// The limit of Campaigns per page when fetching
+    // /// Limit the value to MAX(500)
+    // const MARKET_CAMPAIGNS_LIMIT: u64 = 500;
     /// The limit of AdUnits per page when fetching
     /// It should always be > 1
     const MARKET_AD_UNITS_LIMIT: u64 = 1_000;
@@ -99,7 +98,6 @@ impl PlatformApiInner {
         Ok(Self {
             platform_url,
             client,
-            logger,
         })
     }
 
