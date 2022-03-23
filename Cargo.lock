@@ -92,6 +92,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "array-init"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6945cc5422176fc5e602e590c2878d2c2acd9a4fe20a4baa7c28022521698ec6"
+
+[[package]]
 name = "arrayref"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2770,6 +2776,7 @@ name = "postgres-types"
 version = "0.2.2"
 source = "git+https://github.com/elpiel/rust-postgres?branch=boxed-dyn-ToSql#c516805275aaaf106e8e512f53a9b0234f707583"
 dependencies = [
+ "array-init 2.0.0",
  "bytes",
  "chrono",
  "fallible-iterator",
@@ -3519,7 +3526,7 @@ version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca37e3e4d1b39afd7ff11ee4e947efae85adfddf4841787bfa47c470e96dc26d"
 dependencies = [
- "array-init",
+ "array-init 0.0.4",
  "serde",
  "smallvec 0.6.14",
 ]
