@@ -1,7 +1,14 @@
-//! This module contains all the routers
+//! This module contains all the Sentry REST API routers.
 //!
-//! The routers handle the route matching and parameters, and should also call
-//! the corresponding [`Middleware`]s for the given request.
+//! # Routers
+//!
+//! Routers are functions that are called on certain route prefix (e.g. `/v5/channel`, `/v5/campaign`)
+//! and they perform a few key operations for the REST API web server:
+//!
+//! - Extract parameters from the route
+//! - Match against the different HTTP methods
+//! - Calls additional [`middleware`](`crate::middleware`)s for the route
+//!
 use crate::{
     middleware::{
         auth::{AuthRequired, IsAdmin},

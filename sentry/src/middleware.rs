@@ -1,3 +1,7 @@
+//! This module contains all the routers
+//!
+//! # Middleware
+//! 
 use std::fmt::Debug;
 
 use crate::{Application, ResponseError};
