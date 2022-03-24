@@ -1,4 +1,4 @@
-use primitives::{Channel, ChannelId, ValidatorId};
+use primitives::{Channel, ChannelId};
 
 pub use list_channels::list_channels;
 
