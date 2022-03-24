@@ -5,7 +5,7 @@ use ethstore::{
     SafeAccount,
 };
 use once_cell::sync::Lazy;
-use primitives::{Address, ValidatorId};
+use primitives::{Address, ChainId, ValidatorId};
 use serde::{Deserialize, Serialize};
 use web3::signing::keccak256;
 
@@ -52,6 +52,7 @@ pub struct Payload {
     pub address: Address,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub identity: Option<Address>,
+    pub chain_id: ChainId,
 }
 
 impl Payload {
@@ -221,7 +222,7 @@ mod test {
     use primitives::{
         config::GANACHE_CONFIG,
         test_util::{CREATOR, LEADER},
-        ValidatorId,
+        ChainId, ValidatorId,
     };
 
     use super::*;
@@ -239,11 +240,13 @@ mod test {
             era: 100_000,
             address: eth_adapter.whoami().to_address(),
             identity: None,
+            // Eth
+            chain_id: ChainId::new(1),
         };
         let wallet = eth_adapter.state.wallet.clone();
         let token = Token::sign(&wallet, &eth_adapter.state.password, payload)
             .expect("failed to generate ewt signature");
-        let expected = "eyJ0eXAiOiJKV1QiLCJhbGciOiJFVEgifQ.eyJpZCI6IjB4ODA2OTA3NTE5NjlCMjM0Njk3ZTkwNTllMDRlZDcyMTk1YzM1MDdmYSIsImVyYSI6MTAwMDAwLCJhZGRyZXNzIjoiMHhhQ0JhREEyZDU4MzBkMTg3NWFlM0QyZGUyMDdBMTM2M0IzMTZEZjJGIn0.HVZ3qD2pdY_dqgNgJZTB7vhkpKBmMDzQ1tigee1aSd0ugnA_4D12nilJtpfS0KcG7soAMRqwCXw0-1hUqDqUrxsB";
+        let expected = "eyJ0eXAiOiJKV1QiLCJhbGciOiJFVEgifQ.eyJpZCI6IjB4ODA2OTA3NTE5NjlCMjM0Njk3ZTkwNTllMDRlZDcyMTk1YzM1MDdmYSIsImVyYSI6MTAwMDAwLCJhZGRyZXNzIjoiMHhhQ0JhREEyZDU4MzBkMTg3NWFlM0QyZGUyMDdBMTM2M0IzMTZEZjJGIiwiY2hhaW5faWQiOjF9.GxF4XDXMx-rRty5zQ7-0nx2VlX51R_uEs_7OfA5ezDcyryUS06IWqVgGIfu4chhRJFP7woZ1YJpARNbCE01nWxwB";
         assert_eq!(token.as_str(), expected, "generated wrong ewt signature");
 
         let expected_verification_response = VerifyPayload {
@@ -253,6 +256,8 @@ mod test {
                 era: 100_000,
                 address: *CREATOR,
                 identity: None,
+                // Eth
+                chain_id: ChainId::new(1),
             },
         };
 

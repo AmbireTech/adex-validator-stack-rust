@@ -1,5 +1,4 @@
-use chrono::Utc;
-use primitives::{validator::MessageTypes, Channel, ChannelId, ValidatorId};
+use primitives::{Channel, ChannelId, ValidatorId};
 
 pub use list_channels::list_channels;
 
@@ -18,21 +17,6 @@ pub async fn get_channel_by_id(
         .await?;
 
     let row = client.query_opt(&select, &[&id]).await?;
-
-    Ok(row.as_ref().map(Channel::from))
-}
-
-pub async fn get_channel_by_id_and_validator(
-    pool: &DbPool,
-    id: ChannelId,
-    validator: ValidatorId,
-) -> Result<Option<Channel>, PoolError> {
-    let client = pool.get().await?;
-
-    let query = "SELECT leader, follower, guardian, token, nonce FROM channels WHERE id = $1 AND (leader = $2 OR follower = $2) LIMIT 1";
-    let select = client.prepare(query).await?;
-
-    let row = client.query_opt(&select, &[&id, &validator]).await?;
 
     Ok(row.as_ref().map(Channel::from))
 }
@@ -70,27 +54,6 @@ pub async fn insert_channel(pool: &DbPool, channel: Channel) -> Result<Channel, 
         .await?;
 
     Ok(Channel::from(&row))
-}
-
-pub async fn insert_validator_messages(
-    pool: &DbPool,
-    channel: &Channel,
-    from: &ValidatorId,
-    validator_message: &MessageTypes,
-) -> Result<bool, PoolError> {
-    let client = pool.get().await?;
-
-    let stmt = client.prepare("INSERT INTO validator_messages (channel_id, \"from\", msg, received) values ($1, $2, $3, $4)").await?;
-
-    let row = client
-        .execute(
-            &stmt,
-            &[&channel.id(), &from, &validator_message, &Utc::now()],
-        )
-        .await?;
-
-    let inserted = row == 1;
-    Ok(inserted)
 }
 
 mod list_channels {
@@ -184,7 +147,7 @@ mod list_channels {
 
 #[cfg(test)]
 mod test {
-    use primitives::util::tests::prep_db::DUMMY_CAMPAIGN;
+    use primitives::test_util::DUMMY_CAMPAIGN;
 
     use crate::db::{
         insert_channel,

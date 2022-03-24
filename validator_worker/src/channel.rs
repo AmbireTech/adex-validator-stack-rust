@@ -4,7 +4,7 @@ use crate::{
 };
 
 use adapter::prelude::*;
-use primitives::{config::Config, Channel, ChannelId};
+use primitives::{config::Config, ChainOf, Channel, ChannelId};
 use slog::info;
 use std::time::Duration;
 use tokio::time::timeout;
@@ -12,22 +12,24 @@ use tokio::time::timeout;
 pub async fn channel_tick<C: Unlocked + 'static>(
     sentry: &SentryApi<C>,
     config: &Config,
-    channel: Channel,
+    channel_context: ChainOf<Channel>,
 ) -> Result<(ChannelId, Box<dyn std::fmt::Debug>), Error> {
     let logger = sentry.logger.clone();
+    let channel = channel_context.context;
 
     let adapter = &sentry.adapter;
-    let tick = channel
+    let tick = channel_context
+        .context
         .find_validator(adapter.whoami())
         .ok_or(Error::ChannelNotIntendedForUs)?;
 
     // 1. `GET /channel/:id/spender/all`
-    let all_spenders = sentry.get_all_spenders(channel.id()).await?;
+    let all_spenders = sentry.get_all_spenders(&channel_context).await?;
 
     // 2. `GET /channel/:id/accounting`
     // Validation #1:
     // sum(Accounting.spenders) == sum(Accounting.earners)
-    let accounting = sentry.get_accounting(channel.id()).await?;
+    let accounting = sentry.get_accounting(&channel_context).await?;
 
     // Validation #2:
     // spender.total_deposit >= accounting.balances.spenders[spender.address]
@@ -43,17 +45,12 @@ pub async fn channel_tick<C: Unlocked + 'static>(
         return Err(Error::Validation);
     }
 
-    let token = config
-        .token_address_whitelist
-        .get(&channel.token)
-        .ok_or(Error::ChannelTokenNotWhitelisted)?;
-
     let duration = Duration::from_millis(config.channel_tick_timeout as u64);
 
     match tick {
         primitives::Validator::Leader(_v) => match timeout(
             duration,
-            leader::tick(sentry, channel, accounting.balances, token),
+            leader::tick(sentry, &channel_context, accounting.balances),
         )
         .await
         {
@@ -72,7 +69,7 @@ pub async fn channel_tick<C: Unlocked + 'static>(
         },
         primitives::Validator::Follower(_v) => {
             let follower_fut =
-                follower::tick(sentry, channel, all_spenders, accounting.balances, token);
+                follower::tick(sentry, &channel_context, all_spenders, accounting.balances);
             match timeout(duration, follower_fut).await {
                 Err(timeout_e) => Err(Error::FollowerTick(
                     channel.id(),

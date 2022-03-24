@@ -96,21 +96,21 @@ mod test {
     use serde_json::json;
 
     use super::*;
-    use crate::util::tests::prep_db::ADDRESSES;
+    use crate::test_util::{FOLLOWER, LEADER};
 
     #[test]
     fn test_unified_map_de_serialization() {
         let unified_map: UnifiedMap = vec![
-            (ADDRESSES["leader"], UnifiedNum::from(50_u64)),
-            (ADDRESSES["follower"], UnifiedNum::from(100_u64)),
+            (*LEADER, UnifiedNum::from(50_u64)),
+            (*FOLLOWER, UnifiedNum::from(100_u64)),
         ]
         .into_iter()
         .collect();
 
         let actual_json = serde_json::to_value(&unified_map).expect("Should serialize it");
         let expected_json = json!({
-            "0xC91763D7F14ac5c5dDfBCD012e0D2A61ab9bDED3":"100",
-            "0xce07CbB7e054514D590a0262C93070D838bFBA2e":"50"
+            "0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7":"100",
+            "0x80690751969B234697e9059e04ed72195c3507fa":"50"
         });
 
         assert_eq!(expected_json, actual_json);
@@ -124,16 +124,16 @@ mod test {
     #[test]
     fn test_balances_map_de_serialization() {
         let balances_map: BalancesMap = vec![
-            (ADDRESSES["leader"], BigNum::from(50_u64)),
-            (ADDRESSES["follower"], BigNum::from(100_u64)),
+            (*LEADER, BigNum::from(50_u64)),
+            (*FOLLOWER, BigNum::from(100_u64)),
         ]
         .into_iter()
         .collect();
 
         let actual_json = serde_json::to_value(&balances_map).expect("Should serialize it");
         let expected_json = json!({
-            "0xC91763D7F14ac5c5dDfBCD012e0D2A61ab9bDED3":"100",
-            "0xce07CbB7e054514D590a0262C93070D838bFBA2e":"50"
+            "0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7":"100",
+            "0x80690751969B234697e9059e04ed72195c3507fa":"50"
         });
 
         assert_eq!(expected_json, actual_json);
@@ -148,18 +148,18 @@ mod test {
     fn test_balances_map_deserialization_with_same_keys() {
         // the first is ETH Checksummed, the second is lowercase!
         let json = json!({
-            "0xC91763D7F14ac5c5dDfBCD012e0D2A61ab9bDED3":"100",
-            "0xc91763d7f14ac5c5ddfbcd012e0d2a61ab9bded3":"20",
-            "0xce07CbB7e054514D590a0262C93070D838bFBA2e":"50"
+            "0x80690751969B234697e9059e04ed72195c3507fa":"100",
+            "0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7":"20",
+            "0x80690751969B234697e9059e04ed72195c3507fa":"50"
         });
 
         let actual_deserialized: BalancesMap =
             serde_json::from_value(json).expect("Should deserialize it");
 
         let expected_deserialized: BalancesMap = vec![
-            (ADDRESSES["leader"], BigNum::from(50_u64)),
+            (*LEADER, BigNum::from(50_u64)),
             // only the second should be accepted, as it appears second in the string and it's the latest one
-            (ADDRESSES["follower"], BigNum::from(20_u64)),
+            (*FOLLOWER, BigNum::from(20_u64)),
         ]
         .into_iter()
         .collect();

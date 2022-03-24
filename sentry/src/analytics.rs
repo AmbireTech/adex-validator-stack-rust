@@ -97,8 +97,7 @@ mod test {
     use super::*;
     use primitives::{
         sentry::{Analytics, CLICK, IMPRESSION},
-        test_util::DUMMY_IPFS,
-        util::tests::prep_db::{ADDRESSES, DUMMY_CAMPAIGN},
+        test_util::{DUMMY_CAMPAIGN, DUMMY_IPFS, PUBLISHER},
         UnifiedNum,
     };
 
@@ -123,12 +122,12 @@ mod test {
                 "click_empty".into(),
                 (
                     Event::Click {
-                        publisher: ADDRESSES["publisher"],
+                        publisher: *PUBLISHER,
                         ad_unit: None,
                         ad_slot: None,
                         referrer: None,
                     },
-                    ADDRESSES["publisher"],
+                    *PUBLISHER,
                     UnifiedNum::from_u64(1_000_000),
                 ),
             ),
@@ -136,12 +135,12 @@ mod test {
                 "impression_empty".into(),
                 (
                     Event::Impression {
-                        publisher: ADDRESSES["publisher"],
+                        publisher: *PUBLISHER,
                         ad_unit: None,
                         ad_slot: None,
                         referrer: None,
                     },
-                    ADDRESSES["publisher"],
+                    *PUBLISHER,
                     UnifiedNum::from_u64(1_000_000),
                 ),
             ),
@@ -149,12 +148,12 @@ mod test {
                 "click_with_unit_and_slot".into(),
                 (
                     Event::Click {
-                        publisher: ADDRESSES["publisher"],
+                        publisher: *PUBLISHER,
                         ad_unit: Some(DUMMY_IPFS[0]),
                         ad_slot: Some(DUMMY_IPFS[1]),
                         referrer: Some("http://127.0.0.1".into()),
                     },
-                    ADDRESSES["publisher"],
+                    *PUBLISHER,
                     UnifiedNum::from_u64(1_000_000),
                 ),
             ),
@@ -162,12 +161,12 @@ mod test {
                 "click_with_different_data".into(),
                 (
                     Event::Click {
-                        publisher: ADDRESSES["publisher"],
+                        publisher: *PUBLISHER,
                         ad_unit: Some(DUMMY_IPFS[2]),
                         ad_slot: Some(DUMMY_IPFS[3]),
                         referrer: Some("http://127.0.0.1".into()),
                     },
-                    ADDRESSES["publisher"],
+                    *PUBLISHER,
                     UnifiedNum::from_u64(1_000_000),
                 ),
             ),
@@ -175,12 +174,12 @@ mod test {
                 "impression_with_slot_unit_and_referrer".into(),
                 (
                     Event::Impression {
-                        publisher: ADDRESSES["publisher"],
+                        publisher: *PUBLISHER,
                         ad_unit: Some(DUMMY_IPFS[0]),
                         ad_slot: Some(DUMMY_IPFS[1]),
                         referrer: Some("http://127.0.0.1".into()),
                     },
-                    ADDRESSES["publisher"],
+                    *PUBLISHER,
                     UnifiedNum::from_u64(1_000_000),
                 ),
             ),

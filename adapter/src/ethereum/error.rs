@@ -1,6 +1,6 @@
 use crate::Error as AdapterError;
 use primitives::{
-    address::Error as AddressError, big_num::ParseBigIntError, Address, ChannelId, ValidatorId,
+    address::Error as AddressError, big_num::ParseBigIntError, ChainId, ChannelId, ValidatorId,
 };
 use thiserror::Error;
 
@@ -14,7 +14,7 @@ impl From<Error> for AdapterError {
             err @ Error::Web3(..) => AdapterError::adapter(err),
             err @ Error::InvalidChannelId { .. } => AdapterError::adapter(err),
             err @ Error::ChannelInactive(..) => AdapterError::adapter(err),
-            err @ Error::TokenNotWhitelisted(..) => AdapterError::adapter(err),
+            err @ Error::ChainNotWhitelisted(..) => AdapterError::adapter(err),
             err @ Error::InvalidDepositAsset(..) => AdapterError::adapter(err),
             err @ Error::BigNumParsing(..) => AdapterError::adapter(err),
             err @ Error::SignMessage(..) => AdapterError::adapter(err),
@@ -62,8 +62,8 @@ pub enum Error {
     /// Error occurred during verification of Signature and/or StateRoot and/or Address
     #[error("Verifying address: {0}")]
     VerifyAddress(#[from] VerifyError),
-    #[error("Token not whitelisted: {0}")]
-    TokenNotWhitelisted(Address),
+    #[error("The intended {0:?} in the authentication token in not whitelisted")]
+    ChainNotWhitelisted(ChainId),
     #[error("Deposit asset {0} is invalid")]
     InvalidDepositAsset(#[from] AddressError),
     #[error("Parsing BigNum: {0}")]

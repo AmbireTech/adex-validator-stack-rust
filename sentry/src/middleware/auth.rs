@@ -133,6 +133,7 @@ async fn for_request<C: Locked>(
         let auth = Auth {
             era: adapter_session.era,
             uid: ValidatorId::from(adapter_session.uid),
+            chain: adapter_session.chain,
         };
 
         req.extensions_mut().insert(auth);
@@ -155,8 +156,8 @@ mod test {
     use adapter::dummy::{Dummy, Options};
     use hyper::Request;
     use primitives::{
+        test_util::IDS,
         test_util::{DUMMY_AUTH, LEADER},
-        util::tests::prep_db::IDS,
     };
 
     use deadpool::managed::Object;
@@ -171,7 +172,7 @@ mod test {
     async fn setup() -> (crate::Adapter<Dummy>, Object<Manager>) {
         let connection = TESTS_POOL.get().await.expect("Should return Object");
         let adapter_options = Options {
-            dummy_identity: IDS["leader"],
+            dummy_identity: IDS[&LEADER],
             dummy_auth_tokens: DUMMY_AUTH.clone(),
         };
 

@@ -7,8 +7,6 @@ use serde::{Deserialize, Serialize};
 
 use self::query::{AllowedKey, Time};
 
-pub const ANALYTICS_QUERY_LIMIT: u32 = 200;
-
 #[cfg(feature = "postgres")]
 pub mod postgres {
     use super::{query::AllowedKey, AnalyticsQuery, OperatingSystem};

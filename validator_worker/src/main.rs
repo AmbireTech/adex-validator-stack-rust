@@ -3,29 +3,29 @@
 
 use std::error::Error;
 
-use clap::{crate_version, App, Arg};
+use clap::{crate_version, Arg, Command};
 
-use adapter::{prelude::*, primitives::AdapterTypes, Adapter, Dummy, Ethereum};
+use adapter::{primitives::AdapterTypes, Adapter, Dummy, Ethereum};
 use primitives::{
     config::{configuration, Environment},
     test_util::DUMMY_AUTH,
     util::logging::new_logger,
     ValidatorId,
 };
-use validator_worker::{sentry_interface::Validator, SentryApi, Worker};
+use validator_worker::{SentryApi, Worker};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let cli = App::new("Validator worker")
+    let cli = Command::new("Validator worker")
         .version(crate_version!())
         .arg(
-            Arg::with_name("config")
+            Arg::new("config")
                 .help("the config file for the validator worker")
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("adapter")
+            Arg::new("adapter")
                 .long("adapter")
-                .short("a")
+                .short('a')
                 .help("the adapter for authentication and signing")
                 .required(true)
                 .default_value("ethereum")
@@ -33,32 +33,32 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("keystoreFile")
+            Arg::new("keystoreFile")
                 .long("keystoreFile")
-                .short("k")
+                .short('k')
                 .help("path to the JSON Ethereum Keystore file")
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("dummyIdentity")
+            Arg::new("dummyIdentity")
                 .long("dummyIdentity")
-                .short("i")
+                .short('i')
                 .help("the identity to use with the dummy adapter")
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("sentryUrl")
+            Arg::new("sentryUrl")
                 .long("sentryUrl")
-                .short("u")
+                .short('u')
                 .help("the URL to the sentry used for listing channels")
                 .default_value("http://127.0.0.1:8005")
                 .required(true)
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("singleTick")
+            Arg::new("singleTick")
                 .long("singleTick")
-                .short("t")
+                .short('t')
                 .takes_value(false)
                 .help("runs the validator in single-tick mode and exit"),
         )
@@ -117,27 +117,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     match unlocked_adapter {
         AdapterTypes::Ethereum(eth_adapter) => {
-            let whoami = Validator {
-                url: sentry_url,
-                token: eth_adapter
-                    .get_auth(eth_adapter.whoami())
-                    .expect("Failed to get Authentication token for Who am I"),
-            };
-
-            let sentry = SentryApi::new(*eth_adapter, logger.clone(), config, whoami)
+            let sentry = SentryApi::new(*eth_adapter, logger.clone(), config, sentry_url)
                 .expect("Should create the SentryApi");
 
             Worker::from_sentry(sentry).run(is_single_tick)
         }
         AdapterTypes::Dummy(dummy_adapter) => {
-            let whoami = Validator {
-                url: sentry_url,
-                token: dummy_adapter
-                    .get_auth(dummy_adapter.whoami())
-                    .expect("Failed to get Authentication token for Who am I"),
-            };
-
-            let sentry = SentryApi::new(*dummy_adapter, logger.clone(), config, whoami)
+            let sentry = SentryApi::new(*dummy_adapter, logger.clone(), config, sentry_url)
                 .expect("Should create the SentryApi");
 
             Worker::from_sentry(sentry).run(is_single_tick)

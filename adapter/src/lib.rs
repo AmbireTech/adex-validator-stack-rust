@@ -1,3 +1,7 @@
+#![deny(rust_2018_idioms)]
+#![deny(clippy::all)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
 pub use {
     self::adapter::{
         state::{LockedState, UnlockedState},
@@ -13,7 +17,10 @@ pub use {
 pub mod primitives {
     use serde::{Deserialize, Serialize};
 
-    pub use ::primitives::{Address, BigNum, Channel, ValidatorId};
+    pub use ::primitives::{
+        config::{ChainInfo, Config, TokenInfo},
+        Address, BigNum, Chain, ChainId, ChainOf, Channel, ValidatorId,
+    };
 
     use crate::ethereum::WalletState;
 
@@ -43,7 +50,10 @@ pub mod primitives {
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct Session {
         pub era: i64,
+        /// Authenticated as [`Address`].
         pub uid: Address,
+        /// Authenticated for [`Chain`].
+        pub chain: Chain,
     }
 }
 

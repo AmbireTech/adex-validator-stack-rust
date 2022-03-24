@@ -7,7 +7,7 @@ use serde_hex::{SerHex, StrictPfx};
 
 use hex::{FromHex, FromHexError};
 
-use crate::{Address, Validator, ValidatorId};
+use crate::{chain::Chain, config::TokenInfo, Address, Validator, ValidatorId};
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Copy, Clone, Hash)]
 #[serde(transparent)]
@@ -90,7 +90,13 @@ impl FromStr for ChannelId {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChainContext {
+    pub token: TokenInfo,
+    pub chain: Chain,
+}
+
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct Channel {
     pub leader: ValidatorId,
@@ -150,7 +156,7 @@ impl fmt::Display for Nonce {
 
 impl fmt::Debug for Nonce {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Nonce({})", self.0.to_string())
+        write!(f, "Nonce({})", self.0)
     }
 }
 

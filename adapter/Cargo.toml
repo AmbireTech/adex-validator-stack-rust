@@ -19,12 +19,12 @@ test-util = ["primitives/test-util"]
 primitives = { path = "../primitives" }
 
 # For Ethereum client
-web3 = { version = "0.17", features = ["http-tls", "signing"] }
+web3 = { version = "0.18", features = ["http-tls", "signing"] }
 ethstore = { git = "https://github.com/openethereum/openethereum", tag = "v3.1.1-rc.1" }
 create2 = "0.0.2"
 
 # For Dummy client
-dashmap = "4.0"
+dashmap = "5"
 
 async-trait = "0.1"
 thiserror = "1"
