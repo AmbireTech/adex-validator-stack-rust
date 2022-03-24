@@ -13,8 +13,7 @@ use wiremock::{
     Mock, MockServer, ResponseTemplate,
 };
 
-
-use tera::{Tera, Context};
+use tera::{Context, Tera};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -22,9 +21,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let serve_dir = match std::env::current_dir().unwrap() {
         serve_path if serve_path.ends_with("serve") => serve_path,
-        adview_manager_path if adview_manager_path.ends_with("adview-manager") => adview_manager_path.join("serve"),
+        adview_manager_path if adview_manager_path.ends_with("adview-manager") => {
+            adview_manager_path.join("serve")
+        }
         // running from the Validator stack workspace
-        workspace_path => workspace_path.join("adview-manager/serve")
+        workspace_path => workspace_path.join("adview-manager/serve"),
     };
 
     let templates_glob = format!("{}/templates/**/*.html", serve_dir.display());

@@ -1279,13 +1279,19 @@ mod test {
             let new_budget = UnifiedNum::from_u64(300 * multiplier);
             let delta_budget = get_delta_budget(&campaign_remaining, &campaign, new_budget).await;
 
-            assert!(matches!(&delta_budget, Err(Error::NewBudget(_))), "Got result: {delta_budget:?}");
+            assert!(
+                matches!(&delta_budget, Err(Error::NewBudget(_))),
+                "Got result: {delta_budget:?}"
+            );
 
             // campaign_spent == new_budget
             let new_budget = UnifiedNum::from_u64(400 * multiplier);
             let delta_budget = get_delta_budget(&campaign_remaining, &campaign, new_budget).await;
 
-            assert!(matches!(&delta_budget, Err(Error::NewBudget(_))), "Got result: {delta_budget:?}");
+            assert!(
+                matches!(&delta_budget, Err(Error::NewBudget(_))),
+                "Got result: {delta_budget:?}"
+            );
         }
         // Increasing budget
         {

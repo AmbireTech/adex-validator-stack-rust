@@ -543,7 +543,10 @@ mod test {
     use primitives::{
         channel::Nonce,
         sentry::channel_list::ChannelListResponse,
-        test_util::{ADVERTISER, CREATOR, GUARDIAN, PUBLISHER, PUBLISHER_2, DUMMY_CAMPAIGN, IDS, LEADER, FOLLOWER, LEADER_2},
+        test_util::{
+            ADVERTISER, CREATOR, DUMMY_CAMPAIGN, FOLLOWER, GUARDIAN, IDS, LEADER, LEADER_2,
+            PUBLISHER, PUBLISHER_2,
+        },
         BigNum,
     };
 
@@ -648,9 +651,7 @@ mod test {
             .await
             .expect("Should get json");
 
-        let channel_list_response: ChannelListResponse =
-            serde_json::from_slice(&json).expect("Should get ChannelListResponse");
-        channel_list_response
+        serde_json::from_slice(&json).expect("Should deserialize ChannelListResponse")
     }
 
     #[tokio::test]
@@ -867,30 +868,39 @@ mod test {
             leader: IDS[&LEADER],
             follower: IDS[&FOLLOWER],
             guardian: *GUARDIAN,
-            token: "0x6B175474E89094C44Da98b954EedeAC495271d0F".parse()
-            .expect("Valid DAI token address"),
+            token: "0x6B175474E89094C44Da98b954EedeAC495271d0F"
+                .parse()
+                .expect("Valid DAI (Ethereum mainnet) token address"),
             nonce: Nonce::from(987_654_321_u32),
         };
-        insert_channel(&app.pool, channel).await.expect("should insert");
+        insert_channel(&app.pool, channel)
+            .await
+            .expect("should insert");
         let channel_other_token = Channel {
             leader: IDS[&LEADER],
             follower: IDS[&FOLLOWER],
             guardian: *GUARDIAN,
-            token: "0x73967c6a0904aa032c103b4104747e88c566b1a2".parse()
-            .expect("Valid DAI token address"),
+            token: "0xdAC17F958D2ee523a2206206994597C13D831ec7"
+                .parse()
+                .expect("Valid USDT (Ethereum mainnet) token address"),
             nonce: Nonce::from(987_654_321_u32),
         };
-        insert_channel(&app.pool, channel_other_token).await.expect("should insert");
+        insert_channel(&app.pool, channel_other_token)
+            .await
+            .expect("should insert");
 
         let channel_other_leader = Channel {
             leader: IDS[&LEADER_2],
             follower: IDS[&FOLLOWER],
             guardian: *GUARDIAN,
-            token: "0x6B175474E89094C44Da98b954EedeAC495271d0F".parse()
-            .expect("Valid DAI token address"),
+            token: "0x6B175474E89094C44Da98b954EedeAC495271d0F"
+                .parse()
+                .expect("Valid DAI (Ethereum mainnet) token address"),
             nonce: Nonce::from(987_654_321_u32),
         };
-        insert_channel(&app.pool, channel_other_leader).await.expect("should insert");
+        insert_channel(&app.pool, channel_other_leader)
+            .await
+            .expect("should insert");
 
         let build_request = |query: ChannelListQuery| {
             let query = serde_urlencoded::to_string(query).expect("should parse query");
@@ -902,41 +912,122 @@ mod test {
         };
 
         // Test query page - page 0, page 1
-        let query = ChannelListQuery {
-            page: 0,
-            validator: None,
-        };
-        let res = channel_list(build_request(query), &app).await.expect("should get channels");
-        let channels_list = res_to_channel_list_response(res).await;
-        assert_eq!(channels_list.channels.len(), 2, "There should be 2 channels on the first page");
-        assert_eq!(channels_list.pagination.total_pages, 2, "There should be 2 pages in total");
+        {
+            let query = ChannelListQuery {
+                page: 0,
+                validator: None,
+            };
+            let res = channel_list(build_request(query), &app)
+                .await
+                .expect("should get channels");
+            let channels_list = res_to_channel_list_response(res).await;
+            let expected_channels_list = vec![channel, channel_other_token];
+            assert_eq!(
+                channels_list.channels.len(),
+                2,
+                "There should be 2 channels on the first page"
+            );
+            assert_eq!(
+                channels_list.channels, expected_channels_list,
+                "The channels should be listed by ascending order of their creation"
+            );
+            assert_eq!(
+                channels_list.pagination.total_pages, 2,
+                "There should be 2 pages in total"
+            );
 
-        let query = ChannelListQuery {
-            page: 1,
-            validator: None,
-        };
-        let res = channel_list(build_request(query), &app).await.expect("should get channels");
-        let channels_list = res_to_channel_list_response(res).await;
-        assert_eq!(channels_list.channels.len(), 1, "There should be 1 channel on the second page");
+            let query = ChannelListQuery {
+                page: 1,
+                validator: None,
+            };
+            let res = channel_list(build_request(query), &app)
+                .await
+                .expect("should get channels");
+            let channels_list = res_to_channel_list_response(res).await;
+            let expected_channels_list = vec![channel_other_leader];
+            assert_eq!(
+                channels_list.channels.len(),
+                1,
+                "There should be 1 channel on the second page"
+            );
+            assert_eq!(
+                channels_list.channels, expected_channels_list,
+                "The channels should be listed by ascending order of their creation"
+            );
+        }
 
         // Test query validator - query with validator ID
-        let query = ChannelListQuery {
-            page: 0,
-            validator: Some(IDS[&LEADER_2]),
-        };
-        let res = channel_list(build_request(query), &app).await.expect("should get channels");
-        let channels_list = res_to_channel_list_response(res).await;
-        assert_eq!(channels_list.channels.len(), 1, "There should be 1 channel in total");
-        assert_eq!(channels_list.pagination.total_pages, 1, "There should be 1 page in total");
+        {
+            let query = ChannelListQuery {
+                page: 0,
+                validator: Some(IDS[&LEADER_2]),
+            };
+            let res = channel_list(build_request(query), &app)
+                .await
+                .expect("should get channels");
+            let channels_list = res_to_channel_list_response(res).await;
+            let expected_channels_list = vec![channel_other_leader];
+            assert_eq!(
+                channels_list.channels.len(),
+                1,
+                "There should be 1 channel in total"
+            );
+            assert_eq!(
+                channels_list.channels, expected_channels_list,
+                "Response returns the correct channel"
+            );
+            assert_eq!(
+                channels_list.pagination.total_pages, 1,
+                "There should be 1 page in total"
+            );
+        }
+        // Test query with both pagination and validator by querying for the follower validator
+        {
+            let query = ChannelListQuery {
+                page: 0,
+                validator: Some(IDS[&FOLLOWER]),
+            };
+            let res = channel_list(build_request(query), &app)
+                .await
+                .expect("should get channels");
+            let channels_list = res_to_channel_list_response(res).await;
+            let expected_channels_list = vec![channel, channel_other_token];
+            assert_eq!(
+                channels_list.channels.len(),
+                2,
+                "There should be 1 channel on the second page"
+            );
+            assert_eq!(
+                channels_list.pagination.total_pages, 2,
+                "There should be 2 pages in total"
+            );
+            assert_eq!(
+                channels_list.channels, expected_channels_list,
+                "The channels should be listed by ascending order of their creation"
+            );
 
-        // Test query with both pagination and validator  - page 1 for follower
-        let query = ChannelListQuery {
-            page: 1,
-            validator: Some(IDS[&FOLLOWER]),
-        };
-        let res = channel_list(build_request(query), &app).await.expect("should get channels");
-        let channels_list = res_to_channel_list_response(res).await;
-        assert_eq!(channels_list.channels.len(), 1, "There should be 1 channel on the second page");
-        assert_eq!(channels_list.pagination.total_pages, 2, "There should be 2 pages in total");
+            let query = ChannelListQuery {
+                page: 1,
+                validator: Some(IDS[&FOLLOWER]),
+            };
+            let res = channel_list(build_request(query), &app)
+                .await
+                .expect("should get channels");
+            let channels_list = res_to_channel_list_response(res).await;
+            let expected_channels_list = vec![channel_other_leader];
+            assert_eq!(
+                channels_list.channels.len(),
+                1,
+                "There should be 1 channel on the second page"
+            );
+            assert_eq!(
+                channels_list.channels, expected_channels_list,
+                "The channels should be listed by ascending order of their creation"
+            );
+            assert_eq!(
+                channels_list.pagination.total_pages, 2,
+                "There should be 2 pages in total"
+            );
+        }
     }
 }
