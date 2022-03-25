@@ -538,10 +538,11 @@ mod test {
     use super::*;
     use crate::db::{accounting::spend_amount, insert_channel};
     use crate::test_util::setup_dummy_app;
-    use adapter::primitives::Deposit;
+    use adapter::{ethereum::test_util::GANACHE_1337, primitives::Deposit};
     use hyper::StatusCode;
     use primitives::{
         channel::Nonce,
+        config::GANACHE_CONFIG,
         sentry::channel_list::ChannelListResponse,
         test_util::{
             ADVERTISER, CREATOR, DUMMY_CAMPAIGN, FOLLOWER, GUARDIAN, IDS, LEADER, LEADER_2,
@@ -863,14 +864,29 @@ mod test {
     async fn get_channels_list() {
         let mut app = setup_dummy_app().await;
         app.config.channels_find_limit = 2;
+        let init_chain = GANACHE_1337.clone();
+
+        let mut config = GANACHE_CONFIG.clone();
+
+        // Assert that the Ganache chain exist in the configuration
+        let mut config_chain = config
+            .chains
+            .values_mut()
+            .find(|chain_info| chain_info.chain.chain_id == init_chain.chain_id)
+            .expect("Should find Ganache chain in the configuration");
+
+        // override the chain to use the outpace & sweeper addresses that were just deployed
+        config_chain.chain = init_chain.clone();
 
         let channel = Channel {
             leader: IDS[&LEADER],
             follower: IDS[&FOLLOWER],
             guardian: *GUARDIAN,
-            token: "0x6B175474E89094C44Da98b954EedeAC495271d0F"
-                .parse()
-                .expect("Valid DAI (Ethereum mainnet) token address"),
+            token: config_chain
+                .tokens
+                .get("Mocked TOKEN")
+                .expect("Should get token")
+                .address,
             nonce: Nonce::from(987_654_321_u32),
         };
         insert_channel(&app.pool, channel)
@@ -880,9 +896,11 @@ mod test {
             leader: IDS[&LEADER],
             follower: IDS[&FOLLOWER],
             guardian: *GUARDIAN,
-            token: "0xdAC17F958D2ee523a2206206994597C13D831ec7"
-                .parse()
-                .expect("Valid USDT (Ethereum mainnet) token address"),
+            token: config_chain
+                .tokens
+                .get("Mocked TOKEN 2")
+                .expect("Should get token")
+                .address,
             nonce: Nonce::from(987_654_321_u32),
         };
         insert_channel(&app.pool, channel_other_token)
@@ -893,9 +911,11 @@ mod test {
             leader: IDS[&LEADER_2],
             follower: IDS[&FOLLOWER],
             guardian: *GUARDIAN,
-            token: "0x6B175474E89094C44Da98b954EedeAC495271d0F"
-                .parse()
-                .expect("Valid DAI (Ethereum mainnet) token address"),
+            token: config_chain
+                .tokens
+                .get("Mocked TOKEN")
+                .expect("Should get token")
+                .address,
             nonce: Nonce::from(987_654_321_u32),
         };
         insert_channel(&app.pool, channel_other_leader)

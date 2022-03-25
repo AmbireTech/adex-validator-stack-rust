@@ -67,3 +67,13 @@ sweeper = '0x7dD57C0324284102A757153E18F2Cb1ACdB7d2bD'
     # min_validator_fee = 1 * 10^-6 = 0.000_001
     min_validator_fee = '1000000000000'
 
+    [chain."Ganache #1337".token."Mocked TOKEN 2"]
+    address = '0x0000000000000000000000000000000000000000' # checked
+    precision = 18
+    # Minimum token units for the Create2 deposits to count
+    # 1 * 10^18 = 1.0000 TOKEN
+    min_token_units_for_deposit = '1000000000000000000'
+    # multiplier = 10^12 - 10^18 (token precision) = 10^-6
+    # min_validator_fee = 1 * 10^-6 = 0.000_001
+    min_validator_fee = '1000000000000'
+
