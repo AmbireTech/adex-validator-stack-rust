@@ -28,6 +28,21 @@ validators_whitelist = []
 # Leader - 0x80690751969B234697e9059e04ed72195c3507fa
 admins = ['0x80690751969B234697e9059e04ed72195c3507fa']
 
+[platform]
+# This should be changed for tests and use the wiremock url
+url = "https://platform.adex.network"
+# 20 minutes in milliseconds
+keep_alive_interval = 1200000
+
+[limits.units_for_slot]
+# The maximum number of campaigns a publisher can earn from
+# This will limit the returned Campaigns to the set number
+max_campaigns_earning_from = 25
+
+# 0.01 (UnifiedNum) per 1000 impressions
+# 1_000 * (per) 1_000 / 10^8 = 0.01
+global_min_impression_price = '1000000'
+
 # Ethereum mainnet tokens
 # [chain."Ganache #1"]
 # # Ethereum Mainnet for testing
