@@ -175,6 +175,12 @@ mod event {
         }
     }
 
+    impl From<EventType> for String {
+        fn from(event_type: EventType) -> Self {
+            event_type.to_string()
+        }
+    }
+
     #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
     #[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
     pub enum Event {

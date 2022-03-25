@@ -140,6 +140,7 @@ impl GetField for AdView {
 #[serde(rename_all = "camelCase")]
 /// Global scope, accessible everywhere
 pub struct Global {
+    /// We still use `String`, because the `Event`s have an `Option`al `AdSlot` value.
     pub ad_slot_id: String,
     pub ad_slot_type: String,
     pub publisher_id: Address,
