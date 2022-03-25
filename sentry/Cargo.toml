@@ -41,7 +41,7 @@ postgres-types = { version = "0.2.1", features = [
   "derive",
   "with-chrono-0_4",
   "with-serde_json-1",
-  "array-impls"
+  "array-impls",
 ] }
 
 # Migrations

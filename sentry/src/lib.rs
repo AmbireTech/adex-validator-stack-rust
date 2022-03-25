@@ -525,12 +525,8 @@ pub mod test_util {
         // TODO: Should we get from wiremock?
         let platform_url = "http://change-me.tm".parse().expect("Bad ApiUrl!");
         // Configure keep_alive_interval!
-        let platform_api = PlatformApi::new(
-            platform_url,
-            std::time::Duration::from_secs(3),
-            logger.clone(),
-        )
-        .expect("should build test PlatformApi");
+        let platform_api = PlatformApi::new(platform_url, std::time::Duration::from_secs(3))
+            .expect("should build test PlatformApi");
 
         let app = Application::new(
             adapter,

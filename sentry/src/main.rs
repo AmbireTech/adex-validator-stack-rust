@@ -112,12 +112,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .parse()
         .expect("Bad ApiUrl, load from Config?");
     // todo: Make keep_alive_interval configurable!
-    let platform_api = PlatformApi::new(
-        platform_url,
-        std::time::Duration::from_secs(3),
-        logger.clone(),
-    )
-    .expect("Should make PlatformApi");
+    let platform_api = PlatformApi::new(platform_url, std::time::Duration::from_secs(3))
+        .expect("Should make PlatformApi");
 
     match adapter {
         AdapterTypes::Ethereum(adapter) => {
