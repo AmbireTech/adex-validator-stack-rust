@@ -5,7 +5,7 @@ members = [
     "adapter",
     "adview-manager",
     # Server for testing adview manager generated code
-    "adview-manager/serve",
+    "adview-manager/adview-serve",
     "validator_worker",
     "sentry",
     "test_harness",
