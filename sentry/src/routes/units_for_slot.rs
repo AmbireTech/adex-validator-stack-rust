@@ -1,21 +1,8 @@
 use std::collections::HashSet;
 
 use adapter::client::Locked;
-// use crate::{
-//     cache::{
-//         campaign::{Cache, Campaign, Client},
-//         market::{
-//             ad_slot::AdSlotOutput,
-//             ad_unit::{AdTypeOutput, AdUnitsOutput},
-//             CacheLike, ClientLike,
-//         },
-//         Caches,
-//     },
-//     not_found, service_unavailable,
-//     status::Status,
-//     Config, Error, ROUTE_UNITS_FOR_SLOT,
-// };
 use chrono::Utc;
+use futures::future::try_join_all;
 use hyper::{header::USER_AGENT, Body, Request, Response};
 use hyper::{
     header::{HeaderName, CONTENT_TYPE},
@@ -23,18 +10,24 @@ use hyper::{
 };
 use once_cell::sync::Lazy;
 use primitives::{
-    market::AdSlotResponse,
+    sentry::IMPRESSION,
     supermarket::units_for_slot::response,
     supermarket::units_for_slot::response::Response as UnitsForSlotResponse,
     targeting::{eval_with_callback, get_pricing_bounds, input, input::Input, Output},
-    AdSlot, AdUnit, Address, Campaign, Config, ValidatorId, IPFS,
+    AdSlot, AdUnit, Address, Campaign, Config, UnifiedNum, ValidatorId,
 };
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use slog::{debug, error, warn, Logger};
 use woothee::{parser::Parser, woothee::VALUE_UNKNOWN};
 
-use crate::{Application, ResponseError};
+use crate::{
+    db::{
+        accounting::{get_accounting, Side},
+        units_for_slot_get_campaigns, CampaignRemaining, DbPool,
+    },
+    Application, ResponseError,
+};
 
 pub(crate) static CLOUDFLARE_IPCOUNTY_HEADER: Lazy<HeaderName> =
     Lazy::new(|| HeaderName::from_static("cf-ipcountry"));
@@ -47,7 +40,7 @@ pub(crate) static CLOUDFLARE_IPCOUNTY_HEADER: Lazy<HeaderName> =
 #[serde(rename_all = "camelCase")]
 struct RequestBody {
     ad_slot: AdSlot,
-    deposit_assets: HashSet<Address>,
+    deposit_assets: Option<HashSet<Address>>,
 }
 
 pub(crate) fn not_found() -> Response<Body> {
@@ -67,8 +60,6 @@ pub(crate) fn service_unavailable() -> Response<Body> {
 pub async fn post_units_for_slot<C>(
     req: Request<Body>,
     app: &Application<C>,
-    // ipfs: IPFS,
-    // caches: Caches<C, AU, AT, AS, E>,
 ) -> Result<Response<Body>, ResponseError>
 where
     C: Locked + 'static,
@@ -85,12 +76,9 @@ where
     let ad_slot = request_body.ad_slot.clone();
 
     // TODO: remove once we know how/where we will be fetching the rest of the information!
-    let ad_slot_response = AdSlotResponse {
-        slot: request_body.ad_slot.clone(),
-        accepted_referrers: vec!["TODO".parse().unwrap()],
-        categories: vec!["TODO".into()],
-        alexa_rank: Some(1.0),
-    };
+    let accepted_referrers: Vec<Url> = vec!["TODO".parse().unwrap()];
+    let alexa_rank = Some(1.0_f64);
+    let categories: Vec<String> = vec!["TODO".into()];
 
     let units = match app
         .platform_api
@@ -105,21 +93,19 @@ where
         }
     };
 
-    let accepted_referrers = ad_slot_response.accepted_referrers.clone();
-    let fallback_unit: Option<AdUnit> = match &ad_slot_response.slot.fallback_unit {
+    let fallback_unit: Option<AdUnit> = match &ad_slot.fallback_unit {
         Some(unit_ipfs) => {
-            let ipfs = unit_ipfs.parse::<IPFS>()?;
-            let ad_unit_response = match app.platform_api.fetch_unit(ipfs.clone()).await {
+            let ad_unit_response = match app.platform_api.fetch_unit(*unit_ipfs).await {
                 Ok(Some(response)) => {
-                    debug!(&logger, "Fetched AdUnit"; "AdUnit" => &ipfs);
+                    debug!(&logger, "Fetched AdUnit {:?}", unit_ipfs; "AdUnit" => ?unit_ipfs);
                     response
                 }
                 Ok(None) => {
                     warn!(
                         &logger,
-                        "AdSlot fallback AdUnit ({}) not found in Platform",
-                        &ipfs;
-                        "AdUnit" => &ipfs,
+                        "AdSlot fallback AdUnit {} not found in Platform",
+                        unit_ipfs;
+                        "AdUnit" => ?unit_ipfs,
                         "AdSlot" => ?ad_slot,
                     );
 
@@ -130,7 +116,7 @@ where
                         "Error when fetching AdSlot fallback AdUnit ({}) from Platform",
                         unit_ipfs;
                         "AdSlot" => ?ad_slot,
-                        "Fallback AdUnit" => unit_ipfs,
+                        "Fallback AdUnit" => ?unit_ipfs,
                         "error" => ?error
                     );
 
@@ -144,8 +130,6 @@ where
     };
 
     debug!(&logger, "Fetched {} AdUnits for AdSlot", units.len(); "AdSlot" => ?ad_slot);
-    // let query = req.uri().query().unwrap_or_default();
-    // let parsed_query = form_urlencoded::parse(query.as_bytes());
 
     // For each adUnits apply input
     let ua_parser = Parser::new();
@@ -191,33 +175,37 @@ where
         .and_then(|url| url.host().map(|h| h.to_string()))
         .unwrap_or_default();
 
-    let publisher_id = ad_slot_response.slot.owner;
+    let publisher_id = ad_slot.owner;
 
     let campaigns_limited_by_earner = get_campaigns(
-        /* &caches.campaigns, */ config,
+        app.pool.clone(),
+        app.campaign_remaining.clone(),
+        config,
         &request_body.deposit_assets,
         publisher_id,
     )
-    .await;
+    .await
+    // TODO: Fix mapping this error and Log the error!
+    .map_err(|err| ResponseError::BadRequest(err.to_string()))?;
 
     debug!(&logger, "Fetched Cache campaigns limited by earner (publisher)"; "campaigns" => campaigns_limited_by_earner.len(), "publisher_id" => %publisher_id);
 
     // We return those in the result (which means AdView would have those) but we don't actually use them
     // we do that in order to have the same variables as the validator, so that the `price` is the same
     let targeting_input_ad_slot = Some(input::AdSlot {
-        categories: ad_slot_response.categories.clone(),
+        categories: categories.clone(),
         hostname,
-        alexa_rank: ad_slot_response.alexa_rank,
+        alexa_rank,
     });
 
     let mut targeting_input_base = Input {
         ad_view: None,
         global: input::Global {
-            ad_slot_id: ad_slot_response.slot.ipfs.clone(),
-            ad_slot_type: ad_slot_response.slot.ad_type.clone(),
+            ad_slot_id: ad_slot.ipfs.to_string(),
+            ad_slot_type: ad_slot.ad_type.clone(),
             publisher_id: publisher_id.to_address(),
             country,
-            event_type: "IMPRESSION".to_string(),
+            event_type: IMPRESSION.into(),
             seconds_since_epoch: Utc::now(),
             user_agent_os,
             user_agent_browser_family: user_agent_browser_family.clone(),
@@ -233,7 +221,7 @@ where
         logger,
         campaigns_limited_by_earner,
         targeting_input_base.clone(),
-        ad_slot_response,
+        ad_slot,
     )
     .await;
 
@@ -251,42 +239,95 @@ where
         .header(CONTENT_TYPE, "application/json")
         .body(Body::from(serde_json::to_string(&response)?))
         .expect("Should create response"))
-    // }
 }
 
+// TODO: Use error instead of std::error::Error
 async fn get_campaigns(
-    // cache: &Cache<C>,
+    pool: DbPool,
+    campaign_remaining: CampaignRemaining,
     config: &Config,
-    deposit_assets: &HashSet<Address>,
+    deposit_assets: &Option<HashSet<Address>>,
     publisher_id: ValidatorId,
-) -> Vec<Campaign> {
-    todo!()
-    //     let active_campaigns = cache.active.read().await;
+) -> Result<Vec<Campaign>, Box<dyn std::error::Error>> {
+    // 1. Fetch active Campaigns: (postgres)
+    //  Creator = publisher_id
+    // if deposit asset > 0 => filter by deposit_asset
+    let active_campaigns = units_for_slot_get_campaigns(
+        &pool,
+        deposit_assets.as_ref(),
+        publisher_id.to_address(),
+        Utc::now(),
+    )
+    .await?;
 
-    //     let (mut campaigns_by_earner, rest_of_campaigns): (Vec<&Campaign>, Vec<&Campaign>) =
-    //         active_campaigns
-    //             .iter()
-    //             .filter_map(|(_, campaign)| {
-    //                 // The Supermarket has the Active status combining Active & Ready from Market
-    //                 if campaign.status == Status::Active
-    //                     && campaign.channel.creator != publisher_id
-    //                     && (deposit_assets.is_empty()
-    //                         || deposit_assets.contains(&campaign.channel.deposit_asset))
-    //                 {
-    //                     Some(campaign)
-    //                 } else {
-    //                     None
-    //                 }
-    //             })
-    //             .partition(|&campaign| campaign.balances.contains_key(&publisher_id));
+    let active_campaign_ids = &active_campaigns
+        .iter()
+        .map(|campaign| campaign.id)
+        .collect::<Vec<_>>();
 
-    //     if campaigns_by_earner.len() >= config.limits.max_channels_earning_from.into() {
-    //         campaigns_by_earner.into_iter().cloned().collect()
-    //     } else {
-    //         campaigns_by_earner.extend(rest_of_campaigns.iter());
+    // 2. Check those Campaigns if `Campaign remaining > 0` (in redis)
+    let campaigns_remaining = campaign_remaining
+        .get_multiple_with_ids(&active_campaign_ids)
+        .await?;
 
-    //         campaigns_by_earner.into_iter().cloned().collect()
-    //     }
+    let campaigns_with_remaining = campaigns_remaining
+        .into_iter()
+        .filter_map(|(campaign_id, remaining)| {
+            // remaining should not be `0`
+            if remaining > UnifiedNum::from(0) {
+                // and we have to find the `Campaign` instance
+                active_campaigns
+                    .iter()
+                    .find(|campaign| campaign.id == campaign_id)
+                    .cloned()
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let channels = campaigns_with_remaining
+        .iter()
+        .map(|campaign| campaign.channel.id())
+        .collect::<HashSet<_>>();
+
+    let publisher_accountings = try_join_all(channels.iter().map(|channel_id| {
+        get_accounting(
+            pool.clone(),
+            *channel_id,
+            publisher_id.to_address(),
+            Side::Spender,
+        )
+    }))
+    .await?
+    .into_iter()
+    .filter_map(|accounting| accounting)
+    .collect::<Vec<_>>();
+
+    // 3. Filter `Campaign`s, that include the `publisher_id` in the Channel balances.
+    let (mut campaigns_by_earner, rest_of_campaigns): (Vec<Campaign>, Vec<Campaign>) =
+        campaigns_with_remaining.into_iter().partition(|campaign| {
+            publisher_accountings
+                .iter()
+                .find(|accounting| accounting.channel_id == campaign.channel.id())
+                .is_some()
+        });
+
+    let campaigns = if campaigns_by_earner.len()
+        >= config
+            .limits
+            .units_for_slot
+            .max_campaigns_earning_from
+            .into()
+    {
+        campaigns_by_earner
+    } else {
+        campaigns_by_earner.extend(rest_of_campaigns.into_iter());
+
+        campaigns_by_earner
+    };
+
+    Ok(campaigns)
 }
 
 async fn apply_targeting(
@@ -294,92 +335,88 @@ async fn apply_targeting(
     logger: &Logger,
     campaigns: Vec<Campaign>,
     input_base: Input,
-    ad_slot_response: AdSlotResponse,
+    ad_slot: AdSlot,
 ) -> Vec<response::Campaign> {
-    todo!()
-    //     campaigns
-    //         .into_iter()
-    //         .filter_map::<response::Campaign, _>(|campaign| {
-    //             let ad_units = campaign
-    //                 .channel
-    //                 .spec
-    //                 .ad_units
-    //                 .iter()
-    //                 .filter(|ad_unit| ad_unit.ad_type == ad_slot_response.slot.ad_type)
-    //                 .cloned()
-    //                 .collect::<Vec<_>>();
+    campaigns
+            .into_iter()
+            .filter_map(|campaign| {
+                let ad_units = campaign
+                    .ad_units
+                    .iter()
+                    .filter(|ad_unit| ad_unit.ad_type == ad_slot.ad_type)
+                    .cloned()
+                    .collect::<Vec<_>>();
 
-    //             if ad_units.is_empty() {
-    //                 None
-    //             } else {
-    //                 let targeting_rules = if !campaign.channel.targeting_rules.is_empty() {
-    //                     campaign.channel.targeting_rules.clone()
-    //                 } else {
-    //                     campaign.channel.spec.targeting_rules.clone()
-    //                 };
-    //                 let campaign_input = input_base.clone().with_channel(campaign.channel.clone());
+                if ad_units.is_empty() {
+                    None
+                } else {
+                    let targeting_rules = if !campaign.targeting_rules.is_empty() {
+                        campaign.targeting_rules.clone()
+                    } else {
+                        campaign.targeting_rules.clone()
+                    };
+                    let campaign_input = input_base.clone().with_campaign(campaign.clone());
 
-    //                 let matching_units: Vec<response::UnitsWithPrice> = ad_units
-    //                     .into_iter()
-    //                     .filter_map(|ad_unit| {
-    //                         let mut unit_input = campaign_input.clone();
-    //                         unit_input.ad_unit_id = Some(ad_unit.ipfs.clone());
+                    let matching_units: Vec<response::UnitsWithPrice> = ad_units
+                        .into_iter()
+                        .filter_map(|ad_unit| {
+                            let mut unit_input = campaign_input.clone();
+                            unit_input.ad_unit_id = Some(ad_unit.ipfs.clone());
 
-    //                         let pricing_bounds = get_pricing_bounds(&campaign.channel, "IMPRESSION");
-    //                         let mut output = Output {
-    //                             show: true,
-    //                             boost: 1.0,
-    //                             // only "IMPRESSION" event can be used for this `Output`
-    //                             price: vec![("IMPRESSION".to_string(), pricing_bounds.min.clone())]
-    //                                 .into_iter()
-    //                                 .collect(),
-    //                         };
+                            let pricing_bounds = get_pricing_bounds(&campaign, IMPRESSION.as_str());
+                            let mut output = Output {
+                                show: true,
+                                boost: 1.0,
+                                // only "IMPRESSION" event can be used for this `Output`
+                                price: vec![(IMPRESSION.into(), pricing_bounds.min.clone())]
+                                    .into_iter()
+                                    .collect(),
+                            };
 
-    //                         let on_type_error_campaign = |error, rule| error!(logger, "Rule evaluation error for {:?}", campaign.channel.id; "error" => ?error, "rule" => ?rule);
-    //                         eval_with_callback(&targeting_rules, &unit_input, &mut output, Some(on_type_error_campaign));
+                            let on_type_error_campaign = |error, rule| error!(logger, "Rule evaluation error for {:?}", campaign.id; "error" => ?error, "rule" => ?rule, "campaign" => ?campaign);
+                            eval_with_callback(&targeting_rules, &unit_input, &mut output, Some(on_type_error_campaign));
 
-    //                         if !output.show {
-    //                             return None;
-    //                         }
+                            if !output.show {
+                                return None;
+                            }
 
-    //                         let max_price = match output.price.get("IMPRESSION") {
-    //                             Some(output_price) => output_price.min(&pricing_bounds.max).clone(),
-    //                             None => pricing_bounds.max,
-    //                         };
-    //                         let price = pricing_bounds.min.max(max_price);
+                            let max_price = match output.price.get(IMPRESSION.as_str()) {
+                                Some(output_price) => output_price.min(&pricing_bounds.max).clone(),
+                                None => pricing_bounds.max,
+                            };
+                            let price = pricing_bounds.min.max(max_price);
 
-    //                         if price < config.limits.global_min_impression_price {
-    //                             return None;
-    //                         }
+                            if price < config.limits.units_for_slot.global_min_impression_price {
+                                return None;
+                            }
 
-    //                         // Execute the adSlot rules after we've taken the price since they're not
-    //                         // allowed to change the price
-    //                         let on_type_error_adslot = |error, rule| error!(logger, "Rule evaluation error AdSlot {:?}", ad_slot_response.slot.ipfs; "error" => ?error, "rule" => ?rule);
+                            // Execute the adSlot rules after we've taken the price since they're not
+                            // allowed to change the price
+                            let on_type_error_adslot = |error, rule| error!(logger, "Rule evaluation error AdSlot {:?}", ad_slot.ipfs; "error" => ?error, "rule" => ?rule);
 
-    //                         eval_with_callback(&ad_slot_response.slot.rules, &unit_input, &mut output, Some(on_type_error_adslot));
-    //                         if !output.show {
-    //                             return None;
-    //                         }
+                            eval_with_callback(&ad_slot.rules, &unit_input, &mut output, Some(on_type_error_adslot));
+                            if !output.show {
+                                return None;
+                            }
 
-    //                         let ad_unit = response::AdUnit::from(&ad_unit);
+                            let ad_unit = response::AdUnit::from(&ad_unit);
 
-    //                         Some(response::UnitsWithPrice {
-    //                             unit: ad_unit,
-    //                             price,
-    //                         })
-    //                     })
-    //                     .collect();
+                            Some(response::UnitsWithPrice {
+                                unit: ad_unit,
+                                price,
+                            })
+                        })
+                        .collect();
 
-    //                 if matching_units.is_empty() {
-    //                     None
-    //                 } else {
-    //                     Some(response::Campaign {
-    //                         channel: campaign.channel.into(),
-    //                         targeting_rules,
-    //                         units_with_price: matching_units,
-    //                     })
-    //                 }
-    //             }
-    //         })
-    //         .collect()
+                    if matching_units.is_empty() {
+                        None
+                    } else {
+                        Some(response::Campaign {
+                            campaign,
+                            units_with_price: matching_units,
+                        })
+                    }
+                }
+            })
+            .collect()
 }
