@@ -4,8 +4,8 @@ members = [
     "primitives",
     "adapter",
     "adview-manager",
-    # Server for testing adview manager generated code
-    "adview-manager/adview-serve",
+    # `adview-serve` binary - Servers for testing adview manager generated code
+    "adview-manager/serve",
     "validator_worker",
     "sentry",
     "test_harness",
