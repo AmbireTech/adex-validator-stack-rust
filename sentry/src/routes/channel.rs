@@ -667,6 +667,7 @@ mod test {
     use super::*;
     use crate::db::{insert_campaign, insert_channel};
     use crate::test_util::setup_dummy_app;
+    use crate::CampaignRemaining;
     use adapter::{
         ethereum::test_util::{GANACHE_1, GANACHE_1337, GANACHE_INFO_1, GANACHE_INFO_1337},
         primitives::Deposit,
@@ -679,9 +680,8 @@ mod test {
             ADVERTISER, CREATOR, DUMMY_CAMPAIGN, FOLLOWER, GUARDIAN, IDS, LEADER, LEADER_2,
             PUBLISHER, PUBLISHER_2,
         },
-        BigNum, Deposit, UnifiedMap, ValidatorId
-    }
-    use crate::CampaignRemaining;
+        BigNum, Deposit, UnifiedMap, ValidatorId,
+    };
 
     #[tokio::test]
     async fn create_and_fetch_spendable() {
@@ -1131,6 +1131,10 @@ mod test {
             assert_eq!(
                 channels_list.pagination.total_pages, 2,
                 "There should be 2 pages in total"
+            );
+        }
+    }
+
     async fn payouts_for_earners_test() {
         let app = setup_dummy_app().await;
         let channel_context = app
