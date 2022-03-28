@@ -539,13 +539,12 @@ mod test {
     use crate::db::{accounting::spend_amount, insert_channel};
     use crate::test_util::setup_dummy_app;
     use adapter::{
-        ethereum::test_util::{GANACHE_1, GANACHE_1337},
+        ethereum::test_util::{GANACHE_1, GANACHE_1337, GANACHE_INFO_1, GANACHE_INFO_1337},
         primitives::Deposit,
     };
     use hyper::StatusCode;
     use primitives::{
         channel::Nonce,
-        config::GANACHE_CONFIG,
         sentry::channel_list::ChannelListResponse,
         test_util::{
             ADVERTISER, CREATOR, DUMMY_CAMPAIGN, FOLLOWER, GUARDIAN, IDS, LEADER, LEADER_2,
@@ -870,35 +869,11 @@ mod test {
         let chain_1337 = GANACHE_1337.clone();
         let chain_1 = GANACHE_1.clone();
 
-        let mut config = GANACHE_CONFIG.clone();
-        // Assert that the Ganache chain exist in the configuration
-        let mut config_chain_1337 = config
-            .chains
-            .values_mut()
-            .find(|chain_info| chain_info.chain.chain_id == chain_1337.chain_id)
-            .expect("Should find Ganache chain in the configuration");
-
-        let mut config = GANACHE_CONFIG.clone();
-        // Assert that the Ganache chain exist in the configuration
-        let mut config_chain_1 = config
-            .chains
-            .values_mut()
-            .find(|chain_info| chain_info.chain.chain_id == chain_1.chain_id)
-            .expect("Should find Ganache chain in the configuration");
-
-        // override the chain to use the outpace & sweeper addresses that were just deployed
-        config_chain_1337.chain = chain_1337.clone();
-        config_chain_1.chain = chain_1.clone();
-
         let channel = Channel {
             leader: IDS[&LEADER],
             follower: IDS[&FOLLOWER],
             guardian: *GUARDIAN,
-            token: config_chain_1337
-                .tokens
-                .get("Mocked TOKEN")
-                .expect("Should get token")
-                .address,
+            token: GANACHE_INFO_1337.tokens["Mocked TOKEN"].address,
             nonce: Nonce::from(987_654_321_u32),
         };
         insert_channel(&app.pool, channel)
@@ -908,12 +883,8 @@ mod test {
             leader: IDS[&LEADER],
             follower: IDS[&FOLLOWER],
             guardian: *GUARDIAN,
-            token: config_chain_1
-                .tokens
-                .get("Mocked TOKEN 2")
-                .expect("Should get token")
-                .address,
-            nonce: Nonce::from(987_654_321_u32),
+            token: GANACHE_INFO_1.tokens["Mocked TOKEN 2"].address,
+            nonce: Nonce::from(987_654_322_u32),
         };
         insert_channel(&app.pool, channel_other_token)
             .await
@@ -923,12 +894,8 @@ mod test {
             leader: IDS[&LEADER_2],
             follower: IDS[&FOLLOWER],
             guardian: *GUARDIAN,
-            token: config_chain_1337
-                .tokens
-                .get("Mocked TOKEN")
-                .expect("Should get token")
-                .address,
-            nonce: Nonce::from(987_654_321_u32),
+            token: GANACHE_INFO_1337.tokens["Mocked TOKEN"].address,
+            nonce: Nonce::from(987_654_323_u32),
         };
         insert_channel(&app.pool, channel_other_leader)
             .await
