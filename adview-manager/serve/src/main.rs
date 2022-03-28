@@ -151,63 +151,67 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // GET /preview/video
-    let get_preview_of_video = warp::get().and(warp::path!("preview" / "video" )).then(move || {
-        let tera = tera.clone();
+    let get_preview_of_video = warp::get()
+        .and(warp::path!("preview" / "video"))
+        .then(move || {
+            let tera = tera.clone();
 
-        async move {
-            let whitelisted_tokens = vec!["0x6B175474E89094C44Da98b954EedeAC495271d0F"
-                .parse()
-                .expect("Valid token Address")];
-            let disabled_video = false;
-            let publisher_addr = "0x0000000000000000626f62627973686d75726461"
-                .parse()
-                .unwrap();
-
-            let options = Options {
-                market_url: "http://placeholder.com".parse().unwrap(),
-                market_slot: DUMMY_IPFS[0],
-                publisher_addr,
-                // All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared
-                whitelisted_tokens,
-                size: Some(Size::new(728, 90)),
-                // TODO: Check this value
-                navigator_language: Some("bg".into()),
-                /// Defaulted
-                disabled_video,
-                disabled_sticky: false,
-            };
-
-            // legacy_728x90
-            let video_ad_unit = adex_primitives::supermarket::units_for_slot::response::AdUnit {
-                /// Same as `ipfs`
-                id: "QmShJ6tsJ7LHLiYGX4EAmPyCPWJuCnvm6AKjweQPnw9qfh"
+            async move {
+                let whitelisted_tokens = vec!["0x6B175474E89094C44Da98b954EedeAC495271d0F"
                     .parse()
-                    .expect("Valid IPFS"),
-                media_url: "ipfs://Qmevmms1AZgYXS27A9ghSjHn4DSaHMfgYcD2SoGW14RYGy".to_string(),
-                media_mime: "video/mp4".to_string(),
-                target_url: "https://www.stremio.com/downloads".to_string(),
-            };
+                    .expect("Valid token Address")];
+                let disabled_video = false;
+                let publisher_addr = "0x0000000000000000626f62627973686d75726461"
+                    .parse()
+                    .unwrap();
 
-            let video_html = get_unit_html_with_events(
-                &options,
-                &video_ad_unit,
-                "localhost",
-                DUMMY_CAMPAIGN.id,
-                &DUMMY_CAMPAIGN.validators,
-                false,
-            );
+                let options = Options {
+                    market_url: "http://placeholder.com".parse().unwrap(),
+                    market_slot: DUMMY_IPFS[0],
+                    publisher_addr,
+                    // All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared
+                    whitelisted_tokens,
+                    size: Some(Size::new(728, 90)),
+                    // TODO: Check this value
+                    navigator_language: Some("bg".into()),
+                    /// Defaulted
+                    disabled_video,
+                    disabled_sticky: false,
+                };
 
-            // let video_html = get_unit_html_with_events(&options, );
-            let html = {
-                let mut context = Context::new();
-                context.insert("ad_code", &video_html);
+                // legacy_728x90
+                let video_ad_unit =
+                    adex_primitives::supermarket::units_for_slot::response::AdUnit {
+                        /// Same as `ipfs`
+                        id: "QmShJ6tsJ7LHLiYGX4EAmPyCPWJuCnvm6AKjweQPnw9qfh"
+                            .parse()
+                            .expect("Valid IPFS"),
+                        media_url: "ipfs://Qmevmms1AZgYXS27A9ghSjHn4DSaHMfgYcD2SoGW14RYGy"
+                            .to_string(),
+                        media_mime: "video/mp4".to_string(),
+                        target_url: "https://www.stremio.com/downloads".to_string(),
+                    };
 
-                tera.render("ad.html", &context).expect("Should render")
-            };
+                let video_html = get_unit_html_with_events(
+                    &options,
+                    &video_ad_unit,
+                    "localhost",
+                    DUMMY_CAMPAIGN.id,
+                    &DUMMY_CAMPAIGN.validators,
+                    false,
+                );
 
-            warp::reply::html(html)
-        }
-    });
+                // let video_html = get_unit_html_with_events(&options, );
+                let html = {
+                    let mut context = Context::new();
+                    context.insert("ad_code", &video_html);
+
+                    tera.render("ad.html", &context).expect("Should render")
+                };
+
+                warp::reply::html(html)
+            }
+        });
 
     warp::serve(get_ad.or(get_preview_of_video))
         .run(([127, 0, 0, 1], 3030))

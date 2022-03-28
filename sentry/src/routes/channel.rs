@@ -668,10 +668,18 @@ mod test {
     use crate::db::{insert_campaign, insert_channel};
     use crate::test_util::setup_dummy_app;
     use crate::CampaignRemaining;
+    use adapter::{
+        ethereum::test_util::{GANACHE_INFO_1, GANACHE_INFO_1337},
+        primitives::Deposit as AdapterDeposit,
+    };
     use hyper::StatusCode;
     use primitives::{
-        test_util::{ADVERTISER, CREATOR, GUARDIAN, PUBLISHER, PUBLISHER_2},
-        test_util::{DUMMY_CAMPAIGN, IDS},
+        channel::Nonce,
+        sentry::channel_list::ChannelListResponse,
+        test_util::{
+            ADVERTISER, CREATOR, DUMMY_CAMPAIGN, FOLLOWER, GUARDIAN, IDS, LEADER, LEADER_2,
+            PUBLISHER, PUBLISHER_2,
+        },
         BigNum, Deposit, UnifiedMap, ValidatorId,
     };
 
@@ -690,7 +698,7 @@ mod test {
         };
 
         let precision: u8 = channel_context.token.precision.into();
-        let deposit = Deposit {
+        let deposit = AdapterDeposit {
             total: BigNum::from_str("100000000000000000000").expect("should convert"), // 100 DAI
             still_on_create2: BigNum::from_str("1000000000000000000").expect("should convert"), // 1 DAI
         };
@@ -731,7 +739,7 @@ mod test {
             .expect("should return a spendable");
         assert!(spendable.is_some());
 
-        let updated_deposit = Deposit {
+        let updated_deposit = AdapterDeposit {
             total: BigNum::from_str("110000000000000000000").expect("should convert"), // 110 DAI
             still_on_create2: BigNum::from_str("1100000000000000000").expect("should convert"), // 1.1 DAI
         };
@@ -769,6 +777,14 @@ mod test {
         let accounting_response: AccountingResponse<CheckedState> =
             serde_json::from_slice(&json).expect("Should get AccountingResponse");
         accounting_response
+    }
+
+    async fn res_to_channel_list_response(res: Response<Body>) -> ChannelListResponse {
+        let json = hyper::body::to_bytes(res.into_body())
+            .await
+            .expect("Should get json");
+
+        serde_json::from_slice(&json).expect("Should deserialize ChannelListResponse")
     }
 
     #[tokio::test]
@@ -974,6 +990,149 @@ mod test {
             accounting_response.balances.spenders.get(&CREATOR),
             balances.spenders.get(&CREATOR),
         );
+    }
+
+    #[tokio::test]
+    async fn get_channels_list() {
+        let mut app = setup_dummy_app().await;
+        app.config.channels_find_limit = 2;
+
+        let channel = Channel {
+            leader: IDS[&LEADER],
+            follower: IDS[&FOLLOWER],
+            guardian: *GUARDIAN,
+            token: GANACHE_INFO_1337.tokens["Mocked TOKEN"].address,
+            nonce: Nonce::from(987_654_321_u32),
+        };
+        insert_channel(&app.pool, channel)
+            .await
+            .expect("should insert");
+        let channel_other_token = Channel {
+            leader: IDS[&LEADER],
+            follower: IDS[&FOLLOWER],
+            guardian: *GUARDIAN,
+            token: GANACHE_INFO_1.tokens["Mocked TOKEN 2"].address,
+            nonce: Nonce::from(987_654_322_u32),
+        };
+        insert_channel(&app.pool, channel_other_token)
+            .await
+            .expect("should insert");
+
+        let channel_other_leader = Channel {
+            leader: IDS[&LEADER_2],
+            follower: IDS[&FOLLOWER],
+            guardian: *GUARDIAN,
+            token: GANACHE_INFO_1337.tokens["Mocked TOKEN"].address,
+            nonce: Nonce::from(987_654_323_u32),
+        };
+        insert_channel(&app.pool, channel_other_leader)
+            .await
+            .expect("should insert");
+
+        let build_request = |query: ChannelListQuery| {
+            let query = serde_urlencoded::to_string(query).expect("should parse query");
+            Request::builder()
+                .uri(format!("http://127.0.0.1/v5/channel/list?{}", query))
+                .extension(DUMMY_CAMPAIGN.channel.clone())
+                .body(Body::empty())
+                .expect("Should build Request")
+        };
+
+        // Test query page - page 0, page 1
+        {
+            let query = ChannelListQuery {
+                page: 0,
+                validator: None,
+            };
+            let res = channel_list(build_request(query), &app)
+                .await
+                .expect("should get channels");
+            let channels_list = res_to_channel_list_response(res).await;
+
+            assert_eq!(
+                channels_list.channels,
+                vec![channel, channel_other_token],
+                "The channels should be listed by ascending order of their creation"
+            );
+            assert_eq!(
+                channels_list.pagination.total_pages, 2,
+                "There should be 2 pages in total"
+            );
+
+            let query = ChannelListQuery {
+                page: 1,
+                validator: None,
+            };
+            let res = channel_list(build_request(query), &app)
+                .await
+                .expect("should get channels");
+            let channels_list = res_to_channel_list_response(res).await;
+            assert_eq!(
+                channels_list.channels,
+                vec![channel_other_leader],
+                "The channels should be listed by ascending order of their creation"
+            );
+        }
+
+        // Test query validator - query with validator ID
+        {
+            let query = ChannelListQuery {
+                page: 0,
+                validator: Some(IDS[&LEADER_2]),
+            };
+            let res = channel_list(build_request(query), &app)
+                .await
+                .expect("should get channels");
+            let channels_list = res_to_channel_list_response(res).await;
+            assert_eq!(
+                channels_list.channels,
+                vec![channel_other_leader],
+                "Response returns the correct channel"
+            );
+            assert_eq!(
+                channels_list.pagination.total_pages, 1,
+                "There should be 1 page in total"
+            );
+        }
+        // Test query with both pagination and validator by querying for the follower validator
+        {
+            let query = ChannelListQuery {
+                page: 0,
+                validator: Some(IDS[&FOLLOWER]),
+            };
+            let res = channel_list(build_request(query), &app)
+                .await
+                .expect("should get channels");
+            let channels_list = res_to_channel_list_response(res).await;
+
+            assert_eq!(
+                channels_list.pagination.total_pages, 2,
+                "There should be 2 pages in total"
+            );
+            assert_eq!(
+                channels_list.channels,
+                vec![channel, channel_other_token],
+                "The channels should be listed by ascending order of their creation"
+            );
+
+            let query = ChannelListQuery {
+                page: 1,
+                validator: Some(IDS[&FOLLOWER]),
+            };
+            let res = channel_list(build_request(query), &app)
+                .await
+                .expect("should get channels");
+            let channels_list = res_to_channel_list_response(res).await;
+            assert_eq!(
+                channels_list.channels,
+                vec![channel_other_leader],
+                "The channels should be listed by ascending order of their creation"
+            );
+            assert_eq!(
+                channels_list.pagination.total_pages, 2,
+                "There should be 2 pages in total"
+            );
+        }
     }
 
     #[tokio::test]
