@@ -866,8 +866,6 @@ mod test {
     async fn get_channels_list() {
         let mut app = setup_dummy_app().await;
         app.config.channels_find_limit = 2;
-        let chain_1337 = GANACHE_1337.clone();
-        let chain_1 = GANACHE_1.clone();
 
         let channel = Channel {
             leader: IDS[&LEADER],

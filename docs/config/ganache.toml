@@ -73,12 +73,12 @@ sweeper = '0x7dD57C0324284102A757153E18F2Cb1ACdB7d2bD'
 chain_id = 1
 rpc = 'http://localhost:8546'
 # Ganache Snapshot address
-outpace = '0x0000000000000000000000000000000000000000'
+outpace = '0x0000000000000000000000000000000000000001'
 # Ganache Snapshot address
-sweeper = '0x0000000000000000000000000000000000000000'
+sweeper = '0x0000000000000000000000000000000000000001'
 
     [chain."Ganache #1".token."Mocked TOKEN 2"]
-    address = '0x0000000000000000000000000000000000000000' # checked
+    address = '0x0000000000000000000000000000000000000001' # checked
     precision = 18
     # Minimum token units for the Create2 deposits to count
     # 1 * 10^18 = 1.0000 TOKEN
