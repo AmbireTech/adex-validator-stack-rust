@@ -9,7 +9,8 @@ WORKDIR /scripts
 ENV CHAIN_ID=
 
 COPY ganache-cli.sh .
-COPY snapshot_contracts_${CHAIN_ID} snapshot
+# Copy all snapshot_contracts_CHAIN_ID to the /scripts folder
+COPY snapshot_contracts_* .
 
 EXPOSE 8545
 
