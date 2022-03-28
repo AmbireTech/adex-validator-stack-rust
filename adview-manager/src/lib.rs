@@ -196,6 +196,9 @@ fn get_unit_html(
         </div>", style=max_min_size, adex_icon=adex_icon())
 }
 
+/// no_impression - whether or not an IMPRESSION event should be sent with `onload`
+///
+///   [`WAIT_FOR_IMPRESSION`] - The timeout used before sending the IMPRESSION event to all validators
 pub fn get_unit_html_with_events(
     options: &Options,
     ad_unit: &AdUnit,
