@@ -92,16 +92,16 @@ pub static KEYSTORES: Lazy<HashMap<Address, Options>> = Lazy::new(|| {
 pub const GANACHE_URL: &str = "http://localhost:8545";
 
 // /// [`Chain`] of the locally running `ganache-cli` chain with id #1
-// pub static GANACHE_1: Lazy<Chain> = Lazy::new(|| GANACHE_INFO_1.chain.clone());
+pub static GANACHE_1: Lazy<Chain> = Lazy::new(|| GANACHE_INFO_1.chain.clone());
 
-// /// [`ChainInfo`] of the locally running `ganache-cli` chain with id #1
-// pub static GANACHE_INFO_1: Lazy<ChainInfo> = Lazy::new(|| {
-//     GANACHE_CONFIG
-//         .chains
-//         .get("Ganache #1")
-//         .expect("Ganache Local chain 1 not found")
-//         .clone()
-// });
+/// [`ChainInfo`] of the locally running `ganache-cli` chain with id #1
+pub static GANACHE_INFO_1: Lazy<ChainInfo> = Lazy::new(|| {
+    GANACHE_CONFIG
+        .chains
+        .get("Ganache #1")
+        .expect("Ganache Local chain 1 not found")
+        .clone()
+});
 
 /// [`Chain`] of the locally running `ganache-cli` chain with id #1337
 pub static GANACHE_1337: Lazy<Chain> = Lazy::new(|| GANACHE_INFO_1337.chain.clone());

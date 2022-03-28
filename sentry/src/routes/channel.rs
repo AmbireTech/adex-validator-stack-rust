@@ -538,7 +538,10 @@ mod test {
     use super::*;
     use crate::db::{accounting::spend_amount, insert_channel};
     use crate::test_util::setup_dummy_app;
-    use adapter::{ethereum::test_util::GANACHE_1337, primitives::Deposit};
+    use adapter::{
+        ethereum::test_util::{GANACHE_1, GANACHE_1337},
+        primitives::Deposit,
+    };
     use hyper::StatusCode;
     use primitives::{
         channel::Nonce,
@@ -864,25 +867,34 @@ mod test {
     async fn get_channels_list() {
         let mut app = setup_dummy_app().await;
         app.config.channels_find_limit = 2;
-        let init_chain = GANACHE_1337.clone();
+        let chain_1337 = GANACHE_1337.clone();
+        let chain_1 = GANACHE_1.clone();
 
         let mut config = GANACHE_CONFIG.clone();
-
         // Assert that the Ganache chain exist in the configuration
-        let mut config_chain = config
+        let mut config_chain_1337 = config
             .chains
             .values_mut()
-            .find(|chain_info| chain_info.chain.chain_id == init_chain.chain_id)
+            .find(|chain_info| chain_info.chain.chain_id == chain_1337.chain_id)
+            .expect("Should find Ganache chain in the configuration");
+
+        let mut config = GANACHE_CONFIG.clone();
+        // Assert that the Ganache chain exist in the configuration
+        let mut config_chain_1 = config
+            .chains
+            .values_mut()
+            .find(|chain_info| chain_info.chain.chain_id == chain_1.chain_id)
             .expect("Should find Ganache chain in the configuration");
 
         // override the chain to use the outpace & sweeper addresses that were just deployed
-        config_chain.chain = init_chain.clone();
+        config_chain_1337.chain = chain_1337.clone();
+        config_chain_1.chain = chain_1.clone();
 
         let channel = Channel {
             leader: IDS[&LEADER],
             follower: IDS[&FOLLOWER],
             guardian: *GUARDIAN,
-            token: config_chain
+            token: config_chain_1337
                 .tokens
                 .get("Mocked TOKEN")
                 .expect("Should get token")
@@ -896,7 +908,7 @@ mod test {
             leader: IDS[&LEADER],
             follower: IDS[&FOLLOWER],
             guardian: *GUARDIAN,
-            token: config_chain
+            token: config_chain_1
                 .tokens
                 .get("Mocked TOKEN 2")
                 .expect("Should get token")
@@ -911,7 +923,7 @@ mod test {
             leader: IDS[&LEADER_2],
             follower: IDS[&FOLLOWER],
             guardian: *GUARDIAN,
-            token: config_chain
+            token: config_chain_1337
                 .tokens
                 .get("Mocked TOKEN")
                 .expect("Should get token")
@@ -941,14 +953,10 @@ mod test {
                 .await
                 .expect("should get channels");
             let channels_list = res_to_channel_list_response(res).await;
-            let expected_channels_list = vec![channel, channel_other_token];
+
             assert_eq!(
-                channels_list.channels.len(),
-                2,
-                "There should be 2 channels on the first page"
-            );
-            assert_eq!(
-                channels_list.channels, expected_channels_list,
+                channels_list.channels,
+                vec![channel, channel_other_token],
                 "The channels should be listed by ascending order of their creation"
             );
             assert_eq!(
@@ -964,14 +972,9 @@ mod test {
                 .await
                 .expect("should get channels");
             let channels_list = res_to_channel_list_response(res).await;
-            let expected_channels_list = vec![channel_other_leader];
             assert_eq!(
-                channels_list.channels.len(),
-                1,
-                "There should be 1 channel on the second page"
-            );
-            assert_eq!(
-                channels_list.channels, expected_channels_list,
+                channels_list.channels,
+                vec![channel_other_leader],
                 "The channels should be listed by ascending order of their creation"
             );
         }
@@ -986,14 +989,9 @@ mod test {
                 .await
                 .expect("should get channels");
             let channels_list = res_to_channel_list_response(res).await;
-            let expected_channels_list = vec![channel_other_leader];
             assert_eq!(
-                channels_list.channels.len(),
-                1,
-                "There should be 1 channel in total"
-            );
-            assert_eq!(
-                channels_list.channels, expected_channels_list,
+                channels_list.channels,
+                vec![channel_other_leader],
                 "Response returns the correct channel"
             );
             assert_eq!(
@@ -1011,18 +1009,14 @@ mod test {
                 .await
                 .expect("should get channels");
             let channels_list = res_to_channel_list_response(res).await;
-            let expected_channels_list = vec![channel, channel_other_token];
-            assert_eq!(
-                channels_list.channels.len(),
-                2,
-                "There should be 1 channel on the second page"
-            );
+
             assert_eq!(
                 channels_list.pagination.total_pages, 2,
                 "There should be 2 pages in total"
             );
             assert_eq!(
-                channels_list.channels, expected_channels_list,
+                channels_list.channels,
+                vec![channel, channel_other_token],
                 "The channels should be listed by ascending order of their creation"
             );
 
@@ -1034,14 +1028,9 @@ mod test {
                 .await
                 .expect("should get channels");
             let channels_list = res_to_channel_list_response(res).await;
-            let expected_channels_list = vec![channel_other_leader];
             assert_eq!(
-                channels_list.channels.len(),
-                1,
-                "There should be 1 channel on the second page"
-            );
-            assert_eq!(
-                channels_list.channels, expected_channels_list,
+                channels_list.channels,
+                vec![channel_other_leader],
                 "The channels should be listed by ascending order of their creation"
             );
             assert_eq!(
