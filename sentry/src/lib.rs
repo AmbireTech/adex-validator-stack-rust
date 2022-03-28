@@ -26,8 +26,8 @@ use {
         campaign,
         campaign::{campaign_list, create_campaign, update_campaign},
         channel::{
-            add_spender_leaf, channel_list, get_accounting_for_channel, get_all_spender_limits,
-            get_spender_limits, last_approved,
+            add_spender_leaf, channel_list, channel_payout, get_accounting_for_channel,
+            get_all_spender_limits, get_spender_limits, last_approved,
             validator_message::{
                 create_validator_messages, extract_params, list_validator_messages,
             },
@@ -76,6 +76,9 @@ static CHANNEL_ALL_SPENDER_LIMITS: Lazy<Regex> = Lazy::new(|| {
 static CHANNEL_ACCOUNTING: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/accounting/?$")
         .expect("The regex should be valid")
+});
+static CHANNEL_PAY: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/pay/?$").expect("The regex should be valid")
 });
 
 /// Regex extracted parameters.
@@ -210,10 +213,6 @@ async fn campaigns_router<C: Locked + 'static>(
 }
 
 // TODO AIP#61: Add routes for:
-// - POST /channel/:id/pay
-// #[serde(rename_all = "camelCase")]
-// Pay { payout: BalancesMap },
-//
 // - GET /channel/:id/get-leaf
 async fn channels_router<C: Locked + 'static>(
     mut req: Request<Body>,
@@ -345,6 +344,21 @@ async fn channels_router<C: Locked + 'static>(
             .await?;
 
         get_accounting_for_channel(req, app).await
+    }
+    // POST /v5/channel/:id/pay
+    else if let (Some(caps), &Method::POST) = (CHANNEL_PAY.captures(&path), method) {
+        let param = RouteParams(vec![caps
+            .get(1)
+            .map_or("".to_string(), |m| m.as_str().to_string())]);
+        req.extensions_mut().insert(param);
+
+        req = Chain::new()
+            .chain(AuthRequired)
+            .chain(ChannelLoad)
+            .apply(req, app)
+            .await?;
+
+        channel_payout(req, app).await
     } else {
         Err(ResponseError::NotFound)
     }
