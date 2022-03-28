@@ -669,8 +669,8 @@ mod test {
     use crate::test_util::setup_dummy_app;
     use crate::CampaignRemaining;
     use adapter::{
-        ethereum::test_util::{GANACHE_1, GANACHE_1337, GANACHE_INFO_1, GANACHE_INFO_1337},
-        primitives::Deposit,
+        ethereum::test_util::{GANACHE_INFO_1, GANACHE_INFO_1337},
+        primitives::Deposit as AdapterDeposit,
     };
     use hyper::StatusCode;
     use primitives::{
@@ -698,7 +698,7 @@ mod test {
         };
 
         let precision: u8 = channel_context.token.precision.into();
-        let deposit = Deposit {
+        let deposit = AdapterDeposit {
             total: BigNum::from_str("100000000000000000000").expect("should convert"), // 100 DAI
             still_on_create2: BigNum::from_str("1000000000000000000").expect("should convert"), // 1 DAI
         };
@@ -739,7 +739,7 @@ mod test {
             .expect("should return a spendable");
         assert!(spendable.is_some());
 
-        let updated_deposit = Deposit {
+        let updated_deposit = AdapterDeposit {
             total: BigNum::from_str("110000000000000000000").expect("should convert"), // 110 DAI
             still_on_create2: BigNum::from_str("1100000000000000000").expect("should convert"), // 1.1 DAI
         };
@@ -1135,6 +1135,7 @@ mod test {
         }
     }
 
+    #[tokio::test]
     async fn payouts_for_earners_test() {
         let app = setup_dummy_app().await;
         let channel_context = app
