@@ -6,7 +6,10 @@ LABEL maintainer="dev@ambire.com"
 WORKDIR /scripts
 
 COPY ganache-cli.sh .
-COPY snapshot_contracts snapshot
+COPY snapshot_contracts_${CHAIN_ID} snapshot
+
+# The Chain Id that will be passed to `ganache-cli`
+ENV CHAIN_ID=
 
 EXPOSE 8545
 
