@@ -28,37 +28,17 @@ validators_whitelist = []
 # Leader - 0x80690751969B234697e9059e04ed72195c3507fa
 admins = ['0x80690751969B234697e9059e04ed72195c3507fa']
 
-# Ethereum mainnet tokens
-# [chain."Ganache #1"]
-# # Ethereum Mainnet for testing
-# chain_id = 1
-# rpc = 'http://localhost:8546'
-# # Ganache Snapshot address
-# outpace = '0x0000000000000000000000000000000000000000'
-# # Ganache Snapshot address
-# sweeper = '0x0000000000000000000000000000000000000000'
-
-#     [chain."Ganache #1".token."Mocked TOKEN"]
-#     address = '0x2bcaf6968aec8a3b5126fbfab5fd419da6e8ad8e' # checked
-#     precision = 18
-#     # Minimum token units for the Create2 deposits to count
-#     # 1 * 10^18 = 1.0000 TOKEN
-#     min_token_units_for_deposit = '1000000000000000000'
-#     # multiplier = 10^12 - 10^18 (token precision) = 10^-6
-#     # min_validator_fee = 1 * 10^-6 = 0.000_001
-#     min_validator_fee = '1000000000000'
-
-[chain."Ganache #1337"]
+[chain."Ganache #1"]
 # Ganache default chain id for testing
-chain_id = 1337
+chain_id = 1
 rpc = 'http://localhost:8545'
 # Ganache Snapshot address
-outpace = '0xAbc27d46a458E2e49DaBfEf45ca74dEDBAc3DD06'
+outpace = '0x671b54359be2fa82aB05A5336EB8134F782B88Cd'
 # Ganache Snapshot address
-sweeper = '0x7dD57C0324284102A757153E18F2Cb1ACdB7d2bD'
+sweeper = '0xE37BA12D23e755138f7Ea8391551B773Cb2D8F5F'
 
-    [chain."Ganache #1337".token."Mocked TOKEN"]
-    address = '0x2bcaf6968aec8a3b5126fbfab5fd419da6e8ad8e' # checked
+    [chain."Ganache #1".token."Mocked TOKEN 2"]
+    address = '0x704D76a8c31FbAafE2B7895b13A763c7487FC0D8' # checked
     precision = 18
     # Minimum token units for the Create2 deposits to count
     # 1 * 10^18 = 1.0000 TOKEN
@@ -68,17 +48,17 @@ sweeper = '0x7dD57C0324284102A757153E18F2Cb1ACdB7d2bD'
     min_validator_fee = '1000000000000'
 
 
-[chain."Ganache #1"]
+[chain."Ganache #1337"]
 # Ganache default chain id for testing
-chain_id = 1
-rpc = 'http://localhost:8546'
+chain_id = 1337
+rpc = 'http://localhost:1337'
 # Ganache Snapshot address
-outpace = '0x0000000000000000000000000000000000000001'
+outpace = '0xAbc27d46a458E2e49DaBfEf45ca74dEDBAc3DD06'
 # Ganache Snapshot address
-sweeper = '0x0000000000000000000000000000000000000001'
+sweeper = '0x7dD57C0324284102A757153E18F2Cb1ACdB7d2bD'
 
-    [chain."Ganache #1".token."Mocked TOKEN 2"]
-    address = '0x0000000000000000000000000000000000000001' # checked
+    [chain."Ganache #1337".token."Mocked TOKEN"]
+    address = '0x2bcaf6968aec8a3b5126fbfab5fd419da6e8ad8e' # checked
     precision = 18
     # Minimum token units for the Create2 deposits to count
     # 1 * 10^18 = 1.0000 TOKEN

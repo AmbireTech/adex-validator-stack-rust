@@ -20,6 +20,7 @@ use primitives::{
     util::ApiUrl,
     Address, Chain, Config,
 };
+use slog::{debug, Logger};
 use web3::{contract::Contract, transports::Http, types::H160, Web3};
 
 pub mod deposits;
@@ -28,7 +29,7 @@ pub mod deposits;
 /// NOTE: Current the snapshot and test setup use a single Chain.
 ///
 /// Uses Chain #1337 from the [`GANACHE_CONFIG`] static to init the contracts
-pub static SNAPSHOT_CONTRACTS: Lazy<Contracts> = Lazy::new(|| {
+pub static SNAPSHOT_CONTRACTS_1337: Lazy<Contracts> = Lazy::new(|| {
     let ganache_chain_info = GANACHE_INFO_1337.clone();
 
     let web3 = Web3::new(
@@ -141,6 +142,7 @@ pub static VALIDATORS: Lazy<HashMap<Address, TestValidator>> = Lazy::new(|| {
 
 pub struct Setup {
     pub chain: Chain,
+    pub logger: Logger,
 }
 
 #[derive(Debug, Clone)]
@@ -155,6 +157,8 @@ impl Setup {
     pub async fn deploy_contracts(&self) -> Contracts {
         let transport = Http::new(self.chain.rpc.as_str()).expect("Invalid RPC for chain!");
 
+        debug!(self.logger, "Preparing deployment of contracts to Chain {:?} on {}", self.chain.chain_id, self.chain.rpc; "chain" => ?self.chain);
+
         let web3 = Web3::new(transport);
 
         // deploy contracts
@@ -164,13 +168,19 @@ impl Setup {
             .await
             .expect("Correct parameters are passed to the Token constructor.");
 
+        debug!(self.logger, "Deployed token contract"; "address" => ?token.1, "token_info" => ?token.0);
+
         let sweeper = deploy_sweeper_contract(&web3)
             .await
             .expect("Correct parameters are passed to the Sweeper constructor.");
 
+        debug!(self.logger, "Deployed sweeper contract"; "address" => ?sweeper.0);
+
         let outpace = deploy_outpace_contract(&web3)
             .await
             .expect("Correct parameters are passed to the OUTPACE constructor.");
+
+        debug!(self.logger, "Deployed outpace contract"; "address" => ?outpace.0);
 
         Contracts {
             token,
@@ -225,7 +235,7 @@ mod tests {
     use crate::run::run_sentry_app;
 
     use super::*;
-    use adapter::ethereum::test_util::{GANACHE_1337, KEYSTORES};
+    use adapter::ethereum::test_util::{GANACHE_1, GANACHE_1337, KEYSTORES};
     use adapter::{prelude::*, Adapter, Ethereum};
     use primitives::{
         balances::CheckedState,
@@ -239,13 +249,29 @@ mod tests {
     use validator_worker::{worker::Worker, SentryApi};
 
     #[tokio::test]
-    #[ignore = "We use a snapshot, however, we have left this test for convenience"]
+    // #[ignore = "We use a snapshot, however, we have left this test for convenience"]
     async fn deploy_contracts() {
-        let setup = Setup {
-            chain: GANACHE_1337.clone(),
-        };
-        // deploy contracts
-        let _contracts = setup.deploy_contracts().await;
+        let logger = new_logger("test_harness");
+
+        // Chain Id: 1
+        {
+            let setup = Setup {
+                chain: GANACHE_1.clone(),
+                logger: logger.clone(),
+            };
+            // deploy contracts
+            let _contracts = setup.deploy_contracts().await;
+        }
+
+        // Chain Id: 1337
+        // {
+        //     let setup = Setup {
+        //         chain: GANACHE_1337.clone(),
+        //         logger,
+        //     };
+        //     // deploy contracts
+        //     let _contracts = setup.deploy_contracts().await;
+        // }
     }
 
     static CAMPAIGN_1: Lazy<Campaign> = Lazy::new(|| {
@@ -261,7 +287,7 @@ mod tests {
             leader: VALIDATORS[&LEADER].address.into(),
             follower: VALIDATORS[&FOLLOWER].address.into(),
             guardian: *GUARDIAN,
-            token: SNAPSHOT_CONTRACTS.token.1,
+            token: SNAPSHOT_CONTRACTS_1337.token.1,
             nonce: 0_u64.into(),
         };
 
@@ -329,7 +355,7 @@ mod tests {
     /// This Campaign's Channel has switched leader & follower compared to [`CAMPAIGN_1`]
     ///
     /// `Channel.leader = VALIDATOR["follower"].address`
-    /// `Channel.follower = VALIDATOR["leader"],address`
+    /// `Channel.follower = VALIDATOR["leader"].address`
     /// See [`VALIDATORS`] for more details.
     static CAMPAIGN_2: Lazy<Campaign> = Lazy::new(|| {
         use chrono::{TimeZone, Utc};
@@ -344,7 +370,7 @@ mod tests {
             leader: VALIDATORS[&FOLLOWER].address.into(),
             follower: VALIDATORS[&LEADER].address.into(),
             guardian: *GUARDIAN_2,
-            token: SNAPSHOT_CONTRACTS.token.1,
+            token: SNAPSHOT_CONTRACTS_1337.token.1,
             nonce: 0_u64.into(),
         };
 
@@ -419,10 +445,11 @@ mod tests {
         assert_eq!(&token_chain.chain, &chain, "CAMPAIGN_1 & CAMPAIGN_2 should be both using the same Chain which is setup in the Ganache Config");
         let setup = Setup {
             chain: chain.clone(),
+            logger: new_logger("test_harness"),
         };
 
         // Use snapshot contracts
-        let contracts = SNAPSHOT_CONTRACTS.clone();
+        let contracts = SNAPSHOT_CONTRACTS_1337.clone();
         // let contracts = setup.deploy_contracts().await;
 
         let leader = VALIDATORS[&LEADER].clone();

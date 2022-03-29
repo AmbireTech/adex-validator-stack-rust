@@ -24,13 +24,34 @@ services:
       - "6379:6379"
     networks:
       - adex-external
-  ganache:
-    build: ./scripts/ethereum
+  ganache-1:
+    build:
+      context: ./scripts/ethereum
+      args:
+        SNAPSHOT_CONTRACTS: snapshot_contracts_1
     image: adex-ganache
-    container_name: adex-ganache-cli
+    container_name: adex-ganache-cli-chain_id-1
     restart: always
     ports:
       - "8545:8545"
+    environment:
+      CHAIN_ID: 1
+    networks:
+      - adex-external
+  # Chain Id 1337 - the default Ganache chain id
+  ganache-1337:
+    build:
+      context: ./scripts/ethereum
+      args:
+        SNAPSHOT_CONTRACTS: snapshot_contracts_1337
+    image: adex-ganache
+    container_name: adex-ganache-cli-chain_id-1337
+    restart: always
+    ports:
+      # use a different port for this second instance of ganache-cli
+      - "1337:8545"
+    environment:
+      CHAIN_ID: 1337
     networks:
       - adex-external
 
