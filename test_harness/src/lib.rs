@@ -249,7 +249,7 @@ mod tests {
     use validator_worker::{worker::Worker, SentryApi};
 
     #[tokio::test]
-    #[ignore = "We use a snapshot, however, we have left this test for convenience"]
+    // #[ignore = "We use a snapshot, however, we have left this test for convenience"]
     async fn deploy_contracts() {
         let logger = new_logger("test_harness");
 
@@ -264,14 +264,14 @@ mod tests {
         }
 
         // Chain Id: 1337
-        {
-            let setup = Setup {
-                chain: GANACHE_1337.clone(),
-                logger,
-            };
-            // deploy contracts
-            let _contracts = setup.deploy_contracts().await;
-        }
+        // {
+        //     let setup = Setup {
+        //         chain: GANACHE_1337.clone(),
+        //         logger,
+        //     };
+        //     // deploy contracts
+        //     let _contracts = setup.deploy_contracts().await;
+        // }
     }
 
     static CAMPAIGN_1: Lazy<Campaign> = Lazy::new(|| {
