@@ -25,7 +25,10 @@ services:
     networks:
       - adex-external
   ganache-1:
-    build: ./scripts/ethereum
+    build:
+      context: ./scripts/ethereum
+      args:
+        SNAPSHOT_CONTRACTS: snapshot_contracts_1
     image: adex-ganache
     container_name: adex-ganache-cli-chain_id-1
     restart: always
@@ -37,7 +40,10 @@ services:
       - adex-external
   # Chain Id 1337 - the default Ganache chain id
   ganache-1337:
-    build: ./scripts/ethereum
+    build:
+      context: ./scripts/ethereum
+      args:
+        SNAPSHOT_CONTRACTS: snapshot_contracts_1337
     image: adex-ganache
     container_name: adex-ganache-cli-chain_id-1337
     restart: always

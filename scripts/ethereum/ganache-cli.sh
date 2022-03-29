@@ -42,7 +42,7 @@ CHAIN_ID=${CHAIN_ID:-1337}
 
 node /app/ganache-core.docker.cli.js --gasLimit 0xfffffffffffff \
   --chainId=${CHAIN_ID} \
-  --db="./snapshot_contracts_${CHAIN_ID}" \
+  --db="./snapshot" \
   --deterministic \
   --mnemonic="diary west sketch curious expose decade symptom height minor layer carry man" \
   --account="0xf224ebee7563c68de46b3f57db880e7709c102f56ecedeaa4bccd15dea702815,9000000000000000000000000000" \

@@ -29,7 +29,7 @@ pub mod deposits;
 /// NOTE: Current the snapshot and test setup use a single Chain.
 ///
 /// Uses Chain #1337 from the [`GANACHE_CONFIG`] static to init the contracts
-pub static SNAPSHOT_CONTRACTS: Lazy<Contracts> = Lazy::new(|| {
+pub static SNAPSHOT_CONTRACTS_1337: Lazy<Contracts> = Lazy::new(|| {
     let ganache_chain_info = GANACHE_INFO_1337.clone();
 
     let web3 = Web3::new(
@@ -287,7 +287,7 @@ mod tests {
             leader: VALIDATORS[&LEADER].address.into(),
             follower: VALIDATORS[&FOLLOWER].address.into(),
             guardian: *GUARDIAN,
-            token: SNAPSHOT_CONTRACTS.token.1,
+            token: SNAPSHOT_CONTRACTS_1337.token.1,
             nonce: 0_u64.into(),
         };
 
@@ -355,7 +355,7 @@ mod tests {
     /// This Campaign's Channel has switched leader & follower compared to [`CAMPAIGN_1`]
     ///
     /// `Channel.leader = VALIDATOR["follower"].address`
-    /// `Channel.follower = VALIDATOR["leader"],address`
+    /// `Channel.follower = VALIDATOR["leader"].address`
     /// See [`VALIDATORS`] for more details.
     static CAMPAIGN_2: Lazy<Campaign> = Lazy::new(|| {
         use chrono::{TimeZone, Utc};
@@ -370,7 +370,7 @@ mod tests {
             leader: VALIDATORS[&FOLLOWER].address.into(),
             follower: VALIDATORS[&LEADER].address.into(),
             guardian: *GUARDIAN_2,
-            token: SNAPSHOT_CONTRACTS.token.1,
+            token: SNAPSHOT_CONTRACTS_1337.token.1,
             nonce: 0_u64.into(),
         };
 
@@ -449,7 +449,7 @@ mod tests {
         };
 
         // Use snapshot contracts
-        let contracts = SNAPSHOT_CONTRACTS.clone();
+        let contracts = SNAPSHOT_CONTRACTS_1337.clone();
         // let contracts = setup.deploy_contracts().await;
 
         let leader = VALIDATORS[&LEADER].clone();

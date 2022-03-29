@@ -7,10 +7,12 @@ WORKDIR /scripts
 
 # The Chain Id that will be passed to `ganache-cli`
 ENV CHAIN_ID=
+# The snapshot contracts directory that will be used
+ARG SNAPSHOT_CONTRACTS=
 
 COPY ganache-cli.sh .
 # Copy all snapshot_contracts_CHAIN_ID to the /scripts folder
-COPY snapshot_contracts_* ./
+COPY ${SNAPSHOT_CONTRACTS} ./snapshot
 
 EXPOSE 8545
 
