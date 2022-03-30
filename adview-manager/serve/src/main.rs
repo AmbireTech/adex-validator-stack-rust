@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use adex_primitives::{
     supermarket::units_for_slot,
     targeting::{input::Global, Input},
@@ -13,8 +15,7 @@ use wiremock::{
     Mock, MockServer, ResponseTemplate,
 };
 
-
-use tera::{Tera, Context};
+use tera::{Context, Tera};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -22,20 +23,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let serve_dir = match std::env::current_dir().unwrap() {
         serve_path if serve_path.ends_with("serve") => serve_path,
-        adview_manager_path if adview_manager_path.ends_with("adview-manager") => adview_manager_path.join("serve"),
+        adview_manager_path if adview_manager_path.ends_with("adview-manager") => {
+            adview_manager_path.join("serve")
+        }
         // running from the Validator stack workspace
-        workspace_path => workspace_path.join("adview-manager/serve")
+        workspace_path => workspace_path.join("adview-manager/serve"),
     };
 
     let templates_glob = format!("{}/templates/**/*.html", serve_dir.display());
 
     info!("Tera templates glob path: {templates_glob}");
     // Use globbing
-    let tera = Tera::new(&templates_glob)?;
+    let tera = Arc::new(Tera::new(&templates_glob)?);
 
     // `GET /ad`
+    let ad_tera = tera.clone();
     let get_ad = warp::get().and(warp::path("ad")).then(move || {
-        let tera = tera.clone();
+        let tera = ad_tera.clone();
 
         async move {
             // let logger = logger.clone();
@@ -146,7 +150,72 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    warp::serve(get_ad).run(([127, 0, 0, 1], 3030)).await;
+    // GET /preview/video
+    let get_preview_of_video = warp::get()
+        .and(warp::path!("preview" / "video"))
+        .then(move || {
+            let tera = tera.clone();
+
+            async move {
+                let whitelisted_tokens = vec!["0x6B175474E89094C44Da98b954EedeAC495271d0F"
+                    .parse()
+                    .expect("Valid token Address")];
+                let disabled_video = false;
+                let publisher_addr = "0x0000000000000000626f62627973686d75726461"
+                    .parse()
+                    .unwrap();
+
+                let options = Options {
+                    market_url: "http://placeholder.com".parse().unwrap(),
+                    market_slot: DUMMY_IPFS[0],
+                    publisher_addr,
+                    // All passed tokens must be of the same price and decimals, so that the amounts can be accurately compared
+                    whitelisted_tokens,
+                    size: Some(Size::new(728, 90)),
+                    // TODO: Check this value
+                    navigator_language: Some("bg".into()),
+                    /// Defaulted
+                    disabled_video,
+                    disabled_sticky: false,
+                };
+
+                // legacy_728x90
+                let video_ad_unit =
+                    adex_primitives::supermarket::units_for_slot::response::AdUnit {
+                        /// Same as `ipfs`
+                        id: "QmShJ6tsJ7LHLiYGX4EAmPyCPWJuCnvm6AKjweQPnw9qfh"
+                            .parse()
+                            .expect("Valid IPFS"),
+                        media_url: "ipfs://Qmevmms1AZgYXS27A9ghSjHn4DSaHMfgYcD2SoGW14RYGy"
+                            .to_string(),
+                        media_mime: "video/mp4".to_string(),
+                        target_url: "https://www.stremio.com/downloads".to_string(),
+                    };
+
+                let video_html = get_unit_html_with_events(
+                    &options,
+                    &video_ad_unit,
+                    "localhost",
+                    DUMMY_CAMPAIGN.id,
+                    &DUMMY_CAMPAIGN.validators,
+                    false,
+                );
+
+                // let video_html = get_unit_html_with_events(&options, );
+                let html = {
+                    let mut context = Context::new();
+                    context.insert("ad_code", &video_html);
+
+                    tera.render("ad.html", &context).expect("Should render")
+                };
+
+                warp::reply::html(html)
+            }
+        });
+
+    warp::serve(get_ad.or(get_preview_of_video))
+        .run(([127, 0, 0, 1], 3030))
+        .await;
 
     Ok(())
 }

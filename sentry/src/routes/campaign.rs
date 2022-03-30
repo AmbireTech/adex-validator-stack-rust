@@ -14,7 +14,7 @@ use crate::{
 };
 use adapter::{prelude::*, Adapter, Error as AdaptorError};
 use deadpool_postgres::PoolError;
-use futures::future::try_join_all;
+use futures::{future::try_join_all, TryFutureExt};
 use hyper::{Body, Request, Response};
 use primitives::{
     campaign_validator::Validator,
@@ -115,17 +115,24 @@ pub async fn fetch_campaign_ids_for_channel(
     if total_pages < 2 {
         Ok(campaign_ids)
     } else {
-        let other_pages: Vec<Vec<CampaignId>> = try_join_all((1..total_pages).map(|i| {
-            get_campaign_ids_by_channel(
-                pool,
-                &channel_id,
-                limit.into(),
-                i.checked_mul(limit.into()).expect("TODO"),
-            )
+        let pages_skip: Vec<u64> = (1..total_pages)
+            .map(|i| {
+                i.checked_mul(limit.into()).ok_or_else(|| {
+                    ResponseError::FailedValidation(
+                        "Calculating skip while fetching campaign ids results in an overflow"
+                            .to_string(),
+                    )
+                })
+            })
+            .collect::<Result<_, _>>()?;
+
+        let other_pages = try_join_all(pages_skip.into_iter().map(|skip| {
+            get_campaign_ids_by_channel(pool, &channel_id, limit.into(), skip)
+                .map_err(|e| ResponseError::BadRequest(e.to_string()))
         }))
         .await?;
 
-        let all_campaigns: Vec<CampaignId> = std::iter::once(campaign_ids)
+        let all_campaigns = std::iter::once(campaign_ids)
             .chain(other_pages.into_iter())
             .flat_map(|campaign_ids| campaign_ids.into_iter())
             .collect();
@@ -1279,13 +1286,19 @@ mod test {
             let new_budget = UnifiedNum::from_u64(300 * multiplier);
             let delta_budget = get_delta_budget(&campaign_remaining, &campaign, new_budget).await;
 
-            assert!(matches!(&delta_budget, Err(Error::NewBudget(_))), "Got result: {delta_budget:?}");
+            assert!(
+                matches!(&delta_budget, Err(Error::NewBudget(_))),
+                "Got result: {delta_budget:?}"
+            );
 
             // campaign_spent == new_budget
             let new_budget = UnifiedNum::from_u64(400 * multiplier);
             let delta_budget = get_delta_budget(&campaign_remaining, &campaign, new_budget).await;
 
-            assert!(matches!(&delta_budget, Err(Error::NewBudget(_))), "Got result: {delta_budget:?}");
+            assert!(
+                matches!(&delta_budget, Err(Error::NewBudget(_))),
+                "Got result: {delta_budget:?}"
+            );
         }
         // Increasing budget
         {
