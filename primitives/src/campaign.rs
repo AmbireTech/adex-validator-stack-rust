@@ -29,12 +29,18 @@ mod campaign_id {
     use thiserror::Error;
     use uuid::Uuid;
 
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[derive(Clone, Copy, PartialEq, Eq, Hash)]
     /// an Id of 16 bytes, (de)serialized as a `0x` prefixed hex
     ///
     /// In this implementation of the `CampaignId` the value is generated from a `Uuid::new_v4().to_simple()`
     pub struct CampaignId([u8; 16]);
 
+    impl fmt::Debug for CampaignId {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "CampaignId({})", self)
+        }
+    }
+    
     impl CampaignId {
         /// Generates randomly a `CampaignId` using `Uuid::new_v4().to_simple()`
         pub fn new() -> Self {
