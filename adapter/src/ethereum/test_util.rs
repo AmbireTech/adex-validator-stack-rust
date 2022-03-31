@@ -88,20 +88,17 @@ pub static KEYSTORES: Lazy<HashMap<Address, Options>> = Lazy::new(|| {
     .collect()
 });
 
-/// Local `ganache` is running at:
-pub const GANACHE_URL: &str = "http://localhost:8545";
-
 // /// [`Chain`] of the locally running `ganache-cli` chain with id #1
-// pub static GANACHE_1: Lazy<Chain> = Lazy::new(|| GANACHE_INFO_1.chain.clone());
+pub static GANACHE_1: Lazy<Chain> = Lazy::new(|| GANACHE_INFO_1.chain.clone());
 
-// /// [`ChainInfo`] of the locally running `ganache-cli` chain with id #1
-// pub static GANACHE_INFO_1: Lazy<ChainInfo> = Lazy::new(|| {
-//     GANACHE_CONFIG
-//         .chains
-//         .get("Ganache #1")
-//         .expect("Ganache Local chain 1 not found")
-//         .clone()
-// });
+/// [`ChainInfo`] of the locally running `ganache-cli` chain with id #1
+pub static GANACHE_INFO_1: Lazy<ChainInfo> = Lazy::new(|| {
+    GANACHE_CONFIG
+        .chains
+        .get("Ganache #1")
+        .expect("Ganache Local chain 1 not found")
+        .clone()
+});
 
 /// [`Chain`] of the locally running `ganache-cli` chain with id #1337
 pub static GANACHE_1337: Lazy<Chain> = Lazy::new(|| GANACHE_INFO_1337.chain.clone());
@@ -117,7 +114,7 @@ pub static GANACHE_INFO_1337: Lazy<ChainInfo> = Lazy::new(|| {
 
 /// Initialized Ganache [`Web3`] instance using a Http transport for usage in tests.
 /// It uses the [`GANACHE_1337`] to initialize the client.
-pub static GANACHE_WEB3: Lazy<Web3<Http>> = Lazy::new(|| {
+pub static GANACHE_1337_WEB3: Lazy<Web3<Http>> = Lazy::new(|| {
     GANACHE_1337
         .init_web3()
         .expect("Should init the Web3 client")

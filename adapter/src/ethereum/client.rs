@@ -704,7 +704,7 @@ mod test {
 
     #[tokio::test]
     async fn get_deposit_and_count_create2_when_min_tokens_received() {
-        let web3 = GANACHE_WEB3.clone();
+        let web3 = GANACHE_1337_WEB3.clone();
 
         let leader_account = *LEADER;
 

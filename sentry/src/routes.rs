@@ -76,13 +76,19 @@
 //!
 //! Response: [`LastApprovedResponse`][primitives::sentry::LastApprovedResponse]
 //!
-//! - `POST /v5/channel/:id/pay` (auth required)
+//! - [`POST /v5/channel/:id/pay`](channel::channel_payout) (auth required)
 //!
-//! TODO: implement and document as part of issue #382
+//! Channel Payout with authentication of the spender.
 //!
-//! Channel Payout with authentication of the spender
+//! This route handles withdrawals of advertiser funds for the authenticated spender.
+//! It needs to ensure all campaigns are closed. It accepts a JSON body in the request which contains
+//! all of the earners and updates their balances accordingly. Used when an advertiser/spender wants
+//! to get their remaining funds back.
 //!
-//! Withdrawals of advertiser funds - re-introduces the PAY event with a separate route.
+//! Request JSON body: [`ChannelPayRequest`](primitives::sentry::ChannelPayRequest)
+//!
+//! Response: [`SuccessResponse`](primitives::sentry::SuccessResponse)
+//!
 //!
 //! - `GET /v5/channel/:id/get-leaf`
 //!
