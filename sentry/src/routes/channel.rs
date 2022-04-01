@@ -307,22 +307,50 @@ pub async fn add_spender_leaf<C: Locked + 'static>(
     let channel = req
         .extensions()
         .get::<ChainOf<Channel>>()
-        .ok_or(ResponseError::NotFound)?
-        .context;
+        .ok_or(ResponseError::NotFound)?;
 
     update_accounting(
         app.pool.clone(),
-        channel.id(),
+        channel.context.id(),
         spender,
         Side::Spender,
         UnifiedNum::from_u64(0),
     )
     .await?;
 
-    // TODO: Replace with SpenderResponse
-    Ok(success_response(serde_json::to_string(&SuccessResponse {
-        success: true,
-    })?))
+    let latest_spendable = fetch_spendable(app.pool.clone(), &spender, &channel.context.id()).await?;
+
+    let latest_spendable = match latest_spendable {
+        Some(spendable) => spendable,
+        None => {
+            create_or_update_spendable_document(
+                &app.adapter,
+                app.pool.clone(),
+                &channel,
+                spender,
+            )
+            .await?
+        }
+    };
+
+    let new_state = match get_corresponding_new_state(&app.pool, &app.logger, &channel.context).await? {
+        Some(new_state) => new_state,
+        None => return spender_response_without_leaf(latest_spendable.deposit.total),
+    };
+
+    let total_spent = new_state
+        .balances
+        .spenders
+        .get(&spender)
+        .map(|spent| spent.to_owned());
+
+    let res = SpenderResponse {
+        spender: Spender {
+            total_deposited: latest_spendable.deposit.total,
+            total_spent,
+        },
+    };
+    Ok(success_response(serde_json::to_string(&res)?))
 }
 
 async fn get_corresponding_new_state(
