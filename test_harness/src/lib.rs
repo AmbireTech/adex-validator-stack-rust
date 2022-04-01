@@ -7,7 +7,7 @@ use adapter::ethereum::{
     get_counterfactual_address,
     test_util::{
         deploy_outpace_contract, deploy_sweeper_contract, deploy_token_contract, mock_set_balance,
-        outpace_deposit, GANACHE_INFO_1337, MOCK_TOKEN_ABI,
+        outpace_deposit, GANACHE_INFO_1, GANACHE_INFO_1337, MOCK_TOKEN_ABI,
     },
     Options, OUTPACE_ABI, SWEEPER_ABI,
 };
@@ -40,6 +40,54 @@ pub static SNAPSHOT_CONTRACTS_1337: Lazy<Contracts> = Lazy::new(|| {
         .tokens
         .get("Mocked TOKEN")
         .expect("Ganache config should contain for Chain #1337 the Mocked TOKEN");
+    let chain = ganache_chain_info.chain.clone();
+
+    let token = (
+        // use Ganache Config
+        token_info.clone(),
+        token_info.address,
+        Contract::from_json(
+            web3.eth(),
+            H160(token_info.address.to_bytes()),
+            &MOCK_TOKEN_ABI,
+        )
+        .unwrap(),
+    );
+
+    let sweeper_address = Address::from(ganache_chain_info.chain.sweeper);
+
+    let sweeper = (
+        sweeper_address,
+        Contract::from_json(web3.eth(), H160(sweeper_address.to_bytes()), &SWEEPER_ABI).unwrap(),
+    );
+
+    let outpace_address = Address::from(ganache_chain_info.chain.outpace);
+
+    let outpace = (
+        outpace_address,
+        Contract::from_json(web3.eth(), H160(outpace_address.to_bytes()), &OUTPACE_ABI).unwrap(),
+    );
+
+    Contracts {
+        token,
+        sweeper,
+        outpace,
+        chain,
+    }
+});
+
+/// Uses Chain #1 from the [`GANACHE_CONFIG`] static to init the contracts
+pub static SNAPSHOT_CONTRACTS_1: Lazy<Contracts> = Lazy::new(|| {
+    let ganache_chain_info = GANACHE_INFO_1.clone();
+
+    let web3 = Web3::new(
+        Http::new(ganache_chain_info.chain.rpc.as_str()).expect("failed to init transport"),
+    );
+
+    let token_info = ganache_chain_info
+        .tokens
+        .get("Mocked TOKEN 2")
+        .expect("Ganache config should contain for Chain #1 the Mocked TOKEN");
     let chain = ganache_chain_info.chain.clone();
 
     let token = (
@@ -235,23 +283,27 @@ mod tests {
     use crate::run::run_sentry_app;
 
     use super::*;
-    use adapter::ethereum::{
-        test_util::{KEYSTORES, GANACHE_1, GANACHE_1337},
-        UnlockedWallet,
+    use adapter::{
+        ethereum::{
+            test_util::{GANACHE_1, GANACHE_1337, KEYSTORES},
+            UnlockedWallet,
+        },
+        prelude::*,
+        primitives::ChainOf,
+        Adapter, Ethereum,
     };
-    use adapter::{prelude::*, Adapter, Ethereum};
     use chrono::Utc;
     use primitives::{
         balances::{CheckedState, UncheckedState},
         sentry::{campaign_create::CreateCampaign, AccountingResponse, Event, SuccessResponse},
         spender::Spender,
-        test_util::{ADVERTISER, DUMMY_AD_UNITS, DUMMY_IPFS, GUARDIAN, GUARDIAN_2, PUBLISHER},
+        test_util::{ADVERTISER, DUMMY_AD_UNITS, DUMMY_IPFS, GUARDIAN, GUARDIAN_2, IDS, PUBLISHER},
         util::{logging::new_logger, ApiUrl},
-        validator::{ApproveState, MessageTypes, NewState},
+        validator::{ApproveState, NewState},
         Balances, BigNum, Campaign, CampaignId, Channel, ChannelId, UnifiedNum,
     };
     use reqwest::{Client, StatusCode};
-    use validator_worker::{sentry_interface::Validator, worker::Worker, GetStateRoot, SentryApi};
+    use validator_worker::{worker::Worker, GetStateRoot, SentryApi};
 
     #[tokio::test]
     // #[ignore = "We use a snapshot, however, we have left this test for convenience"]
@@ -324,7 +376,7 @@ mod tests {
                 .expect("Should parse"),
             channel,
             creator: *ADVERTISER,
-            // 20.00000000
+            // 2.00000000
             budget: UnifiedNum::from(200_000_000),
             validators,
             title: Some("Dummy Campaign".to_string()),
@@ -436,10 +488,87 @@ mod tests {
         }
     });
 
+    /// This Campaign has a token from the GANACHE_1 chain instead of the GANACHE_1337 one like the others
+    static CAMPAIGN_3: Lazy<Campaign> = Lazy::new(|| {
+        use chrono::TimeZone;
+        use primitives::{
+            campaign::{Active, Pricing, PricingBounds, Validators},
+            targeting::Rules,
+            validator::ValidatorDesc,
+            EventSubmission,
+        };
+
+        let channel = Channel {
+            leader: VALIDATORS[&LEADER].address.into(),
+            follower: VALIDATORS[&FOLLOWER].address.into(),
+            guardian: *GUARDIAN,
+            token: SNAPSHOT_CONTRACTS_1.token.1,
+            nonce: 0_u64.into(),
+        };
+
+        let leader_desc = ValidatorDesc {
+            id: VALIDATORS[&LEADER].address.into(),
+            url: VALIDATORS[&LEADER].sentry_url.to_string(),
+            // min_validator_fee for token: 0.000_010
+            // fee per 1000 (pro mille) = 0.00003000 (UnifiedNum)
+            // fee per 1 payout: payout * fee / 1000 = payout * 0.00000003
+            fee: 3_000.into(),
+            fee_addr: None,
+        };
+
+        let follower_desc = ValidatorDesc {
+            id: VALIDATORS[&FOLLOWER].address.into(),
+            url: VALIDATORS[&FOLLOWER].sentry_url.to_string(),
+            // min_validator_fee for token: 0.000_010
+            // fee per 1000 (pro mille) = 0.00002000 (UnifiedNum)
+            // fee per 1 payout: payout * fee / 1000 = payout * 0.00000002
+            fee: 2_000.into(),
+            fee_addr: None,
+        };
+
+        let validators = Validators::new((leader_desc, follower_desc));
+
+        Campaign {
+            id: "0x936da01f9abd4d9d80c702af85c822a8"
+                .parse()
+                .expect("Should parse"),
+            channel,
+            creator: *ADVERTISER,
+            // 20.00000000
+            budget: UnifiedNum::from(2_000_000_000),
+            validators,
+            title: Some("Dummy Campaign".to_string()),
+            pricing_bounds: Some(PricingBounds {
+                impression: Some(Pricing {
+                    // 0.00003000
+                    // Per 1000 = 0.03000000
+                    min: 3_000.into(),
+                    // 0.00005000
+                    // Per 1000 = 0.05000000
+                    max: 5_000.into(),
+                }),
+                click: Some(Pricing {
+                    // 0.00006000
+                    // Per 1000 = 0.06000000
+                    min: 6_000.into(),
+                    // 0.00010000
+                    // Per 1000 = 0.10000000
+                    max: 10_000.into(),
+                }),
+            }),
+            event_submission: Some(EventSubmission { allow: vec![] }),
+            ad_units: vec![DUMMY_AD_UNITS[0].clone(), DUMMY_AD_UNITS[1].clone()],
+            targeting_rules: Rules::new(),
+            created: Utc.ymd(2021, 2, 1).and_hms(7, 0, 0),
+            active: Active {
+                to: Utc.ymd(2099, 1, 30).and_hms(0, 0, 0),
+                from: None,
+            },
+        }
+    });
+
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn run_full_test() {
-        // for now we are running tests only on a single Chain!
-        // It is safe to use a single ChainOf for both Campaigns
         let chain = GANACHE_1337.clone();
         assert_eq!(CAMPAIGN_1.channel.token, CAMPAIGN_2.channel.token);
 
@@ -447,7 +576,12 @@ mod tests {
             .find_chain_of(CAMPAIGN_1.channel.token)
             .expect("Should find CAMPAIGN_1 channel token address in Config!");
 
-        assert_eq!(&token_chain.chain, &chain, "CAMPAIGN_1 & CAMPAIGN_2 should be both using the same Chain which is setup in the Ganache Config");
+        let second_token_chain = GANACHE_CONFIG
+            .find_chain_of(CAMPAIGN_3.channel.token)
+            .expect("Should find CAMPAIGN_3 channel token address in Config!");
+
+        assert_eq!(&token_chain.chain, &chain, "CAMPAIGN_1 & CAMPAIGN_2 should be both using the same #1337 Chain which is setup in the Ganache Config");
+
         let setup = Setup {
             chain: chain.clone(),
             logger: new_logger("test_harness"),
@@ -455,6 +589,8 @@ mod tests {
 
         // Use snapshot contracts
         let contracts = SNAPSHOT_CONTRACTS_1337.clone();
+        let contracts_1 = SNAPSHOT_CONTRACTS_1.clone();
+
         // let contracts = setup.deploy_contracts().await;
 
         let leader = VALIDATORS[&LEADER].clone();
@@ -497,6 +633,33 @@ mod tests {
         )
         .expect("Should create new SentryApi for the Leader Worker");
 
+        let events = vec![
+            Event::Impression {
+                publisher: *PUBLISHER,
+                ad_unit: Some(
+                    CAMPAIGN_1
+                        .ad_units
+                        .get(0)
+                        .expect("Should exist in Campaign")
+                        .ipfs,
+                ),
+                ad_slot: Some(DUMMY_IPFS[2]),
+                referrer: Some("https://adex.network".into()),
+            },
+            Event::Click {
+                publisher: *PUBLISHER,
+                ad_unit: Some(
+                    CAMPAIGN_1
+                        .ad_units
+                        .get(0)
+                        .expect("Should exist in Campaign")
+                        .ipfs,
+                ),
+                ad_slot: Some(DUMMY_IPFS[2]),
+                referrer: Some("https://ambire.com".into()),
+            },
+        ];
+
         // check Campaign Leader & Follower urls
         // they should be the same as the test validators
         {
@@ -524,6 +687,10 @@ mod tests {
         // Channel 2:
         // - Outpace: 30 TOKENs
         // - Counterfactual: 20 TOKENs
+        //
+        // Channel 3:
+        // - Outpace: 30 TOKENS
+        // - Counterfactual: 20 TOKENs
         {
             let advertiser_deposits = [
                 Deposit {
@@ -540,7 +707,15 @@ mod tests {
                     outpace_amount: BigNum::with_precision(30, token_precision),
                     counterfactual_amount: BigNum::with_precision(20, token_precision),
                 },
+                Deposit {
+                    channel: CAMPAIGN_3.channel,
+                    token: contracts_1.token.0.clone(),
+                    address: advertiser_adapter.whoami().to_address(),
+                    outpace_amount: BigNum::with_precision(30, token_precision),
+                    counterfactual_amount: BigNum::with_precision(20, token_precision),
+                },
             ];
+
             // 1st deposit
             {
                 setup.deposit(&contracts, &advertiser_deposits[0]).await;
@@ -571,6 +746,22 @@ mod tests {
                     .expect("Should get deposit for advertiser");
 
                 assert_eq!(advertiser_deposits[1], eth_deposit);
+            }
+
+            // 3rd deposit
+            {
+                setup.deposit(&contracts_1, &advertiser_deposits[2]).await;
+
+                // make sure we have the expected deposit returned from EthereumAdapter
+                let eth_deposit = leader_adapter
+                    .get_deposit(
+                        &second_token_chain.clone().with_channel(CAMPAIGN_3.channel),
+                        advertiser_adapter.whoami().to_address(),
+                    )
+                    .await
+                    .expect("Should get deposit for advertiser");
+
+                assert_eq!(advertiser_deposits[2], eth_deposit);
             }
         }
 
@@ -737,6 +928,55 @@ mod tests {
             }
         }
 
+        // Create Campaign 3 w/ Channel 3 using Advertiser on a different chain
+        // In Leader & Follower sentries
+        // Response: 200 Ok
+        // POST /v5/campaign
+        {
+            let second_chain = GANACHE_1.clone();
+            let create_campaign_3 = CreateCampaign::from_campaign(CAMPAIGN_3.clone());
+
+            assert_eq!(
+                &second_token_chain.chain, &second_chain,
+                "CAMPAIGN_3 should be using the #1 Chain which is setup in the Ganache Config"
+            );
+
+            {
+                let leader_token = advertiser_adapter
+                    .get_auth(chain.chain_id, leader_adapter.whoami())
+                    .expect("Get authentication");
+
+                let leader_response = create_campaign(
+                    &api_client,
+                    &leader.sentry_url,
+                    &leader_token,
+                    &create_campaign_3,
+                )
+                .await
+                .expect("Should return Response");
+
+                let status = leader_response.status();
+                assert_eq!(StatusCode::OK, status);
+            }
+
+            {
+                let follower_token = advertiser_adapter
+                    .get_auth(token_chain.chain.chain_id, follower_adapter.whoami())
+                    .expect("Get authentication");
+
+                let follower_response = create_campaign(
+                    &api_client,
+                    &follower.sentry_url,
+                    &follower_token,
+                    &create_campaign_3,
+                )
+                .await
+                .expect("Should return Response");
+
+                assert_eq!(StatusCode::OK, follower_response.status());
+            }
+        }
+
         let leader_worker = Worker::from_sentry(leader_sentry.clone());
         let follower_worker = Worker::from_sentry(follower_sentry.clone());
 
@@ -760,33 +1000,6 @@ mod tests {
 
         // Add new events to sentry
         {
-            let events = vec![
-                Event::Impression {
-                    publisher: *PUBLISHER,
-                    ad_unit: Some(
-                        CAMPAIGN_1
-                            .ad_units
-                            .get(0)
-                            .expect("Should exist in Campaign")
-                            .ipfs,
-                    ),
-                    ad_slot: Some(DUMMY_IPFS[2]),
-                    referrer: Some("https://adex.network".into()),
-                },
-                Event::Click {
-                    publisher: *PUBLISHER,
-                    ad_unit: Some(
-                        CAMPAIGN_1
-                            .ad_units
-                            .get(0)
-                            .expect("Should exist in Campaign")
-                            .ipfs,
-                    ),
-                    ad_slot: Some(DUMMY_IPFS[2]),
-                    referrer: Some("https://ambire.com".into()),
-                },
-            ];
-
             let response = post_new_events(
                 &leader_sentry,
                 token_chain.clone().with(CAMPAIGN_1.id),
@@ -854,10 +1067,9 @@ mod tests {
         test_leader_and_follower_loop(
             leader_sentry,
             follower_sentry,
-            leader_adapter,
-            follower_adapter,
             leader_worker,
             follower_worker,
+            events,
         )
         .await;
     }
@@ -944,21 +1156,23 @@ mod tests {
             .await?)
     }
 
-    // Potential TODO's: Merge both test cases into one and find a way to retrieve heartbeats
     async fn test_leader_and_follower_loop<C: Unlocked + 'static>(
         leader_sentry: SentryApi<C, ()>,
         follower_sentry: SentryApi<C, ()>,
-        leader_adapter: Adapter<Ethereum<UnlockedWallet>, UnlockedState>,
-        follower_adapter: Adapter<Ethereum<UnlockedWallet>, UnlockedState>,
         leader_worker: Worker<Ethereum<UnlockedWallet>>,
         follower_worker: Worker<Ethereum<UnlockedWallet>>,
+        events: Vec<Event>,
     ) {
+        let token_chain = GANACHE_CONFIG
+            .find_chain_of(CAMPAIGN_1.channel.token)
+            .expect("Should find CAMPAIGN_1 channel token address in Config!");
+
         let mut new_channel = CAMPAIGN_1.channel.clone();
         new_channel.nonce = 1_u64.into();
         let mut campaign = CAMPAIGN_1.clone();
         campaign.channel = new_channel;
         // Use snapshot contracts
-        let contracts = SNAPSHOT_CONTRACTS.clone();
+        let contracts = SNAPSHOT_CONTRACTS_1337.clone();
 
         let leader = VALIDATORS[&LEADER].clone();
         let follower = VALIDATORS[&FOLLOWER].clone();
@@ -971,12 +1185,13 @@ mod tests {
         )
         .unlock()
         .expect("Should unlock advertiser's Ethereum Adapter");
+        let context_of_channel = token_chain.clone().with(new_channel);
         let leader_token = advertiser_adapter
-            .get_auth(leader_adapter.whoami())
+            .get_auth(context_of_channel.chain.chain_id, IDS[&LEADER])
             .expect("Get authentication");
 
         let follower_token = advertiser_adapter
-            .get_auth(follower_adapter.whoami())
+            .get_auth(context_of_channel.chain.chain_id, IDS[&FOLLOWER])
             .expect("Get authentication");
         create_campaign(
             &api_client,
@@ -1006,6 +1221,7 @@ mod tests {
             leader_sentry
                 .clone()
                 .with_propagate(all_channels_validators.1)
+                .expect("Should get sentry")
         };
 
         // follower::tick() accepts a sentry instance with validators to propagate to
@@ -1018,6 +1234,7 @@ mod tests {
             follower_sentry
                 .clone()
                 .with_propagate(all_channels_validators.1)
+                .expect("Should get sentry")
         };
 
         // Testing propagation and retrieval of NewState messages, verification of balances
@@ -1025,19 +1242,21 @@ mod tests {
         {
             let mut accounting_balances = get_test_accounting_balances();
 
-            let new_state = get_new_state_msg(
+            // Posting new events
+            post_new_events(
                 &leader_sentry,
-                &accounting_balances,
-                contracts.token.0.precision.get(),
-            );
-
-            // Propagating the NewState message to both validators
-            leader_sentry_with_propagate
-                .propagate(new_channel, &[&MessageTypes::NewState(new_state.clone())])
-                .await;
-            follower_sentry_with_propagate
-                .propagate(new_channel, &[&MessageTypes::NewState(new_state)])
-                .await;
+                token_chain.clone().with(CAMPAIGN_1.id),
+                &events,
+            )
+            .await
+            .expect("Posted events");
+            post_new_events(
+                &follower_sentry,
+                token_chain.clone().with(CAMPAIGN_1.id),
+                &events,
+            )
+            .await
+            .expect("Posted events");
 
             // leader single worker tick
             leader_worker.all_channels_tick().await;
@@ -1055,6 +1274,12 @@ mod tests {
                 .await
                 .expect("should fetch")
                 .unwrap();
+            let heartbeat = leader_sentry_with_propagate
+                .get_our_latest_msg(new_channel.id(), &["Heartbeat"])
+                .await
+                .expect("should fetch")
+                .unwrap();
+            println!("Heartbeat - {:?}", heartbeat);
 
             let newstate = NewState::<CheckedState>::try_from(newstate).expect("Should convert");
             let newstate_follower =
@@ -1064,41 +1289,28 @@ mod tests {
                 newstate.state_root, newstate_follower.state_root,
                 "Leader/Follower NewStates match"
             );
+            let mut expected_balances = Balances::new();
+            expected_balances
+                .spend(
+                    CAMPAIGN_1.creator,
+                    CAMPAIGN_1.channel.leader.to_address(),
+                    UnifiedNum::from_u64(27000),
+                )
+                .expect("Should spend");
+            expected_balances
+                .spend(
+                    CAMPAIGN_1.creator,
+                    CAMPAIGN_1.channel.follower.to_address(),
+                    UnifiedNum::from_u64(18000),
+                )
+                .expect("Should spend");
+            expected_balances
+                .spend(CAMPAIGN_1.creator, *PUBLISHER, UnifiedNum::from_u64(9000))
+                .expect("Should spend");
+
             assert_eq!(
-                newstate
-                    .balances
-                    .spenders
-                    .get(&CAMPAIGN_1.creator)
-                    .expect("Should retrieve spender balance"),
-                &UnifiedNum::from_u64(54000),
-                "Verifying correct spender balance for campaign creator"
-            );
-            assert_eq!(
-                newstate
-                    .balances
-                    .earners
-                    .get(&CAMPAIGN_1.channel.leader.to_address())
-                    .expect("Should retrieve earner balance"),
-                &UnifiedNum::from_u64(27000),
-                "Verifying correct earner balance for leader"
-            );
-            assert_eq!(
-                newstate
-                    .balances
-                    .earners
-                    .get(&CAMPAIGN_1.channel.follower.to_address())
-                    .expect("Should retrieve earner balance"),
-                &UnifiedNum::from_u64(18000),
-                "Verifying correct earner balance for follower"
-            );
-            assert_eq!(
-                newstate
-                    .balances
-                    .earners
-                    .get(&*PUBLISHER)
-                    .expect("Should retrieve earner balance"),
-                &UnifiedNum::from_u64(9000),
-                "Verifying correct earner balance for publisher"
+                newstate.balances, expected_balances,
+                "Balances are as expected"
             );
 
             // Balances are being changed since the last propagated message ensuring that a new NewState will be generated
@@ -1111,13 +1323,26 @@ mod tests {
                 contracts.token.0.precision.get(),
             );
 
-            // Propagating a new NewState so that we can verify it updates properly
-            leader_sentry_with_propagate
-                .propagate(new_channel, &[&MessageTypes::NewState(new_state.clone())])
-                .await;
-            follower_sentry_with_propagate
-                .propagate(new_channel, &[&MessageTypes::NewState(new_state)])
-                .await;
+            // Posting new events
+            post_new_events(
+                &leader_sentry,
+                token_chain.clone().with(CAMPAIGN_1.id),
+                &events,
+            )
+            .await
+            .expect("Posted events");
+            post_new_events(
+                &follower_sentry,
+                token_chain.clone().with(CAMPAIGN_1.id),
+                &events,
+            )
+            .await
+            .expect("Posted events");
+
+            // leader single worker tick
+            leader_worker.all_channels_tick().await;
+            // follower single worker tick
+            follower_worker.all_channels_tick().await;
 
             let newstate = leader_sentry_with_propagate
                 .get_our_latest_msg(new_channel.id(), &["NewState"])
@@ -1139,41 +1364,27 @@ mod tests {
                 newstate.state_root, newstate_follower.state_root,
                 "Stateroots of the new messages match"
             );
+            let mut expected_balances = Balances::new();
+            expected_balances
+                .spend(
+                    CAMPAIGN_1.creator,
+                    CAMPAIGN_1.channel.leader.to_address(),
+                    UnifiedNum::from_u64(27000),
+                )
+                .expect("Should spend");
+            expected_balances
+                .spend(
+                    CAMPAIGN_1.creator,
+                    CAMPAIGN_1.channel.follower.to_address(),
+                    UnifiedNum::from_u64(18000),
+                )
+                .expect("Should spend");
+            expected_balances
+                .spend(CAMPAIGN_1.creator, *PUBLISHER, UnifiedNum::from_u64(18000))
+                .expect("Should spend");
             assert_eq!(
-                newstate
-                    .balances
-                    .spenders
-                    .get(&CAMPAIGN_1.creator)
-                    .expect("Should retrieve spender balance"),
-                &UnifiedNum::from_u64(63000),
-                "Campaign creator spender balances have been updated"
-            );
-            assert_eq!(
-                newstate
-                    .balances
-                    .earners
-                    .get(&CAMPAIGN_1.channel.leader.to_address())
-                    .expect("Should retrieve earner balance"),
-                &UnifiedNum::from_u64(27000),
-                "Leader earner balances have stayed the same"
-            );
-            assert_eq!(
-                newstate
-                    .balances
-                    .earners
-                    .get(&CAMPAIGN_1.channel.follower.to_address())
-                    .expect("Should retrieve earner balance"),
-                &UnifiedNum::from_u64(18000),
-                "Follower earner balances have stayed the same"
-            );
-            assert_eq!(
-                newstate
-                    .balances
-                    .earners
-                    .get(&*PUBLISHER)
-                    .expect("Should retrieve earner balance"),
-                &UnifiedNum::from_u64(18000),
-                "Publisher earner balances have been updated"
+                newstate.balances, expected_balances,
+                "Balances are as expected"
             );
         }
 
@@ -1194,24 +1405,22 @@ mod tests {
                 is_healthy: true,
             };
 
-            // Propagating a NewState message to the leader sentry
-            leader_sentry_with_propagate
-                .propagate(
-                    campaign.channel,
-                    &[&MessageTypes::NewState(new_state.clone())],
-                )
-                .await;
+            // Posting new events
+            post_new_events(
+                &leader_sentry,
+                token_chain.clone().with(CAMPAIGN_1.id),
+                &events,
+            )
+            .await
+            .expect("Posted events");
+            post_new_events(
+                &follower_sentry,
+                token_chain.clone().with(CAMPAIGN_1.id),
+                &events,
+            )
+            .await
+            .expect("Posted events");
 
-            // Propagating an NewState and ApproveState  to the follower sentry
-            follower_sentry_with_propagate
-                .propagate(
-                    campaign.channel,
-                    &[
-                        &MessageTypes::ApproveState(approve_state),
-                        &MessageTypes::NewState(new_state),
-                    ],
-                )
-                .await;
             // leader single worker tick
             leader_worker.all_channels_tick().await;
             // follower single worker tick
@@ -1255,21 +1464,26 @@ mod tests {
                 is_healthy: true,
             };
 
-            leader_sentry_with_propagate
-                .propagate(
-                    campaign.channel,
-                    &[&MessageTypes::NewState(new_state.clone())],
-                )
-                .await;
-            follower_sentry_with_propagate
-                .propagate(
-                    campaign.channel,
-                    &[
-                        &MessageTypes::NewState(new_state),
-                        &MessageTypes::ApproveState(approve_state),
-                    ],
-                )
-                .await;
+            // Posting new events
+            post_new_events(
+                &leader_sentry,
+                token_chain.clone().with(CAMPAIGN_1.id),
+                &events,
+            )
+            .await
+            .expect("Posted events");
+            post_new_events(
+                &follower_sentry,
+                token_chain.clone().with(CAMPAIGN_1.id),
+                &events,
+            )
+            .await
+            .expect("Posted events");
+
+            // leader single worker tick
+            leader_worker.all_channels_tick().await;
+            // follower single worker tick
+            follower_worker.all_channels_tick().await;
 
             // leader single worker tick
             leader_worker.all_channels_tick().await;
