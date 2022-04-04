@@ -29,7 +29,7 @@ use crate::{
     Application, ResponseError,
 };
 
-pub(crate) static CLOUDFLARE_IPCOUNTY_HEADER: Lazy<HeaderName> =
+pub(crate) static CLOUDFLARE_IPCOUNTRY_HEADER: Lazy<HeaderName> =
     Lazy::new(|| HeaderName::from_static("cf-ipcountry"));
 
 // #[cfg(test)]
@@ -167,7 +167,7 @@ where
 
     let country = request_parts
         .headers
-        .get(CLOUDFLARE_IPCOUNTY_HEADER.clone())
+        .get(CLOUDFLARE_IPCOUNTRY_HEADER.clone())
         .and_then(|h| h.to_str().map(ToString::to_string).ok());
 
     let hostname = Url::parse(&ad_slot.website.clone().unwrap_or_default())

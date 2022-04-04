@@ -224,8 +224,14 @@ pub async fn units_for_slot_get_campaigns(
 ) -> Result<Vec<Campaign>, PoolError> {
     let client = pool.get().await?;
 
-    let mut where_clauses = vec!["active_to >= $1".to_string()];
-    let mut params: Vec<Box<(dyn ToSql + Sync + Send)>> = vec![Box::new(active_to_ge)];
+    let mut where_clauses = vec![
+        // Campaign.active.to
+        "active_to >= $1".to_string(),
+        // Campaign.creator
+        "creator = $2".into(),
+    ];
+    let mut params: Vec<Box<(dyn ToSql + Sync + Send)>> =
+        vec![Box::new(active_to_ge), Box::new(creator)];
 
     // Deposit assets
     match deposit_assets {
@@ -235,19 +241,11 @@ pub async fn units_for_slot_get_campaigns(
                 .map(|address| *address)
                 .collect::<Vec<_>>();
 
-            where_clauses.push("channels.token IN ($2)".into());
+            where_clauses.push("channels.token IN ($3)".into());
             params.push(Box::new(assets_vec))
         }
         _ => {}
     };
-
-    // Campaign.creator
-    where_clauses.push("creator = $3".into());
-    params.push(Box::new(creator));
-
-    // Campaign.active.to
-    where_clauses.push("active_to >= $4".into());
-    params.push(Box::new(active_to_ge));
 
     // To understand why we use Order by, see Postgres Documentation: https://www.postgresql.org/docs/8.1/queries-limit.html
     let statement = format!("SELECT campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM campaigns INNER JOIN channels ON campaigns.channel_id=channels.id WHERE {} ORDER BY campaigns.created ASC", where_clauses.join(" AND "));
