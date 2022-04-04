@@ -107,13 +107,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let campaign_remaining = CampaignRemaining::new(redis.clone());
 
-    // todo: Make platform_url configurable! Load from config or pass with env. variable
-    let platform_url = "https://platform.adex.network"
-        .parse()
-        .expect("Bad ApiUrl, load from Config?");
-    // todo: Make keep_alive_interval configurable!
-    let platform_api = PlatformApi::new(platform_url, std::time::Duration::from_secs(3))
-        .expect("Should make PlatformApi");
+    let platform_api = PlatformApi::new(
+        config.platform.url.clone(),
+        config.platform.keep_alive_interval,
+    )
+    .expect("Failed to build PlatformApi");
 
     match adapter {
         AdapterTypes::Ethereum(adapter) => {
