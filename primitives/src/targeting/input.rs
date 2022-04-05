@@ -1,7 +1,7 @@
 use self::campaign::FullCampaign;
 
 use super::{Error, Value};
-use crate::{Address, IPFS, sentry::EventType};
+use crate::{sentry::EventType, Address, IPFS};
 use chrono::{serde::ts_seconds, DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -51,7 +51,7 @@ impl Input {
     pub fn with_campaign(mut self, campaign: crate::Campaign) -> Self {
         self.campaign = Some(Get::Getter(FullCampaign {
             campaign,
-            event_type: self.global.event_type.clone(),
+            event_type: self.global.event_type,
         }));
 
         self
@@ -210,7 +210,9 @@ pub mod campaign {
     use serde::Deserialize;
 
     use super::{field, Get, GetField, Value};
-    use crate::{targeting::get_pricing_bounds, Address, CampaignId, ToHex, UnifiedNum, sentry::EventType};
+    use crate::{
+        sentry::EventType, targeting::get_pricing_bounds, Address, CampaignId, ToHex, UnifiedNum,
+    };
 
     pub type GetCampaign = Get<FullCampaign, Values>;
 
@@ -370,7 +372,10 @@ pub mod balances {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{test_util::{LEADER, PUBLISHER}, sentry::IMPRESSION};
+    use crate::{
+        sentry::IMPRESSION,
+        test_util::{LEADER, PUBLISHER},
+    };
     pub use crate::{
         test_util::{DUMMY_CAMPAIGN as CAMPAIGN, DUMMY_IPFS as IPFS},
         AdUnit, UnifiedMap,

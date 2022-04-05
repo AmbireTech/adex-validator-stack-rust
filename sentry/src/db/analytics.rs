@@ -69,7 +69,7 @@ fn analytics_query_params(
     allowed_keys: &HashSet<AllowedKey>,
 ) -> (Vec<String>, Vec<Box<(dyn ToSql + Sync + Send)>>) {
     let mut where_clauses = vec!["\"time\" >= $1".to_string()];
-    let mut params: Vec<Box<(dyn ToSql + Sync + Send)>> = vec![Box::new(query.time.start.clone())];
+    let mut params: Vec<Box<(dyn ToSql + Sync + Send)>> = vec![Box::new(query.time.start)];
 
     // for all allowed keys of this query
     // insert parameter into the SQL if there is a value set for it
@@ -93,10 +93,10 @@ fn analytics_query_params(
 
     if let Some(end_date) = &query.time.end {
         where_clauses.push(format!("\"time\" <= ${}", params.len() + 1));
-        params.push(Box::new(end_date.clone()));
+        params.push(Box::new(*end_date));
     }
     where_clauses.push(format!("event_type = ${}", params.len() + 1));
-    params.push(Box::new(query.event_type.clone()));
+    params.push(Box::new(query.event_type));
 
     where_clauses.push(format!("{} IS NOT NULL", query.metric.column_name()));
 

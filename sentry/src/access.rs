@@ -172,7 +172,7 @@ mod test {
         config::GANACHE_CONFIG,
         event_submission::{RateLimit, Rule},
         sentry::Event,
-        test_util::{DUMMY_CAMPAIGN, FOLLOWER, IDS, PUBLISHER_2},
+        test_util::{DUMMY_CAMPAIGN, DUMMY_IPFS, FOLLOWER, IDS, PUBLISHER_2},
         Config, EventSubmission,
     };
 
@@ -206,8 +206,8 @@ mod test {
         (0..count)
             .map(|_| Event::Impression {
                 publisher: *PUBLISHER_2,
-                ad_unit: None,
-                ad_slot: None,
+                ad_unit: DUMMY_IPFS[0],
+                ad_slot: DUMMY_IPFS[1],
                 referrer: None,
             })
             .collect()

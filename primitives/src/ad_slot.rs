@@ -1,4 +1,4 @@
-use crate::{targeting::Rule, ValidatorId, IPFS, Address, UnifiedNum};
+use crate::{targeting::Rule, Address, UnifiedNum, ValidatorId, IPFS};
 use chrono::{
     serde::{ts_milliseconds, ts_milliseconds_option},
     DateTime, Utc,

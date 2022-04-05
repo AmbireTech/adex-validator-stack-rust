@@ -350,38 +350,33 @@ async fn apply_targeting(
                 if ad_units.is_empty() {
                     None
                 } else {
-                    let targeting_rules = if !campaign.targeting_rules.is_empty() {
-                        campaign.targeting_rules.clone()
-                    } else {
-                        campaign.targeting_rules.clone()
-                    };
                     let campaign_input = input_base.clone().with_campaign(campaign.clone());
 
                     let matching_units: Vec<response::UnitsWithPrice> = ad_units
                         .into_iter()
                         .filter_map(|ad_unit| {
                             let mut unit_input = campaign_input.clone();
-                            unit_input.ad_unit_id = Some(ad_unit.ipfs.clone());
+                            unit_input.ad_unit_id = Some(ad_unit.ipfs);
 
                             let pricing_bounds = get_pricing_bounds(&campaign, &IMPRESSION);
                             let mut output = Output {
                                 show: true,
                                 boost: 1.0,
                                 // only "IMPRESSION" event can be used for this `Output`
-                                price: vec![(IMPRESSION.into(), pricing_bounds.min.clone())]
+                                price: vec![(IMPRESSION.into(), pricing_bounds.min)]
                                     .into_iter()
                                     .collect(),
                             };
 
                             let on_type_error_campaign = |error, rule| error!(logger, "Rule evaluation error for {:?}", campaign.id; "error" => ?error, "rule" => ?rule, "campaign" => ?campaign);
-                            eval_with_callback(&targeting_rules, &unit_input, &mut output, Some(on_type_error_campaign));
+                            eval_with_callback(&campaign.targeting_rules, &unit_input, &mut output, Some(on_type_error_campaign));
 
                             if !output.show {
                                 return None;
                             }
 
                             let max_price = match output.price.get(IMPRESSION.as_str()) {
-                                Some(output_price) => output_price.min(&pricing_bounds.max).clone(),
+                                Some(output_price) => *output_price.min(&pricing_bounds.max),
                                 None => pricing_bounds.max,
                             };
                             let price = pricing_bounds.min.max(max_price);

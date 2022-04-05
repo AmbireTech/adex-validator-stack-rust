@@ -924,7 +924,8 @@ mod postgres {
     };
     use crate::{
         analytics::{AnalyticsQuery, Metric},
-        validator::{messages::Type as MessageType, MessageTypes}, IPFS,
+        validator::{messages::Type as MessageType, MessageTypes},
+        IPFS,
     };
     use bytes::BytesMut;
     use chrono::{DateTime, Timelike, Utc};

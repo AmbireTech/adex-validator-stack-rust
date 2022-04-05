@@ -236,10 +236,7 @@ pub async fn units_for_slot_get_campaigns(
     // Deposit assets
     match deposit_assets {
         Some(assets) if !assets.is_empty() => {
-            let assets_vec = assets
-                .into_iter()
-                .map(|address| *address)
-                .collect::<Vec<_>>();
+            let assets_vec = assets.iter().copied().collect::<Vec<_>>();
 
             where_clauses.push("channels.token IN ($3)".into());
             params.push(Box::new(assets_vec))
@@ -583,7 +580,7 @@ mod test {
         campaign,
         campaign::Validators,
         event_submission::{RateLimit, Rule},
-        sentry::campaign_modify::ModifyCampaign,
+        sentry::{campaign_modify::ModifyCampaign, CLICK, IMPRESSION},
         targeting::Rules,
         test_util::{
             ADVERTISER, ADVERTISER_2, CREATOR, DUMMY_AD_UNITS, DUMMY_CAMPAIGN,
@@ -650,16 +647,26 @@ mod test {
                 budget: Some(new_budget),
                 validators: None,
                 title: Some("Modified Campaign".to_string()),
-                pricing_bounds: Some(campaign::PricingBounds {
-                    impression: Some(campaign::Pricing {
-                        min: 1.into(),
-                        max: 10.into(),
-                    }),
-                    click: Some(campaign::Pricing {
-                        min: 0.into(),
-                        max: 0.into(),
-                    }),
-                }),
+                pricing_bounds: Some(
+                    vec![
+                        (
+                            IMPRESSION,
+                            campaign::Pricing {
+                                min: 1.into(),
+                                max: 10.into(),
+                            },
+                        ),
+                        (
+                            CLICK,
+                            campaign::Pricing {
+                                min: 0.into(),
+                                max: 0.into(),
+                            },
+                        ),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ),
                 event_submission: Some(EventSubmission { allow: vec![rule] }),
                 ad_units: Some(DUMMY_AD_UNITS.to_vec()),
                 targeting_rules: Some(Rules::new()),

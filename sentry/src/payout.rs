@@ -50,7 +50,7 @@ pub fn get_payout(
                         ad_slot_type: ad_unit.map(|u| u.ad_type.clone()).unwrap_or_default(),
                         publisher_id: *publisher,
                         country: session.country.clone(),
-                        event_type: event_type.clone(),
+                        event_type: event_type,
                         seconds_since_epoch: Utc::now(),
                         user_agent_os: session.os.clone(),
                         user_agent_browser_family: None,
@@ -93,10 +93,9 @@ pub fn get_payout(
 mod test {
     use super::*;
     use primitives::{
-        campaign::{Pricing, PricingBounds},
+        campaign::Pricing,
         sentry::{CLICK, IMPRESSION},
         test_util::{discard_logger, DUMMY_CAMPAIGN, DUMMY_IPFS, LEADER, PUBLISHER},
-        IPFS,
     };
 
     #[test]
