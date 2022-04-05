@@ -1,4 +1,4 @@
-use crate::{targeting::Rule, BigNum, ValidatorId, IPFS};
+use crate::{targeting::Rule, ValidatorId, IPFS, Address, UnifiedNum};
 use chrono::{
     serde::{ts_milliseconds, ts_milliseconds_option},
     DateTime, Utc,
@@ -25,9 +25,9 @@ pub struct AdSlot {
     /// see IAB ad unit guidelines and iab_flex_{adUnitName} (see IAB's new ad portfolio and PDF)
     #[serde(rename = "type")]
     pub ad_type: String,
-    // HashMap<DepositAsset, BigNum> for the minimum payment accepted per impression
+    // HashMap<DepositAsset, UnifiedNum> for the minimum payment accepted per impression
     #[serde(default)]
-    pub min_per_impression: Option<HashMap<String, BigNum>>,
+    pub min_per_impression: Option<HashMap<Address, UnifiedNum>>,
     #[serde(default)]
     pub rules: Vec<Rule>,
     /// Valid ipfs hash for Ad Unit object. It will be used as fallback data (optional)

@@ -124,14 +124,8 @@ pub async fn update_analytics(
             &[
                 &update_analytics.campaign_id,
                 &update_analytics.time,
-                &update_analytics
-                    .ad_unit
-                    .map(|ipfs| ipfs.to_string())
-                    .unwrap_or_default(),
-                &update_analytics
-                    .ad_slot
-                    .map(|ipfs| ipfs.to_string())
-                    .unwrap_or_default(),
+                &update_analytics.ad_unit,
+                &update_analytics.ad_slot,
                 &update_analytics.ad_slot_type.clone().unwrap_or_default(),
                 &update_analytics.advertiser,
                 &update_analytics.publisher,
@@ -186,8 +180,8 @@ mod test {
             let update = UpdateAnalytics {
                 time: DateHour::from_ymdh(2021, 2, 1, 1),
                 campaign_id: DUMMY_CAMPAIGN.id,
-                ad_unit: Some(ad_unit.ipfs),
-                ad_slot: Some(ad_slot_ipfs),
+                ad_unit: ad_unit.ipfs,
+                ad_slot: ad_slot_ipfs,
                 ad_slot_type: Some(ad_unit.ad_type.clone()),
                 advertiser: *CREATOR,
                 publisher: *PUBLISHER,
@@ -234,8 +228,8 @@ mod test {
             let analytics_with_empty_fields = UpdateAnalytics {
                 time: DateHour::from_ymdh(2021, 2, 1, 1),
                 campaign_id: DUMMY_CAMPAIGN.id,
-                ad_unit: None,
-                ad_slot: None,
+                ad_unit: DUMMY_IPFS[1],
+                ad_slot: DUMMY_IPFS[0],
                 ad_slot_type: None,
                 advertiser: *CREATOR,
                 publisher: *PUBLISHER,
@@ -261,25 +255,6 @@ mod test {
             assert_eq!(insert_res.hostname, analytics_with_empty_fields.hostname);
             assert_eq!(insert_res.country, analytics_with_empty_fields.country);
         }
-    }
-
-    fn days_count<const N: usize>(_days: &[u8; N], count_per_day: u32) -> u32 {
-        u32::try_from(N).expect("Array size should be < u32::MAX") * count_per_day
-    }
-
-    // TODO: Move to separate test; days_count can be generalized (Whoop whoop, maybe w/ chrono::Date)
-    #[test]
-    fn test_days_count() {
-        let hours_in_day = 0..=23_u32;
-        assert_eq!(
-            hours_in_day.sum::<u32>(),
-            276,
-            "Sum of all hours 0 + 1 + 2 .. + 23 = 276"
-        );
-
-        // days in the form of e.g. 2.12.2021 & 3.12.2021
-        let two_days = days_count(&[2, 3], 276);
-        assert_eq!(two_days, 2 * 276);
     }
 
     #[tokio::test]
@@ -839,8 +814,8 @@ mod test {
         UpdateAnalytics {
             time: DateHour::from_ymdh(2021, 12, day, hour),
             campaign_id: DUMMY_CAMPAIGN.id,
-            ad_unit: Some(ad_unit.ipfs),
-            ad_slot: Some(ad_slot),
+            ad_unit: ad_unit.ipfs,
+            ad_slot: ad_slot,
             ad_slot_type: Some(ad_unit.ad_type.clone()),
             advertiser: *CREATOR,
             publisher: *PUBLISHER,
@@ -865,8 +840,8 @@ mod test {
         UpdateAnalytics {
             time: DateHour::from_ymdh(2021, 12, day, hour),
             campaign_id: DUMMY_CAMPAIGN.id,
-            ad_unit: Some(ad_unit.ipfs),
-            ad_slot: Some(ad_slot),
+            ad_unit: ad_unit.ipfs,
+            ad_slot: ad_slot,
             ad_slot_type: Some(ad_unit.ad_type.clone()),
             advertiser: *CREATOR,
             publisher: *PUBLISHER,

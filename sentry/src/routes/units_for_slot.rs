@@ -38,9 +38,9 @@ pub(crate) static CLOUDFLARE_IPCOUNTRY_HEADER: Lazy<HeaderName> =
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct RequestBody {
-    ad_slot: AdSlot,
-    deposit_assets: Option<HashSet<Address>>,
+pub struct RequestBody {
+    pub ad_slot: AdSlot,
+    pub deposit_assets: Option<HashSet<Address>>,
 }
 
 pub(crate) fn not_found() -> Response<Body> {
@@ -201,7 +201,7 @@ where
     let mut targeting_input_base = Input {
         ad_view: None,
         global: input::Global {
-            ad_slot_id: ad_slot.ipfs.to_string(),
+            ad_slot_id: ad_slot.ipfs,
             ad_slot_type: ad_slot.ad_type.clone(),
             publisher_id: publisher_id.to_address(),
             country,
@@ -363,7 +363,7 @@ async fn apply_targeting(
                             let mut unit_input = campaign_input.clone();
                             unit_input.ad_unit_id = Some(ad_unit.ipfs.clone());
 
-                            let pricing_bounds = get_pricing_bounds(&campaign, IMPRESSION.as_str());
+                            let pricing_bounds = get_pricing_bounds(&campaign, &IMPRESSION);
                             let mut output = Output {
                                 show: true,
                                 boost: 1.0,

@@ -1,7 +1,7 @@
 use self::campaign::FullCampaign;
 
 use super::{Error, Value};
-use crate::{Address, IPFS};
+use crate::{Address, IPFS, sentry::EventType};
 use chrono::{serde::ts_seconds, DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -141,11 +141,11 @@ impl GetField for AdView {
 /// Global scope, accessible everywhere
 pub struct Global {
     /// We still use `String`, because the `Event`s have an `Option`al `AdSlot` value.
-    pub ad_slot_id: String,
+    pub ad_slot_id: IPFS,
     pub ad_slot_type: String,
     pub publisher_id: Address,
     pub country: Option<String>,
-    pub event_type: String,
+    pub event_type: EventType,
     #[serde(with = "ts_seconds")]
     pub seconds_since_epoch: DateTime<Utc>,
     #[serde(rename = "userAgentOS")]
@@ -159,11 +159,11 @@ impl GetField for Global {
 
     fn get(&self, field: &Self::Field) -> Self::Output {
         match field {
-            field::Global::AdSlotId => Some(Value::String(self.ad_slot_id.clone())),
+            field::Global::AdSlotId => Some(Value::String(self.ad_slot_id.to_string())),
             field::Global::AdSlotType => Some(Value::String(self.ad_slot_type.clone())),
             field::Global::PublisherId => Some(Value::String(self.publisher_id.to_string())),
             field::Global::Country => self.country.clone().map(Value::String),
-            field::Global::EventType => Some(Value::String(self.event_type.clone())),
+            field::Global::EventType => Some(Value::String(self.event_type.to_string())),
             field::Global::SecondsSinceEpoch => {
                 // no need to convert to u64, this value should always be positive
                 Some(Value::new_number(self.seconds_since_epoch.timestamp()))
@@ -210,7 +210,7 @@ pub mod campaign {
     use serde::Deserialize;
 
     use super::{field, Get, GetField, Value};
-    use crate::{targeting::get_pricing_bounds, Address, CampaignId, ToHex, UnifiedNum};
+    use crate::{targeting::get_pricing_bounds, Address, CampaignId, ToHex, UnifiedNum, sentry::EventType};
 
     pub type GetCampaign = Get<FullCampaign, Values>;
 
@@ -229,7 +229,7 @@ pub mod campaign {
     #[derive(Debug, Clone, PartialEq)]
     pub struct FullCampaign {
         pub campaign: crate::Campaign,
-        pub(super) event_type: String,
+        pub(super) event_type: EventType,
     }
 
     impl GetField for Get<FullCampaign, Values> {
@@ -370,7 +370,7 @@ pub mod balances {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::test_util::{LEADER, PUBLISHER};
+    use crate::{test_util::{LEADER, PUBLISHER}, sentry::IMPRESSION};
     pub use crate::{
         test_util::{DUMMY_CAMPAIGN as CAMPAIGN, DUMMY_IPFS as IPFS},
         AdUnit, UnifiedMap,
@@ -424,11 +424,11 @@ mod test {
                 navigator_language: "en".into(),
             }),
             global: Global {
-                ad_slot_id: IPFS[0].to_string(),
+                ad_slot_id: IPFS[0],
                 ad_slot_type: "legacy_300x100".into(),
                 publisher_id: *PUBLISHER,
                 country: Some("BG".into()),
-                event_type: "IMPRESSION".into(),
+                event_type: IMPRESSION,
                 seconds_since_epoch: actual_date,
                 user_agent_os: Some("Ubuntu".into()),
                 user_agent_browser_family: Some("Firefox".into()),
@@ -442,13 +442,13 @@ mod test {
                 campaign_budget: CAMPAIGN.budget,
                 event_min_price: Some(
                     CAMPAIGN
-                        .pricing("IMPRESSION")
+                        .pricing(IMPRESSION)
                         .map(|price| price.min)
                         .expect("should have price"),
                 ),
                 event_max_price: Some(
                     CAMPAIGN
-                        .pricing("IMPRESSION")
+                        .pricing(IMPRESSION)
                         .map(|price| price.max)
                         .expect("Should have price"),
                 ),
