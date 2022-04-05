@@ -40,7 +40,7 @@ mod campaign_id {
             write!(f, "CampaignId({})", self)
         }
     }
-    
+
     impl CampaignId {
         /// Generates randomly a `CampaignId` using `Uuid::new_v4().to_simple()`
         pub fn new() -> Self {

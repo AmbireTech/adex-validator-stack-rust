@@ -318,25 +318,22 @@ pub async fn add_spender_leaf<C: Locked + 'static>(
     )
     .await?;
 
-    let latest_spendable = fetch_spendable(app.pool.clone(), &spender, &channel.context.id()).await?;
+    let latest_spendable =
+        fetch_spendable(app.pool.clone(), &spender, &channel.context.id()).await?;
 
     let latest_spendable = match latest_spendable {
         Some(spendable) => spendable,
         None => {
-            create_or_update_spendable_document(
-                &app.adapter,
-                app.pool.clone(),
-                &channel,
-                spender,
-            )
-            .await?
+            create_or_update_spendable_document(&app.adapter, app.pool.clone(), &channel, spender)
+                .await?
         }
     };
 
-    let new_state = match get_corresponding_new_state(&app.pool, &app.logger, &channel.context).await? {
-        Some(new_state) => new_state,
-        None => return spender_response_without_leaf(latest_spendable.deposit.total),
-    };
+    let new_state =
+        match get_corresponding_new_state(&app.pool, &app.logger, &channel.context).await? {
+            Some(new_state) => new_state,
+            None => return spender_response_without_leaf(latest_spendable.deposit.total),
+        };
 
     let total_spent = new_state
         .balances
