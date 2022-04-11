@@ -927,11 +927,20 @@ mod test {
     #[tokio::test]
     async fn adds_and_retrieves_spender_leaf() {
         let app = setup_dummy_app().await;
+
         let channel_context = app
             .config
             .find_chain_of(DUMMY_CAMPAIGN.channel.token)
             .expect("Dummy channel Token should be present in config!")
             .with(DUMMY_CAMPAIGN.channel);
+
+        let deposit = AdapterDeposit {
+            total: BigNum::from_str("100000000000000000000").expect("should convert"), // 100 DAI
+            still_on_create2: BigNum::from_str("1000000000000000000").expect("should convert"), // 1 DAI
+        };
+        app.adapter
+            .client
+            .add_deposit_call(channel_context.context.id(), *CREATOR, deposit.clone());
 
         insert_channel(&app.pool, channel_context.context)
             .await
