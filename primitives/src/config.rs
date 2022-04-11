@@ -136,6 +136,7 @@ impl ChainInfo {
 /// Precision can differ for the same token from one [`Chain`] to another.
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Hash)]
 pub struct TokenInfo {
+    #[deprecated = "we no longer need the sweeper contract & create2 addresses for deposits"]
     pub min_token_units_for_deposit: BigNum,
     pub min_validator_fee: BigNum,
     pub precision: NonZeroU8,

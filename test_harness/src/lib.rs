@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 use std::{
     collections::HashMap,
     net::{IpAddr, Ipv4Addr},
@@ -5,9 +6,7 @@ use std::{
 
 use adapter::ethereum::{
     get_counterfactual_address,
-    test_util::{
-        GANACHE_INFO_1, GANACHE_INFO_1337, Outpace, Erc20Token, Sweeper,
-    },
+    test_util::{Erc20Token, Outpace, Sweeper, GANACHE_INFO_1, GANACHE_INFO_1337},
     Options,
 };
 use deposits::Deposit;
@@ -216,30 +215,36 @@ impl Setup {
 
         // OUTPACE regular deposit
         // first set a balance of tokens to be deposited
-        contracts.token.set_balance(
-            deposit.address.to_bytes(),
-            deposit.address.to_bytes(),
-            &deposit.outpace_amount,
-        )
-        .await
-        .expect("Failed to set balance");
+        contracts
+            .token
+            .set_balance(
+                deposit.address.to_bytes(),
+                deposit.address.to_bytes(),
+                &deposit.outpace_amount,
+            )
+            .await
+            .expect("Failed to set balance");
         // call the OUTPACE deposit
-        contracts.outpace.deposit(
-            &deposit.channel,
-            deposit.address.to_bytes(),
-            &deposit.outpace_amount,
-        )
-        .await
-        .expect("Should deposit with OUTPACE");
+        contracts
+            .outpace
+            .deposit(
+                &deposit.channel,
+                deposit.address.to_bytes(),
+                &deposit.outpace_amount,
+            )
+            .await
+            .expect("Should deposit with OUTPACE");
 
         // Counterfactual address deposit
-        contracts.token.set_balance(
-            deposit.address.to_bytes(),
-            counterfactual_address.to_bytes(),
-            &deposit.counterfactual_amount,
-        )
-        .await
-        .expect("Failed to set balance");
+        contracts
+            .token
+            .set_balance(
+                deposit.address.to_bytes(),
+                counterfactual_address.to_bytes(),
+                &deposit.counterfactual_amount,
+            )
+            .await
+            .expect("Failed to set balance");
     }
 }
 
@@ -682,43 +687,43 @@ mod tests {
                 },
             ];
 
-            // // 1st deposit
-            // // Chain #1337
-            // {
-            //     setup
-            //         .deposit(&contracts_1337, &advertiser_deposits[0])
-            //         .await;
+            // 1st deposit
+            // Chain #1337
+            {
+                setup
+                    .deposit(&contracts_1337, &advertiser_deposits[0])
+                    .await;
 
-            //     // make sure we have the expected deposit returned from EthereumAdapter
-            //     let eth_deposit = leader_adapter
-            //         .get_deposit(
-            //             &token_chain_1337.clone().with_channel(CAMPAIGN_1.channel),
-            //             advertiser_adapter.whoami().to_address(),
-            //         )
-            //         .await
-            //         .expect("Should get deposit for advertiser");
+                // make sure we have the expected deposit returned from EthereumAdapter
+                let eth_deposit = leader_adapter
+                    .get_deposit(
+                        &token_chain_1337.clone().with_channel(CAMPAIGN_1.channel),
+                        advertiser_adapter.whoami().to_address(),
+                    )
+                    .await
+                    .expect("Should get deposit for advertiser");
 
-            //     assert_eq!(advertiser_deposits[0], eth_deposit);
-            // }
+                assert_eq!(advertiser_deposits[0], eth_deposit);
+            }
 
-            // // 2nd deposit
-            // // Chain #1337
-            // {
-            //     setup
-            //         .deposit(&contracts_1337, &advertiser_deposits[1])
-            //         .await;
+            // 2nd deposit
+            // Chain #1337
+            {
+                setup
+                    .deposit(&contracts_1337, &advertiser_deposits[1])
+                    .await;
 
-            //     // make sure we have the expected deposit returned from EthereumAdapter
-            //     let eth_deposit = leader_adapter
-            //         .get_deposit(
-            //             &token_chain_1337.clone().with_channel(CAMPAIGN_2.channel),
-            //             advertiser_adapter.whoami().to_address(),
-            //         )
-            //         .await
-            //         .expect("Should get deposit for advertiser");
+                // make sure we have the expected deposit returned from EthereumAdapter
+                let eth_deposit = leader_adapter
+                    .get_deposit(
+                        &token_chain_1337.clone().with_channel(CAMPAIGN_2.channel),
+                        advertiser_adapter.whoami().to_address(),
+                    )
+                    .await
+                    .expect("Should get deposit for advertiser");
 
-            //     assert_eq!(advertiser_deposits[1], eth_deposit);
-            // }
+                assert_eq!(advertiser_deposits[1], eth_deposit);
+            }
 
             // 3rd deposit
             // Chain #1
@@ -1241,11 +1246,12 @@ mod tests {
             follower_worker.all_channels_tick().await;
 
             // Retrieving the NewState message from both validators
-            let newstate = leader_sentry_with_propagate
+            let newstate_leader = leader_sentry_with_propagate
                 .get_our_latest_msg(new_channel.id(), &["NewState"])
                 .await
                 .expect("should fetch")
                 .unwrap();
+
             let newstate_follower = follower_sentry_with_propagate
                 .get_our_latest_msg(new_channel.id(), &["NewState"])
                 .await
@@ -1258,12 +1264,12 @@ mod tests {
                 .unwrap();
             println!("Heartbeat - {:?}", heartbeat);
 
-            let newstate = NewState::<CheckedState>::try_from(newstate).expect("Should convert");
+            let newstate_leader = NewState::<CheckedState>::try_from(newstate_leader).expect("Should convert");
             let newstate_follower =
                 NewState::<CheckedState>::try_from(newstate_follower).expect("Should convert");
 
             assert_eq!(
-                newstate.state_root, newstate_follower.state_root,
+                newstate_leader.state_root, newstate_follower.state_root,
                 "Leader/Follower NewStates match"
             );
             let mut expected_balances = Balances::new();
@@ -1286,7 +1292,7 @@ mod tests {
                 .expect("Should spend");
 
             assert_eq!(
-                newstate.balances, expected_balances,
+                newstate_leader.balances, expected_balances,
                 "Balances are as expected"
             );
 
