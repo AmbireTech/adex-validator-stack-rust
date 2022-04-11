@@ -6,22 +6,20 @@ use std::{
 use adapter::ethereum::{
     get_counterfactual_address,
     test_util::{
-        deploy_outpace_contract, deploy_sweeper_contract, deploy_token_contract, mock_set_balance,
-        outpace_deposit, GANACHE_INFO_1, GANACHE_INFO_1337, MOCK_TOKEN_ABI,
+        GANACHE_INFO_1, GANACHE_INFO_1337, Outpace, Erc20Token, Sweeper,
     },
-    Options, OUTPACE_ABI, SWEEPER_ABI,
+    Options,
 };
 use deposits::Deposit;
 use once_cell::sync::Lazy;
 use primitives::{
-    config::TokenInfo,
     config::GANACHE_CONFIG,
     test_util::{FOLLOWER, LEADER},
     util::ApiUrl,
     Address, Chain, Config,
 };
 use slog::{debug, Logger};
-use web3::{contract::Contract, transports::Http, types::H160, Web3};
+use web3::{transports::Http, Web3};
 
 pub mod deposits;
 
@@ -38,35 +36,19 @@ pub static SNAPSHOT_CONTRACTS_1337: Lazy<Contracts> = Lazy::new(|| {
 
     let token_info = ganache_chain_info
         .tokens
-        .get("Mocked TOKEN")
+        .get("Mocked TOKEN 1337")
         .expect("Ganache config should contain for Chain #1337 the Mocked TOKEN");
     let chain = ganache_chain_info.chain.clone();
 
-    let token = (
-        // use Ganache Config
-        token_info.clone(),
-        token_info.address,
-        Contract::from_json(
-            web3.eth(),
-            H160(token_info.address.to_bytes()),
-            &MOCK_TOKEN_ABI,
-        )
-        .unwrap(),
-    );
+    let token = Erc20Token::new(&web3, token_info.clone());
 
     let sweeper_address = Address::from(ganache_chain_info.chain.sweeper);
 
-    let sweeper = (
-        sweeper_address,
-        Contract::from_json(web3.eth(), H160(sweeper_address.to_bytes()), &SWEEPER_ABI).unwrap(),
-    );
+    let sweeper = Sweeper::new(&web3, sweeper_address);
 
     let outpace_address = Address::from(ganache_chain_info.chain.outpace);
 
-    let outpace = (
-        outpace_address,
-        Contract::from_json(web3.eth(), H160(outpace_address.to_bytes()), &OUTPACE_ABI).unwrap(),
-    );
+    let outpace = Outpace::new(&web3, outpace_address);
 
     Contracts {
         token,
@@ -86,35 +68,20 @@ pub static SNAPSHOT_CONTRACTS_1: Lazy<Contracts> = Lazy::new(|| {
 
     let token_info = ganache_chain_info
         .tokens
-        .get("Mocked TOKEN 2")
+        .get("Mocked TOKEN 1")
         .expect("Ganache config should contain for Chain #1 the Mocked TOKEN");
-    let chain = ganache_chain_info.chain.clone();
 
-    let token = (
-        // use Ganache Config
-        token_info.clone(),
-        token_info.address,
-        Contract::from_json(
-            web3.eth(),
-            H160(token_info.address.to_bytes()),
-            &MOCK_TOKEN_ABI,
-        )
-        .unwrap(),
-    );
+    let token = Erc20Token::new(&web3, token_info.clone());
 
     let sweeper_address = Address::from(ganache_chain_info.chain.sweeper);
 
-    let sweeper = (
-        sweeper_address,
-        Contract::from_json(web3.eth(), H160(sweeper_address.to_bytes()), &SWEEPER_ABI).unwrap(),
-    );
+    let sweeper = Sweeper::new(&web3, sweeper_address);
 
     let outpace_address = Address::from(ganache_chain_info.chain.outpace);
 
-    let outpace = (
-        outpace_address,
-        Contract::from_json(web3.eth(), H160(outpace_address.to_bytes()), &OUTPACE_ABI).unwrap(),
-    );
+    let outpace = Outpace::new(&web3, outpace_address);
+
+    let chain = ganache_chain_info.chain.clone();
 
     Contracts {
         token,
@@ -195,9 +162,10 @@ pub struct Setup {
 
 #[derive(Debug, Clone)]
 pub struct Contracts {
-    pub token: (TokenInfo, Address, Contract<Http>),
-    pub sweeper: (Address, Contract<Http>),
-    pub outpace: (Address, Contract<Http>),
+    pub token: Erc20Token,
+    #[deprecated = "We are removing the sweeper contract & the create2 addresses for Deposits"]
+    pub sweeper: Sweeper,
+    pub outpace: Outpace,
     pub chain: Chain,
 }
 
@@ -212,23 +180,23 @@ impl Setup {
         // deploy contracts
         // TOKEN contract is with precision 18 (like DAI)
         // set the minimum token units to 1 TOKEN
-        let token = deploy_token_contract(&web3, 10_u64.pow(18))
+        let token = Erc20Token::deploy(&web3, 10_u64.pow(18))
             .await
             .expect("Correct parameters are passed to the Token constructor.");
 
-        debug!(self.logger, "Deployed token contract"; "address" => ?token.1, "token_info" => ?token.0);
+        debug!(self.logger, "Deployed token contract"; "address" => ?token.info.address, "token_info" => ?token.info);
 
-        let sweeper = deploy_sweeper_contract(&web3)
+        let sweeper = Sweeper::deploy(&web3)
             .await
             .expect("Correct parameters are passed to the Sweeper constructor.");
 
-        debug!(self.logger, "Deployed sweeper contract"; "address" => ?sweeper.0);
+        debug!(self.logger, "Deployed sweeper contract"; "address" => ?sweeper.address);
 
-        let outpace = deploy_outpace_contract(&web3)
+        let outpace = Outpace::deploy(&web3)
             .await
             .expect("Correct parameters are passed to the OUTPACE constructor.");
 
-        debug!(self.logger, "Deployed outpace contract"; "address" => ?outpace.0);
+        debug!(self.logger, "Deployed outpace contract"; "address" => ?outpace.address);
 
         Contracts {
             token,
@@ -240,16 +208,15 @@ impl Setup {
 
     pub async fn deposit(&self, contracts: &Contracts, deposit: &Deposit) {
         let counterfactual_address = get_counterfactual_address(
-            contracts.sweeper.0,
+            contracts.sweeper.address,
             &deposit.channel,
-            contracts.outpace.0,
+            contracts.outpace.address,
             deposit.address,
         );
 
         // OUTPACE regular deposit
         // first set a balance of tokens to be deposited
-        mock_set_balance(
-            &contracts.token.2,
+        contracts.token.set_balance(
             deposit.address.to_bytes(),
             deposit.address.to_bytes(),
             &deposit.outpace_amount,
@@ -257,8 +224,7 @@ impl Setup {
         .await
         .expect("Failed to set balance");
         // call the OUTPACE deposit
-        outpace_deposit(
-            &contracts.outpace.1,
+        contracts.outpace.deposit(
             &deposit.channel,
             deposit.address.to_bytes(),
             &deposit.outpace_amount,
@@ -267,8 +233,7 @@ impl Setup {
         .expect("Should deposit with OUTPACE");
 
         // Counterfactual address deposit
-        mock_set_balance(
-            &contracts.token.2,
+        contracts.token.set_balance(
             deposit.address.to_bytes(),
             counterfactual_address.to_bytes(),
             &deposit.counterfactual_amount,
@@ -306,7 +271,7 @@ mod tests {
     use validator_worker::{worker::Worker, GetStateRoot, SentryApi};
 
     #[tokio::test]
-    // #[ignore = "We use a snapshot, however, we have left this test for convenience"]
+    #[ignore = "We use a snapshot, however, we have left this test for convenience"]
     async fn deploy_contracts() {
         let logger = new_logger("test_harness");
 
@@ -321,14 +286,14 @@ mod tests {
         }
 
         // Chain Id: 1337
-        // {
-        //     let setup = Setup {
-        //         chain: GANACHE_1337.clone(),
-        //         logger,
-        //     };
-        //     // deploy contracts
-        //     let _contracts = setup.deploy_contracts().await;
-        // }
+        {
+            let setup = Setup {
+                chain: GANACHE_1337.clone(),
+                logger,
+            };
+            // deploy contracts
+            let _contracts = setup.deploy_contracts().await;
+        }
     }
 
     static CAMPAIGN_1: Lazy<Campaign> = Lazy::new(|| {
@@ -344,7 +309,7 @@ mod tests {
             leader: VALIDATORS[&LEADER].address.into(),
             follower: VALIDATORS[&FOLLOWER].address.into(),
             guardian: *GUARDIAN,
-            token: SNAPSHOT_CONTRACTS_1337.token.1,
+            token: SNAPSHOT_CONTRACTS_1337.token.info.address,
             nonce: 0_u64.into(),
         };
 
@@ -427,7 +392,7 @@ mod tests {
             leader: VALIDATORS[&FOLLOWER].address.into(),
             follower: VALIDATORS[&LEADER].address.into(),
             guardian: *GUARDIAN_2,
-            token: SNAPSHOT_CONTRACTS_1337.token.1,
+            token: SNAPSHOT_CONTRACTS_1337.token.info.address,
             nonce: 0_u64.into(),
         };
 
@@ -501,9 +466,9 @@ mod tests {
         let channel = Channel {
             leader: VALIDATORS[&LEADER].address.into(),
             follower: VALIDATORS[&FOLLOWER].address.into(),
-            guardian: *GUARDIAN,
-            token: SNAPSHOT_CONTRACTS_1.token.1,
-            nonce: 0_u64.into(),
+            guardian: *GUARDIAN_2,
+            token: SNAPSHOT_CONTRACTS_1.token.info.address,
+            nonce: 1_u64.into(),
         };
 
         let leader_desc = ValidatorDesc {
@@ -529,7 +494,7 @@ mod tests {
         let validators = Validators::new((leader_desc, follower_desc));
 
         Campaign {
-            id: "0x936da01f9abd4d9d80c702af85c822a8"
+            id: "0xa78f3492481b41a688488a7aa1ff17df"
                 .parse()
                 .expect("Should parse"),
             channel,
@@ -537,7 +502,7 @@ mod tests {
             // 20.00000000
             budget: UnifiedNum::from(2_000_000_000),
             validators,
-            title: Some("Dummy Campaign".to_string()),
+            title: Some("Dummy Campaign in Chain #1".to_string()),
             pricing_bounds: Some(PricingBounds {
                 impression: Some(Pricing {
                     // 0.00003000
@@ -568,11 +533,12 @@ mod tests {
     });
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    // #[ignore = "for now"]
     async fn run_full_test() {
         let chain = GANACHE_1337.clone();
         assert_eq!(CAMPAIGN_1.channel.token, CAMPAIGN_2.channel.token);
 
-        let token_chain = GANACHE_CONFIG
+        let token_chain_1337 = GANACHE_CONFIG
             .find_chain_of(CAMPAIGN_1.channel.token)
             .expect("Should find CAMPAIGN_1 channel token address in Config!");
 
@@ -580,7 +546,7 @@ mod tests {
             .find_chain_of(CAMPAIGN_3.channel.token)
             .expect("Should find CAMPAIGN_3 channel token address in Config!");
 
-        assert_eq!(&token_chain.chain, &chain, "CAMPAIGN_1 & CAMPAIGN_2 should be both using the same #1337 Chain which is setup in the Ganache Config");
+        assert_eq!(&token_chain_1337.chain, &chain, "CAMPAIGN_1 & CAMPAIGN_2 should be both using the same #1337 Chain which is setup in the Ganache Config");
 
         let setup = Setup {
             chain: chain.clone(),
@@ -588,7 +554,7 @@ mod tests {
         };
 
         // Use snapshot contracts
-        let contracts = SNAPSHOT_CONTRACTS_1337.clone();
+        let contracts_1337 = SNAPSHOT_CONTRACTS_1337.clone();
         let contracts_1 = SNAPSHOT_CONTRACTS_1.clone();
 
         // let contracts = setup.deploy_contracts().await;
@@ -596,7 +562,8 @@ mod tests {
         let leader = VALIDATORS[&LEADER].clone();
         let follower = VALIDATORS[&FOLLOWER].clone();
 
-        let token_precision = contracts.token.0.precision.get();
+        let token_1_precision = contracts_1.token.info.precision.get();
+        let token_1337_precision = contracts_1337.token.info.precision.get();
 
         // We use the Advertiser's `EthereumAdapter::get_auth` for authentication!
         let advertiser_adapter = Adapter::new(
@@ -605,7 +572,6 @@ mod tests {
         )
         .unlock()
         .expect("Should unlock advertiser's Ethereum Adapter");
-        let advertiser_adapter = advertiser_adapter;
 
         // setup Sentry & returns Adapter
         let leader_adapter = setup_sentry(&leader)
@@ -680,75 +646,82 @@ mod tests {
 
         // Advertiser deposits
         //
-        // Channel 1:
+        // Channel 1 in Chain #1337:
         // - Outpace: 20 TOKENs
         // - Counterfactual: 10 TOKENs
         //
-        // Channel 2:
+        // Channel 2 in Chain #1337:
         // - Outpace: 30 TOKENs
         // - Counterfactual: 20 TOKENs
         //
-        // Channel 3:
+        // Channel 3 in Chain #1:
         // - Outpace: 30 TOKENS
         // - Counterfactual: 20 TOKENs
         {
             let advertiser_deposits = [
                 Deposit {
                     channel: CAMPAIGN_1.channel,
-                    token: contracts.token.0.clone(),
+                    token: contracts_1337.token.info.clone(),
                     address: advertiser_adapter.whoami().to_address(),
-                    outpace_amount: BigNum::with_precision(20, token_precision),
-                    counterfactual_amount: BigNum::with_precision(10, token_precision),
+                    outpace_amount: BigNum::with_precision(20, token_1337_precision),
+                    counterfactual_amount: BigNum::with_precision(10, token_1337_precision),
                 },
                 Deposit {
                     channel: CAMPAIGN_2.channel,
-                    token: contracts.token.0.clone(),
+                    token: contracts_1337.token.info.clone(),
                     address: advertiser_adapter.whoami().to_address(),
-                    outpace_amount: BigNum::with_precision(30, token_precision),
-                    counterfactual_amount: BigNum::with_precision(20, token_precision),
+                    outpace_amount: BigNum::with_precision(30, token_1337_precision),
+                    counterfactual_amount: BigNum::with_precision(20, token_1337_precision),
                 },
                 Deposit {
                     channel: CAMPAIGN_3.channel,
-                    token: contracts_1.token.0.clone(),
+                    token: contracts_1.token.info.clone(),
                     address: advertiser_adapter.whoami().to_address(),
-                    outpace_amount: BigNum::with_precision(30, token_precision),
-                    counterfactual_amount: BigNum::with_precision(20, token_precision),
+                    outpace_amount: BigNum::with_precision(100, token_1_precision),
+                    counterfactual_amount: BigNum::with_precision(20, token_1_precision),
                 },
             ];
 
-            // 1st deposit
-            {
-                setup.deposit(&contracts, &advertiser_deposits[0]).await;
+            // // 1st deposit
+            // // Chain #1337
+            // {
+            //     setup
+            //         .deposit(&contracts_1337, &advertiser_deposits[0])
+            //         .await;
 
-                // make sure we have the expected deposit returned from EthereumAdapter
-                let eth_deposit = leader_adapter
-                    .get_deposit(
-                        &token_chain.clone().with_channel(CAMPAIGN_1.channel),
-                        advertiser_adapter.whoami().to_address(),
-                    )
-                    .await
-                    .expect("Should get deposit for advertiser");
+            //     // make sure we have the expected deposit returned from EthereumAdapter
+            //     let eth_deposit = leader_adapter
+            //         .get_deposit(
+            //             &token_chain_1337.clone().with_channel(CAMPAIGN_1.channel),
+            //             advertiser_adapter.whoami().to_address(),
+            //         )
+            //         .await
+            //         .expect("Should get deposit for advertiser");
 
-                assert_eq!(advertiser_deposits[0], eth_deposit);
-            }
+            //     assert_eq!(advertiser_deposits[0], eth_deposit);
+            // }
 
-            // 2nd deposit
-            {
-                setup.deposit(&contracts, &advertiser_deposits[1]).await;
+            // // 2nd deposit
+            // // Chain #1337
+            // {
+            //     setup
+            //         .deposit(&contracts_1337, &advertiser_deposits[1])
+            //         .await;
 
-                // make sure we have the expected deposit returned from EthereumAdapter
-                let eth_deposit = leader_adapter
-                    .get_deposit(
-                        &token_chain.clone().with_channel(CAMPAIGN_2.channel),
-                        advertiser_adapter.whoami().to_address(),
-                    )
-                    .await
-                    .expect("Should get deposit for advertiser");
+            //     // make sure we have the expected deposit returned from EthereumAdapter
+            //     let eth_deposit = leader_adapter
+            //         .get_deposit(
+            //             &token_chain_1337.clone().with_channel(CAMPAIGN_2.channel),
+            //             advertiser_adapter.whoami().to_address(),
+            //         )
+            //         .await
+            //         .expect("Should get deposit for advertiser");
 
-                assert_eq!(advertiser_deposits[1], eth_deposit);
-            }
+            //     assert_eq!(advertiser_deposits[1], eth_deposit);
+            // }
 
             // 3rd deposit
+            // Chain #1
             {
                 setup.deposit(&contracts_1, &advertiser_deposits[2]).await;
 
@@ -827,7 +800,7 @@ mod tests {
         // GET /v5/channel/{}/spender/all
         {
             let leader_response = leader_sentry
-                .get_all_spenders(&token_chain.clone().with_channel(CAMPAIGN_1.channel))
+                .get_all_spenders(&token_chain_1337.clone().with_channel(CAMPAIGN_1.channel))
                 .await
                 .expect("Should return Response");
 
@@ -912,7 +885,7 @@ mod tests {
 
             {
                 let follower_token = advertiser_adapter
-                    .get_auth(token_chain.chain.chain_id, follower_adapter.whoami())
+                    .get_auth(token_chain_1337.chain.chain_id, follower_adapter.whoami())
                     .expect("Get authentication");
 
                 let follower_response = create_campaign(
@@ -943,7 +916,7 @@ mod tests {
 
             {
                 let leader_token = advertiser_adapter
-                    .get_auth(chain.chain_id, leader_adapter.whoami())
+                    .get_auth(second_chain.chain_id, leader_adapter.whoami())
                     .expect("Get authentication");
 
                 let leader_response = create_campaign(
@@ -956,12 +929,12 @@ mod tests {
                 .expect("Should return Response");
 
                 let status = leader_response.status();
-                assert_eq!(StatusCode::OK, status);
+                assert_eq!(StatusCode::OK, status, "Creating CAMPAIGN_3 failed");
             }
 
             {
                 let follower_token = advertiser_adapter
-                    .get_auth(token_chain.chain.chain_id, follower_adapter.whoami())
+                    .get_auth(second_chain.chain_id, follower_adapter.whoami())
                     .expect("Get authentication");
 
                 let follower_response = create_campaign(
@@ -973,7 +946,11 @@ mod tests {
                 .await
                 .expect("Should return Response");
 
-                assert_eq!(StatusCode::OK, follower_response.status());
+                assert_eq!(
+                    StatusCode::OK,
+                    follower_response.status(),
+                    "Creating CAMPAIGN_3 failed"
+                );
             }
         }
 
@@ -991,7 +968,7 @@ mod tests {
                 balances: Balances::<CheckedState>::new(),
             };
             let actual_accounting = leader_sentry
-                .get_accounting(&token_chain.clone().with_channel(CAMPAIGN_1.channel))
+                .get_accounting(&token_chain_1337.clone().with_channel(CAMPAIGN_1.channel))
                 .await
                 .expect("Should get Channel Accounting");
 
@@ -1002,7 +979,7 @@ mod tests {
         {
             let response = post_new_events(
                 &leader_sentry,
-                token_chain.clone().with(CAMPAIGN_1.id),
+                token_chain_1337.clone().with(CAMPAIGN_1.id),
                 &events,
             )
             .await
@@ -1056,7 +1033,7 @@ mod tests {
             };
 
             let actual_accounting = leader_sentry
-                .get_accounting(&token_chain.with_channel(CAMPAIGN_1.channel))
+                .get_accounting(&token_chain_1337.with_channel(CAMPAIGN_1.channel))
                 .await
                 .expect("Should get Channel Accounting");
 
@@ -1163,7 +1140,7 @@ mod tests {
         follower_worker: Worker<Ethereum<UnlockedWallet>>,
         events: Vec<Event>,
     ) {
-        let token_chain = GANACHE_CONFIG
+        let token_chain_1337 = GANACHE_CONFIG
             .find_chain_of(CAMPAIGN_1.channel.token)
             .expect("Should find CAMPAIGN_1 channel token address in Config!");
 
@@ -1172,7 +1149,7 @@ mod tests {
         let mut campaign = CAMPAIGN_1.clone();
         campaign.channel = new_channel;
         // Use snapshot contracts
-        let contracts = SNAPSHOT_CONTRACTS_1337.clone();
+        let contracts_1337 = SNAPSHOT_CONTRACTS_1337.clone();
 
         let leader = VALIDATORS[&LEADER].clone();
         let follower = VALIDATORS[&FOLLOWER].clone();
@@ -1185,7 +1162,7 @@ mod tests {
         )
         .unlock()
         .expect("Should unlock advertiser's Ethereum Adapter");
-        let context_of_channel = token_chain.clone().with(new_channel);
+        let context_of_channel = token_chain_1337.clone().with(new_channel);
         let leader_token = advertiser_adapter
             .get_auth(context_of_channel.chain.chain_id, IDS[&LEADER])
             .expect("Get authentication");
@@ -1245,14 +1222,14 @@ mod tests {
             // Posting new events
             post_new_events(
                 &leader_sentry,
-                token_chain.clone().with(CAMPAIGN_1.id),
+                token_chain_1337.clone().with(CAMPAIGN_1.id),
                 &events,
             )
             .await
             .expect("Posted events");
             post_new_events(
                 &follower_sentry,
-                token_chain.clone().with(CAMPAIGN_1.id),
+                token_chain_1337.clone().with(CAMPAIGN_1.id),
                 &events,
             )
             .await
@@ -1320,20 +1297,20 @@ mod tests {
             let new_state = get_new_state_msg(
                 &leader_sentry,
                 &accounting_balances,
-                contracts.token.0.precision.get(),
+                contracts_1337.token.info.precision.get(),
             );
 
             // Posting new events
             post_new_events(
                 &leader_sentry,
-                token_chain.clone().with(CAMPAIGN_1.id),
+                token_chain_1337.clone().with(CAMPAIGN_1.id),
                 &events,
             )
             .await
             .expect("Posted events");
             post_new_events(
                 &follower_sentry,
-                token_chain.clone().with(CAMPAIGN_1.id),
+                token_chain_1337.clone().with(CAMPAIGN_1.id),
                 &events,
             )
             .await
@@ -1396,7 +1373,7 @@ mod tests {
             let new_state = get_new_state_msg(
                 &leader_sentry,
                 &accounting_balances,
-                contracts.token.0.precision.get(),
+                contracts_1337.token.info.precision.get(),
             );
 
             let approve_state = ApproveState {
@@ -1408,14 +1385,14 @@ mod tests {
             // Posting new events
             post_new_events(
                 &leader_sentry,
-                token_chain.clone().with(CAMPAIGN_1.id),
+                token_chain_1337.clone().with(CAMPAIGN_1.id),
                 &events,
             )
             .await
             .expect("Posted events");
             post_new_events(
                 &follower_sentry,
-                token_chain.clone().with(CAMPAIGN_1.id),
+                token_chain_1337.clone().with(CAMPAIGN_1.id),
                 &events,
             )
             .await
@@ -1455,7 +1432,7 @@ mod tests {
             let new_state = get_new_state_msg(
                 &leader_sentry,
                 &accounting_balances,
-                contracts.token.0.precision.get(),
+                contracts_1337.token.info.precision.get(),
             );
 
             let approve_state = ApproveState {
@@ -1467,14 +1444,14 @@ mod tests {
             // Posting new events
             post_new_events(
                 &leader_sentry,
-                token_chain.clone().with(CAMPAIGN_1.id),
+                token_chain_1337.clone().with(CAMPAIGN_1.id),
                 &events,
             )
             .await
             .expect("Posted events");
             post_new_events(
                 &follower_sentry,
-                token_chain.clone().with(CAMPAIGN_1.id),
+                token_chain_1337.clone().with(CAMPAIGN_1.id),
                 &events,
             )
             .await

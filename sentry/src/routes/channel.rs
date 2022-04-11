@@ -1001,7 +1001,7 @@ mod test {
             leader: IDS[&LEADER],
             follower: IDS[&FOLLOWER],
             guardian: *GUARDIAN,
-            token: GANACHE_INFO_1337.tokens["Mocked TOKEN"].address,
+            token: GANACHE_INFO_1337.tokens["Mocked TOKEN 1337"].address,
             nonce: Nonce::from(987_654_321_u32),
         };
         insert_channel(&app.pool, channel)
@@ -1011,7 +1011,7 @@ mod test {
             leader: IDS[&LEADER],
             follower: IDS[&FOLLOWER],
             guardian: *GUARDIAN,
-            token: GANACHE_INFO_1.tokens["Mocked TOKEN 2"].address,
+            token: GANACHE_INFO_1.tokens["Mocked TOKEN 1"].address,
             nonce: Nonce::from(987_654_322_u32),
         };
         insert_channel(&app.pool, channel_other_token)
@@ -1022,7 +1022,7 @@ mod test {
             leader: IDS[&LEADER_2],
             follower: IDS[&FOLLOWER],
             guardian: *GUARDIAN,
-            token: GANACHE_INFO_1337.tokens["Mocked TOKEN"].address,
+            token: GANACHE_INFO_1337.tokens["Mocked TOKEN 1337"].address,
             nonce: Nonce::from(987_654_323_u32),
         };
         insert_channel(&app.pool, channel_other_leader)

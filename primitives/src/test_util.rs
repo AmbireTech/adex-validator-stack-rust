@@ -162,7 +162,7 @@ pub static DUMMY_CAMPAIGN: Lazy<Campaign> = Lazy::new(|| {
         .get("Ganache #1337")
         .unwrap()
         .tokens
-        .get("Mocked TOKEN")
+        .get("Mocked TOKEN 1337")
         .unwrap();
 
     Campaign {
