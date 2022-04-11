@@ -997,10 +997,17 @@ mod test {
     use crate::test_util::setup_dummy_app;
     use crate::update_campaign::DeltaBudget;
     use adapter::primitives::Deposit;
+    use chrono::{TimeZone, Utc};
     use hyper::StatusCode;
     use primitives::{
-        test_util::{DUMMY_CAMPAIGN, IDS, LEADER},
-        BigNum, ValidatorId,
+        campaign::validators::Validators,
+        config::GANACHE_CONFIG,
+        sentry::campaign_list::{CampaignListResponse, ValidatorParam},
+        test_util::{
+            DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, FOLLOWER, GUARDIAN,
+            IDS, LEADER, LEADER_2, PUBLISHER_2,
+        },
+        BigNum, ValidatorDesc, ValidatorId,
     };
 
     #[tokio::test]
@@ -1425,6 +1432,307 @@ mod test {
                 ResponseError::Forbidden("Request not sent by campaign creator".to_string()),
                 res
             );
+        }
+    }
+
+    async fn res_to_campaign_list_response(res: Response<Body>) -> CampaignListResponse {
+        let json = hyper::body::to_bytes(res.into_body())
+            .await
+            .expect("Should get json");
+
+        serde_json::from_slice(&json).expect("Should deserialize CampaignListResponse")
+    }
+
+    #[tokio::test]
+    async fn test_campaign_list() {
+        let mut app = setup_dummy_app().await;
+        app.config.campaigns_find_limit = 2;
+        // Setting up new leader and a channel and campaign which use it on Ganache #1337
+        let dummy_leader_2 = ValidatorDesc {
+            id: IDS[&LEADER_2],
+            url: "http://tom.adex.network".to_string(),
+            fee: 200.into(),
+            fee_addr: None,
+        };
+        let channel_new_leader = Channel {
+            leader: IDS[&*LEADER_2],
+            follower: IDS[&*FOLLOWER],
+            guardian: *GUARDIAN,
+            token: DUMMY_CAMPAIGN.channel.token,
+            nonce: DUMMY_CAMPAIGN.channel.nonce,
+        };
+        let mut campaign_new_leader = DUMMY_CAMPAIGN.clone();
+        campaign_new_leader.id = CampaignId::new();
+        campaign_new_leader.channel = channel_new_leader;
+        campaign_new_leader.validators =
+            Validators::new((dummy_leader_2.clone(), DUMMY_VALIDATOR_FOLLOWER.clone()));
+        campaign_new_leader.created = Utc.ymd(2021, 2, 1).and_hms(8, 0, 0);
+
+        let chain_1_token = GANACHE_CONFIG
+            .chains
+            .get("Ganache #1")
+            .unwrap()
+            .tokens
+            .get("Mocked TOKEN 2")
+            .unwrap()
+            .address;
+        // Setting up new follower and a channel and campaign which use it on Ganache #1
+        let dummy_follower_2 = ValidatorDesc {
+            id: IDS[&GUARDIAN],
+            url: "http://jerry.adex.network".to_string(),
+            fee: 300.into(),
+            fee_addr: None,
+        };
+        let channel_new_follower = Channel {
+            leader: IDS[&*LEADER],
+            follower: IDS[&*GUARDIAN],
+            guardian: *GUARDIAN,
+            token: chain_1_token,
+            nonce: DUMMY_CAMPAIGN.channel.nonce,
+        };
+        let mut campaign_new_follower = DUMMY_CAMPAIGN.clone();
+        campaign_new_follower.id = CampaignId::new();
+        campaign_new_follower.channel = channel_new_follower;
+        campaign_new_follower.validators =
+            Validators::new((DUMMY_VALIDATOR_LEADER.clone(), dummy_follower_2.clone()));
+        campaign_new_follower.created = Utc.ymd(2021, 2, 1).and_hms(9, 0, 0);
+
+        // Setting up a channel and campaign which use the new leader and follower on Ganache #1
+        let channel_new_leader_and_follower = Channel {
+            leader: IDS[&*LEADER_2],
+            follower: IDS[&*GUARDIAN],
+            guardian: *GUARDIAN,
+            token: chain_1_token,
+            nonce: DUMMY_CAMPAIGN.channel.nonce,
+        };
+        let mut campaign_new_leader_and_follower = DUMMY_CAMPAIGN.clone();
+        campaign_new_leader_and_follower.id = CampaignId::new();
+        campaign_new_leader_and_follower.channel = channel_new_leader_and_follower;
+        campaign_new_leader_and_follower.validators =
+            Validators::new((dummy_leader_2.clone(), dummy_follower_2.clone()));
+        campaign_new_leader_and_follower.created = Utc.ymd(2021, 2, 1).and_hms(10, 0, 0);
+
+        insert_channel(&app.pool, DUMMY_CAMPAIGN.channel)
+            .await
+            .expect("Should insert dummy channel");
+        insert_campaign(&app.pool, &DUMMY_CAMPAIGN)
+            .await
+            .expect("Should insert dummy campaign");
+        insert_channel(&app.pool, channel_new_leader)
+            .await
+            .expect("Should insert dummy channel");
+        insert_campaign(&app.pool, &campaign_new_leader)
+            .await
+            .expect("Should insert dummy campaign");
+        insert_channel(&app.pool, channel_new_follower)
+            .await
+            .expect("Should insert dummy channel");
+        insert_campaign(&app.pool, &campaign_new_follower)
+            .await
+            .expect("Should insert dummy campaign");
+        insert_channel(&app.pool, channel_new_leader_and_follower)
+            .await
+            .expect("Should insert dummy channel");
+        insert_campaign(&app.pool, &campaign_new_leader_and_follower)
+            .await
+            .expect("Should insert dummy campaign");
+
+        let mut campaign_other_creator = DUMMY_CAMPAIGN.clone();
+        campaign_other_creator.id = CampaignId::new();
+        campaign_other_creator.creator = *PUBLISHER_2;
+        campaign_other_creator.created = Utc.ymd(2021, 2, 1).and_hms(11, 0, 0);
+
+        insert_campaign(&app.pool, &campaign_other_creator)
+            .await
+            .expect("Should insert dummy campaign");
+
+        let mut campaign_long_active_to = DUMMY_CAMPAIGN.clone();
+        campaign_long_active_to.id = CampaignId::new();
+        campaign_long_active_to.active.to = Utc.ymd(2101, 1, 30).and_hms(0, 0, 0);
+        campaign_long_active_to.created = Utc.ymd(2021, 2, 1).and_hms(12, 0, 0);
+
+        insert_campaign(&app.pool, &campaign_long_active_to)
+            .await
+            .expect("Should insert dummy campaign");
+
+        let build_request = |query: CampaignListQuery| {
+            let query = serde_urlencoded::to_string(query).expect("should parse query");
+            Request::builder()
+                .uri(format!("http://127.0.0.1/v5/campaign/list?{}", query))
+                .body(Body::empty())
+                .expect("Should build Request")
+        };
+
+        // Test for dummy leader
+        {
+            let query = CampaignListQuery {
+                page: 0,
+                active_to_ge: Utc::now(),
+                creator: None,
+                validator: Some(ValidatorParam::Leader(DUMMY_VALIDATOR_LEADER.id)),
+            };
+            let res = campaign_list(build_request(query), &app)
+                .await
+                .expect("should get campaigns");
+            let res = res_to_campaign_list_response(res).await;
+
+            assert_eq!(
+                res.campaigns,
+                vec![DUMMY_CAMPAIGN.clone(), campaign_new_follower.clone()],
+                "First page of campaigns with dummy leader is correct"
+            );
+            assert_eq!(res.pagination.total_pages, 2);
+
+            let query = CampaignListQuery {
+                page: 1,
+                active_to_ge: Utc::now(),
+                creator: None,
+                validator: Some(ValidatorParam::Leader(DUMMY_VALIDATOR_LEADER.id)),
+            };
+            let res = campaign_list(build_request(query), &app)
+                .await
+                .expect("should get campaigns");
+            let res = res_to_campaign_list_response(res).await;
+
+            assert_eq!(
+                res.campaigns,
+                vec![
+                    campaign_other_creator.clone(),
+                    campaign_long_active_to.clone()
+                ],
+                "Second page of campaigns with dummy leader is correct"
+            );
+        }
+
+        // Test for dummy follower
+        {
+            let query = CampaignListQuery {
+                page: 0,
+                active_to_ge: Utc::now(),
+                creator: None,
+                validator: Some(ValidatorParam::Validator(DUMMY_VALIDATOR_FOLLOWER.id)),
+            };
+            let res = campaign_list(build_request(query), &app)
+                .await
+                .expect("should get campaigns");
+            let res = res_to_campaign_list_response(res).await;
+
+            assert_eq!(
+                res.campaigns,
+                vec![DUMMY_CAMPAIGN.clone(), campaign_new_leader.clone()],
+                "First page of campaigns with dummy follower is correct"
+            );
+            assert_eq!(res.pagination.total_pages, 2);
+
+            let query = CampaignListQuery {
+                page: 1,
+                active_to_ge: Utc::now(),
+                creator: None,
+                validator: Some(ValidatorParam::Validator(DUMMY_VALIDATOR_FOLLOWER.id)),
+            };
+            let res = campaign_list(build_request(query), &app)
+                .await
+                .expect("should get campaigns");
+            let res = res_to_campaign_list_response(res).await;
+
+            assert_eq!(
+                res.campaigns,
+                vec![
+                    campaign_other_creator.clone(),
+                    campaign_long_active_to.clone()
+                ],
+                "Second page of campaigns with dummy follower is correct"
+            );
+        }
+
+        // Test for dummy leader 2
+        {
+            let query = CampaignListQuery {
+                page: 0,
+                active_to_ge: Utc::now(),
+                creator: None,
+                validator: Some(ValidatorParam::Leader(dummy_leader_2.id)),
+            };
+            let res = campaign_list(build_request(query), &app)
+                .await
+                .expect("should get campaigns");
+            let res = res_to_campaign_list_response(res).await;
+
+            assert_eq!(
+                res.campaigns,
+                vec![
+                    campaign_new_leader.clone(),
+                    campaign_new_leader_and_follower.clone()
+                ],
+                "Campaigns with dummy leader 2 are correct"
+            );
+            assert_eq!(res.pagination.total_pages, 1);
+        }
+
+        // Test for dummy follower 2
+        {
+            let query = CampaignListQuery {
+                page: 0,
+                active_to_ge: Utc::now(),
+                creator: None,
+                validator: Some(ValidatorParam::Validator(dummy_follower_2.id)),
+            };
+            let res = campaign_list(build_request(query), &app)
+                .await
+                .expect("should get campaigns");
+            let res = res_to_campaign_list_response(res).await;
+
+            assert_eq!(
+                res.campaigns,
+                vec![
+                    campaign_new_follower.clone(),
+                    campaign_new_leader_and_follower.clone()
+                ],
+                "Campaigns with dummy follower 2 are correct"
+            );
+            assert_eq!(res.pagination.total_pages, 1);
+        }
+
+        // Test for other creator
+        {
+            let query = CampaignListQuery {
+                page: 0,
+                active_to_ge: Utc::now(),
+                creator: Some(*PUBLISHER_2),
+                validator: None,
+            };
+            let res = campaign_list(build_request(query), &app)
+                .await
+                .expect("should get campaigns");
+            let res = res_to_campaign_list_response(res).await;
+
+            assert_eq!(
+                res.campaigns,
+                vec![campaign_other_creator.clone()],
+                "The campaign with a different creator is retrieved correctly"
+            );
+            assert_eq!(res.pagination.total_pages, 1);
+        }
+
+        // Test for active_to
+        {
+            let query = CampaignListQuery {
+                page: 0,
+                active_to_ge: Utc.ymd(2101, 1, 1).and_hms(0, 0, 0),
+                creator: None,
+                validator: None,
+            };
+            let res = campaign_list(build_request(query), &app)
+                .await
+                .expect("should get campaigns");
+            let res = res_to_campaign_list_response(res).await;
+
+            assert_eq!(
+                res.campaigns,
+                vec![campaign_long_active_to.clone()],
+                "The campaign with a longer active_to is retrieved correctly"
+            );
+            assert_eq!(res.pagination.total_pages, 1);
         }
     }
 }
