@@ -33,12 +33,12 @@ admins = ['0x80690751969B234697e9059e04ed72195c3507fa']
 chain_id = 1
 rpc = 'http://localhost:8545'
 # Ganache Snapshot address
-outpace = '0x671b54359be2fa82aB05A5336EB8134F782B88Cd'
+outpace = '0x26CBc2eAAe377f6Ac4b73a982CD1125eF4CEC96f'
 # Ganache Snapshot address
-sweeper = '0xE37BA12D23e755138f7Ea8391551B773Cb2D8F5F'
+sweeper = '0x3550A85877002f79db46B01672b5F86f1037cB7c'
 
-    [chain."Ganache #1".token."Mocked TOKEN 2"]
-    address = '0x704D76a8c31FbAafE2B7895b13A763c7487FC0D8' # checked
+    [chain."Ganache #1".token."Mocked TOKEN 1"]
+    address = '0x12a28f2bfBFfDf5842657235cC058242f40fDEa6' # checked
     precision = 18
     # Minimum token units for the Create2 deposits to count
     # 1 * 10^18 = 1.0000 TOKEN
@@ -57,7 +57,7 @@ outpace = '0xAbc27d46a458E2e49DaBfEf45ca74dEDBAc3DD06'
 # Ganache Snapshot address
 sweeper = '0x7dD57C0324284102A757153E18F2Cb1ACdB7d2bD'
 
-    [chain."Ganache #1337".token."Mocked TOKEN"]
+    [chain."Ganache #1337".token."Mocked TOKEN 1337"]
     address = '0x2bcaf6968aec8a3b5126fbfab5fd419da6e8ad8e' # checked
     precision = 18
     # Minimum token units for the Create2 deposits to count
