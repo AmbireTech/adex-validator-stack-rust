@@ -2,6 +2,7 @@ use chrono::{TimeZone, Utc};
 
 use super::*;
 use crate::{
+    sentry::IMPRESSION,
     targeting::input,
     test_util::{DUMMY_CAMPAIGN, DUMMY_IPFS, LEADER},
     UnifiedMap,
@@ -17,11 +18,11 @@ fn get_default_input() -> Input {
             navigator_language: "bg".to_string(),
         }),
         global: input::Global {
-            ad_slot_id: "ad_slot_id Value".to_string(),
+            ad_slot_id: DUMMY_IPFS[0],
             ad_slot_type: "ad_slot_type Value".to_string(),
             publisher_id: *LEADER,
             country: Some("bg".to_string()),
-            event_type: "IMPRESSION".to_string(),
+            event_type: IMPRESSION,
             seconds_since_epoch: Utc.ymd(2020, 11, 6).and_hms(12, 0, 0),
             user_agent_os: Some("os".to_string()),
             user_agent_browser_family: Some("family".to_string()),
@@ -95,6 +96,8 @@ mod rules_test {
 }
 
 mod dsl_test {
+    use crate::sentry::CLICK;
+
     use super::*;
 
     #[test]
@@ -270,20 +273,28 @@ mod dsl_test {
 
     #[test]
     fn test_set_eval() {
-        use crate::campaign::{Pricing, PricingBounds};
+        use crate::campaign::Pricing;
         use crate::test_util::DUMMY_CAMPAIGN;
 
         let mut campaign = DUMMY_CAMPAIGN.clone();
-        campaign.pricing_bounds = Some(PricingBounds {
-            impression: Some(Pricing {
-                min: 1_000.into(),
-                max: 2_000.into(),
-            }),
-            click: Some(Pricing {
-                min: 3_000.into(),
-                max: 4_000.into(),
-            }),
-        });
+        campaign.pricing_bounds = vec![
+            (
+                IMPRESSION,
+                Pricing {
+                    min: 1_000.into(),
+                    max: 2_000.into(),
+                },
+            ),
+            (
+                CLICK,
+                Pricing {
+                    min: 3_000.into(),
+                    max: 4_000.into(),
+                },
+            ),
+        ]
+        .into_iter()
+        .collect();
 
         let input = get_default_input();
         let mut output = Output::from(&campaign);

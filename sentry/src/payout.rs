@@ -18,7 +18,7 @@ pub fn get_payout(
     event: &Event,
     session: &Session,
 ) -> Result {
-    let event_type = event.to_string();
+    let event_type = event.event_type();
 
     match event {
         Event::Impression {
@@ -40,18 +40,17 @@ pub fn get_payout(
             if targeting_rules.is_empty() {
                 Ok(Some((*publisher, pricing.min)))
             } else {
-                let ad_unit = ad_unit
-                    .as_ref()
-                    .and_then(|ipfs| campaign.ad_units.iter().find(|u| &u.ipfs == ipfs));
+                // Find the event's AdUnit in the Campaign.
+                let ad_unit = campaign.ad_units.iter().find(|u| &u.ipfs == ad_unit);
 
                 let input = Input {
                     ad_view: None,
                     global: input::Global {
-                        ad_slot_id: ad_slot.as_ref().map_or(String::new(), ToString::to_string),
+                        ad_slot_id: *ad_slot,
                         ad_slot_type: ad_unit.map(|u| u.ad_type.clone()).unwrap_or_default(),
                         publisher_id: *publisher,
                         country: session.country.clone(),
-                        event_type: event_type.clone(),
+                        event_type: event_type,
                         seconds_since_epoch: Utc::now(),
                         user_agent_os: session.os.clone(),
                         user_agent_browser_family: None,
@@ -66,7 +65,7 @@ pub fn get_payout(
                 let mut output = Output {
                     show: true,
                     boost: 1.0,
-                    price: vec![(event_type.clone(), pricing.min)]
+                    price: vec![(event_type.to_string(), pricing.min)]
                         .into_iter()
                         .collect(),
                 };
@@ -76,7 +75,7 @@ pub fn get_payout(
                 eval_with_callback(&targeting_rules, &input, &mut output, Some(on_type_error));
 
                 if output.show {
-                    let price = match output.price.get(&event_type) {
+                    let price = match output.price.get(event_type.as_str()) {
                         Some(output_price) => max(pricing.min, min(pricing.max, *output_price)),
                         None => max(pricing.min, pricing.max),
                     };
@@ -94,8 +93,9 @@ pub fn get_payout(
 mod test {
     use super::*;
     use primitives::{
-        campaign::{Pricing, PricingBounds},
-        test_util::{discard_logger, DUMMY_CAMPAIGN, LEADER, PUBLISHER},
+        campaign::Pricing,
+        sentry::{CLICK, IMPRESSION},
+        test_util::{discard_logger, DUMMY_CAMPAIGN, DUMMY_IPFS, LEADER, PUBLISHER},
     };
 
     #[test]
@@ -104,21 +104,29 @@ mod test {
 
         let mut campaign = DUMMY_CAMPAIGN.clone();
         campaign.budget = 100.into();
-        campaign.pricing_bounds = Some(PricingBounds {
-            impression: Some(Pricing {
-                min: 8.into(),
-                max: 64.into(),
-            }),
-            click: Some(Pricing {
-                min: 23.into(),
-                max: 100.into(),
-            }),
-        });
+        campaign.pricing_bounds = vec![
+            (
+                IMPRESSION,
+                Pricing {
+                    min: 8.into(),
+                    max: 64.into(),
+                },
+            ),
+            (
+                CLICK,
+                Pricing {
+                    min: 23.into(),
+                    max: 100.into(),
+                },
+            ),
+        ]
+        .into_iter()
+        .collect();
 
         let event = Event::Impression {
             publisher: *LEADER,
-            ad_unit: None,
-            ad_slot: None,
+            ad_unit: DUMMY_IPFS[0],
+            ad_slot: DUMMY_IPFS[1],
             referrer: None,
         };
 
@@ -140,21 +148,29 @@ mod test {
         let logger = discard_logger();
         let mut campaign = DUMMY_CAMPAIGN.clone();
         campaign.budget = 100.into();
-        campaign.pricing_bounds = Some(PricingBounds {
-            impression: Some(Pricing {
-                min: 8.into(),
-                max: 64.into(),
-            }),
-            click: Some(Pricing {
-                min: 23.into(),
-                max: 100.into(),
-            }),
-        });
+        campaign.pricing_bounds = vec![
+            (
+                IMPRESSION,
+                Pricing {
+                    min: 8.into(),
+                    max: 64.into(),
+                },
+            ),
+            (
+                CLICK,
+                Pricing {
+                    min: 23.into(),
+                    max: 100.into(),
+                },
+            ),
+        ]
+        .into_iter()
+        .collect();
 
         let event = Event::Click {
             publisher: *PUBLISHER,
-            ad_unit: None,
-            ad_slot: None,
+            ad_unit: DUMMY_IPFS[0],
+            ad_slot: DUMMY_IPFS[1],
             referrer: None,
         };
 

@@ -4,9 +4,10 @@ use chrono::{TimeZone, Utc};
 use once_cell::sync::Lazy;
 
 use crate::{
-    campaign::{Active, Pricing, PricingBounds, Validators},
+    campaign::{Active, Pricing, Validators},
     channel::Nonce,
     config::GANACHE_CONFIG,
+    sentry::{CLICK, IMPRESSION},
     targeting::Rules,
     AdUnit, Address, Campaign, Channel, EventSubmission, UnifiedNum, ValidatorDesc, ValidatorId,
     IPFS,
@@ -184,16 +185,24 @@ pub static DUMMY_CAMPAIGN: Lazy<Campaign> = Lazy::new(|| {
             DUMMY_VALIDATOR_FOLLOWER.clone(),
         )),
         title: Some("Dummy Campaign".to_string()),
-        pricing_bounds: Some(PricingBounds {
-            impression: Some(Pricing {
-                min: 1.into(),
-                max: 10.into(),
-            }),
-            click: Some(Pricing {
-                min: 0.into(),
-                max: 0.into(),
-            }),
-        }),
+        pricing_bounds: vec![
+            (
+                IMPRESSION,
+                Pricing {
+                    min: 1.into(),
+                    max: 10.into(),
+                },
+            ),
+            (
+                CLICK,
+                Pricing {
+                    min: 0.into(),
+                    max: 0.into(),
+                },
+            ),
+        ]
+        .into_iter()
+        .collect(),
         event_submission: Some(EventSubmission { allow: vec![] }),
         ad_units: vec![],
         targeting_rules: Rules::new(),

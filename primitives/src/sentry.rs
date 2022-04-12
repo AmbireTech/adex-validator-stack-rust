@@ -175,21 +175,27 @@ mod event {
         }
     }
 
+    impl From<EventType> for String {
+        fn from(event_type: EventType) -> Self {
+            event_type.to_string()
+        }
+    }
+
     #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
     #[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
     pub enum Event {
         #[serde(rename_all = "camelCase")]
         Impression {
             publisher: Address,
-            ad_unit: Option<IPFS>,
-            ad_slot: Option<IPFS>,
+            ad_unit: IPFS,
+            ad_slot: IPFS,
             referrer: Option<String>,
         },
         #[serde(rename_all = "camelCase")]
         Click {
             publisher: Address,
-            ad_unit: Option<IPFS>,
-            ad_slot: Option<IPFS>,
+            ad_unit: IPFS,
+            ad_slot: IPFS,
             referrer: Option<String>,
         },
     }
@@ -270,8 +276,8 @@ mod event {
 pub struct UpdateAnalytics {
     pub time: DateHour<Utc>,
     pub campaign_id: CampaignId,
-    pub ad_unit: Option<IPFS>,
-    pub ad_slot: Option<IPFS>,
+    pub ad_unit: IPFS,
+    pub ad_slot: IPFS,
     pub ad_slot_type: Option<String>,
     pub advertiser: Address,
     pub publisher: Address,
@@ -288,8 +294,8 @@ pub struct UpdateAnalytics {
 pub struct Analytics {
     pub time: DateHour<Utc>,
     pub campaign_id: CampaignId,
-    pub ad_unit: Option<IPFS>,
-    pub ad_slot: Option<IPFS>,
+    pub ad_unit: IPFS,
+    pub ad_slot: IPFS,
     pub ad_slot_type: Option<String>,
     pub advertiser: Address,
     pub publisher: Address,
@@ -774,8 +780,8 @@ pub mod campaign_create {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         pub title: Option<String>,
         /// Event pricing bounds
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub pricing_bounds: Option<PricingBounds>,
+        #[serde(default, skip_serializing_if = "PricingBounds::is_empty")]
+        pub pricing_bounds: PricingBounds,
         /// EventSubmission object, applies to event submission (POST /channel/:id/events)
         #[serde(default, skip_serializing_if = "Option::is_none")]
         pub event_submission: Option<EventSubmission>,
@@ -868,7 +874,7 @@ pub mod campaign_modify {
                 budget: Some(campaign.budget),
                 validators: Some(campaign.validators),
                 title: campaign.title,
-                pricing_bounds: campaign.pricing_bounds,
+                pricing_bounds: Some(campaign.pricing_bounds),
                 event_submission: campaign.event_submission,
                 ad_units: Some(campaign.ad_units),
                 targeting_rules: Some(campaign.targeting_rules),
@@ -890,7 +896,7 @@ pub mod campaign_modify {
             }
 
             if let Some(new_pricing_bounds) = self.pricing_bounds {
-                campaign.pricing_bounds = Some(new_pricing_bounds);
+                campaign.pricing_bounds = new_pricing_bounds;
             }
 
             if let Some(new_event_submission) = self.event_submission {
@@ -919,6 +925,7 @@ mod postgres {
     use crate::{
         analytics::{AnalyticsQuery, Metric},
         validator::{messages::Type as MessageType, MessageTypes},
+        IPFS,
     };
     use bytes::BytesMut;
     use chrono::{DateTime, Timelike, Utc};
@@ -983,20 +990,8 @@ mod postgres {
                 .get::<_, Option<String>>("country")
                 .filter(|string| !string.is_empty());
 
-            let ad_unit = row.get::<_, Option<String>>("ad_unit").and_then(|string| {
-                if !string.is_empty() {
-                    Some(string.parse().expect("Valid IPFS"))
-                } else {
-                    None
-                }
-            });
-            let ad_slot = row.get::<_, Option<String>>("ad_slot").and_then(|string| {
-                if !string.is_empty() {
-                    Some(string.parse().expect("Valid IPFS"))
-                } else {
-                    None
-                }
-            });
+            let ad_unit = row.get::<_, IPFS>("ad_unit");
+            let ad_slot = row.get::<_, IPFS>("ad_slot");
 
             Self {
                 campaign_id: row.get("campaign_id"),
@@ -1116,8 +1111,8 @@ mod test {
     pub fn test_de_serialize_events() {
         let click = Event::Click {
             publisher: *PUBLISHER,
-            ad_unit: Some(DUMMY_IPFS[0]),
-            ad_slot: Some(DUMMY_IPFS[1]),
+            ad_unit: DUMMY_IPFS[0],
+            ad_slot: DUMMY_IPFS[1],
             referrer: Some("some_referrer".to_string()),
         };
 

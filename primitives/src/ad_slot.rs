@@ -1,4 +1,4 @@
-use crate::{targeting::Rule, BigNum, ValidatorId};
+use crate::{targeting::Rule, Address, UnifiedNum, ValidatorId, IPFS};
 use chrono::{
     serde::{ts_milliseconds, ts_milliseconds_option},
     DateTime, Utc,
@@ -14,7 +14,7 @@ use std::collections::HashMap;
 #[serde(rename_all = "camelCase")]
 pub struct AdSlot {
     /// valid ipfs hash of spec props below
-    pub ipfs: String,
+    pub ipfs: IPFS,
     /// The type of the AdSlot
     /// currently, possible values are:
     /// > legacy_300x250, legacy_250x250, legacy_240x400, legacy_336x280,
@@ -25,14 +25,14 @@ pub struct AdSlot {
     /// see IAB ad unit guidelines and iab_flex_{adUnitName} (see IAB's new ad portfolio and PDF)
     #[serde(rename = "type")]
     pub ad_type: String,
-    // HashMap<DepositAsset, BigNum> for the minimum payment accepted per impression
+    // HashMap<DepositAsset, UnifiedNum> for the minimum payment accepted per impression
     #[serde(default)]
-    pub min_per_impression: Option<HashMap<String, BigNum>>,
+    pub min_per_impression: Option<HashMap<Address, UnifiedNum>>,
     #[serde(default)]
     pub rules: Vec<Rule>,
     /// Valid ipfs hash for Ad Unit object. It will be used as fallback data (optional)
     #[serde(default)]
-    pub fallback_unit: Option<String>,
+    pub fallback_unit: Option<IPFS>,
     /// User address from the session
     pub owner: ValidatorId,
     /// UTC timestamp in milliseconds, used as nonce for escaping duplicated spec ipfs hashes

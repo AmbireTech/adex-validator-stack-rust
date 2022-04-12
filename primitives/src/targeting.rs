@@ -1,4 +1,4 @@
-use crate::{campaign::Pricing, Campaign, UnifiedNum};
+use crate::{campaign::Pricing, sentry::EventType, Campaign, UnifiedNum};
 
 pub use eval::*;
 use serde_json::Number;
@@ -9,11 +9,10 @@ pub use input::{field::GetField, Input};
 mod eval;
 pub mod input;
 
-pub fn get_pricing_bounds(campaign: &Campaign, event_type: &str) -> Pricing {
+pub fn get_pricing_bounds(campaign: &Campaign, event_type: &EventType) -> Pricing {
     campaign
         .pricing_bounds
-        .as_ref()
-        .and_then(|pricing_bounds| pricing_bounds.get(event_type))
+        .get(event_type)
         .cloned()
         .unwrap_or_else(|| Pricing {
             min: 0.into(),
@@ -59,14 +58,11 @@ impl Output {
 
 impl From<&Campaign> for Output {
     fn from(campaign: &Campaign) -> Self {
-        let price = match &campaign.pricing_bounds {
-            Some(pricing_bounds) => pricing_bounds
-                .to_vec()
-                .into_iter()
-                .map(|(key, price)| (key.to_string(), price.min))
-                .collect(),
-            _ => Default::default(),
-        };
+        let price = campaign
+            .pricing_bounds
+            .iter()
+            .map(|(key, price)| (key.to_string(), price.min))
+            .collect();
 
         Self {
             show: true,
@@ -78,6 +74,8 @@ impl From<&Campaign> for Output {
 
 #[cfg(test)]
 mod test {
+    use crate::sentry::{CLICK, IMPRESSION};
+
     use super::*;
 
     #[test]
@@ -106,20 +104,28 @@ mod test {
     #[test]
     #[allow(clippy::float_cmp)]
     fn test_output_from_channel() {
-        use crate::campaign::{Pricing, PricingBounds};
+        use crate::campaign::Pricing;
         use crate::test_util::DUMMY_CAMPAIGN;
 
         let mut campaign = DUMMY_CAMPAIGN.clone();
-        campaign.pricing_bounds = Some(PricingBounds {
-            impression: Some(Pricing {
-                min: 1_000.into(),
-                max: 2_000.into(),
-            }),
-            click: Some(Pricing {
-                min: 3_000.into(),
-                max: 4_000.into(),
-            }),
-        });
+        campaign.pricing_bounds = vec![
+            (
+                IMPRESSION,
+                Pricing {
+                    min: 1_000.into(),
+                    max: 2_000.into(),
+                },
+            ),
+            (
+                CLICK,
+                Pricing {
+                    min: 3_000.into(),
+                    max: 4_000.into(),
+                },
+            ),
+        ]
+        .into_iter()
+        .collect();
 
         let output = Output::from(&campaign);
 

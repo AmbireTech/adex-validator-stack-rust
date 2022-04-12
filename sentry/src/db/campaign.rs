@@ -1,5 +1,8 @@
+use std::collections::HashSet;
+
 use crate::db::{DbPool, PoolError, TotalCount};
 use chrono::{DateTime, Utc};
+use futures::TryStreamExt;
 use primitives::{
     sentry::{
         campaign_list::{CampaignListResponse, ValidatorParam},
@@ -7,7 +10,10 @@ use primitives::{
     },
     Address, Campaign, CampaignId, ChannelId,
 };
-use tokio_postgres::types::{Json, ToSql};
+use tokio_postgres::{
+    types::{Json, ToSql},
+    Row,
+};
 
 pub use campaign_remaining::CampaignRemaining;
 
@@ -210,8 +216,46 @@ pub async fn update_campaign(pool: &DbPool, campaign: &Campaign) -> Result<Campa
     Ok(Campaign::from(&updated_row))
 }
 
+pub async fn units_for_slot_get_campaigns(
+    pool: &DbPool,
+    deposit_assets: Option<&HashSet<Address>>,
+    creator: Address,
+    active_to_ge: DateTime<Utc>,
+) -> Result<Vec<Campaign>, PoolError> {
+    let client = pool.get().await?;
+
+    let mut where_clauses = vec![
+        // Campaign.active.to
+        "active_to >= $1".to_string(),
+        // Campaign.creator
+        "creator = $2".into(),
+    ];
+    let mut params: Vec<Box<(dyn ToSql + Sync + Send)>> =
+        vec![Box::new(active_to_ge), Box::new(creator)];
+
+    // Deposit assets
+    match deposit_assets {
+        Some(assets) if !assets.is_empty() => {
+            let assets_vec = assets.iter().copied().collect::<Vec<_>>();
+
+            where_clauses.push("channels.token IN ($3)".into());
+            params.push(Box::new(assets_vec))
+        }
+        _ => {}
+    };
+
+    // To understand why we use Order by, see Postgres Documentation: https://www.postgresql.org/docs/8.1/queries-limit.html
+    let statement = format!("SELECT campaigns.id, creator, budget, validators, title, pricing_bounds, event_submission, ad_units, targeting_rules, campaigns.created, active_from, active_to, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM campaigns INNER JOIN channels ON campaigns.channel_id=channels.id WHERE {} ORDER BY campaigns.created ASC", where_clauses.join(" AND "));
+    let stmt = client.prepare(&statement).await?;
+    let rows: Vec<Row> = client.query_raw(&stmt, params).await?.try_collect().await?;
+
+    Ok(rows.iter().map(Campaign::from).collect())
+}
+
 /// struct that handles redis calls for the Campaign Remaining Budget
 mod campaign_remaining {
+    use std::collections::HashMap;
+
     use crate::db::RedisError;
     use primitives::{CampaignId, UnifiedNum};
     use redis::aio::MultiplexedConnection;
@@ -282,6 +326,37 @@ mod campaign_remaining {
                 .collect();
 
             Ok(campaigns_remaining)
+        }
+
+        /// This method will get the remaining of the provided [`Campaign`]s
+        /// and it will also match the returned values to the [`CampaignId`]s
+        /// `MGET` should always return results in the same order!
+        pub async fn get_multiple_with_ids(
+            &self,
+            campaigns: &[CampaignId],
+        ) -> Result<HashMap<CampaignId, UnifiedNum>, RedisError> {
+            // `MGET` fails on empty keys
+            if campaigns.is_empty() {
+                return Ok(HashMap::default());
+            }
+
+            let keys: Vec<String> = campaigns
+                .iter()
+                .map(|campaign| Self::get_key(*campaign))
+                .collect();
+
+            let campaigns_remaining = redis::cmd("MGET")
+                .arg(keys)
+                .query_async::<_, Vec<Option<i64>>>(&mut self.redis.clone())
+                .await?
+                .into_iter()
+                .map(|remaining| match remaining {
+                    Some(remaining) => UnifiedNum::from_u64(remaining.max(0).unsigned_abs()),
+                    None => UnifiedNum::from_u64(0),
+                })
+                .collect::<Vec<UnifiedNum>>();
+
+            Ok(campaigns.iter().copied().zip(campaigns_remaining).collect())
         }
 
         pub async fn increase_by(
@@ -505,7 +580,7 @@ mod test {
         campaign,
         campaign::Validators,
         event_submission::{RateLimit, Rule},
-        sentry::campaign_modify::ModifyCampaign,
+        sentry::{campaign_modify::ModifyCampaign, CLICK, IMPRESSION},
         targeting::Rules,
         test_util::{
             ADVERTISER, ADVERTISER_2, CREATOR, DUMMY_AD_UNITS, DUMMY_CAMPAIGN,
@@ -572,16 +647,26 @@ mod test {
                 budget: Some(new_budget),
                 validators: None,
                 title: Some("Modified Campaign".to_string()),
-                pricing_bounds: Some(campaign::PricingBounds {
-                    impression: Some(campaign::Pricing {
-                        min: 1.into(),
-                        max: 10.into(),
-                    }),
-                    click: Some(campaign::Pricing {
-                        min: 0.into(),
-                        max: 0.into(),
-                    }),
-                }),
+                pricing_bounds: Some(
+                    vec![
+                        (
+                            IMPRESSION,
+                            campaign::Pricing {
+                                min: 1.into(),
+                                max: 10.into(),
+                            },
+                        ),
+                        (
+                            CLICK,
+                            campaign::Pricing {
+                                min: 0.into(),
+                                max: 0.into(),
+                            },
+                        ),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ),
                 event_submission: Some(EventSubmission { allow: vec![rule] }),
                 ad_units: Some(DUMMY_AD_UNITS.to_vec()),
                 targeting_rules: Some(Rules::new()),
