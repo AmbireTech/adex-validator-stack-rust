@@ -962,7 +962,7 @@ pub mod run {
     use slog::info;
     use subprocess::{Popen, PopenConfig, Redirection};
 
-    use crate::{TestValidator, GANACHE_CONFIG};
+    use crate::TestValidator;
 
     pub async fn run_sentry_app(
         adapter: adapter::ethereum::LockedAdapter,
@@ -996,15 +996,15 @@ pub mod run {
         let logger = new_logger(&validator.sentry_logger_prefix);
         let campaign_remaining = CampaignRemaining::new(redis.clone());
 
-       let platform_api = PlatformApi::new(
-          config.platform.url.clone(),
-          config.platform.keep_alive_interval,
-      )
-      .expect("Failed to build PlatformApi");
+        let platform_api = PlatformApi::new(
+            validator.config.platform.url.clone(),
+            validator.config.platform.keep_alive_interval,
+        )
+        .expect("Failed to build PlatformApi");
 
         let app = Application::new(
             adapter,
-            GANACHE_CONFIG.clone(),
+            validator.config.clone(),
             logger,
             redis.clone(),
             postgres.clone(),
