@@ -14,7 +14,9 @@ analytics_maxtime = 20000
 heartbeat_time = 30000
 health_threshold_promilles = 950
 health_unsignable_promilles = 750
-propagation_timeout = 1000
+# 2 seconds
+# TODO: Check the POST /validator-message route performance, more than 1 second for timeout is a lot!
+propagation_timeout = 2000
 
 fetch_timeout = 5000
 all_campaigns_timeout = 5000
