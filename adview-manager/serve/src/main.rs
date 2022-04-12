@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use adex_primitives::{
+    sentry::IMPRESSION,
     supermarket::units_for_slot,
     targeting::{input::Global, Input},
     test_util::{DUMMY_CAMPAIGN, DUMMY_IPFS},
@@ -77,11 +78,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 targeting_input_base: Input {
                     ad_view: None,
                     global: Global {
-                        ad_slot_id: options.market_slot.to_string(),
+                        ad_slot_id: options.market_slot,
                         ad_slot_type: "".into(),
                         publisher_id: publisher_addr,
                         country: Some("Bulgaria".into()),
-                        event_type: "IMPRESSION".into(),
+                        event_type: IMPRESSION,
                         seconds_since_epoch: Utc::now(),
                         user_agent_os: None,
                         user_agent_browser_family: None,

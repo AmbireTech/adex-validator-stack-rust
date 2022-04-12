@@ -1026,8 +1026,8 @@ mod test {
                 channel_context.context.id(),
                 for_address,
                 Deposit {
-                    // a deposit 4 times larger than the Campaign Budget
-                    // I.e. 4 TOKENS
+                    // a deposit 4 times larger than the first Campaign.budget = 500
+                    // I.e. 2 000 TOKENS
                     total: UnifiedNum::from(200_000_000_000)
                         .to_precision(channel_context.token.precision.get()),
                     still_on_create2: BigNum::from(0),
@@ -1089,6 +1089,10 @@ mod test {
         };
 
         // modify campaign
+        // Deposit = 2 000
+        // old Campaign.budget = 500
+        // new Campaign.budget = 1 000
+        // Deposit left = 1 000
         let modified = {
             let new_budget = UnifiedNum::from(1000 * multiplier);
             let modify = ModifyCampaign {
@@ -1100,7 +1104,9 @@ mod test {
                 ad_units: None,
                 targeting_rules: None,
             };
-            // prepare for Campaign modification
+
+            // prepare for Campaign modification.
+            // does not alter the deposit amount
             add_deposit_call(&channel_context, campaign_context.context.creator);
 
             let modified_campaign = modify_campaign(
@@ -1121,6 +1127,9 @@ mod test {
         };
 
         // we have 1000 left from our deposit, so we are using half of it
+        // remaining Deposit = 1 000
+        // new Campaign.budget = 500
+        // Deposit left = 500
         let _second_campaign = {
             // erases the CampaignId for the CreateCampaign request
             let mut create_second =
@@ -1146,8 +1155,8 @@ mod test {
         };
 
         // No budget left for new campaigns
-        // remaining: 500
-        // new campaign budget: 600
+        // remaining Deposit = 500
+        // new Campaign.budget = 600
         {
             // erases the CampaignId for the CreateCampaign request
             let mut create = CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
@@ -1201,8 +1210,8 @@ mod test {
         };
 
         // Just enough budget to create this Campaign
-        // remaining: 600
-        // new campaign budget: 600
+        // remaining Deposit = 600
+        // new Campaign.budget = 600
         {
             // erases the CampaignId for the CreateCampaign request
             let mut create = CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
@@ -1224,9 +1233,9 @@ mod test {
         }
 
         // Modify a campaign without enough budget
-        // remaining: 0
-        // new campaign budget: 1100
-        // current campaign budget: 900
+        // remaining Deposit = 0
+        // new Campaign.budget = 1100
+        // current Campaign.budget = 900
         {
             let new_budget = UnifiedNum::from(110_000_000_000);
             let modify = ModifyCampaign {

@@ -1,7 +1,14 @@
-//! This module contains all the routers
+//! This module contains all the Sentry REST API routers.
 //!
-//! The routers handle the route matching and parameters, and should also call
-//! the corresponding [`Middleware`]s for the given request.
+//! # Routers
+//!
+//! Routers are functions that are called on certain route prefix (e.g. `/v5/channel`, `/v5/campaign`)
+//! and they perform a few key operations for the REST API web server:
+//!
+//! - Extract parameters from the route
+//! - Match against the different HTTP methods
+//! - Calls additional [`middleware`](`crate::middleware`)s for the route
+//!
 use crate::{
     middleware::{
         auth::{AuthRequired, IsAdmin},
@@ -13,6 +20,21 @@ use crate::{
 use adapter::prelude::*;
 use hyper::{Body, Method, Request, Response};
 use primitives::analytics::{query::AllowedKey, AuthenticateAs};
+
+use super::units_for_slot::post_units_for_slot;
+
+pub async fn units_for_slot_router<C: Locked + 'static>(
+    req: Request<Body>,
+    app: &Application<C>,
+) -> Result<Response<Body>, ResponseError> {
+    let (route, method) = (req.uri().path(), req.method());
+
+    match (method, route) {
+        (&Method::POST, "/v5/units-for-slot") => post_units_for_slot(req, app).await,
+
+        _ => Err(ResponseError::NotFound),
+    }
+}
 
 /// `/v5/analytics` router
 pub async fn analytics_router<C: Locked + 'static>(
@@ -88,8 +110,8 @@ mod analytics_router_test {
         let analytics_base_hour = UpdateAnalytics {
             time: base_datehour,
             campaign_id: DUMMY_CAMPAIGN.id,
-            ad_unit: None,
-            ad_slot: None,
+            ad_unit: DUMMY_IPFS[0],
+            ad_slot: DUMMY_IPFS[1],
             ad_slot_type: None,
             advertiser: *ADVERTISER,
             publisher: *PUBLISHER,
@@ -107,8 +129,8 @@ mod analytics_router_test {
         let analytics_different_country = UpdateAnalytics {
             time: base_datehour,
             campaign_id: DUMMY_CAMPAIGN.id,
-            ad_unit: None,
-            ad_slot: None,
+            ad_unit: DUMMY_IPFS[0],
+            ad_slot: DUMMY_IPFS[1],
             ad_slot_type: None,
             advertiser: *ADVERTISER,
             publisher: *PUBLISHER,
@@ -126,8 +148,8 @@ mod analytics_router_test {
         let analytics_two_hours_ago = UpdateAnalytics {
             time: base_datehour - 2,
             campaign_id: DUMMY_CAMPAIGN.id,
-            ad_unit: None,
-            ad_slot: None,
+            ad_unit: DUMMY_IPFS[0],
+            ad_slot: DUMMY_IPFS[1],
             ad_slot_type: None,
             advertiser: *ADVERTISER,
             publisher: *PUBLISHER,
@@ -145,8 +167,8 @@ mod analytics_router_test {
         let analytics_four_hours_ago = UpdateAnalytics {
             time: base_datehour - 4,
             campaign_id: DUMMY_CAMPAIGN.id,
-            ad_unit: None,
-            ad_slot: None,
+            ad_unit: DUMMY_IPFS[0],
+            ad_slot: DUMMY_IPFS[1],
             ad_slot_type: None,
             advertiser: *ADVERTISER,
             publisher: *PUBLISHER,
@@ -164,8 +186,8 @@ mod analytics_router_test {
         let analytics_three_days_ago = UpdateAnalytics {
             time: base_datehour - (24 * 3),
             campaign_id: DUMMY_CAMPAIGN.id,
-            ad_unit: None,
-            ad_slot: None,
+            ad_unit: DUMMY_IPFS[0],
+            ad_slot: DUMMY_IPFS[1],
             ad_slot_type: None,
             advertiser: *ADVERTISER,
             publisher: *PUBLISHER,
@@ -183,8 +205,8 @@ mod analytics_router_test {
         let analytics_ten_days_ago = UpdateAnalytics {
             time: base_datehour - (24 * 10),
             campaign_id: DUMMY_CAMPAIGN.id,
-            ad_unit: None,
-            ad_slot: None,
+            ad_unit: DUMMY_IPFS[0],
+            ad_slot: DUMMY_IPFS[1],
             ad_slot_type: None,
             advertiser: *ADVERTISER,
             publisher: *PUBLISHER,
@@ -202,8 +224,8 @@ mod analytics_router_test {
         let analytics_sixty_days_ago = UpdateAnalytics {
             time: base_datehour - (24 * 60),
             campaign_id: DUMMY_CAMPAIGN.id,
-            ad_unit: None,
-            ad_slot: None,
+            ad_unit: DUMMY_IPFS[0],
+            ad_slot: DUMMY_IPFS[1],
             ad_slot_type: None,
             advertiser: *ADVERTISER,
             publisher: *PUBLISHER,
@@ -221,8 +243,8 @@ mod analytics_router_test {
         let analytics_two_years_ago = UpdateAnalytics {
             time: base_datehour - (24 * 7 * 104),
             campaign_id: DUMMY_CAMPAIGN.id,
-            ad_unit: None,
-            ad_slot: None,
+            ad_unit: DUMMY_IPFS[0],
+            ad_slot: DUMMY_IPFS[1],
             ad_slot_type: None,
             advertiser: *ADVERTISER,
             publisher: *PUBLISHER,
@@ -265,8 +287,8 @@ mod analytics_router_test {
             let analytics_midnight = UpdateAnalytics {
                 time: today_midnight,
                 campaign_id: DUMMY_CAMPAIGN.id,
-                ad_unit: None,
-                ad_slot: None,
+                ad_unit: DUMMY_IPFS[0],
+                ad_slot: DUMMY_IPFS[1],
                 ad_slot_type: None,
                 advertiser: *ADVERTISER,
                 publisher: *PUBLISHER,
@@ -286,8 +308,8 @@ mod analytics_router_test {
             let analytics_midnight = UpdateAnalytics {
                 time: today_1am,
                 campaign_id: DUMMY_CAMPAIGN.id,
-                ad_unit: None,
-                ad_slot: None,
+                ad_unit: DUMMY_IPFS[0],
+                ad_slot: DUMMY_IPFS[1],
                 ad_slot_type: None,
                 advertiser: *ADVERTISER,
                 publisher: *PUBLISHER,
@@ -307,8 +329,8 @@ mod analytics_router_test {
             let analytics_midnight = UpdateAnalytics {
                 time: yesterday_23,
                 campaign_id: DUMMY_CAMPAIGN.id,
-                ad_unit: None,
-                ad_slot: None,
+                ad_unit: DUMMY_IPFS[0],
+                ad_slot: DUMMY_IPFS[1],
                 ad_slot_type: None,
                 advertiser: *ADVERTISER,
                 publisher: *PUBLISHER,
@@ -830,8 +852,8 @@ mod analytics_router_test {
         let analytics = UpdateAnalytics {
             time: base_datehour,
             campaign_id: DUMMY_CAMPAIGN.id,
-            ad_unit: Some(DUMMY_IPFS[0]),
-            ad_slot: Some(DUMMY_IPFS[1]),
+            ad_unit: DUMMY_IPFS[0],
+            ad_slot: DUMMY_IPFS[1],
             ad_slot_type: None,
             advertiser: *ADVERTISER,
             publisher: *PUBLISHER,
@@ -849,8 +871,8 @@ mod analytics_router_test {
         let analytics_different_slot_unit = UpdateAnalytics {
             time: base_datehour,
             campaign_id: DUMMY_CAMPAIGN.id,
-            ad_unit: Some(DUMMY_IPFS[2]),
-            ad_slot: Some(DUMMY_IPFS[3]),
+            ad_unit: DUMMY_IPFS[2],
+            ad_slot: DUMMY_IPFS[3],
             ad_slot_type: None,
             advertiser: *ADVERTISER,
             publisher: *PUBLISHER,
@@ -868,8 +890,8 @@ mod analytics_router_test {
         let analytics_different_event = UpdateAnalytics {
             time: base_datehour,
             campaign_id: DUMMY_CAMPAIGN.id,
-            ad_unit: Some(DUMMY_IPFS[0]),
-            ad_slot: Some(DUMMY_IPFS[1]),
+            ad_unit: DUMMY_IPFS[0],
+            ad_slot: DUMMY_IPFS[1],
             ad_slot_type: None,
             advertiser: *ADVERTISER,
             publisher: *PUBLISHER,
@@ -887,8 +909,8 @@ mod analytics_router_test {
         let analytics_all_optional_fields = UpdateAnalytics {
             time: base_datehour - 2,
             campaign_id: DUMMY_CAMPAIGN.id,
-            ad_unit: Some(DUMMY_IPFS[0]),
-            ad_slot: Some(DUMMY_IPFS[1]),
+            ad_unit: DUMMY_IPFS[0],
+            ad_slot: DUMMY_IPFS[1],
             ad_slot_type: Some("TEST_TYPE".to_string()),
             advertiser: *ADVERTISER,
             publisher: *PUBLISHER,
@@ -906,8 +928,8 @@ mod analytics_router_test {
         let analytics_different_publisher = UpdateAnalytics {
             time: base_datehour,
             campaign_id: DUMMY_CAMPAIGN.id,
-            ad_unit: Some(DUMMY_IPFS[0]),
-            ad_slot: Some(DUMMY_IPFS[1]),
+            ad_unit: DUMMY_IPFS[0],
+            ad_slot: DUMMY_IPFS[1],
             ad_slot_type: None,
             advertiser: *ADVERTISER,
             publisher: *PUBLISHER_2,
@@ -925,8 +947,8 @@ mod analytics_router_test {
         let analytics_different_advertiser = UpdateAnalytics {
             time: base_datehour,
             campaign_id: DUMMY_CAMPAIGN.id,
-            ad_unit: Some(DUMMY_IPFS[0]),
-            ad_slot: Some(DUMMY_IPFS[1]),
+            ad_unit: DUMMY_IPFS[0],
+            ad_slot: DUMMY_IPFS[1],
             ad_slot_type: None,
             advertiser: *ADVERTISER,
             publisher: *PUBLISHER,
@@ -944,8 +966,8 @@ mod analytics_router_test {
         let analytics_different_publisher_advertiser = UpdateAnalytics {
             time: base_datehour,
             campaign_id: DUMMY_CAMPAIGN.id,
-            ad_unit: Some(DUMMY_IPFS[0]),
-            ad_slot: Some(DUMMY_IPFS[1]),
+            ad_unit: DUMMY_IPFS[0],
+            ad_slot: DUMMY_IPFS[1],
             ad_slot_type: None,
             advertiser: *ADVERTISER,
             publisher: *PUBLISHER_2,

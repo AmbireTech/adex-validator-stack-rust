@@ -27,6 +27,20 @@ creators_whitelist = []
 validators_whitelist = []
 admins = ['0xce07CbB7e054514D590a0262C93070D838bFBA2e']
 
+[platform]
+url = "https://platform.adex.network"
+# 20 minutes in milliseconds
+keep_alive_interval = 1200000
+
+[limits.units_for_slot]
+# The maximum number of campaigns a publisher can earn from
+# This will limit the returned Campaigns to the set number
+max_campaigns_earning_from = 25
+
+# 0.01 (UnifiedNum) per 1000 impressions
+# 1_000 * (per) 1_000 / 10^8 = 0.01
+global_min_impression_price = '1000000'
+
 # Ethereum mainnet tokens
 [chain."Ethereum Mainnet"]
 # Ethereum Mainnet for testing

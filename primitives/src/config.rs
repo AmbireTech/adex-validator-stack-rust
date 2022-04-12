@@ -1,11 +1,12 @@
 use crate::{
     chain::{Chain, ChainId},
     event_submission::RateLimit,
+    util::ApiUrl,
     Address, BigNum, ChainOf, ValidatorId,
 };
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, num::NonZeroU8};
+use serde::{Deserialize, Deserializer, Serialize};
+use std::{collections::HashMap, num::NonZeroU8, time::Duration};
 use thiserror::Error;
 
 pub use toml::de::Error as TomlError;
@@ -37,7 +38,7 @@ impl Default for Environment {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all(serialize = "SCREAMING_SNAKE_CASE"))]
+// TODO: use `milliseconds_to_std_duration` for all u32 values with "In milliseconds" in docs.
 pub struct Config {
     /// Maximum number of channels to return per request
     pub max_channels: u32,
@@ -84,6 +85,33 @@ pub struct Config {
     /// otherwise [`Config::find_chain_of()`] will fetch only one of them and cause unexpected problems.
     #[serde(rename = "chain")]
     pub chains: HashMap<String, ChainInfo>,
+    pub platform: PlatformConfig,
+    pub limits: Limits,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+
+pub struct PlatformConfig {
+    pub url: ApiUrl,
+    #[serde(deserialize_with = "milliseconds_to_std_duration")]
+    pub keep_alive_interval: Duration,
+}
+
+fn milliseconds_to_std_duration<'de, D>(deserializer: D) -> Result<Duration, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de::Error;
+    use toml::Value;
+
+    let toml_value: Value = Value::deserialize(deserializer)?;
+
+    let milliseconds = match toml_value {
+        Value::Integer(mills) => u64::try_from(mills).map_err(Error::custom),
+        _ => Err(Error::custom("Only integers allowed for this value")),
+    }?;
+
+    Ok(Duration::from_millis(milliseconds))
 }
 
 impl Config {
@@ -141,6 +169,28 @@ pub struct TokenInfo {
     pub min_validator_fee: BigNum,
     pub precision: NonZeroU8,
     pub address: Address,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Limits {
+    pub units_for_slot: limits::UnitsForSlot,
+}
+mod limits {
+    use serde::{Deserialize, Serialize};
+
+    use crate::UnifiedNum;
+
+    #[derive(Serialize, Deserialize, Debug, Clone)]
+    /// Limits applied to the `POST /units-for-slot` route
+    pub struct UnitsForSlot {
+        /// The maximum number of campaigns a publisher can earn from.
+        /// This will limit the returned Campaigns to the set number.
+        #[serde(default)]
+        pub max_campaigns_earning_from: u16,
+        /// If the resulting targeting price is lower than this value,
+        /// it will filter out the given AdUnit.
+        pub global_min_impression_price: UnifiedNum,
+    }
 }
 
 #[derive(Debug, Error)]

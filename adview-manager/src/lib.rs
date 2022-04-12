@@ -211,14 +211,14 @@ pub fn get_unit_html_with_events(
         let event = match event_type {
             "CLICK" => Event::Click {
                 publisher: options.publisher_addr,
-                ad_unit: Some(ad_unit.id),
-                ad_slot: Some(options.market_slot),
+                ad_unit: ad_unit.id,
+                ad_slot: options.market_slot,
                 referrer: Some("document.referrer".to_string()),
             },
             _ => Event::Impression {
                 publisher: options.publisher_addr,
-                ad_unit: Some(ad_unit.id),
-                ad_slot: Some(options.market_slot),
+                ad_unit: ad_unit.id,
+                ad_slot: options.market_slot,
                 referrer: Some("document.referrer".to_string()),
             },
         };

@@ -1,6 +1,6 @@
 use crate::{
-    targeting::Rules, AdUnit, Address, Channel, EventSubmission, UnifiedNum, Validator,
-    ValidatorDesc, ValidatorId,
+    sentry::EventType, targeting::Rules, AdUnit, Address, Channel, EventSubmission, UnifiedNum,
+    Validator, ValidatorDesc, ValidatorId,
 };
 
 use chrono::{
@@ -29,12 +29,18 @@ mod campaign_id {
     use thiserror::Error;
     use uuid::Uuid;
 
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[derive(Clone, Copy, PartialEq, Eq, Hash)]
     /// an Id of 16 bytes, (de)serialized as a `0x` prefixed hex
     ///
     /// In this implementation of the `CampaignId` the value is generated from a `Uuid::new_v4().to_simple()`
     pub struct CampaignId([u8; 16]);
 
+    impl fmt::Debug for CampaignId {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "CampaignId({})", self)
+        }
+    }
+    
     impl CampaignId {
         /// Generates randomly a `CampaignId` using `Uuid::new_v4().to_simple()`
         pub fn new() -> Self {
@@ -175,10 +181,10 @@ pub struct Campaign {
     pub validators: Validators,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
-    /// Event pricing bounds
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub pricing_bounds: Option<PricingBounds>,
-    /// EventSubmission object, applies to event submission (POST /channel/:id/events)
+    /// Events pricing bounds
+    #[serde(default, skip_serializing_if = "PricingBounds::is_empty")]
+    pub pricing_bounds: PricingBounds,
+    /// EventSubmission object, applied to event submission
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub event_submission: Option<EventSubmission>,
     /// An array of AdUnit (optional)
@@ -189,7 +195,6 @@ pub struct Campaign {
     /// A millisecond timestamp of when the campaign was created
     #[serde(with = "ts_milliseconds")]
     pub created: DateTime<Utc>,
-    /// A millisecond timestamp representing the time you want this campaign to become active (optional)
     /// Used by the AdViewManager & Targeting AIP#31
     #[serde(flatten, with = "prefix_active")]
     pub active: Active,
@@ -217,34 +222,36 @@ impl Campaign {
     }
 
     /// Returns the pricing of a given event
-    pub fn pricing(&self, event: &str) -> Option<&Pricing> {
-        self.pricing_bounds
-            .as_ref()
-            .and_then(|bound| bound.get(event))
+    pub fn pricing(&self, event: EventType) -> Option<&Pricing> {
+        self.pricing_bounds.get(&event)
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Active {
+    /// Campaign active from in a milliseconds timestamp
+    ///
+    /// The time at which you want this campaign to become active (optional)
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
         with = "ts_milliseconds_option"
     )]
     pub from: Option<DateTime<Utc>>,
-    //
-    // TODO: AIP#61 Update docs
-    //
-    /// A millisecond timestamp of when the campaign should enter a withdraw period
-    /// (no longer accept any events other than CHANNEL_CLOSE)
-    /// A sane value should be lower than channel.validUntil * 1000 and higher than created
-    /// It's recommended to set this at least one month prior to channel.validUntil * 1000
+    /// Campaign active to in a milliseconds timestamp
+    ///
+    /// The time at which you want this campaign to become inactive (mandatory)
     #[serde(with = "ts_milliseconds")]
     pub to: DateTime<Utc>,
 }
 
 mod pricing {
-    use crate::UnifiedNum;
+    use std::{
+        collections::HashMap,
+        ops::{Deref, DerefMut},
+    };
+
+    use crate::{sentry::EventType, UnifiedNum};
     use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
@@ -253,36 +260,33 @@ mod pricing {
         pub max: UnifiedNum,
     }
 
-    #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
-    #[serde(rename_all = "UPPERCASE")]
-    pub struct PricingBounds {
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub impression: Option<Pricing>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub click: Option<Pricing>,
-    }
+    #[derive(Default, Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
+    #[serde(transparent)]
+    pub struct PricingBounds(HashMap<EventType, Pricing>);
 
     impl PricingBounds {
-        pub fn to_vec(&self) -> Vec<(&str, Pricing)> {
-            let mut vec = Vec::new();
-
-            if let Some(pricing) = self.impression.as_ref() {
-                vec.push(("IMPRESSION", pricing.clone()));
-            }
-
-            if let Some(pricing) = self.click.as_ref() {
-                vec.push(("CLICK", pricing.clone()))
-            }
-
-            vec
+        pub fn is_empty(&self) -> bool {
+            self.0.is_empty()
         }
+    }
 
-        pub fn get(&self, event_type: &str) -> Option<&Pricing> {
-            match event_type {
-                "IMPRESSION" => self.impression.as_ref(),
-                "CLICK" => self.click.as_ref(),
-                _ => None,
-            }
+    impl FromIterator<(EventType, Pricing)> for PricingBounds {
+        fn from_iter<T: IntoIterator<Item = (EventType, Pricing)>>(iter: T) -> Self {
+            Self(iter.into_iter().collect())
+        }
+    }
+
+    impl Deref for PricingBounds {
+        type Target = HashMap<EventType, Pricing>;
+
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
+    impl DerefMut for PricingBounds {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.0
         }
     }
 }

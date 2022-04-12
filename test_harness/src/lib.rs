@@ -265,7 +265,10 @@ mod tests {
     use chrono::Utc;
     use primitives::{
         balances::{CheckedState, UncheckedState},
-        sentry::{campaign_create::CreateCampaign, AccountingResponse, Event, SuccessResponse},
+        sentry::{
+            campaign_create::CreateCampaign, AccountingResponse, Event, SuccessResponse, CLICK,
+            IMPRESSION,
+        },
         spender::Spender,
         test_util::{ADVERTISER, DUMMY_AD_UNITS, DUMMY_IPFS, GUARDIAN, GUARDIAN_2, IDS, PUBLISHER},
         util::{logging::new_logger, ApiUrl},
@@ -305,7 +308,7 @@ mod tests {
     static CAMPAIGN_1: Lazy<Campaign> = Lazy::new(|| {
         use chrono::TimeZone;
         use primitives::{
-            campaign::{Active, Pricing, PricingBounds, Validators},
+            campaign::{Active, Pricing, Validators},
             targeting::Rules,
             validator::ValidatorDesc,
             EventSubmission,
@@ -351,24 +354,32 @@ mod tests {
             budget: UnifiedNum::from(200_000_000),
             validators,
             title: Some("Dummy Campaign".to_string()),
-            pricing_bounds: Some(PricingBounds {
-                impression: Some(Pricing {
-                    // 0.00003000
-                    // Per 1000 = 0.03000000
-                    min: 3_000.into(),
-                    // 0.00005000
-                    // Per 1000 = 0.05000000
-                    max: 5_000.into(),
-                }),
-                click: Some(Pricing {
-                    // 0.00006000
-                    // Per 1000 = 0.06000000
-                    min: 6_000.into(),
-                    // 0.00010000
-                    // Per 1000 = 0.10000000
-                    max: 10_000.into(),
-                }),
-            }),
+            pricing_bounds: vec![
+                (
+                    IMPRESSION,
+                    Pricing {
+                        // 0.00003000
+                        // Per 1000 = 0.03000000
+                        min: 3_000.into(),
+                        // 0.00005000
+                        // Per 1000 = 0.05000000
+                        max: 5_000.into(),
+                    },
+                ),
+                (
+                    CLICK,
+                    Pricing {
+                        // 0.00006000
+                        // Per 1000 = 0.06000000
+                        min: 6_000.into(),
+                        // 0.00010000
+                        // Per 1000 = 0.10000000
+                        max: 10_000.into(),
+                    },
+                ),
+            ]
+            .into_iter()
+            .collect(),
             event_submission: Some(EventSubmission { allow: vec![] }),
             ad_units: vec![DUMMY_AD_UNITS[0].clone(), DUMMY_AD_UNITS[1].clone()],
             targeting_rules: Rules::new(),
@@ -388,7 +399,7 @@ mod tests {
     static CAMPAIGN_2: Lazy<Campaign> = Lazy::new(|| {
         use chrono::TimeZone;
         use primitives::{
-            campaign::{Active, Pricing, PricingBounds, Validators},
+            campaign::{Active, Pricing, Validators},
             targeting::Rules,
             validator::ValidatorDesc,
             EventSubmission,
@@ -434,20 +445,28 @@ mod tests {
             budget: UnifiedNum::from(2_000_000_000),
             validators,
             title: Some("Dummy Campaign".to_string()),
-            pricing_bounds: Some(PricingBounds {
-                impression: Some(Pricing {
-                    // 0.00001000
-                    min: 1_000.into(),
-                    // 0.00002000
-                    max: 2_000.into(),
-                }),
-                click: Some(Pricing {
-                    // 0.00003000
-                    min: 3_000.into(),
-                    // 0.00005000
-                    max: 5_000.into(),
-                }),
-            }),
+            pricing_bounds: vec![
+                (
+                    IMPRESSION,
+                    Pricing {
+                        // 0.00001000
+                        min: 1_000.into(),
+                        // 0.00002000
+                        max: 2_000.into(),
+                    },
+                ),
+                (
+                    CLICK,
+                    Pricing {
+                        // 0.00003000
+                        min: 3_000.into(),
+                        // 0.00005000
+                        max: 5_000.into(),
+                    },
+                ),
+            ]
+            .into_iter()
+            .collect(),
             event_submission: Some(EventSubmission { allow: vec![] }),
             ad_units: vec![],
             targeting_rules: Rules::new(),
@@ -604,33 +623,6 @@ mod tests {
             follower.sentry_url.clone(),
         )
         .expect("Should create new SentryApi for the Leader Worker");
-
-        let events = vec![
-            Event::Impression {
-                publisher: *PUBLISHER,
-                ad_unit: Some(
-                    CAMPAIGN_1
-                        .ad_units
-                        .get(0)
-                        .expect("Should exist in Campaign")
-                        .ipfs,
-                ),
-                ad_slot: Some(DUMMY_IPFS[2]),
-                referrer: Some("https://adex.network".into()),
-            },
-            Event::Click {
-                publisher: *PUBLISHER,
-                ad_unit: Some(
-                    CAMPAIGN_1
-                        .ad_units
-                        .get(0)
-                        .expect("Should exist in Campaign")
-                        .ipfs,
-                ),
-                ad_slot: Some(DUMMY_IPFS[2]),
-                referrer: Some("https://ambire.com".into()),
-            },
-        ];
 
         // check Campaign Leader & Follower urls
         // they should be the same as the test validators
@@ -1008,6 +1000,29 @@ mod tests {
 
         // Add new events for `CAMPAIGN_1` to sentry
         {
+            let events = vec![
+                Event::Impression {
+                    publisher: *PUBLISHER,
+                    ad_unit: CAMPAIGN_1
+                        .ad_units
+                        .get(0)
+                        .expect("Should exist in Campaign")
+                        .ipfs,
+                    ad_slot: DUMMY_IPFS[2],
+                    referrer: Some("https://adex.network".into()),
+                },
+                Event::Click {
+                    publisher: *PUBLISHER,
+                    ad_unit: CAMPAIGN_1
+                        .ad_units
+                        .get(0)
+                        .expect("Should exist in Campaign")
+                        .ipfs,
+                    ad_slot: DUMMY_IPFS[2],
+                    referrer: Some("https://ambire.com".into()),
+                },
+            ];
+
             let response = post_new_events(
                 &leader_sentry,
                 token_chain_1337.clone().with(CAMPAIGN_1.id),
@@ -1606,12 +1621,13 @@ pub mod run {
             postgres_connection, redis_connection, redis_pool::Manager,
             tests_postgres::setup_test_migrations, CampaignRemaining,
         },
+        platform::PlatformApi,
         Application,
     };
     use slog::info;
     use subprocess::{Popen, PopenConfig, Redirection};
 
-    use crate::{TestValidator, GANACHE_CONFIG};
+    use crate::TestValidator;
 
     pub async fn run_sentry_app(
         adapter: adapter::ethereum::LockedAdapter,
@@ -1642,15 +1658,23 @@ pub mod run {
             .await
             .expect("Should flush redis database");
 
+        let logger = new_logger(&validator.sentry_logger_prefix);
         let campaign_remaining = CampaignRemaining::new(redis.clone());
+
+        let platform_api = PlatformApi::new(
+            validator.config.platform.url.clone(),
+            validator.config.platform.keep_alive_interval,
+        )
+        .expect("Failed to build PlatformApi");
 
         let app = Application::new(
             adapter,
-            GANACHE_CONFIG.clone(),
-            new_logger(&validator.sentry_logger_prefix),
+            validator.config.clone(),
+            logger,
             redis.clone(),
             postgres.clone(),
             campaign_remaining,
+            platform_api,
         );
 
         // Before the tests, make sure to flush the DB from previous run of `sentry` tests

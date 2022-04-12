@@ -43,13 +43,13 @@ pub async fn record(
                     ad_slot,
                 } => (*publisher, *ad_unit, referrer.clone(), *ad_slot),
             };
-            let ad_unit = event_ad_unit.and_then(|ipfs| {
-                campaign
-                    .ad_units
-                    .iter()
-                    .find(|ad_unit| ad_unit.ipfs == ipfs)
-            });
+            let ad_unit = campaign
+                .ad_units
+                .iter()
+                .find(|ad_unit| ad_unit.ipfs == event_ad_unit);
+
             let ad_slot_type = ad_unit.as_ref().map(|unit| unit.ad_type.clone());
+
             (publisher, event_ad_unit, referrer, ad_slot, ad_slot_type)
         };
 
@@ -119,38 +119,12 @@ mod test {
     fn get_test_events() -> HashMap<String, (Event, Address, UnifiedNum)> {
         vec![
             (
-                "click_empty".into(),
+                "click".into(),
                 (
                     Event::Click {
                         publisher: *PUBLISHER,
-                        ad_unit: None,
-                        ad_slot: None,
-                        referrer: None,
-                    },
-                    *PUBLISHER,
-                    UnifiedNum::from_u64(1_000_000),
-                ),
-            ),
-            (
-                "impression_empty".into(),
-                (
-                    Event::Impression {
-                        publisher: *PUBLISHER,
-                        ad_unit: None,
-                        ad_slot: None,
-                        referrer: None,
-                    },
-                    *PUBLISHER,
-                    UnifiedNum::from_u64(1_000_000),
-                ),
-            ),
-            (
-                "click_with_unit_and_slot".into(),
-                (
-                    Event::Click {
-                        publisher: *PUBLISHER,
-                        ad_unit: Some(DUMMY_IPFS[0]),
-                        ad_slot: Some(DUMMY_IPFS[1]),
+                        ad_unit: DUMMY_IPFS[0],
+                        ad_slot: DUMMY_IPFS[1],
                         referrer: Some("http://127.0.0.1".into()),
                     },
                     *PUBLISHER,
@@ -162,8 +136,8 @@ mod test {
                 (
                     Event::Click {
                         publisher: *PUBLISHER,
-                        ad_unit: Some(DUMMY_IPFS[2]),
-                        ad_slot: Some(DUMMY_IPFS[3]),
+                        ad_unit: DUMMY_IPFS[2],
+                        ad_slot: DUMMY_IPFS[3],
                         referrer: Some("http://127.0.0.1".into()),
                     },
                     *PUBLISHER,
@@ -171,12 +145,12 @@ mod test {
                 ),
             ),
             (
-                "impression_with_slot_unit_and_referrer".into(),
+                "impression".into(),
                 (
                     Event::Impression {
                         publisher: *PUBLISHER,
-                        ad_unit: Some(DUMMY_IPFS[0]),
-                        ad_slot: Some(DUMMY_IPFS[1]),
+                        ad_unit: DUMMY_IPFS[0],
+                        ad_slot: DUMMY_IPFS[1],
                         referrer: Some("http://127.0.0.1".into()),
                     },
                     *PUBLISHER,
@@ -207,9 +181,9 @@ mod test {
         };
 
         let input_events = vec![
-            test_events["click_empty"].clone(),
-            test_events["impression_empty"].clone(),
-            test_events["impression_empty"].clone(),
+            test_events["click"].clone(),
+            test_events["impression"].clone(),
+            test_events["impression"].clone(),
         ];
 
         record(&database.clone(), &campaign, &session, input_events.clone())
@@ -262,15 +236,15 @@ mod test {
         };
 
         let input_events = vec![
-            test_events["click_with_unit_and_slot"].clone(),
-            test_events["click_with_unit_and_slot"].clone(),
+            test_events["click"].clone(),
+            test_events["click"].clone(),
             test_events["click_with_different_data"].clone(),
             test_events["click_with_different_data"].clone(),
             test_events["click_with_different_data"].clone(),
-            test_events["impression_with_slot_unit_and_referrer"].clone(),
-            test_events["impression_with_slot_unit_and_referrer"].clone(),
-            test_events["impression_with_slot_unit_and_referrer"].clone(),
-            test_events["impression_with_slot_unit_and_referrer"].clone(),
+            test_events["impression"].clone(),
+            test_events["impression"].clone(),
+            test_events["impression"].clone(),
+            test_events["impression"].clone(),
         ];
 
         record(&database.clone(), &campaign, &session, input_events.clone())
@@ -291,9 +265,7 @@ mod test {
         let with_slot_and_unit: Analytics = analytics
             .iter()
             .find(|a| {
-                a.ad_unit == Some(DUMMY_IPFS[0])
-                    && a.ad_slot == Some(DUMMY_IPFS[1])
-                    && a.event_type == CLICK
+                a.ad_unit == DUMMY_IPFS[0] && a.ad_slot == DUMMY_IPFS[1] && a.event_type == CLICK
             })
             .expect("entry should exist")
             .to_owned();
@@ -306,7 +278,7 @@ mod test {
 
         let with_different_slot_and_unit: Analytics = analytics
             .iter()
-            .find(|a| a.ad_unit == Some(DUMMY_IPFS[2]) && a.ad_slot == Some(DUMMY_IPFS[3]))
+            .find(|a| a.ad_unit == DUMMY_IPFS[2] && a.ad_slot == DUMMY_IPFS[3])
             .expect("entry should exist")
             .to_owned();
         assert_eq!(with_different_slot_and_unit.payout_count, 3);
@@ -318,8 +290,8 @@ mod test {
         let with_referrer: Analytics = analytics
             .iter()
             .find(|a| {
-                a.ad_unit == Some(DUMMY_IPFS[0])
-                    && a.ad_slot == Some(DUMMY_IPFS[1])
+                a.ad_unit == DUMMY_IPFS[0]
+                    && a.ad_slot == DUMMY_IPFS[1]
                     && a.event_type == IMPRESSION
             })
             .expect("entry should exist")

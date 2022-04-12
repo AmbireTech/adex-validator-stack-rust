@@ -70,7 +70,7 @@
 //!
 //! Validator messages: [`MessageTypes`]
 //!
-//! - [`POST /v5/channel/:id/last-approved`](channel::last_approved)
+//! - [`GET /v5/channel/:id/last-approved`](channel::last_approved)
 //!
 //! Request query parameters: [`LastApprovedQuery`][primitives::sentry::LastApprovedQuery]
 //!
@@ -232,3 +232,5 @@ mod cfg;
 pub mod channel;
 
 pub mod routers;
+
+mod units_for_slot;

@@ -10,6 +10,7 @@ use primitives::{
 };
 use sentry::{
     db::{postgres_connection, redis_connection, setup_migrations, CampaignRemaining},
+    platform::PlatformApi,
     Application,
 };
 use slog::info;
@@ -106,6 +107,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let campaign_remaining = CampaignRemaining::new(redis.clone());
 
+    let platform_api = PlatformApi::new(
+        config.platform.url.clone(),
+        config.platform.keep_alive_interval,
+    )
+    .expect("Failed to build PlatformApi");
+
     match adapter {
         AdapterTypes::Ethereum(adapter) => {
             Application::new(
@@ -115,6 +122,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 redis,
                 postgres,
                 campaign_remaining,
+                platform_api,
             )
             .run(socket_addr)
             .await
@@ -127,6 +135,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 redis,
                 postgres,
                 campaign_remaining,
+                platform_api,
             )
             .run(socket_addr)
             .await
