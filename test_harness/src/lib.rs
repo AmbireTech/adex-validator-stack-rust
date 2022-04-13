@@ -36,7 +36,7 @@ pub static SNAPSHOT_CONTRACTS_1337: Lazy<Contracts> = Lazy::new(|| {
     let token_info = ganache_chain_info
         .tokens
         .get("Mocked TOKEN 1337")
-        .expect("Ganache config should contain for Chain #1337 the Mocked TOKEN");
+        .expect("Ganache config should contain for Chain #1337 the Mocked TOKEN 1337");
     let chain = ganache_chain_info.chain.clone();
 
     let token = Erc20Token::new(&web3, token_info.clone());
@@ -68,7 +68,7 @@ pub static SNAPSHOT_CONTRACTS_1: Lazy<Contracts> = Lazy::new(|| {
     let token_info = ganache_chain_info
         .tokens
         .get("Mocked TOKEN 1")
-        .expect("Ganache config should contain for Chain #1 the Mocked TOKEN");
+        .expect("Ganache config should contain for Chain #1 the Mocked TOKEN 1");
 
     let token = Erc20Token::new(&web3, token_info.clone());
 

@@ -1468,14 +1468,7 @@ mod test {
             Validators::new((dummy_leader_2.clone(), DUMMY_VALIDATOR_FOLLOWER.clone()));
         campaign_new_leader.created = Utc.ymd(2021, 2, 1).and_hms(8, 0, 0);
 
-        let chain_1_token = GANACHE_CONFIG
-            .chains
-            .get("Ganache #1")
-            .unwrap()
-            .tokens
-            .get("Mocked TOKEN 2")
-            .unwrap()
-            .address;
+        let chain_1_token = GANACHE_CONFIG.chains["Ganache #1"].tokens["Mocked TOKEN 1"].address;
         // Setting up new follower and a channel and campaign which use it on Ganache #1
         let dummy_follower_2 = ValidatorDesc {
             id: IDS[&GUARDIAN],
