@@ -28,7 +28,7 @@ pub type ChainsValidators = HashMap<ChainId, Validators>;
 pub type Validators = HashMap<ValidatorId, Validator>;
 pub type AuthToken = String;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Validator {
     /// Sentry API url
     pub url: ApiUrl,
@@ -621,13 +621,17 @@ mod test {
     use super::*;
     use adapter::dummy::{Adapter, Dummy, Options};
     use primitives::{
-        config::{configuration, Environment},
-        sentry::Pagination,
+        campaign::validators::Validators as CampaignValidators,
+        config::{configuration, Environment, GANACHE_CONFIG},
+        sentry::{
+            campaign_list::CampaignListResponse, channel_list::ChannelListResponse, Pagination,
+        },
         test_util::{
             discard_logger, ADVERTISER, ADVERTISER_2, CREATOR, DUMMY_CAMPAIGN,
-            DUMMY_VALIDATOR_LEADER, IDS, LEADER, PUBLISHER, PUBLISHER_2,
+            DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, FOLLOWER, GUARDIAN, IDS, LEADER,
+            LEADER_2, PUBLISHER, PUBLISHER_2,
         },
-        UnifiedNum,
+        CampaignId, UnifiedNum, ValidatorDesc,
     };
     use std::str::FromStr;
     use wiremock::{
@@ -779,5 +783,263 @@ mod test {
 
         // There should be no remaining elements
         assert_eq!(res.len(), 0)
+    }
+
+    #[tokio::test]
+    async fn test_collecting_and_channels_and_campaigns() {
+        let server = MockServer::start().await;
+        let chain_1_token = GANACHE_CONFIG
+            .chains
+            .get("Ganache #1")
+            .unwrap()
+            .tokens
+            .get("Mocked TOKEN 2")
+            .unwrap()
+            .address;
+
+        // Setting up new leader and a channel and campaign which use it on Ganache #1337
+        let dummy_leader_2 = ValidatorDesc {
+            id: IDS[&LEADER_2],
+            url: "http://tom.adex.network".to_string(),
+            fee: 200.into(),
+            fee_addr: None,
+        };
+        let channel_new_leader = Channel {
+            leader: IDS[&*LEADER_2],
+            follower: IDS[&*FOLLOWER],
+            guardian: *GUARDIAN,
+            token: DUMMY_CAMPAIGN.channel.token,
+            nonce: DUMMY_CAMPAIGN.channel.nonce,
+        };
+        let mut campaign_new_leader = DUMMY_CAMPAIGN.clone();
+        campaign_new_leader.id = CampaignId::new();
+        campaign_new_leader.channel = channel_new_leader;
+        campaign_new_leader.validators =
+            CampaignValidators::new((dummy_leader_2.clone(), DUMMY_VALIDATOR_FOLLOWER.clone()));
+
+        // Setting up new follower and a channel and campaign which use it on Ganache #1
+        let dummy_follower_2 = ValidatorDesc {
+            id: IDS[&GUARDIAN],
+            url: "http://jerry.adex.network".to_string(),
+            fee: 300.into(),
+            fee_addr: None,
+        };
+        let channel_new_follower = Channel {
+            leader: IDS[&*LEADER],
+            follower: IDS[&*GUARDIAN],
+            guardian: *GUARDIAN,
+            token: chain_1_token,
+            nonce: DUMMY_CAMPAIGN.channel.nonce,
+        };
+        let mut campaign_new_follower = DUMMY_CAMPAIGN.clone();
+        campaign_new_follower.id = CampaignId::new();
+        campaign_new_follower.channel = channel_new_follower;
+        campaign_new_follower.validators =
+            CampaignValidators::new((DUMMY_VALIDATOR_LEADER.clone(), dummy_follower_2.clone()));
+
+        // Setting up a channel and campaign which use the new leader and follower on Ganache #1
+        let channel_new_leader_and_follower = Channel {
+            leader: IDS[&*LEADER_2],
+            follower: IDS[&*GUARDIAN],
+            guardian: *GUARDIAN,
+            token: chain_1_token,
+            nonce: DUMMY_CAMPAIGN.channel.nonce,
+        };
+        let mut campaign_new_leader_and_follower = DUMMY_CAMPAIGN.clone();
+        campaign_new_leader_and_follower.id = CampaignId::new();
+        campaign_new_leader_and_follower.channel = channel_new_leader_and_follower;
+        campaign_new_leader_and_follower.validators =
+            CampaignValidators::new((dummy_leader_2.clone(), dummy_follower_2.clone()));
+
+        // Initializing SentryApi instance
+        let sentry_url = ApiUrl::from_str(&server.uri()).expect("Should parse");
+
+        let mut config = configuration(Environment::Development, None).expect("Should get Config");
+        config.spendable_find_limit = 2;
+        let adapter = Adapter::with_unlocked(Dummy::init(Options {
+            dummy_identity: IDS[&LEADER],
+            dummy_auth_tokens: vec![(IDS[&LEADER].to_address(), "AUTH_Leader".into())]
+                .into_iter()
+                .collect(),
+        }));
+        let logger = discard_logger();
+
+        let sentry = SentryApi::new(adapter, logger, config.clone(), sentry_url.clone())
+            .expect("Should build sentry");
+
+        // Getting Wiremock to return the campaigns when called
+        let first_page_response = CampaignListResponse {
+            campaigns: vec![DUMMY_CAMPAIGN.clone(), campaign_new_leader.clone()],
+            pagination: Pagination {
+                page: 0,
+                total_pages: 2,
+            },
+        };
+
+        let second_page_response = CampaignListResponse {
+            campaigns: vec![
+                campaign_new_follower.clone(),
+                campaign_new_leader_and_follower.clone(),
+            ],
+            pagination: Pagination {
+                page: 1,
+                total_pages: 2,
+            },
+        };
+
+        Mock::given(method("GET"))
+            .and(path("/v5/campaign/list"))
+            .and(query_param("page", "0"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&first_page_response))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/v5/campaign/list"))
+            .and(query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&second_page_response))
+            .mount(&server)
+            .await;
+
+        // Testing collect_channels()
+        {
+            let mut expected_channels: HashSet<ChainOf<Channel>> = HashSet::new();
+            expected_channels.insert(
+                config
+                    .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+                    .expect("Should find channel token in config")
+                    .with_channel(DUMMY_CAMPAIGN.channel),
+            );
+            expected_channels.insert(
+                config
+                    .find_chain_of(channel_new_leader.token)
+                    .expect("Should find channel token in config")
+                    .with_channel(channel_new_leader),
+            );
+            expected_channels.insert(
+                config
+                    .find_chain_of(channel_new_follower.token)
+                    .expect("Should find channel token in config")
+                    .with_channel(channel_new_follower),
+            );
+            expected_channels.insert(
+                config
+                    .find_chain_of(channel_new_leader_and_follower.token)
+                    .expect("Should find channel token in config")
+                    .with_channel(channel_new_leader_and_follower),
+            );
+
+            let (channels, chains_validators) = sentry
+                .collect_channels()
+                .await
+                .expect("Should collect channels");
+            assert_eq!(channels, expected_channels, "Correct channels are returned");
+
+            let chains_validators_1337 = chains_validators
+                .get(&ChainId::from(1337))
+                .expect("There should be validators for #1337 chain");
+            assert!(
+                chains_validators_1337.contains_key(&DUMMY_VALIDATOR_LEADER.id),
+                "Dummy leader is included"
+            );
+            assert!(
+                chains_validators_1337.contains_key(&DUMMY_VALIDATOR_FOLLOWER.id),
+                "Dummy follower is included"
+            );
+            assert!(
+                chains_validators_1337.contains_key(&dummy_leader_2.id),
+                "Dummy leader 2 is included"
+            );
+            assert_eq!(
+                chains_validators_1337.keys().len(),
+                3,
+                "There are no extra validators returned"
+            );
+
+            let chains_validators_1 = chains_validators
+                .get(&ChainId::from(1))
+                .expect("There should be validators for #1 chain");
+            assert!(
+                chains_validators_1.contains_key(&DUMMY_VALIDATOR_LEADER.id),
+                "Dummy leader is returned"
+            );
+            assert!(
+                chains_validators_1.contains_key(&dummy_follower_2.id),
+                "Dummy follower 2 is returned"
+            );
+            assert!(
+                chains_validators_1.contains_key(&dummy_leader_2.id),
+                "Dummy leader 2 is returned"
+            );
+            assert_eq!(
+                chains_validators_1.keys().len(),
+                3,
+                "There are no extra validators returned"
+            );
+        }
+        // Calls all_campaigns() to see if all campaigns are returned
+        // We test for query parameters in campaign_list() tests
+        {
+            let all_campaigns = vec![
+                DUMMY_CAMPAIGN.clone(),
+                campaign_new_leader.clone(),
+                campaign_new_follower.clone(),
+                campaign_new_leader_and_follower.clone(),
+            ];
+            let res = campaigns::all_campaigns(sentry.client.clone(), &sentry_url.clone(), None)
+                .await
+                .expect("Should get all campaigns");
+            assert_eq!(res, all_campaigns, "All campaigns are present");
+        }
+        // test all_channels
+        {
+            // Get Wiremock to return the channels
+            let first_page_response = ChannelListResponse {
+                channels: vec![DUMMY_CAMPAIGN.channel.clone(), channel_new_leader],
+                pagination: Pagination {
+                    page: 0,
+                    total_pages: 2,
+                },
+            };
+
+            let second_page_response = ChannelListResponse {
+                channels: vec![
+                    channel_new_follower.clone(),
+                    channel_new_leader_and_follower.clone(),
+                ],
+                pagination: Pagination {
+                    page: 1,
+                    total_pages: 2,
+                },
+            };
+
+            Mock::given(method("GET"))
+                .and(path("/v5/channel/list"))
+                .and(query_param("page", "0"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(&first_page_response))
+                .mount(&server)
+                .await;
+
+            Mock::given(method("GET"))
+                .and(path("/v5/channel/list"))
+                .and(query_param("page", "1"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(&second_page_response))
+                .mount(&server)
+                .await;
+            let all_channels = vec![
+                DUMMY_CAMPAIGN.channel,
+                channel_new_leader,
+                channel_new_follower,
+                channel_new_leader_and_follower,
+            ];
+            let res = channels::all_channels(
+                sentry.client.clone(),
+                &sentry_url.clone(),
+                DUMMY_VALIDATOR_LEADER.id,
+            )
+            .await
+            .expect("Should get channels");
+            assert_eq!(all_channels, res, "All channels are present");
+        }
     }
 }
