@@ -254,30 +254,27 @@ mod tests {
 
     use super::*;
     use adapter::{
-        ethereum::{
-            test_util::{GANACHE_1, GANACHE_1337, KEYSTORES},
-            UnlockedWallet,
-        },
+        ethereum::test_util::{GANACHE_1, GANACHE_1337, KEYSTORES},
         prelude::*,
         primitives::ChainOf,
         Adapter, Ethereum,
     };
     use chrono::Utc;
     use primitives::{
-        balances::{CheckedState, UncheckedState},
+        balances::CheckedState,
         sentry::{
             campaign_create::CreateCampaign, AccountingResponse, Event, SuccessResponse, CLICK,
             IMPRESSION,
         },
         spender::Spender,
-        test_util::{ADVERTISER, DUMMY_AD_UNITS, DUMMY_IPFS, GUARDIAN, GUARDIAN_2, IDS, PUBLISHER},
+        test_util::{ADVERTISER, DUMMY_AD_UNITS, DUMMY_IPFS, GUARDIAN, GUARDIAN_2, PUBLISHER},
         util::{logging::new_logger, ApiUrl},
-        validator::{ApproveState, Heartbeat, NewState},
+        validator::{Heartbeat, NewState},
         Balances, BigNum, Campaign, CampaignId, Channel, ChannelId, UnifiedNum,
     };
     use reqwest::{Client, StatusCode};
     use slog::info;
-    use validator_worker::{worker::Worker, GetStateRoot, SentryApi};
+    use validator_worker::{worker::Worker, SentryApi};
 
     #[tokio::test]
     #[ignore = "We use a snapshot, however, we have left this test for convenience"]
@@ -482,7 +479,7 @@ mod tests {
     static CAMPAIGN_3: Lazy<Campaign> = Lazy::new(|| {
         use chrono::TimeZone;
         use primitives::{
-            campaign::{Active, Pricing, PricingBounds, Validators},
+            campaign::{Active, Pricing, Validators},
             targeting::Rules,
             validator::ValidatorDesc,
             EventSubmission,
@@ -528,24 +525,32 @@ mod tests {
             budget: UnifiedNum::from(2_000_000_000),
             validators,
             title: Some("Dummy Campaign in Chain #1".to_string()),
-            pricing_bounds: Some(PricingBounds {
-                impression: Some(Pricing {
-                    // 0.00003000
-                    // Per 1000 = 0.03000000
-                    min: 3_000.into(),
-                    // 0.00005000
-                    // Per 1000 = 0.05000000
-                    max: 5_000.into(),
-                }),
-                click: Some(Pricing {
-                    // 0.00006000
-                    // Per 1000 = 0.06000000
-                    min: 6_000.into(),
-                    // 0.00010000
-                    // Per 1000 = 0.10000000
-                    max: 10_000.into(),
-                }),
-            }),
+            pricing_bounds: vec![
+                (
+                    IMPRESSION,
+                    Pricing {
+                        // 0.00003000
+                        // Per 1000 = 0.03000000
+                        min: 3_000.into(),
+                        // 0.00005000
+                        // Per 1000 = 0.05000000
+                        max: 5_000.into(),
+                    },
+                ),
+                (
+                    CLICK,
+                    Pricing {
+                        // 0.00006000
+                        // Per 1000 = 0.06000000
+                        min: 6_000.into(),
+                        // 0.00010000
+                        // Per 1000 = 0.10000000
+                        max: 10_000.into(),
+                    },
+                ),
+            ]
+            .into_iter()
+            .collect(),
             event_submission: Some(EventSubmission { allow: vec![] }),
             ad_units: vec![DUMMY_AD_UNITS[0].clone(), DUMMY_AD_UNITS[1].clone()],
             targeting_rules: Rules::new(),
@@ -915,7 +920,7 @@ mod tests {
             }
         }
 
-        // Create Campaign 3 w/ Channel 3 using Advertiser on a different chain
+        // Create Campaign 3 w/ Channel 3 using Advertiser on a different chain (Chain #1)
         // In Leader & Follower sentries
         // Response: 200 Ok
         // POST /v5/campaign
@@ -996,6 +1001,36 @@ mod tests {
 
             assert_eq!(expected_accounting, actual_accounting);
             info!(setup.logger, "Channel 1 {:?} has empty Accounting because of no events have been submitted to any Campaign", CAMPAIGN_1.channel.id());
+        }
+
+        // All Channels should have a heartbeat message now
+        // Channel 1
+        // Channel 2
+        // Channel 3
+        {
+            // Channel 1
+            let _channel_1_heartbeat = leader_sentry
+                .get_our_latest_msg(CAMPAIGN_1.channel.id(), &["Heartbeat"])
+                .await
+                .expect("Should fetch Heartbeat from Leader")
+                .map(|message| Heartbeat::try_from(message).expect("Should be Heartbeat"))
+                .expect("Should have a Heartbeat in Leader for the Campaign 1 channel");
+
+            // Channel 2
+            let _channel_2_heartbeat = leader_sentry
+                .get_our_latest_msg(CAMPAIGN_2.channel.id(), &["Heartbeat"])
+                .await
+                .expect("Should fetch Heartbeat from Leader")
+                .map(|message| Heartbeat::try_from(message).expect("Should be Heartbeat"))
+                .expect("Should have a Heartbeat in Leader for the Campaign 2 channel");
+
+            // Channel 3
+            let _channel_2_heartbeat = leader_sentry
+                .get_our_latest_msg(CAMPAIGN_3.channel.id(), &["Heartbeat"])
+                .await
+                .expect("Should fetch Heartbeat from Leader")
+                .map(|message| Heartbeat::try_from(message).expect("Should be Heartbeat"))
+                .expect("Should have a Heartbeat in Leader for the Campaign 3 channel");
         }
 
         // Add new events for `CAMPAIGN_1` to sentry
@@ -1117,69 +1152,71 @@ mod tests {
                 })
                 .expect("Should have a NewState in Leader for the Campaign 1 channel");
 
-            let newstate_follower = follower_sentry
-                .get_latest_msg(
-                    CAMPAIGN_1.channel.id(),
-                    leader_sentry.adapter.whoami(),
-                    &["NewState"],
-                )
-                .await
-                .expect("Should fetch NewState received from Leader in Follower sentry")
-                .map(|message| {
-                    NewState::<CheckedState>::try_from(message)
-                        .expect("Should be NewState with Checked Balances")
-                })
-                .expect("Should have a NewState in Follower for the Campaign 1 channel");
+            // Check balances in Leader's NewState
+            {
+                let mut expected_balances = Balances::new();
+                expected_balances
+                    .spend(
+                        CAMPAIGN_1.creator,
+                        CAMPAIGN_1.channel.leader.to_address(),
+                        UnifiedNum::from_u64(27000),
+                    )
+                    .expect("Should spend");
+                expected_balances
+                    .spend(
+                        CAMPAIGN_1.creator,
+                        CAMPAIGN_1.channel.follower.to_address(),
+                        UnifiedNum::from_u64(18000),
+                    )
+                    .expect("Should spend");
+                expected_balances
+                    .spend(CAMPAIGN_1.creator, *PUBLISHER, UnifiedNum::from_u64(9000))
+                    .expect("Should spend");
 
-            let heartbeat = leader_sentry
-                .get_our_latest_msg(CAMPAIGN_1.channel.id(), &["Heartbeat"])
+                pretty_assertions::assert_eq!(
+                    newstate_leader.balances,
+                    expected_balances,
+                    "Balances are as expected"
+                );
+            }
+
+            let last_approved_response_follower = follower_sentry
+                .get_last_approved(CAMPAIGN_1.channel.id())
                 .await
-                .expect("Should fetch Heartbeat from Leader")
-                .map(|message| {
-                    Heartbeat::try_from(message).expect("Should be Heartbeat with Checked Balances")
-                })
-                .expect("Should have a Heartbeat in Leader for the Campaign 1 channel");
+                .expect("Should fetch APprove state from Follower");
+
+            let last_approved_response_leader = leader_sentry
+                .get_last_approved(CAMPAIGN_1.channel.id())
+                .await
+                .expect("Should fetch Approve state from Leader");
+
+            pretty_assertions::assert_eq!(
+                last_approved_response_leader,
+                last_approved_response_follower,
+                "Leader and Follower should both have the same last Approved response"
+            );
+
+            let last_approved_follower = last_approved_response_follower
+                .last_approved
+                .expect("Should have last approved messages for the events we've submitted");
+
+            let last_approved_leader = last_approved_response_leader
+                .last_approved
+                .expect("Should have last approved messages for the events we've submitted");
+
+            pretty_assertions::assert_eq!(
+                last_approved_leader,
+                last_approved_follower,
+                "Last Approved responses should be the same for both Leader & Follower"
+            );
 
             pretty_assertions::assert_eq!(
                 newstate_leader,
-                newstate_follower,
-                "Leader/Follower NewStates match"
-            );
-            let mut expected_balances = Balances::new();
-            expected_balances
-                .spend(
-                    CAMPAIGN_1.creator,
-                    CAMPAIGN_1.channel.leader.to_address(),
-                    UnifiedNum::from_u64(27000),
-                )
-                .expect("Should spend");
-            expected_balances
-                .spend(
-                    CAMPAIGN_1.creator,
-                    CAMPAIGN_1.channel.follower.to_address(),
-                    UnifiedNum::from_u64(18000),
-                )
-                .expect("Should spend");
-            expected_balances
-                .spend(CAMPAIGN_1.creator, *PUBLISHER, UnifiedNum::from_u64(9000))
-                .expect("Should spend");
-
-            pretty_assertions::assert_eq!(
-                newstate_leader.balances,
-                expected_balances,
-                "Balances are as expected"
+                last_approved_follower.new_state.map(|new_state| new_state.msg.0.clone().try_checked().expect("Should have CheckedState Balances"))
+                .expect("Should have last approved NewState from submitted events"),
+                "Last approved NewState in Follower should be the same as the last NewState from Leader"
             );
         }
-
-        // Running validator worker tests
-        // test_leader_and_follower_loop(
-        //     leader_sentry,
-        //     follower_sentry,
-        //     leader_worker,
-        //     follower_worker,
-        //     events,
-        // )
-        // .await;
     }
 
     async fn setup_sentry(validator: &TestValidator) -> adapter::ethereum::LockedAdapter {
@@ -1263,350 +1300,6 @@ mod tests {
             .send()
             .await?)
     }
-
-    // async fn test_leader_and_follower_loop<C: Unlocked + 'static>(
-    //     leader_sentry: SentryApi<C, ()>,
-    //     follower_sentry: SentryApi<C, ()>,
-    //     leader_worker: Worker<Ethereum<UnlockedWallet>>,
-    //     follower_worker: Worker<Ethereum<UnlockedWallet>>,
-    //     events: Vec<Event>,
-    // ) {
-    // Testing propagation and retrieval of NewState messages, verification of balances
-    // We make a NewState message, propagate it, update the balances and send a second message with the new balances
-    // {
-    // // Retrieving the NewState message from both validators
-    // let newstate_leader = leader_sentry_with_propagate
-    //     .get_our_latest_msg(new_channel.id(), &["NewState"])
-    //     .await
-    //     .expect("should fetch")
-    //     .expect("Should have a NewState for the new channel");
-
-    // let newstate_follower = follower_sentry_with_propagate
-    //     .get_our_latest_msg(new_channel.id(), &["NewState"])
-    //     .await
-    //     .expect("should fetch")
-    //     .unwrap();
-    // let heartbeat = leader_sentry_with_propagate
-    //     .get_our_latest_msg(new_channel.id(), &["Heartbeat"])
-    //     .await
-    //     .expect("should fetch")
-    //     .unwrap();
-    // println!("Heartbeat - {:?}", heartbeat);
-
-    // let newstate_leader =
-    //     NewState::<CheckedState>::try_from(newstate_leader).expect("Should convert");
-    // let newstate_follower =
-    //     NewState::<CheckedState>::try_from(newstate_follower).expect("Should convert");
-
-    // assert_eq!(
-    //     newstate_leader.state_root, newstate_follower.state_root,
-    //     "Leader/Follower NewStates match"
-    // );
-    // let mut expected_balances = Balances::new();
-    // expected_balances
-    //     .spend(
-    //         CAMPAIGN_1.creator,
-    //         CAMPAIGN_1.channel.leader.to_address(),
-    //         UnifiedNum::from_u64(27000),
-    //     )
-    //     .expect("Should spend");
-    // expected_balances
-    //     .spend(
-    //         CAMPAIGN_1.creator,
-    //         CAMPAIGN_1.channel.follower.to_address(),
-    //         UnifiedNum::from_u64(18000),
-    //     )
-    //     .expect("Should spend");
-    // expected_balances
-    //     .spend(CAMPAIGN_1.creator, *PUBLISHER, UnifiedNum::from_u64(9000))
-    //     .expect("Should spend");
-
-    // assert_eq!(
-    //     newstate_leader.balances, expected_balances,
-    //     "Balances are as expected"
-    // );
-
-    // // Balances are being changed since the last propagated message ensuring that a new NewState will be generated
-    // accounting_balances
-    //     .spend(campaign.creator, *PUBLISHER, UnifiedNum::from(9_000))
-    //     .expect("Should spend for Publisher");
-    // let new_state = get_new_state_msg(
-    //     &leader_sentry,
-    //     &accounting_balances,
-    //     contracts_1337.token.info.precision.get(),
-    // );
-
-    // Posting new events
-    // post_new_events(
-    //     &leader_sentry,
-    //     token_chain_1337.clone().with(CAMPAIGN_1.id),
-    //     &events,
-    // )
-    // .await
-    // .expect("Posted events");
-    // post_new_events(
-    //     &follower_sentry,
-    //     token_chain_1337.clone().with(CAMPAIGN_1.id),
-    //     &events,
-    // )
-    // .await
-    // .expect("Posted events");
-
-    //     // leader single worker tick
-    //     leader_worker.all_channels_tick().await;
-    //     // follower single worker tick
-    //     follower_worker.all_channels_tick().await;
-
-    //     let newstate = leader_sentry_with_propagate
-    //         .get_our_latest_msg(new_channel.id(), &["NewState"])
-    //         .await
-    //         .expect("should fetch")
-    //         .unwrap();
-
-    //     let newstate_follower = follower_sentry_with_propagate
-    //         .get_our_latest_msg(new_channel.id(), &["NewState"])
-    //         .await
-    //         .expect("should fetch")
-    //         .unwrap();
-
-    //     let newstate = NewState::<CheckedState>::try_from(newstate).expect("Should convert");
-    //     let newstate_follower =
-    //         NewState::<CheckedState>::try_from(newstate_follower).expect("Should convert");
-
-    //     assert_eq!(
-    //         newstate.state_root, newstate_follower.state_root,
-    //         "Stateroots of the new messages match"
-    //     );
-    //     let mut expected_balances = Balances::new();
-    //     expected_balances
-    //         .spend(
-    //             CAMPAIGN_1.creator,
-    //             CAMPAIGN_1.channel.leader.to_address(),
-    //             UnifiedNum::from_u64(27000),
-    //         )
-    //         .expect("Should spend");
-    //     expected_balances
-    //         .spend(
-    //             CAMPAIGN_1.creator,
-    //             CAMPAIGN_1.channel.follower.to_address(),
-    //             UnifiedNum::from_u64(18000),
-    //         )
-    //         .expect("Should spend");
-    //     expected_balances
-    //         .spend(CAMPAIGN_1.creator, *PUBLISHER, UnifiedNum::from_u64(18000))
-    //         .expect("Should spend");
-    //     assert_eq!(
-    //         newstate.balances, expected_balances,
-    //         "Balances are as expected"
-    //     );
-    // } worker tick
-    //     leader_worker.all_channels_tick().await;
-    //     // follower single worker tick
-    //     follower_worker.all_channels_tick().await;
-
-    //     let newstate = leader_sentry_with_propagate
-    //         .get_our_latest_msg(new_channel.id(), &["NewState"])
-    //         .await
-    //         .expect("should fetch")
-    //         .unwrap();
-
-    //     let newstate_follower = follower_sentry_with_propagate
-    //         .get_our_latest_msg(new_channel.id(), &["NewState"])
-    //         .await
-    //         .expect("should fetch")
-    //         .unwrap();
-
-    //     let newstate = NewState::<CheckedState>::try_from(newstate).expect("Should convert");
-    //     let newstate_follower =
-    //         NewState::<CheckedState>::try_from(newstate_follower).expect("Should convert");
-
-    //     assert_eq!(
-    //         newstate.state_root, newstate_follower.state_root,
-    //         "Stateroots of the new messages match"
-    //     );
-    //     let mut expected_balances = Balances::new();
-    //     expected_balances
-    //         .spend(
-    //             CAMPAIGN_1.creator,
-    //             CAMPAIGN_1.channel.leader.to_address(),
-    //             UnifiedNum::from_u64(27000),
-    //         )
-    //         .expect("Should spend");
-    //     expected_balances
-    //         .spend(
-    //             CAMPAIGN_1.creator,
-    //             CAMPAIGN_1.channel.follower.to_address(),
-    //             UnifiedNum::from_u64(18000),
-    //         )
-    //         .expect("Should spend");
-    //     expected_balances
-    //         .spend(CAMPAIGN_1.creator, *PUBLISHER, UnifiedNum::from_u64(18000))
-    //         .expect("Should spend");
-    //     assert_eq!(
-    //         newstate.balances, expected_balances,
-    //         "Balances are as expected"
-    //     );
-    // }
-
-    // Testing ApproveState propagation, ensures the validator worker and follower are running properly
-    // We propagate a NewState/ApproveState pair, verify they match, then we update
-    //     {
-    //         let mut accounting_balances = get_test_accounting_balances();
-
-    //         let new_state = get_new_state_msg(
-    //             &leader_sentry,
-    //             &accounting_balances,
-    //             contracts_1337.token.info.precision.get(),
-    //         );
-
-    //         let approve_state = ApproveState {
-    //             state_root: new_state.state_root.clone(),
-    //             signature: new_state.signature.clone(),
-    //             is_healthy: true,
-    //         };
-
-    //         // Posting new events
-    //         post_new_events(
-    //             &leader_sentry,
-    //             token_chain_1337.clone().with(CAMPAIGN_1.id),
-    //             &events,
-    //         )
-    //         .await
-    //         .expect("Posted events");
-    //         post_new_events(
-    //             &follower_sentry,
-    //             token_chain_1337.clone().with(CAMPAIGN_1.id),
-    //             &events,
-    //         )
-    //         .await
-    //         .expect("Posted events");
-
-    //         // leader single worker tick
-    //         leader_worker.all_channels_tick().await;
-    //         // follower single worker tick
-    //         follower_worker.all_channels_tick().await;
-
-    //         let res = follower_sentry_with_propagate
-    //             .get_last_approved(new_channel.id())
-    //             .await
-    //             .expect("should retrieve");
-    //         assert!(res.last_approved.is_some(), "We have a last_approved pair");
-    //         let last_approved = res.last_approved.unwrap();
-    //         assert!(
-    //             last_approved.new_state.is_some(),
-    //             "We have a new_state in last_approved"
-    //         );
-    //         assert!(
-    //             last_approved.approve_state.is_some(),
-    //             "We have approve_state in last_approved"
-    //         );
-    //         let new_state_root = &last_approved.new_state.unwrap().msg.state_root;
-    //         let approve_state_root = &last_approved.approve_state.unwrap().msg.state_root;
-    //         assert_eq!(
-    //             new_state_root, approve_state_root,
-    //             "NewState and ApproveState state roots match"
-    //         );
-
-    //         accounting_balances
-    //             .spend(campaign.creator, *PUBLISHER, UnifiedNum::from(9_000))
-    //             .expect("Should spend for Publisher");
-
-    //         // Propagating a new NewState so that the follower has to generate an ApproveState message
-    //         let new_state = get_new_state_msg(
-    //             &leader_sentry,
-    //             &accounting_balances,
-    //             contracts_1337.token.info.precision.get(),
-    //         );
-
-    //         let approve_state = ApproveState {
-    //             state_root: new_state.state_root.clone(),
-    //             signature: new_state.signature.clone(),
-    //             is_healthy: true,
-    //         };
-
-    //         // Posting new events
-    //         post_new_events(
-    //             &leader_sentry,
-    //             token_chain_1337.clone().with(CAMPAIGN_1.id),
-    //             &events,
-    //         )
-    //         .await
-    //         .expect("Posted events");
-    //         post_new_events(
-    //             &follower_sentry,
-    //             token_chain_1337.clone().with(CAMPAIGN_1.id),
-    //             &events,
-    //         )
-    //         .await
-    //         .expect("Posted events");
-
-    //         // leader single worker tick
-    //         leader_worker.all_channels_tick().await;
-    //         // follower single worker tick
-    //         follower_worker.all_channels_tick().await;
-
-    //         // leader single worker tick
-    //         leader_worker.all_channels_tick().await;
-    //         // follower single worker tick
-    //         follower_worker.all_channels_tick().await;
-
-    //         let res = follower_sentry_with_propagate
-    //             .get_last_approved(new_channel.id())
-    //             .await
-    //             .expect("should retrieve");
-    //         assert!(res.last_approved.is_some(), "We have a last_approved");
-    //         let new_last_approved = res.last_approved.unwrap();
-
-    //         assert_ne!(
-    //             &new_last_approved.new_state.unwrap().msg.state_root,
-    //             new_state_root,
-    //             "NewState is different from the last pair"
-    //         );
-    //         assert_ne!(
-    //             &new_last_approved.approve_state.unwrap().msg.state_root,
-    //             approve_state_root,
-    //             "ApproveState is different from the last pair"
-    //         );
-    //     }
-    // }
-
-    // fn get_new_state_msg<C: Unlocked + 'static>(
-    //     sentry: &SentryApi<C, ()>,
-    //     accounting_balances: &Balances,
-    //     precision: u8,
-    // ) -> NewState<UncheckedState> {
-    //     let state_root = accounting_balances
-    //         .encode(CAMPAIGN_1.channel.id(), precision)
-    //         .expect("should encode");
-    //     let signature = sentry.adapter.sign(&state_root).expect("should sign");
-    //     NewState {
-    //         state_root: state_root.to_string(),
-    //         signature,
-    //         balances: accounting_balances.clone().into_unchecked(),
-    //     }
-    // }
-
-    // fn get_test_accounting_balances() -> Balances {
-    //     let mut accounting_balances = Balances::new();
-    //     accounting_balances
-    //         .spend(
-    //             CAMPAIGN_1.creator,
-    //             CAMPAIGN_1.channel.leader.to_address(),
-    //             UnifiedNum::from(27_000),
-    //         )
-    //         .expect("Should spend for Leader");
-    //     accounting_balances
-    //         .spend(
-    //             CAMPAIGN_1.creator,
-    //             CAMPAIGN_1.channel.follower.to_address(),
-    //             UnifiedNum::from(18_000),
-    //         )
-    //         .expect("Should spend for Follower");
-    //     accounting_balances
-    //         .spend(CAMPAIGN_1.creator, *PUBLISHER, UnifiedNum::from(9_000))
-    //         .expect("Should spend for Publisher");
-    //     accounting_balances
-    // }
 }
 pub mod run {
     use std::{env::current_dir, net::SocketAddr, path::PathBuf};

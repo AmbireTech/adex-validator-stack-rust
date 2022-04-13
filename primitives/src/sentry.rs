@@ -767,10 +767,10 @@ pub mod campaign_create {
         AdUnit, Address, Campaign, CampaignId, Channel, EventSubmission, UnifiedNum,
     };
 
-    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-    #[serde(rename_all = "camelCase")]
     /// All fields are present except the `CampaignId` which is randomly created
     /// This struct defines the Body of the request (in JSON)
+    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+    #[serde(rename_all = "camelCase")]
     pub struct CreateCampaign {
         pub id: Option<CampaignId>,
         pub channel: Channel,
