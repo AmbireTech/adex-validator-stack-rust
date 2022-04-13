@@ -988,9 +988,10 @@ mod test {
                 campaign_new_follower.clone(),
                 campaign_new_leader_and_follower.clone(),
             ];
-            let res = campaigns::all_campaigns(leader_sentry.client.clone(), &sentry_url.clone(), None)
-                .await
-                .expect("Should get all campaigns");
+            let res =
+                campaigns::all_campaigns(leader_sentry.client.clone(), &sentry_url.clone(), None)
+                    .await
+                    .expect("Should get all campaigns");
             assert_eq!(res, all_campaigns, "All campaigns are present");
         }
         // test all_channels
