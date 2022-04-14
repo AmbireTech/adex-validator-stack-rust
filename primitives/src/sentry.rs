@@ -39,7 +39,7 @@ pub struct LastApproved<S: BalancesState> {
     pub approve_state: Option<MessageResponse<ApproveState>>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct MessageResponse<T: MessageType> {
     pub from: ValidatorId,
     pub received: DateTime<Utc>,

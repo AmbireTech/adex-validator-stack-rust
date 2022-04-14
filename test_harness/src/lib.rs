@@ -267,7 +267,7 @@ mod tests {
             IMPRESSION,
         },
         spender::Spender,
-        test_util::{ADVERTISER, DUMMY_AD_UNITS, DUMMY_IPFS, GUARDIAN, GUARDIAN_2, PUBLISHER},
+        test_util::{ADVERTISER, DUMMY_AD_UNITS, DUMMY_IPFS, GUARDIAN, GUARDIAN_2, IDS, PUBLISHER},
         util::{logging::new_logger, ApiUrl},
         validator::{Heartbeat, NewState},
         Balances, BigNum, Campaign, CampaignId, Channel, ChannelId, UnifiedNum,
@@ -1142,7 +1142,7 @@ mod tests {
         // Check ApproveState of the Follower
         // Assert that it exists in both validators
         {
-            let newstate_leader = leader_sentry
+            let latest_new_state_leader = leader_sentry
                 .get_our_latest_msg(CAMPAIGN_1.channel.id(), &["NewState"])
                 .await
                 .expect("Should fetch NewState from Leader (Who am I) in Leader sentry")
@@ -1174,7 +1174,7 @@ mod tests {
                     .expect("Should spend");
 
                 pretty_assertions::assert_eq!(
-                    newstate_leader.balances,
+                    latest_new_state_leader.balances,
                     expected_balances,
                     "Balances are as expected"
                 );
@@ -1190,9 +1190,23 @@ mod tests {
                 .await
                 .expect("Should fetch Approve state from Leader");
 
+            // Due to timestamp differences in the `received` field
+            // we can only `assert_eq!` the messages themselves
             pretty_assertions::assert_eq!(
-                last_approved_response_leader,
-                last_approved_response_follower,
+                last_approved_response_leader
+                    .heartbeats
+                    .expect("Leader response should have heartbeats")
+                    .clone()
+                    .into_iter()
+                    .map(|message| message.msg)
+                    .collect::<Vec<_>>(),
+                last_approved_response_follower
+                    .heartbeats
+                    .expect("Follower response should have heartbeats")
+                    .clone()
+                    .into_iter()
+                    .map(|message| message.msg)
+                    .collect::<Vec<_>>(),
                 "Leader and Follower should both have the same last Approved response"
             );
 
@@ -1204,18 +1218,70 @@ mod tests {
                 .last_approved
                 .expect("Should have last approved messages for the events we've submitted");
 
-            pretty_assertions::assert_eq!(
-                last_approved_leader,
-                last_approved_follower,
-                "Last Approved responses should be the same for both Leader & Follower"
-            );
+            // Due to the received time that can be different in messages
+            // we must check the actual ValidatorMessage without the timestamps
+            {
+                let msg_new_state_leader = last_approved_leader
+                    .new_state
+                    .expect("Leader should have last approved NewState");
 
-            pretty_assertions::assert_eq!(
-                newstate_leader,
-                last_approved_follower.new_state.map(|new_state| new_state.msg.0.clone().try_checked().expect("Should have CheckedState Balances"))
-                .expect("Should have last approved NewState from submitted events"),
-                "Last approved NewState in Follower should be the same as the last NewState from Leader"
-            );
+                assert_eq!(
+                    msg_new_state_leader.from, IDS[&LEADER],
+                    "NewState should be received from Leader"
+                );
+
+                let msg_approve_state_leader = last_approved_leader
+                    .approve_state
+                    .expect("Leader should have last approved ApproveState");
+
+                assert_eq!(
+                    msg_approve_state_leader.from, IDS[&FOLLOWER],
+                    "ApproveState should be received from Follower"
+                );
+
+                let msg_new_state_follower = last_approved_follower
+                    .new_state
+                    .expect("Follower should have last approved NewState");
+
+                assert_eq!(
+                    msg_new_state_follower.from, IDS[&LEADER],
+                    "NewState should be received from Leader"
+                );
+
+                let msg_approve_state_follower = last_approved_follower
+                    .approve_state
+                    .expect("Follower should have last approved ApproveState");
+
+                assert_eq!(
+                    msg_approve_state_follower.from, IDS[&FOLLOWER],
+                    "ApproveState should be received from Follower"
+                );
+
+                let new_state_leader = msg_new_state_leader
+                    .msg
+                    .clone()
+                    .into_inner()
+                    .try_checked()
+                    .expect("NewState should have valid CheckedState Balances");
+
+                let new_state_follower = msg_new_state_follower
+                    .msg
+                    .clone()
+                    .into_inner()
+                    .try_checked()
+                    .expect("NewState should have valid CheckedState Balances");
+
+                assert_eq!(
+                    new_state_leader, new_state_follower,
+                    "Last approved NewState in Leader & Follower should be the same"
+                );
+
+                pretty_assertions::assert_eq!(
+                    latest_new_state_leader,
+                    new_state_leader,
+                    "Latest NewState from Leader should be the same as last approved NewState from Leader & Follower"
+                );
+            }
         }
     }
 
