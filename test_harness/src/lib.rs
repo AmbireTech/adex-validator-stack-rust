@@ -1025,7 +1025,7 @@ mod tests {
                 .expect("Should have a Heartbeat in Leader for the Campaign 2 channel");
 
             // Channel 3
-            let _channel_2_heartbeat = leader_sentry
+            let _channel_3_heartbeat = leader_sentry
                 .get_our_latest_msg(CAMPAIGN_3.channel.id(), &["Heartbeat"])
                 .await
                 .expect("Should fetch Heartbeat from Leader")
