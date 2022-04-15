@@ -43,7 +43,7 @@ fn channel_load<C: Locked>(
             .await?
             .ok_or(ResponseError::NotFound)?;
 
-        let channel_context = app.config.find_chain_of(channel.token).ok_or(ResponseError::FailedValidation("Channel token is not whitelisted in this validator".into()))?.with_channel(channel);
+        let channel_context = app.config.find_chain_of(channel.token).ok_or_else(|| ResponseError::FailedValidation("Channel token is not whitelisted in this validator".into()))?.with_channel(channel);
 
         // If this is an authenticated call
         // Check if the Channel context (Chain Id) aligns with the Authentication token Chain id

@@ -34,9 +34,7 @@ impl<C: Locked + 'static> Middleware<C> for CampaignLoad {
         let campaign_context = application
             .config
             .find_chain_of(campaign.channel.token)
-            .ok_or(ResponseError::BadRequest(
-                "Channel token not whitelisted".to_string(),
-            ))?
+            .ok_or_else(|| ResponseError::BadRequest("Channel token not whitelisted".to_string()))?
             .with_campaign(campaign);
 
         // If this is an authenticated call

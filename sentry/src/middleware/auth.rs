@@ -82,8 +82,7 @@ async fn for_request<C: Locked>(
     let referrer = req
         .headers()
         .get(REFERER)
-        .map(|hv| hv.to_str().ok().map(ToString::to_string))
-        .flatten();
+        .and_then(|hv| hv.to_str().ok().map(ToString::to_string));
 
     let session = Session {
         ip: get_request_ip(&req),
@@ -147,8 +146,7 @@ fn get_request_ip(req: &Request<Body>) -> Option<String> {
         .get("true-client-ip")
         .or_else(|| req.headers().get("x-forwarded-for"))
         .and_then(|hv| hv.to_str().map(ToString::to_string).ok())
-        .map(|token| token.split(',').next().map(ToString::to_string))
-        .flatten()
+        .and_then(|token| token.split(',').next().map(ToString::to_string))
 }
 
 #[cfg(test)]
