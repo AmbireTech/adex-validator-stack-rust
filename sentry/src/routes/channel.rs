@@ -938,9 +938,11 @@ mod test {
             total: BigNum::from_str("100000000000000000000").expect("should convert"), // 100 DAI
             still_on_create2: BigNum::from_str("1000000000000000000").expect("should convert"), // 1 DAI
         };
-        app.adapter
-            .client
-            .add_deposit_call(channel_context.context.id(), *CREATOR, deposit.clone());
+        app.adapter.client.add_deposit_call(
+            channel_context.context.id(),
+            *CREATOR,
+            deposit.clone(),
+        );
 
         insert_channel(&app.pool, channel_context.context)
             .await
@@ -1035,7 +1037,7 @@ mod test {
             leader: IDS[&LEADER],
             follower: IDS[&FOLLOWER],
             guardian: *GUARDIAN,
-            token: GANACHE_INFO_1337.tokens["Mocked TOKEN"].address,
+            token: GANACHE_INFO_1337.tokens["Mocked TOKEN 1337"].address,
             nonce: Nonce::from(987_654_321_u32),
         };
         insert_channel(&app.pool, channel)
@@ -1045,7 +1047,7 @@ mod test {
             leader: IDS[&LEADER],
             follower: IDS[&FOLLOWER],
             guardian: *GUARDIAN,
-            token: GANACHE_INFO_1.tokens["Mocked TOKEN 2"].address,
+            token: GANACHE_INFO_1.tokens["Mocked TOKEN 1"].address,
             nonce: Nonce::from(987_654_322_u32),
         };
         insert_channel(&app.pool, channel_other_token)
@@ -1056,7 +1058,7 @@ mod test {
             leader: IDS[&LEADER_2],
             follower: IDS[&FOLLOWER],
             guardian: *GUARDIAN,
-            token: GANACHE_INFO_1337.tokens["Mocked TOKEN"].address,
+            token: GANACHE_INFO_1337.tokens["Mocked TOKEN 1337"].address,
             nonce: Nonce::from(987_654_323_u32),
         };
         insert_channel(&app.pool, channel_other_leader)
