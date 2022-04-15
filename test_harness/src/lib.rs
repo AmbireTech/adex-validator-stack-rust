@@ -41,11 +41,11 @@ pub static SNAPSHOT_CONTRACTS_1337: Lazy<Contracts> = Lazy::new(|| {
 
     let token = Erc20Token::new(&web3, token_info.clone());
 
-    let sweeper_address = Address::from(ganache_chain_info.chain.sweeper);
+    let sweeper_address = ganache_chain_info.chain.sweeper;
 
     let sweeper = Sweeper::new(&web3, sweeper_address);
 
-    let outpace_address = Address::from(ganache_chain_info.chain.outpace);
+    let outpace_address = ganache_chain_info.chain.outpace;
 
     let outpace = Outpace::new(&web3, outpace_address);
 
@@ -72,11 +72,11 @@ pub static SNAPSHOT_CONTRACTS_1: Lazy<Contracts> = Lazy::new(|| {
 
     let token = Erc20Token::new(&web3, token_info.clone());
 
-    let sweeper_address = Address::from(ganache_chain_info.chain.sweeper);
+    let sweeper_address = ganache_chain_info.chain.sweeper;
 
     let sweeper = Sweeper::new(&web3, sweeper_address);
 
-    let outpace_address = Address::from(ganache_chain_info.chain.outpace);
+    let outpace_address = ganache_chain_info.chain.outpace;
 
     let outpace = Outpace::new(&web3, outpace_address);
 

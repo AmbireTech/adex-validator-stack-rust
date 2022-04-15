@@ -173,7 +173,7 @@ pub mod tests_postgres {
         };
         let manager = Manager::new(POSTGRES_CONFIG.clone(), manager_config, db_prefix)?;
 
-        Ok(Pool::builder(manager)
+        Pool::builder(manager)
             .max_size(15)
             .build()
             .map_err(|err| match err {
@@ -181,7 +181,7 @@ pub mod tests_postgres {
                 deadpool::managed::BuildError::NoRuntimeSpecified(message) => {
                     Error::Build(deadpool::managed::BuildError::NoRuntimeSpecified(message))
                 }
-            })?)
+            })
     }
 
     /// A Database is used to isolate test runs from each other

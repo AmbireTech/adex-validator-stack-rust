@@ -74,7 +74,7 @@ pub async fn update_latest_spendable<C>(
 where
     C: Locked + 'static,
 {
-    let latest_deposit = adapter.get_deposit(&channel_context, address).await?;
+    let latest_deposit = adapter.get_deposit(channel_context, address).await?;
 
     let spendable = Spendable {
         spender: address,
@@ -255,7 +255,7 @@ where
 
     // Channel insertion can never create a `SqlState::UNIQUE_VIOLATION`
     // Insert the Campaign too
-    match insert_campaign(&app.pool, &campaign).await {
+    match insert_campaign(&app.pool, campaign).await {
         Err(error) => {
             error!(&app.logger, "{}", &error; "module" => "create_campaign");
             match error {
@@ -398,7 +398,7 @@ pub mod update_campaign {
         // *NOTE*: To close a campaign set campaignBudget to campaignSpent so that spendable == 0
 
         let delta_budget = if let Some(new_budget) = modify_campaign.budget {
-            get_delta_budget(campaign_remaining, &campaign, new_budget).await?
+            get_delta_budget(campaign_remaining, campaign, new_budget).await?
         } else {
             None
         };

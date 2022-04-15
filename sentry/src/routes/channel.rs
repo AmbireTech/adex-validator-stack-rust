@@ -324,7 +324,7 @@ pub async fn add_spender_leaf<C: Locked + 'static>(
     let latest_spendable = match latest_spendable {
         Some(spendable) => spendable,
         None => {
-            create_or_update_spendable_document(&app.adapter, app.pool.clone(), &channel, spender)
+            create_or_update_spendable_document(&app.adapter, app.pool.clone(), channel, spender)
                 .await?
         }
     };
@@ -451,7 +451,7 @@ pub async fn channel_payout<C: Locked + 'static>(
         .map_err(|e| ResponseError::FailedValidation(e.to_string()))?;
 
     // Handling the case where a request with an empty body comes through
-    if to_pay.payouts.len() == 0 {
+    if to_pay.payouts.is_empty() {
         return Err(ResponseError::FailedValidation(
             "Request has empty payouts".to_string(),
         ));
@@ -504,9 +504,11 @@ pub async fn channel_payout<C: Locked + 'static>(
         fetch_spendable(app.pool.clone(), &spender, &channel_context.context.id())
             .await
             .map_err(|err| ResponseError::BadRequest(err.to_string()))?
-            .ok_or(ResponseError::BadRequest(
-                "There is no spendable amount for the spender in this Channel".to_string(),
-            ))?;
+            .ok_or_else(|| {
+                ResponseError::BadRequest(
+                    "There is no spendable amount for the spender in this Channel".to_string(),
+                )
+            })?;
     let total_deposited = latest_spendable.deposit.total;
 
     let available_for_payout = total_deposited
