@@ -51,8 +51,9 @@ async fn send_heartbeat<C: Unlocked + 'static>(
     iface: &SentryApi<C>,
     channel_context: &ChainOf<Channel>,
 ) -> Result<Vec<PropagationResult>, Error> {
+    let timestamp = Utc::now();
     let mut timestamp_buf = [0_u8; 32];
-    let milliseconds: u64 = u64::try_from(Utc::now().timestamp_millis())
+    let milliseconds: u64 = u64::try_from(timestamp.timestamp_millis())
         .expect("The timestamp should be able to be converted to u64");
     BigEndian::write_uint(&mut timestamp_buf[26..], milliseconds, 6);
 
@@ -67,7 +68,7 @@ async fn send_heartbeat<C: Unlocked + 'static>(
     let message_types = MessageTypes::Heartbeat(Heartbeat {
         signature,
         state_root,
-        timestamp: Utc::now(),
+        timestamp,
     });
 
     Ok(iface.propagate(channel_context, &[message_types]).await?)

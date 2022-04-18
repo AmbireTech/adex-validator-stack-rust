@@ -105,6 +105,7 @@ pub async fn tick<C: Unlocked + 'static>(
         .map(NewState::try_from)
         .transpose()
         .expect("Should always return a NewState message");
+    println!("new state: {:?}", new_msg);
 
     let our_latest_msg_response = sentry
         .get_our_latest_msg(channel_id, &["ApproveState", "RejectState"])
@@ -332,4 +333,300 @@ async fn on_error<'a, C: Unlocked + 'static>(
         state_root: new_state.state_root.clone(),
         propagation,
     })
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use adapter::dummy::{Adapter, Dummy, Options};
+    use crate::sentry_interface::{ChainsValidators, Validator, AuthToken};
+    use chrono::{Utc};
+    use wiremock::{
+        matchers::{method, path, query_param},
+        Mock, MockServer, ResponseTemplate,
+    };
+    use primitives::{
+        util::ApiUrl,
+        balances::UncheckedState,
+        config::{configuration, Environment},
+        sentry::{SuccessResponse, ValidatorMessage, ValidatorMessagesListResponse},
+        test_util::{
+            discard_logger, ADVERTISER, DUMMY_CAMPAIGN,
+            DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, GUARDIAN, IDS, LEADER,
+            PUBLISHER, PUBLISHER_2,
+        },
+        validator::messages::{Heartbeat, NewState},
+        ChainId, ValidatorId, UnifiedNum
+    };
+    use std::{str::FromStr, collections::HashMap};
+
+    #[tokio::test]
+    async fn test_follower_tick() {
+        // Set up wiremock to return success:true when propagating to both leader and follower
+        let server = MockServer::start().await;
+        let ok_response = SuccessResponse {
+            success: true,
+        };
+        Mock::given(method("POST"))
+            .and(path(format!(
+                "leader/v5/channel/{}/validator-messages",
+                DUMMY_CAMPAIGN.channel.id()
+            )))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&ok_response))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("POST"))
+            .and(path(format!(
+                "follower/v5/channel/{}/validator-messages",
+                DUMMY_CAMPAIGN.channel.id()
+            )))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&ok_response))
+            .mount(&server)
+            .await;
+
+        let heartbeat = Heartbeat {
+            signature: String::new(),
+            state_root: String::new(),
+            timestamp: Utc::now(),
+        };
+        let heartbeat_res = ValidatorMessagesListResponse {
+            messages: vec![ValidatorMessage {
+                from: DUMMY_CAMPAIGN.channel.follower,
+                received: Utc::now(),
+                msg: MessageTypes::Heartbeat(heartbeat),
+            }],
+        };
+        Mock::given(method("GET"))
+            .and(path(format!(
+                "/v5/channel/{}/validator-messages/{}/{}",
+                DUMMY_CAMPAIGN.channel.id(),
+                DUMMY_CAMPAIGN.channel.leader,
+                "Heartbeat",
+            )))
+            .and(query_param("limit", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&heartbeat_res))
+            .mount(&server)
+            .await;
+
+        // Initializing SentryApi instance
+        let sentry_url = ApiUrl::from_str(&server.uri()).expect("Should parse");
+
+        let mut config = configuration(Environment::Development, None).expect("Should get Config");
+        config.spendable_find_limit = 2;
+        let adapter = Adapter::with_unlocked(Dummy::init(Options {
+            dummy_identity: IDS[&LEADER],
+            dummy_auth_tokens: vec![(IDS[&LEADER].to_address(), "AUTH_Leader".into())]
+                .into_iter()
+                .collect(),
+        }));
+        let logger = discard_logger();
+
+        let mut validators: HashMap<ValidatorId, Validator> = HashMap::new();
+        let leader = Validator {
+            url: ApiUrl::from_str(&format!("{}/leader", server.uri())).expect("should be valid"),
+            token: AuthToken::default(),
+        };
+        let follower = Validator {
+            url: ApiUrl::from_str(&format!("{}/follower", server.uri())).expect("should be valid"),
+            token: AuthToken::default(),
+        };
+        validators.insert(DUMMY_VALIDATOR_LEADER.id, leader);
+        validators.insert(DUMMY_VALIDATOR_FOLLOWER.id, follower);
+        let mut propagate_to: ChainsValidators = HashMap::new();
+        propagate_to.insert(ChainId::from(1337), validators);
+        let sentry = SentryApi::new(adapter, logger, config.clone(), sentry_url).expect("Should create instance").with_propagate(propagate_to).expect("Should propagate");
+
+        let channel_context = config
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect("Should find Dummy campaign token in config")
+            .with_channel(DUMMY_CAMPAIGN.channel);
+
+        let get_initial_balances = || {
+            let mut balances: Balances<CheckedState> = Balances::new();
+            balances.spend(*ADVERTISER, *PUBLISHER, UnifiedNum::from_u64(1000)).expect("should spend");
+            balances.spend(*ADVERTISER, *PUBLISHER_2, UnifiedNum::from_u64(1000)).expect("should spend");
+            balances.spend(*GUARDIAN, *PUBLISHER, UnifiedNum::from_u64(1000)).expect("should spend");
+            balances.spend(*GUARDIAN, *PUBLISHER_2, UnifiedNum::from_u64(1000)).expect("should spend");
+            balances
+        };
+
+        let get_initial_spenders = || {
+            let mut spenders: HashMap<Address, Spender> = HashMap::new();
+            spenders.insert(*ADVERTISER, Spender {
+                total_deposited: UnifiedNum::from_u64(10_000),
+                total_spent: Some(UnifiedNum::from_u64(2000)),
+            });
+            spenders.insert(*GUARDIAN, Spender {
+                total_deposited: UnifiedNum::from_u64(10_000),
+                total_spent: Some(UnifiedNum::from_u64(2000)),
+            });
+            spenders
+        };
+
+        // Case where all_spenders_sum overflows
+        {
+            let mut all_spenders: HashMap<Address, Spender> = HashMap::new();
+
+            all_spenders.insert(*ADVERTISER, Spender {
+                total_deposited: UnifiedNum::from_u64(u64::MAX),
+                total_spent: None,
+            });
+            all_spenders.insert(*GUARDIAN, Spender {
+                total_deposited: UnifiedNum::from_u64(u64::MAX),
+                total_spent: None,
+            });
+
+            let tick_res = tick(&sentry, &channel_context, all_spenders, get_initial_balances()).await;
+            assert!(matches!(tick_res, Err(Error::Overflow)));
+        }
+
+        // Case where no NewState is returned
+        {
+            // Setting up the expected response
+            let empty_res = ValidatorMessagesListResponse {
+                messages: vec![],
+            };
+            Mock::given(method("GET"))
+                .and(path(format!(
+                    "/v5/channel/{}/validator-messages/{}/{}",
+                    DUMMY_CAMPAIGN.channel.id(),
+                    DUMMY_CAMPAIGN.channel.leader,
+                    "NewState",
+                )))
+                .and(query_param("limit", "1"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(&empty_res))
+                .mount(&server)
+                .await;
+
+            Mock::given(method("GET"))
+                .and(path(format!(
+                    "/v5/channel/{}/validator-messages/{}/{}",
+                    DUMMY_CAMPAIGN.channel.id(),
+                    DUMMY_CAMPAIGN.channel.leader,
+                    "ApproveState+RejectState",
+                )))
+                .and(query_param("limit", "1"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(&empty_res))
+                .mount(&server)
+                .await;
+
+            let tick_status = tick(&sentry, &channel_context, get_initial_spenders(), get_initial_balances()).await.expect("Shouldn't return an error");
+            assert!(matches!(tick_status.approve_state, ApproveStateResult::Sent(None)));
+        }
+
+        // Case where the NewState/ApproveState pair has matching state roots resulting in ApproveStateResult::Sent(None)
+        {
+            let received = Utc::now();
+            // Setting up the expected responses
+            let new_state: NewState<UncheckedState> = NewState {
+                state_root: "1".to_string(),
+                signature: "1".to_string(),
+                balances: get_initial_balances().into_unchecked(),
+            };
+            let new_state_res = ValidatorMessagesListResponse {
+                messages: vec![ValidatorMessage {
+                    from: DUMMY_CAMPAIGN.channel.leader,
+                    received,
+                    msg: MessageTypes::NewState(new_state),
+                }],
+            };
+            let approve_state = ApproveState {
+                state_root: "1".to_string(),
+                signature: "1".to_string(),
+                is_healthy: true,
+            };
+            let approve_state_res = ValidatorMessagesListResponse {
+                messages: vec![ValidatorMessage {
+                    from: DUMMY_CAMPAIGN.channel.follower,
+                    received,
+                    msg: MessageTypes::ApproveState(approve_state)
+                }],
+            };
+            Mock::given(method("GET"))
+                .and(path(format!(
+                    "/v5/channel/{}/validator-messages/{}/{}",
+                    DUMMY_CAMPAIGN.channel.id(),
+                    DUMMY_CAMPAIGN.channel.leader,
+                    "NewState",
+                )))
+                .and(query_param("limit", "1"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(&new_state_res))
+                .mount(&server)
+                .await;
+
+            Mock::given(method("GET"))
+                .and(path(format!(
+                    "/v5/channel/{}/validator-messages/{}/{}",
+                    DUMMY_CAMPAIGN.channel.id(),
+                    DUMMY_CAMPAIGN.channel.follower,
+                    "ApproveState+RejectState",
+                )))
+                .and(query_param("limit", "1"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(&approve_state_res))
+                .mount(&server)
+                .await;
+
+            let tick_status = tick(&sentry, &channel_context, get_initial_spenders(), get_initial_balances()).await.expect("Shouldn't return an error");
+            assert!(matches!(tick_status.approve_state, ApproveStateResult::Sent(None)));
+        }
+
+        // Case where the NewState/RejectState pair has matching state roots resulting in ApproveStateResult::Sent(None)
+        {
+            let received = Utc::now();
+            // Setting up the expected responses
+            let new_state: NewState<UncheckedState> = NewState {
+                state_root: "1".to_string(),
+                signature: "1".to_string(),
+                balances: get_initial_balances().into_unchecked(),
+            };
+            let new_state_res = ValidatorMessagesListResponse {
+                messages: vec![ValidatorMessage {
+                    from: DUMMY_CAMPAIGN.channel.leader,
+                    received,
+                    msg: MessageTypes::NewState(new_state),
+                }],
+            };
+            let reject_state = RejectState {
+                state_root: "1".to_string(),
+                signature: "1".to_string(),
+                timestamp: Some(received),
+                reason: "rejected".to_string(),
+                balances: None,
+            };
+            let reject_state_res = ValidatorMessagesListResponse {
+                messages: vec![ValidatorMessage {
+                    from: DUMMY_CAMPAIGN.channel.follower,
+                    received,
+                    msg: MessageTypes::RejectState(reject_state)
+                }],
+            };
+            Mock::given(method("GET"))
+                .and(path(format!(
+                    "/v5/channel/{}/validator-messages/{}/{}",
+                    DUMMY_CAMPAIGN.channel.id(),
+                    DUMMY_CAMPAIGN.channel.leader,
+                    "NewState",
+                )))
+                .and(query_param("limit", "1"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(&new_state_res))
+                .mount(&server)
+                .await;
+
+            Mock::given(method("GET"))
+                .and(path(format!(
+                    "/v5/channel/{}/validator-messages/{}/{}",
+                    DUMMY_CAMPAIGN.channel.id(),
+                    DUMMY_CAMPAIGN.channel.follower,
+                    "ApproveState+RejectState",
+                )))
+                .and(query_param("limit", "1"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(&reject_state_res))
+                .mount(&server)
+                .await;
+
+            let tick_status = tick(&sentry, &channel_context, get_initial_spenders(), get_initial_balances()).await.expect("Shouldn't return an error");
+            assert!(matches!(tick_status.approve_state, ApproveStateResult::Sent(None)));
+        }
+    }
 }
