@@ -131,37 +131,33 @@ async fn on_new_accounting<C: Unlocked + 'static>(
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::sentry_interface::{AuthToken, ChainsValidators, Validator};
     use adapter::dummy::{Adapter, Dummy, Options};
-    use crate::sentry_interface::{ChainsValidators, Validator, AuthToken};
-    use chrono::{Utc, TimeZone};
-    use wiremock::{
-        matchers::{method, path, query_param},
-        Mock, MockServer, ResponseTemplate,
-    };
+    use chrono::{TimeZone, Utc};
     use primitives::{
-        util::ApiUrl,
         balances::UncheckedState,
         config::{configuration, Environment},
         sentry::{SuccessResponse, ValidatorMessage, ValidatorMessagesListResponse},
         test_util::{
             discard_logger, ADVERTISER, ADVERTISER_2, CREATOR, DUMMY_CAMPAIGN,
-            DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, FOLLOWER, GUARDIAN, GUARDIAN_2, IDS, LEADER,
-            LEADER_2, PUBLISHER, PUBLISHER_2,
+            DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, FOLLOWER, GUARDIAN, GUARDIAN_2, IDS,
+            LEADER, LEADER_2, PUBLISHER, PUBLISHER_2,
         },
+        util::ApiUrl,
         validator::messages::{Heartbeat, NewState},
-        ChainId, ValidatorId, UnifiedNum
+        ChainId, UnifiedNum, ValidatorId,
     };
-    use std::{str::FromStr, collections::HashMap};
-
-
+    use std::{collections::HashMap, str::FromStr};
+    use wiremock::{
+        matchers::{method, path, query_param},
+        Mock, MockServer, ResponseTemplate,
+    };
 
     #[tokio::test]
     async fn test_leader_tick() {
         // Set up wiremock to return success:true when propagating to both leader and follower
         let server = MockServer::start().await;
-        let ok_response = SuccessResponse {
-            success: true,
-        };
+        let ok_response = SuccessResponse { success: true };
         Mock::given(method("POST"))
             .and(path(format!(
                 "leader/v5/channel/{}/validator-messages",
@@ -230,7 +226,10 @@ mod test {
         validators.insert(DUMMY_VALIDATOR_FOLLOWER.id, follower);
         let mut propagate_to: ChainsValidators = HashMap::new();
         propagate_to.insert(ChainId::from(1337), validators);
-        let sentry = SentryApi::new(adapter, logger, config.clone(), sentry_url).expect("Should create instance").with_propagate(propagate_to).expect("Should propagate");
+        let sentry = SentryApi::new(adapter, logger, config.clone(), sentry_url)
+            .expect("Should create instance")
+            .with_propagate(propagate_to)
+            .expect("Should propagate");
 
         let channel_context = config
             .find_chain_of(DUMMY_CAMPAIGN.channel.token)
@@ -239,17 +238,27 @@ mod test {
 
         let get_initial_balances = || {
             let mut balances: Balances<CheckedState> = Balances::new();
-            balances.spend(*ADVERTISER, *PUBLISHER, UnifiedNum::from_u64(1000)).expect("should spend");
-            balances.spend(*ADVERTISER, *PUBLISHER_2, UnifiedNum::from_u64(1000)).expect("should spend");
-            balances.spend(*GUARDIAN, *PUBLISHER, UnifiedNum::from_u64(1000)).expect("should spend");
-            balances.spend(*GUARDIAN, *PUBLISHER_2, UnifiedNum::from_u64(1000)).expect("should spend");
+            balances
+                .spend(*ADVERTISER, *PUBLISHER, UnifiedNum::from_u64(1000))
+                .expect("should spend");
+            balances
+                .spend(*ADVERTISER, *PUBLISHER_2, UnifiedNum::from_u64(1000))
+                .expect("should spend");
+            balances
+                .spend(*GUARDIAN, *PUBLISHER, UnifiedNum::from_u64(1000))
+                .expect("should spend");
+            balances
+                .spend(*GUARDIAN, *PUBLISHER_2, UnifiedNum::from_u64(1000))
+                .expect("should spend");
             balances
         };
 
         // Test case for empty balances
         {
             let balances: Balances<CheckedState> = Balances::new();
-            let tick_result = tick(&sentry, &channel_context, balances).await.expect("Shouldn't return an error");
+            let tick_result = tick(&sentry, &channel_context, balances)
+                .await
+                .expect("Shouldn't return an error");
             assert!(tick_result.new_state.is_none());
         }
         // Test case where both spender and earner balances in the returned NewState message are equal to the ones in accounting_balances thus no new_state will be generated
@@ -279,11 +288,11 @@ mod test {
                 .mount(&server)
                 .await;
 
-
-            let tick_result = tick(&sentry, &channel_context, get_initial_balances()).await.expect("Shouldn't return an error");
+            let tick_result = tick(&sentry, &channel_context, get_initial_balances())
+                .await
+                .expect("Shouldn't return an error");
             assert!(tick_result.new_state.is_none());
         }
-
 
         // Test cases where NewState will be generated
 
@@ -315,17 +324,19 @@ mod test {
                 .await;
 
             let mut expected_balances = get_initial_balances();
-            expected_balances.spend(*ADVERTISER, *PUBLISHER, UnifiedNum::from_u64(1000)).expect("should spend");
-            let tick_result = tick(&sentry, &channel_context, expected_balances).await.expect("Shouldn't return an error");
+            expected_balances
+                .spend(*ADVERTISER, *PUBLISHER, UnifiedNum::from_u64(1000))
+                .expect("should spend");
+            let tick_result = tick(&sentry, &channel_context, expected_balances)
+                .await
+                .expect("Shouldn't return an error");
             assert!(tick_result.new_state.is_some());
             // TODO: Check NewState message
         }
         // No NewState message is returned
         {
             // Setting up the expected response
-            let new_state_res = ValidatorMessagesListResponse {
-                messages: vec![],
-            };
+            let new_state_res = ValidatorMessagesListResponse { messages: vec![] };
             Mock::given(method("GET"))
                 .and(path(format!(
                     "/v5/channel/{}/validator-messages/{}/{}",
@@ -338,7 +349,9 @@ mod test {
                 .mount(&server)
                 .await;
 
-            let tick_result = tick(&sentry, &channel_context, get_initial_balances()).await.expect("Shouldn't return an error");
+            let tick_result = tick(&sentry, &channel_context, get_initial_balances())
+                .await
+                .expect("Shouldn't return an error");
             assert!(tick_result.new_state.is_some());
             // TODO: Check NewState message
         }

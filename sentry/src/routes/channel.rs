@@ -938,9 +938,11 @@ mod test {
             total: BigNum::from_str("100000000000000000000").expect("should convert"), // 100 DAI
             still_on_create2: BigNum::from_str("1000000000000000000").expect("should convert"), // 1 DAI
         };
-        app.adapter
-            .client
-            .add_deposit_call(channel_context.context.id(), *CREATOR, deposit.clone());
+        app.adapter.client.add_deposit_call(
+            channel_context.context.id(),
+            *CREATOR,
+            deposit.clone(),
+        );
 
         insert_channel(&app.pool, channel_context.context)
             .await
