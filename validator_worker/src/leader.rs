@@ -342,45 +342,5 @@ mod test {
             assert!(tick_result.new_state.is_some());
             // TODO: Check NewState message
         }
-        // - Payout mismatch when checking new_state.balances()
-        {
-            todo!();
-        }
-        // - Case where new_state.state_root won’t be the same as proposed_balances.encode(…)
-        {
-            todo!();
-        }
-        // - Case where sentry.adapter.verify(…) will return false (not sure how)
-        {
-            todo!();
-        }
-        // - Case where LastApprovedResponse new state balances have a payout mismatch resulting in an error
-        {
-            todo!();
-        }
-        // - Fix balances returned in LastApprovedResponse
-        {
-            todo!();
-        }
-        // - Case where is_valid_transition() fails for spenders (proposed balances for spenders < previous balances)
-        {
-            todo!();
-        }
-        // - Case where is_valid_transition() fails for earners (proposed balances for earners < previous balances)
-        {
-            todo!();
-        }
-        // - Case where get_health() will return less than 750 promilles for earners
-        {
-            todo!();
-        }
-        // - Case where get_health() will return less than 750 promilles for spenders
-        {
-            todo!();
-        }
-        // - Case where output will be ApproveStateResult::Sent(Some(propagation_result)) (all rules have been met)
-        {
-            todo!();
-        }
     }
 }

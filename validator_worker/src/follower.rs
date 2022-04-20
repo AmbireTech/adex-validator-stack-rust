@@ -105,7 +105,6 @@ pub async fn tick<C: Unlocked + 'static>(
         .map(NewState::try_from)
         .transpose()
         .expect("Should always return a NewState message");
-    println!("new state: {:?}", new_msg);
 
     let our_latest_msg_response = sentry
         .get_our_latest_msg(channel_id, &["ApproveState", "RejectState"])
@@ -349,14 +348,14 @@ mod test {
         util::ApiUrl,
         balances::UncheckedState,
         config::{configuration, Environment},
-        sentry::{SuccessResponse, ValidatorMessage, ValidatorMessagesListResponse},
+        sentry::{SuccessResponse, ValidatorMessage, ValidatorMessagesListResponse, LastApproved, LastApprovedResponse, message::Message, MessageResponse},
         test_util::{
             discard_logger, ADVERTISER, DUMMY_CAMPAIGN,
             DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, GUARDIAN, IDS, LEADER,
-            PUBLISHER, PUBLISHER_2,
+            PUBLISHER, PUBLISHER_2, GUARDIAN_2, FOLLOWER
         },
         validator::messages::{Heartbeat, NewState},
-        ChainId, ValidatorId, UnifiedNum
+        ChainId, ValidatorId, UnifiedNum, ToETHChecksum
     };
     use std::{str::FromStr, collections::HashMap};
 
@@ -628,5 +627,216 @@ mod test {
             let tick_status = tick(&sentry, &channel_context, get_initial_spenders(), get_initial_balances()).await.expect("Shouldn't return an error");
             assert!(matches!(tick_status.approve_state, ApproveStateResult::Sent(None)));
         }
+        // - Payout mismatch when checking new_state.balances()
+        {
+            let mut new_state_balances = get_initial_balances().into_unchecked();
+            new_state_balances.earners.insert(*GUARDIAN_2, UnifiedNum::from_u64(10000));
+            let new_state: NewState<UncheckedState> = NewState {
+                state_root: "1".to_string(),
+                signature: "1".to_string(),
+                balances: new_state_balances,
+            };
+            let res = on_new_state(&sentry, &channel_context, get_initial_balances(), new_state, UnifiedNum::from_u64(4000)).await.expect("Shouldn't return an error");
+            assert!(matches!(res, ApproveStateResult::RejectedState { reason: InvalidNewState::Transition, .. }));
+        }
+        // - Case where new_state.state_root won’t be the same as proposed_balances.encode(…) -> proposed balances are different
+        {
+            let mut new_state_balances = get_initial_balances();
+            new_state_balances.spend(*PUBLISHER, *GUARDIAN, UnifiedNum::from_u64(10000)).expect("should spend");
+            let new_state: NewState<UncheckedState> = NewState {
+                state_root: "1".to_string(),
+                signature: "1".to_string(),
+                balances: new_state_balances.into_unchecked(),
+            };
+            let res = on_new_state(&sentry, &channel_context, get_initial_balances(), new_state, UnifiedNum::from_u64(4000)).await.expect("Shouldn't return an error");
+            assert!(matches!(res, ApproveStateResult::RejectedState { reason: InvalidNewState::RootHash, .. }));
+        }
+
+        // - Case where sentry.adapter.verify(…) will return false -> signature is from a different validator
+        {
+            let proposed_balances = get_initial_balances();
+            let state_root = proposed_balances.encode(channel_context.context.id(), channel_context.token.precision.get()).expect("should encode");
+            let new_state: NewState<UncheckedState> = NewState {
+                state_root: state_root,
+                signature: IDS[&*FOLLOWER].to_checksum(),
+                balances: proposed_balances.into_unchecked(),
+            };
+            let res = on_new_state(&sentry, &channel_context, get_initial_balances(), new_state, UnifiedNum::from_u64(4000)).await.expect("Shouldn't return an error");
+            assert!(matches!(res, ApproveStateResult::RejectedState { reason: InvalidNewState::Signature, .. }));
+        }
+
+        // - Case where LastApprovedResponse new state balances have a payout mismatch resulting in an error
+        {
+            let mut last_approved_balances = get_initial_balances().into_unchecked();
+            last_approved_balances.earners.insert(*GUARDIAN_2, UnifiedNum::from_u64(10_000));
+            let last_approved_new_state: NewState<UncheckedState> = NewState {
+                state_root: "1".to_string(),
+                signature: "1".to_string(),
+                balances: last_approved_balances,
+            };
+            let new_state_res = MessageResponse {
+                from: IDS[&*LEADER],
+                received: Utc::now(),
+                msg: Message::new(last_approved_new_state),
+            };
+            let last_approved_response = LastApprovedResponse {
+                last_approved: Some(LastApproved {
+                    new_state: Some(new_state_res),
+                    approve_state: None,
+                }),
+                heartbeats: None,
+            };
+
+            Mock::given(method("GET"))
+                .and(path(format!(
+                    "/v5/channel/{}/last-approved",
+                    DUMMY_CAMPAIGN.channel.id(),
+                )))
+                .and(query_param("withHeartbeat", "true"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(&last_approved_response))
+                .mount(&server)
+                .await;
+
+            let proposed_balances = get_initial_balances();
+            let state_root = proposed_balances.encode(channel_context.context.id(), channel_context.token.precision.get()).expect("should encode");
+            let new_state: NewState<UncheckedState> = NewState {
+                state_root: state_root,
+                signature: IDS[&*LEADER].to_checksum(),
+                balances: proposed_balances.into_unchecked(),
+            };
+            let res = on_new_state(&sentry, &channel_context, get_initial_balances(), new_state, UnifiedNum::from_u64(4000)).await.expect("Shouldn't return an error");
+            assert!(matches!(res, ApproveStateResult::RejectedState { reason: InvalidNewState::Signature, .. }));
+        }
+
+        // - Case where is_valid_transition() fails (proposed balances < previous balances)
+        {
+            let mut last_approved_balances = get_initial_balances();
+            last_approved_balances.spend(*ADVERTISER, *PUBLISHER, UnifiedNum::from_u64(2000)).expect("should spend");
+            let last_approved_new_state: NewState<UncheckedState> = NewState {
+                state_root: "1".to_string(),
+                signature: "1".to_string(),
+                balances: last_approved_balances.into_unchecked(),
+            };
+            let new_state_res = MessageResponse {
+                from: IDS[&*LEADER],
+                received: Utc::now(),
+                msg: Message::new(last_approved_new_state),
+            };
+            let res = LastApprovedResponse {
+                last_approved: Some(LastApproved {
+                    new_state: Some(new_state_res),
+                    approve_state: None,
+                }),
+                heartbeats: None,
+            };
+
+            Mock::given(method("GET"))
+                .and(path(format!(
+                    "/v5/channel/{}/last-approved",
+                    DUMMY_CAMPAIGN.channel.id(),
+                )))
+                .and(query_param("withHeartbeat", "true"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(&res))
+                .mount(&server)
+                .await;
+
+            let proposed_balances = get_initial_balances();
+            let state_root = proposed_balances.encode(channel_context.context.id(), channel_context.token.precision.get()).expect("should encode");
+            let new_state: NewState<UncheckedState> = NewState {
+                state_root: state_root,
+                signature: IDS[&*LEADER].to_checksum(),
+                balances: proposed_balances.into_unchecked(),
+            };
+            let res = on_new_state(&sentry, &channel_context, get_initial_balances(), new_state, UnifiedNum::from_u64(4000)).await.expect("Shouldn't return an error");
+            assert!(matches!(res, ApproveStateResult::RejectedState { reason: InvalidNewState::Transition, .. }));
+        }
+
+
+        // - Case where get_health() will return less than 750 promilles
+        {
+            let last_approved_balances = get_initial_balances();
+            let last_approved_new_state: NewState<UncheckedState> = NewState {
+                state_root: "1".to_string(),
+                signature: "1".to_string(),
+                balances: last_approved_balances.into_unchecked(),
+            };
+            let new_state_res = MessageResponse {
+                from: IDS[&*LEADER],
+                received: Utc::now(),
+                msg: Message::new(last_approved_new_state),
+            };
+            let res = LastApprovedResponse {
+                last_approved: Some(LastApproved {
+                    new_state: Some(new_state_res),
+                    approve_state: None,
+                }),
+                heartbeats: None,
+            };
+
+            Mock::given(method("GET"))
+                .and(path(format!(
+                    "/v5/channel/{}/last-approved",
+                    DUMMY_CAMPAIGN.channel.id(),
+                )))
+                .and(query_param("withHeartbeat", "true"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(&res))
+                .mount(&server)
+                .await;
+
+            let mut our_balances = get_initial_balances();
+            our_balances.spend(*ADVERTISER, *PUBLISHER, UnifiedNum::from_u64(200_000)).expect("should spend");
+            our_balances.spend(*GUARDIAN, *PUBLISHER_2, UnifiedNum::from_u64(200_000)).expect("should spend");
+
+            let state_root = get_initial_balances().encode(channel_context.context.id(), channel_context.token.precision.get()).expect("should encode");
+            let new_state: NewState<UncheckedState> = NewState {
+                state_root: state_root,
+                signature: IDS[&*LEADER].to_checksum(),
+                balances: get_initial_balances().into_unchecked(),
+            };
+            let res = on_new_state(&sentry, &channel_context, our_balances, new_state, UnifiedNum::from_u64(1_000_000)).await.expect("Shouldn't return an error");
+            assert!(matches!(res, ApproveStateResult::RejectedState { reason: InvalidNewState::Health(..), .. }));
+        }
+
+        // - Case where output will be ApproveStateResult::Sent(Some(propagation_result)) (all rules have been met)
+        {
+            let last_approved_balances = get_initial_balances();
+            let last_approved_new_state: NewState<UncheckedState> = NewState {
+                state_root: "1".to_string(),
+                signature: "1".to_string(),
+                balances: last_approved_balances.into_unchecked(),
+            };
+            let new_state_res = MessageResponse {
+                from: IDS[&*LEADER],
+                received: Utc::now(),
+                msg: Message::new(last_approved_new_state),
+            };
+            let res = LastApprovedResponse {
+                last_approved: Some(LastApproved {
+                    new_state: Some(new_state_res),
+                    approve_state: None,
+                }),
+                heartbeats: None,
+            };
+
+            Mock::given(method("GET"))
+                .and(path(format!(
+                    "/v5/channel/{}/last-approved",
+                    DUMMY_CAMPAIGN.channel.id(),
+                )))
+                .and(query_param("withHeartbeat", "true"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(&res))
+                .mount(&server)
+                .await;
+
+            let state_root = get_initial_balances().encode(channel_context.context.id(), channel_context.token.precision.get()).expect("should encode");
+            let new_state: NewState<UncheckedState> = NewState {
+                state_root: state_root,
+                signature: IDS[&*LEADER].to_checksum(),
+                balances: get_initial_balances().into_unchecked(),
+            };
+            let res = on_new_state(&sentry, &channel_context, get_initial_balances(), new_state, UnifiedNum::from_u64(1_000_000)).await.expect("Shouldn't return an error");
+            assert!(matches!(res, ApproveStateResult::Sent(Some(..))));
+        }
+
     }
 }
