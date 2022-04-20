@@ -73,3 +73,140 @@ async fn send_heartbeat<C: Unlocked + 'static>(
 
     Ok(iface.propagate(channel_context, &[message_types]).await?)
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::sentry_interface::{AuthToken, ChainsValidators, Validator};
+    use adapter::dummy::{Adapter, Dummy, Options};
+    use chrono::{Duration, Utc};
+    use primitives::{
+        config::{configuration, Environment},
+        sentry::{ValidatorMessage, ValidatorMessagesListResponse},
+        test_util::{
+            discard_logger, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, IDS,
+            LEADER,
+        },
+        util::ApiUrl,
+        validator::messages::Heartbeat,
+        ChainId, Config, ValidatorId,
+    };
+    use std::{collections::HashMap, str::FromStr};
+    use wiremock::{
+        matchers::{method, path, query_param},
+        Mock, MockServer, ResponseTemplate,
+    };
+
+    async fn setup_sentry(server: &MockServer, config: &Config) -> SentryApi<Dummy> {
+        let sentry_url = ApiUrl::from_str(&server.uri()).expect("Should parse");
+
+        let adapter = Adapter::with_unlocked(Dummy::init(Options {
+            dummy_identity: IDS[&LEADER],
+            dummy_auth_tokens: vec![(IDS[&LEADER].to_address(), "AUTH_Leader".into())]
+                .into_iter()
+                .collect(),
+        }));
+        let logger = discard_logger();
+
+        let mut validators: HashMap<ValidatorId, Validator> = HashMap::new();
+        let leader = Validator {
+            url: ApiUrl::from_str(&format!("{}/leader", server.uri())).expect("should be valid"),
+            token: AuthToken::default(),
+        };
+        let follower = Validator {
+            url: ApiUrl::from_str(&format!("{}/follower", server.uri())).expect("should be valid"),
+            token: AuthToken::default(),
+        };
+        validators.insert(DUMMY_VALIDATOR_LEADER.id, leader);
+        validators.insert(DUMMY_VALIDATOR_FOLLOWER.id, follower);
+        let mut propagate_to: ChainsValidators = HashMap::new();
+        propagate_to.insert(ChainId::from(1337), validators);
+        SentryApi::new(adapter, logger, config.clone(), sentry_url)
+            .expect("Should create instance")
+            .with_propagate(propagate_to)
+            .expect("Should propagate")
+    }
+
+    #[tokio::test]
+    async fn test_heartbeats() {
+        let config = configuration(Environment::Development, None).expect("Should get Config");
+        let server = MockServer::start().await;
+        let sentry = setup_sentry(&server, &config).await;
+        {
+            let heartbeat_msg = Heartbeat {
+                signature: String::new(),
+                state_root: String::new(),
+                timestamp: Utc::now(),
+            };
+            let heartbeat_res = ValidatorMessagesListResponse {
+                messages: vec![ValidatorMessage {
+                    from: DUMMY_CAMPAIGN.channel.follower,
+                    received: Utc::now(),
+                    msg: MessageTypes::Heartbeat(heartbeat_msg),
+                }],
+            };
+            Mock::given(method("GET"))
+                .and(path(format!(
+                    "/v5/channel/{}/validator-messages/{}/{}",
+                    DUMMY_CAMPAIGN.channel.id(),
+                    DUMMY_CAMPAIGN.channel.leader,
+                    "Heartbeat",
+                )))
+                .and(query_param("limit", "1"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(&heartbeat_res))
+                .mount(&server)
+                .await;
+
+            let channel_context = config
+                .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+                .expect("Should find Dummy campaign token in config")
+                .with_channel(DUMMY_CAMPAIGN.channel);
+
+            let res = heartbeat(&sentry, &channel_context)
+                .await
+                .expect("shouldn't return an error");
+
+            assert!(res.is_none());
+        }
+
+        // Old heartbeat
+        {
+            // Using sleep(config.heartbeat_time) would make our test freeze for 30 seconds so just modifying the timestamp is more efficient
+            let heartbeat_msg = Heartbeat {
+                signature: String::new(),
+                state_root: String::new(),
+                timestamp: Utc::now() - Duration::minutes(10),
+            };
+            let heartbeat_res = ValidatorMessagesListResponse {
+                messages: vec![ValidatorMessage {
+                    from: DUMMY_CAMPAIGN.channel.follower,
+                    received: Utc::now(),
+                    msg: MessageTypes::Heartbeat(heartbeat_msg),
+                }],
+            };
+            Mock::given(method("GET"))
+                .and(path(format!(
+                    "/v5/channel/{}/validator-messages/{}/{}",
+                    DUMMY_CAMPAIGN.channel.id(),
+                    DUMMY_CAMPAIGN.channel.leader,
+                    "Heartbeat",
+                )))
+                .and(query_param("limit", "1"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(&heartbeat_res))
+                .mount(&server)
+                .await;
+
+            let channel_context = config
+                .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+                .expect("Should find Dummy campaign token in config")
+                .with_channel(DUMMY_CAMPAIGN.channel);
+
+            let res = heartbeat(&sentry, &channel_context)
+                .await
+                .expect("shouldn't return an error");
+
+            assert!(res.is_some());
+            // TODO: Check if heartbeat is proapgated to the right validators
+        }
+    }
+}
