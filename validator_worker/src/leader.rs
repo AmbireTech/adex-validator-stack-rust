@@ -152,8 +152,8 @@ mod test {
         Mock, MockServer, ResponseTemplate,
     };
 
+    // Sets up wiremock server instance and responses which are shared for all test cases
     async fn setup_mock_server() -> MockServer {
-        // Set up wiremock to return success:true when propagating to both leader and follower
         let server = MockServer::start().await;
         let ok_response = SuccessResponse { success: true };
         Mock::given(method("POST"))
@@ -201,8 +201,8 @@ mod test {
         server
     }
 
+    // Initializes a SentryApi instance
     async fn setup_sentry(server: &MockServer, config: &Config) -> SentryApi<Dummy> {
-        // Initializing SentryApi instance
         let sentry_url = ApiUrl::from_str(&server.uri()).expect("Should parse");
 
         let adapter = Adapter::with_unlocked(Dummy::init(Options {
@@ -232,6 +232,7 @@ mod test {
             .expect("Should propagate")
     }
 
+    // Sets up wiremock to return a specific NewState message or None when GET validator-messages is called
     async fn setup_new_state_response(
         server: &MockServer,
         new_state_msg: Option<NewState<UncheckedState>>,
@@ -294,8 +295,43 @@ mod test {
             let tick_result = tick(&sentry, &channel_context, balances)
                 .await
                 .expect("Shouldn't return an error");
-            assert!(tick_result.new_state.is_none());
+            assert!(
+                tick_result.new_state.is_none(),
+                "Shouldn't generate a NewState when balances are empty"
+            );
         }
+        // No NewState message is returned -> Channel has just been created
+        {
+            setup_new_state_response(&server, None).await;
+
+            let tick_result = tick(&sentry, &channel_context, get_initial_balances())
+                .await
+                .expect("Shouldn't return an error");
+            assert!(
+                tick_result.new_state.is_some(),
+                "A NewState message should be generated when there isn't one"
+            );
+            let propagated_to: Vec<ValidatorId> = tick_result
+                .new_state
+                .unwrap()
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()
+                .expect("Shouldn't return an error");
+            assert!(
+                propagated_to.contains(&IDS[&*LEADER]),
+                "NewState message is propagated to the leader validator"
+            );
+            assert!(
+                propagated_to.contains(&IDS[&*FOLLOWER]),
+                "NewState message is propagated to the follower validator"
+            );
+            assert_eq!(
+                propagated_to.len(),
+                2,
+                "NewState message isn't propagated to any other validator"
+            );
+        }
+
         // Test case where both spender and earner balances in the returned NewState message are equal to the ones in accounting_balances thus no new_state will be generated
         {
             // Setting up the expected response
@@ -316,27 +352,7 @@ mod test {
             let tick_result = tick(&sentry, &channel_context, get_initial_balances())
                 .await
                 .expect("Shouldn't return an error");
-            assert!(tick_result.new_state.is_none());
-        }
-
-        // Test cases where NewState will be generated
-        // No NewState message is returned -> Channel has just been created
-        {
-            setup_new_state_response(&server, None).await;
-
-            let tick_result = tick(&sentry, &channel_context, get_initial_balances())
-                .await
-                .expect("Shouldn't return an error");
-            assert!(tick_result.new_state.is_some());
-            let propagated_to: Vec<ValidatorId> = tick_result
-                .new_state
-                .unwrap()
-                .into_iter()
-                .collect::<Result<Vec<_>, _>>()
-                .expect("Shouldn't return an error");
-            assert!(propagated_to.contains(&IDS[&*LEADER]));
-            assert!(propagated_to.contains(&IDS[&*FOLLOWER]));
-            assert_eq!(propagated_to.len(), 2);
+            assert!(tick_result.new_state.is_none(), "Shouldn't generate a NewState when the balances in the previous NewState are equal to the ones in accounting_balances");
         }
 
         // Balance returned from the NewState message is lower for an earner/spender than the one in accounting_balances
@@ -363,16 +379,29 @@ mod test {
             let tick_result = tick(&sentry, &channel_context, expected_balances)
                 .await
                 .expect("Shouldn't return an error");
-            assert!(tick_result.new_state.is_some());
+            assert!(
+                tick_result.new_state.is_some(),
+                "NewState message should be generated accounting_balances have been changed"
+            );
             let propagated_to: Vec<ValidatorId> = tick_result
                 .new_state
                 .unwrap()
                 .into_iter()
                 .collect::<Result<Vec<_>, _>>()
                 .expect("Shouldn't return an error");
-            assert!(propagated_to.contains(&IDS[&*LEADER]));
-            assert!(propagated_to.contains(&IDS[&*FOLLOWER]));
-            assert_eq!(propagated_to.len(), 2);
+            assert!(
+                propagated_to.contains(&IDS[&*LEADER]),
+                "NewState message is propagated to the leader validator"
+            );
+            assert!(
+                propagated_to.contains(&IDS[&*FOLLOWER]),
+                "NewState message is propagated to the follower validator"
+            );
+            assert_eq!(
+                propagated_to.len(),
+                2,
+                "NewState message isn't propagated to any other validator"
+            );
         }
     }
 }

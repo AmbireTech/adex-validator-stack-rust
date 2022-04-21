@@ -362,8 +362,8 @@ mod test {
         Mock, MockServer, ResponseTemplate,
     };
 
+    // Sets up wiremock server instance and responses which are shared for all test cases
     async fn setup_mock_server() -> MockServer {
-        // Set up wiremock to return success:true when propagating to both leader and follower
         let server = MockServer::start().await;
         let ok_response = SuccessResponse { success: true };
         Mock::given(method("POST"))
@@ -410,6 +410,7 @@ mod test {
         server
     }
 
+    // Initialies a SentryApi instance
     async fn setup_sentry(server: &MockServer, config: &Config) -> SentryApi<Dummy> {
         let sentry_url = ApiUrl::from_str(&server.uri()).expect("Should parse");
 
@@ -441,6 +442,8 @@ mod test {
             .expect("Should propagate")
     }
 
+    // TODO: Merge the following 3 functions by accepting an enum
+    // Gets wiremock to return a specific NewState message or None when called
     async fn setup_new_state_response(
         server: &MockServer,
         new_state_msg: Option<NewState<UncheckedState>>,
@@ -469,6 +472,7 @@ mod test {
             .await;
     }
 
+    // Gets wiremock to return a specific ApproveState message or None when called
     async fn setup_approve_state_response(
         server: &MockServer,
         approve_state: Option<ApproveState>,
@@ -497,6 +501,7 @@ mod test {
             .await;
     }
 
+    // Gets wiremock to return a specific RejectState message or None when called
     async fn setup_reject_state_response(
         server: &MockServer,
         reject_state: Option<RejectState<UncheckedState>>,
@@ -568,6 +573,7 @@ mod test {
             .mount(&server)
             .await;
     }
+
     #[tokio::test]
     async fn test_follower_tick() {
         let server = setup_mock_server().await;
@@ -641,7 +647,10 @@ mod test {
                 get_initial_balances(),
             )
             .await;
-            assert!(matches!(tick_res, Err(Error::Overflow)));
+            assert!(
+                matches!(tick_res, Err(Error::Overflow)),
+                "Returns an Overflow error"
+            );
         }
 
         // - Payout mismatch when checking new_state.balances()
@@ -670,20 +679,22 @@ mod test {
                     reason: InvalidNewState::Transition,
                     ..
                 }
-            ));
+            ), "InvalidNewState::Transition is the rejection reason when there is a payout mismatch");
         }
         // - Case where new_state.state_root won’t be the same as proposed_balances.encode(…) -> proposed balances are different
         {
             let mut new_state_balances = get_initial_balances();
-            new_state_balances
-                .spend(*PUBLISHER, *GUARDIAN, UnifiedNum::from_u64(10000))
-                .expect("should spend");
+            // State root is encoded with the initial balances
             let state_root = new_state_balances
                 .encode(
                     channel_context.context.id(),
                     channel_context.token.precision.get(),
                 )
                 .expect("should encode");
+            // Balances are changed so when they are encoded in on_new_state() the output will be different
+            new_state_balances
+                .spend(*ADVERTISER, *PUBLISHER, UnifiedNum::from_u64(10000))
+                .expect("should spend");
             let new_state: NewState<UncheckedState> = NewState {
                 state_root,
                 signature: IDS[&*LEADER].to_checksum(),
@@ -704,7 +715,7 @@ mod test {
                     reason: InvalidNewState::RootHash,
                     ..
                 }
-            ));
+            ), "InvalidNewState::RootHash is the rejection reason when the state roots don't match");
         }
 
         // - Case where sentry.adapter.verify(…) will return false -> signature is from a different validator
@@ -736,7 +747,7 @@ mod test {
                     reason: InvalidNewState::Signature,
                     ..
                 }
-            ));
+            ), "InvalidNewState::Signature is the rejection reason when the signature can't be verified");
         }
 
         // - Case where LastApprovedResponse new state balances have a payout mismatch resulting in an error
@@ -771,10 +782,10 @@ mod test {
             assert!(matches!(
                 res,
                 ApproveStateResult::RejectedState {
-                    reason: InvalidNewState::Signature,
+                    reason: InvalidNewState::Transition,
                     ..
                 }
-            ));
+            ), "InvalidNewState::Transition is the rejection reason last_approved.new_state.balances have a payout mismatch");
         }
 
         // - Case where is_valid_transition() fails (proposed balances < previous balances)
@@ -817,7 +828,7 @@ mod test {
                     reason: InvalidNewState::Transition,
                     ..
                 }
-            ));
+            ), "InvalidNewState::Transition is the rejection reason when proposed balances are lower than the previous balances");
         }
 
         // - Case where get_health() will return less than 750 promilles
@@ -863,7 +874,7 @@ mod test {
                     reason: InvalidNewState::Health(..),
                     ..
                 }
-            ));
+            ), "InvalidNewState::Health is the rejection reason when the health penalty is too high");
         }
 
         // Case where no NewState is returned
@@ -991,6 +1002,28 @@ mod test {
             .await
             .expect("Shouldn't return an error");
             assert!(matches!(res, ApproveStateResult::Sent(Some(..))));
+            let propagated_to = match res {
+                ApproveStateResult::Sent(propagated_to) => propagated_to,
+                _ => None, // Shouldn't happen
+            };
+            let propagated_to: Vec<ValidatorId> = propagated_to
+                .unwrap()
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()
+                .expect("Shouldn't return an error");
+            assert!(
+                propagated_to.contains(&IDS[&*LEADER]),
+                "ApproveState message is propagated to the leader validator"
+            );
+            assert!(
+                propagated_to.contains(&IDS[&*FOLLOWER]),
+                "ApproveState message is propagated to the follower validator"
+            );
+            assert_eq!(
+                propagated_to.len(),
+                2,
+                "ApproveState message isn't propagated to any other validator"
+            );
         }
     }
 }

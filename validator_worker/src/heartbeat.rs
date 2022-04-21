@@ -84,8 +84,8 @@ mod test {
         config::{configuration, Environment},
         sentry::{ValidatorMessage, ValidatorMessagesListResponse},
         test_util::{
-            discard_logger, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, IDS,
-            LEADER,
+            discard_logger, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER,
+            FOLLOWER, IDS, LEADER,
         },
         util::ApiUrl,
         validator::messages::Heartbeat,
@@ -206,7 +206,25 @@ mod test {
                 .expect("shouldn't return an error");
 
             assert!(res.is_some());
-            // TODO: Check if heartbeat is proapgated to the right validators
+
+            let propagated_to: Vec<ValidatorId> = res
+                .unwrap()
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()
+                .expect("Shouldn't return an error");
+            assert!(
+                propagated_to.contains(&IDS[&*LEADER]),
+                "Heartbeat message is propagated to the leader validator"
+            );
+            assert!(
+                propagated_to.contains(&IDS[&*FOLLOWER]),
+                "Heartbeat message is propagated to the follower validator"
+            );
+            assert_eq!(
+                propagated_to.len(),
+                2,
+                "Heartbeat message isn't propagated to any other validator"
+            );
         }
     }
 }
