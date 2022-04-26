@@ -267,7 +267,10 @@ mod tests {
             IMPRESSION,
         },
         spender::Spender,
-        test_util::{ADVERTISER, DUMMY_AD_UNITS, DUMMY_IPFS, GUARDIAN, GUARDIAN_2, IDS, PUBLISHER},
+        test_util::{
+            ADVERTISER, ADVERTISER_2, DUMMY_AD_UNITS, DUMMY_IPFS, GUARDIAN, GUARDIAN_2, IDS,
+            PUBLISHER, PUBLISHER_2,
+        },
         util::{logging::new_logger, ApiUrl},
         validator::{Heartbeat, NewState},
         Balances, BigNum, Campaign, CampaignId, Channel, ChannelId, UnifiedNum,
@@ -441,7 +444,7 @@ mod tests {
             // 20.00000000
             budget: UnifiedNum::from(2_000_000_000),
             validators,
-            title: Some("Dummy Campaign".to_string()),
+            title: Some("Dummy Campaign 2 in Chain #1337".to_string()),
             pricing_bounds: vec![
                 (
                     IMPRESSION,
@@ -497,9 +500,9 @@ mod tests {
             id: VALIDATORS[&LEADER].address.into(),
             url: VALIDATORS[&LEADER].sentry_url.to_string(),
             // min_validator_fee for token: 0.000_010
-            // fee per 1000 (pro mille) = 0.00003000 (UnifiedNum)
-            // fee per 1 payout: payout * fee / 1000 = payout * 0.00000003
-            fee: 3_000.into(),
+            // fee per 1000 (pro mille) = 0.00020000 (UnifiedNum)
+            // fee per 1 payout: payout * fee / 1000 = payout * 0.00000020
+            fee: 20_000.into(),
             fee_addr: None,
         };
 
@@ -507,9 +510,9 @@ mod tests {
             id: VALIDATORS[&FOLLOWER].address.into(),
             url: VALIDATORS[&FOLLOWER].sentry_url.to_string(),
             // min_validator_fee for token: 0.000_010
-            // fee per 1000 (pro mille) = 0.00002000 (UnifiedNum)
-            // fee per 1 payout: payout * fee / 1000 = payout * 0.00000002
-            fee: 2_000.into(),
+            // fee per 1000 (pro mille) = 0.00010000 (UnifiedNum)
+            // fee per 1 payout: payout * fee / 1000 = payout * 0.0000001
+            fee: 10_000.into(),
             fee_addr: None,
         };
 
@@ -520,39 +523,39 @@ mod tests {
                 .parse()
                 .expect("Should parse"),
             channel,
-            creator: *ADVERTISER,
+            creator: *ADVERTISER_2,
             // 20.00000000
             budget: UnifiedNum::from(2_000_000_000),
             validators,
-            title: Some("Dummy Campaign in Chain #1".to_string()),
+            title: Some("Dummy Campaign 3 in Chain #1".to_string()),
             pricing_bounds: vec![
                 (
                     IMPRESSION,
                     Pricing {
-                        // 0.00003000
-                        // Per 1000 = 0.03000000
-                        min: 3_000.into(),
-                        // 0.00005000
-                        // Per 1000 = 0.05000000
-                        max: 5_000.into(),
+                        // 0.00030000
+                        // Per 1000 = 0.30000000
+                        min: 30_000.into(),
+                        // 0.00050000
+                        // Per 1000 = 0.50000000
+                        max: 50_000.into(),
                     },
                 ),
                 (
                     CLICK,
                     Pricing {
-                        // 0.00006000
-                        // Per 1000 = 0.06000000
-                        min: 6_000.into(),
-                        // 0.00010000
-                        // Per 1000 = 0.10000000
-                        max: 10_000.into(),
+                        // 0.00060000
+                        // Per 1000 = 0.60000000
+                        min: 60_000.into(),
+                        // 0.00090000
+                        // Per 1000 = 0.90000000
+                        max: 90_000.into(),
                     },
                 ),
             ]
             .into_iter()
             .collect(),
             event_submission: Some(EventSubmission { allow: vec![] }),
-            ad_units: vec![DUMMY_AD_UNITS[0].clone(), DUMMY_AD_UNITS[1].clone()],
+            ad_units: vec![DUMMY_AD_UNITS[2].clone(), DUMMY_AD_UNITS[3].clone()],
             targeting_rules: Rules::new(),
             created: Utc.ymd(2021, 2, 1).and_hms(7, 0, 0),
             active: Active {
@@ -563,7 +566,6 @@ mod tests {
     });
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-    // #[ignore = "for now"]
     async fn run_full_test() {
         let chain = GANACHE_1337.clone();
         assert_eq!(CAMPAIGN_1.channel.token, CAMPAIGN_2.channel.token);
@@ -572,7 +574,7 @@ mod tests {
             .find_chain_of(CAMPAIGN_1.channel.token)
             .expect("Should find CAMPAIGN_1 channel token address in Config!");
 
-        let second_token_chain = GANACHE_CONFIG
+        let token_chain_1 = GANACHE_CONFIG
             .find_chain_of(CAMPAIGN_3.channel.token)
             .expect("Should find CAMPAIGN_3 channel token address in Config!");
 
@@ -598,10 +600,18 @@ mod tests {
         // We use the Advertiser's `EthereumAdapter::get_auth` for authentication!
         let advertiser_adapter = Adapter::new(
             Ethereum::init(KEYSTORES[&ADVERTISER].clone(), &GANACHE_CONFIG)
-                .expect("Should initialize creator adapter"),
+                .expect("Should initialize ADVERTISER adapter"),
         )
         .unlock()
         .expect("Should unlock advertiser's Ethereum Adapter");
+
+        // We use the Advertiser's `EthereumAdapter::get_auth` for authentication!
+        let advertiser2_adapter = Adapter::new(
+            Ethereum::init(KEYSTORES[&ADVERTISER_2].clone(), &GANACHE_CONFIG)
+                .expect("Should initialize ADVERTISER_2 adapter"),
+        )
+        .unlock()
+        .expect("Should unlock Advertiser 2 Ethereum Adapter");
 
         // setup Sentry & returns Adapter
         let leader_adapter = setup_sentry(&leader)
@@ -649,6 +659,7 @@ mod tests {
 
         // Advertiser deposits
         //
+        // Advertiser
         // Channel 1 in Chain #1337:
         // - Outpace: 20 TOKENs
         // - Counterfactual: 10 TOKENs
@@ -657,8 +668,9 @@ mod tests {
         // - Outpace: 30 TOKENs
         // - Counterfactual: 20 TOKENs
         //
+        // Advertiser 2
         // Channel 3 in Chain #1:
-        // - Outpace: 30 TOKENS
+        // - Outpace: 100 TOKENS
         // - Counterfactual: 20 TOKENs
         {
             let advertiser_deposits = [
@@ -679,7 +691,7 @@ mod tests {
                 Deposit {
                     channel: CAMPAIGN_3.channel,
                     token: contracts_1.token.info.clone(),
-                    address: advertiser_adapter.whoami().to_address(),
+                    address: advertiser2_adapter.whoami().to_address(),
                     outpace_amount: BigNum::with_precision(100, token_1_precision),
                     counterfactual_amount: BigNum::with_precision(20, token_1_precision),
                 },
@@ -731,8 +743,8 @@ mod tests {
                 // make sure we have the expected deposit returned from EthereumAdapter
                 let eth_deposit = leader_adapter
                     .get_deposit(
-                        &second_token_chain.clone().with_channel(CAMPAIGN_3.channel),
-                        advertiser_adapter.whoami().to_address(),
+                        &token_chain_1.clone().with_channel(CAMPAIGN_3.channel),
+                        advertiser2_adapter.whoami().to_address(),
                     )
                     .await
                     .expect("Should get deposit for advertiser");
@@ -920,7 +932,7 @@ mod tests {
             }
         }
 
-        // Create Campaign 3 w/ Channel 3 using Advertiser on a different chain (Chain #1)
+        // Create Campaign 3 w/ Channel 3 using Advertiser 2 on a different chain (Chain #1)
         // In Leader & Follower sentries
         // Response: 200 Ok
         // POST /v5/campaign
@@ -929,12 +941,12 @@ mod tests {
             let create_campaign_3 = CreateCampaign::from_campaign(CAMPAIGN_3.clone());
 
             assert_eq!(
-                &second_token_chain.chain, &second_chain,
+                &token_chain_1.chain, &second_chain,
                 "CAMPAIGN_3 should be using the #1 Chain which is setup in the Ganache Config"
             );
 
             {
-                let leader_token = advertiser_adapter
+                let leader_token = advertiser2_adapter
                     .get_auth(second_chain.chain_id, leader_adapter.whoami())
                     .expect("Get authentication");
 
@@ -956,7 +968,7 @@ mod tests {
             }
 
             {
-                let follower_token = advertiser_adapter
+                let follower_token = advertiser2_adapter
                     .get_auth(second_chain.chain_id, follower_adapter.whoami())
                     .expect("Get authentication");
 
@@ -1058,7 +1070,7 @@ mod tests {
                 },
             ];
 
-            let response = post_new_events(
+            let leader_response = post_new_events(
                 &leader_sentry,
                 token_chain_1337.clone().with(CAMPAIGN_1.id),
                 &events,
@@ -1066,12 +1078,94 @@ mod tests {
             .await
             .expect("Posted events");
 
-            assert_eq!(SuccessResponse { success: true }, response);
+            assert_eq!(SuccessResponse { success: true }, leader_response);
+
+            let follower_response = post_new_events(
+                &follower_sentry,
+                token_chain_1337.clone().with(CAMPAIGN_1.id),
+                &events,
+            )
+            .await
+            .expect("Posted events");
+
+            assert_eq!(SuccessResponse { success: true }, follower_response);
             info!(
                 setup.logger,
-                "Successfully POST events for CAMPAIGN_1 {:?} and Channel {:?} ",
+                "Successfully POST events for CAMPAIGN_1 {:?} and Channel {:?} to Leader & Follower",
                 CAMPAIGN_1.id,
                 CAMPAIGN_1.channel.id()
+            );
+        }
+
+        // Add new events for `CAMPAIGN_3` to sentry
+        {
+            let events = vec![
+                Event::Impression {
+                    publisher: *PUBLISHER_2,
+                    ad_unit: CAMPAIGN_3
+                        .ad_units
+                        .get(1)
+                        .expect("Should exist in Campaign")
+                        .ipfs,
+                    ad_slot: DUMMY_IPFS[3],
+                    referrer: Some("https://adex.network".into()),
+                },
+                Event::Impression {
+                    publisher: *PUBLISHER_2,
+                    ad_unit: CAMPAIGN_3
+                        .ad_units
+                        .get(1)
+                        .expect("Should exist in Campaign")
+                        .ipfs,
+                    ad_slot: DUMMY_IPFS[3],
+                    referrer: Some("https://adex.network".into()),
+                },
+                Event::Click {
+                    publisher: *PUBLISHER_2,
+                    ad_unit: CAMPAIGN_3
+                        .ad_units
+                        .get(1)
+                        .expect("Should exist in Campaign")
+                        .ipfs,
+                    ad_slot: DUMMY_IPFS[3],
+                    referrer: Some("https://ambire.com".into()),
+                },
+                Event::Click {
+                    publisher: *PUBLISHER_2,
+                    ad_unit: CAMPAIGN_3
+                        .ad_units
+                        .get(1)
+                        .expect("Should exist in Campaign")
+                        .ipfs,
+                    ad_slot: DUMMY_IPFS[3],
+                    referrer: Some("https://ambire.com".into()),
+                },
+            ];
+
+            let response_leader = post_new_events(
+                &leader_sentry,
+                token_chain_1.clone().with(CAMPAIGN_3.id),
+                &events,
+            )
+            .await
+            .expect("Posted events");
+
+            assert_eq!(SuccessResponse { success: true }, response_leader);
+
+            let follower_response = post_new_events(
+                &follower_sentry,
+                token_chain_1.clone().with(CAMPAIGN_3.id),
+                &events,
+            )
+            .await
+            .expect("Posted events");
+
+            assert_eq!(SuccessResponse { success: true }, follower_response);
+            info!(
+                setup.logger,
+                "Successfully POST events for CAMPAIGN_3 {:?} and Channel {:?} to Leader & Follower",
+                CAMPAIGN_3.id,
+                CAMPAIGN_3.channel.id()
             );
         }
 
@@ -1128,6 +1222,63 @@ mod tests {
             info!(setup.logger, "Successfully validated Accounting Balances for Channel 1 {:?} after CAMPAIGN_1 events {:?}", CAMPAIGN_1.channel.id(), CAMPAIGN_1.id);
         }
 
+        // Channel 3 expected Accounting
+        // Fees are calculated based on pro mile of the payout
+        // event payout * fee / 1000
+        //
+        //
+        // IMPRESSION:
+        // - Publisher2 payout: 2 * 30 000 = 60 000
+        // - Leader fees: 60 000 * 20 000 / 1 000 = 1 200 000
+        // - Follower fees: 60 000 * 10 000 / 1000 = 600 000
+        //
+        // CLICK:
+        // - Publisher2 payout: 2 * 60 000 = 120 000
+        // - Leader fees: 120 000 * 20 000 / 1000 = 2 400 000
+        // - Follower fees: 120 000 * 10 000 / 1000 = 1 200 000
+        //
+        // Creator (Advertiser2) pays out:
+        // events_payout + leader fee + follower fee
+        // events_payout = 60 000 (impression) + 120 000 (click) = 180 000
+        // 180 000 + (1 200 000 + 2 400 000) + (600 000 + 1 200 000) = 5 580 000
+        //
+        // Publisher2 total payout: 180 000
+        // leader total fees: 1 200 000 + 2 400 000 = 3 600 000
+        // follower total fees: 600 000 + 1 200 000 = 1 800 000
+        {
+            let mut expected_balances = Balances::new();
+
+            expected_balances
+                .spend(
+                    CAMPAIGN_3.creator,
+                    CAMPAIGN_3.channel.leader.to_address(),
+                    UnifiedNum::from(3_600_000),
+                )
+                .expect("Should spend for Leader");
+            expected_balances
+                .spend(
+                    CAMPAIGN_3.creator,
+                    CAMPAIGN_3.channel.follower.to_address(),
+                    UnifiedNum::from(1_800_000),
+                )
+                .expect("Should spend for Follower");
+            expected_balances
+                .spend(CAMPAIGN_3.creator, *PUBLISHER_2, UnifiedNum::from(180_000))
+                .expect("Should spend for Publisher");
+
+            let expected_accounting = AccountingResponse {
+                balances: expected_balances,
+            };
+
+            let actual_accounting = leader_sentry
+                .get_accounting(&token_chain_1.with_channel(CAMPAIGN_3.channel))
+                .await
+                .expect("Should get Channel Accounting");
+
+            pretty_assertions::assert_eq!(expected_accounting, actual_accounting);
+            info!(setup.logger, "Successfully validated Accounting Balances for Channel 3 {:?} after CAMPAIGN_3 events {:?}", CAMPAIGN_3.channel.id(), CAMPAIGN_3.id);
+        }
+
         // leader single worker tick
         leader_worker.all_channels_tick().await;
         // follower single worker tick
@@ -1159,14 +1310,14 @@ mod tests {
                     .spend(
                         CAMPAIGN_1.creator,
                         CAMPAIGN_1.channel.leader.to_address(),
-                        UnifiedNum::from_u64(27000),
+                        UnifiedNum::from_u64(27_000),
                     )
                     .expect("Should spend");
                 expected_balances
                     .spend(
                         CAMPAIGN_1.creator,
                         CAMPAIGN_1.channel.follower.to_address(),
-                        UnifiedNum::from_u64(18000),
+                        UnifiedNum::from_u64(18_000),
                     )
                     .expect("Should spend");
                 expected_balances

@@ -328,7 +328,7 @@ mod campaign_remaining {
             Ok(campaigns_remaining)
         }
 
-        /// This method will get the remaining of the provided [`Campaign`]s
+        /// This method will get the remaining of the provided [`Campaign`](primitives::Campaign)s
         /// and it will also match the returned values to the [`CampaignId`]s
         /// `MGET` should always return results in the same order!
         pub async fn get_multiple_with_ids(
