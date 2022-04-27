@@ -149,7 +149,7 @@ mod test {
     use std::{collections::HashMap, str::FromStr};
     use wiremock::{
         matchers::{method, path, query_param},
-        Mock, MockServer, ResponseTemplate,
+        Mock, MockServer, ResponseTemplate, MockGuard
     };
 
     // Sets up wiremock server instance and responses which are shared for all test cases
@@ -236,7 +236,7 @@ mod test {
     async fn setup_new_state_response(
         server: &MockServer,
         new_state_msg: Option<NewState<UncheckedState>>,
-    ) {
+    ) -> MockGuard {
         let new_state_res = match new_state_msg {
             Some(msg) => ValidatorMessagesListResponse {
                 messages: vec![ValidatorMessage {
@@ -257,8 +257,10 @@ mod test {
             )))
             .and(query_param("limit", "1"))
             .respond_with(ResponseTemplate::new(200).set_body_json(&new_state_res))
-            .mount(&server)
-            .await;
+            .expect(1)
+            .named("GET NewState helper")
+            .mount_as_scoped(&server)
+            .await
     }
 
     #[tokio::test]
@@ -302,7 +304,7 @@ mod test {
         }
         // No NewState message is returned -> Channel has just been created
         {
-            setup_new_state_response(&server, None).await;
+            let _mock_guard =setup_new_state_response(&server, None).await;
 
             let tick_result = tick(&sentry, &channel_context, get_initial_balances())
                 .await
@@ -347,7 +349,7 @@ mod test {
                 signature: IDS[&*LEADER].to_checksum(),
                 balances: proposed_balances.into_unchecked(),
             };
-            setup_new_state_response(&server, Some(new_state)).await;
+            let _mock_guard = setup_new_state_response(&server, Some(new_state)).await;
 
             let tick_result = tick(&sentry, &channel_context, get_initial_balances())
                 .await
@@ -370,7 +372,7 @@ mod test {
                 signature: IDS[&*LEADER].to_checksum(),
                 balances: proposed_balances.into_unchecked(),
             };
-            setup_new_state_response(&server, Some(new_state)).await;
+            let _mock_guard = setup_new_state_response(&server, Some(new_state)).await;
 
             let mut expected_balances = get_initial_balances();
             expected_balances

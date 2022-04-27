@@ -82,7 +82,7 @@ mod test {
     use chrono::{Duration, Utc};
     use primitives::{
         config::{configuration, Environment},
-        sentry::{ValidatorMessage, ValidatorMessagesListResponse},
+        sentry::{ValidatorMessage, ValidatorMessagesListResponse, SuccessResponse},
         test_util::{
             discard_logger, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER,
             FOLLOWER, IDS, LEADER,
@@ -94,8 +94,33 @@ mod test {
     use std::{collections::HashMap, str::FromStr};
     use wiremock::{
         matchers::{method, path, query_param},
-        Mock, MockServer, ResponseTemplate,
+        Mock, MockServer, ResponseTemplate, MockGuard
     };
+
+    // Sets up wiremock server instance and responses which are shared for all test cases
+    async fn setup_mock_server() -> MockServer {
+        let server = MockServer::start().await;
+        let ok_response = SuccessResponse { success: true };
+        Mock::given(method("POST"))
+            .and(path(format!(
+                "leader/v5/channel/{}/validator-messages",
+                DUMMY_CAMPAIGN.channel.id()
+            )))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&ok_response))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("POST"))
+            .and(path(format!(
+                "follower/v5/channel/{}/validator-messages",
+                DUMMY_CAMPAIGN.channel.id()
+            )))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&ok_response))
+            .mount(&server)
+            .await;
+
+        server
+    }
 
     async fn setup_sentry(server: &MockServer, config: &Config) -> SentryApi<Dummy> {
         let sentry_url = ApiUrl::from_str(&server.uri()).expect("Should parse");
@@ -127,10 +152,32 @@ mod test {
             .expect("Should propagate")
     }
 
+    async fn setup_heartbeat_res(server: &MockServer, heartbeat: Heartbeat) -> MockGuard {
+        let heartbeat_res = ValidatorMessagesListResponse {
+            messages: vec![ValidatorMessage {
+                from: DUMMY_CAMPAIGN.channel.follower,
+                received: Utc::now(),
+                msg: MessageTypes::Heartbeat(heartbeat),
+            }],
+        };
+        Mock::given(method("GET"))
+            .and(path(format!(
+                "/v5/channel/{}/validator-messages/{}/{}",
+                DUMMY_CAMPAIGN.channel.id(),
+                DUMMY_CAMPAIGN.channel.leader,
+                "Heartbeat",
+            )))
+            .and(query_param("limit", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&heartbeat_res))
+            .expect(1)
+            .mount_as_scoped(&server)
+            .await
+    }
+
     #[tokio::test]
     async fn test_heartbeats() {
         let config = configuration(Environment::Development, None).expect("Should get Config");
-        let server = MockServer::start().await;
+        let server = setup_mock_server().await;
         let sentry = setup_sentry(&server, &config).await;
         {
             let heartbeat_msg = Heartbeat {
@@ -138,24 +185,7 @@ mod test {
                 state_root: String::new(),
                 timestamp: Utc::now(),
             };
-            let heartbeat_res = ValidatorMessagesListResponse {
-                messages: vec![ValidatorMessage {
-                    from: DUMMY_CAMPAIGN.channel.follower,
-                    received: Utc::now(),
-                    msg: MessageTypes::Heartbeat(heartbeat_msg),
-                }],
-            };
-            Mock::given(method("GET"))
-                .and(path(format!(
-                    "/v5/channel/{}/validator-messages/{}/{}",
-                    DUMMY_CAMPAIGN.channel.id(),
-                    DUMMY_CAMPAIGN.channel.leader,
-                    "Heartbeat",
-                )))
-                .and(query_param("limit", "1"))
-                .respond_with(ResponseTemplate::new(200).set_body_json(&heartbeat_res))
-                .mount(&server)
-                .await;
+            let _mock_guard = setup_heartbeat_res(&server, heartbeat_msg).await;
 
             let channel_context = config
                 .find_chain_of(DUMMY_CAMPAIGN.channel.token)
@@ -177,24 +207,7 @@ mod test {
                 state_root: String::new(),
                 timestamp: Utc::now() - Duration::minutes(10),
             };
-            let heartbeat_res = ValidatorMessagesListResponse {
-                messages: vec![ValidatorMessage {
-                    from: DUMMY_CAMPAIGN.channel.follower,
-                    received: Utc::now(),
-                    msg: MessageTypes::Heartbeat(heartbeat_msg),
-                }],
-            };
-            Mock::given(method("GET"))
-                .and(path(format!(
-                    "/v5/channel/{}/validator-messages/{}/{}",
-                    DUMMY_CAMPAIGN.channel.id(),
-                    DUMMY_CAMPAIGN.channel.leader,
-                    "Heartbeat",
-                )))
-                .and(query_param("limit", "1"))
-                .respond_with(ResponseTemplate::new(200).set_body_json(&heartbeat_res))
-                .mount(&server)
-                .await;
+            let _mock_guard = setup_heartbeat_res(&server, heartbeat_msg).await;
 
             let channel_context = config
                 .find_chain_of(DUMMY_CAMPAIGN.channel.token)
