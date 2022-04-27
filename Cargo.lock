@@ -2828,6 +2828,7 @@ dependencies = [
  "toml",
  "url",
  "uuid",
+ "wiremock",
 ]
 
 [[package]]

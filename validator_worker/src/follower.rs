@@ -343,72 +343,17 @@ mod test {
     use primitives::{
         balances::UncheckedState,
         config::{configuration, Environment},
-        sentry::{
-            message::Message, LastApproved, LastApprovedResponse, MessageResponse, SuccessResponse,
-            ValidatorMessage, ValidatorMessagesListResponse,
-        },
         test_util::{
-            discard_logger, ADVERTISER, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER,
+            discard_logger, ServerSetup, ADVERTISER, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER,
             DUMMY_VALIDATOR_LEADER, FOLLOWER, GUARDIAN, GUARDIAN_2, IDS, LEADER, PUBLISHER,
             PUBLISHER_2,
         },
         util::ApiUrl,
-        validator::messages::{Heartbeat, NewState},
+        validator::messages::NewState,
         ChainId, Config, ToETHChecksum, UnifiedNum, ValidatorId,
     };
     use std::{collections::HashMap, str::FromStr};
-    use wiremock::{
-        matchers::{method, path, query_param},
-        Mock, MockServer, ResponseTemplate, MockGuard
-    };
-
-    // Sets up wiremock server instance and responses which are shared for all test cases
-    async fn setup_mock_server() -> MockServer {
-        let server = MockServer::start().await;
-        let ok_response = SuccessResponse { success: true };
-        Mock::given(method("POST"))
-            .and(path(format!(
-                "leader/v5/channel/{}/validator-messages",
-                DUMMY_CAMPAIGN.channel.id()
-            )))
-            .respond_with(ResponseTemplate::new(200).set_body_json(&ok_response))
-            .mount(&server)
-            .await;
-
-        Mock::given(method("POST"))
-            .and(path(format!(
-                "follower/v5/channel/{}/validator-messages",
-                DUMMY_CAMPAIGN.channel.id()
-            )))
-            .respond_with(ResponseTemplate::new(200).set_body_json(&ok_response))
-            .mount(&server)
-            .await;
-
-        let heartbeat = Heartbeat {
-            signature: String::new(),
-            state_root: String::new(),
-            timestamp: Utc::now(),
-        };
-        let heartbeat_res = ValidatorMessagesListResponse {
-            messages: vec![ValidatorMessage {
-                from: DUMMY_CAMPAIGN.channel.follower,
-                received: Utc::now(),
-                msg: MessageTypes::Heartbeat(heartbeat),
-            }],
-        };
-        Mock::given(method("GET"))
-            .and(path(format!(
-                "/v5/channel/{}/validator-messages/{}/{}",
-                DUMMY_CAMPAIGN.channel.id(),
-                DUMMY_CAMPAIGN.channel.leader,
-                "Heartbeat",
-            )))
-            .and(query_param("limit", "1"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(&heartbeat_res))
-            .mount(&server)
-            .await;
-        server
-    }
+    use wiremock::MockServer;
 
     // Initialies a SentryApi instance
     async fn setup_sentry(server: &MockServer, config: &Config) -> SentryApi<Dummy> {
@@ -442,150 +387,11 @@ mod test {
             .expect("Should propagate")
     }
 
-    // Gets wiremock to return a specific NewState message or None when called
-    async fn setup_new_state_response(
-        server: &MockServer,
-        new_state_msg: Option<NewState<UncheckedState>>,
-    ) -> MockGuard {
-        let new_state_res = match new_state_msg {
-            Some(msg) => ValidatorMessagesListResponse {
-                messages: vec![ValidatorMessage {
-                    from: DUMMY_CAMPAIGN.channel.leader,
-                    received: Utc::now(),
-                    msg: MessageTypes::NewState(msg),
-                }],
-            },
-            None => ValidatorMessagesListResponse { messages: vec![] },
-        };
-
-        Mock::given(method("GET"))
-            .and(path(format!(
-                "/v5/channel/{}/validator-messages/{}/{}",
-                DUMMY_CAMPAIGN.channel.id(),
-                DUMMY_CAMPAIGN.channel.leader,
-                "NewState",
-            )))
-            .and(query_param("limit", "1"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(&new_state_res))
-            .expect(1)
-            .named("GET NewState helper")
-            .mount_as_scoped(&server)
-            .await
-    }
-
-    // Gets wiremock to return a specific ApproveState message or None when called
-    async fn setup_approve_state_response(
-        server: &MockServer,
-        approve_state: Option<ApproveState>,
-    ) -> MockGuard {
-        let approve_state_res = match approve_state {
-            Some(msg) => ValidatorMessagesListResponse {
-                messages: vec![ValidatorMessage {
-                    from: DUMMY_CAMPAIGN.channel.follower,
-                    received: Utc::now(),
-                    msg: MessageTypes::ApproveState(msg),
-                }],
-            },
-            None => ValidatorMessagesListResponse { messages: vec![] },
-        };
-
-        Mock::given(method("GET"))
-            .and(path(format!(
-                "/v5/channel/{}/validator-messages/{}/{}",
-                DUMMY_CAMPAIGN.channel.id(),
-                DUMMY_CAMPAIGN.channel.leader,
-                "ApproveState+RejectState",
-            )))
-            .and(query_param("limit", "1"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(&approve_state_res))
-            .expect(1)
-            .named("GET ApproveState helper")
-            .mount_as_scoped(&server)
-            .await
-    }
-
-    // Gets wiremock to return a specific RejectState message or None when called
-    async fn setup_reject_state_response(
-        server: &MockServer,
-        reject_state: Option<RejectState<UncheckedState>>,
-    ) -> MockGuard {
-        let reject_state_res = match reject_state {
-            Some(msg) => ValidatorMessagesListResponse {
-                messages: vec![ValidatorMessage {
-                    from: DUMMY_CAMPAIGN.channel.follower,
-                    received: Utc::now(),
-                    msg: MessageTypes::RejectState(msg),
-                }],
-            },
-            None => ValidatorMessagesListResponse { messages: vec![] },
-        };
-
-        Mock::given(method("GET"))
-            .and(path(format!(
-                "/v5/channel/{}/validator-messages/{}/{}",
-                DUMMY_CAMPAIGN.channel.id(),
-                DUMMY_CAMPAIGN.channel.leader,
-                "ApproveState+RejectState",
-            )))
-            .and(query_param("limit", "1"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(&reject_state_res))
-            .expect(1)
-            .named("GET RejectState helper")
-            .mount_as_scoped(&server)
-            .await
-    }
-
-    async fn setup_last_approved_response(
-        server: &MockServer,
-        balances: Balances<UncheckedState>,
-        channel_context: &ChainOf<Channel>,
-    ) -> MockGuard {
-        // In the case of a payout mismatch, the value of the state_root won't matter
-        let state_root = match balances.clone().check() {
-            Ok(balances) => balances
-                .encode(
-                    channel_context.context.id(),
-                    channel_context.token.precision.get(),
-                )
-                .expect("should encode"),
-            Err(_) => String::new(),
-        };
-        let last_approved_new_state: NewState<UncheckedState> = NewState {
-            state_root,
-            signature: IDS[&*LEADER].to_checksum(),
-            balances: balances.into_unchecked(),
-        };
-        let new_state_res = MessageResponse {
-            from: IDS[&*LEADER],
-            received: Utc::now(),
-            msg: Message::new(last_approved_new_state),
-        };
-        let last_approved_response = LastApprovedResponse {
-            last_approved: Some(LastApproved {
-                new_state: Some(new_state_res),
-                approve_state: None,
-            }),
-            heartbeats: None,
-        };
-
-        Mock::given(method("GET"))
-            .and(path(format!(
-                "/v5/channel/{}/last-approved",
-                DUMMY_CAMPAIGN.channel.id(),
-            )))
-            .and(query_param("withHeartbeat", "true"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(&last_approved_response))
-            .expect(1)
-            .named("GET LastApproved helper")
-            .mount_as_scoped(&server)
-            .await
-    }
-
     #[tokio::test]
     async fn test_follower_tick() {
-        let server = setup_mock_server().await;
+        let server_setup = ServerSetup::init(&DUMMY_CAMPAIGN.channel).await;
         let config = configuration(Environment::Development, None).expect("Should get Config");
-        let sentry = setup_sentry(&server, &config).await;
+        let sentry = setup_sentry(&server_setup.server, &config).await;
 
         let channel_context = config
             .find_chain_of(DUMMY_CAMPAIGN.channel.token)
@@ -763,7 +569,9 @@ mod test {
             last_approved_balances
                 .earners
                 .insert(*GUARDIAN_2, UnifiedNum::from_u64(10_000));
-            let _mock_guard = setup_last_approved_response(&server, last_approved_balances, &channel_context).await;
+            let _mock_guard = server_setup
+                .setup_last_approved_response(last_approved_balances, String::new())
+                .await;
 
             let proposed_balances = get_initial_balances();
             let state_root = proposed_balances
@@ -801,12 +609,15 @@ mod test {
             last_approved_balances
                 .spend(*ADVERTISER, *PUBLISHER, UnifiedNum::from_u64(2000))
                 .expect("should spend");
-            let _mock_guard = setup_last_approved_response(
-                &server,
-                last_approved_balances.into_unchecked(),
-                &channel_context,
-            )
-            .await;
+            let state_root = last_approved_balances
+                .encode(
+                    channel_context.context.id(),
+                    channel_context.token.precision.get(),
+                )
+                .expect("Should encode");
+            let _mock_guard = server_setup
+                .setup_last_approved_response(last_approved_balances.into_unchecked(), state_root)
+                .await;
 
             let proposed_balances = get_initial_balances();
             let state_root = proposed_balances
@@ -840,12 +651,16 @@ mod test {
 
         // - Case where get_health() will return less than 750 promilles
         {
-            let _mock_guard = setup_last_approved_response(
-                &server,
-                get_initial_balances().into_unchecked(),
-                &channel_context,
-            )
-            .await;
+            let balances = get_initial_balances();
+            let state_root = balances
+                .encode(
+                    channel_context.context.id(),
+                    channel_context.token.precision.get(),
+                )
+                .expect("Should encode");
+            let _mock_guard = server_setup
+                .setup_last_approved_response(balances.into_unchecked(), state_root)
+                .await;
 
             let mut our_balances = get_initial_balances();
             our_balances
@@ -887,8 +702,8 @@ mod test {
         // Case where no NewState is returned
         {
             // Setting up the expected response
-            let _mock_guard = setup_new_state_response(&server, None).await;
-            let _mock_guard = setup_approve_state_response(&server, None).await;
+            let _mock_guard = server_setup.setup_new_state_response(None).await;
+            let _mock_guard = server_setup.setup_approve_state_response(None).await;
 
             let tick_status = tick(
                 &sentry,
@@ -918,13 +733,15 @@ mod test {
                 signature: IDS[&*LEADER].to_checksum(),
                 balances: get_initial_balances().into_unchecked(),
             };
-            let _mock_guard = setup_new_state_response(&server, Some(new_state)).await;
+            let _mock_guard = server_setup.setup_new_state_response(Some(new_state)).await;
             let approve_state = ApproveState {
                 state_root,
                 signature: IDS[&*FOLLOWER].to_checksum(),
                 is_healthy: true,
             };
-            let _mock_guard = setup_approve_state_response(&server, Some(approve_state)).await;
+            let _mock_guard = server_setup
+                .setup_approve_state_response(Some(approve_state))
+                .await;
 
             let tick_status = tick(
                 &sentry,
@@ -955,7 +772,7 @@ mod test {
                 signature: IDS[&*LEADER].to_checksum(),
                 balances: get_initial_balances().into_unchecked(),
             };
-            let _mock_guard = setup_new_state_response(&server, Some(new_state)).await;
+            let _mock_guard = server_setup.setup_new_state_response(Some(new_state)).await;
 
             let reject_state = RejectState {
                 state_root,
@@ -964,7 +781,9 @@ mod test {
                 reason: "rejected".to_string(),
                 balances: None,
             };
-            let _mock_guard = setup_reject_state_response(&server, Some(reject_state)).await;
+            let _mock_guard = server_setup
+                .setup_reject_state_response(Some(reject_state))
+                .await;
             let tick_status = tick(
                 &sentry,
                 &channel_context,
@@ -981,12 +800,16 @@ mod test {
 
         // - Case where output will be ApproveStateResult::Sent(Some(propagation_result)) (all rules have been met)
         {
-            let _mock_guard = setup_last_approved_response(
-                &server,
-                get_initial_balances().into_unchecked(),
-                &channel_context,
-            )
-            .await;
+            let balances = get_initial_balances();
+            let state_root = balances
+                .encode(
+                    channel_context.context.id(),
+                    channel_context.token.precision.get(),
+                )
+                .expect("Should encode");
+            let _mock_guard = server_setup
+                .setup_last_approved_response(balances.into_unchecked(), state_root)
+                .await;
 
             let state_root = get_initial_balances()
                 .encode(

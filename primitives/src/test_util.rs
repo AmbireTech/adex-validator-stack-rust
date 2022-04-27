@@ -4,13 +4,23 @@ use chrono::{TimeZone, Utc};
 use once_cell::sync::Lazy;
 
 use crate::{
+    balances::{Balances, UncheckedState},
     campaign::{Active, Pricing, Validators},
     channel::Nonce,
     config::GANACHE_CONFIG,
-    sentry::{CLICK, IMPRESSION},
+    sentry::{
+        message::Message, LastApproved, LastApprovedResponse, MessageResponse, SuccessResponse,
+        ValidatorMessage, ValidatorMessagesListResponse, CLICK, IMPRESSION,
+    },
     targeting::Rules,
-    AdUnit, Address, Campaign, Channel, EventSubmission, UnifiedNum, ValidatorDesc, ValidatorId,
-    IPFS,
+    validator::{ApproveState, Heartbeat, MessageTypes, NewState, RejectState},
+    AdUnit, Address, Campaign, Channel, EventSubmission, ToETHChecksum, UnifiedNum, ValidatorDesc,
+    ValidatorId, IPFS,
+};
+
+use wiremock::{
+    matchers::{method, path, query_param},
+    Mock, MockGuard, MockServer, ResponseTemplate,
 };
 
 pub use logger::discard_logger;
@@ -295,6 +305,190 @@ pub static DUMMY_IPFS: Lazy<[IPFS; 5]> = Lazy::new(|| {
             .expect("Valid IPFS V1"),
     ]
 });
+
+pub struct ServerSetup {
+    pub server: MockServer,
+}
+
+impl ServerSetup {
+    pub async fn init(channel: &Channel) -> Self {
+        let server = MockServer::start().await;
+        let ok_response = SuccessResponse { success: true };
+
+        // Making sure all propagations to leader/follower succeed
+        Mock::given(method("POST"))
+            .and(path(format!(
+                "leader/v5/channel/{}/validator-messages",
+                channel.id()
+            )))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&ok_response))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("POST"))
+            .and(path(format!(
+                "follower/v5/channel/{}/validator-messages",
+                channel.id()
+            )))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&ok_response))
+            .mount(&server)
+            .await;
+
+        let heartbeat = Heartbeat {
+            signature: String::new(),
+            state_root: String::new(),
+            timestamp: Utc::now(),
+        };
+        let heartbeat_res = ValidatorMessagesListResponse {
+            messages: vec![ValidatorMessage {
+                from: DUMMY_CAMPAIGN.channel.leader,
+                received: Utc::now(),
+                msg: MessageTypes::Heartbeat(heartbeat),
+            }],
+        };
+        Mock::given(method("GET"))
+            .and(path(format!(
+                "/v5/channel/{}/validator-messages/{}/{}",
+                DUMMY_CAMPAIGN.channel.id(),
+                DUMMY_CAMPAIGN.channel.leader,
+                "Heartbeat",
+            )))
+            .and(query_param("limit", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&heartbeat_res))
+            .mount(&server)
+            .await;
+
+        Self { server }
+    }
+
+    pub async fn setup_new_state_response(
+        &self,
+        new_state_msg: Option<NewState<UncheckedState>>,
+    ) -> MockGuard {
+        let new_state_res = match new_state_msg {
+            Some(msg) => ValidatorMessagesListResponse {
+                messages: vec![ValidatorMessage {
+                    from: DUMMY_CAMPAIGN.channel.leader,
+                    received: Utc::now(),
+                    msg: MessageTypes::NewState(msg),
+                }],
+            },
+            None => ValidatorMessagesListResponse { messages: vec![] },
+        };
+
+        Mock::given(method("GET"))
+            .and(path(format!(
+                "/v5/channel/{}/validator-messages/{}/{}",
+                DUMMY_CAMPAIGN.channel.id(),
+                DUMMY_CAMPAIGN.channel.leader,
+                "NewState",
+            )))
+            .and(query_param("limit", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&new_state_res))
+            .expect(1)
+            .named("GET NewState helper")
+            .mount_as_scoped(&self.server)
+            .await
+    }
+
+    // Gets wiremock to return a specific ApproveState message or None when called
+    pub async fn setup_approve_state_response(
+        &self,
+        approve_state: Option<ApproveState>,
+    ) -> MockGuard {
+        let approve_state_res = match approve_state {
+            Some(msg) => ValidatorMessagesListResponse {
+                messages: vec![ValidatorMessage {
+                    from: DUMMY_CAMPAIGN.channel.follower,
+                    received: Utc::now(),
+                    msg: MessageTypes::ApproveState(msg),
+                }],
+            },
+            None => ValidatorMessagesListResponse { messages: vec![] },
+        };
+
+        Mock::given(method("GET"))
+            .and(path(format!(
+                "/v5/channel/{}/validator-messages/{}/{}",
+                DUMMY_CAMPAIGN.channel.id(),
+                DUMMY_CAMPAIGN.channel.leader,
+                "ApproveState+RejectState",
+            )))
+            .and(query_param("limit", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&approve_state_res))
+            .expect(1)
+            .named("GET ApproveState helper")
+            .mount_as_scoped(&self.server)
+            .await
+    }
+
+    // Gets wiremock to return a specific RejectState message or None when called
+    pub async fn setup_reject_state_response(
+        &self,
+        reject_state: Option<RejectState<UncheckedState>>,
+    ) -> MockGuard {
+        let reject_state_res = match reject_state {
+            Some(msg) => ValidatorMessagesListResponse {
+                messages: vec![ValidatorMessage {
+                    from: DUMMY_CAMPAIGN.channel.follower,
+                    received: Utc::now(),
+                    msg: MessageTypes::RejectState(msg),
+                }],
+            },
+            None => ValidatorMessagesListResponse { messages: vec![] },
+        };
+
+        Mock::given(method("GET"))
+            .and(path(format!(
+                "/v5/channel/{}/validator-messages/{}/{}",
+                DUMMY_CAMPAIGN.channel.id(),
+                DUMMY_CAMPAIGN.channel.leader,
+                "ApproveState+RejectState",
+            )))
+            .and(query_param("limit", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&reject_state_res))
+            .expect(1)
+            .named("GET RejectState helper")
+            .mount_as_scoped(&self.server)
+            .await
+    }
+
+    pub async fn setup_last_approved_response(
+        &self,
+        balances: Balances<UncheckedState>,
+        state_root: String,
+    ) -> MockGuard {
+        let last_approved_new_state: NewState<UncheckedState> = NewState {
+            state_root,
+            signature: IDS[&*LEADER].to_checksum(),
+            balances: balances.into_unchecked(),
+        };
+        let new_state_res = MessageResponse {
+            from: IDS[&*LEADER],
+            received: Utc::now(),
+            msg: Message::new(last_approved_new_state),
+        };
+        let last_approved_response = LastApprovedResponse {
+            last_approved: Some(LastApproved {
+                new_state: Some(new_state_res),
+                approve_state: None,
+            }),
+            heartbeats: None,
+        };
+
+        Mock::given(method("GET"))
+            .and(path(format!(
+                "/v5/channel/{}/last-approved",
+                DUMMY_CAMPAIGN.channel.id(),
+            )))
+            .and(query_param("withHeartbeat", "true"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&last_approved_response))
+            .expect(1)
+            .named("GET LastApproved helper")
+            .mount_as_scoped(&self.server)
+            .await
+    }
+}
 
 #[cfg(test)]
 mod test {

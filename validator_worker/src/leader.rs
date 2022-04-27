@@ -133,73 +133,19 @@ mod test {
     use super::*;
     use crate::sentry_interface::{AuthToken, ChainsValidators, Validator};
     use adapter::dummy::{Adapter, Dummy, Options};
-    use chrono::Utc;
     use primitives::{
         balances::UncheckedState,
         config::{configuration, Environment},
-        sentry::{SuccessResponse, ValidatorMessage, ValidatorMessagesListResponse},
         test_util::{
-            discard_logger, ADVERTISER, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER,
+            discard_logger, ServerSetup, ADVERTISER, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER,
             DUMMY_VALIDATOR_LEADER, FOLLOWER, GUARDIAN, IDS, LEADER, PUBLISHER, PUBLISHER_2,
         },
         util::ApiUrl,
-        validator::messages::{Heartbeat, NewState},
+        validator::messages::NewState,
         ChainId, Config, ToETHChecksum, UnifiedNum, ValidatorId,
     };
     use std::{collections::HashMap, str::FromStr};
-    use wiremock::{
-        matchers::{method, path, query_param},
-        Mock, MockServer, ResponseTemplate, MockGuard
-    };
-
-    // Sets up wiremock server instance and responses which are shared for all test cases
-    async fn setup_mock_server() -> MockServer {
-        let server = MockServer::start().await;
-        let ok_response = SuccessResponse { success: true };
-        Mock::given(method("POST"))
-            .and(path(format!(
-                "leader/v5/channel/{}/validator-messages",
-                DUMMY_CAMPAIGN.channel.id()
-            )))
-            .respond_with(ResponseTemplate::new(200).set_body_json(&ok_response))
-            .mount(&server)
-            .await;
-
-        Mock::given(method("POST"))
-            .and(path(format!(
-                "follower/v5/channel/{}/validator-messages",
-                DUMMY_CAMPAIGN.channel.id()
-            )))
-            .respond_with(ResponseTemplate::new(200).set_body_json(&ok_response))
-            .mount(&server)
-            .await;
-
-        let heartbeat = Heartbeat {
-            signature: String::new(),
-            state_root: String::new(),
-            timestamp: Utc::now(),
-        };
-        let heartbeat_res = ValidatorMessagesListResponse {
-            messages: vec![ValidatorMessage {
-                from: DUMMY_CAMPAIGN.channel.leader,
-                received: Utc::now(),
-                msg: MessageTypes::Heartbeat(heartbeat),
-            }],
-        };
-        Mock::given(method("GET"))
-            .and(path(format!(
-                "/v5/channel/{}/validator-messages/{}/{}",
-                DUMMY_CAMPAIGN.channel.id(),
-                DUMMY_CAMPAIGN.channel.leader,
-                "Heartbeat",
-            )))
-            .and(query_param("limit", "1"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(&heartbeat_res))
-            .mount(&server)
-            .await;
-
-        server
-    }
+    use wiremock::MockServer;
 
     // Initializes a SentryApi instance
     async fn setup_sentry(server: &MockServer, config: &Config) -> SentryApi<Dummy> {
@@ -232,42 +178,11 @@ mod test {
             .expect("Should propagate")
     }
 
-    // Sets up wiremock to return a specific NewState message or None when GET validator-messages is called
-    async fn setup_new_state_response(
-        server: &MockServer,
-        new_state_msg: Option<NewState<UncheckedState>>,
-    ) -> MockGuard {
-        let new_state_res = match new_state_msg {
-            Some(msg) => ValidatorMessagesListResponse {
-                messages: vec![ValidatorMessage {
-                    from: DUMMY_CAMPAIGN.channel.leader,
-                    received: Utc::now(),
-                    msg: MessageTypes::NewState(msg),
-                }],
-            },
-            None => ValidatorMessagesListResponse { messages: vec![] },
-        };
-
-        Mock::given(method("GET"))
-            .and(path(format!(
-                "/v5/channel/{}/validator-messages/{}/{}",
-                DUMMY_CAMPAIGN.channel.id(),
-                DUMMY_CAMPAIGN.channel.leader,
-                "NewState",
-            )))
-            .and(query_param("limit", "1"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(&new_state_res))
-            .expect(1)
-            .named("GET NewState helper")
-            .mount_as_scoped(&server)
-            .await
-    }
-
     #[tokio::test]
     async fn test_leader_tick() {
         let config = configuration(Environment::Development, None).expect("Should get Config");
-        let server = setup_mock_server().await;
-        let sentry = setup_sentry(&server, &config).await;
+        let server_setup = ServerSetup::init(&DUMMY_CAMPAIGN.channel).await;
+        let sentry = setup_sentry(&server_setup.server, &config).await;
 
         let channel_context = config
             .find_chain_of(DUMMY_CAMPAIGN.channel.token)
@@ -304,7 +219,7 @@ mod test {
         }
         // No NewState message is returned -> Channel has just been created
         {
-            let _mock_guard =setup_new_state_response(&server, None).await;
+            let _mock_guard = server_setup.setup_new_state_response(None).await;
 
             let tick_result = tick(&sentry, &channel_context, get_initial_balances())
                 .await
@@ -349,7 +264,7 @@ mod test {
                 signature: IDS[&*LEADER].to_checksum(),
                 balances: proposed_balances.into_unchecked(),
             };
-            let _mock_guard = setup_new_state_response(&server, Some(new_state)).await;
+            let _mock_guard = server_setup.setup_new_state_response(Some(new_state)).await;
 
             let tick_result = tick(&sentry, &channel_context, get_initial_balances())
                 .await
@@ -372,7 +287,7 @@ mod test {
                 signature: IDS[&*LEADER].to_checksum(),
                 balances: proposed_balances.into_unchecked(),
             };
-            let _mock_guard = setup_new_state_response(&server, Some(new_state)).await;
+            let _mock_guard = server_setup.setup_new_state_response(Some(new_state)).await;
 
             let mut expected_balances = get_initial_balances();
             expected_balances

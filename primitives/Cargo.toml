@@ -68,6 +68,7 @@ futures = "0.3"
 async-trait = "0.1"
 # Other
 once_cell = "^1.8"
+wiremock = "0.5.12"
 
 [dev-dependencies]
 pretty_assertions = "1"

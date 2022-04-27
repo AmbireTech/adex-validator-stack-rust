@@ -82,7 +82,7 @@ mod test {
     use chrono::{Duration, Utc};
     use primitives::{
         config::{configuration, Environment},
-        sentry::{ValidatorMessage, ValidatorMessagesListResponse, SuccessResponse},
+        sentry::{SuccessResponse, ValidatorMessage, ValidatorMessagesListResponse},
         test_util::{
             discard_logger, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER,
             FOLLOWER, IDS, LEADER,
@@ -94,7 +94,7 @@ mod test {
     use std::{collections::HashMap, str::FromStr};
     use wiremock::{
         matchers::{method, path, query_param},
-        Mock, MockServer, ResponseTemplate, MockGuard
+        Mock, MockGuard, MockServer, ResponseTemplate,
     };
 
     // Sets up wiremock server instance and responses which are shared for all test cases
