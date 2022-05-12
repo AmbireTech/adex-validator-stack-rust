@@ -195,7 +195,8 @@ impl UnifiedNum {
     pub const ONE: UnifiedNum = UnifiedNum(100_000_000);
 
     pub fn div_floor(&self, other: &Self) -> Self {
-        Self(self.0.div_floor(&other.0))
+        // just division will floor the result!
+        self / other
     }
 
     pub const fn from_u64(value: u64) -> Self {
@@ -392,24 +393,7 @@ impl Div<&UnifiedNum> for &UnifiedNum {
     type Output = UnifiedNum;
 
     fn div(self, rhs: &UnifiedNum) -> Self::Output {
-        if rhs == &UnifiedNum::ONE {
-            return *self;
-        }
-
-        // checks for denom = 0 and panics if it is
-        // if both are less than 1.0
-        // or both are > 1.0
-        // we must use the multiplier
-        let ratio = if self < &UnifiedNum::ONE && rhs < &UnifiedNum::ONE
-            || self > &UnifiedNum::ONE && rhs > &UnifiedNum::ONE
-            || self < &UnifiedNum::ONE && rhs > &UnifiedNum::ONE
-        {
-            Ratio::from_integer(self.0) / Ratio::new(rhs.0, UnifiedNum::MULTIPLIER)
-        } else {
-            Ratio::new(self.0, rhs.0)
-        };
-
-        UnifiedNum(ratio.round().to_integer())
+        self.checked_div(rhs).expect("Division by 0")
     }
 }
 
@@ -554,14 +538,30 @@ impl CheckedMul for UnifiedNum {
 }
 
 impl CheckedDiv for UnifiedNum {
-    fn checked_div(&self, v: &Self) -> Option<Self> {
-        let ratio = if self.0 > v.0 {
-            Ratio::new(self.0, v.0).checked_mul(&Ratio::from_integer(UnifiedNum::MULTIPLIER))
+    fn checked_div(&self, rhs: &Self) -> Option<Self> {
+        if rhs == &UnifiedNum::ONE {
+            return Some(*self);
+        }
+
+        // checks for denom = 0 and panics if it is
+        // if both are less than 1.0
+        // or both are > 1.0
+        // or one is left hand side is < 1.0
+        // we must use the multiplier
+        let ratio = if self < &UnifiedNum::ONE && rhs < &UnifiedNum::ONE
+            || self > &UnifiedNum::ONE && rhs > &UnifiedNum::ONE
+            || self < &UnifiedNum::ONE && rhs > &UnifiedNum::ONE
+        {
+            Ratio::from_integer(self.0).checked_div(&Ratio::new(rhs.0, UnifiedNum::MULTIPLIER))
         } else {
-            Ratio::from_integer(self.0).checked_div(&Ratio::new(v.0, UnifiedNum::MULTIPLIER))
+            Some(Ratio::new(self.0, rhs.0))
         };
 
-        ratio.map(|ratio| Self(ratio.round().to_integer()))
+        ratio.map(|ratio| {
+            let integer = ratio.round().to_integer();
+
+            UnifiedNum(integer)
+        })
     }
 }
 
@@ -666,7 +666,7 @@ mod test {
     }
 
     #[test]
-    fn test_unified_num_mul_and_div() {
+    fn test_unified_num_mul_and_div_and_div_floor() {
         // 0.0003
         let three_ten_thousands = UnifiedNum::from(30_000_u64);
         // 0.1
@@ -744,6 +744,46 @@ mod test {
             // Case 6:
             // 3 * 0.1 = 0.30 000 000
             assert_eq!(three * one_tenth, UnifiedNum::from(30_000_000_u64));
+        }
+
+        // Mul & then Div with `checked_mul` & `checked_div`
+        {
+            // 0.00030 * 0.1 / 1000.0 = 0.00 000 003
+            // 30 000 * 10 000 000 / 1 000 00 000 000 = 3
+            let result = UnifiedNum::from(30_000)
+                .checked_mul(&UnifiedNum::from(10_000_000))
+                .and_then(|number| number.checked_div(&UnifiedNum::from(1_000_00_000_000)))
+                .unwrap();
+
+            assert_eq!(UnifiedNum::from(3), result);
+
+            let result = UnifiedNum::from_whole(0.0003)
+                .checked_mul(&UnifiedNum::from_whole(0.1))
+                .and_then(|number| number.checked_div(&UnifiedNum::from_whole(1000)))
+                .unwrap();
+
+            assert_eq!(UnifiedNum::from(3), result);
+        }
+
+        // div_floor
+        {
+            // 0.00006 * 0.1 / 1000.0 = 0.00 000 000 6
+            // 6 000 * 10 000 000 / 1 000 00 000 000 = 0.6 = UnifiedNum(0)
+            let result = UnifiedNum::from(6_000)
+                .checked_mul(&UnifiedNum::from(10_000_000))
+                .map(|number| number.div_floor(&UnifiedNum::from(1_000_00_000_000)))
+                .unwrap();
+
+            assert_eq!(UnifiedNum::ZERO, result);
+
+            // 0.00016 * 0.1 / 1000.0 = 0.00 000 001 6
+            // 16 000 * 10 000 000 / 1 000 00 000 000 = 1.6 = UnifiedNum(1)
+            let result = UnifiedNum::from(16_000)
+                .checked_mul(&UnifiedNum::from(10_000_000))
+                .map(|number| number.div_floor(&UnifiedNum::from(1_000_00_000_000)))
+                .unwrap();
+
+            assert_eq!(UnifiedNum::from(1), result);
         }
     }
 
