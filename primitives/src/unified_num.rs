@@ -1,16 +1,109 @@
 use crate::BigNum;
 use num::{
-    pow::Pow, traits::CheckedRem, CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Integer, One,
+    pow::Pow, rational::Ratio, traits::CheckedRem, CheckedAdd, CheckedDiv, CheckedMul, CheckedSub,
+    Integer, One,
 };
-use num_derive::{FromPrimitive, Num, NumCast, NumOps, ToPrimitive, Zero};
+use num_derive::{FromPrimitive, Num, NumCast, ToPrimitive, Zero};
 use parse_display::{Display, FromStr, ParseError};
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
     fmt,
     iter::Sum,
-    ops::{Add, AddAssign, Div, Mul, Sub},
+    ops::{Add, AddAssign, Div, Mul, Rem, Sub},
 };
+
+pub use whole_number::FromWhole;
+
+mod whole_number {
+    use num::ToPrimitive;
+
+    use crate::UnifiedNum;
+
+    /// Helper trait for handling the creation of special numbers from a whole number
+    pub trait FromWhole<T>: Sized {
+        /// # Panics
+        /// If the number is greater than one can be represented.
+        fn from_whole(whole_number: T) -> Self;
+
+        /// Same as [`Self::from_whole`] but instead of panicking it returns an Option.
+        fn from_whole_opt(whole_number: T) -> Option<Self>;
+    }
+
+    impl FromWhole<f64> for UnifiedNum {
+        fn from_whole(number: f64) -> Self {
+            Self::from_whole_opt(number).expect("The number is too large")
+        }
+
+        fn from_whole_opt(number: f64) -> Option<Self> {
+            let whole_number = number.trunc().to_u64()?.checked_mul(Self::MULTIPLIER)?;
+
+            // multiply the fractional part by the multiplier
+            // truncate it to get the fractional part only
+            // convert it to u64
+            let fract_number = (number.fract() * 10_f64.powf(Self::PRECISION.into()))
+                .round()
+                .to_u64()?;
+
+            whole_number.checked_add(fract_number).map(Self)
+        }
+    }
+
+    impl FromWhole<u64> for UnifiedNum {
+        fn from_whole(whole_number: u64) -> Self {
+            Self(
+                whole_number
+                    .checked_mul(UnifiedNum::MULTIPLIER)
+                    .expect("The whole number is too large"),
+            )
+        }
+
+        fn from_whole_opt(whole_number: u64) -> Option<Self> {
+            whole_number.checked_mul(UnifiedNum::MULTIPLIER).map(Self)
+        }
+    }
+
+    #[cfg(test)]
+    mod test {
+        use crate::UnifiedNum;
+
+        use super::FromWhole;
+
+        #[test]
+        fn test_whole_number_impl_for_f64() {
+            assert_eq!(
+                UnifiedNum::from(800_000_000_u64),
+                UnifiedNum::from_whole(8.0_f64)
+            );
+            assert_eq!(
+                UnifiedNum::from(810_000_000_u64),
+                UnifiedNum::from_whole(8.1_f64)
+            );
+            assert_eq!(
+                UnifiedNum::from(800_000_009_u64),
+                UnifiedNum::from_whole(8.00_000_009_f64)
+            );
+
+            assert_eq!(
+                UnifiedNum::from(800_000_001_u64),
+                UnifiedNum::from_whole(8.000_000_009_f64),
+                "Should round up the floating number"
+            );
+
+            assert_eq!(
+                UnifiedNum::from(800_000_000_u64),
+                UnifiedNum::from_whole(8.000_000_004_f64),
+                "Should round down the floating number"
+            );
+
+            assert_eq!(
+                UnifiedNum::from(123_456_789_000_000_00_u64),
+                UnifiedNum::from_whole(123_456_789.000_000_004_f64),
+                "Should round down the floating number"
+            );
+        }
+    }
+}
 
 /// Unified Number with a precision of 8 digits after the decimal point.
 ///
@@ -23,7 +116,7 @@ use std::{
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```
 /// use primitives::UnifiedNum;
 /// use serde_json::Value;
 ///
@@ -44,7 +137,6 @@ use std::{
     Clone,
     Copy,
     Num,
-    NumOps,
     NumCast,
     ToPrimitive,
     FromPrimitive,
@@ -78,8 +170,29 @@ impl TryFrom<String> for UnifiedNum {
 }
 
 impl UnifiedNum {
+    /// The precision of the [`UnifiedNum`] is 8 decimal numbers after the comma.
     pub const PRECISION: u8 = 8;
+    /// The whole number multiplier when dealing with a [`UnifiedNum`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use primitives::UnifiedNum;
+    ///
+    /// let whole_number = 8_u64; // we want to represent 8.00_000_000
+    ///
+    /// assert_eq!(UnifiedNum::from_u64(800_000_000), UnifiedNum::from(whole_number * UnifiedNum::MULTIPLIER));
+    /// ```
+    pub const MULTIPLIER: u64 = 10_u64.pow(Self::PRECISION as u32);
     pub const DEBUG_DELIMITER: char = '.';
+
+    pub const ZERO: UnifiedNum = UnifiedNum(0);
+    /// The whole number `1` as a [`UnifiedNum`].
+    /// One (`1`) followed by exactly 8 zeroes (`0`).
+    ///
+    /// `1.00_000_000`
+    /// `100_000_000`
+    pub const ONE: UnifiedNum = UnifiedNum(100_000_000);
 
     pub fn div_floor(&self, other: &Self) -> Self {
         Self(self.0.div_floor(&other.0))
@@ -175,8 +288,9 @@ impl fmt::Debug for UnifiedNum {
 }
 
 impl One for UnifiedNum {
+    /// 1.00_000_000
     fn one() -> Self {
-        Self(100_000_000)
+        UnifiedNum::ONE
     }
 }
 
@@ -220,6 +334,14 @@ impl Integer for UnifiedNum {
     }
 }
 
+impl Add<UnifiedNum> for UnifiedNum {
+    type Output = UnifiedNum;
+
+    fn add(self, rhs: UnifiedNum) -> Self::Output {
+        UnifiedNum(self.0 + rhs.0)
+    }
+}
+
 impl Add<&UnifiedNum> for &UnifiedNum {
     type Output = UnifiedNum;
 
@@ -231,6 +353,14 @@ impl Add<&UnifiedNum> for &UnifiedNum {
 impl AddAssign<&UnifiedNum> for UnifiedNum {
     fn add_assign(&mut self, rhs: &UnifiedNum) {
         self.0 += &rhs.0
+    }
+}
+
+impl Sub<UnifiedNum> for UnifiedNum {
+    type Output = UnifiedNum;
+
+    fn sub(self, rhs: UnifiedNum) -> Self::Output {
+        UnifiedNum(self.0 - rhs.0)
     }
 }
 
@@ -262,7 +392,33 @@ impl Div<&UnifiedNum> for &UnifiedNum {
     type Output = UnifiedNum;
 
     fn div(self, rhs: &UnifiedNum) -> Self::Output {
-        UnifiedNum(self.0 / rhs.0)
+        if rhs == &UnifiedNum::ONE {
+            return *self;
+        }
+
+        // checks for denom = 0 and panics if it is
+        // if both are less than 1.0
+        // or both are > 1.0
+        // we must use the multiplier
+        let ratio = if self < &UnifiedNum::ONE && rhs < &UnifiedNum::ONE
+            || self > &UnifiedNum::ONE && rhs > &UnifiedNum::ONE
+            || self < &UnifiedNum::ONE && rhs > &UnifiedNum::ONE
+        {
+            Ratio::from_integer(self.0) / Ratio::new(rhs.0, UnifiedNum::MULTIPLIER)
+        } else {
+            Ratio::new(self.0, rhs.0)
+        };
+
+        UnifiedNum(ratio.round().to_integer())
+    }
+}
+
+impl Div<UnifiedNum> for UnifiedNum {
+    type Output = UnifiedNum;
+
+    fn div(self, rhs: UnifiedNum) -> Self::Output {
+        // Use &UnifiedNum / &UnifiedNum
+        &self / &rhs
     }
 }
 
@@ -270,7 +426,16 @@ impl Div<&UnifiedNum> for UnifiedNum {
     type Output = UnifiedNum;
 
     fn div(self, rhs: &UnifiedNum) -> Self::Output {
-        UnifiedNum(self.0 / rhs.0)
+        // use &UnifiedNum / &UnifiedNum
+        &self / rhs
+    }
+}
+
+impl Mul<UnifiedNum> for UnifiedNum {
+    type Output = UnifiedNum;
+
+    fn mul(self, rhs: UnifiedNum) -> Self::Output {
+        &self * &rhs
     }
 }
 
@@ -278,7 +443,11 @@ impl Mul<&UnifiedNum> for &UnifiedNum {
     type Output = UnifiedNum;
 
     fn mul(self, rhs: &UnifiedNum) -> Self::Output {
-        UnifiedNum(self.0 * rhs.0)
+        // checks for denom = 0 and panics if it is
+        // No need for `checked_div`, because MULTIPLIER is always > 0
+        let ratio = Ratio::from_integer(self.0) * Ratio::new(rhs.0, UnifiedNum::MULTIPLIER);
+
+        UnifiedNum(ratio.round().to_integer())
     }
 }
 
@@ -286,7 +455,8 @@ impl Mul<&UnifiedNum> for UnifiedNum {
     type Output = UnifiedNum;
 
     fn mul(self, rhs: &UnifiedNum) -> Self::Output {
-        UnifiedNum(self.0 * rhs.0)
+        // Use &UnifiedNum * &UnifiedNum
+        &self * rhs
     }
 }
 
@@ -294,7 +464,8 @@ impl Mul<u64> for &UnifiedNum {
     type Output = UnifiedNum;
 
     fn mul(self, rhs: u64) -> Self::Output {
-        UnifiedNum(self.0 * rhs)
+        // Use &UnifiedNum * &UnifiedNum
+        self * &UnifiedNum(rhs)
     }
 }
 
@@ -302,7 +473,8 @@ impl Mul<u64> for UnifiedNum {
     type Output = UnifiedNum;
 
     fn mul(self, rhs: u64) -> Self::Output {
-        UnifiedNum(self.0 * rhs)
+        // Use &UnifiedNum * &UnifiedNum
+        &self * &UnifiedNum(rhs)
     }
 }
 
@@ -310,7 +482,8 @@ impl Mul<UnifiedNum> for u64 {
     type Output = UnifiedNum;
 
     fn mul(self, rhs: UnifiedNum) -> Self::Output {
-        UnifiedNum(self * rhs.0)
+        // Use &UnifiedNum * &UnifiedNum
+        &UnifiedNum(self) * &rhs
     }
 }
 
@@ -318,7 +491,30 @@ impl Mul<&UnifiedNum> for u64 {
     type Output = UnifiedNum;
 
     fn mul(self, rhs: &UnifiedNum) -> Self::Output {
-        UnifiedNum(self * rhs.0)
+        // Use &UnifiedNum * &UnifiedNum
+        &UnifiedNum(self) * rhs
+    }
+}
+
+impl Rem<UnifiedNum> for UnifiedNum {
+    type Output = UnifiedNum;
+
+    fn rem(self, rhs: UnifiedNum) -> Self::Output {
+        UnifiedNum(self.0.rem(rhs.0))
+    }
+}
+
+impl Rem<&UnifiedNum> for &UnifiedNum {
+    type Output = UnifiedNum;
+
+    fn rem(self, rhs: &UnifiedNum) -> Self::Output {
+        UnifiedNum(self.0.rem(rhs.0))
+    }
+}
+
+impl CheckedRem for UnifiedNum {
+    fn checked_rem(&self, v: &Self) -> Option<Self> {
+        self.0.checked_rem(v.0).map(Self)
     }
 }
 
@@ -350,19 +546,22 @@ impl CheckedSub for UnifiedNum {
 
 impl CheckedMul for UnifiedNum {
     fn checked_mul(&self, v: &Self) -> Option<Self> {
-        self.0.checked_mul(v.0).map(Self)
+        let ratio =
+            Ratio::from_integer(self.0).checked_mul(&Ratio::new(v.0, UnifiedNum::MULTIPLIER));
+
+        ratio.map(|ratio| Self(ratio.round().to_integer()))
     }
 }
 
 impl CheckedDiv for UnifiedNum {
     fn checked_div(&self, v: &Self) -> Option<Self> {
-        self.0.checked_div(v.0).map(Self)
-    }
-}
+        let ratio = if self.0 > v.0 {
+            Ratio::new(self.0, v.0).checked_mul(&Ratio::from_integer(UnifiedNum::MULTIPLIER))
+        } else {
+            Ratio::from_integer(self.0).checked_div(&Ratio::new(v.0, UnifiedNum::MULTIPLIER))
+        };
 
-impl CheckedRem for UnifiedNum {
-    fn checked_rem(&self, v: &Self) -> Option<Self> {
-        self.0.checked_rem(v.0).map(Self)
+        ratio.map(|ratio| Self(ratio.round().to_integer()))
     }
 }
 
@@ -464,6 +663,151 @@ mod test {
             UnifiedNum::from_precision(larger_bignum, dai_precision),
             "Should floor the large BigNum"
         );
+    }
+
+    #[test]
+    fn test_unified_num_mul_and_div() {
+        // 0.0003
+        let three_ten_thousands = UnifiedNum::from(30_000_u64);
+        // 0.1
+        let one_tenth = UnifiedNum::from(10_000_000_u64);
+
+        // 1.0
+        let one = UnifiedNum::ONE;
+
+        // 2.0
+        let two = UnifiedNum::from(2_00_000_000);
+
+        // 3.0
+        let three = UnifiedNum::from(3_00_000_000);
+
+        // division
+        {
+            // Case 1:
+            // 0.0003 / 0.1 = 0.003
+            //
+            // 0.00 030 000 / 0.10 000 000 = 0.00 300 000
+            // 30 000 / 10 000 000 = 300 000
+            assert_eq!(UnifiedNum::from(300_000), three_ten_thousands / one_tenth);
+
+            // Case 2:
+            // 3.0 / 0.1 = 30
+            // 3 00 000 000 / 10 000 000 = 30
+            assert_eq!(UnifiedNum::from(30), three / one_tenth);
+
+            // Case 3:
+            // 3.0 / 1.0 = 3.0
+            // 3 00 000 000 / 1 00 000 000 * MULTIPLIER = 3 00 000 000
+            assert_eq!(three, three / one);
+
+            // Case 4:
+            // 3.0 / 2.0 = 1.5
+            // 3 00 000 000 / 2 00 000 000 * MULTIPLIER = 1 50 000 000
+            assert_eq!(UnifiedNum::from(1_50_000_000), three / two);
+
+            // Case 4:
+            // 2.0 / 3.0 = 0.66666667
+            // 3 00 000 000 / 2 00 000 000 * MULTIPLIER = 66 666 667
+            assert_eq!(UnifiedNum::from(66_666_667), two / three);
+
+            // Case 5:
+            // 0.1 / 3.0 = 0.03333333
+            // 10 000 000 / 3 00 000 000 * MULTIPLIER = 3 333 333
+            assert_eq!(UnifiedNum::from(3_333_333), one_tenth / three);
+        }
+
+        // multiplication
+        {
+            // Case 1:
+            // 0.0003 * 1 = 0.0003
+            // 0.00 030 000 * 1 = 0.00 030 000
+            assert_eq!(three_ten_thousands * one, three_ten_thousands);
+
+            // Case 2:
+            // 3 * 1 = 3
+            assert_eq!(three * one, three);
+
+            // Case 3:
+            // 0.0003 * 0.1 = 0.00003
+            // 0.00030000 * 0.10000000 = 0.00 003 000
+            assert_eq!(three_ten_thousands * one_tenth, UnifiedNum::from(3_000_u64));
+
+            // Case 4:
+            // 0.0003 * 2 = 0.0006
+            // 0.00 030 000 * 2 = 0.00 060 000
+            assert_eq!(three_ten_thousands * two, UnifiedNum::from(60_000_u64));
+
+            // Case 5:
+            // 3 * 2 = 6
+            assert_eq!(three * two, UnifiedNum::from(600_000_000_u64));
+
+            // Case 6:
+            // 3 * 0.1 = 0.30 000 000
+            assert_eq!(three * one_tenth, UnifiedNum::from(30_000_000_u64));
+        }
+    }
+
+    #[test]
+    fn test_unified_num_rem_and_checked_rem_and_with_whole() {
+        // 10.0 % 3.0 = 1.0
+        assert_eq!(
+            UnifiedNum::ONE,
+            UnifiedNum::from(10_00_000_000) % UnifiedNum::from(3_00_000_000)
+        );
+
+        assert_eq!(
+            UnifiedNum::ONE,
+            UnifiedNum::from_whole(10) % UnifiedNum::from_whole(3)
+        );
+
+        assert_eq!(
+            UnifiedNum::ONE,
+            UnifiedNum::from_whole(10.0) % UnifiedNum::from_whole(3.0)
+        );
+        assert_eq!(
+            UnifiedNum::from(100_000_000),
+            UnifiedNum::from_whole(10) % UnifiedNum::from_whole(3)
+        );
+
+        // 10.0 % 0.3 = 0.1
+        {
+            assert_eq!(
+                UnifiedNum::from_whole(10.0),
+                UnifiedNum::from(10_00_000_000) % UnifiedNum::from_whole(30_000_000)
+            );
+
+            assert_eq!(
+                UnifiedNum::from(10_000_000),
+                UnifiedNum::from_whole(10.0) % UnifiedNum::from_whole(0.3)
+            );
+
+            assert_eq!(
+                UnifiedNum::from(10_000_000),
+                UnifiedNum::from_whole(10) % UnifiedNum::from_whole(0.3)
+            );
+        }
+
+        // 0.3 % 10.0 = 0.3
+        {
+            assert_eq!(
+                UnifiedNum::from(30_000_000),
+                UnifiedNum::from(30_000_000) % UnifiedNum::from(10_00_000_000)
+            );
+
+            assert_eq!(
+                UnifiedNum::from_whole(0.3),
+                UnifiedNum::from_whole(0.3) % UnifiedNum::from_whole(10.0)
+            );
+        }
+
+        // CheckedRem by 0
+        {
+            assert_eq!(
+                None,
+                UnifiedNum::from_whole(3).checked_rem(&UnifiedNum::ZERO),
+                "CheckedRem by zero should result in None"
+            );
+        }
     }
 }
 
