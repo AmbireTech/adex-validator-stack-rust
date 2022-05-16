@@ -460,7 +460,7 @@ impl Mul<u64> for &UnifiedNum {
 
     fn mul(self, rhs: u64) -> Self::Output {
         // Use &UnifiedNum * &UnifiedNum
-        self * &UnifiedNum(rhs)
+        self * &UnifiedNum::from_whole(rhs)
     }
 }
 
@@ -469,7 +469,7 @@ impl Mul<u64> for UnifiedNum {
 
     fn mul(self, rhs: u64) -> Self::Output {
         // Use &UnifiedNum * &UnifiedNum
-        &self * &UnifiedNum(rhs)
+        &self * &UnifiedNum::from_whole(rhs)
     }
 }
 
@@ -478,7 +478,7 @@ impl Mul<UnifiedNum> for u64 {
 
     fn mul(self, rhs: UnifiedNum) -> Self::Output {
         // Use &UnifiedNum * &UnifiedNum
-        &UnifiedNum(self) * &rhs
+        &UnifiedNum::from_whole(self) * &rhs
     }
 }
 
@@ -487,7 +487,7 @@ impl Mul<&UnifiedNum> for u64 {
 
     fn mul(self, rhs: &UnifiedNum) -> Self::Output {
         // Use &UnifiedNum * &UnifiedNum
-        &UnifiedNum(self) * rhs
+        &UnifiedNum::from_whole(self) * rhs
     }
 }
 
