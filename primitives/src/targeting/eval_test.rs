@@ -230,19 +230,45 @@ mod dsl_test {
 
         let cases = vec![
             (Value::new_string("1000"), Value::UnifiedNum(1000.into())),
-            (Value::new_number(2_000), Value::UnifiedNum(2_000.into())),
+            (
+                Value::new_number(2_000),
+                Value::UnifiedNum(UnifiedNum::from_whole(2_000)),
+            ),
             (Value::UnifiedNum(3.into()), Value::UnifiedNum(3.into())),
-            // rounded floats should work!
+            // whole number floats should work!
             (
                 Value::Number(Number::from_f64(40.0).expect("should create float number")),
-                Value::UnifiedNum(40.into()),
+                Value::UnifiedNum(UnifiedNum::from_whole(40)),
+            ),
+            // as whole non-rounded floats should too
+            (
+                Value::Number(Number::from_f64(2.5).expect("should create float number")),
+                Value::UnifiedNum(UnifiedNum::from_whole(2.5)),
+            ),
+            // with rounding up
+            (
+                Value::Number(
+                    Number::from_f64(9.99_999_999_9).expect("should create float number"),
+                ),
+                Value::UnifiedNum(UnifiedNum::from_whole(10)),
+            ),
+            // rounding down
+            (
+                Value::Number(
+                    Number::from_f64(8.99_999_999_4).expect("should create float number"),
+                ),
+                Value::UnifiedNum(UnifiedNum::from(8_99_999_999)),
             ),
         ];
 
         for (from, expected) in cases.into_iter() {
             let rule = Rule::Function(Function::new_bn(from));
 
-            assert_eq!(Ok(Some(expected)), rule.eval(&input, &mut output));
+            assert_eq!(
+                Ok(Some(expected)),
+                rule.clone().eval(&input, &mut output),
+                "rule: {rule:?}"
+            );
         }
     }
 
@@ -261,13 +287,18 @@ mod dsl_test {
             Value::new_number(-100),
             Value::Bool(true),
             Value::Array(vec![Value::Bool(false)]),
-            Value::Number(Number::from_f64(2.5).expect("should create float number")),
+            // UnifiedNums can only be positive
+            Value::Number(Number::from_f64(-2.5).expect("should create float number")),
         ];
 
         for error_case in error_cases.into_iter() {
             let rule = Rule::Function(Function::new_bn(error_case));
 
-            assert_eq!(Err(Error::TypeError), rule.eval(&input, &mut output));
+            assert_eq!(
+                Err(Error::TypeError),
+                rule.clone().eval(&input, &mut output),
+                "rule: {rule:?}"
+            );
         }
     }
 
@@ -348,20 +379,24 @@ mod math_functions {
         };
 
         let cases = vec![
+            // Divide non whole number to whole number
             (
                 Value::UnifiedNum(100.into()),
-                Value::UnifiedNum(3.into()),
+                Value::UnifiedNum(UnifiedNum::from_whole(3)),
                 Value::UnifiedNum(33.into()),
             ),
+            // Divide whole numbers
             (
                 Value::new_number(100),
-                Value::UnifiedNum(3.into()),
-                Value::UnifiedNum(33.into()),
+                Value::UnifiedNum(UnifiedNum::from_whole(3)),
+                // 33.33 333 333
+                Value::UnifiedNum(UnifiedNum::from(33_33_333_333)),
             ),
             (
-                Value::UnifiedNum(100.into()),
+                Value::UnifiedNum(UnifiedNum::from_whole(100)),
                 Value::new_number(3),
-                Value::UnifiedNum(33.into()),
+                // 33.33 333 333
+                Value::UnifiedNum(UnifiedNum::from(33_33_333_333)),
             ),
             (
                 Value::Number(Number::from_f64(100.0).expect("should create float number")),
@@ -380,7 +415,11 @@ mod math_functions {
         for (lhs, rhs, expected) in cases.into_iter() {
             let rule = Rule::Function(Function::new_div(lhs, rhs));
 
-            assert_eq!(Ok(Some(expected)), rule.eval(&input, &mut output));
+            assert_eq!(
+                Ok(Some(expected)),
+                rule.clone().eval(&input, &mut output),
+                "rule: {rule:?}"
+            );
         }
     }
     #[test]
@@ -394,9 +433,9 @@ mod math_functions {
 
         let cases = vec![
             (
-                Value::UnifiedNum(3.into()),
-                Value::UnifiedNum(1000.into()),
-                Value::UnifiedNum(3000.into()),
+                Value::UnifiedNum(UnifiedNum::from_whole(3)),
+                Value::UnifiedNum(UnifiedNum::from_whole(1000)),
+                Value::UnifiedNum(UnifiedNum::from_whole(3000)),
             ),
             (
                 Value::new_number(3),
@@ -404,9 +443,9 @@ mod math_functions {
                 Value::UnifiedNum(3000.into()),
             ),
             (
-                Value::UnifiedNum(3.into()),
+                Value::UnifiedNum(UnifiedNum::from_whole(3)),
                 Value::new_number(1000),
-                Value::UnifiedNum(3000.into()),
+                Value::UnifiedNum(UnifiedNum::from_whole(3000)),
             ),
             (
                 Value::Number(Number::from_f64(0.5).expect("should create float number")),
@@ -423,7 +462,11 @@ mod math_functions {
         for (lhs, rhs, expected) in cases.into_iter() {
             let rule = Rule::Function(Function::new_mul(lhs, rhs));
 
-            assert_eq!(Ok(Some(expected)), rule.eval(&input, &mut output));
+            assert_eq!(
+                Ok(Some(expected)),
+                rule.clone().eval(&input, &mut output),
+                "rule: {rule:?}"
+            );
         }
     }
     #[test]
@@ -443,13 +486,13 @@ mod math_functions {
             ),
             (
                 Value::new_number(10),
-                Value::UnifiedNum(3.into()),
-                Value::UnifiedNum(1.into()),
+                Value::UnifiedNum(UnifiedNum::from_whole(3)),
+                Value::UnifiedNum(UnifiedNum::from_whole(1)),
             ),
             (
-                Value::UnifiedNum(10.into()),
+                Value::UnifiedNum(UnifiedNum::from_whole(10)),
                 Value::new_number(4),
-                Value::UnifiedNum(2.into()),
+                Value::UnifiedNum(UnifiedNum::from_whole(2)),
             ),
             (
                 Value::Number(Number::from_f64(10.0).expect("should create float number")),
@@ -466,7 +509,11 @@ mod math_functions {
         for (lhs, rhs, expected) in cases.into_iter() {
             let rule = Function::new_mod(lhs, rhs);
 
-            assert_eq!(Ok(Some(expected)), rule.eval(&input, &mut output));
+            assert_eq!(
+                Ok(Some(expected)),
+                rule.clone().eval(&input, &mut output),
+                "rule: {rule:?}"
+            );
         }
     }
     #[test]
@@ -486,13 +533,13 @@ mod math_functions {
             ),
             (
                 Value::new_number(2),
-                Value::UnifiedNum(2.into()),
-                Value::UnifiedNum(4.into()),
+                Value::UnifiedNum(UnifiedNum::from_whole(2)),
+                Value::UnifiedNum(UnifiedNum::from_whole(4)),
             ),
             (
-                Value::UnifiedNum(2.into()),
+                Value::UnifiedNum(UnifiedNum::from_whole(2)),
                 Value::new_number(2),
-                Value::UnifiedNum(4.into()),
+                Value::UnifiedNum(UnifiedNum::from_whole(4)),
             ),
             (
                 Value::Number(Number::from_f64(2.2).expect("should create float number")),
@@ -509,7 +556,11 @@ mod math_functions {
         for (lhs, rhs, expected) in cases.into_iter() {
             let rule = Rule::Function(Function::new_add(lhs, rhs));
 
-            assert_eq!(Ok(Some(expected)), rule.eval(&input, &mut output));
+            assert_eq!(
+                Ok(Some(expected)),
+                rule.eval(&input, &mut output),
+                "rule: {rule:?}"
+            );
         }
     }
     #[test]
@@ -522,37 +573,46 @@ mod math_functions {
         };
 
         let cases = vec![
+            // Not whole number operation
             (
+                // 0.00 000 010
                 Value::UnifiedNum(10.into()),
                 Value::UnifiedNum(2.into()),
                 Value::UnifiedNum(8.into()),
             ),
+            // whole number operations
             (
-                Value::new_number(10),
-                Value::UnifiedNum(10.into()),
-                Value::UnifiedNum(0.into()),
+                Value::new_number(10_u64),
+                Value::UnifiedNum(UnifiedNum::from_whole(10)),
+                Value::UnifiedNum(UnifiedNum::ZERO),
             ),
             (
-                Value::UnifiedNum(10.into()),
-                Value::new_number(5),
-                Value::UnifiedNum(5.into()),
+                Value::UnifiedNum(UnifiedNum::from_whole(10)),
+                Value::new_number(5_u64),
+                Value::UnifiedNum(UnifiedNum::from_whole(5)),
             ),
+            // Float whole number operation
             (
                 Value::Number(Number::from_f64(8.4).expect("should create float number")),
                 Value::Number(Number::from_f64(2.7).expect("should create float number")),
                 Value::Number(Number::from_f64(5.7).expect("should create float number")),
             ),
+            // Whole number operation
             (
-                Value::new_number(10),
-                Value::new_number(4),
-                Value::new_number(6),
+                Value::new_number(10_u64),
+                Value::new_number(4_u64),
+                Value::new_number(6_u64),
             ),
         ];
 
         for (lhs, rhs, expected) in cases.into_iter() {
             let rule = Rule::Function(Function::new_sub(lhs, rhs));
 
-            assert_eq!(Ok(Some(expected)), rule.eval(&input, &mut output));
+            assert_eq!(
+                Ok(Some(expected.clone())),
+                rule.eval(&input, &mut output),
+                "rule: {rule:?}"
+            );
         }
     }
     #[test]
@@ -572,13 +632,13 @@ mod math_functions {
             ),
             (
                 Value::new_number(10),
-                Value::UnifiedNum(100.into()),
-                Value::UnifiedNum(10.into()),
+                Value::UnifiedNum(UnifiedNum::from_whole(100)),
+                Value::UnifiedNum(UnifiedNum::from_whole(10)),
             ),
             (
-                Value::UnifiedNum(10.into()),
+                Value::UnifiedNum(UnifiedNum::from_whole(10)),
                 Value::new_number(10),
-                Value::UnifiedNum(10.into()),
+                Value::UnifiedNum(UnifiedNum::from_whole(10)),
             ),
             (
                 Value::Number(Number::from_f64(0.1).expect("should create float number")),
@@ -595,7 +655,11 @@ mod math_functions {
         for (lhs, rhs, expected) in cases.into_iter() {
             let rule = Rule::Function(Function::new_min(lhs, rhs));
 
-            assert_eq!(Ok(Some(expected)), rule.eval(&input, &mut output));
+            assert_eq!(
+                Ok(Some(expected)),
+                rule.eval(&input, &mut output),
+                "rule: {rule:?}"
+            );
         }
     }
     #[test]
@@ -615,13 +679,13 @@ mod math_functions {
             ),
             (
                 Value::new_number(10),
-                Value::UnifiedNum(100.into()),
-                Value::UnifiedNum(100.into()),
+                Value::UnifiedNum(UnifiedNum::from_whole(100)),
+                Value::UnifiedNum(UnifiedNum::from_whole(100)),
             ),
             (
-                Value::UnifiedNum(10.into()),
+                Value::UnifiedNum(UnifiedNum::from_whole(10)),
                 Value::new_number(10),
-                Value::UnifiedNum(10.into()),
+                Value::UnifiedNum(UnifiedNum::from_whole(10)),
             ),
             (
                 Value::Number(Number::from_f64(0.1).expect("should create float number")),
@@ -701,11 +765,16 @@ mod math_functions {
             ),
             (
                 Value::new_number(100),
-                Value::UnifiedNum(100.into()),
+                Value::UnifiedNum(UnifiedNum::from_whole(100)),
                 Value::Bool(true),
             ),
             (
-                Value::UnifiedNum(10.into()),
+                Value::new_number(100),
+                Value::UnifiedNum(100.into()),
+                Value::Bool(false),
+            ),
+            (
+                Value::UnifiedNum(UnifiedNum::from_whole(10)),
                 Value::new_number(100),
                 Value::Bool(true),
             ),
@@ -713,6 +782,11 @@ mod math_functions {
                 Value::Number(Number::from_f64(0.1).expect("should create float number")),
                 Value::Number(Number::from_f64(0.11).expect("should create float number")),
                 Value::Bool(true),
+            ),
+            (
+                Value::new_number(20),
+                Value::new_number(15),
+                Value::Bool(false),
             ),
             (
                 Value::new_number(0),
@@ -724,7 +798,11 @@ mod math_functions {
         for (lhs, rhs, expected) in cases.into_iter() {
             let rule = Rule::Function(Function::new_lte(lhs, rhs));
 
-            assert_eq!(Ok(Some(expected)), rule.eval(&input, &mut output));
+            assert_eq!(
+                Ok(Some(expected)),
+                rule.clone().eval(&input, &mut output),
+                "rule: {rule:?}"
+            );
         }
     }
     #[test]
@@ -744,12 +822,17 @@ mod math_functions {
             ),
             (
                 Value::new_number(100),
-                Value::UnifiedNum(100.into()),
+                Value::UnifiedNum(UnifiedNum::from_whole(100)),
                 Value::Bool(false),
             ),
             (
-                Value::UnifiedNum(10.into()),
+                Value::UnifiedNum(UnifiedNum::from_whole(10)),
                 Value::new_number(100),
+                Value::Bool(false),
+            ),
+            (
+                Value::new_number(10),
+                Value::UnifiedNum(UnifiedNum::from_whole(100)),
                 Value::Bool(false),
             ),
             (
@@ -767,7 +850,11 @@ mod math_functions {
         for (lhs, rhs, expected) in cases.into_iter() {
             let rule = Rule::Function(Function::new_gt(lhs, rhs));
 
-            assert_eq!(Ok(Some(expected)), rule.eval(&input, &mut output));
+            assert_eq!(
+                Ok(Some(expected)),
+                rule.clone().eval(&input, &mut output),
+                "rule: {rule:?}"
+            );
         }
     }
     #[test]
@@ -787,11 +874,16 @@ mod math_functions {
             ),
             (
                 Value::new_number(100),
-                Value::UnifiedNum(100.into()),
+                Value::UnifiedNum(UnifiedNum::from_whole(100)),
                 Value::Bool(true),
             ),
             (
-                Value::UnifiedNum(10.into()),
+                Value::UnifiedNum(UnifiedNum::from_whole(100)),
+                Value::new_number(100),
+                Value::Bool(true),
+            ),
+            (
+                Value::UnifiedNum(UnifiedNum::from_whole(10)),
                 Value::new_number(100),
                 Value::Bool(false),
             ),
@@ -810,7 +902,11 @@ mod math_functions {
         for (lhs, rhs, expected) in cases.into_iter() {
             let rule = Rule::Function(Function::new_gte(lhs, rhs));
 
-            assert_eq!(Ok(Some(expected)), rule.eval(&input, &mut output));
+            assert_eq!(
+                Ok(Some(expected)),
+                rule.clone().eval(&input, &mut output),
+                "rule: {rule:?}"
+            );
         }
     }
     #[test]
@@ -870,14 +966,16 @@ mod math_functions {
             price: Default::default(),
         };
 
+        // multiply and divide against whole numbers
         let rule = Rule::Function(Function::new_muldiv(
-            Value::UnifiedNum(10.into()),
-            Value::UnifiedNum(10.into()),
-            Value::UnifiedNum(2.into()),
+            Value::UnifiedNum(UnifiedNum::from_whole(10)),
+            Value::UnifiedNum(UnifiedNum::from_whole(10)),
+            Value::UnifiedNum(UnifiedNum::from_whole(2)),
         ));
         assert_eq!(
-            Ok(Some(Value::UnifiedNum(50.into()))),
-            rule.eval(&input, &mut output)
+            Ok(Some(Value::UnifiedNum(UnifiedNum::from_whole(50)))),
+            rule.clone().eval(&input, &mut output),
+            "rule: {rule:?}"
         );
     }
 }
