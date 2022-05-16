@@ -115,7 +115,7 @@ pub struct ValidatorDesc {
     ///
     /// Each fee is calculated based on the payout for an event.
     ///
-    /// payout * fee / 1000 = event fee payoout
+    /// payout * fee / 1000 = event fee payout
     pub fee: UnifiedNum,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     /// The address which will receive the fees
