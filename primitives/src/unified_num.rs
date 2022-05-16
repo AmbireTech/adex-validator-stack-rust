@@ -194,8 +194,14 @@ impl UnifiedNum {
     pub const ONE: UnifiedNum = UnifiedNum(100_000_000);
 
     pub fn div_floor(&self, other: &Self) -> Self {
-        // just division will floor the result!
-        self / other
+        let ratio =
+            div_unified_num_to_ratio(self, other).expect("Failed to create ratio for div_floor");
+
+        let whole_number = ratio
+            .checked_div(&Ratio::from_integer(UnifiedNum::MULTIPLIER))
+            .expect("Should divide with Multiplier for div_floor");
+
+        UnifiedNum::from_whole(whole_number.to_integer())
     }
 
     pub const fn from_u64(value: u64) -> Self {
@@ -617,97 +623,93 @@ mod test {
 
         // 2 / 0.1 = 20
         assert_eq!(
-            UnifiedNum::from_whole(20),
-            UnifiedNum(
-                div_unified_num_to_ratio(&two, &one_tenth)
-                    .unwrap()
-                    .to_integer()
-            )
+            20 * UnifiedNum::MULTIPLIER,
+            div_unified_num_to_ratio(&two, &one_tenth)
+                .unwrap()
+                .to_integer()
         );
-        assert_eq!(UnifiedNum::from_whole(20), two / one_tenth);
 
+        // 3 / 0.1 = 30
         assert_eq!(
-            UnifiedNum::from_whole(30),
-            UnifiedNum(
-                div_unified_num_to_ratio(&three, &one_tenth)
-                    .unwrap()
-                    .to_integer()
-            )
+            30 * UnifiedNum::MULTIPLIER,
+            div_unified_num_to_ratio(&three, &one_tenth)
+                .unwrap()
+                .to_integer()
         );
-        assert_eq!(UnifiedNum::from_whole(30), three / one_tenth);
 
         // 1 / 0.1 = 10
         assert_eq!(
-            UnifiedNum::from_whole(10),
-            UnifiedNum(
-                div_unified_num_to_ratio(&one, &one_tenth)
-                    .unwrap()
-                    .to_integer()
-            )
+            10 * UnifiedNum::MULTIPLIER,
+            div_unified_num_to_ratio(&one, &one_tenth)
+                .unwrap()
+                .to_integer()
         );
-        assert_eq!(UnifiedNum::from_whole(10), one / one_tenth);
 
         // 0.1 / 1 = 0.1
         assert_eq!(
-            UnifiedNum::from_whole(0.1),
-            UnifiedNum(
-                div_unified_num_to_ratio(&one_tenth, &one)
-                    .unwrap()
-                    .to_integer()
-            )
+            10_000_000_u64,
+            div_unified_num_to_ratio(&one_tenth, &one)
+                .unwrap()
+                .to_integer()
         );
-        assert_eq!(UnifiedNum::from_whole(0.1), one_tenth / one);
 
         // 0.1 / 2 = 0.05
         assert_eq!(
-            UnifiedNum::from_whole(0.05),
-            UnifiedNum(
-                div_unified_num_to_ratio(&one_tenth, &two)
-                    .unwrap()
-                    .to_integer()
-            )
+            5_000_000,
+            div_unified_num_to_ratio(&one_tenth, &two)
+                .unwrap()
+                .to_integer()
         );
-        assert_eq!(UnifiedNum::from_whole(0.05), one_tenth / two);
+
         // 0.00 000 001
+        // 0.00 000 001 / 2.0 = 0.00 000 001
         // should round
         assert_eq!(
-            UnifiedNum::from_whole(0.00_000_001),
-            UnifiedNum(
-                div_unified_num_to_ratio(&smallest, &two)
-                    .unwrap()
-                    .round()
-                    .to_integer()
-            )
+            1_u64,
+            div_unified_num_to_ratio(&smallest, &two)
+                .unwrap()
+                .round()
+                .to_integer()
         );
 
         // 0.00 000 000
         // should floor
         assert_eq!(
-            UnifiedNum::from_whole(0),
-            UnifiedNum(
-                div_unified_num_to_ratio(&smallest, &two)
-                    .unwrap()
-                    .floor()
-                    .to_integer()
-            )
+            0,
+            div_unified_num_to_ratio(&smallest, &two)
+                .unwrap()
+                .floor()
+                .to_integer()
         );
-        assert_eq!(UnifiedNum::from_whole(0), smallest / two);
-        assert_eq!(UnifiedNum::from_whole(0), smallest.div_floor(&two));
 
         // 0.00 000 015 / 2 = 0.00 000 007 5
         // 0.00 000 008 (when rounding)
         // 0.00 000 007 (when flooring)
         assert_eq!(
-            UnifiedNum::from(8),
-            UnifiedNum(
-                div_unified_num_to_ratio(&fifteen, &two)
-                    .unwrap()
-                    .round()
-                    .to_integer()
-            )
+            8,
+            div_unified_num_to_ratio(&fifteen, &two)
+                .unwrap()
+                .round()
+                .to_integer()
         );
-        assert_eq!(UnifiedNum::from(7), fifteen.div_floor(&two));
 
+        assert_eq!(
+            7,
+            div_unified_num_to_ratio(&fifteen, &two)
+                .unwrap()
+                .floor()
+                .to_integer()
+        );
+
+        // should ceil to smallest
+        // 0.00 000 001 / 3.0 = 0.00 000 000 3333..
+        assert_eq!(
+            smallest.to_u64(),
+            div_unified_num_to_ratio(&smallest, &three)
+                .unwrap()
+                .ceil()
+                .to_integer()
+        );
         // Check Division with zero & Zero division
         {
             assert_eq!(None, div_unified_num_to_ratio(&one, &zero), "Division by 0");
@@ -822,78 +824,70 @@ mod test {
         // 3.0
         let three = UnifiedNum::from(3_00_000_000);
 
+        let fifteen = UnifiedNum::from_whole(15);
+
         // division
         {
-            // Case 1:
             // 0.0003 / 0.1 = 0.003
-            //
-            // 0.00 030 000 / 0.10 000 000 = 0.00 300 000
-            // 30 000 / 10 000 000 = 300 000
             assert_eq!(UnifiedNum::from(300_000), three_ten_thousands / one_tenth);
 
-            // Case 2:
-            // 3.0 / 0.1 = 30
-            // 3 00 000 000 / 10 000 000 = 30
+            // 3.0 / 0.1 = 30.0
             assert_eq!(UnifiedNum::from_whole(30), three / one_tenth);
+            // 2.0 / 0.1 = 20.0
+            assert_eq!(UnifiedNum::from_whole(20), two / one_tenth);
+            // 1.0 / 0.1 = 10.0
+            assert_eq!(UnifiedNum::from_whole(10), one / one_tenth);
 
-            // Case 3:
             // 3.0 / 1.0 = 3.0
-            // 3 00 000 000 / 1 00 000 000 * MULTIPLIER = 3 00 000 000
             assert_eq!(three, three / one);
 
-            // Case 4:
             // 3.0 / 2.0 = 1.5
-            // 3 00 000 000 / 2 00 000 000 * MULTIPLIER = 1 50 000 000
             assert_eq!(UnifiedNum::from(1_50_000_000), three / two);
 
-            // Case 4:
             // 2.0 / 3.0 = 0.6666666...
-            // 3 00 000 000 / 2 00 000 000 * MULTIPLIER = 66 666 666 (floored)
             assert_eq!(UnifiedNum::from(66_666_666), two / three);
 
-            // Case 5:
             // 0.1 / 3.0 = 0.03333333
-            // 10 000 000 / 3 00 000 000 * MULTIPLIER = 3 333 333
             assert_eq!(UnifiedNum::from(3_333_333), one_tenth / three);
+            
+            // 0.1 / 2.0 = 0.05
+            assert_eq!(UnifiedNum::from_whole(0.05), one_tenth / two);
+
+            // 0.1 / 1.0 = 0.1
+            assert_eq!(one_tenth, one_tenth / one);
+
+            // 15.0 / 2 = 7.5
+            assert_eq!(UnifiedNum::from_whole(7.5), fifteen / &two);
         }
 
         // multiplication
         {
-            // Case 1:
             // 0.0003 * 1 = 0.0003
-            // 0.00 030 000 * 1 = 0.00 030 000
             assert_eq!(three_ten_thousands * one, three_ten_thousands);
 
-            // Case 2:
             // 3 * 1 = 3
             assert_eq!(three * one, three);
 
-            // Case 3:
             // 0.0003 * 0.1 = 0.00003
-            // 0.00030000 * 0.10000000 = 0.00 003 000
             assert_eq!(three_ten_thousands * one_tenth, UnifiedNum::from(3_000_u64));
 
-            // Case 4:
             // 0.0003 * 2 = 0.0006
-            // 0.00 030 000 * 2 = 0.00 060 000
             assert_eq!(three_ten_thousands * two, UnifiedNum::from(60_000_u64));
 
-            // Case 5:
             // 3 * 2 = 6
             assert_eq!(three * two, UnifiedNum::from(600_000_000_u64));
 
-            // Case 6:
-            // 3 * 0.1 = 0.30 000 000
+            // 3 * 0.1 = 0.3
             assert_eq!(three * one_tenth, UnifiedNum::from(30_000_000_u64));
         }
 
         // Mul & then Div with `checked_mul` & `checked_div`
         {
-            // 0.00030 * 0.1 / 1000.0 = 0.00 000 003
+            // 0.0003 * 0.1 / 1000.0 = 0.00 000 003
             // 30 000 * 10 000 000 / 1 000 00 000 000 = 3
-            let result = UnifiedNum::from(30_000)
-                .checked_mul(&UnifiedNum::from(10_000_000))
-                .and_then(|number| number.checked_div(&UnifiedNum::from(1_000_00_000_000)))
+            let result = UnifiedNum::from_whole(0.0003)
+                .checked_mul(&UnifiedNum::from_whole(0.1))
+                .and_then(|number| number.checked_div(&UnifiedNum::from_whole(1_000)))
                 .unwrap();
 
             assert_eq!(UnifiedNum::from(3), result);
@@ -908,23 +902,16 @@ mod test {
 
         // div_floor
         {
-            // 0.00006 * 0.1 / 1000.0 = 0.00 000 000 6
-            // 6 000 * 10 000 000 / 1 000 00 000 000 = 0.6 = UnifiedNum(0)
-            let result = UnifiedNum::from(6_000)
-                .checked_mul(&UnifiedNum::from(10_000_000))
-                .map(|number| number.div_floor(&UnifiedNum::from(1_000_00_000_000)))
-                .unwrap();
-
+            // 1.2 / 2 = 0.6 = 0.0 (floored)
+            let result = UnifiedNum::from_whole(1.2).div_floor(&UnifiedNum::from_whole(2));
             assert_eq!(UnifiedNum::ZERO, result);
 
-            // 0.00016 * 0.1 / 1000.0 = 0.00 000 001 6
-            // 16 000 * 10 000 000 / 1 000 00 000 000 = 1.6 = UnifiedNum(1)
-            let result = UnifiedNum::from(16_000)
-                .checked_mul(&UnifiedNum::from(10_000_000))
-                .map(|number| number.div_floor(&UnifiedNum::from(1_000_00_000_000)))
-                .unwrap();
+            // 3.8 / 2 = 1.9 = 1.0 (floored)
+            let result = UnifiedNum::from_whole(3.2).div_floor(&UnifiedNum::from_whole(2));
+            assert_eq!(UnifiedNum::ONE, result);
 
-            assert_eq!(UnifiedNum::from(1), result);
+            // 15 / 2 = 7 (floored)
+            assert_eq!(UnifiedNum::from_whole(7), fifteen.div_floor(&two));
         }
     }
 
