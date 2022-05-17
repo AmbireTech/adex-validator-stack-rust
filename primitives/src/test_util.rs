@@ -9,8 +9,9 @@ use crate::{
     config::GANACHE_CONFIG,
     sentry::{CLICK, IMPRESSION},
     targeting::Rules,
+    unified_num::FromWhole,
     AdUnit, Address, Campaign, Channel, EventSubmission, UnifiedNum, ValidatorDesc, ValidatorId,
-    IPFS, unified_num::FromWhole,
+    IPFS,
 };
 
 pub use logger::discard_logger;

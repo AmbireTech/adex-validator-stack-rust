@@ -308,7 +308,7 @@ impl One for UnifiedNum {
 
 impl Integer for UnifiedNum {
     fn div_floor(&self, other: &Self) -> Self {
-        UnifiedNum::div_floor(self, &other)
+        UnifiedNum::div_floor(self, other)
     }
 
     // TODO: Check math and write tests
@@ -426,6 +426,7 @@ impl Div<UnifiedNum> for UnifiedNum {
 impl Div<&UnifiedNum> for UnifiedNum {
     type Output = UnifiedNum;
 
+    #[allow(clippy::op_ref)]
     fn div(self, rhs: &UnifiedNum) -> Self::Output {
         // use &UnifiedNum / &UnifiedNum
         &self / rhs
@@ -455,45 +456,10 @@ impl Mul<&UnifiedNum> for &UnifiedNum {
 impl Mul<&UnifiedNum> for UnifiedNum {
     type Output = UnifiedNum;
 
+    #[allow(clippy::op_ref)]
     fn mul(self, rhs: &UnifiedNum) -> Self::Output {
         // Use &UnifiedNum * &UnifiedNum
         &self * rhs
-    }
-}
-
-impl Mul<u64> for &UnifiedNum {
-    type Output = UnifiedNum;
-
-    fn mul(self, rhs: u64) -> Self::Output {
-        // Use &UnifiedNum * &UnifiedNum
-        self * &UnifiedNum::from_whole(rhs)
-    }
-}
-
-impl Mul<u64> for UnifiedNum {
-    type Output = UnifiedNum;
-
-    fn mul(self, rhs: u64) -> Self::Output {
-        // Use &UnifiedNum * &UnifiedNum
-        &self * &UnifiedNum::from_whole(rhs)
-    }
-}
-
-impl Mul<UnifiedNum> for u64 {
-    type Output = UnifiedNum;
-
-    fn mul(self, rhs: UnifiedNum) -> Self::Output {
-        // Use &UnifiedNum * &UnifiedNum
-        &UnifiedNum::from_whole(self) * &rhs
-    }
-}
-
-impl Mul<&UnifiedNum> for u64 {
-    type Output = UnifiedNum;
-
-    fn mul(self, rhs: &UnifiedNum) -> Self::Output {
-        // Use &UnifiedNum * &UnifiedNum
-        &UnifiedNum::from_whole(self) * rhs
     }
 }
 
@@ -573,27 +539,12 @@ fn div_unified_num_to_ratio(lhs: &UnifiedNum, rhs: &UnifiedNum) -> Option<Ratio<
         return Some(Ratio::from_integer(lhs.0));
     }
 
+    // check for denom = 0 because Ration will panic if it is
     if rhs == &UnifiedNum::ZERO {
         return None;
     }
 
-    // checks for denom = 0 and panics if it is
-    // if both are < 1.0
-    // or both are > 1.0
-    // or one of the sides is < 1.0 with the special case of lhs >= UnifiedNum::ONE (1_00_000_000)
-    // we must use the multiplier
-    let ratio = if lhs < &UnifiedNum::ONE && rhs < &UnifiedNum::ONE // 0.5 / 0.8
-        || lhs > &UnifiedNum::ONE && rhs > &UnifiedNum::ONE // 1 / 2 | 7 / 2 | 15 / 3
-        || lhs < &UnifiedNum::ONE && rhs > &UnifiedNum::ONE // 0.1 / 1.2
-        || lhs >= &UnifiedNum::ONE && rhs < &UnifiedNum::ONE
-    // 1 / 0.1 | 1.2 / 0.2
-    {
-        Ratio::new(lhs.0, rhs.0).checked_mul(&Ratio::new(UnifiedNum::MULTIPLIER, 1))
-    } else {
-        Some(Ratio::new(lhs.0, rhs.0))
-    };
-
-    ratio
+    Ratio::new(lhs.0, rhs.0).checked_mul(&Ratio::new(UnifiedNum::MULTIPLIER, 1))
 }
 
 #[cfg(test)]
@@ -618,6 +569,7 @@ mod test {
     fn test_unified_num_div_to_u64_ratio() {
         let one = UnifiedNum::one();
         let two = one + one;
+        let twenty = UnifiedNum::from_whole(20);
         let three = one + one + one;
         let zero = UnifiedNum::zero();
         let one_tenth = UnifiedNum::from_whole(0.1);
@@ -626,6 +578,14 @@ mod test {
         let smallest = UnifiedNum::from(1);
         // 0.00 000 015 = UnifiedNum(15)
         let fifteen = UnifiedNum::from(15);
+
+        // 20 / 2 = 10
+        assert_eq!(
+            10 * UnifiedNum::MULTIPLIER,
+            div_unified_num_to_ratio(&twenty, &two)
+                .unwrap()
+                .to_integer(),
+        );
 
         // 2 / 0.1 = 20
         assert_eq!(
@@ -855,7 +815,7 @@ mod test {
 
             // 0.1 / 3.0 = 0.03333333
             assert_eq!(UnifiedNum::from(3_333_333), one_tenth / three);
-            
+
             // 0.1 / 2.0 = 0.05
             assert_eq!(UnifiedNum::from_whole(0.05), one_tenth / two);
 
