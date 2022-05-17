@@ -39,7 +39,7 @@ pub struct LastApproved<S: BalancesState> {
     pub approve_state: Option<MessageResponse<ApproveState>>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct MessageResponse<T: MessageType> {
     pub from: ValidatorId,
     pub received: DateTime<Utc>,
@@ -767,10 +767,10 @@ pub mod campaign_create {
         AdUnit, Address, Campaign, CampaignId, Channel, EventSubmission, UnifiedNum,
     };
 
-    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-    #[serde(rename_all = "camelCase")]
     /// All fields are present except the `CampaignId` which is randomly created
     /// This struct defines the Body of the request (in JSON)
+    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+    #[serde(rename_all = "camelCase")]
     pub struct CreateCampaign {
         pub id: Option<CampaignId>,
         pub channel: Channel,

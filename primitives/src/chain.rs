@@ -48,6 +48,7 @@ pub struct Chain {
     /// The OUTPACE contract address on this Chain
     pub outpace: Address,
     /// The Sweeper contract address on this Chain
+    #[deprecated = "we no longer need the sweeper contract for deposits"]
     pub sweeper: Address,
 }
 

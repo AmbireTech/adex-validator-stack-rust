@@ -14,7 +14,9 @@ analytics_maxtime = 20000
 heartbeat_time = 30000
 health_threshold_promilles = 950
 health_unsignable_promilles = 750
-propagation_timeout = 1000
+# 2 seconds
+# TODO: Check the POST /validator-message route performance, more than 1 second for timeout is a lot!
+propagation_timeout = 2000
 
 fetch_timeout = 5000
 all_campaigns_timeout = 5000
@@ -47,12 +49,12 @@ global_min_impression_price = '1000000'
 chain_id = 1
 rpc = 'http://localhost:8545'
 # Ganache Snapshot address
-outpace = '0x671b54359be2fa82aB05A5336EB8134F782B88Cd'
+outpace = '0x26CBc2eAAe377f6Ac4b73a982CD1125eF4CEC96f'
 # Ganache Snapshot address
-sweeper = '0xE37BA12D23e755138f7Ea8391551B773Cb2D8F5F'
+sweeper = '0x3550A85877002f79db46B01672b5F86f1037cB7c'
 
-    [chain."Ganache #1".token."Mocked TOKEN 2"]
-    address = '0x704D76a8c31FbAafE2B7895b13A763c7487FC0D8' # checked
+    [chain."Ganache #1".token."Mocked TOKEN 1"]
+    address = '0x12a28f2bfBFfDf5842657235cC058242f40fDEa6' # checked
     precision = 18
     # Minimum token units for the Create2 deposits to count
     # 1 * 10^18 = 1.0000 TOKEN
@@ -70,7 +72,7 @@ outpace = '0xAbc27d46a458E2e49DaBfEf45ca74dEDBAc3DD06'
 # Ganache Snapshot address
 sweeper = '0x7dD57C0324284102A757153E18F2Cb1ACdB7d2bD'
 
-    [chain."Ganache #1337".token."Mocked TOKEN"]
+    [chain."Ganache #1337".token."Mocked TOKEN 1337"]
     address = '0x2bcaf6968aec8a3b5126fbfab5fd419da6e8ad8e' # checked
     precision = 18
     # Minimum token units for the Create2 deposits to count

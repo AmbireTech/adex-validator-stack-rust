@@ -173,7 +173,7 @@ pub mod tests_postgres {
         };
         let manager = Manager::new(POSTGRES_CONFIG.clone(), manager_config, db_prefix)?;
 
-        Ok(Pool::builder(manager)
+        Pool::builder(manager)
             .max_size(15)
             .build()
             .map_err(|err| match err {
@@ -181,7 +181,7 @@ pub mod tests_postgres {
                 deadpool::managed::BuildError::NoRuntimeSpecified(message) => {
                     Error::Build(deadpool::managed::BuildError::NoRuntimeSpecified(message))
                 }
-            })?)
+            })
     }
 
     /// A Database is used to isolate test runs from each other
@@ -553,7 +553,7 @@ pub mod redis_pool {
             }
         }
 
-        /// Flushing (`FLUSDB`) is synchronous by default in Redis
+        /// Flushing (`FLUSHDB`) is synchronous by default in Redis
         pub async fn flush_db(connection: &mut MultiplexedConnection) -> Result<String, Error> {
             redis::cmd("FLUSHDB")
                 .query_async::<_, String>(connection)
@@ -619,15 +619,17 @@ pub mod redis_pool {
         async fn recycle(&self, database: &mut Database) -> RecycleResult<Self::Error> {
             // always make a new connection because of know redis crate issue
             // see https://github.com/mitsuhiko/redis-rs/issues/325
-            let connection = redis_connection(format!("{}{}", Self::URL, database.index))
+            let mut connection = redis_connection(format!("{}{}", Self::URL, database.index))
                 .await
                 .expect("Should connect");
+            // first flush the database
+            // this avoids the problem of flushing after the DB is picked up again by the Pool
+            let flush_result = Self::flush_db(&mut connection).await;
             // make the database available
             database.available = true;
             database.connection = connection;
-            Self::flush_db(&mut database.connection)
-                .await
-                .expect("Should flush");
+
+            flush_result.expect("Should have flushed the redis DB successfully");
 
             Ok(())
         }

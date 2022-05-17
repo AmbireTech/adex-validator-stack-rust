@@ -162,8 +162,8 @@ fn get_unit_html(
 ) -> String {
     // replace all `"` quotes with a single quote `'`
     // these values are used inside `onclick` & `onload` html attributes
-    let on_load = on_load.replace("\"", "'");
-    let on_click = on_click.replace("\"", "'");
+    let on_load = on_load.replace('\"', "'");
+    let on_click = on_click.replace('\"', "'");
     let image_url = normalize_url(&ad_unit.media_url);
 
     let element_html = if is_video(ad_unit) {
@@ -460,7 +460,7 @@ impl Manager {
         // Apply targeting, now with adView.* variables, and sort the resulting ad units
         let mut units_with_price = m_campaigns
             .iter()
-            .map(|m_campaign| {
+            .flat_map(|m_campaign| {
                 // since we are in a Iterator.map(), we can't use async, so we block
                 if block_on(self.is_campaign_sticky(m_campaign.campaign.id)) {
                     return vec![];
@@ -498,7 +498,6 @@ impl Manager {
                     .map(|uwp| (uwp.clone(), campaign_id))
                     .collect()
             })
-            .flatten()
             .filter(|x| !(self.options.disabled_video && is_video(&x.0.unit)))
             .collect::<Vec<_>>();
 
