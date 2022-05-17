@@ -583,7 +583,7 @@ pub mod insert_events {
         sentry::{Event, SuccessResponse},
         Address, Campaign, CampaignId, ChainOf, DomainError, UnifiedNum, ValidatorDesc,
     };
-    use slog::{debug, error, Logger};
+    use slog::error;
     use thiserror::Error;
 
     #[derive(Debug, Error)]

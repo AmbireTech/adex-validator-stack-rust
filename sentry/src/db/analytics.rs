@@ -432,7 +432,9 @@ mod test {
                 .expect("Should not overflow");
 
             assert_eq!(
-                14 * amount_per_day + 15 * amount_per_day + 16 * amount_per_day,
+                UnifiedNum::from_whole(14) * amount_per_day
+                    + UnifiedNum::from_whole(15) * amount_per_day
+                    + UnifiedNum::from_whole(16) * amount_per_day,
                 three_days_fetched_paid
             );
         }
@@ -534,12 +536,12 @@ mod test {
                 .expect("Should not overflow");
 
             assert_eq!(
-                10 * amount_per_day
-                    + 11 * amount_per_day
-                    + 12 * amount_per_day
-                    + 13 * amount_per_day
-                    + 14 * amount_per_day
-                    + 15 * amount_per_day,
+                UnifiedNum::from_whole(10) * amount_per_day
+                    + UnifiedNum::from_whole(11) * amount_per_day
+                    + UnifiedNum::from_whole(12) * amount_per_day
+                    + UnifiedNum::from_whole(13) * amount_per_day
+                    + UnifiedNum::from_whole(14) * amount_per_day
+                    + UnifiedNum::from_whole(15) * amount_per_day,
                 six_days_fetched_paid
             );
         }
