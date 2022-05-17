@@ -326,9 +326,9 @@ mod tests {
             id: VALIDATORS[&LEADER].address.into(),
             url: VALIDATORS[&LEADER].sentry_url.to_string(),
             // min_validator_fee for token: 0.000_010
-            // fee per 1000 (pro mille) = 0.00003000 (UnifiedNum)
-            // fee per 1 payout: payout * fee / 1000 = payout * 0.00000003
-            fee: 3_000.into(),
+            // fee per 1000 (pro mille) = 5.00000000 (UnifiedNum)
+            // fee per 1 payout: payout * fee / 1000 = payout * 0.00500000
+            fee: 500_000_000.into(),
             fee_addr: None,
         };
 
@@ -336,9 +336,9 @@ mod tests {
             id: VALIDATORS[&FOLLOWER].address.into(),
             url: VALIDATORS[&FOLLOWER].sentry_url.to_string(),
             // min_validator_fee for token: 0.000_010
-            // fee per 1000 (pro mille) = 0.00002000 (UnifiedNum)
-            // fee per 1 payout: payout * fee / 1000 = payout * 0.00000002
-            fee: 2_000.into(),
+            // fee per 1000 (pro mille) = 4.00000000 (UnifiedNum)
+            // fee per 1 payout: payout * fee / 1000 = payout * 0.00400000
+            fee: 400_000_000.into(),
             fee_addr: None,
         };
 
@@ -350,31 +350,31 @@ mod tests {
                 .expect("Should parse"),
             channel,
             creator: *ADVERTISER,
-            // 2.00000000
-            budget: UnifiedNum::from(200_000_000),
+            // 150.00000000
+            budget: UnifiedNum::from(15_000_000_000),
             validators,
             title: Some("Dummy Campaign".to_string()),
             pricing_bounds: vec![
                 (
                     IMPRESSION,
                     Pricing {
-                        // 0.00003000
-                        // Per 1000 = 0.03000000
-                        min: 3_000.into(),
-                        // 0.00005000
-                        // Per 1000 = 0.05000000
-                        max: 5_000.into(),
+                        // 0.04000000
+                        // Per 1000 = 40.00000000
+                        min: 4_000_000.into(),
+                        // 0.05000000
+                        // Per 1000 = 50.00000000
+                        max: 5_000_000.into(),
                     },
                 ),
                 (
                     CLICK,
                     Pricing {
-                        // 0.00006000
-                        // Per 1000 = 0.06000000
-                        min: 6_000.into(),
-                        // 0.00010000
-                        // Per 1000 = 0.10000000
-                        max: 10_000.into(),
+                        // 0.06000000
+                        // Per 1000 = 60.00000000
+                        min: 6_000_000.into(),
+                        // 0.10000000
+                        // Per 1000 = 100.00000000
+                        max: 10_000_000.into(),
                     },
                 ),
             ]
@@ -449,26 +449,26 @@ mod tests {
                 (
                     IMPRESSION,
                     Pricing {
-                        // 0.00001000
-                        min: 1_000.into(),
-                        // 0.00002000
-                        max: 2_000.into(),
+                        // 1 TOKEN
+                        min: 100_000_000.into(),
+                        // 2 TOKENs
+                        max: 200_000_000.into(),
                     },
                 ),
                 (
                     CLICK,
                     Pricing {
-                        // 0.00003000
-                        min: 3_000.into(),
-                        // 0.00005000
-                        max: 5_000.into(),
+                        // 3 TOKENs
+                        min: 300_000_000.into(),
+                        // 5 TOKENs
+                        max: 500_000_000.into(),
                     },
                 ),
             ]
             .into_iter()
             .collect(),
             event_submission: Some(EventSubmission { allow: vec![] }),
-            ad_units: vec![],
+            ad_units: vec![DUMMY_AD_UNITS[0].clone(), DUMMY_AD_UNITS[1].clone()],
             targeting_rules: Rules::new(),
             created: Utc.ymd(2021, 2, 1).and_hms(7, 0, 0),
             active: Active {
@@ -500,9 +500,9 @@ mod tests {
             id: VALIDATORS[&LEADER].address.into(),
             url: VALIDATORS[&LEADER].sentry_url.to_string(),
             // min_validator_fee for token: 0.000_010
-            // fee per 1000 (pro mille) = 0.00020000 (UnifiedNum)
-            // fee per 1 payout: payout * fee / 1000 = payout * 0.00000020
-            fee: 20_000.into(),
+            // fee per 1000 (pro mille) = 2.00000000
+            // fee per 1 payout: payout * fee / 1000 = payout * 0.00200000
+            fee: 200_000_000.into(),
             fee_addr: None,
         };
 
@@ -510,9 +510,9 @@ mod tests {
             id: VALIDATORS[&FOLLOWER].address.into(),
             url: VALIDATORS[&FOLLOWER].sentry_url.to_string(),
             // min_validator_fee for token: 0.000_010
-            // fee per 1000 (pro mille) = 0.00010000 (UnifiedNum)
-            // fee per 1 payout: payout * fee / 1000 = payout * 0.0000001
-            fee: 10_000.into(),
+            // fee per 1000 (pro mille) = 1.75000000
+            // fee per 1 payout: payout * fee / 1000 = payout * 0.00175000
+            fee: 175_000_000.into(),
             fee_addr: None,
         };
 
@@ -532,23 +532,23 @@ mod tests {
                 (
                     IMPRESSION,
                     Pricing {
-                        // 0.00030000
-                        // Per 1000 = 0.30000000
-                        min: 30_000.into(),
-                        // 0.00050000
-                        // Per 1000 = 0.50000000
-                        max: 50_000.into(),
+                        // 0.01500000
+                        // Per 1000 = 15.00000000
+                        min: 1_500_000.into(),
+                        // 0.0250000
+                        // Per 1000 = 25.00000000
+                        max: 2_500_000.into(),
                     },
                 ),
                 (
                     CLICK,
                     Pricing {
-                        // 0.00060000
-                        // Per 1000 = 0.60000000
-                        min: 60_000.into(),
-                        // 0.00090000
-                        // Per 1000 = 0.90000000
-                        max: 90_000.into(),
+                        // 0.03500000
+                        // Per 1000 = 35.00000000
+                        min: 3_500_000.into(),
+                        // 0.06500000
+                        // Per 1000 = 65.00000000
+                        max: 6_500_000.into(),
                     },
                 ),
             ]
@@ -661,7 +661,7 @@ mod tests {
         //
         // Advertiser
         // Channel 1 in Chain #1337:
-        // - Outpace: 20 TOKENs
+        // - Outpace: 150 TOKENs
         // - Counterfactual: 10 TOKENs
         //
         // Channel 2 in Chain #1337:
@@ -678,7 +678,7 @@ mod tests {
                     channel: CAMPAIGN_1.channel,
                     token: contracts_1337.token.info.clone(),
                     address: advertiser_adapter.whoami().to_address(),
-                    outpace_amount: BigNum::with_precision(20, token_1337_precision),
+                    outpace_amount: BigNum::with_precision(150, token_1337_precision),
                     counterfactual_amount: BigNum::with_precision(10, token_1337_precision),
                 },
                 Deposit {
@@ -784,9 +784,9 @@ mod tests {
                 .expect("Get authentication");
 
             let mut no_budget_campaign = CreateCampaign::from_campaign(CAMPAIGN_1.clone());
-            // Deposit of Advertiser for Channel 2: 20 (outpace) + 10 (create2)
-            // Campaign Budget: 40 TOKENs
-            no_budget_campaign.budget = UnifiedNum::from(4_000_000_000);
+            // Deposit of Advertiser for Channel 1: 150 (outpace) + 10 (create2)
+            // Campaign Budget: 400 TOKENs
+            no_budget_campaign.budget = UnifiedNum::from(40_000_000_000);
 
             let no_budget_response = create_campaign(
                 &api_client,
@@ -822,8 +822,8 @@ mod tests {
             let expected = vec![(
                 advertiser_adapter.whoami().to_address(),
                 Spender {
-                    // Expected: 30 TOKENs
-                    total_deposited: UnifiedNum::from(3_000_000_000),
+                    // Expected: 160 TOKENs
+                    total_deposited: UnifiedNum::from(16_000_000_000),
                     total_spent: None,
                 },
             )]
@@ -1091,7 +1091,7 @@ mod tests {
             assert_eq!(SuccessResponse { success: true }, follower_response);
             info!(
                 setup.logger,
-                "Successfully POST events for CAMPAIGN_1 {:?} and Channel {:?} to Leader & Follower",
+                "Successful POST of events for CAMPAIGN_1 {:?} and Channel {:?} to Leader & Follower",
                 CAMPAIGN_1.id,
                 CAMPAIGN_1.channel.id()
             );
@@ -1169,25 +1169,34 @@ mod tests {
             );
         }
 
-        // Channel 1 expected Accounting
+        // CAMPAIGN_1 & Channel 1 expected Accounting
+        //
         // Fees are calculated based on pro mile of the payout
         // event payout * fee / 1000
         //
+        // leader fee (per 1000): 5
+        // follower fee (per 1000): 4
+        // IMPRESSION price (min): 0.04
+        // CLICK price (min): 0.06
         //
-        // IMPRESSION:
-        // - Publisher payout: 3000
-        // - Leader fees: 3000 * 3000 / 1 000 = 9 000
-        // - Follower fees: 3000 * 2000 / 1000 = 6 000
+        // 1 x IMPRESSION:
+        // - Publisher payout: 0.04 = UnifiedNum(4 000 000)
+        // - Leader fees: 0.04 * 5 / 1 000 = 0.0002 = UnifiedNum(20 000)
+        // - Follower fees: 0.04 * 4 / 1 000 = 0.00016 = UnifiedNum(16 000)
         //
-        // CLICK:
-        // - Publisher payout: 6000
-        // - Leader fees: 6000 * 3000 / 1000 = 18 000
-        // - Follower fees: 6000 * 2000 / 1000 = 12 000
+        // 1 x CLICK:
+        // - Publisher payout: 0.06 = UnifiedNum(6 000 000)
+        // - Leader fees: 0.06 * 5 / 1 000 = 0.0003 = UnifiedNum(30 000)
+        // - Follower fees: 0.06 * 4 / 1 000 = 0.00024 = UnifiedNum(24 000)
         //
         // Creator (Advertiser) pays out:
+        //
+        // Publisher total payout: 0.04 (impression) + 0.06 (click) = 0.1 = UnifiedNum(10 000 000)
+        // Leader total fees: 0.0002 + 0.0003 = 0.0005 = UnifiedNum (50 000)
+        // Follower total fees: 0.00016 + 0.00024 = 0.0004 = UnifiedNum(40 000)
+        //
         // events_payout + leader fee + follower fee
-        // events_payout = 3000 (impression) + 6000 (click) = 9 000
-        // 9000 + (9000 + 18000) + (6000 + 12000) = 54 000
+        // 0.1 + (0.0002 + 0.0003) + (0.00016 + 0.00024) = 0.1009 = UnifiedNum(10 090 000)
         {
             let mut expected_balances = Balances::new();
 
@@ -1195,18 +1204,18 @@ mod tests {
                 .spend(
                     CAMPAIGN_1.creator,
                     CAMPAIGN_1.channel.leader.to_address(),
-                    UnifiedNum::from(27_000),
+                    UnifiedNum::from(50_000),
                 )
                 .expect("Should spend for Leader");
             expected_balances
                 .spend(
                     CAMPAIGN_1.creator,
                     CAMPAIGN_1.channel.follower.to_address(),
-                    UnifiedNum::from(18_000),
+                    UnifiedNum::from(40_000),
                 )
                 .expect("Should spend for Follower");
             expected_balances
-                .spend(CAMPAIGN_1.creator, *PUBLISHER, UnifiedNum::from(9_000))
+                .spend(CAMPAIGN_1.creator, *PUBLISHER, UnifiedNum::from(10_000_000))
                 .expect("Should spend for Publisher");
 
             let expected_accounting = AccountingResponse {
@@ -1214,7 +1223,7 @@ mod tests {
             };
 
             let actual_accounting = leader_sentry
-                .get_accounting(&token_chain_1337.with_channel(CAMPAIGN_1.channel))
+                .get_accounting(&token_chain_1337.clone().with_channel(CAMPAIGN_1.channel))
                 .await
                 .expect("Should get Channel Accounting");
 
@@ -1310,18 +1319,22 @@ mod tests {
                     .spend(
                         CAMPAIGN_1.creator,
                         CAMPAIGN_1.channel.leader.to_address(),
-                        UnifiedNum::from_u64(27_000),
+                        UnifiedNum::from_u64(50_000),
                     )
                     .expect("Should spend");
                 expected_balances
                     .spend(
                         CAMPAIGN_1.creator,
                         CAMPAIGN_1.channel.follower.to_address(),
-                        UnifiedNum::from_u64(18_000),
+                        UnifiedNum::from_u64(40_000),
                     )
                     .expect("Should spend");
                 expected_balances
-                    .spend(CAMPAIGN_1.creator, *PUBLISHER, UnifiedNum::from_u64(9000))
+                    .spend(
+                        CAMPAIGN_1.creator,
+                        *PUBLISHER,
+                        UnifiedNum::from_u64(10_000_000),
+                    )
                     .expect("Should spend");
 
                 pretty_assertions::assert_eq!(
@@ -1334,7 +1347,7 @@ mod tests {
             let last_approved_response_follower = follower_sentry
                 .get_last_approved(CAMPAIGN_1.channel.id())
                 .await
-                .expect("Should fetch APprove state from Follower");
+                .expect("Should fetch Approve state from Follower");
 
             let last_approved_response_leader = leader_sentry
                 .get_last_approved(CAMPAIGN_1.channel.id())
