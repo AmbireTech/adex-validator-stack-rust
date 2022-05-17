@@ -307,22 +307,47 @@ pub async fn add_spender_leaf<C: Locked + 'static>(
     let channel = req
         .extensions()
         .get::<ChainOf<Channel>>()
-        .ok_or(ResponseError::NotFound)?
-        .context;
+        .ok_or(ResponseError::NotFound)?;
 
     update_accounting(
         app.pool.clone(),
-        channel.id(),
+        channel.context.id(),
         spender,
         Side::Spender,
         UnifiedNum::from_u64(0),
     )
     .await?;
 
-    // TODO: Replace with SpenderResponse
-    Ok(success_response(serde_json::to_string(&SuccessResponse {
-        success: true,
-    })?))
+    let latest_spendable =
+        fetch_spendable(app.pool.clone(), &spender, &channel.context.id()).await?;
+
+    let latest_spendable = match latest_spendable {
+        Some(spendable) => spendable,
+        None => {
+            create_or_update_spendable_document(&app.adapter, app.pool.clone(), channel, spender)
+                .await?
+        }
+    };
+
+    let new_state =
+        match get_corresponding_new_state(&app.pool, &app.logger, &channel.context).await? {
+            Some(new_state) => new_state,
+            None => return spender_response_without_leaf(latest_spendable.deposit.total),
+        };
+
+    let total_spent = new_state
+        .balances
+        .spenders
+        .get(&spender)
+        .map(|spent| spent.to_owned());
+
+    let res = SpenderResponse {
+        spender: Spender {
+            total_deposited: latest_spendable.deposit.total,
+            total_spent,
+        },
+    };
+    Ok(success_response(serde_json::to_string(&res)?))
 }
 
 async fn get_corresponding_new_state(
@@ -426,7 +451,7 @@ pub async fn channel_payout<C: Locked + 'static>(
         .map_err(|e| ResponseError::FailedValidation(e.to_string()))?;
 
     // Handling the case where a request with an empty body comes through
-    if to_pay.payouts.len() == 0 {
+    if to_pay.payouts.is_empty() {
         return Err(ResponseError::FailedValidation(
             "Request has empty payouts".to_string(),
         ));
@@ -479,9 +504,11 @@ pub async fn channel_payout<C: Locked + 'static>(
         fetch_spendable(app.pool.clone(), &spender, &channel_context.context.id())
             .await
             .map_err(|err| ResponseError::BadRequest(err.to_string()))?
-            .ok_or(ResponseError::BadRequest(
-                "There is no spendable amount for the spender in this Channel".to_string(),
-            ))?;
+            .ok_or_else(|| {
+                ResponseError::BadRequest(
+                    "There is no spendable amount for the spender in this Channel".to_string(),
+                )
+            })?;
     let total_deposited = latest_spendable.deposit.total;
 
     let available_for_payout = total_deposited
@@ -902,11 +929,22 @@ mod test {
     #[tokio::test]
     async fn adds_and_retrieves_spender_leaf() {
         let app = setup_dummy_app().await;
+
         let channel_context = app
             .config
             .find_chain_of(DUMMY_CAMPAIGN.channel.token)
             .expect("Dummy channel Token should be present in config!")
             .with(DUMMY_CAMPAIGN.channel);
+
+        let deposit = AdapterDeposit {
+            total: BigNum::from_str("100000000000000000000").expect("should convert"), // 100 DAI
+            still_on_create2: BigNum::from_str("1000000000000000000").expect("should convert"), // 1 DAI
+        };
+        app.adapter.client.add_deposit_call(
+            channel_context.context.id(),
+            *CREATOR,
+            deposit.clone(),
+        );
 
         insert_channel(&app.pool, channel_context.context)
             .await
@@ -1001,7 +1039,7 @@ mod test {
             leader: IDS[&LEADER],
             follower: IDS[&FOLLOWER],
             guardian: *GUARDIAN,
-            token: GANACHE_INFO_1337.tokens["Mocked TOKEN"].address,
+            token: GANACHE_INFO_1337.tokens["Mocked TOKEN 1337"].address,
             nonce: Nonce::from(987_654_321_u32),
         };
         insert_channel(&app.pool, channel)
@@ -1011,7 +1049,7 @@ mod test {
             leader: IDS[&LEADER],
             follower: IDS[&FOLLOWER],
             guardian: *GUARDIAN,
-            token: GANACHE_INFO_1.tokens["Mocked TOKEN 2"].address,
+            token: GANACHE_INFO_1.tokens["Mocked TOKEN 1"].address,
             nonce: Nonce::from(987_654_322_u32),
         };
         insert_channel(&app.pool, channel_other_token)
@@ -1022,7 +1060,7 @@ mod test {
             leader: IDS[&LEADER_2],
             follower: IDS[&FOLLOWER],
             guardian: *GUARDIAN,
-            token: GANACHE_INFO_1337.tokens["Mocked TOKEN"].address,
+            token: GANACHE_INFO_1337.tokens["Mocked TOKEN 1337"].address,
             nonce: Nonce::from(987_654_323_u32),
         };
         insert_channel(&app.pool, channel_other_leader)

@@ -147,105 +147,215 @@ pub fn get_test_channel(token_address: Address) -> Channel {
     }
 }
 
-pub async fn mock_set_balance(
-    token_contract: &Contract<Http>,
-    from: [u8; 20],
-    address: [u8; 20],
-    amount: &BigNum,
-) -> web3::contract::Result<H256> {
-    let amount = U256::from_dec_str(&amount.to_string()).expect("Should create U256");
-
-    token_contract
-        .call(
-            "setBalanceTo",
-            (H160(address), amount),
-            H160(from),
-            ContractOptions::default(),
-        )
-        .await
+/// The Sweeper contract
+///
+/// Initialized and ready for calling contract with [`Web3<Http>`].
+#[derive(Debug, Clone)]
+pub struct Sweeper {
+    pub contract: Contract<Http>,
+    pub address: Address,
 }
 
-pub async fn outpace_deposit(
-    outpace_contract: &Contract<Http>,
-    channel: &Channel,
-    to: [u8; 20],
-    amount: &BigNum,
-) -> web3::contract::Result<H256> {
-    let amount = U256::from_dec_str(&amount.to_string()).expect("Should create U256");
+impl Sweeper {
+    pub fn new(web3: &Web3<Http>, sweeper_address: Address) -> Self {
+        let sweeper_contract =
+            Contract::from_json(web3.eth(), H160(sweeper_address.to_bytes()), &SWEEPER_ABI)
+                .expect("Failed to init Sweeper contract from JSON ABI!");
 
-    outpace_contract
-        .call(
-            "deposit",
-            (channel.tokenize(), H160(to), amount),
-            H160(to),
-            ContractOptions::with(|opt| {
+        Self {
+            address: sweeper_address,
+            contract: sweeper_contract,
+        }
+    }
+
+    /// Deploys the Sweeper contract from [`LEADER`]
+    pub async fn deploy(web3: &Web3<Http>) -> web3::contract::Result<Self> {
+        let contract = Contract::deploy(web3.eth(), &SWEEPER_ABI)
+            .expect("Invalid ABI of Sweeper contract")
+            .confirmations(0)
+            .options(ContractOptions::with(|opt| {
                 opt.gas_price = Some(1.into());
                 opt.gas = Some(6_721_975.into());
-            }),
-        )
-        .await
+            }))
+            .execute(*SWEEPER_BYTECODE, (), H160(LEADER.to_bytes()))
+            .await?;
+
+        let sweeper_address = Address::from(contract.address().to_fixed_bytes());
+
+        Ok(Self {
+            contract,
+            address: sweeper_address,
+        })
+    }
+
+    pub async fn sweep(
+        &self,
+        outpace_address: [u8; 20],
+        channel: &Channel,
+        depositor: [u8; 20],
+    ) -> web3::contract::Result<H256> {
+        let from_leader_account = H160(*LEADER.as_bytes());
+
+        self.contract
+            .call(
+                "sweep",
+                (
+                    Token::Address(H160(outpace_address)),
+                    channel.tokenize(),
+                    Token::Array(vec![Token::Address(H160(depositor))]),
+                ),
+                from_leader_account,
+                ContractOptions::with(|opt| {
+                    opt.gas_price = Some(1.into());
+                    opt.gas = Some(6_721_975.into());
+                }),
+            )
+            .await
+    }
+}
+/// The Mocked token API contract
+///
+/// Used for mocking the tokens of an address.
+///
+/// Initialized and ready for calling contract with [`Web3<Http>`].
+///
+/// Mocked ABI: [`MOCK_TOKEN_ABI`]
+///
+/// Real ABI: [`crate::ethereum::ERC20_ABI`]
+#[derive(Debug, Clone)]
+pub struct Erc20Token {
+    pub web3: Web3<Http>,
+    pub info: TokenInfo,
+    pub contract: Contract<Http>,
 }
 
-pub async fn sweeper_sweep(
-    sweeper_contract: &Contract<Http>,
-    outpace_address: [u8; 20],
-    channel: &Channel,
-    depositor: [u8; 20],
-) -> web3::contract::Result<H256> {
-    let from_leader_account = H160(*LEADER.as_bytes());
+impl Erc20Token {
+    /// Presumes a default TokenInfo
+    pub fn new(web3: &Web3<Http>, token_info: TokenInfo) -> Self {
+        let token_contract = Contract::from_json(
+            web3.eth(),
+            token_info.address.as_bytes().into(),
+            &MOCK_TOKEN_ABI,
+        )
+        .expect("Failed to init Outpace contract from JSON ABI!");
 
-    sweeper_contract
-        .call(
-            "sweep",
-            (
-                Token::Address(H160(outpace_address)),
-                channel.tokenize(),
-                Token::Array(vec![Token::Address(H160(depositor))]),
-            ),
-            from_leader_account,
-            ContractOptions::with(|opt| {
+        Self {
+            web3: web3.clone(),
+            info: token_info,
+            contract: token_contract,
+        }
+    }
+
+    /// Deploys the Mock Token contract from [`LEADER`]
+    pub async fn deploy(web3: &Web3<Http>, min_token_units: u64) -> web3::contract::Result<Self> {
+        let token_contract = Contract::deploy(web3.eth(), &MOCK_TOKEN_ABI)
+            .expect("Invalid ABI of Mock Token contract")
+            .confirmations(0)
+            .options(ContractOptions::with(|opt| {
+                opt.gas_price = Some(1_i32.into());
+                opt.gas = Some(6_721_975_i32.into());
+            }))
+            .execute(*MOCK_TOKEN_BYTECODE, (), H160(LEADER.to_bytes()))
+            .await?;
+
+        let token_address = Address::from(token_contract.address().to_fixed_bytes());
+
+        let token_info = TokenInfo {
+            min_token_units_for_deposit: BigNum::from(min_token_units),
+            precision: NonZeroU8::new(18).expect("should create NonZeroU8"),
+            // 0.000_001
+            min_validator_fee: BigNum::from(1_000_000_000_000),
+            address: token_address,
+        };
+
+        Ok(Self {
+            web3: web3.clone(),
+            info: token_info,
+            contract: token_contract,
+        })
+    }
+
+    /// Set Mocked token balance
+    pub async fn set_balance(
+        &self,
+        from: [u8; 20],
+        address: [u8; 20],
+        amount: &BigNum,
+    ) -> web3::contract::Result<H256> {
+        let amount = U256::from_dec_str(&amount.to_string()).expect("Should create U256");
+
+        self.contract
+            .call(
+                "setBalanceTo",
+                (H160(address), amount),
+                H160(from),
+                ContractOptions::default(),
+            )
+            .await
+    }
+}
+
+/// The Outpace contract
+///
+/// Initialized and ready for calling contract with [`Web3<Http>`].
+#[derive(Debug, Clone)]
+pub struct Outpace {
+    pub contract: Contract<Http>,
+    pub address: Address,
+}
+
+impl Outpace {
+    pub fn new(web3: &Web3<Http>, outpace_address: Address) -> Self {
+        let outpace_contract =
+            Contract::from_json(web3.eth(), outpace_address.as_bytes().into(), &OUTPACE_ABI)
+                .expect("Failed to init Outpace contract from JSON ABI!");
+
+        Self {
+            address: outpace_address,
+            contract: outpace_contract,
+        }
+    }
+
+    /// Deploys the Outpace contract from [`LEADER`]
+    pub async fn deploy(web3: &Web3<Http>) -> web3::contract::Result<Self> {
+        let outpace_contract = Contract::deploy(web3.eth(), &OUTPACE_ABI)
+            .expect("Invalid ABI of Outpace contract")
+            .confirmations(0)
+            .options(ContractOptions::with(|opt| {
                 opt.gas_price = Some(1.into());
                 opt.gas = Some(6_721_975.into());
-            }),
-        )
-        .await
-}
+            }))
+            .execute(*OUTPACE_BYTECODE, (), H160(LEADER.to_bytes()))
+            .await?;
 
-/// Deploys the Sweeper contract from [`LEADER`]
-pub async fn deploy_sweeper_contract(
-    web3: &Web3<Http>,
-) -> web3::contract::Result<(Address, Contract<Http>)> {
-    let sweeper_contract = Contract::deploy(web3.eth(), &SWEEPER_ABI)
-        .expect("Invalid ABI of Sweeper contract")
-        .confirmations(0)
-        .options(ContractOptions::with(|opt| {
-            opt.gas_price = Some(1.into());
-            opt.gas = Some(6_721_975.into());
-        }))
-        .execute(*SWEEPER_BYTECODE, (), H160(LEADER.to_bytes()))
-        .await?;
+        let outpace_address = Address::from(outpace_contract.address().to_fixed_bytes());
 
-    let sweeper_address = Address::from(sweeper_contract.address().to_fixed_bytes());
+        Ok(Self {
+            address: outpace_address,
+            contract: outpace_contract,
+        })
+    }
 
-    Ok((sweeper_address, sweeper_contract))
-}
+    pub async fn deposit(
+        &self,
+        channel: &Channel,
+        to: [u8; 20],
+        amount: &BigNum,
+    ) -> web3::contract::Result<H256> {
+        let amount = U256::from_dec_str(&amount.to_string()).expect("Should create U256");
 
-/// Deploys the Outpace contract from [`LEADER`]
-pub async fn deploy_outpace_contract(
-    web3: &Web3<Http>,
-) -> web3::contract::Result<(Address, Contract<Http>)> {
-    let outpace_contract = Contract::deploy(web3.eth(), &OUTPACE_ABI)
-        .expect("Invalid ABI of Outpace contract")
-        .confirmations(0)
-        .options(ContractOptions::with(|opt| {
-            opt.gas_price = Some(1.into());
-            opt.gas = Some(6_721_975.into());
-        }))
-        .execute(*OUTPACE_BYTECODE, (), H160(LEADER.to_bytes()))
-        .await?;
-    let outpace_address = Address::from(outpace_contract.address().to_fixed_bytes());
-
-    Ok((outpace_address, outpace_contract))
+        self.contract
+            .call(
+                "deposit",
+                (channel.tokenize(), H160(to), amount),
+                H160(to),
+                ContractOptions::with(|opt| {
+                    opt.gas_price = Some(1.into());
+                    opt.gas = Some(6_721_975.into());
+                }),
+            )
+            .await
+    }
 }
 
 /// Deploys the Identity contract for the give `for_address`
@@ -277,32 +387,4 @@ pub async fn deploy_identity_contract(
     let identity_address = Address::from(identity_contract.address().to_fixed_bytes());
 
     Ok((identity_address, identity_contract))
-}
-
-/// Deploys the Mock Token contract from [`LEADER`]
-pub async fn deploy_token_contract(
-    web3: &Web3<Http>,
-    min_token_units: u64,
-) -> web3::contract::Result<(TokenInfo, Address, Contract<Http>)> {
-    let token_contract = Contract::deploy(web3.eth(), &MOCK_TOKEN_ABI)
-        .expect("Invalid ABI of Mock Token contract")
-        .confirmations(0)
-        .options(ContractOptions::with(|opt| {
-            opt.gas_price = Some(1_i32.into());
-            opt.gas = Some(6_721_975_i32.into());
-        }))
-        .execute(*MOCK_TOKEN_BYTECODE, (), H160(LEADER.to_bytes()))
-        .await?;
-
-    let token_address = Address::from(token_contract.address().to_fixed_bytes());
-
-    let token_info = TokenInfo {
-        min_token_units_for_deposit: BigNum::from(min_token_units),
-        precision: NonZeroU8::new(18).expect("should create NonZeroU8"),
-        // 0.000_001
-        min_validator_fee: BigNum::from(1_000_000_000_000),
-        address: token_address,
-    };
-
-    Ok((token_info, token_address, token_contract))
 }

@@ -143,8 +143,7 @@ fn forbidden_referrer(session: &Session) -> bool {
     match session
         .referrer_header
         .as_ref()
-        .map(|rf| rf.split('/').nth(2))
-        .flatten()
+        .and_then(|rf| rf.split('/').nth(2))
     {
         Some(hostname) => {
             hostname == "localhost"

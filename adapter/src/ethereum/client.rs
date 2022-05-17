@@ -280,7 +280,7 @@ impl<S: WalletState> Locked for Ethereum<S> {
 
         let outpace_contract = Contract::from_json(
             web3.eth(),
-            channel_context.chain.outpace.as_bytes().into(),
+            H160(channel_context.chain.outpace.to_bytes()),
             &OUTPACE_ABI,
         )
         .map_err(Error::ContractInitialization)?;
@@ -291,7 +291,7 @@ impl<S: WalletState> Locked for Ethereum<S> {
 
         let sweeper_contract = Contract::from_json(
             web3.eth(),
-            channel_context.chain.sweeper.as_bytes().into(),
+            H160(channel_context.chain.sweeper.to_bytes()),
             &SWEEPER_ABI,
         )
         .map_err(Error::ContractInitialization)?;
@@ -406,9 +406,13 @@ mod test {
     use ethstore::ethkey::Message;
 
     use primitives::{
+        channel::Nonce,
         config::GANACHE_CONFIG,
-        test_util::{ADDRESS_3, ADDRESS_4, ADDRESS_5, ADVERTISER, CREATOR, LEADER},
-        BigNum, ChainOf, ToHex, ValidatorId,
+        test_util::{
+            ADDRESS_3, ADDRESS_4, ADDRESS_5, ADVERTISER, CREATOR, DUMMY_CAMPAIGN, FOLLOWER,
+            GUARDIAN, GUARDIAN_2, IDS, LEADER, LEADER_2,
+        },
+        BigNum, ChainOf, Channel, ToHex, ValidatorId,
     };
     use web3::{
         contract::Options as ContractOptions, ethabi::Token, signing::keccak256, types::H160,
@@ -703,78 +707,234 @@ mod test {
     }
 
     #[tokio::test]
+    async fn multi_chain_deposit_from_config() -> Result<(), Box<dyn std::error::Error>> {
+        let config = GANACHE_CONFIG.clone();
+
+        let mut channel_1 = DUMMY_CAMPAIGN.channel.clone();
+        let channel_1_token = GANACHE_INFO_1.tokens["Mocked TOKEN 1"].clone();
+        channel_1.token = channel_1_token.address;
+
+        let chain_of = ChainOf::new(GANACHE_1.clone(), channel_1_token);
+
+        let web3_1 = chain_of
+            .chain
+            .init_web3()
+            .expect("Should init web3 for Chain #1");
+
+        let leader_adapter = Ethereum::init(KEYSTORES[&LEADER].clone(), &config)
+            .expect("should init ethereum adapter")
+            .unlock()
+            .expect("should unlock eth adapter");
+
+        let advertiser = *ADVERTISER;
+
+        let _actual_deposit = leader_adapter
+            .get_deposit(&chain_of.clone().with(channel_1), advertiser)
+            .await
+            .expect("Should get deposit for Channel in Chain 1");
+
+        let token = Erc20Token::new(&web3_1, chain_of.token.clone());
+        let outpace = Outpace::new(&web3_1, chain_of.chain.outpace);
+
+        // OUTPACE deposit Chain #1
+        // 10 tokens
+        {
+            let ten = BigNum::with_precision(10, chain_of.token.precision.into());
+            token
+                .set_balance(LEADER.to_bytes(), advertiser.to_bytes(), &ten)
+                .await
+                .expect("Failed to set balance");
+
+            outpace
+                .deposit(&channel_1, advertiser.to_bytes(), &ten)
+                .await
+                .expect("Should deposit funds");
+
+            let regular_deposit = leader_adapter
+                .get_deposit(&chain_of.clone().with(channel_1), advertiser)
+                .await
+                .expect("should get deposit");
+
+            assert_eq!(
+                Deposit {
+                    total: ten.clone(),
+                    still_on_create2: BigNum::from(0),
+                },
+                regular_deposit
+            );
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn multi_chain_deposit_from_deployed_contracts() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let chain_of_1337 = ChainOf::new(
+            GANACHE_1337.clone(),
+            GANACHE_INFO_1337.tokens["Mocked TOKEN 1337"].clone(),
+        );
+
+        let mut config = GANACHE_CONFIG.clone();
+
+        let channel_chain_1 = {
+            let web3 = GANACHE_1.init_web3().expect("Init web3");
+
+            // deploy contracts
+            let token = Erc20Token::deploy(&web3, 1_000)
+                .await
+                .expect("Correct parameters are passed to the Token constructor.");
+
+            let sweeper = Sweeper::deploy(&web3)
+                .await
+                .expect("Correct parameters are passed to the Sweeper constructor.");
+
+            let outpace = Outpace::deploy(&web3)
+                .await
+                .expect("Correct parameters are passed to the OUTPACE constructor.");
+
+            // Add new "Deployed TOKEN"
+            let mut ganache_1 = config
+                .chains
+                .get_mut("Ganache #1")
+                .expect("Should have Ganache #1 already in config");
+
+            assert!(
+                ganache_1
+                    .tokens
+                    .values()
+                    .find(|existing_token| { existing_token.address == token.info.address })
+                    .is_none(),
+                "The deployed token address should not have existed previously in the config!"
+            );
+
+            // Insert the new token in the config
+            assert!(
+                ganache_1
+                    .tokens
+                    .insert("Deployed TOKEN".into(), token.info.clone())
+                    .is_none(),
+                "Should not have previous value for the Deployed TOKEN"
+            );
+
+            // Replace Outpace & Sweeper addresses with the ones just deployed.
+            ganache_1.chain.outpace = outpace.address;
+            ganache_1.chain.sweeper = sweeper.address;
+
+            let chain_of_1 = ChainOf::new(ganache_1.chain.clone(), token.info.clone());
+
+            chain_of_1.clone().with(Channel {
+                leader: IDS[&LEADER],
+                follower: IDS[&FOLLOWER],
+                guardian: *GUARDIAN,
+                token: chain_of_1.token.address,
+                nonce: Nonce::from(1_u32),
+            })
+        };
+
+        let channel_chain_1337 = chain_of_1337.clone().with(Channel {
+            leader: IDS[&LEADER_2],
+            follower: IDS[&FOLLOWER],
+            guardian: *GUARDIAN_2,
+            token: chain_of_1337.token.address,
+            nonce: Nonce::from(1337_u32),
+        });
+
+        let eth_adapter = Ethereum::init(KEYSTORES[&FOLLOWER].clone(), &config)
+            .expect("should init ethereum adapter")
+            .unlock()
+            .expect("should unlock eth adapter");
+
+        let spender = *ADVERTISER;
+
+        // No Regular nor Create2 deposits
+        // Chain #1
+        {
+            let no_deposits = eth_adapter
+                .get_deposit(&channel_chain_1, spender)
+                .await
+                .expect("should get deposit");
+
+            assert_eq!(
+                Deposit {
+                    total: BigNum::from(0),
+                    still_on_create2: BigNum::from(0),
+                },
+                no_deposits
+            );
+        }
+
+        // No Regular nor Create2 deposits
+        // Chain #1337
+        {
+            let no_deposits = eth_adapter
+                .get_deposit(&channel_chain_1337, spender)
+                .await
+                .expect("should get deposit");
+
+            assert_eq!(
+                Deposit {
+                    total: BigNum::from(0),
+                    still_on_create2: BigNum::from(0),
+                },
+                no_deposits
+            );
+        }
+
+        // OUTPACE deposit
+        // {
+        //     mock_set_balance(&token.2, LEADER.to_bytes(), spender.to_bytes(), &one_token)
+        //         .await
+        //         .expect("Failed to set balance");
+
+        //     outpace_deposit(&outpace.1, &channel, spender.to_bytes(), &one_token)
+        //         .await
+        //         .expect("Should deposit funds");
+
+        //     let regular_deposit = eth_adapter
+        //         .get_deposit(&channel_context, spender)
+        //         .await
+        //         .expect("should get deposit");
+
+        //     assert_eq!(
+        //         Deposit {
+        //             total: one_token.clone(),
+        //             still_on_create2: BigNum::from(0),
+        //         },
+        //         regular_deposit
+        //     );
+        // }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore = "Create2 deposits with sweeper will be removed"]
     async fn get_deposit_and_count_create2_when_min_tokens_received() {
         let web3 = GANACHE_1337_WEB3.clone();
 
         let leader_account = *LEADER;
 
-        // deploy contracts
-        let token = deploy_token_contract(&web3, 1_000)
-            .await
-            .expect("Correct parameters are passed to the Token constructor.");
-        let token_address = token.1;
-
-        let sweeper = deploy_sweeper_contract(&web3)
-            .await
-            .expect("Correct parameters are passed to the Sweeper constructor.");
-
-        let outpace = deploy_outpace_contract(&web3)
-            .await
-            .expect("Correct parameters are passed to the OUTPACE constructor.");
-
         let spender = *CREATOR;
 
-        let (config, chain_context) = {
-            let mut init_chain = GANACHE_1337.clone();
-            init_chain.outpace = outpace.0;
-            init_chain.sweeper = sweeper.0;
+        let token_info = GANACHE_INFO_1337.tokens["Mocked TOKEN 1337"].clone();
+        let chain_of = ChainOf::new(GANACHE_1337.clone(), token_info.clone());
 
-            let mut config = GANACHE_CONFIG.clone();
-
-            // Assert that the Ganache chain exist in the configuration
-            let mut config_chain = config
-                .chains
-                .values_mut()
-                .find(|chain_info| chain_info.chain.chain_id == init_chain.chain_id)
-                .expect("Should find Ganache chain in the configuration");
-
-            // override the chain to use the outpace & sweeper addresses that were just deployed
-            config_chain.chain = init_chain.clone();
-
-            // Assert that the token that was just deploy does not exist in the Config
-            assert!(
-                config_chain
-                    .tokens
-                    .values()
-                    .find(|config_token_info| config_token_info.address == token.1)
-                    .is_none(),
-                "Config should not have this token address, we've just deployed the contract."
-            );
-
-            let token_exists = config_chain.tokens.insert("TOKEN".into(), token.0.clone());
-
-            // Assert that the token name that was just deploy does not exist in the Config
-            assert!(
-                token_exists.is_none(),
-                "This token name should not pre-exist in Ganache config"
-            );
-
-            let chain_context = ChainOf::new(init_chain, token.0.clone());
-
-            (config, chain_context)
-        };
-
-        let channel = get_test_channel(token_address);
-        let channel_context = chain_context.with(channel);
+        let channel = get_test_channel(token_info.address);
+        let channel_context = chain_of.clone().with(channel);
 
         // since we deploy a new contract, it's should be different from all the ones found in config.
-        let eth_adapter = Ethereum::init(KEYSTORES[&LEADER].clone(), &config)
+        let eth_adapter = Ethereum::init(KEYSTORES[&LEADER].clone(), &GANACHE_CONFIG)
             .expect("should init ethereum adapter")
             .unlock()
             .expect("should unlock eth adapter");
 
-        let counterfactual_address =
-            get_counterfactual_address(sweeper.0, &channel, outpace.0, spender);
+        let counterfactual_address = get_counterfactual_address(
+            chain_of.chain.sweeper,
+            &channel,
+            chain_of.chain.outpace,
+            spender,
+        );
 
         // No Regular nor Create2 deposits
         {
@@ -796,28 +956,27 @@ mod test {
         let one_token = {
             let deposit = "1000000000000000000".parse::<BigNum>().unwrap();
             // make sure 1 TOKEN is the minimum set in Config
-            let config_token = eth_adapter
-                .config
-                .find_chain_of(channel.token)
-                .expect("Channel token should be present in Config")
-                .token;
-
             assert!(
-                deposit >= config_token.min_token_units_for_deposit,
+                deposit >= token_info.min_token_units_for_deposit,
                 "The minimum deposit should be >= the configured token minimum token units"
             );
 
             deposit
         };
 
+        let token = Erc20Token::new(&web3, token_info.clone());
+        let outpace = Outpace::new(&web3, chain_of.chain.outpace);
+        let sweeper = Sweeper::new(&web3, chain_of.chain.sweeper);
+
         // Regular deposit in Outpace without Create2
         {
-            assert!(token.1 == channel.token);
-            mock_set_balance(&token.2, LEADER.to_bytes(), spender.to_bytes(), &one_token)
+            token
+                .set_balance(LEADER.to_bytes(), spender.to_bytes(), &one_token)
                 .await
                 .expect("Failed to set balance");
 
-            outpace_deposit(&outpace.1, &channel, spender.to_bytes(), &one_token)
+            outpace
+                .deposit(&channel, spender.to_bytes(), &one_token)
                 .await
                 .expect("Should deposit funds");
 
@@ -840,14 +999,14 @@ mod test {
         // 999 * 10^18 < 1 TOKEN
         {
             // Set balance < minimal token units, i.e. 1 TOKEN
-            mock_set_balance(
-                &token.2,
-                leader_account.to_bytes(),
-                counterfactual_address.to_bytes(),
-                &BigNum::from(999),
-            )
-            .await
-            .expect("Failed to set balance");
+            token
+                .set_balance(
+                    leader_account.to_bytes(),
+                    counterfactual_address.to_bytes(),
+                    &BigNum::from(999),
+                )
+                .await
+                .expect("Failed to set balance");
 
             let deposit_with_create2 = eth_adapter
                 .get_deposit(&channel_context, spender)
@@ -864,17 +1023,23 @@ mod test {
             );
         }
 
+        let two_tokens = BigNum::with_precision(2, token_info.precision.into());
+
         // Deposit with more than minimum token units
         {
+            assert!(
+                two_tokens > token_info.min_token_units_for_deposit,
+                "Two tokens is less than the minimum units for deposit in Config."
+            );
             // Set balance > minimal token units
-            mock_set_balance(
-                &token.2,
-                leader_account.to_bytes(),
-                counterfactual_address.to_bytes(),
-                &BigNum::from(1_999),
-            )
-            .await
-            .expect("Failed to set balance");
+            token
+                .set_balance(
+                    leader_account.to_bytes(),
+                    counterfactual_address.to_bytes(),
+                    &two_tokens,
+                )
+                .await
+                .expect("Failed to set balance");
 
             let deposit_with_create2 = eth_adapter
                 .get_deposit(&channel_context, spender)
@@ -883,9 +1048,9 @@ mod test {
 
             assert_eq!(
                 Deposit {
-                    total: &one_token + BigNum::from(1_999),
+                    total: &one_token + &two_tokens,
                     // tokens are more than the minimum tokens required for deposits to count
-                    still_on_create2: BigNum::from(1_999),
+                    still_on_create2: two_tokens.clone(),
                 },
                 deposit_with_create2
             );
@@ -893,14 +1058,10 @@ mod test {
 
         // Run sweeper, it should clear the previously set create2 deposit and leave the total
         {
-            sweeper_sweep(
-                &sweeper.1,
-                outpace.0.to_bytes(),
-                &channel,
-                spender.to_bytes(),
-            )
-            .await
-            .expect("Should sweep the Spender account");
+            sweeper
+                .sweep(outpace.address.to_bytes(), &channel, spender.to_bytes())
+                .await
+                .expect("Should sweep the Spender account");
 
             let swept_deposit = eth_adapter
                 .get_deposit(&channel_context, spender)
@@ -909,7 +1070,7 @@ mod test {
 
             assert_eq!(
                 Deposit {
-                    total: &one_token + BigNum::from(1_999),
+                    total: &one_token + &two_tokens,
                     // we've just swept the account, so create2 should be empty
                     still_on_create2: BigNum::from(0),
                 },
