@@ -137,8 +137,9 @@ mod test {
         balances::UncheckedState,
         config::GANACHE_CONFIG,
         test_util::{
-            discard_logger, ServerSetup, ADVERTISER, DUMMY_AUTH, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER,
-            DUMMY_VALIDATOR_LEADER, FOLLOWER, CREATOR, IDS, LEADER, PUBLISHER, PUBLISHER_2,
+            discard_logger, ServerSetup, ADVERTISER, CREATOR, DUMMY_AUTH, DUMMY_CAMPAIGN,
+            DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, FOLLOWER, IDS, LEADER, PUBLISHER,
+            PUBLISHER_2,
         },
         util::ApiUrl,
         validator::messages::NewState,
@@ -160,11 +161,17 @@ mod test {
         let mut validators: HashMap<ValidatorId, Validator> = HashMap::new();
         let leader = Validator {
             url: ApiUrl::from_str(&format!("{}/leader", server.uri())).expect("should be valid"),
-            token: DUMMY_AUTH.get(&*LEADER).expect("should be valid").to_string(),
+            token: DUMMY_AUTH
+                .get(&*LEADER)
+                .expect("should be valid")
+                .to_string(),
         };
         let follower = Validator {
             url: ApiUrl::from_str(&format!("{}/follower", server.uri())).expect("should be valid"),
-            token: DUMMY_AUTH.get(&*FOLLOWER).expect("should be valid").to_string(),
+            token: DUMMY_AUTH
+                .get(&*FOLLOWER)
+                .expect("should be valid")
+                .to_string(),
         };
         validators.insert(DUMMY_VALIDATOR_LEADER.id, leader);
         validators.insert(DUMMY_VALIDATOR_FOLLOWER.id, follower);

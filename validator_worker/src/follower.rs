@@ -344,9 +344,9 @@ mod test {
         balances::UncheckedState,
         config::GANACHE_CONFIG,
         test_util::{
-            discard_logger, ServerSetup, ADVERTISER, DUMMY_AUTH, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER,
-            DUMMY_VALIDATOR_LEADER, FOLLOWER, CREATOR, GUARDIAN_2, IDS, LEADER, PUBLISHER,
-            PUBLISHER_2,
+            discard_logger, ServerSetup, ADVERTISER, CREATOR, DUMMY_AUTH, DUMMY_CAMPAIGN,
+            DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, FOLLOWER, GUARDIAN_2, IDS, LEADER,
+            PUBLISHER, PUBLISHER_2,
         },
         util::ApiUrl,
         validator::messages::NewState,
@@ -368,11 +368,17 @@ mod test {
         let mut validators: HashMap<ValidatorId, Validator> = HashMap::new();
         let leader = Validator {
             url: ApiUrl::from_str(&format!("{}/leader", server.uri())).expect("should be valid"),
-            token: DUMMY_AUTH.get(&*LEADER).expect("should retrieve").to_string(),
+            token: DUMMY_AUTH
+                .get(&*LEADER)
+                .expect("should retrieve")
+                .to_string(),
         };
         let follower = Validator {
             url: ApiUrl::from_str(&format!("{}/follower", server.uri())).expect("should be valid"),
-            token: DUMMY_AUTH.get(&*FOLLOWER).expect("should retrieve").to_string(),
+            token: DUMMY_AUTH
+                .get(&*FOLLOWER)
+                .expect("should retrieve")
+                .to_string(),
         };
         validators.insert(DUMMY_VALIDATOR_LEADER.id, leader);
         validators.insert(DUMMY_VALIDATOR_FOLLOWER.id, follower);
@@ -731,7 +737,8 @@ mod test {
                 signature: IDS[&*LEADER].to_checksum(),
                 balances: get_initial_balances().into_unchecked(),
             };
-            let _mock_guard_new_state = server_setup.setup_new_state_response(Some(new_state)).await;
+            let _mock_guard_new_state =
+                server_setup.setup_new_state_response(Some(new_state)).await;
             let approve_state = ApproveState {
                 state_root,
                 signature: IDS[&*FOLLOWER].to_checksum(),
