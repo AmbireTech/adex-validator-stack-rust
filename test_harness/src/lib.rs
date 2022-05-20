@@ -271,8 +271,9 @@ mod tests {
             ADVERTISER, ADVERTISER_2, DUMMY_AD_UNITS, DUMMY_IPFS, GUARDIAN, GUARDIAN_2, IDS,
             PUBLISHER, PUBLISHER_2,
         },
+        unified_num::FromWhole,
         util::{logging::new_logger, ApiUrl},
-        validator::{Heartbeat, NewState},
+        validator::{ApproveState, Heartbeat, NewState, RejectState},
         Balances, BigNum, Campaign, CampaignId, Channel, ChannelId, UnifiedNum,
     };
     use reqwest::{Client, StatusCode};
@@ -419,7 +420,8 @@ mod tests {
             id: VALIDATORS[&FOLLOWER].address.into(),
             url: VALIDATORS[&FOLLOWER].sentry_url.to_string(),
             // fee per 1000 (pro mille) = 0.10000000 (UnifiedNum)
-            fee: 10_000_000.into(),
+            // fee per 1 = 0.00010000
+            fee: UnifiedNum::from_whole(0.1),
             fee_addr: None,
         };
 
@@ -429,12 +431,19 @@ mod tests {
             id: VALIDATORS[&LEADER].address.into(),
             url: VALIDATORS[&LEADER].sentry_url.to_string(),
             // fee per 1000 (pro mille) = 0.05000000 (UnifiedNum)
-            fee: 5_000_000.into(),
+            // fee per 1 = 0.00005000
+            fee: UnifiedNum::from_whole(0.05),
             fee_addr: None,
         };
 
         let validators = Validators::new((leader_desc, follower_desc));
 
+        // CAMPAIGN_2 budget 20 TOKENs (2_000_000_000)
+        // leader fee (pro mile) 10_000_000 = 0.10000000 TOKENs
+        // follower fee (pro mile) 5_000_000 = 0.05000000 TOKENs
+        // IMPRESSION pricing (min) - 1 TOKEN
+        // CLICK pricing (min) - 3 TOKENs
+        //
         Campaign {
             id: "0x127b98248f4e4b73af409d10f62daeaa"
                 .parse()
@@ -442,7 +451,7 @@ mod tests {
             channel,
             creator: *ADVERTISER,
             // 20.00000000
-            budget: UnifiedNum::from(2_000_000_000),
+            budget: UnifiedNum::from_whole(20),
             validators,
             title: Some("Dummy Campaign 2 in Chain #1337".to_string()),
             pricing_bounds: vec![
@@ -450,18 +459,18 @@ mod tests {
                     IMPRESSION,
                     Pricing {
                         // 1 TOKEN
-                        min: 100_000_000.into(),
+                        min: UnifiedNum::from_whole(1),
                         // 2 TOKENs
-                        max: 200_000_000.into(),
+                        max: UnifiedNum::from_whole(2),
                     },
                 ),
                 (
                     CLICK,
                     Pricing {
                         // 3 TOKENs
-                        min: 300_000_000.into(),
+                        min: UnifiedNum::from_whole(3),
                         // 5 TOKENs
-                        max: 500_000_000.into(),
+                        max: UnifiedNum::from_whole(5),
                     },
                 ),
             ]
@@ -502,7 +511,7 @@ mod tests {
             // min_validator_fee for token: 0.000_010
             // fee per 1000 (pro mille) = 2.00000000
             // fee per 1 payout: payout * fee / 1000 = payout * 0.00200000
-            fee: 200_000_000.into(),
+            fee: UnifiedNum::from_whole(2),
             fee_addr: None,
         };
 
@@ -512,7 +521,7 @@ mod tests {
             // min_validator_fee for token: 0.000_010
             // fee per 1000 (pro mille) = 1.75000000
             // fee per 1 payout: payout * fee / 1000 = payout * 0.00175000
-            fee: 175_000_000.into(),
+            fee: UnifiedNum::from_whole(1.75),
             fee_addr: None,
         };
 
@@ -525,7 +534,7 @@ mod tests {
             channel,
             creator: *ADVERTISER_2,
             // 20.00000000
-            budget: UnifiedNum::from(2_000_000_000),
+            budget: UnifiedNum::from_whole(20),
             validators,
             title: Some("Dummy Campaign 3 in Chain #1".to_string()),
             pricing_bounds: vec![
@@ -534,10 +543,10 @@ mod tests {
                     Pricing {
                         // 0.01500000
                         // Per 1000 = 15.00000000
-                        min: 1_500_000.into(),
+                        min: UnifiedNum::from_whole(0.015),
                         // 0.0250000
                         // Per 1000 = 25.00000000
-                        max: 2_500_000.into(),
+                        max: UnifiedNum::from_whole(0.025),
                     },
                 ),
                 (
@@ -545,10 +554,10 @@ mod tests {
                     Pricing {
                         // 0.03500000
                         // Per 1000 = 35.00000000
-                        min: 3_500_000.into(),
+                        min: UnifiedNum::from_whole(0.035),
                         // 0.06500000
                         // Per 1000 = 65.00000000
-                        max: 6_500_000.into(),
+                        max: UnifiedNum::from_whole(0.065),
                     },
                 ),
             ]
@@ -563,6 +572,95 @@ mod tests {
                 from: None,
             },
         }
+    });
+
+    /// These `CAMPAIGN_2` events are used to test the `ApproveState` with `is_healthy: false`
+    /// and `RejectState`
+    /// 5 x IMPRESSIONs
+    /// 4 x CLICKs
+    static CAMPAIGN_2_EVENTS: Lazy<[Event; 8]> = Lazy::new(|| {
+        [
+            Event::Impression {
+                publisher: *PUBLISHER_2,
+                ad_unit: CAMPAIGN_2
+                    .ad_units
+                    .get(0)
+                    .expect("Should exist in Campaign")
+                    .ipfs,
+                ad_slot: DUMMY_IPFS[3],
+                referrer: Some("https://adex.network".into()),
+            },
+            Event::Impression {
+                publisher: *PUBLISHER_2,
+                ad_unit: CAMPAIGN_2
+                    .ad_units
+                    .get(0)
+                    .expect("Should exist in Campaign")
+                    .ipfs,
+                ad_slot: DUMMY_IPFS[3],
+                referrer: Some("https://adex.network".into()),
+            },
+            Event::Impression {
+                publisher: *PUBLISHER_2,
+                ad_unit: CAMPAIGN_2
+                    .ad_units
+                    .get(1)
+                    .expect("Should exist in Campaign")
+                    .ipfs,
+                ad_slot: DUMMY_IPFS[3],
+                referrer: Some("https://adex.network".into()),
+            },
+            Event::Impression {
+                publisher: *PUBLISHER_2,
+                ad_unit: CAMPAIGN_2
+                    .ad_units
+                    .get(1)
+                    .expect("Should exist in Campaign")
+                    .ipfs,
+                ad_slot: DUMMY_IPFS[3],
+                referrer: Some("https://adex.network".into()),
+            },
+            Event::Impression {
+                publisher: *PUBLISHER_2,
+                ad_unit: CAMPAIGN_2
+                    .ad_units
+                    .get(1)
+                    .expect("Should exist in Campaign")
+                    .ipfs,
+                ad_slot: DUMMY_IPFS[3],
+                referrer: Some("https://adex.network".into()),
+            },
+            Event::Click {
+                publisher: *PUBLISHER_2,
+                ad_unit: CAMPAIGN_2
+                    .ad_units
+                    .get(0)
+                    .expect("Should exist in Campaign")
+                    .ipfs,
+                ad_slot: DUMMY_IPFS[3],
+                referrer: Some("https://ambire.com".into()),
+            },
+            Event::Click {
+                publisher: *PUBLISHER_2,
+                ad_unit: CAMPAIGN_2
+                    .ad_units
+                    .get(1)
+                    .expect("Should exist in Campaign")
+                    .ipfs,
+                ad_slot: DUMMY_IPFS[3],
+                referrer: Some("https://ambire.com".into()),
+            },
+            Event::Click {
+                publisher: *PUBLISHER_2,
+                ad_unit: CAMPAIGN_2
+                    .ad_units
+                    .get(1)
+                    .expect("Should exist in Campaign")
+                    .ipfs,
+                ad_slot: DUMMY_IPFS[3],
+                referrer: Some("https://ambire.com".into()),
+            },
+        ]
     });
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -666,7 +764,7 @@ mod tests {
         //
         // Channel 2 in Chain #1337:
         // - Outpace: 30 TOKENs
-        // - Counterfactual: 20 TOKENs
+        // - Counterfactual: 0 TOKENs
         //
         // Advertiser 2
         // Channel 3 in Chain #1:
@@ -686,7 +784,7 @@ mod tests {
                     token: contracts_1337.token.info.clone(),
                     address: advertiser_adapter.whoami().to_address(),
                     outpace_amount: BigNum::with_precision(30, token_1337_precision),
-                    counterfactual_amount: BigNum::with_precision(20, token_1337_precision),
+                    counterfactual_amount: BigNum::from(0),
                 },
                 Deposit {
                     channel: CAMPAIGN_3.channel,
@@ -996,6 +1094,130 @@ mod tests {
         let leader_worker = Worker::from_sentry(leader_sentry.clone());
         let follower_worker = Worker::from_sentry(follower_sentry.clone());
 
+        // Add new events for `CAMPAIGN_2` to sentry
+        // Should trigger RejectedState on LEADER (the Channel's follower)
+        //
+        // Note: Follower and Leader for this channel are reversed!
+        //
+        // Channel 2 has only 1 spender with 50 deposit!
+        // All spenders sum: 50.00000000
+        //
+        //
+        // Channel Leader (FOLLOWER) has:
+        // 5 IMPRESSIONS
+        //
+        // Channel Follower (LEADER) has:
+        // 5 IMPRESSIONS
+        // 3 CLICKS
+        //
+        // RejectState should be triggered by the Channel follower (LEADER) because:
+        //
+        // 5 x IMPRESSION = 5 TOKENs
+        // 3 x CLICK =      9 TOKENs
+        //                 ----------
+        //                  14 TOKENs
+        //
+        // IMPRESSIONs:
+        //
+        // 5 x leader fee = 5 * (1 TOKENs * 0.1 (fee) / 1000 (pro mile) ) = 5 * 0.0001 TOKENs = 0.0005 TOKENs
+        // 5 x follower fee = 5 * ( 1 TOKENs * 0.05 (fee) / 1000 (pro_mile) ) = 5 * 0.00005 TOKENs = 0.00025 TOKENs
+        //
+        // CLICKs (for 3):
+        //
+        // 3 x leader fee = 3 * ( 3 TOKENs * 0.1 (fee) / 1000 (pro mile) ) = 3 x 0.0003 TOKENs = 0.0009 TOKENs
+        // 3 x follower fee = 3 x ( 3 TOKENs * 0.05 (fee) / 1000 (pro_mile) ) = 3 x 0.00015 TOKENs = 0.00045 TOKENs
+        //
+        // All payouts (for 5 IMPRESSIONs + 3 CLICKs):
+        // Advertiser (spender) = 14.0021 TOKENs
+        // Publisher (earner) = 14 TOKENs
+        // Leader (earner) = 0.0005 (IMPRESSIONs) + 0.0009 (CLICKs) = 0.0014 TOKENs
+        // Follower (earner) = 0.00025 (IMPRESSIONs) + 0.00045 (CLICKs) = 0.00070 TOKENs
+        //
+        // Total: 14.0021 TOKENs
+        //
+        // For Channel Follower (LEADER) which has all 5 IMPRESSIONs and 3/4 CLICKs:
+        //
+        // sum_our = 14.0021
+        // sum_approved_mins (5 x IMPRESSION) = 5 + 0.0005 + 0.00025 = 5.00075
+        // sum_approved_mins (3 x CLICKS) = 9 + 0.0009 + 0.00045 = 9.00135
+        //
+        // For Channel Leader (FOLLOWER) which has only 5 x IMPRESSION events
+        //
+        // 5 x IMPRESSIONs (only)
+        // diff = 14.0021 - 5.00075 = 9.00135
+        // health_penalty = 9.00135 * 1 000 / 30.0 = 300.045
+        //
+        // health = 1 000 - health_penalty = 699.955 (Unsignable)
+        //
+        // Ganache health_threshold_promilles = 950
+        // Ganache health_unsignable_promilles = 750
+        {
+            // Take all 5 IMPRESSIONs and None of the CLICKs to trigger `RejectState` on the Follower of the Channel (LEADER)
+            let channel_leader_events = &CAMPAIGN_2_EVENTS[..=4];
+            // follower should receive all IMPRESSIONs & 3/3 CLICKs so it will trigger `RejectState`
+            let channel_follower_events = CAMPAIGN_2_EVENTS.as_ref();
+
+            let channel_leader_response = post_new_events(
+                &follower_sentry,
+                token_chain_1337.clone().with(CAMPAIGN_2.id),
+                // the Leader of this channel is FOLLOWER!
+                &channel_leader_events,
+            )
+            .await
+            .expect("Posted events");
+
+            assert_eq!(SuccessResponse { success: true }, channel_leader_response);
+
+            let channel_follower_response = post_new_events(
+                &leader_sentry,
+                token_chain_1337.clone().with(CAMPAIGN_2.id),
+                // the Follower of this channel is LEADER!
+                channel_follower_events,
+            )
+            .await
+            .expect("Posted events");
+
+            assert_eq!(SuccessResponse { success: true }, channel_follower_response);
+
+            info!(
+                setup.logger,
+                "Successful POST of events for CAMPAIGN_2 {:?} and Channel {:?} to Leader & Follower to trigger RejectState",
+                CAMPAIGN_2.id,
+                CAMPAIGN_2.channel.id()
+            );
+
+            // Channel 2 expected Accounting on Leader (FOLLOWER)
+            {
+                let expected_accounting = AccountingResponse {
+                    balances: {
+                        let mut balances = Balances::<CheckedState>::new();
+                        // publisher (PUBLISHER_2) payout = 5.0
+                        balances
+                            .spend(*ADVERTISER, *PUBLISHER_2, UnifiedNum::from_whole(5))
+                            .expect("Should not overflow");
+                        // leader (FOLLOWER) payout = 0.0005
+                        balances
+                            .spend(*ADVERTISER, *FOLLOWER, UnifiedNum::from_whole(0.0005))
+                            .expect("Should not overflow");
+                        // follower (LEADER) payout = 0.00025
+                        balances
+                            .spend(*ADVERTISER, *LEADER, UnifiedNum::from_whole(0.00025))
+                            .expect("Should not overflow");
+
+                        balances
+                    },
+                };
+                // Channel Leader (FOLLOWER)
+                let actual_accounting = follower_sentry
+                    .get_accounting(&token_chain_1337.clone().with_channel(CAMPAIGN_2.channel))
+                    .await
+                    .expect("Should get Channel Accounting");
+
+                assert_eq!(expected_accounting, actual_accounting);
+                info!(setup.logger, "Channel 1 {:?} has empty Accounting because no events have been submitted to any Campaign", CAMPAIGN_1.channel.id());
+            }
+        }
+
         // leader single worker tick
         leader_worker.all_channels_tick().await;
         // follower single worker tick
@@ -1012,7 +1234,77 @@ mod tests {
                 .expect("Should get Channel Accounting");
 
             assert_eq!(expected_accounting, actual_accounting);
-            info!(setup.logger, "Channel 1 {:?} has empty Accounting because of no events have been submitted to any Campaign", CAMPAIGN_1.channel.id());
+            info!(setup.logger, "Channel 1 {:?} has empty Accounting because no events have been submitted to any Campaign", CAMPAIGN_1.channel.id());
+        }
+
+        // For CAMPAIGN_2 & Channel 2
+        //
+        // Check NewState on Leader (FOLLOWER)
+        // RejectState should not be generated by Follower (LEADER) because tick has ran before the Leader's (FOLLOWER)
+        //
+        // Leader (FOLLOWER) events:
+        // - 5 IMPRESSIONs
+        //
+        // event payout * fee / 1000 (pro mile)
+        //
+        // 5 x leader fee = 5 * ( 1 * 0.1 / 1000 ) = 5 * 0.0001 = 0.0005
+        // 5 x follower fee = 5 * ( 1 * 0.05 / 1000 ) = 5 * 0.00005 = 0.00025
+        //
+        // Payouts for 5 IMPRESSIONs:
+        //
+        // Advertiser (spender) = 5.00075
+        // Publisher (earner) = 5
+        // Leader (earner) = 0.0005
+        // Follower (earner) = 0.00025
+        //
+        // Total: 5.00075 TOKENs
+        {
+            let latest_new_state_leader = follower_sentry
+                .get_our_latest_msg(CAMPAIGN_2.channel.id(), &["NewState"])
+                .await
+                .expect("Should fetch NewState from Channel's Leader (Who am I) in FOLLOWER sentry")
+                .map(|message| {
+                    NewState::<CheckedState>::try_from(message)
+                        .expect("Should be NewState with Checked Balances")
+                })
+                .expect("Should have a NewState in Channel's Leader for the Campaign 2 channel");
+
+            let latest_reject_state_follower = leader_sentry
+                .get_our_latest_msg(CAMPAIGN_2.channel.id(), &["RejectState"])
+                .await
+                .expect(
+                    "Should successfully try to fetch a RejectState from Channel's Follower (Who am I) in LEADER sentry",
+                );
+
+            let expected_new_state_balances = {
+                let mut balances = Balances::<CheckedState>::new();
+                let multiplier = 10_u64.pow(UnifiedNum::PRECISION.into());
+                // Channel's Leader (FOLLOWER) & Follower (LEADER) are reversed!
+                balances
+                    .spend(*ADVERTISER, *PUBLISHER_2, UnifiedNum::from(5 * multiplier))
+                    .expect("Should not overflow");
+                // total Leader fee: 0.0005 TOKENs
+                balances
+                    .spend(*ADVERTISER, *FOLLOWER, 50_000_u64.into())
+                    .expect("Should not overflow");
+                // total Follower fee: 0.00025 TOKENs
+                balances
+                    .spend(*ADVERTISER, *LEADER, 25_000_u64.into())
+                    .expect("Should not overflow");
+
+                balances
+            };
+
+            pretty_assertions::assert_eq!(
+                expected_new_state_balances,
+                latest_new_state_leader.balances,
+                "Expected Channel's Leader (FOLLOWER) balances should match"
+            );
+
+            assert_eq!(
+                None, latest_reject_state_follower,
+                "Channel's follower should not have RejectState yet"
+            );
         }
 
         // All Channels should have a heartbeat message now
@@ -1098,6 +1390,8 @@ mod tests {
         }
 
         // Add new events for `CAMPAIGN_3` to sentry
+        // 2 IMPRESSIONS
+        // 2 CLICKS
         {
             let events = vec![
                 Event::Impression {
@@ -1163,7 +1457,7 @@ mod tests {
             assert_eq!(SuccessResponse { success: true }, follower_response);
             info!(
                 setup.logger,
-                "Successfully POST events for CAMPAIGN_3 {:?} and Channel {:?} to Leader & Follower",
+                "Successful POST of events for CAMPAIGN_3 {:?} and Channel {:?} to Leader & Follower",
                 CAMPAIGN_3.id,
                 CAMPAIGN_3.channel.id()
             );
@@ -1204,18 +1498,18 @@ mod tests {
                 .spend(
                     CAMPAIGN_1.creator,
                     CAMPAIGN_1.channel.leader.to_address(),
-                    UnifiedNum::from(50_000),
+                    UnifiedNum::from_whole(0.0005),
                 )
                 .expect("Should spend for Leader");
             expected_balances
                 .spend(
                     CAMPAIGN_1.creator,
                     CAMPAIGN_1.channel.follower.to_address(),
-                    UnifiedNum::from(40_000),
+                    UnifiedNum::from_whole(0.0004),
                 )
                 .expect("Should spend for Follower");
             expected_balances
-                .spend(CAMPAIGN_1.creator, *PUBLISHER, UnifiedNum::from(10_000_000))
+                .spend(CAMPAIGN_1.creator, *PUBLISHER, UnifiedNum::from_whole(0.1))
                 .expect("Should spend for Publisher");
 
             let expected_accounting = AccountingResponse {
@@ -1231,29 +1525,33 @@ mod tests {
             info!(setup.logger, "Successfully validated Accounting Balances for Channel 1 {:?} after CAMPAIGN_1 events {:?}", CAMPAIGN_1.channel.id(), CAMPAIGN_1.id);
         }
 
-        // Channel 3 expected Accounting
+        // CAMPAIGN_3 & Channel 3 expected Accounting
         // Fees are calculated based on pro mile of the payout
         // event payout * fee / 1000
         //
+        // leader fee (per 1000): 2
+        // follower fee (per 1000): 1.75
+        // IMPRESSION price (min): 0.015
+        // CLICK price (min): 0.035
         //
-        // IMPRESSION:
-        // - Publisher2 payout: 2 * 30 000 = 60 000
-        // - Leader fees: 60 000 * 20 000 / 1 000 = 1 200 000
-        // - Follower fees: 60 000 * 10 000 / 1000 = 600 000
+        // 2 x IMPRESSION:
+        // - Publisher2 payout: 2 * 0.015 = = 0.030 UnifiedNum(3 000 000)
+        // - Leader fees: 2 * (0.015 * 2 / 1000) = 0.00006 = UnifiedNum(6 000)
+        // - Follower fees: 2 * (0.015 * 1.75 / 1000) = 0.0000525 = UnifiedNum(5 250)
         //
-        // CLICK:
-        // - Publisher2 payout: 2 * 60 000 = 120 000
-        // - Leader fees: 120 000 * 20 000 / 1000 = 2 400 000
-        // - Follower fees: 120 000 * 10 000 / 1000 = 1 200 000
+        // 2 x CLICK:
+        // - Publisher2 payout: 2 * 0.035 = UnifiedNum(7 000 000)
+        // - Leader fees: 2 * (0.035 * 2 / 1000) = 0.00014 = UnifiedNum(14 000)
+        // - Follower fees: 2 * (0.035 * 1.75 / 1000) = 0.0001225 = UnifiedNum(12 250)
         //
         // Creator (Advertiser2) pays out:
-        // events_payout + leader fee + follower fee
-        // events_payout = 60 000 (impression) + 120 000 (click) = 180 000
-        // 180 000 + (1 200 000 + 2 400 000) + (600 000 + 1 200 000) = 5 580 000
         //
-        // Publisher2 total payout: 180 000
-        // leader total fees: 1 200 000 + 2 400 000 = 3 600 000
-        // follower total fees: 600 000 + 1 200 000 = 1 800 000
+        // Publisher2 total payout: 2 * 0.015 (impression) + 2 * 0.035 (click) = 0.1 = UnifiedNum(10 000 000)
+        // Leader total fees: 0.00006 + 0.00014 = 0.00020 = UnifiedNum(20 000)
+        // Follower total fees: 0.0000525 + 0.0001225 = 0.000175 = UnifiedNum(17 500)
+        //
+        // events_payout + leader fee + follower fee
+        // 0.1 + 0.00020 + 0.000175 = 0.100375 = UnifiedNum(10 037 500)
         {
             let mut expected_balances = Balances::new();
 
@@ -1261,18 +1559,22 @@ mod tests {
                 .spend(
                     CAMPAIGN_3.creator,
                     CAMPAIGN_3.channel.leader.to_address(),
-                    UnifiedNum::from(3_600_000),
+                    UnifiedNum::from_whole(0.00020),
                 )
                 .expect("Should spend for Leader");
             expected_balances
                 .spend(
                     CAMPAIGN_3.creator,
                     CAMPAIGN_3.channel.follower.to_address(),
-                    UnifiedNum::from(1_800_000),
+                    UnifiedNum::from_whole(0.000175),
                 )
                 .expect("Should spend for Follower");
             expected_balances
-                .spend(CAMPAIGN_3.creator, *PUBLISHER_2, UnifiedNum::from(180_000))
+                .spend(
+                    CAMPAIGN_3.creator,
+                    *PUBLISHER_2,
+                    UnifiedNum::from_whole(0.1),
+                )
                 .expect("Should spend for Publisher");
 
             let expected_accounting = AccountingResponse {
@@ -1446,6 +1748,460 @@ mod tests {
                     "Latest NewState from Leader should be the same as last approved NewState from Leader & Follower"
                 );
             }
+        }
+
+        // For CAMPAIGN_2 & Channel 2
+        //
+        // Check RejectState on Follower (LEADER) in Channel 2 after validator tick
+        //
+        // For Channel Follower (LEADER) which has all events:
+        //
+        // All payouts (for 5 IMPRESSIONs + 3/4 CLICKs):
+        // Advertiser (spender) = 14.0021 TOKENs
+        // Publisher (earner) = 14 TOKENs
+        // Leader (earner) = 0.0005 (IMPRESSIONs) + 0.0009 (CLICKs) = 0.0014 TOKENs
+        // Follower (earner) = 0.00025 (IMPRESSIONs) + 0.00045 (CLICKs) = 0.00070 TOKENs
+        //
+        // Total: 14.0021 TOKENs
+        //
+        // sum_our = 14.0021
+        // sum_approved_mins (5 x IMPRESSION) = 5 + 0.0005 + 0.00025 = 5.00075
+        // sum_approved_mins (3 x CLICKS) = 9 + 0.0009 + 0.00045 = 9.00135
+        //
+        // For Channel Leader (FOLLOWER) which has only the 5 IMPRESSION events
+        //
+        // 5 x IMPRESSIONs (only)
+        // diff = 14.0021 - 5.00075 = 9.00135
+        // health_penalty = 9.00135 * 1 000 / 30.0 = 300.045
+        // health = 1 000 - health_penalty = 699.955 (Unsignable)
+        //
+        // Ganache health_threshold_promilles = 950
+        // Ganache health_unsignable_promilles = 750
+        {
+            let latest_reject_state_follower = leader_sentry
+                .get_our_latest_msg(CAMPAIGN_2.channel.id(), &["RejectState"])
+                .await
+                .expect(
+                    "Should fetch RejectState from Channel's Follower (Who am I) in Leader sentry",
+                )
+                .map(|message| {
+                    RejectState::<CheckedState>::try_from(message)
+                        .expect("Should be RejectState with valid Checked Balances")
+                })
+                .expect(
+                    "Should have a RejectState in Channel's Follower for the Campaign 2 channel",
+                );
+
+            let rejected_balances = latest_reject_state_follower
+                .balances
+                .expect("Channel Follower (LEADER) should have RejectState with balances");
+            // Expected Leader (FOLLOWER) total rejected in Follower: 5.00075
+            assert_eq!(
+                UnifiedNum::from_whole(5.00075),
+                rejected_balances
+                    .sum()
+                    .expect("Should not overflow summing balances")
+                    // does not really matter if we're checking earners or spenders for CheckedState
+                    .0
+            )
+        }
+
+        // For CAMPAIGN_3
+        //
+        // Check NewState existence of Channel 3 after the validator ticks
+        // For both Leader & Follower
+        // Assert that both states are the same!
+        //
+        // Check ApproveState of the Follower
+        // Assert that it exists in both validators
+        {
+            let latest_new_state_leader = leader_sentry
+                .get_our_latest_msg(CAMPAIGN_3.channel.id(), &["NewState"])
+                .await
+                .expect("Should fetch NewState from Leader (Who am I) in Leader sentry")
+                .map(|message| {
+                    NewState::<CheckedState>::try_from(message)
+                        .expect("Should be NewState with Checked Balances")
+                })
+                .expect("Should have a NewState in Leader for the Campaign 3 channel");
+
+            // Check balances in Leader's NewState
+            {
+                let mut expected_balances = Balances::new();
+                expected_balances
+                    .spend(
+                        CAMPAIGN_3.creator,
+                        CAMPAIGN_3.channel.leader.to_address(),
+                        UnifiedNum::from_whole(0.0002),
+                    )
+                    .expect("Should spend");
+                expected_balances
+                    .spend(
+                        CAMPAIGN_3.creator,
+                        CAMPAIGN_3.channel.follower.to_address(),
+                        UnifiedNum::from_whole(0.000175),
+                    )
+                    .expect("Should spend");
+                expected_balances
+                    .spend(
+                        CAMPAIGN_3.creator,
+                        *PUBLISHER_2,
+                        UnifiedNum::from_whole(0.1),
+                    )
+                    .expect("Should spend");
+
+                pretty_assertions::assert_eq!(
+                    latest_new_state_leader.balances,
+                    expected_balances,
+                    "Balances are as expected"
+                );
+            }
+
+            let last_approved_response_follower = follower_sentry
+                .get_last_approved(CAMPAIGN_3.channel.id())
+                .await
+                .expect("Should fetch Approve state from Follower");
+
+            let last_approved_response_leader = leader_sentry
+                .get_last_approved(CAMPAIGN_3.channel.id())
+                .await
+                .expect("Should fetch Approve state from Leader");
+
+            // Due to timestamp differences in the `received` field
+            // we can only `assert_eq!` the messages themselves
+            pretty_assertions::assert_eq!(
+                last_approved_response_leader
+                    .heartbeats
+                    .expect("Leader response should have heartbeats")
+                    .clone()
+                    .into_iter()
+                    .map(|message| message.msg)
+                    .collect::<Vec<_>>(),
+                last_approved_response_follower
+                    .heartbeats
+                    .expect("Follower response should have heartbeats")
+                    .clone()
+                    .into_iter()
+                    .map(|message| message.msg)
+                    .collect::<Vec<_>>(),
+                "Leader and Follower should both have the same last Approved response"
+            );
+
+            let last_approved_follower = last_approved_response_follower
+                .last_approved
+                .expect("Should have last approved messages for the events we've submitted");
+
+            let last_approved_leader = last_approved_response_leader
+                .last_approved
+                .expect("Should have last approved messages for the events we've submitted");
+
+            // Due to the received time that can be different in messages
+            // we must check the actual ValidatorMessage without the timestamps
+            {
+                let msg_new_state_leader = last_approved_leader
+                    .new_state
+                    .expect("Leader should have last approved NewState");
+
+                assert_eq!(
+                    msg_new_state_leader.from, IDS[&LEADER],
+                    "NewState should be received from Leader"
+                );
+
+                let msg_approve_state_leader = last_approved_leader
+                    .approve_state
+                    .expect("Leader should have last approved ApproveState");
+
+                assert_eq!(
+                    msg_approve_state_leader.from, IDS[&FOLLOWER],
+                    "ApproveState should be received from Follower"
+                );
+
+                let msg_new_state_follower = last_approved_follower
+                    .new_state
+                    .expect("Follower should have last approved NewState");
+
+                assert_eq!(
+                    msg_new_state_follower.from, IDS[&LEADER],
+                    "NewState should be received from Leader"
+                );
+
+                let msg_approve_state_follower = last_approved_follower
+                    .approve_state
+                    .expect("Follower should have last approved ApproveState");
+
+                assert_eq!(
+                    msg_approve_state_follower.from, IDS[&FOLLOWER],
+                    "ApproveState should be received from Follower"
+                );
+
+                let new_state_leader = msg_new_state_leader
+                    .msg
+                    .clone()
+                    .into_inner()
+                    .try_checked()
+                    .expect("NewState should have valid CheckedState Balances");
+
+                let new_state_follower = msg_new_state_follower
+                    .msg
+                    .clone()
+                    .into_inner()
+                    .try_checked()
+                    .expect("NewState should have valid CheckedState Balances");
+
+                assert_eq!(
+                    new_state_leader, new_state_follower,
+                    "Last approved NewState in Leader & Follower should be the same"
+                );
+
+                pretty_assertions::assert_eq!(
+                    latest_new_state_leader,
+                    new_state_leader,
+                    "Latest NewState from Leader should be the same as last approved NewState from Leader & Follower"
+                );
+            }
+        }
+
+        // For CAMPAIGN_2 & Channel 2
+        // Trigger Unhealthy but signable NewState with 5 IMPRESSIONs & 2 CLICKs in Leader
+        // As opposed to 5 IMPRESSIONs & 3 CLICKs in Follower
+        //
+        // 5 x IMPRESSION = 5 TOKENs
+        // 3 x CLICK =      9 TOKENs
+        //
+        //                  14 TOKENs
+        //
+        // IMPRESSIONs:
+        //
+        // 5 x leader fee = 5 * (1 TOKENs * 0.1 (fee) / 1000 (pro mile) ) = 5 x 0.0001 TOKENs = 0.0005 TOKENs
+        // 5 x follower fee = 5 x ( 1 TOKENs * 0.05 (fee) / 1000 (pro_mile) ) = 5 x 0.00005 TOKENs = 0.00025 TOKENs
+        //
+        // CLICKs (for 3):
+        //
+        // 3 x leader fee = 3 * (3 TOKENs * 0.1 (fee) / 1000 (pro mile) ) = 3 x 0.0003 TOKENs = 0.0009 TOKENs
+        // 3 x follower fee = 3 x ( 3 TOKENs * 0.05 (fee) / 1000 (pro_mile) ) = 3 x 0.00015 TOKENs = 0.00045 TOKENs
+        //
+        // CLICKS (for 2):
+        // 2 x leader fee = 2 * (3 TOKENs * 0.1 (fee) / 1000 (pro mile) ) = 2 x 0.0003 TOKENs = 0.0006 TOKENs
+        // 2 x follower fee = 2 x ( 3 TOKENs * 0.05 (fee) / 1000 (pro_mile) ) = 2 x 0.00015 TOKENs = 0.00030 TOKENs
+        //
+        // Payouts (all current Follower events: 5 IMPRESSIONs + 3 CLICKs):
+        // Advertiser (spender) = 14.0021
+        // Publisher (earner) = 14 TOKENs
+        // Leader (earner) = 0.0005 (IMPRESSIONs) + 0.0009 (CLICKs) = 0.0014 TOKENs
+        // Follower (earner) = 0.00025 (IMPRESSIONs) + 0.00045 (CLICKs) = 0.00070 TOKENs
+        //
+        // Total: 14.0021
+        //
+        // sum_our = 14.0021
+        // sum_approved_mins (5 x IMPRESSION) = 5 + 0.0005 + 0.00025 = 5.00075
+        // sum_approved_mins (2 x CLICKS) = 6 + 0.0006 + 0.00030 = 6.0009
+        //                                                       ------------
+        //                                                          11.00165
+        //
+        // 5 IMPRESSIONs + 2 CLICKs
+        //
+        // diff = 14.0021 - (5.00075 + 6.0009) = 3.00045
+        // health_penalty = 3.00045 * 1 000 / 30.0 = 100.015
+        //
+        // health = 1 000 - health_penalty = 899.985 (Unhealthy but Signable)
+        //
+        // Ganache health_threshold_promilles = 950
+        // Ganache health_unsignable_promilles = 750
+        //
+        // Add new events for `CAMPAIGN_2` to sentry Follower
+        // Should trigger RejectedState
+        //
+        // Note: Follower and Leader for this channel are reversed!
+        //
+        // Channel's Leader (FOLLOWER) events opposed to Channel's Follower (LEADER) events:
+        //
+        // 5 IMPRESSIONs
+        // 2 (out of 3) CLICKs
+        {
+            // Prepare 2 out of 4 CLICK events to trigger unhealthy `ApproveState` on the Follower of the Channel (LEADER)
+            let channel_leader_events = &CAMPAIGN_2_EVENTS[5..=6];
+
+            let channel_leader_response = post_new_events(
+                // the Leader of this channel is FOLLOWER!
+                &follower_sentry,
+                token_chain_1337.clone().with(CAMPAIGN_2.id),
+                &channel_leader_events,
+            )
+            .await
+            .expect("Posted events");
+
+            assert_eq!(SuccessResponse { success: true }, channel_leader_response);
+
+            info!(
+                setup.logger,
+                "Successful POST of 2/3 CLICK events found in the Channel's Follower for CAMPAIGN_2 {:?} and Channel {:?} to Channel Leader to trigger unhealthy ApproveState",
+                CAMPAIGN_2.id,
+                CAMPAIGN_2.channel.id()
+            );
+        }
+
+        // IMPORTANT! Call the FOLLOWER tick first as it's the Channel 2 Leader!
+        // This will trigger a the new state and the Channel 2 follower (LEADER) will process that.
+
+        // follower single worker tick
+        follower_worker.all_channels_tick().await;
+        // leader single worker tick
+        leader_worker.all_channels_tick().await;
+
+        {
+            let latest_approve_state_follower = leader_sentry
+                .get_our_latest_msg(CAMPAIGN_2.channel.id(), &["ApproveState"])
+                .await
+                .expect(
+                    "Should fetch ApproveState from Channel's Follower (Who am I) from LEADER sentry",
+                )
+                .map(|message| {
+                    ApproveState::try_from(message)
+                        .expect("Should be ApproveState with valid Checked Balances")
+                })
+                .expect("Should have a ApproveState in Channel's Follower for the Campaign 2 channel");
+
+            let latest_new_state_leader = follower_sentry
+                .get_our_latest_msg(CAMPAIGN_2.channel.id(), &["NewState"])
+                .await
+                .expect(
+                    "Should fetch NewState from Channel's Leader (Who am I) from FOLLOWER sentry",
+                )
+                .map(|message| {
+                    NewState::<CheckedState>::try_from(message)
+                        .expect("Should be NewState with valid Checked Balances")
+                })
+                .expect("Should have a NewState in Channel's Follower for the Campaign 2 channel");
+
+            assert_eq!(
+                latest_approve_state_follower.state_root, latest_new_state_leader.state_root,
+                "Latest ApproveState in Follower should correspond to the latest NewState Leader"
+            );
+            assert!(!latest_approve_state_follower.is_healthy);
+            assert_eq!(
+                UnifiedNum::from_whole(11.00165),
+                latest_new_state_leader
+                    .balances
+                    .sum()
+                    .expect("Should not overflow summing balances")
+                    // does not really matter if we're checking earners or spenders for CheckedState
+                    .0
+            )
+        }
+
+        // For CAMPAIGN_2 & Channel 2
+        //
+        // Post new events to Channel Leader (FOLLOWER)
+        //
+        // Trigger a healthy ApproveState by posting the last CLICK event in Leader (FOLLOWER)
+        // this will create a healthy NewState and have the exact same number of events as the Follower (LEADER)
+        //
+        // 5 x IMPRESSION = 5 TOKENs
+        // 3 x CLICK =      9 TOKENs
+        //
+        //                  14 TOKENs
+        //
+        // Channel's Leader (FOLLOWER) events opposed to Channel's Follower (LEADER) events:
+        //
+        // 5 IMPRESSIONs
+        // 3 (out of 3) CLICKs
+        {
+            // Take the last CLICK event
+            let channel_leader_events = [CAMPAIGN_2_EVENTS[7].clone()];
+
+            let channel_leader_response = post_new_events(
+                &follower_sentry,
+                token_chain_1337.clone().with(CAMPAIGN_2.id),
+                // the Leader of this channel is FOLLOWER!
+                &channel_leader_events,
+            )
+            .await
+            .expect("Posted events");
+
+            assert_eq!(SuccessResponse { success: true }, channel_leader_response);
+
+            info!(
+                setup.logger,
+                "Successful POST of the last CLICK event for CAMPAIGN_2 {:?} and Channel {:?} to Leader to trigger Healthy NewState",
+                CAMPAIGN_2.id,
+                CAMPAIGN_2.channel.id()
+            );
+        }
+
+        // IMPORTANT! Call the FOLLOWER tick first as it's the Channel 2 Leader!
+        // This will trigger a the new state and the Channel 2 follower (LEADER) will process that.
+
+        // follower single worker tick
+        follower_worker.all_channels_tick().await;
+        // leader single worker tick
+        leader_worker.all_channels_tick().await;
+
+        // For CAMPAIGN_2 Channel 2
+        //
+        // Healthy ApproveState
+        //
+        {
+            let latest_approve_state_follower = leader_sentry
+                .get_our_latest_msg(CAMPAIGN_2.channel.id(), &["ApproveState"])
+                .await
+                .expect(
+                    "Should fetch ApproveState from Channel's Follower (Who am I) from LEADER sentry",
+                )
+                .map(|message| {
+                    ApproveState::try_from(message)
+                        .expect("Should be ApproveState with valid Checked Balances")
+                })
+                .expect("Should have a ApproveState in Channel's Follower for the Campaign 2 channel");
+
+            assert!(
+                latest_approve_state_follower.is_healthy,
+                "ApproveState in Channel's Follower (LEADER) should be healthy"
+            );
+
+            let latest_new_state_leader = follower_sentry
+                .get_our_latest_msg(CAMPAIGN_2.channel.id(), &["NewState"])
+                .await
+                .expect(
+                    "Should fetch NewState from Channel's Leader (Who am I) from FOLLOWER sentry",
+                )
+                .map(|message| {
+                    NewState::<CheckedState>::try_from(message)
+                        .expect("Should be NewState with valid Checked Balances")
+                })
+                .expect("Should have a NewState in Channel's Follower for the Campaign 2 channel");
+
+            assert_eq!(
+                latest_new_state_leader.state_root,
+                latest_approve_state_follower.state_root
+            );
+
+            // double check that the ApproveStateResponse in both validators is present
+            // and that they are the same
+            let last_approve_state_leader = follower_sentry
+            .get_last_approved(CAMPAIGN_2.channel.id())
+            .await
+            .expect(
+                "Should fetch Last Approved Response from Channel's Leader (Who am I) from FOLLOWER sentry",
+            ).last_approved.expect("Should have an ApproveState & NewState");
+
+            let last_approve_state_follower = leader_sentry
+            .get_last_approved(CAMPAIGN_2.channel.id())
+            .await
+            .expect(
+                "Should fetch Last Approved Response from Channel's FOllower (Who am I) from LEADER sentry",
+            ).last_approved.expect("Should have an ApproveState & NewState");
+
+            assert_eq!(
+                last_approve_state_leader.new_state.unwrap(),
+                last_approve_state_follower.new_state.unwrap(),
+                "The NewState Messages in Channel's Leader & Follower should be the same"
+            );
+
+            assert_eq!(
+                last_approve_state_leader.approve_state.unwrap(),
+                last_approve_state_follower.approve_state.unwrap(),
+                "The ApproveState Messages in Channel's Leader & Follower should be the same"
+            );
         }
     }
 
