@@ -565,7 +565,95 @@ mod tests {
         }
     });
 
+    /// This Campaign has a token from the GANACHE_1 chain instead of the GANACHE_1337 one like the others
+    static CAMPAIGN_3: Lazy<Campaign> = Lazy::new(|| {
+        use chrono::TimeZone;
+        use primitives::{
+            campaign::{Active, Pricing, Validators},
+            targeting::Rules,
+            validator::ValidatorDesc,
+            EventSubmission,
+        };
+
+        let channel = Channel {
+            leader: VALIDATORS[&LEADER].address.into(),
+            follower: VALIDATORS[&FOLLOWER].address.into(),
+            guardian: *GUARDIAN_2,
+            token: SNAPSHOT_CONTRACTS_1.token.info.address,
+            nonce: 1_u64.into(),
+        };
+
+        let leader_desc = ValidatorDesc {
+            id: VALIDATORS[&LEADER].address.into(),
+            url: VALIDATORS[&LEADER].sentry_url.to_string(),
+            // min_validator_fee for token: 0.000_010
+            // fee per 1000 (pro mille) = 0.00003000 (UnifiedNum)
+            // fee per 1 payout: payout * fee / 1000 = payout * 0.00000003
+            fee: 3_000.into(),
+            fee_addr: None,
+        };
+
+        let follower_desc = ValidatorDesc {
+            id: VALIDATORS[&FOLLOWER].address.into(),
+            url: VALIDATORS[&FOLLOWER].sentry_url.to_string(),
+            // min_validator_fee for token: 0.000_010
+            // fee per 1000 (pro mille) = 0.00002000 (UnifiedNum)
+            // fee per 1 payout: payout * fee / 1000 = payout * 0.00000002
+            fee: 2_000.into(),
+            fee_addr: None,
+        };
+
+        let validators = Validators::new((leader_desc, follower_desc));
+
+        Campaign {
+            id: "0xa78f3492481b41a688488a7aa1ff17df"
+                .parse()
+                .expect("Should parse"),
+            channel,
+            creator: *ADVERTISER,
+            // 20.00000000
+            budget: UnifiedNum::from(2_000_000_000),
+            validators,
+            title: Some("Dummy Campaign in Chain #1".to_string()),
+            pricing_bounds: vec![
+                (
+                    IMPRESSION,
+                    Pricing {
+                        // 0.00003000
+                        // Per 1000 = 0.03000000
+                        min: 3_000.into(),
+                        // 0.00005000
+                        // Per 1000 = 0.05000000
+                        max: 5_000.into(),
+                    },
+                ),
+                (
+                    CLICK,
+                    Pricing {
+                        // 0.00006000
+                        // Per 1000 = 0.06000000
+                        min: 6_000.into(),
+                        // 0.00010000
+                        // Per 1000 = 0.10000000
+                        max: 10_000.into(),
+                    },
+                ),
+            ]
+            .into_iter()
+            .collect(),
+            event_submission: Some(EventSubmission { allow: vec![] }),
+            ad_units: vec![DUMMY_AD_UNITS[0].clone(), DUMMY_AD_UNITS[1].clone()],
+            targeting_rules: Rules::new(),
+            created: Utc.ymd(2021, 2, 1).and_hms(7, 0, 0),
+            active: Active {
+                to: Utc.ymd(2099, 1, 30).and_hms(0, 0, 0),
+                from: None,
+            },
+        }
+    });
+
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    // #[ignore = "for now"]
     async fn run_full_test() {
         let chain = GANACHE_1337.clone();
         assert_eq!(CAMPAIGN_1.channel.token, CAMPAIGN_2.channel.token);
