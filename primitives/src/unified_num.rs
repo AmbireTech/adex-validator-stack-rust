@@ -204,7 +204,7 @@ impl UnifiedNum {
         UnifiedNum::from_whole(whole_number.to_integer())
     }
 
-    /// This method returns the inner [`u64`] representation of the [`UnifiedNum`].
+    /// This method creates a [`UnifiedNum`] from an inner [`u64`] value.
     ///
     /// This method does **not** take into account precision of [`UnifiedNum`]!
     pub const fn from_u64(value: u64) -> Self {
