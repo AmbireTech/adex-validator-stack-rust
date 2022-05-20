@@ -131,14 +131,14 @@ async fn on_new_accounting<C: Unlocked + 'static>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::sentry_interface::{AuthToken, ChainsValidators, Validator};
+    use crate::sentry_interface::{ChainsValidators, Validator};
     use adapter::dummy::{Adapter, Dummy, Options};
     use primitives::{
         balances::UncheckedState,
-        config::{configuration, Environment},
+        config::GANACHE_CONFIG,
         test_util::{
-            discard_logger, ServerSetup, ADVERTISER, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER,
-            DUMMY_VALIDATOR_LEADER, FOLLOWER, GUARDIAN, IDS, LEADER, PUBLISHER, PUBLISHER_2,
+            discard_logger, ServerSetup, ADVERTISER, DUMMY_AUTH, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER,
+            DUMMY_VALIDATOR_LEADER, FOLLOWER, CREATOR, IDS, LEADER, PUBLISHER, PUBLISHER_2,
         },
         util::ApiUrl,
         validator::messages::NewState,
@@ -153,20 +153,18 @@ mod test {
 
         let adapter = Adapter::with_unlocked(Dummy::init(Options {
             dummy_identity: IDS[&LEADER],
-            dummy_auth_tokens: vec![(IDS[&LEADER].to_address(), "AUTH_Leader".into())]
-                .into_iter()
-                .collect(),
+            dummy_auth_tokens: DUMMY_AUTH.clone(),
         }));
         let logger = discard_logger();
 
         let mut validators: HashMap<ValidatorId, Validator> = HashMap::new();
         let leader = Validator {
             url: ApiUrl::from_str(&format!("{}/leader", server.uri())).expect("should be valid"),
-            token: AuthToken::default(),
+            token: DUMMY_AUTH.get(&*LEADER).expect("should be valid").to_string(),
         };
         let follower = Validator {
             url: ApiUrl::from_str(&format!("{}/follower", server.uri())).expect("should be valid"),
-            token: AuthToken::default(),
+            token: DUMMY_AUTH.get(&*FOLLOWER).expect("should be valid").to_string(),
         };
         validators.insert(DUMMY_VALIDATOR_LEADER.id, leader);
         validators.insert(DUMMY_VALIDATOR_FOLLOWER.id, follower);
@@ -180,7 +178,7 @@ mod test {
 
     #[tokio::test]
     async fn test_leader_tick() {
-        let config = configuration(Environment::Development, None).expect("Should get Config");
+        let config = GANACHE_CONFIG.clone();
         let server_setup = ServerSetup::init(&DUMMY_CAMPAIGN.channel).await;
         let sentry = setup_sentry(&server_setup.server, &config).await;
 
@@ -198,10 +196,10 @@ mod test {
                 .spend(*ADVERTISER, *PUBLISHER_2, UnifiedNum::from_u64(1000))
                 .expect("should spend");
             balances
-                .spend(*GUARDIAN, *PUBLISHER, UnifiedNum::from_u64(1000))
+                .spend(*CREATOR, *PUBLISHER, UnifiedNum::from_u64(1000))
                 .expect("should spend");
             balances
-                .spend(*GUARDIAN, *PUBLISHER_2, UnifiedNum::from_u64(1000))
+                .spend(*CREATOR, *PUBLISHER_2, UnifiedNum::from_u64(1000))
                 .expect("should spend");
             balances
         };

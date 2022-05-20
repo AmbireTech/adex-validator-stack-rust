@@ -337,15 +337,15 @@ async fn on_error<'a, C: Unlocked + 'static>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::sentry_interface::{AuthToken, ChainsValidators, Validator};
+    use crate::sentry_interface::{ChainsValidators, Validator};
     use adapter::dummy::{Adapter, Dummy, Options};
     use chrono::Utc;
     use primitives::{
         balances::UncheckedState,
-        config::{configuration, Environment},
+        config::GANACHE_CONFIG,
         test_util::{
-            discard_logger, ServerSetup, ADVERTISER, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER,
-            DUMMY_VALIDATOR_LEADER, FOLLOWER, GUARDIAN, GUARDIAN_2, IDS, LEADER, PUBLISHER,
+            discard_logger, ServerSetup, ADVERTISER, DUMMY_AUTH, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER,
+            DUMMY_VALIDATOR_LEADER, FOLLOWER, CREATOR, GUARDIAN_2, IDS, LEADER, PUBLISHER,
             PUBLISHER_2,
         },
         util::ApiUrl,
@@ -361,20 +361,18 @@ mod test {
 
         let adapter = Adapter::with_unlocked(Dummy::init(Options {
             dummy_identity: IDS[&LEADER],
-            dummy_auth_tokens: vec![(IDS[&LEADER].to_address(), "AUTH_Leader".into())]
-                .into_iter()
-                .collect(),
+            dummy_auth_tokens: DUMMY_AUTH.clone(),
         }));
         let logger = discard_logger();
 
         let mut validators: HashMap<ValidatorId, Validator> = HashMap::new();
         let leader = Validator {
             url: ApiUrl::from_str(&format!("{}/leader", server.uri())).expect("should be valid"),
-            token: AuthToken::default(),
+            token: DUMMY_AUTH.get(&*LEADER).expect("should retrieve").to_string(),
         };
         let follower = Validator {
             url: ApiUrl::from_str(&format!("{}/follower", server.uri())).expect("should be valid"),
-            token: AuthToken::default(),
+            token: DUMMY_AUTH.get(&*FOLLOWER).expect("should retrieve").to_string(),
         };
         validators.insert(DUMMY_VALIDATOR_LEADER.id, leader);
         validators.insert(DUMMY_VALIDATOR_FOLLOWER.id, follower);
@@ -390,7 +388,7 @@ mod test {
     #[tokio::test]
     async fn test_follower_tick() {
         let server_setup = ServerSetup::init(&DUMMY_CAMPAIGN.channel).await;
-        let config = configuration(Environment::Development, None).expect("Should get Config");
+        let config = GANACHE_CONFIG.clone();
         let sentry = setup_sentry(&server_setup.server, &config).await;
 
         let channel_context = config
@@ -407,10 +405,10 @@ mod test {
                 .spend(*ADVERTISER, *PUBLISHER_2, UnifiedNum::from_u64(1000))
                 .expect("should spend");
             balances
-                .spend(*GUARDIAN, *PUBLISHER, UnifiedNum::from_u64(1000))
+                .spend(*CREATOR, *PUBLISHER, UnifiedNum::from_u64(1000))
                 .expect("should spend");
             balances
-                .spend(*GUARDIAN, *PUBLISHER_2, UnifiedNum::from_u64(1000))
+                .spend(*CREATOR, *PUBLISHER_2, UnifiedNum::from_u64(1000))
                 .expect("should spend");
             balances
         };
@@ -425,7 +423,7 @@ mod test {
                 },
             );
             spenders.insert(
-                *GUARDIAN,
+                *CREATOR,
                 Spender {
                     total_deposited: UnifiedNum::from_u64(10_000),
                     total_spent: Some(UnifiedNum::from_u64(2000)),
@@ -446,7 +444,7 @@ mod test {
                 },
             );
             all_spenders.insert(
-                *GUARDIAN,
+                *CREATOR,
                 Spender {
                     total_deposited: UnifiedNum::from_u64(u64::MAX),
                     total_spent: None,
@@ -541,7 +539,7 @@ mod test {
                 )
                 .expect("should encode");
             let new_state: NewState<UncheckedState> = NewState {
-                state_root: state_root,
+                state_root,
                 signature: IDS[&*FOLLOWER].to_checksum(),
                 balances: proposed_balances.into_unchecked(),
             };
@@ -581,7 +579,7 @@ mod test {
                 )
                 .expect("should encode");
             let new_state: NewState<UncheckedState> = NewState {
-                state_root: state_root,
+                state_root,
                 signature: IDS[&*LEADER].to_checksum(),
                 balances: proposed_balances.into_unchecked(),
             };
@@ -627,7 +625,7 @@ mod test {
                 )
                 .expect("should encode");
             let new_state: NewState<UncheckedState> = NewState {
-                state_root: state_root,
+                state_root,
                 signature: IDS[&*LEADER].to_checksum(),
                 balances: proposed_balances.into_unchecked(),
             };
@@ -667,7 +665,7 @@ mod test {
                 .spend(*ADVERTISER, *PUBLISHER, UnifiedNum::from_u64(200_000))
                 .expect("should spend");
             our_balances
-                .spend(*GUARDIAN, *PUBLISHER_2, UnifiedNum::from_u64(200_000))
+                .spend(*CREATOR, *PUBLISHER_2, UnifiedNum::from_u64(200_000))
                 .expect("should spend");
 
             let state_root = get_initial_balances()
@@ -677,7 +675,7 @@ mod test {
                 )
                 .expect("should encode");
             let new_state: NewState<UncheckedState> = NewState {
-                state_root: state_root,
+                state_root,
                 signature: IDS[&*LEADER].to_checksum(),
                 balances: get_initial_balances().into_unchecked(),
             };
@@ -702,8 +700,8 @@ mod test {
         // Case where no NewState is returned
         {
             // Setting up the expected response
-            let _mock_guard = server_setup.setup_new_state_response(None).await;
-            let _mock_guard = server_setup.setup_approve_state_response(None).await;
+            let _mock_guard_new_state = server_setup.setup_new_state_response(None).await;
+            let _mock_guard_approve_state = server_setup.setup_approve_state_response(None).await;
 
             let tick_status = tick(
                 &sentry,
@@ -733,13 +731,13 @@ mod test {
                 signature: IDS[&*LEADER].to_checksum(),
                 balances: get_initial_balances().into_unchecked(),
             };
-            let _mock_guard = server_setup.setup_new_state_response(Some(new_state)).await;
+            let _mock_guard_new_state = server_setup.setup_new_state_response(Some(new_state)).await;
             let approve_state = ApproveState {
                 state_root,
                 signature: IDS[&*FOLLOWER].to_checksum(),
                 is_healthy: true,
             };
-            let _mock_guard = server_setup
+            let _mock_guard_approve_state = server_setup
                 .setup_approve_state_response(Some(approve_state))
                 .await;
 
@@ -818,7 +816,7 @@ mod test {
                 )
                 .expect("should encode");
             let new_state: NewState<UncheckedState> = NewState {
-                state_root: state_root,
+                state_root,
                 signature: IDS[&*LEADER].to_checksum(),
                 balances: get_initial_balances().into_unchecked(),
             };
@@ -834,7 +832,7 @@ mod test {
             assert!(matches!(res, ApproveStateResult::Sent(Some(..))));
             let propagated_to = match res {
                 ApproveStateResult::Sent(propagated_to) => propagated_to,
-                _ => None, // Shouldn't happen
+                _ => panic!("Shouldn't happen"),
             };
             let propagated_to: Vec<ValidatorId> = propagated_to
                 .unwrap()

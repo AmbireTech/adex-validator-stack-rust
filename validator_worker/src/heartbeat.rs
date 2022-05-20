@@ -77,14 +77,14 @@ async fn send_heartbeat<C: Unlocked + 'static>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::sentry_interface::{AuthToken, ChainsValidators, Validator};
+    use crate::sentry_interface::{ChainsValidators, Validator};
     use adapter::dummy::{Adapter, Dummy, Options};
     use chrono::{Duration, Utc};
     use primitives::{
-        config::{configuration, Environment},
+        config::GANACHE_CONFIG,
         sentry::{SuccessResponse, ValidatorMessage, ValidatorMessagesListResponse},
         test_util::{
-            discard_logger, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER,
+            discard_logger, DUMMY_AUTH, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER,
             FOLLOWER, IDS, LEADER,
         },
         util::ApiUrl,
@@ -127,20 +127,18 @@ mod test {
 
         let adapter = Adapter::with_unlocked(Dummy::init(Options {
             dummy_identity: IDS[&LEADER],
-            dummy_auth_tokens: vec![(IDS[&LEADER].to_address(), "AUTH_Leader".into())]
-                .into_iter()
-                .collect(),
+            dummy_auth_tokens: DUMMY_AUTH.clone(),
         }));
         let logger = discard_logger();
 
         let mut validators: HashMap<ValidatorId, Validator> = HashMap::new();
         let leader = Validator {
             url: ApiUrl::from_str(&format!("{}/leader", server.uri())).expect("should be valid"),
-            token: AuthToken::default(),
+            token: DUMMY_AUTH.get(&*LEADER).expect("should be valid").to_string(),
         };
         let follower = Validator {
             url: ApiUrl::from_str(&format!("{}/follower", server.uri())).expect("should be valid"),
-            token: AuthToken::default(),
+            token: DUMMY_AUTH.get(&*FOLLOWER).expect("should be valid").to_string(),
         };
         validators.insert(DUMMY_VALIDATOR_LEADER.id, leader);
         validators.insert(DUMMY_VALIDATOR_FOLLOWER.id, follower);
@@ -176,7 +174,7 @@ mod test {
 
     #[tokio::test]
     async fn test_heartbeats() {
-        let config = configuration(Environment::Development, None).expect("Should get Config");
+        let config = GANACHE_CONFIG.clone();
         let server = setup_mock_server().await;
         let sentry = setup_sentry(&server, &config).await;
         {

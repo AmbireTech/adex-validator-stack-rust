@@ -341,7 +341,7 @@ impl ServerSetup {
         };
         let heartbeat_res = ValidatorMessagesListResponse {
             messages: vec![ValidatorMessage {
-                from: DUMMY_CAMPAIGN.channel.leader,
+                from: channel.leader,
                 received: Utc::now(),
                 msg: MessageTypes::Heartbeat(heartbeat),
             }],
@@ -349,8 +349,8 @@ impl ServerSetup {
         Mock::given(method("GET"))
             .and(path(format!(
                 "/v5/channel/{}/validator-messages/{}/{}",
-                DUMMY_CAMPAIGN.channel.id(),
-                DUMMY_CAMPAIGN.channel.leader,
+                channel.id(),
+                channel.leader,
                 "Heartbeat",
             )))
             .and(query_param("limit", "1"))
