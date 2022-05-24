@@ -9,6 +9,7 @@ use crate::{
     config::GANACHE_CONFIG,
     sentry::{CLICK, IMPRESSION},
     targeting::Rules,
+    unified_num::FromWhole,
     AdUnit, Address, Campaign, Channel, EventSubmission, UnifiedNum, ValidatorDesc, ValidatorId,
     IPFS,
 };
@@ -145,14 +146,14 @@ mod logger {
 pub static DUMMY_VALIDATOR_LEADER: Lazy<ValidatorDesc> = Lazy::new(|| ValidatorDesc {
     id: IDS[&LEADER],
     url: "http://localhost:8005".to_string(),
-    fee: 100.into(),
+    fee: UnifiedNum::from_whole(0.02),
     fee_addr: None,
 });
 
 pub static DUMMY_VALIDATOR_FOLLOWER: Lazy<ValidatorDesc> = Lazy::new(|| ValidatorDesc {
     id: IDS[&FOLLOWER],
     url: "http://localhost:8006".to_string(),
-    fee: 100.into(),
+    fee: UnifiedNum::from_whole(0.03),
     fee_addr: None,
 });
 
@@ -179,7 +180,7 @@ pub static DUMMY_CAMPAIGN: Lazy<Campaign> = Lazy::new(|| {
         },
         creator: *CREATOR,
         // 1000.00000000
-        budget: UnifiedNum::from(100_000_000_000),
+        budget: UnifiedNum::from_whole(1_000),
         validators: Validators::new((
             DUMMY_VALIDATOR_LEADER.clone(),
             DUMMY_VALIDATOR_FOLLOWER.clone(),

@@ -48,7 +48,7 @@ pub mod targeting;
 #[cfg(feature = "test-util")]
 #[cfg_attr(docsrs, doc(cfg(feature = "test-util")))]
 pub mod test_util;
-mod unified_num;
+pub mod unified_num;
 pub mod validator;
 
 /// This module is available with the `postgres` feature.

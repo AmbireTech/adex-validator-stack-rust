@@ -11,7 +11,9 @@ use web3::{
 use primitives::{
     channel::{Channel, Nonce},
     config::{ChainInfo, TokenInfo, GANACHE_CONFIG},
-    test_util::{ADVERTISER, CREATOR, FOLLOWER, GUARDIAN, GUARDIAN_2, LEADER, PUBLISHER},
+    test_util::{
+        ADVERTISER, ADVERTISER_2, CREATOR, FOLLOWER, GUARDIAN, GUARDIAN_2, LEADER, PUBLISHER,
+    },
     Address, BigNum, Chain, ValidatorId,
 };
 
@@ -82,6 +84,15 @@ pub static KEYSTORES: Lazy<HashMap<Address, Options>> = Lazy::new(|| {
         (
             *GUARDIAN_2,
             keystore_options(&format!("{}_keystore.json", *GUARDIAN_2), "ganache6"),
+        ),
+        // Address 7
+        // (
+        //     *PUBLISHER_2,
+        //     keystore_options(&format!("{}_keystore.json", *PUBLISHER_2), "ganache7"),
+        // ),
+        (
+            *ADVERTISER_2,
+            keystore_options(&format!("{}_keystore.json", *ADVERTISER_2), "ganache8"),
         ),
     ]
     .into_iter()

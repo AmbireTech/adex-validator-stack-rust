@@ -159,6 +159,7 @@ mod test {
         },
         sentry::{DateHour, CLICK, IMPRESSION},
         test_util::{CREATOR, DUMMY_AD_UNITS, DUMMY_CAMPAIGN, DUMMY_IPFS, PUBLISHER, PUBLISHER_2},
+        unified_num::FromWhole,
         AdUnit, UnifiedNum, ValidatorId, IPFS,
     };
 
@@ -314,12 +315,12 @@ mod test {
 
         let amount_per_day: UnifiedNum = hours
             .clone()
-            .map(|hour| UnifiedNum::from(hour as u64 * 100_000_000))
+            .map(|hour| UnifiedNum::from_whole(hour as u64))
             .sum::<Option<_>>()
             .expect("Should not overflow");
         let amount_for_month: UnifiedNum = december_days
             .clone()
-            .map(|day_n| UnifiedNum::from(amount_per_day * day_n as u64))
+            .map(|day_n| amount_per_day * UnifiedNum::from_whole(day_n as u64))
             .sum::<Option<UnifiedNum>>()
             .expect("Should not overflow");
 
@@ -431,7 +432,9 @@ mod test {
                 .expect("Should not overflow");
 
             assert_eq!(
-                14 * amount_per_day + 15 * amount_per_day + 16 * amount_per_day,
+                UnifiedNum::from_whole(14) * amount_per_day
+                    + UnifiedNum::from_whole(15) * amount_per_day
+                    + UnifiedNum::from_whole(16) * amount_per_day,
                 three_days_fetched_paid
             );
         }
@@ -533,12 +536,12 @@ mod test {
                 .expect("Should not overflow");
 
             assert_eq!(
-                10 * amount_per_day
-                    + 11 * amount_per_day
-                    + 12 * amount_per_day
-                    + 13 * amount_per_day
-                    + 14 * amount_per_day
-                    + 15 * amount_per_day,
+                UnifiedNum::from_whole(10) * amount_per_day
+                    + UnifiedNum::from_whole(11) * amount_per_day
+                    + UnifiedNum::from_whole(12) * amount_per_day
+                    + UnifiedNum::from_whole(13) * amount_per_day
+                    + UnifiedNum::from_whole(14) * amount_per_day
+                    + UnifiedNum::from_whole(15) * amount_per_day,
                 six_days_fetched_paid
             );
         }
