@@ -2188,20 +2188,44 @@ mod tests {
             .get_last_approved(CAMPAIGN_2.channel.id())
             .await
             .expect(
-                "Should fetch Last Approved Response from Channel's FOllower (Who am I) from LEADER sentry",
+                "Should fetch Last Approved Response from Channel's Follower (Who am I) from LEADER sentry",
             ).last_approved.expect("Should have an ApproveState & NewState");
 
-            assert_eq!(
-                last_approve_state_leader.new_state.unwrap(),
-                last_approve_state_follower.new_state.unwrap(),
-                "The NewState Messages in Channel's Leader & Follower should be the same"
-            );
+            // compare NewState from Leader & Follower
+            // NOTE: The `received` timestamp can differ, so compare everything except `received`!
+            {
+                let leader = last_approve_state_leader.new_state.unwrap();
+                let follower = last_approve_state_follower.new_state.unwrap();
 
-            assert_eq!(
-                last_approve_state_leader.approve_state.unwrap(),
-                last_approve_state_follower.approve_state.unwrap(),
-                "The ApproveState Messages in Channel's Leader & Follower should be the same"
-            );
+                assert_eq!(
+                    leader.msg,
+                    follower.msg,
+                    "The NewState Messages in Channel's Leader & Follower should be the same"
+                );
+                assert_eq!(
+                    leader.from,
+                    follower.from,
+                    "The NewState Messages in Channel's Leader & Follower should have the same `from` address"
+                );
+            }
+
+            // compare ApproveState from Leader & Follower
+            // NOTE: The `received` timestamp can differ, so compare everything except `received`!
+            {
+                let leader = last_approve_state_leader.approve_state.unwrap();
+                let follower = last_approve_state_follower.approve_state.unwrap();
+
+                assert_eq!(
+                    leader.msg,
+                    follower.msg,
+                    "The ApproveState Messages in Channel's Leader & Follower should be the same"
+                );
+                assert_eq!(
+                    leader.from,
+                    follower.from,
+                    "The ApproveState Messages in Channel's Leader & Follower should have the same `from` address"
+                );
+            }
         }
     }
 
