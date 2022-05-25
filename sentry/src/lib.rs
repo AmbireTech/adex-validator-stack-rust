@@ -491,13 +491,15 @@ pub struct Auth {
 
 #[cfg(test)]
 pub mod test_util {
+    use std::ops;
+
     use adapter::{
         dummy::{Dummy, Options},
         Adapter,
     };
     use primitives::{
         config::GANACHE_CONFIG,
-        test_util::{discard_logger, CREATOR, FOLLOWER, IDS, LEADER},
+        test_util::{discard_logger, DUMMY_AUTH, IDS, LEADER},
     };
 
     use crate::{
@@ -510,19 +512,38 @@ pub mod test_util {
         Application,
     };
 
+    /// This guard holds the Redis and Postgres pools taken from their respective Pool of pools.
+    ///
+    /// This ensures that they will not be dropped which will cause tests to fail randomly.
+    pub struct ApplicationGuard {
+        pub app: Application<Dummy>,
+        #[allow(dead_code)]
+        redis_pool: deadpool::managed::Object<crate::db::redis_pool::Manager>,
+        #[allow(dead_code)]
+        db_pool: deadpool::managed::Object<crate::db::tests_postgres::Manager>,
+    }
+
+    impl ops::Deref for ApplicationGuard {
+        type Target = Application<Dummy>;
+
+        fn deref(&self) -> &Self::Target {
+            &self.app
+        }
+    }
+    impl ops::DerefMut for ApplicationGuard {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.app
+        }
+    }
+
     /// Uses development and therefore the goerli testnet addresses of the tokens
-    /// It still uses DummyAdapter.
-    pub async fn setup_dummy_app() -> Application<Dummy> {
+    /// but still uses the `DummyAdapter`.
+    pub async fn setup_dummy_app() -> ApplicationGuard {
         let config = GANACHE_CONFIG.clone();
+
         let adapter = Adapter::new(Dummy::init(Options {
             dummy_identity: IDS[&LEADER],
-            dummy_auth_tokens: vec![
-                (*CREATOR, "AUTH_Creator".into()),
-                (*LEADER, "AUTH_Leader".into()),
-                (*FOLLOWER, "AUTH_Follower".into()),
-            ]
-            .into_iter()
-            .collect(),
+            dummy_auth_tokens: DUMMY_AUTH.clone(),
         }));
 
         let redis = TESTS_POOL.get().await.expect("Should return Object");
@@ -550,6 +571,10 @@ pub mod test_util {
             platform_api,
         );
 
-        app
+        ApplicationGuard {
+            app,
+            redis_pool: redis,
+            db_pool: database,
+        }
     }
 }
