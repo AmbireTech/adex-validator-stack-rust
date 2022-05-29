@@ -231,7 +231,7 @@ pub static DUMMY_AD_UNITS: Lazy<[AdUnit; 4]> = Lazy::new(|| {
             min_targeting_score: None,
             modified: None,
             owner: IDS[&PUBLISHER],
-            title: Some("Dummy AdUnit 3".to_string()),
+            title: Some("Dummy AdUnit 1".to_string()),
         },
         AdUnit {
             ipfs: IPFS::try_from("QmVhRDGXoM3Fg3HZD5xwMuxtb9ZErwC8wHt8CjsfxaiUbZ")
