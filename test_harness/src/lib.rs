@@ -2198,8 +2198,7 @@ mod tests {
                 let follower = last_approve_state_follower.new_state.unwrap();
 
                 assert_eq!(
-                    leader.msg,
-                    follower.msg,
+                    leader.msg, follower.msg,
                     "The NewState Messages in Channel's Leader & Follower should be the same"
                 );
                 assert_eq!(
@@ -2216,8 +2215,7 @@ mod tests {
                 let follower = last_approve_state_follower.approve_state.unwrap();
 
                 assert_eq!(
-                    leader.msg,
-                    follower.msg,
+                    leader.msg, follower.msg,
                     "The ApproveState Messages in Channel's Leader & Follower should be the same"
                 );
                 assert_eq!(

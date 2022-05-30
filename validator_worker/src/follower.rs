@@ -982,7 +982,8 @@ mod test {
                 reason: "rejected".to_string(),
                 balances: None,
             };
-            let _mock_guard_reject_state = setup_reject_state_response(&server, Some(reject_state)).await;
+            let _mock_guard_reject_state =
+                setup_reject_state_response(&server, Some(reject_state)).await;
             let tick_status = tick(
                 &sentry,
                 &channel_context,
