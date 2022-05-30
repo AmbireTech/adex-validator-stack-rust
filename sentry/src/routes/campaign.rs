@@ -74,7 +74,7 @@ pub async fn update_latest_spendable<C>(
 where
     C: Locked + 'static,
 {
-    let latest_deposit = adapter.get_deposit(&channel_context, address).await?;
+    let latest_deposit = adapter.get_deposit(channel_context, address).await?;
 
     let spendable = Spendable {
         spender: address,
@@ -255,7 +255,7 @@ where
 
     // Channel insertion can never create a `SqlState::UNIQUE_VIOLATION`
     // Insert the Campaign too
-    match insert_campaign(&app.pool, &campaign).await {
+    match insert_campaign(&app.pool, campaign).await {
         Err(error) => {
             error!(&app.logger, "{}", &error; "module" => "create_campaign");
             match error {
@@ -398,7 +398,7 @@ pub mod update_campaign {
         // *NOTE*: To close a campaign set campaignBudget to campaignSpent so that spendable == 0
 
         let delta_budget = if let Some(new_budget) = modify_campaign.budget {
-            get_delta_budget(campaign_remaining, &campaign, new_budget).await?
+            get_delta_budget(campaign_remaining, campaign, new_budget).await?
         } else {
             None
         };
@@ -808,7 +808,10 @@ pub mod insert_events {
 
     #[cfg(test)]
     mod test {
-        use primitives::test_util::{DUMMY_CAMPAIGN, PUBLISHER};
+        use primitives::{
+            test_util::{DUMMY_CAMPAIGN, PUBLISHER},
+            unified_num::FromWhole,
+        };
         use redis::aio::MultiplexedConnection;
 
         use crate::db::{
@@ -924,7 +927,7 @@ pub mod insert_events {
 
             let leader = campaign.leader().unwrap();
             let follower = campaign.follower().unwrap();
-            let payout = UnifiedNum::from(300);
+            let payout = UnifiedNum::from_whole(0.03);
 
             // No Campaign Remaining set, should error
             {
@@ -952,7 +955,8 @@ pub mod insert_events {
 
             // Repeat the same call, but set the Campaign remaining budget in Redis
             {
-                set_campaign_remaining(&mut redis, campaign.id, 11_000).await;
+                // 0.11 budget left
+                set_campaign_remaining(&mut redis, campaign.id, 11_000_000).await;
 
                 let spend_event = spend_for_event(
                     &database.pool,
@@ -970,13 +974,17 @@ pub mod insert_events {
                     "Campaign budget has no remaining funds to spend or an error occurred"
                 );
 
-                // Payout: 300
-                // Leader fee: 100
-                // Leader payout: 300 * 100 / 1000 = 30
-                // Follower fee: 100
-                // Follower payout: 300 * 100 / 1000 = 30
+                // Payout: 0.03
+                // Leader fee: 0.03
+                // Leader payout: 0.03 * 0.03 / 1000.0 = 0.00 000 090 = UnifiedNum(90)
+                //
+                // Follower fee: 0.02
+                // Follower payout: 0.03 * 0.02 / 1000.0 = 0.00 000 060 = UnifiedNum(60)
+
+                // campaign budget left - payout - leader fee - follower fee
+                // 0.11 - 0.03 - 0.00 000 090 - 0.00 000 060 = 0.07999850
                 assert_eq!(
-                    Some(10_640_i64),
+                    Some(7_999_850_i64),
                     campaign_remaining
                         .get_remaining_opt(campaign.id)
                         .await
@@ -1468,14 +1476,7 @@ mod test {
             Validators::new((dummy_leader_2.clone(), DUMMY_VALIDATOR_FOLLOWER.clone()));
         campaign_new_leader.created = Utc.ymd(2021, 2, 1).and_hms(8, 0, 0);
 
-        let chain_1_token = GANACHE_CONFIG
-            .chains
-            .get("Ganache #1")
-            .unwrap()
-            .tokens
-            .get("Mocked TOKEN 2")
-            .unwrap()
-            .address;
+        let chain_1_token = GANACHE_CONFIG.chains["Ganache #1"].tokens["Mocked TOKEN 1"].address;
         // Setting up new follower and a channel and campaign which use it on Ganache #1
         let dummy_follower_2 = ValidatorDesc {
             id: IDS[&GUARDIAN],

@@ -142,28 +142,22 @@ where
     // WARNING! This will return only the OS type, e.g. `Linux` and not the actual distribution name e.g. `Ubuntu`
     // By contrast `ua-parser-js` will return `Ubuntu` (distribution) and not the OS type `Linux`.
     // `UAParser(...).os.name` (`ua-parser-js: 0.7.22`)
-    let user_agent_os = parsed
-        .as_ref()
-        .map(|p| {
-            if p.os != VALUE_UNKNOWN {
-                Some(p.os.to_string())
-            } else {
-                None
-            }
-        })
-        .flatten();
+    let user_agent_os = parsed.as_ref().and_then(|p| {
+        if p.os != VALUE_UNKNOWN {
+            Some(p.os.to_string())
+        } else {
+            None
+        }
+    });
 
     // Corresponds to `UAParser(...).browser.name` (`ua-parser-js: 0.7.22`)
-    let user_agent_browser_family = parsed
-        .as_ref()
-        .map(|p| {
-            if p.name != VALUE_UNKNOWN {
-                Some(p.name.to_string())
-            } else {
-                None
-            }
-        })
-        .flatten();
+    let user_agent_browser_family = parsed.as_ref().and_then(|p| {
+        if p.name != VALUE_UNKNOWN {
+            Some(p.name.to_string())
+        } else {
+            None
+        }
+    });
 
     let country = request_parts
         .headers
@@ -205,7 +199,7 @@ where
             ad_slot_type: ad_slot.ad_type.clone(),
             publisher_id: publisher_id.to_address(),
             country,
-            event_type: IMPRESSION.into(),
+            event_type: IMPRESSION,
             seconds_since_epoch: Utc::now(),
             user_agent_os,
             user_agent_browser_family: user_agent_browser_family.clone(),
@@ -267,7 +261,7 @@ async fn get_campaigns(
 
     // 2. Check those Campaigns if `Campaign remaining > 0` (in redis)
     let campaigns_remaining = campaign_remaining
-        .get_multiple_with_ids(&active_campaign_ids)
+        .get_multiple_with_ids(active_campaign_ids)
         .await?;
 
     let campaigns_with_remaining = campaigns_remaining
@@ -301,7 +295,7 @@ async fn get_campaigns(
     }))
     .await?
     .into_iter()
-    .filter_map(|accounting| accounting)
+    .flatten()
     .collect::<Vec<_>>();
 
     // 3. Filter `Campaign`s, that include the `publisher_id` in the Channel balances.
@@ -309,8 +303,7 @@ async fn get_campaigns(
         campaigns_with_remaining.into_iter().partition(|campaign| {
             publisher_accountings
                 .iter()
-                .find(|accounting| accounting.channel_id == campaign.channel.id())
-                .is_some()
+                .any(|accounting| accounting.channel_id == campaign.channel.id())
         });
 
     let campaigns = if campaigns_by_earner.len()

@@ -619,7 +619,10 @@ pub mod campaigns {
 #[cfg(test)]
 mod test {
     use super::*;
-    use adapter::dummy::{Adapter, Dummy, Options};
+    use adapter::{
+        dummy::{Adapter, Dummy, Options},
+        ethereum::test_util::GANACHE_INFO_1,
+    };
     use primitives::{
         campaign::validators::Validators as CampaignValidators,
         config::{configuration, Environment, GANACHE_CONFIG},
@@ -627,7 +630,7 @@ mod test {
             campaign_list::CampaignListResponse, channel_list::ChannelListResponse, Pagination,
         },
         test_util::{
-            discard_logger, ADVERTISER, ADVERTISER_2, CREATOR, DUMMY_CAMPAIGN,
+            discard_logger, ADVERTISER, ADVERTISER_2, CREATOR, DUMMY_AUTH, DUMMY_CAMPAIGN,
             DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, FOLLOWER, GUARDIAN, IDS, LEADER,
             LEADER_2, PUBLISHER, PUBLISHER_2,
         },
@@ -638,6 +641,22 @@ mod test {
         matchers::{method, path, query_param},
         Mock, MockServer, ResponseTemplate,
     };
+
+    /// Uses the [`Dummy`] adapter with [`DUMMY_AUTH`] as the authentication tokens.
+    /// Sentry url can be provided, for `wiremock` to be able to mock the calls in [`SentryApi`].
+    pub fn setup_dummy_sentry(
+        whoami: ValidatorId,
+        config: Config,
+        sentry_url: ApiUrl,
+    ) -> SentryApi<Dummy, ()> {
+        let adapter = Adapter::with_unlocked(Dummy::init(Options {
+            dummy_identity: whoami,
+            dummy_auth_tokens: DUMMY_AUTH.clone(),
+        }));
+        let logger = discard_logger();
+
+        SentryApi::new(adapter, logger, config, sentry_url).expect("Should build sentry")
+    }
 
     #[tokio::test]
     async fn test_get_all_spenders() {
@@ -744,11 +763,9 @@ mod test {
         let mut config = configuration(Environment::Development, None).expect("Should get Config");
         config.spendable_find_limit = 2;
 
-        let adapter = Adapter::with_unlocked(Dummy::init(Options {
+        let leader_adapter = Adapter::with_unlocked(Dummy::init(Options {
             dummy_identity: IDS[&LEADER],
-            dummy_auth_tokens: vec![(IDS[&LEADER].to_address(), "AUTH_Leader".into())]
-                .into_iter()
-                .collect(),
+            dummy_auth_tokens: DUMMY_AUTH.clone(),
         }));
         let logger = discard_logger();
 
@@ -757,8 +774,8 @@ mod test {
             .expect("Should find Dummy campaign token in config")
             .with_channel(DUMMY_CAMPAIGN.channel);
 
-        let sentry =
-            SentryApi::new(adapter, logger, config, sentry_url).expect("Should build sentry");
+        let sentry = SentryApi::new(leader_adapter, logger, config, sentry_url)
+            .expect("Should build sentry");
 
         let mut res = sentry
             .get_all_spenders(&channel_context)
@@ -788,14 +805,7 @@ mod test {
     #[tokio::test]
     async fn test_collecting_and_channels_and_campaigns() {
         let server = MockServer::start().await;
-        let chain_1_token = GANACHE_CONFIG
-            .chains
-            .get("Ganache #1")
-            .unwrap()
-            .tokens
-            .get("Mocked TOKEN 2")
-            .unwrap()
-            .address;
+        let chain_1_token = GANACHE_INFO_1.tokens["Mocked TOKEN 1"].address;
 
         // Setting up new leader and a channel and campaign which use it on Ganache #1337
         let dummy_leader_2 = ValidatorDesc {
@@ -851,21 +861,13 @@ mod test {
         campaign_new_leader_and_follower.validators =
             CampaignValidators::new((dummy_leader_2.clone(), dummy_follower_2.clone()));
 
-        // Initializing SentryApi instance
         let sentry_url = ApiUrl::from_str(&server.uri()).expect("Should parse");
 
-        let mut config = configuration(Environment::Development, None).expect("Should get Config");
-        config.spendable_find_limit = 2;
-        let adapter = Adapter::with_unlocked(Dummy::init(Options {
-            dummy_identity: IDS[&LEADER],
-            dummy_auth_tokens: vec![(IDS[&LEADER].to_address(), "AUTH_Leader".into())]
-                .into_iter()
-                .collect(),
-        }));
-        let logger = discard_logger();
+        let mut config = GANACHE_CONFIG.clone();
+        config.campaigns_find_limit = 2;
 
-        let sentry = SentryApi::new(adapter, logger, config.clone(), sentry_url.clone())
-            .expect("Should build sentry");
+        // Initializing SentryApi instance
+        let leader_sentry = setup_dummy_sentry(IDS[&LEADER], config.clone(), sentry_url.clone());
 
         // Getting Wiremock to return the campaigns when called
         let first_page_response = CampaignListResponse {
@@ -929,7 +931,7 @@ mod test {
                     .with_channel(channel_new_leader_and_follower),
             );
 
-            let (channels, chains_validators) = sentry
+            let (channels, chains_validators) = leader_sentry
                 .collect_channels()
                 .await
                 .expect("Should collect channels");
@@ -986,9 +988,10 @@ mod test {
                 campaign_new_follower.clone(),
                 campaign_new_leader_and_follower.clone(),
             ];
-            let res = campaigns::all_campaigns(sentry.client.clone(), &sentry_url.clone(), None)
-                .await
-                .expect("Should get all campaigns");
+            let res =
+                campaigns::all_campaigns(leader_sentry.client.clone(), &sentry_url.clone(), None)
+                    .await
+                    .expect("Should get all campaigns");
             assert_eq!(res, all_campaigns, "All campaigns are present");
         }
         // test all_channels
@@ -1033,7 +1036,7 @@ mod test {
                 channel_new_leader_and_follower,
             ];
             let res = channels::all_channels(
-                sentry.client.clone(),
+                leader_sentry.client.clone(),
                 &sentry_url.clone(),
                 DUMMY_VALIDATOR_LEADER.id,
             )
