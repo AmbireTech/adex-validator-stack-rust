@@ -973,7 +973,7 @@ mod test {
                 signature: IDS[&*LEADER].to_checksum(),
                 balances: get_initial_balances().into_unchecked(),
             };
-            let _mock_guard = setup_new_state_response(&server, Some(new_state)).await;
+            let _mock_guard_new_state = setup_new_state_response(&server, Some(new_state)).await;
 
             let reject_state = RejectState {
                 state_root,
@@ -982,7 +982,7 @@ mod test {
                 reason: "rejected".to_string(),
                 balances: None,
             };
-            let _mock_guard = setup_reject_state_response(&server, Some(reject_state)).await;
+            let _mock_guard_reject_state = setup_reject_state_response(&server, Some(reject_state)).await;
             let tick_status = tick(
                 &sentry,
                 &channel_context,
