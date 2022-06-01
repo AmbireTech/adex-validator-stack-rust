@@ -25,6 +25,7 @@ pub enum AllowedKey {
     Hostname,
     Country,
     OsName,
+    Chains,
 }
 
 impl AllowedKey {
@@ -51,6 +52,7 @@ pub static ALLOWED_KEYS: Lazy<HashSet<AllowedKey>> = Lazy::new(|| {
         AllowedKey::Hostname,
         AllowedKey::Country,
         AllowedKey::OsName,
+        AllowedKey::Chains,
     ]
     .into_iter()
     .collect()

@@ -3,7 +3,7 @@ use crate::{
     balances::BalancesState,
     spender::Spender,
     validator::{ApproveState, Heartbeat, MessageTypes, NewState, Type as MessageType},
-    Address, Balances, CampaignId, UnifiedMap, UnifiedNum, ValidatorId, IPFS,
+    Address, Balances, CampaignId, ChainId, UnifiedMap, UnifiedNum, ValidatorId, IPFS,
 };
 use chrono::{
     serde::ts_milliseconds, Date, DateTime, Datelike, Duration, NaiveDate, TimeZone, Timelike, Utc,
@@ -284,6 +284,7 @@ pub struct UpdateAnalytics {
     pub hostname: Option<String>,
     pub country: Option<String>,
     pub os_name: OperatingSystem,
+    pub chain_id: ChainId,
     pub event_type: EventType,
     pub amount_to_add: UnifiedNum,
     pub count_to_add: i32,

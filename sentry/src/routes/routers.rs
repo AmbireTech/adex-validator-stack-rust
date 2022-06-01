@@ -45,9 +45,13 @@ pub async fn analytics_router<C: Locked + 'static>(
 
     match (route, method) {
         ("/v5/analytics", &Method::GET) => {
-            let allowed_keys_for_request = vec![AllowedKey::Country, AllowedKey::AdSlotType]
-                .into_iter()
-                .collect();
+            let allowed_keys_for_request = vec![
+                AllowedKey::Country,
+                AllowedKey::AdSlotType,
+                AllowedKey::Chains,
+            ]
+            .into_iter()
+            .collect();
             get_analytics(req, app, Some(allowed_keys_for_request), None).await
         }
         ("/v5/analytics/for-advertiser", &Method::GET) => {
@@ -103,7 +107,7 @@ mod analytics_router_test {
         sentry::{DateHour, FetchedAnalytics, FetchedMetric, UpdateAnalytics, CLICK, IMPRESSION},
         test_util::{ADVERTISER, PUBLISHER, PUBLISHER_2},
         test_util::{DUMMY_CAMPAIGN, DUMMY_IPFS, IDS, LEADER},
-        UnifiedNum,
+        UnifiedNum, ChainId,
     };
 
     async fn insert_mock_analytics(pool: &DbPool, base_datehour: DateHour<Utc>) {
@@ -118,6 +122,7 @@ mod analytics_router_test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
+            chain_id: ChainId::new(1),
             event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
@@ -137,6 +142,7 @@ mod analytics_router_test {
             hostname: None,
             country: Some("Japan".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
+            chain_id: ChainId::new(1),
             event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
@@ -156,6 +162,7 @@ mod analytics_router_test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
+            chain_id: ChainId::new(1),
             event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
@@ -175,6 +182,7 @@ mod analytics_router_test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
+            chain_id: ChainId::new(1),
             event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
@@ -194,6 +202,7 @@ mod analytics_router_test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
+            chain_id: ChainId::new(1),
             event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
@@ -213,6 +222,7 @@ mod analytics_router_test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
+            chain_id: ChainId::new(1),
             event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
@@ -232,6 +242,7 @@ mod analytics_router_test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
+            chain_id: ChainId::new(1),
             event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
@@ -251,6 +262,7 @@ mod analytics_router_test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
+            chain_id: ChainId::new(1),
             event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
@@ -295,6 +307,7 @@ mod analytics_router_test {
                 hostname: None,
                 country: Some("Bulgaria".to_string()),
                 os_name: OperatingSystem::map_os("Windows"),
+                chain_id: ChainId::new(1),
                 event_type: IMPRESSION,
                 amount_to_add: UnifiedNum::from_u64(25_000_000),
                 count_to_add: 25,
@@ -316,6 +329,7 @@ mod analytics_router_test {
                 hostname: None,
                 country: Some("Bulgaria".to_string()),
                 os_name: OperatingSystem::map_os("Windows"),
+                chain_id: ChainId::new(1),
                 event_type: IMPRESSION,
                 amount_to_add: UnifiedNum::from_u64(17_000_000),
                 count_to_add: 17,
@@ -337,6 +351,7 @@ mod analytics_router_test {
                 hostname: None,
                 country: Some("Bulgaria".to_string()),
                 os_name: OperatingSystem::map_os("Windows"),
+                chain_id: ChainId::new(1),
                 event_type: IMPRESSION,
                 amount_to_add: UnifiedNum::from_u64(58_000_000),
                 count_to_add: 58,
@@ -400,6 +415,7 @@ mod analytics_router_test {
                 hostname: None,
                 country: None,
                 os_name: None,
+                chains: None,
             };
             let query = serde_urlencoded::to_string(query).expect("should parse query");
             let req = Request::builder()
@@ -446,6 +462,7 @@ mod analytics_router_test {
                 hostname: None,
                 country: None,
                 os_name: None,
+                chains: None,
             };
             let query = serde_urlencoded::to_string(query).expect("should parse query");
             let req = Request::builder()
@@ -496,6 +513,7 @@ mod analytics_router_test {
                 hostname: None,
                 country: None,
                 os_name: None,
+                chains: None,
             };
             let query = serde_urlencoded::to_string(query).expect("should serialize query");
             let req = Request::builder()
@@ -547,6 +565,7 @@ mod analytics_router_test {
                 hostname: None,
                 country: Some("Bulgaria".into()),
                 os_name: None,
+                chains: None,
             };
             let query = serde_urlencoded::to_string(query).expect("should parse query");
             let req = Request::builder()
@@ -815,6 +834,7 @@ mod analytics_router_test {
                 hostname: None,
                 country: None,
                 os_name: None,
+                chains: None,
             };
             let query = serde_urlencoded::to_string(query).expect("should parse query");
             let req = Request::builder()
@@ -860,6 +880,7 @@ mod analytics_router_test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
+            chain_id: ChainId::new(1),
             event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
@@ -879,6 +900,7 @@ mod analytics_router_test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
+            chain_id: ChainId::new(1),
             event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
@@ -898,6 +920,7 @@ mod analytics_router_test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
+            chain_id: ChainId::new(1),
             event_type: IMPRESSION,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
@@ -917,6 +940,7 @@ mod analytics_router_test {
             hostname: Some("localhost".to_string()),
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
+            chain_id: ChainId::new(1),
             event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
@@ -936,6 +960,7 @@ mod analytics_router_test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
+            chain_id: ChainId::new(1),
             event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
@@ -955,6 +980,7 @@ mod analytics_router_test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
+            chain_id: ChainId::new(1),
             event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
@@ -974,6 +1000,7 @@ mod analytics_router_test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
+            chain_id: ChainId::new(1),
             event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
@@ -1008,6 +1035,7 @@ mod analytics_router_test {
             hostname: None,
             country: None,
             os_name: None,
+            chains: None,
         };
         let base_query = serde_urlencoded::to_string(query).expect("should parse query");
 
@@ -1139,6 +1167,7 @@ mod analytics_router_test {
                 hostname: Some("localhost".into()),
                 country: Some("Bulgaria".into()),
                 os_name: Some(OperatingSystem::map_os("Windows")),
+                chains: None,
             };
             let query = serde_urlencoded::to_string(query).expect("should parse query");
             let req = Request::builder()

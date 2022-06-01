@@ -3,7 +3,7 @@
 
 use std::collections::HashSet;
 
-use crate::{db::analytics::get_analytics, success_response, Application, ResponseError};
+use crate::{db::analytics::get_analytics, success_response, Application, Auth, ResponseError};
 use adapter::client::Locked;
 use hyper::{Body, Request, Response};
 use primitives::analytics::{
@@ -19,7 +19,14 @@ pub async fn analytics<C: Locked + 'static>(
     request_allowed: Option<HashSet<AllowedKey>>,
     authenticate_as: Option<AuthenticateAs>,
 ) -> Result<Response<Body>, ResponseError> {
-    let query = serde_urlencoded::from_str::<AnalyticsQuery>(req.uri().query().unwrap_or(""))?;
+    let mut query = serde_urlencoded::from_str::<AnalyticsQuery>(req.uri().query().unwrap_or(""))?;
+
+    // If we have a route that requires authentication the Chain will be extracted
+    // from the sentry's authentication, which guarantees the value will exist
+    // This will also override a query parameter for the chain if it is provided
+    if let Some(auth) = req.extensions().get::<Auth>() {
+        query.chains = Some(vec![auth.chain.chain_id])
+    }
 
     let applied_limit = query.limit.min(app.config.analytics_find_limit);
 

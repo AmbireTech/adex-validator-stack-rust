@@ -1,6 +1,6 @@
 use crate::{
     sentry::{EventType, IMPRESSION},
-    Address, CampaignId, ValidatorId, IPFS,
+    Address, CampaignId, ChainId, ValidatorId, IPFS,
 };
 use parse_display::Display;
 use serde::{Deserialize, Serialize};
@@ -36,6 +36,7 @@ pub mod postgres {
                     .map(|hostname| Box::new(hostname) as _),
                 AllowedKey::Country => self.country.clone().map(|country| Box::new(country) as _),
                 AllowedKey::OsName => self.os_name.clone().map(|os_name| Box::new(os_name) as _),
+                AllowedKey::Chains => self.chains.clone().map(|chains| Box::new(chains) as _),
             }
         }
     }
@@ -115,6 +116,7 @@ pub struct AnalyticsQuery {
     pub hostname: Option<String>,
     pub country: Option<String>,
     pub os_name: Option<OperatingSystem>,
+    pub chains: Option<Vec<ChainId>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Display, Hash, Eq)]
