@@ -127,3 +127,298 @@ async fn on_new_accounting<C: Unlocked + 'static>(
 
     Ok(propagation_results)
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::sentry_interface::{ChainsValidators, Validator};
+    use adapter::dummy::{Adapter, Dummy, Options};
+    use chrono::Utc;
+    use primitives::{
+        balances::UncheckedState,
+        campaign::Validators,
+        config::GANACHE_CONFIG,
+        sentry::{SuccessResponse, ValidatorMessage, ValidatorMessagesListResponse},
+        test_util::{
+            discard_logger, ADVERTISER, CREATOR, DUMMY_AUTH, DUMMY_CAMPAIGN,
+            DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, FOLLOWER, IDS, LEADER, PUBLISHER,
+            PUBLISHER_2,
+        },
+        util::ApiUrl,
+        validator::{Heartbeat, MessageTypes, NewState},
+        ChainId, Config, ToETHChecksum, UnifiedNum, ValidatorDesc, ValidatorId,
+    };
+    use std::{collections::HashMap, str::FromStr};
+    use wiremock::{
+        matchers::{method, path, query_param},
+        Mock, MockGuard, MockServer, ResponseTemplate,
+    };
+    // Initializes a SentryApi instance
+    async fn setup_sentry(server: &MockServer, config: &Config) -> SentryApi<Dummy> {
+        let sentry_url =
+            ApiUrl::from_str(&format!("{}/leader", &server.uri())).expect("Should parse");
+
+        let adapter = Adapter::with_unlocked(Dummy::init(Options {
+            dummy_identity: IDS[&LEADER],
+            dummy_auth_tokens: DUMMY_AUTH.clone(),
+        }));
+        let logger = discard_logger();
+
+        let mut validators: HashMap<ValidatorId, Validator> = HashMap::new();
+        let leader = Validator {
+            url: ApiUrl::from_str(&format!("{}/leader", server.uri())).expect("should be valid"),
+            token: DUMMY_AUTH
+                .get(&*LEADER)
+                .expect("should be valid")
+                .to_string(),
+        };
+        let follower = Validator {
+            url: ApiUrl::from_str(&format!("{}/follower", server.uri())).expect("should be valid"),
+            token: DUMMY_AUTH
+                .get(&*FOLLOWER)
+                .expect("should be valid")
+                .to_string(),
+        };
+        validators.insert(DUMMY_VALIDATOR_LEADER.id, leader);
+        validators.insert(DUMMY_VALIDATOR_FOLLOWER.id, follower);
+        let mut propagate_to: ChainsValidators = HashMap::new();
+        propagate_to.insert(ChainId::from(1337), validators);
+        SentryApi::new(adapter, logger, config.clone(), sentry_url)
+            .expect("Should create instance")
+            .with_propagate(propagate_to)
+            .expect("Should propagate")
+    }
+
+    async fn setup_new_state_response(
+        server: &MockServer,
+        new_state_msg: Option<NewState<UncheckedState>>,
+    ) -> MockGuard {
+        let new_state_res = match new_state_msg {
+            Some(msg) => ValidatorMessagesListResponse {
+                messages: vec![ValidatorMessage {
+                    from: DUMMY_CAMPAIGN.channel.leader,
+                    received: Utc::now(),
+                    msg: MessageTypes::NewState(msg),
+                }],
+            },
+            None => ValidatorMessagesListResponse { messages: vec![] },
+        };
+
+        Mock::given(method("GET"))
+            .and(path(format!(
+                "/leader/v5/channel/{}/validator-messages/{}/{}",
+                DUMMY_CAMPAIGN.channel.id(),
+                DUMMY_CAMPAIGN.channel.leader,
+                "NewState",
+            )))
+            .and(query_param("limit", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&new_state_res))
+            .expect(1)
+            .named("GET NewState helper")
+            .mount_as_scoped(&server)
+            .await
+    }
+
+    #[tokio::test]
+    async fn test_leader_tick() {
+        let config = GANACHE_CONFIG.clone();
+        let server = MockServer::start().await;
+        let ok_response = SuccessResponse { success: true };
+        let mut mock_campaign = DUMMY_CAMPAIGN.clone();
+        mock_campaign.validators = Validators::new((
+            ValidatorDesc {
+                id: IDS[&LEADER],
+                url: format!("{}/leader", server.uri()),
+                fee: 100.into(),
+                fee_addr: None,
+            },
+            ValidatorDesc {
+                id: IDS[&LEADER],
+                url: format!("{}/follower", server.uri()),
+                fee: 100.into(),
+                fee_addr: None,
+            },
+        ));
+
+        // Making sure all propagations to leader/follower succeed
+        Mock::given(method("POST"))
+            .and(path(format!(
+                "leader/v5/channel/{}/validator-messages",
+                DUMMY_CAMPAIGN.channel.id()
+            )))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&ok_response))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("POST"))
+            .and(path(format!(
+                "follower/v5/channel/{}/validator-messages",
+                DUMMY_CAMPAIGN.channel.id()
+            )))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&ok_response))
+            .mount(&server)
+            .await;
+
+        let heartbeat = Heartbeat {
+            signature: String::new(),
+            state_root: String::new(),
+            timestamp: Utc::now(),
+        };
+        let heartbeat_res = ValidatorMessagesListResponse {
+            messages: vec![ValidatorMessage {
+                from: DUMMY_CAMPAIGN.channel.leader,
+                received: Utc::now(),
+                msg: MessageTypes::Heartbeat(heartbeat),
+            }],
+        };
+        Mock::given(method("GET"))
+            .and(path(format!(
+                "/leader/v5/channel/{}/validator-messages/{}/{}",
+                DUMMY_CAMPAIGN.channel.id(),
+                DUMMY_CAMPAIGN.channel.leader,
+                "Heartbeat",
+            )))
+            .and(query_param("limit", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&heartbeat_res))
+            .mount(&server)
+            .await;
+        let sentry = setup_sentry(&server, &config).await;
+
+        let channel_context = config
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect("Should find Dummy campaign token in config")
+            .with_channel(DUMMY_CAMPAIGN.channel);
+
+        let get_initial_balances = || {
+            let mut balances: Balances<CheckedState> = Balances::new();
+            balances
+                .spend(*ADVERTISER, *PUBLISHER, UnifiedNum::from_u64(1000))
+                .expect("should spend");
+            balances
+                .spend(*ADVERTISER, *PUBLISHER_2, UnifiedNum::from_u64(1000))
+                .expect("should spend");
+            balances
+                .spend(*CREATOR, *PUBLISHER, UnifiedNum::from_u64(1000))
+                .expect("should spend");
+            balances
+                .spend(*CREATOR, *PUBLISHER_2, UnifiedNum::from_u64(1000))
+                .expect("should spend");
+            balances
+        };
+
+        // Test case for empty balances
+        {
+            let balances: Balances<CheckedState> = Balances::new();
+            let tick_result = tick(&sentry, &channel_context, balances)
+                .await
+                .expect("Shouldn't return an error");
+            assert!(
+                tick_result.new_state.is_none(),
+                "Shouldn't generate a NewState when balances are empty"
+            );
+        }
+        // No NewState message is returned -> Channel has just been created
+        {
+            let _mock_guard = setup_new_state_response(&server, None).await;
+
+            let tick_result = tick(&sentry, &channel_context, get_initial_balances())
+                .await
+                .expect("Shouldn't return an error");
+            assert!(
+                tick_result.new_state.is_some(),
+                "A NewState message should be generated when there isn't one"
+            );
+            let propagated_to: Vec<ValidatorId> = tick_result
+                .new_state
+                .unwrap()
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()
+                .expect("Shouldn't return an error");
+            assert!(
+                propagated_to.contains(&IDS[&*LEADER]),
+                "NewState message is propagated to the leader validator"
+            );
+            assert!(
+                propagated_to.contains(&IDS[&*FOLLOWER]),
+                "NewState message is propagated to the follower validator"
+            );
+            assert_eq!(
+                propagated_to.len(),
+                2,
+                "NewState message isn't propagated to any other validator"
+            );
+        }
+
+        // Test case where both spender and earner balances in the returned NewState message are equal to the ones in accounting_balances thus no new_state will be generated
+        {
+            // Setting up the expected response
+            let proposed_balances = get_initial_balances();
+            let state_root = proposed_balances
+                .encode(
+                    channel_context.context.id(),
+                    channel_context.token.precision.get(),
+                )
+                .expect("should encode");
+            let new_state: NewState<UncheckedState> = NewState {
+                state_root,
+                signature: IDS[&*LEADER].to_checksum(),
+                balances: proposed_balances.into_unchecked(),
+            };
+            let _mock_guard = setup_new_state_response(&server, Some(new_state)).await;
+
+            let tick_result = tick(&sentry, &channel_context, get_initial_balances())
+                .await
+                .expect("Shouldn't return an error");
+            assert!(tick_result.new_state.is_none(), "Shouldn't generate a NewState when the balances in the previous NewState are equal to the ones in accounting_balances");
+        }
+
+        // Balance returned from the NewState message is lower for an earner/spender than the one in accounting_balances
+        {
+            // Setting up the expected response
+            let proposed_balances = get_initial_balances();
+            let state_root = proposed_balances
+                .encode(
+                    channel_context.context.id(),
+                    channel_context.token.precision.get(),
+                )
+                .expect("should encode");
+            let new_state: NewState<UncheckedState> = NewState {
+                state_root,
+                signature: IDS[&*LEADER].to_checksum(),
+                balances: proposed_balances.into_unchecked(),
+            };
+            let _mock_guard = setup_new_state_response(&server, Some(new_state)).await;
+
+            let mut expected_balances = get_initial_balances();
+            expected_balances
+                .spend(*ADVERTISER, *PUBLISHER, UnifiedNum::from_u64(1000))
+                .expect("should spend");
+            let tick_result = tick(&sentry, &channel_context, expected_balances)
+                .await
+                .expect("Shouldn't return an error");
+            assert!(
+                tick_result.new_state.is_some(),
+                "NewState message should be generated accounting_balances have been changed"
+            );
+            let propagated_to: Vec<ValidatorId> = tick_result
+                .new_state
+                .unwrap()
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()
+                .expect("Shouldn't return an error");
+            assert!(
+                propagated_to.contains(&IDS[&*LEADER]),
+                "NewState message is propagated to the leader validator"
+            );
+            assert!(
+                propagated_to.contains(&IDS[&*FOLLOWER]),
+                "NewState message is propagated to the follower validator"
+            );
+            assert_eq!(
+                propagated_to.len(),
+                2,
+                "NewState message isn't propagated to any other validator"
+            );
+        }
+    }
+}
