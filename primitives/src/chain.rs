@@ -27,20 +27,20 @@ impl ChainId {
 
 impl<'a> FromSql<'a> for ChainId {
     fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<ChainId, Box<dyn Error + Sync + Send>> {
-        let value = <i64 as FromSql>::from_sql(ty, raw)?;
+        let value = <i32 as FromSql>::from_sql(ty, raw)?;
 
         Ok(ChainId(u32::try_from(value)?))
     }
 
-    accepts!(INT8);
+    accepts!(INT4);
 }
 
 impl ToSql for ChainId {
     fn to_sql(&self, ty: &Type, w: &mut BytesMut) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-        <i64 as ToSql>::to_sql(&self.0.try_into()?, ty, w)
+        <i32 as ToSql>::to_sql(&self.0.try_into()?, ty, w)
     }
 
-    accepts!(INT8);
+    accepts!(INT4);
 
     to_sql_checked!();
 }
