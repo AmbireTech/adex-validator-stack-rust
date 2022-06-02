@@ -18,10 +18,18 @@ pub async fn get_analytics(
 ) -> Result<Vec<FetchedAnalytics>, PoolError> {
     let client = pool.get().await?;
 
-    let (mut where_clauses, params) = analytics_query_params(&query, auth_as.as_ref(), &allowed_keys);
+    let (mut where_clauses, params) =
+        analytics_query_params(&query, auth_as.as_ref(), &allowed_keys);
 
     if let Some(chains) = &query.chains {
-        where_clauses.push(format!("chain_id IN ({})", chains.iter().map(|id| id.as_u32().to_string()).collect::<Vec<String>>().join(",")));
+        where_clauses.push(format!(
+            "chain_id IN ({})",
+            chains
+                .iter()
+                .map(|id| id.as_u32().to_string())
+                .collect::<Vec<String>>()
+                .join(",")
+        ));
     }
 
     let time_group = match &query.time.timeframe {
@@ -165,7 +173,7 @@ mod test {
         sentry::{DateHour, CLICK, IMPRESSION},
         test_util::{CREATOR, DUMMY_AD_UNITS, DUMMY_CAMPAIGN, DUMMY_IPFS, PUBLISHER, PUBLISHER_2},
         unified_num::FromWhole,
-        AdUnit, UnifiedNum, ValidatorId, IPFS, ChainId,
+        AdUnit, ChainId, UnifiedNum, ValidatorId, IPFS,
     };
 
     use crate::db::tests_postgres::{setup_test_migrations, DATABASE_POOL};

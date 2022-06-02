@@ -45,12 +45,9 @@ pub async fn analytics_router<C: Locked + 'static>(
 
     match (route, method) {
         ("/v5/analytics", &Method::GET) => {
-            let allowed_keys_for_request = vec![
-                AllowedKey::Country,
-                AllowedKey::AdSlotType,
-            ]
-            .into_iter()
-            .collect();
+            let allowed_keys_for_request = vec![AllowedKey::Country, AllowedKey::AdSlotType]
+                .into_iter()
+                .collect();
             get_analytics(req, app, Some(allowed_keys_for_request), None).await
         }
         ("/v5/analytics/for-advertiser", &Method::GET) => {
@@ -106,7 +103,7 @@ mod analytics_router_test {
         sentry::{DateHour, FetchedAnalytics, FetchedMetric, UpdateAnalytics, CLICK, IMPRESSION},
         test_util::{ADVERTISER, PUBLISHER, PUBLISHER_2},
         test_util::{DUMMY_CAMPAIGN, DUMMY_IPFS, IDS, LEADER},
-        UnifiedNum, ChainId,
+        ChainId, UnifiedNum,
     };
 
     async fn insert_mock_analytics(pool: &DbPool, base_datehour: DateHour<Utc>) {

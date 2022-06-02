@@ -3,8 +3,8 @@ use std::{error::Error, fmt};
 
 use crate::{config::TokenInfo, util::ApiUrl, Address, Campaign, Channel};
 use bytes::BytesMut;
-use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
 use parse_display::Display;
+use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
 
 /// The Id of the chain
 ///

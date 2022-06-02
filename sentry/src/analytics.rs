@@ -97,12 +97,12 @@ pub async fn record(
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::test_util::setup_dummy_app;
     use primitives::{
         sentry::{Analytics, CLICK, IMPRESSION},
         test_util::{DUMMY_CAMPAIGN, DUMMY_IPFS, PUBLISHER},
         UnifiedNum,
     };
-    use crate::test_util::setup_dummy_app;
 
     use crate::db::tests_postgres::{setup_test_migrations, DATABASE_POOL};
 
@@ -199,9 +199,14 @@ mod test {
         let channel_context = channel_chain.with_channel(dummy_channel);
         let campaign_context = channel_context.clone().with(campaign);
 
-        record(&database.clone(), &campaign_context, &session, input_events.clone())
-            .await
-            .expect("should record");
+        record(
+            &database.clone(),
+            &campaign_context,
+            &session,
+            input_events.clone(),
+        )
+        .await
+        .expect("should record");
 
         let analytics = get_all_analytics(&database.pool)
             .await
@@ -269,9 +274,14 @@ mod test {
             .expect("Channel token should be whitelisted in config!");
         let channel_context = channel_chain.with_channel(dummy_channel);
         let campaign_context = channel_context.clone().with(campaign);
-        record(&database.clone(), &campaign_context, &session, input_events.clone())
-            .await
-            .expect("should record");
+        record(
+            &database.clone(),
+            &campaign_context,
+            &session,
+            input_events.clone(),
+        )
+        .await
+        .expect("should record");
 
         let analytics = get_all_analytics(&database.pool)
             .await

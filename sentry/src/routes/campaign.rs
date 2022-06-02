@@ -722,7 +722,7 @@ pub mod insert_events {
 
         // Record successfully paid out events to Analytics
         if let Err(err) =
-            analytics::record(&app.pool, &campaign_context, session, events_success).await
+            analytics::record(&app.pool, campaign_context, session, events_success).await
         {
             error!(&app.logger, "Analytics recording failed: {}", err; "campaign" => ?campaign_context, "err" => ?err)
         }
