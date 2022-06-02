@@ -181,7 +181,7 @@
 //!
 //! - [`GET /v5/analytics`](get_analytics)
 //!
-//! Allowed keys: [`AllowedKey::Country`][primitives::analytics::query::AllowedKey::Country], [`AllowedKey::AdSlotType`][primitives::analytics::query::AllowedKey::AdSlotType] & [`AllowedKey::Chains`][primitives::analytics::query::AllowedKey::Chains]
+//! Allowed keys: [`AllowedKey::Country`][primitives::analytics::query::AllowedKey::Country], [`AllowedKey::AdSlotType`][primitives::analytics::query::AllowedKey::AdSlotType]
 //!
 //! - [`GET /v5/analytics/for-publisher`](get_analytics) (auth required)
 //!

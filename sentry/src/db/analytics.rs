@@ -18,7 +18,11 @@ pub async fn get_analytics(
 ) -> Result<Vec<FetchedAnalytics>, PoolError> {
     let client = pool.get().await?;
 
-    let (where_clauses, params) = analytics_query_params(&query, auth_as.as_ref(), &allowed_keys);
+    let (mut where_clauses, params) = analytics_query_params(&query, auth_as.as_ref(), &allowed_keys);
+
+    if let Some(chains) = &query.chains {
+        where_clauses.push(format!("chain_id IN ({})", chains.iter().map(|id| id.as_u32().to_string()).collect::<Vec<String>>().join(",")));
+    }
 
     let time_group = match &query.time.timeframe {
         Timeframe::Year => "date_trunc('month', analytics.time) as timeframe_time",

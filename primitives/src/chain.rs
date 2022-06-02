@@ -4,13 +4,14 @@ use std::{error::Error, fmt};
 use crate::{config::TokenInfo, util::ApiUrl, Address, Campaign, Channel};
 use bytes::BytesMut;
 use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
+use parse_display::Display;
 
 /// The Id of the chain
 ///
 /// # Ethereum Virtual Machine
 ///
 /// For all the EVM-compatible Chain IDs visit <https://chainid.network>
-#[derive(Serialize, Deserialize, Hash, Clone, Copy, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Hash, Clone, Copy, Eq, PartialEq, Display)]
 #[serde(transparent)]
 pub struct ChainId(u32);
 
@@ -22,6 +23,10 @@ impl ChainId {
         assert!(id != 0);
 
         Self(id)
+    }
+
+    pub fn as_u32(self) -> u32 {
+        self.0
     }
 }
 

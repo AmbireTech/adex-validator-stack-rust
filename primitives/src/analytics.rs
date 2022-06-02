@@ -36,7 +36,6 @@ pub mod postgres {
                     .map(|hostname| Box::new(hostname) as _),
                 AllowedKey::Country => self.country.clone().map(|country| Box::new(country) as _),
                 AllowedKey::OsName => self.os_name.clone().map(|os_name| Box::new(os_name) as _),
-                AllowedKey::Chains => self.chains.clone().map(|chains| Box::new(chains) as _),
             }
         }
     }

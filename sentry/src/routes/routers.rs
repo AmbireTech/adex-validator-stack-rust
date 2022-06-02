@@ -48,7 +48,6 @@ pub async fn analytics_router<C: Locked + 'static>(
             let allowed_keys_for_request = vec![
                 AllowedKey::Country,
                 AllowedKey::AdSlotType,
-                AllowedKey::Chains,
             ]
             .into_iter()
             .collect();
