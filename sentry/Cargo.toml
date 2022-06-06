@@ -18,7 +18,7 @@ hex = "0.4"
 clap = "2.33.0"
 # Server
 tokio = { version = "0.2.9", features = ["macros", "rt-threaded"] }
-hyper = { version = "0.13", features = ["stream"] }
+hyper = { version = "0.14", features = ["stream"] }
 regex = "1"
 # Database
 redis = "0.15"
