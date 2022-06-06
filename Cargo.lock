@@ -1398,7 +1398,7 @@ source = "git+https://github.com/elpiel/openethereum?branch=remove-dir-depeneden
 dependencies = [
  "ethereum-types 0.4.2",
  "ethkey",
- "itertools",
+ "itertools 0.5.10",
  "lazy_static",
  "libc",
  "log",
@@ -2063,6 +2063,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a9a9d19fa1e79b6215ff29b9d6880b706147f16e9b1dbb1e4e5947b5b02bc5e3"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2123,15 +2132,17 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "lever"
-version = "0.1.1-alpha.11"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0799e1baca2f9f3152fd75f8305f7769a0a88622328ac09d080e95007d2053f"
+checksum = "aa15851cdc0a45152f28baa89af4c0719b9c1c69e422f71d5c37963da93c194b"
 dependencies = [
  "anyhow",
- "crossbeam-epoch 0.8.2",
+ "crossbeam-epoch 0.9.0",
+ "itertools 0.10.3",
  "lazy_static",
  "log",
  "parking_lot 0.11.0",
+ "slice-group-by",
  "thiserror",
 ]
 
@@ -3894,6 +3905,12 @@ name = "slab"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
+
+[[package]]
+name = "slice-group-by"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f7474f0b646d228360ab62ed974744617bc869d959eac8403bfa3665931a7fb"
 
 [[package]]
 name = "slog"
