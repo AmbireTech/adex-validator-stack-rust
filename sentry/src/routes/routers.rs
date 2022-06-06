@@ -266,6 +266,26 @@ mod analytics_router_test {
         update_analytics(pool, analytics_two_years_ago)
             .await
             .expect("Should update analytics");
+
+        let analytics_other_chain = UpdateAnalytics {
+            time: base_datehour,
+            campaign_id: DUMMY_CAMPAIGN.id,
+            ad_unit: DUMMY_IPFS[0],
+            ad_slot: DUMMY_IPFS[1],
+            ad_slot_type: None,
+            advertiser: *ADVERTISER,
+            publisher: *PUBLISHER,
+            hostname: None,
+            country: Some("Bulgaria".to_string()),
+            os_name: OperatingSystem::map_os("Windows"),
+            chain_id: ChainId::new(2),
+            event_type: CLICK,
+            amount_to_add: UnifiedNum::from_u64(1_000_000),
+            count_to_add: 1,
+        };
+        update_analytics(pool, analytics_other_chain)
+            .await
+            .expect("Should update analytics");
     }
 
     #[tokio::test]
@@ -411,9 +431,9 @@ mod analytics_router_test {
                 hostname: None,
                 country: None,
                 os_name: None,
-                chains: None,
+                chains: Some(vec![ChainId::new(1)]),
             };
-            let query = serde_urlencoded::to_string(query).expect("should parse query");
+            let query = serde_qs::to_string(&query).expect("should parse query");
             let req = Request::builder()
                 .uri(format!("http://127.0.0.1/v5/analytics?{}", query))
                 .body(Body::empty())
@@ -458,9 +478,9 @@ mod analytics_router_test {
                 hostname: None,
                 country: None,
                 os_name: None,
-                chains: None,
+                chains: Some(vec![ChainId::new(1)]),
             };
-            let query = serde_urlencoded::to_string(query).expect("should parse query");
+            let query = serde_qs::to_string(&query).expect("should parse query");
             let req = Request::builder()
                 .uri(format!("http://127.0.0.1/v5/analytics?{}", query))
                 .body(Body::empty())
@@ -509,9 +529,9 @@ mod analytics_router_test {
                 hostname: None,
                 country: None,
                 os_name: None,
-                chains: None,
+                chains: Some(vec![ChainId::new(1)]),
             };
-            let query = serde_urlencoded::to_string(query).expect("should serialize query");
+            let query = serde_qs::to_string(&query).expect("should parse query");
             let req = Request::builder()
                 .uri(format!("http://127.0.0.1/v5/analytics?{}", query))
                 .body(Body::empty())
@@ -561,9 +581,9 @@ mod analytics_router_test {
                 hostname: None,
                 country: Some("Bulgaria".into()),
                 os_name: None,
-                chains: None,
+                chains: Some(vec![ChainId::new(1)]),
             };
-            let query = serde_urlencoded::to_string(query).expect("should parse query");
+            let query = serde_qs::to_string(&query).expect("should parse query");
             let req = Request::builder()
                 .uri(format!("http://127.0.0.1/v5/analytics?{}", query))
                 .body(Body::empty())
@@ -859,6 +879,56 @@ mod analytics_router_test {
                     .collect::<Vec<_>>(),
             );
         }
+
+        // Test with a different chain
+        // with base date hour
+        // event type: CLICK
+        {
+            let query = AnalyticsQuery {
+                limit: 1000,
+                event_type: CLICK,
+                metric: Metric::Count,
+                segment_by: None,
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: base_datehour - 1,
+                    end: None,
+                },
+                campaign_id: None,
+                ad_unit: None,
+                ad_slot: None,
+                ad_slot_type: None,
+                advertiser: None,
+                publisher: None,
+                hostname: None,
+                country: None,
+                os_name: None,
+                chains: Some(vec![ChainId::new(2)]),
+            };
+            let query = serde_qs::to_string(&query).expect("should parse query");
+            let req = Request::builder()
+                .uri(format!("http://127.0.0.1/v5/analytics?{}", query))
+                .body(Body::empty())
+                .expect("Should build Request");
+
+            let analytics_response = analytics_router(req, &app)
+                .await
+                .expect("Should get analytics data");
+            let json = hyper::body::to_bytes(analytics_response.into_body())
+                .await
+                .expect("Should get json");
+
+            let fetched_analytics: Vec<FetchedAnalytics> =
+                serde_json::from_slice(&json).expect("Should get analytics response");
+            assert_eq!(
+                vec![FetchedMetric::Count(1)],
+                fetched_analytics
+                    .iter()
+                    .map(|analytics| analytics.value)
+                    .collect::<Vec<_>>(),
+            );
+        }
+
         // Test with timeframe=day and start_date= 2 or more days ago to check if the results vec is split properly
     }
 
@@ -1004,6 +1074,25 @@ mod analytics_router_test {
         update_analytics(pool, analytics_different_publisher_advertiser)
             .await
             .expect("Should update analytics");
+        let analytics_different_chain = UpdateAnalytics {
+            time: base_datehour,
+            campaign_id: DUMMY_CAMPAIGN.id,
+            ad_unit: DUMMY_IPFS[0],
+            ad_slot: DUMMY_IPFS[1],
+            ad_slot_type: None,
+            advertiser: *ADVERTISER,
+            publisher: *PUBLISHER,
+            hostname: None,
+            country: Some("Bulgaria".to_string()),
+            os_name: OperatingSystem::map_os("Windows"),
+            chain_id: ChainId::new(2),
+            event_type: CLICK,
+            amount_to_add: UnifiedNum::from_u64(1_000_000),
+            count_to_add: 1,
+        };
+        update_analytics(pool, analytics_different_chain)
+            .await
+            .expect("Should update analytics");
     }
 
     #[tokio::test]
@@ -1051,6 +1140,13 @@ mod analytics_router_test {
             era: 0,
             uid: IDS[&LEADER],
             chain: DUMMY_CHAIN.clone(),
+        };
+        let mut different_chain = DUMMY_CHAIN.clone();
+        different_chain.chain_id = ChainId::new(2);
+        let admin_auth_other_chain = Auth {
+            era: 0,
+            uid: IDS[&LEADER],
+            chain: different_chain,
         };
 
         // test for publisher
@@ -1163,9 +1259,9 @@ mod analytics_router_test {
                 hostname: Some("localhost".into()),
                 country: Some("Bulgaria".into()),
                 os_name: Some(OperatingSystem::map_os("Windows")),
-                chains: None,
+                chains: Some(vec![ChainId::new(1)]),
             };
-            let query = serde_urlencoded::to_string(query).expect("should parse query");
+            let query = serde_qs::to_string(&query).expect("should parse query");
             let req = Request::builder()
                 .extension(admin_auth.clone())
                 .uri(format!("http://127.0.0.1/v5/analytics/for-admin?{}", query))
@@ -1187,6 +1283,36 @@ mod analytics_router_test {
                 fetched_analytics.get(0).unwrap().value,
             );
         }
+
+        // test for admin with a different chain
+        {
+            let req = Request::builder()
+                .extension(admin_auth_other_chain.clone())
+                .uri(format!(
+                    "http://127.0.0.1/v5/analytics/for-admin?{}",
+                    base_query
+                ))
+                .body(Body::empty())
+                .expect("Should build Request");
+
+            let analytics_response = analytics_router(req, &app)
+                .await
+                .expect("Should get analytics data");
+            let json = hyper::body::to_bytes(analytics_response.into_body())
+                .await
+                .expect("Should get json");
+
+            let fetched_analytics: Vec<FetchedAnalytics> =
+                serde_json::from_slice(&json).expect("Should get analytics response");
+            assert_eq!(
+                vec![FetchedMetric::Count(1)],
+                fetched_analytics
+                    .iter()
+                    .map(|fetched| fetched.value)
+                    .collect::<Vec<_>>(),
+            );
+        }
+
 
         // TODO: Move test to a analytics_router test
         // test with no authUid

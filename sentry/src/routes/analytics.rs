@@ -19,8 +19,7 @@ pub async fn analytics<C: Locked + 'static>(
     request_allowed: Option<HashSet<AllowedKey>>,
     authenticate_as: Option<AuthenticateAs>,
 ) -> Result<Response<Body>, ResponseError> {
-    let mut query = serde_urlencoded::from_str::<AnalyticsQuery>(req.uri().query().unwrap_or(""))?;
-
+    let mut query = serde_qs::from_str::<AnalyticsQuery>(req.uri().query().unwrap_or(""))?;
     // If we have a route that requires authentication the Chain will be extracted
     // from the sentry's authentication, which guarantees the value will exist
     // This will also override a query parameter for the chain if it is provided
