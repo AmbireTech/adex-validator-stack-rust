@@ -852,7 +852,7 @@ mod analytics_router_test {
                 os_name: None,
                 chains: vec![],
             };
-            let query = serde_urlencoded::to_string(query).expect("should parse query");
+            let query = serde_qs::to_string(&query).expect("should parse query");
             let req = Request::builder()
                 .uri(format!("http://127.0.0.1/v5/analytics?{}", query))
                 .body(Body::empty())
@@ -1122,7 +1122,7 @@ mod analytics_router_test {
             os_name: None,
             chains: vec![],
         };
-        let base_query = serde_urlencoded::to_string(query).expect("should parse query");
+        let base_query = serde_qs::to_string(&query).expect("should parse query");
 
         insert_mock_analytics_for_auth_routes(&app.pool, base_datehour).await;
 

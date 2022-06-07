@@ -543,7 +543,7 @@ pub mod channels {
         let endpoint = sentry_url
             .join(&format!(
                 "v5/channel/list?{}",
-                serde_urlencoded::to_string(query).expect("Should not fail to serialize")
+                serde_qs::to_string(&query).expect("Should not fail to serialize")
             ))
             .expect("Should not fail to create endpoint URL");
 
@@ -608,7 +608,7 @@ pub mod campaigns {
         let endpoint = sentry_url
             .join(&format!(
                 "v5/campaign/list?{}",
-                serde_urlencoded::to_string(query).expect("Should not fail to serialize")
+                serde_qs::to_string(&query).expect("Should not fail to serialize")
             ))
             .expect("Should not fail to create endpoint URL");
 

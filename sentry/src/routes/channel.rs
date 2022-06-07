@@ -40,7 +40,7 @@ pub async fn channel_list<C: Locked + 'static>(
     req: Request<Body>,
     app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
-    let query = serde_urlencoded::from_str::<ChannelListQuery>(req.uri().query().unwrap_or(""))?;
+    let query = serde_qs::from_str::<ChannelListQuery>(req.uri().query().unwrap_or(""))?;
     let skip = query
         .page
         .checked_mul(app.config.channels_find_limit.into())
@@ -96,7 +96,7 @@ pub async fn last_approved<C: Locked + 'static>(
         return Ok(default_response);
     }
 
-    let query = serde_urlencoded::from_str::<LastApprovedQuery>(req.uri().query().unwrap_or(""))?;
+    let query = serde_qs::from_str::<LastApprovedQuery>(req.uri().query().unwrap_or(""))?;
     let validators = vec![channel.leader, channel.follower];
     let channel_id = channel.id();
     let heartbeats = if query.with_heartbeat.is_some() {
@@ -247,7 +247,7 @@ pub async fn get_all_spender_limits<C: Locked + 'static>(
         .expect("Request should have Channel")
         .context;
 
-    let query = serde_urlencoded::from_str::<AllSpendersQuery>(req.uri().query().unwrap_or(""))?;
+    let query = serde_qs::from_str::<AllSpendersQuery>(req.uri().query().unwrap_or(""))?;
     let limit = app.config.spendable_find_limit;
     let skip = query
         .page
@@ -606,7 +606,7 @@ pub mod validator_message {
         validator_id: &Option<ValidatorId>,
         message_types: &[String],
     ) -> Result<Response<Body>, ResponseError> {
-        let query = serde_urlencoded::from_str::<ValidatorMessagesListQuery>(
+        let query = serde_qs::from_str::<ValidatorMessagesListQuery>(
             req.uri().query().unwrap_or(""),
         )?;
 
@@ -1068,7 +1068,7 @@ mod test {
             .expect("should insert");
 
         let build_request = |query: ChannelListQuery| {
-            let query = serde_urlencoded::to_string(query).expect("should parse query");
+            let query = serde_qs::to_string(&query).expect("should parse query");
             Request::builder()
                 .uri(format!("http://127.0.0.1/v5/channel/list?{}", query))
                 .extension(DUMMY_CAMPAIGN.channel.clone())

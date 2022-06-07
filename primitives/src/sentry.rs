@@ -719,7 +719,7 @@ pub mod campaign_list {
                 *CREATOR, *LEADER
             );
             let query_leader_encoded =
-                serde_urlencoded::from_str::<CampaignListQuery>(&query_leader_string)
+                serde_qs::from_str::<CampaignListQuery>(&query_leader_string)
                     .expect("should encode");
 
             pretty_assertions::assert_eq!(query_leader_encoded, query_leader);
@@ -735,7 +735,7 @@ pub mod campaign_list {
                 *CREATOR, *FOLLOWER
             );
             let query_validator_encoded =
-                serde_urlencoded::from_str::<CampaignListQuery>(&query_validator_string)
+                serde_qs::from_str::<CampaignListQuery>(&query_validator_string)
                     .expect("should encode");
 
             pretty_assertions::assert_eq!(query_validator_encoded, query_validator,);
@@ -750,7 +750,7 @@ pub mod campaign_list {
             let query_no_validator_string =
                 format!("page=0&activeTo=1612162800&creator={}", *CREATOR);
             let query_no_validator_encoded =
-                serde_urlencoded::from_str::<CampaignListQuery>(&query_no_validator_string)
+                serde_qs::from_str::<CampaignListQuery>(&query_no_validator_string)
                     .expect("should encode");
 
             pretty_assertions::assert_eq!(query_no_validator_encoded, query_no_validator,);
