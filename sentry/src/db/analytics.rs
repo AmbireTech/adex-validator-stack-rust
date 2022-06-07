@@ -21,10 +21,11 @@ pub async fn get_analytics(
     let (mut where_clauses, params) =
         analytics_query_params(&query, auth_as.as_ref(), &allowed_keys);
 
-    if let Some(chains) = &query.chains {
+    if !query.chains.is_empty() {
         where_clauses.push(format!(
             "chain_id IN ({})",
-            chains
+            query
+                .chains
                 .iter()
                 .map(|id| id.as_u32().to_string())
                 .collect::<Vec<String>>()
@@ -369,7 +370,7 @@ mod test {
             hostname: Some("localhost".into()),
             country: Some("Bulgaria".into()),
             os_name: Some(OperatingSystem::Linux),
-            chains: None,
+            chains: vec![],
         };
 
         // Impression query - should count all inserted Analytics
@@ -474,7 +475,7 @@ mod test {
             hostname: Some("localhost".into()),
             country: Some("Estonia".into()),
             os_name: Some(OperatingSystem::Linux),
-            chains: None,
+            chains: vec![],
         };
 
         // Click query - should count all inserted Analytics
@@ -624,7 +625,7 @@ mod test {
                 hostname: None,
                 country: None,
                 os_name: None,
-                chains: None,
+                chains: vec![],
             };
 
             let count_impressions = get_analytics(
@@ -680,7 +681,7 @@ mod test {
                 hostname: None,
                 country: None,
                 os_name: None,
-                chains: None,
+                chains: vec![],
             };
 
             let count_impressions = get_analytics(
@@ -736,7 +737,7 @@ mod test {
                 hostname: None,
                 country: None,
                 os_name: None,
-                chains: None,
+                chains: vec![],
             };
 
             let count_impressions = get_analytics(
@@ -792,7 +793,7 @@ mod test {
                 hostname: None,
                 country: None,
                 os_name: None,
-                chains: None,
+                chains: vec![],
             };
 
             let count_impressions = get_analytics(

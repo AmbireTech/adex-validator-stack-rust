@@ -24,7 +24,7 @@ pub async fn analytics<C: Locked + 'static>(
     // from the sentry's authentication, which guarantees the value will exist
     // This will also override a query parameter for the chain if it is provided
     if let Some(auth) = req.extensions().get::<Auth>() {
-        query.chains = Some(vec![auth.chain.chain_id])
+        query.chains = vec![auth.chain.chain_id]
     }
 
     let applied_limit = query.limit.min(app.config.analytics_find_limit);

@@ -118,10 +118,10 @@ impl ChainOf<Campaign> {
 
 #[cfg(feature = "postgres")]
 pub mod postgres {
-    use bytes::BytesMut;
-    use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
-    use std::error::Error;
     use super::ChainId;
+    use bytes::BytesMut;
+    use std::error::Error;
+    use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
 
     impl<'a> FromSql<'a> for ChainId {
         fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<ChainId, Box<dyn Error + Sync + Send>> {
@@ -133,7 +133,11 @@ pub mod postgres {
     }
 
     impl ToSql for ChainId {
-        fn to_sql(&self, ty: &Type, w: &mut BytesMut) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+        fn to_sql(
+            &self,
+            ty: &Type,
+            w: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
             <i32 as ToSql>::to_sql(&self.0.try_into()?, ty, w)
         }
 

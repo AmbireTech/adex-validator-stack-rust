@@ -115,7 +115,8 @@ pub struct AnalyticsQuery {
     pub hostname: Option<String>,
     pub country: Option<String>,
     pub os_name: Option<OperatingSystem>,
-    pub chains: Option<Vec<ChainId>>,
+    #[serde(default)]
+    pub chains: Vec<ChainId>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Display, Hash, Eq)]

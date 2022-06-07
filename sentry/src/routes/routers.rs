@@ -431,7 +431,7 @@ mod analytics_router_test {
                 hostname: None,
                 country: None,
                 os_name: None,
-                chains: Some(vec![ChainId::new(1)]),
+                chains: vec![ChainId::new(1)],
             };
             let query = serde_qs::to_string(&query).expect("should parse query");
             let req = Request::builder()
@@ -478,7 +478,7 @@ mod analytics_router_test {
                 hostname: None,
                 country: None,
                 os_name: None,
-                chains: Some(vec![ChainId::new(1)]),
+                chains: vec![ChainId::new(1)],
             };
             let query = serde_qs::to_string(&query).expect("should parse query");
             let req = Request::builder()
@@ -529,7 +529,7 @@ mod analytics_router_test {
                 hostname: None,
                 country: None,
                 os_name: None,
-                chains: Some(vec![ChainId::new(1)]),
+                chains: vec![ChainId::new(1)],
             };
             let query = serde_qs::to_string(&query).expect("should parse query");
             let req = Request::builder()
@@ -581,7 +581,7 @@ mod analytics_router_test {
                 hostname: None,
                 country: Some("Bulgaria".into()),
                 os_name: None,
-                chains: Some(vec![ChainId::new(1)]),
+                chains: vec![ChainId::new(1)],
             };
             let query = serde_qs::to_string(&query).expect("should parse query");
             let req = Request::builder()
@@ -850,7 +850,7 @@ mod analytics_router_test {
                 hostname: None,
                 country: None,
                 os_name: None,
-                chains: None,
+                chains: vec![],
             };
             let query = serde_urlencoded::to_string(query).expect("should parse query");
             let req = Request::builder()
@@ -903,7 +903,7 @@ mod analytics_router_test {
                 hostname: None,
                 country: None,
                 os_name: None,
-                chains: Some(vec![ChainId::new(2)]),
+                chains: vec![ChainId::new(2)],
             };
             let query = serde_qs::to_string(&query).expect("should parse query");
             let req = Request::builder()
@@ -1120,7 +1120,7 @@ mod analytics_router_test {
             hostname: None,
             country: None,
             os_name: None,
-            chains: None,
+            chains: vec![],
         };
         let base_query = serde_urlencoded::to_string(query).expect("should parse query");
 
@@ -1259,7 +1259,7 @@ mod analytics_router_test {
                 hostname: Some("localhost".into()),
                 country: Some("Bulgaria".into()),
                 os_name: Some(OperatingSystem::map_os("Windows")),
-                chains: Some(vec![ChainId::new(1)]),
+                chains: vec![ChainId::new(1)],
             };
             let query = serde_qs::to_string(&query).expect("should parse query");
             let req = Request::builder()
@@ -1312,7 +1312,6 @@ mod analytics_router_test {
                     .collect::<Vec<_>>(),
             );
         }
-
 
         // TODO: Move test to a analytics_router test
         // test with no authUid
