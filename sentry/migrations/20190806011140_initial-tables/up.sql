@@ -93,9 +93,10 @@ CREATE TABLE analytics (
     hostname varchar(255) NOT NULL,
     country varchar(255) NOT NULL,
     os_name varchar(255) NOT NULL,
+    chain_id integer NOT NULL,
     event_type varchar(255) NOT NULL,
     payout_amount bigint NOT NULL DEFAULT 0,
     payout_count integer NOT NULL DEFAULT 0,
     -- Do not rename the Primary key constraint (`analytics_pkey`)!
-    PRIMARY KEY (campaign_id, "time", ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os_name, event_type)
+    PRIMARY KEY (campaign_id, "time", ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os_name, chain_id, event_type)
 );

@@ -1,6 +1,6 @@
 use crate::{
     sentry::{EventType, IMPRESSION},
-    Address, CampaignId, ValidatorId, IPFS,
+    Address, CampaignId, ChainId, ValidatorId, IPFS,
 };
 use parse_display::Display;
 use serde::{Deserialize, Serialize};
@@ -115,6 +115,8 @@ pub struct AnalyticsQuery {
     pub hostname: Option<String>,
     pub country: Option<String>,
     pub os_name: Option<OperatingSystem>,
+    #[serde(default)]
+    pub chains: Vec<ChainId>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Display, Hash, Eq)]

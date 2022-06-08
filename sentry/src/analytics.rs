@@ -5,14 +5,14 @@ use crate::{
 use primitives::{
     analytics::OperatingSystem,
     sentry::{DateHour, Event, UpdateAnalytics},
-    Address, Campaign, UnifiedNum,
+    Address, Campaign, ChainOf, UnifiedNum,
 };
 use std::collections::HashMap;
 
 /// Validator fees will not be included in analytics
 pub async fn record(
     pool: &DbPool,
-    campaign: &Campaign,
+    campaign_context: &ChainOf<Campaign>,
     session: &Session,
     events_with_payouts: Vec<(Event, Address, UnifiedNum)>,
 ) -> Result<(), PoolError> {
@@ -43,7 +43,8 @@ pub async fn record(
                     ad_slot,
                 } => (*publisher, *ad_unit, referrer.clone(), *ad_slot),
             };
-            let ad_unit = campaign
+            let ad_unit = campaign_context
+                .context
                 .ad_units
                 .iter()
                 .find(|ad_unit| ad_unit.ipfs == event_ad_unit);
@@ -70,16 +71,17 @@ pub async fn record(
                 analytics.count_to_add += 1;
             })
             .or_insert_with(|| UpdateAnalytics {
-                campaign_id: campaign.id,
+                campaign_id: campaign_context.context.id,
                 time: datehour,
                 ad_unit,
                 ad_slot,
                 ad_slot_type,
-                advertiser: campaign.creator,
+                advertiser: campaign_context.context.creator,
                 publisher,
                 hostname,
                 country: session.country.to_owned(),
                 os_name: os_name.clone(),
+                chain_id: campaign_context.chain.chain_id,
                 event_type,
                 amount_to_add: payout_amount,
                 count_to_add: 1,
@@ -95,6 +97,7 @@ pub async fn record(
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::test_util::setup_dummy_app;
     use primitives::{
         sentry::{Analytics, CLICK, IMPRESSION},
         test_util::{DUMMY_CAMPAIGN, DUMMY_IPFS, PUBLISHER},
@@ -164,6 +167,8 @@ mod test {
 
     #[tokio::test]
     async fn test_analytics_recording_with_empty_events() {
+        let app = setup_dummy_app().await;
+
         let test_events = get_test_events();
         let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
 
@@ -186,9 +191,22 @@ mod test {
             test_events["impression"].clone(),
         ];
 
-        record(&database.clone(), &campaign, &session, input_events.clone())
-            .await
-            .expect("should record");
+        let dummy_channel = DUMMY_CAMPAIGN.channel;
+        let channel_chain = app
+            .config
+            .find_chain_of(dummy_channel.token)
+            .expect("Channel token should be whitelisted in config!");
+        let channel_context = channel_chain.with_channel(dummy_channel);
+        let campaign_context = channel_context.clone().with(campaign);
+
+        record(
+            &database.clone(),
+            &campaign_context,
+            &session,
+            input_events.clone(),
+        )
+        .await
+        .expect("should record");
 
         let analytics = get_all_analytics(&database.pool)
             .await
@@ -218,6 +236,8 @@ mod test {
 
     #[tokio::test]
     async fn test_recording_with_session() {
+        let app = setup_dummy_app().await;
+
         let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
 
         setup_test_migrations(database.pool.clone())
@@ -247,9 +267,21 @@ mod test {
             test_events["impression"].clone(),
         ];
 
-        record(&database.clone(), &campaign, &session, input_events.clone())
-            .await
-            .expect("should record");
+        let dummy_channel = DUMMY_CAMPAIGN.channel;
+        let channel_chain = app
+            .config
+            .find_chain_of(dummy_channel.token)
+            .expect("Channel token should be whitelisted in config!");
+        let channel_context = channel_chain.with_channel(dummy_channel);
+        let campaign_context = channel_context.clone().with(campaign);
+        record(
+            &database.clone(),
+            &campaign_context,
+            &session,
+            input_events.clone(),
+        )
+        .await
+        .expect("should record");
 
         let analytics = get_all_analytics(&database.pool)
             .await

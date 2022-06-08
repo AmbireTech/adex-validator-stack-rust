@@ -1625,7 +1625,7 @@ dependencies = [
  "rand 0.7.3",
  "serde",
  "serde_json",
- "serde_qs",
+ "serde_qs 0.7.2",
  "serde_urlencoded",
  "url",
 ]
@@ -3464,6 +3464,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "serde_qs 0.9.2",
  "serde_urlencoded",
  "slog",
  "thiserror",
@@ -3530,6 +3531,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5af82de3c6549b001bec34961ff2d6a54339a87bab37ce901b693401f27de6cb"
 dependencies = [
  "data-encoding",
+ "percent-encoding",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "serde_qs"
+version = "0.9.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6af4cee6cd4b23b45e6709150d1e9af5c748131de7e3316a7c2b3008051ed725"
+dependencies = [
  "percent-encoding",
  "serde",
  "thiserror",

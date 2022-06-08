@@ -2,13 +2,14 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use crate::{config::TokenInfo, util::ApiUrl, Address, Campaign, Channel};
+use parse_display::Display;
 
 /// The Id of the chain
 ///
 /// # Ethereum Virtual Machine
 ///
 /// For all the EVM-compatible Chain IDs visit <https://chainid.network>
-#[derive(Serialize, Deserialize, Hash, Clone, Copy, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Hash, Clone, Copy, Eq, PartialEq, Display)]
 #[serde(transparent)]
 pub struct ChainId(u32);
 
@@ -20,6 +21,10 @@ impl ChainId {
         assert!(id != 0);
 
         Self(id)
+    }
+
+    pub fn to_u32(self) -> u32 {
+        self.0
     }
 }
 
@@ -108,5 +113,36 @@ impl ChainOf<Campaign> {
             token: self.token.clone(),
             chain: self.chain.clone(),
         }
+    }
+}
+
+#[cfg(feature = "postgres")]
+pub mod postgres {
+    use super::ChainId;
+    use bytes::BytesMut;
+    use std::error::Error;
+    use tokio_postgres::types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
+
+    impl<'a> FromSql<'a> for ChainId {
+        fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<ChainId, Box<dyn Error + Sync + Send>> {
+            let value = <i32 as FromSql>::from_sql(ty, raw)?;
+
+            Ok(ChainId(u32::try_from(value)?))
+        }
+        accepts!(INT4);
+    }
+
+    impl ToSql for ChainId {
+        fn to_sql(
+            &self,
+            ty: &Type,
+            w: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+            <i32 as ToSql>::to_sql(&self.0.try_into()?, ty, w)
+        }
+
+        accepts!(INT4);
+
+        to_sql_checked!();
     }
 }

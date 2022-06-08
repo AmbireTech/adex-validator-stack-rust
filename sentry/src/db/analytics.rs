@@ -18,7 +18,20 @@ pub async fn get_analytics(
 ) -> Result<Vec<FetchedAnalytics>, PoolError> {
     let client = pool.get().await?;
 
-    let (where_clauses, params) = analytics_query_params(&query, auth_as.as_ref(), &allowed_keys);
+    let (mut where_clauses, params) =
+        analytics_query_params(&query, auth_as.as_ref(), &allowed_keys);
+
+    if !query.chains.is_empty() {
+        where_clauses.push(format!(
+            "chain_id IN ({})",
+            query
+                .chains
+                .iter()
+                .map(|id| id.to_u32().to_string())
+                .collect::<Vec<String>>()
+                .join(",")
+        ));
+    }
 
     let time_group = match &query.time.timeframe {
         Timeframe::Year => "date_trunc('month', analytics.time) as timeframe_time",
@@ -110,10 +123,10 @@ pub async fn update_analytics(
 ) -> Result<Analytics, PoolError> {
     let client = pool.get().await?;
 
-    let query = "INSERT INTO analytics(campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os_name, event_type, payout_amount, payout_count)
-    VALUES ($1, date_trunc('hour', cast($2 as timestamp with time zone)), $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+    let query = "INSERT INTO analytics(campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os_name, chain_id, event_type, payout_amount, payout_count)
+    VALUES ($1, date_trunc('hour', cast($2 as timestamp with time zone)), $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
     ON CONFLICT ON CONSTRAINT analytics_pkey DO UPDATE
-    SET payout_amount = analytics.payout_amount + $12, payout_count = analytics.payout_count + 1
+    SET payout_amount = analytics.payout_amount + $13, payout_count = analytics.payout_count + 1
     RETURNING campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os_name, event_type, payout_amount, payout_count";
 
     let stmt = client.prepare(query).await?;
@@ -135,6 +148,7 @@ pub async fn update_analytics(
                     .unwrap_or(&"".to_string()),
                 &update_analytics.country.as_ref().unwrap_or(&"".to_string()),
                 &update_analytics.os_name.to_string(),
+                &update_analytics.chain_id,
                 &update_analytics.event_type,
                 &update_analytics.amount_to_add,
                 &update_analytics.count_to_add,
@@ -160,7 +174,7 @@ mod test {
         sentry::{DateHour, CLICK, IMPRESSION},
         test_util::{CREATOR, DUMMY_AD_UNITS, DUMMY_CAMPAIGN, DUMMY_IPFS, PUBLISHER, PUBLISHER_2},
         unified_num::FromWhole,
-        AdUnit, UnifiedNum, ValidatorId, IPFS,
+        AdUnit, ChainId, UnifiedNum, ValidatorId, IPFS,
     };
 
     use crate::db::tests_postgres::{setup_test_migrations, DATABASE_POOL};
@@ -189,6 +203,7 @@ mod test {
                 hostname: Some("localhost".to_string()),
                 country: Some("Bulgaria".to_string()),
                 os_name: OperatingSystem::Linux,
+                chain_id: ChainId::new(1),
                 event_type: IMPRESSION,
                 amount_to_add: UnifiedNum::from_u64(1_000_000),
                 count_to_add: 1,
@@ -237,6 +252,7 @@ mod test {
                 hostname: None,
                 country: None,
                 os_name: OperatingSystem::Linux,
+                chain_id: ChainId::new(1),
                 event_type: IMPRESSION,
                 amount_to_add: UnifiedNum::from_u64(1_000_000),
                 count_to_add: 1,
@@ -354,6 +370,7 @@ mod test {
             hostname: Some("localhost".into()),
             country: Some("Bulgaria".into()),
             os_name: Some(OperatingSystem::Linux),
+            chains: vec![],
         };
 
         // Impression query - should count all inserted Analytics
@@ -458,6 +475,7 @@ mod test {
             hostname: Some("localhost".into()),
             country: Some("Estonia".into()),
             os_name: Some(OperatingSystem::Linux),
+            chains: vec![],
         };
 
         // Click query - should count all inserted Analytics
@@ -607,6 +625,7 @@ mod test {
                 hostname: None,
                 country: None,
                 os_name: None,
+                chains: vec![],
             };
 
             let count_impressions = get_analytics(
@@ -662,6 +681,7 @@ mod test {
                 hostname: None,
                 country: None,
                 os_name: None,
+                chains: vec![],
             };
 
             let count_impressions = get_analytics(
@@ -717,6 +737,7 @@ mod test {
                 hostname: None,
                 country: None,
                 os_name: None,
+                chains: vec![],
             };
 
             let count_impressions = get_analytics(
@@ -772,6 +793,7 @@ mod test {
                 hostname: None,
                 country: None,
                 os_name: None,
+                chains: vec![],
             };
 
             let count_impressions = get_analytics(
@@ -825,6 +847,7 @@ mod test {
             hostname: Some("localhost".to_string()),
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::Linux,
+            chain_id: ChainId::new(1),
             event_type: IMPRESSION,
             amount_to_add: UnifiedNum::from_u64(day as u64 * hour as u64 * 100_000_000),
             count_to_add: hour as i32,
@@ -851,6 +874,7 @@ mod test {
             hostname: Some("localhost".to_string()),
             country: Some("Estonia".to_string()),
             os_name: OperatingSystem::Linux,
+            chain_id: ChainId::new(1),
             event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(day as u64 * hour as u64 * 100_000_000),
             count_to_add: hour as i32,
