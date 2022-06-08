@@ -23,7 +23,7 @@ impl ChainId {
         Self(id)
     }
 
-    pub fn as_u32(self) -> u32 {
+    pub fn to_u32(self) -> u32 {
         self.0
     }
 }

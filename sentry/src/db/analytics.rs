@@ -27,7 +27,7 @@ pub async fn get_analytics(
             query
                 .chains
                 .iter()
-                .map(|id| id.as_u32().to_string())
+                .map(|id| id.to_u32().to_string())
                 .collect::<Vec<String>>()
                 .join(",")
         ));
