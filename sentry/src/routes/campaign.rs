@@ -283,7 +283,7 @@ pub async fn campaign_list<C: Locked + 'static>(
     req: Request<Body>,
     app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
-    let query = serde_urlencoded::from_str::<CampaignListQuery>(req.uri().query().unwrap_or(""))?;
+    let query = serde_qs::from_str::<CampaignListQuery>(req.uri().query().unwrap_or(""))?;
 
     let limit = app.config.campaigns_find_limit;
     let skip = query
@@ -1552,7 +1552,7 @@ mod test {
             .expect("Should insert dummy campaign");
 
         let build_request = |query: CampaignListQuery| {
-            let query = serde_urlencoded::to_string(query).expect("should parse query");
+            let query = serde_qs::to_string(&query).expect("should parse query");
             Request::builder()
                 .uri(format!("http://127.0.0.1/v5/campaign/list?{}", query))
                 .body(Body::empty())
