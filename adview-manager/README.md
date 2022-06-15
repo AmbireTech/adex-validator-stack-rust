@@ -1,6 +1,7 @@
 # AdView Manager
 
-Gives you the ability to generate the code for showing ads on a publisher website.
+Gives you the ability to generate the code required for showing ads
+on a website (publisher).
 
 ### Testing
 
