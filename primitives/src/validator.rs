@@ -330,7 +330,7 @@ pub mod messages {
         }
     }
 
-    #[derive(Default, Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
     #[serde(rename_all = "camelCase")]
     pub struct RejectState<S: BalancesState> {
         pub reason: String,
@@ -338,7 +338,8 @@ pub mod messages {
         pub signature: String,
         #[serde(flatten, bound = "S: BalancesState")]
         pub balances: Option<Balances<S>>,
-        pub timestamp: Option<DateTime<Utc>>,
+        /// The timestamp when the [`NewState`] was rejected.
+        pub timestamp: DateTime<Utc>,
     }
 
     #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]

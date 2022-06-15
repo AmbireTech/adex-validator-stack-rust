@@ -321,8 +321,8 @@ async fn on_error<'a, C: Unlocked + 'static>(
                 state_root: new_state.state_root.clone(),
                 signature: new_state.signature.clone(),
                 balances: Some(new_state.balances.clone()),
-                /// The timestamp when the NewState is being rejected
-                timestamp: Some(Utc::now()),
+                // The timestamp when the NewState is being rejected
+                timestamp: Utc::now(),
             })],
         )
         .await?;
@@ -363,7 +363,7 @@ mod test {
         Mock, MockGuard, MockServer, ResponseTemplate,
     };
 
-    // Initialies a SentryApi instance
+    // Initializes a SentryApi instance
     async fn setup_sentry(server: &MockServer, config: &Config) -> SentryApi<Dummy> {
         let sentry_url =
             ApiUrl::from_str(&format!("{}/follower", &server.uri())).expect("Should parse");
@@ -978,7 +978,7 @@ mod test {
             let reject_state = RejectState {
                 state_root,
                 signature: IDS[&*FOLLOWER].to_checksum(),
-                timestamp: Some(received),
+                timestamp: received,
                 reason: "rejected".to_string(),
                 balances: None,
             };
