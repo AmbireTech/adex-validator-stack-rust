@@ -123,10 +123,10 @@ mod test {
         Deposit, UnifiedNum,
     };
 
-    use crate::db::{
+    use crate::{db::{
         insert_channel,
         tests_postgres::{setup_test_migrations, DATABASE_POOL},
-    };
+    }, test_util::setup_dummy_app};
     use tokio::time::{sleep, Duration};
 
     use super::*;
@@ -134,6 +134,7 @@ mod test {
     #[tokio::test]
     async fn it_inserts_and_fetches_and_updates_spendable() {
         let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
+        let app = setup_dummy_app().await;
 
         setup_test_migrations(database.pool.clone())
             .await
@@ -148,7 +149,12 @@ mod test {
             },
         };
 
-        insert_channel(&database.pool, spendable.channel)
+        let channel_chain = app
+            .config
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect("Channel token should be whitelisted in config!");
+        let channel_context = channel_chain.with_channel(spendable.channel);
+        insert_channel(&database.pool, &channel_context)
             .await
             .expect("Should insert Channel before creating spendable");
 
@@ -184,14 +190,20 @@ mod test {
     #[tokio::test]
     async fn insert_and_get_single_spendable_for_channel() {
         let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
+        let app = setup_dummy_app().await;
 
         setup_test_migrations(database.pool.clone())
             .await
             .expect("Migrations should succeed");
 
         let channel = DUMMY_CAMPAIGN.channel;
+        let channel_chain = app
+            .config
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect("Channel token should be whitelisted in config!");
+        let channel_context = channel_chain.with_channel(channel);
 
-        insert_channel(&database, channel)
+        insert_channel(&database, &channel_context)
             .await
             .expect("Should insert");
 
@@ -227,14 +239,20 @@ mod test {
     #[tokio::test]
     async fn gets_multiple_pages_of_spendables_for_channel() {
         let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
+        let app = setup_dummy_app().await;
 
         setup_test_migrations(database.pool.clone())
             .await
             .expect("Migrations should succeed");
 
         let channel = DUMMY_CAMPAIGN.channel;
+        let channel_chain = app
+            .config
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect("Channel token should be whitelisted in config!");
+        let channel_context = channel_chain.with_channel(channel);
 
-        insert_channel(&database, channel)
+        insert_channel(&database, &channel_context)
             .await
             .expect("Should insert");
 

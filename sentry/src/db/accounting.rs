@@ -189,22 +189,31 @@ mod test {
         ADVERTISER, ADVERTISER_2, CREATOR, DUMMY_CAMPAIGN, PUBLISHER, PUBLISHER_2,
     };
 
-    use crate::db::{
+    use crate::{db::{
         insert_channel,
         tests_postgres::{setup_test_migrations, DATABASE_POOL},
-    };
+    }, test_util::setup_dummy_app};
+    
 
     use super::*;
 
     #[tokio::test]
     async fn insert_update_and_get_accounting() {
         let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
+        let app = setup_dummy_app().await;
 
         setup_test_migrations(database.pool.clone())
             .await
             .expect("Migrations should succeed");
+
+        let channel_chain = app
+            .config
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect("Channel token should be whitelisted in config!");
+        let channel_context = channel_chain.with_channel(DUMMY_CAMPAIGN.channel);
+
         // insert the channel into the DB
-        let channel = insert_channel(&database.pool, DUMMY_CAMPAIGN.channel)
+        let channel = insert_channel(&database.pool, &channel_context)
             .await
             .expect("Should insert");
 
@@ -394,13 +403,21 @@ mod test {
     #[tokio::test]
     async fn test_spend_amount() {
         let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
+        let app = setup_dummy_app().await;
 
         setup_test_migrations(database.pool.clone())
             .await
             .expect("Migrations should succeed");
 
+        let channel_chain = app
+            .config
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect("Channel token should be whitelisted in config!");
+        let channel_context = channel_chain.with_channel(DUMMY_CAMPAIGN.channel);
+
+
         // insert the channel into the DB
-        let channel = insert_channel(&database.pool, DUMMY_CAMPAIGN.channel)
+        let channel = insert_channel(&database.pool, &channel_context)
             .await
             .expect("Should insert");
 
@@ -481,13 +498,20 @@ mod test {
     #[tokio::test]
     async fn test_spend_amount_with_multiple_spends() {
         let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
+        let app = setup_dummy_app().await;
 
         setup_test_migrations(database.pool.clone())
             .await
             .expect("Migrations should succeed");
 
+        let channel_chain = app
+            .config
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect("Channel token should be whitelisted in config!");
+        let channel_context = channel_chain.with_channel(DUMMY_CAMPAIGN.channel);
+
         // insert the channel into the DB
-        let channel = insert_channel(&database.pool, DUMMY_CAMPAIGN.channel)
+        let channel = insert_channel(&database.pool, &channel_context)
             .await
             .expect("Should insert");
 

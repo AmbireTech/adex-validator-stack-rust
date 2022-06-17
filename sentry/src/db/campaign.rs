@@ -571,10 +571,10 @@ mod campaign_remaining {
 
 #[cfg(test)]
 mod test {
-    use crate::db::{
+    use crate::{db::{
         insert_channel,
         tests_postgres::{setup_test_migrations, DATABASE_POOL},
-    };
+    }, test_util::setup_dummy_app};
     use chrono::TimeZone;
     use primitives::{
         campaign,
@@ -595,6 +595,7 @@ mod test {
 
     #[tokio::test]
     async fn it_inserts_fetches_and_updates_a_campaign() {
+        let app = setup_dummy_app().await;
         let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
 
         setup_test_migrations(database.pool.clone())
@@ -603,8 +604,15 @@ mod test {
 
         let campaign = DUMMY_CAMPAIGN.clone();
 
+        let channel_chain = app
+            .config
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect("Channel token should be whitelisted in config!");
+        let channel_context = channel_chain.with_channel(DUMMY_CAMPAIGN.channel);
+
+
         // insert the channel into the DB
-        let _channel = insert_channel(&database.pool, DUMMY_CAMPAIGN.channel)
+        let _channel = insert_channel(&database.pool, &channel_context)
             .await
             .expect("Should insert");
 
@@ -690,6 +698,7 @@ mod test {
     #[tokio::test]
     async fn it_lists_campaigns_properly() {
         let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
+        let app = setup_dummy_app().await;
 
         setup_test_migrations(database.pool.clone())
             .await
@@ -699,10 +708,18 @@ mod test {
         let mut channel_with_different_leader = DUMMY_CAMPAIGN.channel;
         channel_with_different_leader.leader = IDS[&ADVERTISER_2];
 
-        insert_channel(&database, DUMMY_CAMPAIGN.channel)
+        let channel_chain = app
+            .config
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect("Channel token should be whitelisted in config!");
+        let channel_context = channel_chain.clone().with_channel(DUMMY_CAMPAIGN.channel);
+        let channel_context_different_leader = channel_chain.with_channel(channel_with_different_leader);
+
+
+        insert_channel(&database, &channel_context)
             .await
             .expect("Should insert");
-        insert_channel(&database, channel_with_different_leader)
+        insert_channel(&database, &channel_context_different_leader)
             .await
             .expect("Should insert");
 

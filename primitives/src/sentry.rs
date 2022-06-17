@@ -637,7 +637,7 @@ pub struct ValidationErrorResponse {
 }
 
 pub mod channel_list {
-    use crate::{Channel, ValidatorId};
+    use crate::{Channel, ValidatorId, ChainId};
     use serde::{Deserialize, Serialize};
 
     use super::Pagination;
@@ -657,6 +657,8 @@ pub mod channel_list {
         pub page: u64,
         /// filters the channels containing a specific validator if provided
         pub validator: Option<ValidatorId>,
+        #[serde(default)]
+        pub chains: Vec<ChainId>,
     }
 }
 
