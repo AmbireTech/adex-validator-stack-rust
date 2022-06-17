@@ -538,7 +538,7 @@ pub mod channels {
         let query = ChannelListQuery {
             page,
             validator: Some(validator),
-            chains: vec![]
+            chains: vec![],
         };
 
         let endpoint = sentry_url

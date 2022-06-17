@@ -571,10 +571,13 @@ mod campaign_remaining {
 
 #[cfg(test)]
 mod test {
-    use crate::{db::{
-        insert_channel,
-        tests_postgres::{setup_test_migrations, DATABASE_POOL},
-    }, test_util::setup_dummy_app};
+    use crate::{
+        db::{
+            insert_channel,
+            tests_postgres::{setup_test_migrations, DATABASE_POOL},
+        },
+        test_util::setup_dummy_app,
+    };
     use chrono::TimeZone;
     use primitives::{
         campaign,
@@ -609,7 +612,6 @@ mod test {
             .find_chain_of(DUMMY_CAMPAIGN.channel.token)
             .expect("Channel token should be whitelisted in config!");
         let channel_context = channel_chain.with_channel(DUMMY_CAMPAIGN.channel);
-
 
         // insert the channel into the DB
         let _channel = insert_channel(&database.pool, &channel_context)
@@ -713,8 +715,8 @@ mod test {
             .find_chain_of(DUMMY_CAMPAIGN.channel.token)
             .expect("Channel token should be whitelisted in config!");
         let channel_context = channel_chain.clone().with_channel(DUMMY_CAMPAIGN.channel);
-        let channel_context_different_leader = channel_chain.with_channel(channel_with_different_leader);
-
+        let channel_context_different_leader =
+            channel_chain.with_channel(channel_with_different_leader);
 
         insert_channel(&database, &channel_context)
             .await

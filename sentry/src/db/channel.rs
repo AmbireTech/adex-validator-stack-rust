@@ -1,4 +1,4 @@
-use primitives::{Channel, ChannelId, ChainOf};
+use primitives::{ChainOf, Channel, ChannelId};
 
 pub use list_channels::list_channels;
 
@@ -31,7 +31,10 @@ pub async fn get_channel_by_id(
 /// ON CONFLICT ON CONSTRAINT channels_pkey DO UPDATE SET created=EXCLUDED.created
 /// RETURNING leader, follower, guardian, token, nonce
 /// ```
-pub async fn insert_channel(pool: &DbPool, channel_chain: &ChainOf<Channel>) -> Result<Channel, PoolError> {
+pub async fn insert_channel(
+    pool: &DbPool,
+    channel_chain: &ChainOf<Channel>,
+) -> Result<Channel, PoolError> {
     let client = pool.get().await?;
     let chain_id = channel_chain.chain.chain_id;
     let channel = channel_chain.context;
@@ -61,7 +64,10 @@ pub async fn insert_channel(pool: &DbPool, channel_chain: &ChainOf<Channel>) -> 
 
 mod list_channels {
     use primitives::{
-        sentry::{channel_list::{ChannelListResponse, ChannelListQuery}, Pagination},
+        sentry::{
+            channel_list::{ChannelListQuery, ChannelListResponse},
+            Pagination,
+        },
         Channel,
     };
 
@@ -162,7 +168,10 @@ mod list_channels {
                 client.query_one(&stmt, &[&validator.to_string()]).await?
             }
             None => {
-                let statement = format!("SELECT COUNT(id)::varchar FROM channels WHERE {}", where_clauses.join(" AND "));
+                let statement = format!(
+                    "SELECT COUNT(id)::varchar FROM channels WHERE {}",
+                    where_clauses.join(" AND ")
+                );
                 let stmt = client.prepare(&statement).await?;
 
                 client.query_one(&stmt, &[]).await?
@@ -175,12 +184,15 @@ mod list_channels {
 
 #[cfg(test)]
 mod test {
-    use primitives::{test_util::DUMMY_CAMPAIGN, sentry::channel_list::ChannelListQuery, ChainId};
+    use primitives::{sentry::channel_list::ChannelListQuery, test_util::DUMMY_CAMPAIGN, ChainId};
 
-    use crate::{db::{
-        insert_channel,
-        tests_postgres::{setup_test_migrations, DATABASE_POOL},
-    }, test_util::setup_dummy_app};
+    use crate::{
+        db::{
+            insert_channel,
+            tests_postgres::{setup_test_migrations, DATABASE_POOL},
+        },
+        test_util::setup_dummy_app,
+    };
 
     use super::list_channels::list_channels;
 

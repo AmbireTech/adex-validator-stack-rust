@@ -123,10 +123,13 @@ mod test {
         Deposit, UnifiedNum,
     };
 
-    use crate::{db::{
-        insert_channel,
-        tests_postgres::{setup_test_migrations, DATABASE_POOL},
-    }, test_util::setup_dummy_app};
+    use crate::{
+        db::{
+            insert_channel,
+            tests_postgres::{setup_test_migrations, DATABASE_POOL},
+        },
+        test_util::setup_dummy_app,
+    };
     use tokio::time::{sleep, Duration};
 
     use super::*;

@@ -637,7 +637,7 @@ pub struct ValidationErrorResponse {
 }
 
 pub mod channel_list {
-    use crate::{Channel, ValidatorId, ChainId};
+    use crate::{ChainId, Channel, ValidatorId};
     use serde::{Deserialize, Serialize};
 
     use super::Pagination;

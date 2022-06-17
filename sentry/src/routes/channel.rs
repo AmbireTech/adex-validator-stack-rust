@@ -50,13 +50,8 @@ pub async fn channel_list<C: Locked + 'static>(
         .checked_mul(app.config.channels_find_limit.into())
         .ok_or_else(|| ResponseError::BadRequest("Page and/or limit is too large".into()))?;
 
-    let list_response = list_channels(
-        &app.pool,
-        skip,
-        app.config.channels_find_limit,
-        &query
-    )
-    .await?;
+    let list_response =
+        list_channels(&app.pool, skip, app.config.channels_find_limit, &query).await?;
 
     Ok(success_response(serde_json::to_string(&list_response)?))
 }
@@ -137,7 +132,7 @@ async fn create_or_update_spendable_document<A: Locked>(
     channel_context: &ChainOf<Channel>,
     spender: Address,
 ) -> Result<Spendable, ResponseError> {
-    insert_channel(&pool, &channel_context).await?;
+    insert_channel(&pool, channel_context).await?;
 
     let deposit = adapter.get_deposit(channel_context, spender).await?;
     let total = UnifiedNum::from_precision(deposit.total, channel_context.token.precision.get());
@@ -610,9 +605,8 @@ pub mod validator_message {
         validator_id: &Option<ValidatorId>,
         message_types: &[String],
     ) -> Result<Response<Body>, ResponseError> {
-        let query = serde_qs::from_str::<ValidatorMessagesListQuery>(
-            req.uri().query().unwrap_or(""),
-        )?;
+        let query =
+            serde_qs::from_str::<ValidatorMessagesListQuery>(req.uri().query().unwrap_or(""))?;
 
         let channel = req
             .extensions()
@@ -1052,10 +1046,10 @@ mod test {
             nonce: Nonce::from(987_654_321_u32),
         };
         let channel_context = app
-                .config
-                .find_chain_of(channel.token)
-                .expect("Dummy channel Token should be present in config!")
-                .with(channel);
+            .config
+            .find_chain_of(channel.token)
+            .expect("Dummy channel Token should be present in config!")
+            .with(channel);
         insert_channel(&app.pool, &channel_context)
             .await
             .expect("should insert");
@@ -1068,10 +1062,10 @@ mod test {
             nonce: Nonce::from(987_654_322_u32),
         };
         let channel_context = app
-                .config
-                .find_chain_of(channel_other_token.token)
-                .expect("Dummy channel Token should be present in config!")
-                .with(channel_other_token);
+            .config
+            .find_chain_of(channel_other_token.token)
+            .expect("Dummy channel Token should be present in config!")
+            .with(channel_other_token);
         insert_channel(&app.pool, &channel_context)
             .await
             .expect("should insert");
@@ -1084,10 +1078,10 @@ mod test {
             nonce: Nonce::from(987_654_323_u32),
         };
         let channel_context = app
-                .config
-                .find_chain_of(channel_other_leader.token)
-                .expect("Dummy channel Token should be present in config!")
-                .with(channel_other_leader);
+            .config
+            .find_chain_of(channel_other_leader.token)
+            .expect("Dummy channel Token should be present in config!")
+            .with(channel_other_leader);
         insert_channel(&app.pool, &channel_context)
             .await
             .expect("should insert");

@@ -189,11 +189,13 @@ mod test {
         ADVERTISER, ADVERTISER_2, CREATOR, DUMMY_CAMPAIGN, PUBLISHER, PUBLISHER_2,
     };
 
-    use crate::{db::{
-        insert_channel,
-        tests_postgres::{setup_test_migrations, DATABASE_POOL},
-    }, test_util::setup_dummy_app};
-    
+    use crate::{
+        db::{
+            insert_channel,
+            tests_postgres::{setup_test_migrations, DATABASE_POOL},
+        },
+        test_util::setup_dummy_app,
+    };
 
     use super::*;
 
@@ -414,7 +416,6 @@ mod test {
             .find_chain_of(DUMMY_CAMPAIGN.channel.token)
             .expect("Channel token should be whitelisted in config!");
         let channel_context = channel_chain.with_channel(DUMMY_CAMPAIGN.channel);
-
 
         // insert the channel into the DB
         let channel = insert_channel(&database.pool, &channel_context)

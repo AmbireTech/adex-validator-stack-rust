@@ -172,7 +172,15 @@ where
         ));
     }
 
-    let channel_context = app.config.find_chain_of(campaign.channel.token).ok_or_else(|| ResponseError::FailedValidation("Channel token is not whitelisted in this validator".into()))?.with_channel(campaign.channel);
+    let channel_context = app
+        .config
+        .find_chain_of(campaign.channel.token)
+        .ok_or_else(|| {
+            ResponseError::FailedValidation(
+                "Channel token is not whitelisted in this validator".into(),
+            )
+        })?
+        .with_channel(campaign.channel);
     // make sure that the Channel is available in the DB
     // insert Channel
     insert_channel(&app.pool, &channel_context)
@@ -810,11 +818,14 @@ pub mod insert_events {
         };
         use redis::aio::MultiplexedConnection;
 
-        use crate::{db::{
-            insert_channel,
-            redis_pool::TESTS_POOL,
-            tests_postgres::{setup_test_migrations, DATABASE_POOL},
-        }, test_util::setup_dummy_app};
+        use crate::{
+            db::{
+                insert_channel,
+                redis_pool::TESTS_POOL,
+                tests_postgres::{setup_test_migrations, DATABASE_POOL},
+            },
+            test_util::setup_dummy_app,
+        };
 
         use super::*;
 
@@ -1525,27 +1536,39 @@ mod test {
             .find_chain_of(DUMMY_CAMPAIGN.channel.token)
             .expect("Channel token should be whitelisted in config!");
 
-        insert_channel(&app.pool, &channel_chain.clone().with_channel(DUMMY_CAMPAIGN.channel))
-            .await
-            .expect("Should insert dummy channel");
+        insert_channel(
+            &app.pool,
+            &channel_chain.clone().with_channel(DUMMY_CAMPAIGN.channel),
+        )
+        .await
+        .expect("Should insert dummy channel");
         insert_campaign(&app.pool, &DUMMY_CAMPAIGN)
             .await
             .expect("Should insert dummy campaign");
-        insert_channel(&app.pool, &channel_chain.clone().with_channel(channel_new_leader))
-            .await
-            .expect("Should insert dummy channel");
+        insert_channel(
+            &app.pool,
+            &channel_chain.clone().with_channel(channel_new_leader),
+        )
+        .await
+        .expect("Should insert dummy channel");
         insert_campaign(&app.pool, &campaign_new_leader)
             .await
             .expect("Should insert dummy campaign");
-        insert_channel(&app.pool, &channel_chain.clone().with_channel(channel_new_follower))
-            .await
-            .expect("Should insert dummy channel");
+        insert_channel(
+            &app.pool,
+            &channel_chain.clone().with_channel(channel_new_follower),
+        )
+        .await
+        .expect("Should insert dummy channel");
         insert_campaign(&app.pool, &campaign_new_follower)
             .await
             .expect("Should insert dummy campaign");
-        insert_channel(&app.pool, &channel_chain.with_channel(channel_new_leader_and_follower))
-            .await
-            .expect("Should insert dummy channel");
+        insert_channel(
+            &app.pool,
+            &channel_chain.with_channel(channel_new_leader_and_follower),
+        )
+        .await
+        .expect("Should insert dummy channel");
         insert_campaign(&app.pool, &campaign_new_leader_and_follower)
             .await
             .expect("Should insert dummy campaign");
