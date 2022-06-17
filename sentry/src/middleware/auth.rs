@@ -67,7 +67,6 @@ impl<C: Locked + 'static> Middleware<C> for IsAdmin {
         if !application.config.admins.contains(&auth.uid.to_string()) {
             return Err(ResponseError::Unauthorized);
         }
-
         Ok(request)
     }
 }
