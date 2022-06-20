@@ -11,8 +11,9 @@ use crate::db::{
     DbPool,
 };
 use crate::{
-    campaign::fetch_campaign_ids_for_channel, success_response, Application, Auth, ResponseError,
-    RouteParams,
+    response::{success_response, ResponseError},
+    routes::{campaign::fetch_campaign_ids_for_channel, routers::RouteParams},
+    Application, Auth,
 };
 use adapter::{client::Locked, Adapter};
 use futures::future::try_join_all;
@@ -556,7 +557,10 @@ pub mod validator_message {
         db::validator_message::{get_validator_messages, insert_validator_messages},
         Auth,
     };
-    use crate::{success_response, Application, ResponseError};
+    use crate::{
+        response::{success_response, ResponseError},
+        Application,
+    };
     use adapter::client::Locked;
     use futures::future::try_join_all;
     use hyper::{Body, Request, Response};
@@ -606,9 +610,8 @@ pub mod validator_message {
         validator_id: &Option<ValidatorId>,
         message_types: &[String],
     ) -> Result<Response<Body>, ResponseError> {
-        let query = serde_qs::from_str::<ValidatorMessagesListQuery>(
-            req.uri().query().unwrap_or(""),
-        )?;
+        let query =
+            serde_qs::from_str::<ValidatorMessagesListQuery>(req.uri().query().unwrap_or(""))?;
 
         let channel = req
             .extensions()
@@ -692,9 +695,10 @@ pub mod validator_message {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::db::{insert_campaign, insert_channel};
-    use crate::test_util::setup_dummy_app;
-    use crate::CampaignRemaining;
+    use crate::{
+        db::{insert_campaign, insert_channel, CampaignRemaining},
+        test_util::setup_dummy_app,
+    };
     use adapter::{
         ethereum::test_util::{GANACHE_INFO_1, GANACHE_INFO_1337},
         primitives::Deposit as AdapterDeposit,

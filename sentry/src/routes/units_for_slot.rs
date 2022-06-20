@@ -26,7 +26,8 @@ use crate::{
         accounting::{get_accounting, Side},
         units_for_slot_get_campaigns, CampaignRemaining, DbPool,
     },
-    Application, ResponseError,
+    response::ResponseError,
+    Application,
 };
 
 pub(crate) static CLOUDFLARE_IPCOUNTRY_HEADER: Lazy<HeaderName> =
