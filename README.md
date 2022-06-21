@@ -23,7 +23,7 @@ Requirements:
 
 ## Sentry
 
-`Sentry` is the REST API that the [`Validator worker`](#running-the-validator-worker)
+`Sentry` is the REST API that the [`Validator worker`](#validator-worker)
 uses for storing and retrieving information.
 
 Two services are needed to run `Sentry`: `Postgres` and `Redis`.
