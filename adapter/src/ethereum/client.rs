@@ -7,20 +7,16 @@ use crate::{
 use async_trait::async_trait;
 use chrono::Utc;
 use create2::calc_addr;
-use ethstore::{
-    ethkey::{verify_address, Message, Signature},
-    SafeAccount,
-};
+use ethsign::{KeyFile, Signature};
 use primitives::{Address, BigNum, Chain, ChainId, ChainOf, Channel, Config, ValidatorId};
 
 use super::{
     channel::EthereumChannel,
     error::{Error, EwtSigningError, KeystoreError, VerifyError},
     ewt::{self, Payload},
-    to_ethereum_signed, LockedWallet, UnlockedWallet, WalletState, DEPOSITOR_BYTECODE_DECODED,
-    ERC20_ABI, IDENTITY_ABI, OUTPACE_ABI, SWEEPER_ABI,
+    to_ethereum_signed, Electrum, LockedWallet, UnlockedWallet, WalletState,
+    DEPOSITOR_BYTECODE_DECODED, ERC20_ABI, IDENTITY_ABI, OUTPACE_ABI, SWEEPER_ABI,
 };
-use serde_json::Value;
 use web3::{
     contract::{Contract, Options as ContractOptions},
     ethabi::{encode, Token},
@@ -80,22 +76,18 @@ impl Ethereum<LockedWallet> {
     pub fn init(opts: Options, config: &Config) -> Result<Self, Error> {
         let keystore_contents =
             fs::read_to_string(&opts.keystore_file).map_err(KeystoreError::ReadingFile)?;
-        let keystore_json: Value =
+        let keystore_json: KeyFile =
             serde_json::from_str(&keystore_contents).map_err(KeystoreError::Deserialization)?;
 
-        let address = {
-            let keystore_address = keystore_json
-                .get("address")
-                .and_then(|value| value.as_str())
-                .ok_or(KeystoreError::AddressMissing)?;
+        let address_bytes = keystore_json
+            .address
+            .clone()
+            .ok_or(KeystoreError::AddressMissing)?;
 
-            keystore_address
-                .parse()
-                .map_err(KeystoreError::AddressInvalid)
-        }?;
+        let address = Address::from_slice(&address_bytes.0).ok_or(KeystoreError::AddressLength)?;
 
         Ok(Self {
-            address,
+            address: ValidatorId::from(address),
             config: config.to_owned(),
             state: LockedWallet::KeyStore {
                 keystore: keystore_json,
@@ -160,16 +152,9 @@ impl Unlockable for Ethereum<LockedWallet> {
     fn unlock(&self) -> Result<Ethereum<UnlockedWallet>, <Self::Unlocked as Locked>::Error> {
         let unlocked_wallet = match &self.state {
             LockedWallet::KeyStore { keystore, password } => {
-                let json = serde_json::from_value(keystore.clone())
-                    .map_err(KeystoreError::Deserialization)?;
+                let wallet = keystore.to_secret_key(password)?;
 
-                let wallet = SafeAccount::from_file(json, None, &Some(password.clone()))
-                    .map_err(|err| Error::WalletUnlock(err.to_string()))?;
-
-                UnlockedWallet {
-                    wallet,
-                    password: password.clone(),
-                }
+                UnlockedWallet { wallet }
             }
             LockedWallet::PrivateKey(_priv_key) => todo!(),
         };
@@ -201,15 +186,19 @@ impl<S: WalletState> Locked for Ethereum<S> {
         }
         let decoded_signature =
             hex::decode(&signature[2..]).map_err(VerifyError::SignatureDecoding)?;
-        let address = ethstore::ethkey::Address::from(*signer.as_bytes());
-        let signature = Signature::from_electrum(&decoded_signature);
+
+        let signature =
+            Signature::from_electrum(&decoded_signature).ok_or(VerifyError::SignatureInvalid)?;
         let state_root = hex::decode(state_root).map_err(VerifyError::StateRootDecoding)?;
-        let message = Message::from(to_ethereum_signed(&state_root));
 
-        let verify_address = verify_address(&address, &signature, &message)
-            .map_err(VerifyError::PublicKeyRecovery)?;
+        let message = to_ethereum_signed(&state_root);
 
-        Ok(verify_address)
+        // recover the public key using the signature and the eth sign message
+        let public_key = signature
+            .recover(&message)
+            .map_err(|ec_err| VerifyError::PublicKeyRecovery(ec_err.to_string()))?;
+
+        Ok(public_key.address() == signer.as_bytes())
     }
 
     /// Creates a `Session` from a provided Token by calling the Contract.
@@ -358,16 +347,16 @@ impl<S: WalletState> Locked for Ethereum<S> {
 impl Unlocked for Ethereum<UnlockedWallet> {
     fn sign(&self, state_root: &str) -> Result<String, Error> {
         let state_root = hex::decode(state_root).map_err(VerifyError::StateRootDecoding)?;
-        let message = Message::from(to_ethereum_signed(&state_root));
+        let message = to_ethereum_signed(&state_root);
+
         let wallet_sign = self
             .state
             .wallet
-            .sign(&self.state.password, &message)
+            .sign(&message)
             // TODO: This is not entirely true, we do not sign an Ethereum Web Token but Outpace state_root
             .map_err(|err| EwtSigningError::SigningMessage(err.to_string()))?;
-        let signature: Signature = wallet_sign.into_electrum().into();
 
-        Ok(format!("0x{}", signature))
+        Ok(format!("0x{}", hex::encode(wallet_sign.to_electrum())))
     }
 
     fn get_auth(&self, for_chain: ChainId, intended_for: ValidatorId) -> Result<String, Error> {
@@ -380,8 +369,7 @@ impl Unlocked for Ethereum<UnlockedWallet> {
             chain_id: for_chain,
         };
 
-        let token = ewt::Token::sign(&self.state.wallet, &self.state.password, payload)
-            .map_err(Error::SignMessage)?;
+        let token = ewt::Token::sign(&self.state.wallet, payload).map_err(Error::SignMessage)?;
 
         Ok(token.to_string())
     }
@@ -395,7 +383,7 @@ mod test {
         ewt::{self, Payload},
         get_counterfactual_address,
         test_util::*,
-        to_ethereum_signed,
+        to_ethereum_signed, Electrum,
     };
 
     use crate::{
@@ -403,7 +391,6 @@ mod test {
         primitives::{Deposit, Session},
     };
     use chrono::Utc;
-    use ethstore::ethkey::Message;
 
     use primitives::{
         channel::Nonce,
@@ -509,14 +496,13 @@ mod test {
 
             let signature_actual = {
                 let ethers_sign_message = to_ethereum_signed(&msg_hash_actual);
-                let message = Message::from(ethers_sign_message);
 
                 let mut signature = user_adapter
                     .state
                     .wallet
-                    .sign(&user_adapter.state.password, &message)
+                    .sign(&ethers_sign_message)
                     .expect("Should sign message")
-                    .into_electrum()
+                    .to_electrum()
                     .to_vec();
 
                 signature.extend(ETH_SIGN_SUFFIX.as_slice());
@@ -549,14 +535,13 @@ mod test {
 
             let signature_actual = {
                 let ethers_sign_message = to_ethereum_signed(&msg_hash_actual);
-                let message = Message::from(ethers_sign_message);
 
                 let mut signature = evil_adapter
                     .state
                     .wallet
-                    .sign(&evil_adapter.state.password, &message)
+                    .sign(&ethers_sign_message)
                     .expect("Should sign message")
-                    .into_electrum()
+                    .to_electrum()
                     .to_vec();
 
                 signature.extend(ETH_SIGN_SUFFIX.as_slice());
@@ -631,7 +616,7 @@ mod test {
             chain_id: ganache_chain.chain_id,
         };
 
-        let auth_token = ewt::Token::sign(&adapter.state.wallet, &adapter.state.password, payload)
+        let auth_token = ewt::Token::sign(&adapter.state.wallet, payload)
             .expect("Should sign successfully the Payload");
 
         let has_privileges = adapter
@@ -684,12 +669,8 @@ mod test {
             chain_id: ganache_chain.chain_id,
         };
 
-        let token = ewt::Token::sign(
-            &signer_adapter.state.wallet,
-            &signer_adapter.state.password,
-            payload,
-        )
-        .expect("Should sign successfully the Payload");
+        let token = ewt::Token::sign(&signer_adapter.state.wallet, payload)
+            .expect("Should sign successfully the Payload");
 
         // double check that we have privileges for _Who Am I_
         assert!(adapter

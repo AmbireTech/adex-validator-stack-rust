@@ -1,9 +1,6 @@
 use std::fmt;
 
-use ethstore::{
-    ethkey::{public_to_address, recover, Message, Password, Signature},
-    SafeAccount,
-};
+use ethsign::{SecretKey, Signature};
 use once_cell::sync::Lazy;
 use primitives::{Address, ChainId, ValidatorId};
 use serde::{Deserialize, Serialize};
@@ -11,7 +8,7 @@ use web3::signing::keccak256;
 
 use super::{
     error::{EwtSigningError, EwtVerifyError},
-    to_ethereum_signed,
+    to_ethereum_signed, Electrum,
 };
 
 pub static ETH_SIGN_SUFFIX: Lazy<Vec<u8>> = Lazy::new(|| hex::decode("01").unwrap());
@@ -101,11 +98,7 @@ impl Token {
     /// `Ethereum web token` signing of payload with 1 difference:
     /// it's not the JSON string representation that gets signed
     /// but the `keccak256(payload_json)`.
-    pub fn sign(
-        signer: &SafeAccount,
-        password: &Password,
-        payload: Payload,
-    ) -> Result<Self, EwtSigningError> {
+    pub fn sign(signer: &SecretKey, payload: Payload) -> Result<Self, EwtSigningError> {
         let header = ETH_HEADER.clone();
         let header_encoded =
             base64_encode(&header).map_err(EwtSigningError::HeaderSerialization)?;
@@ -116,12 +109,12 @@ impl Token {
         let message_hash = keccak256(format!("{}.{}", header_encoded, payload_encoded).as_bytes());
 
         // the singed message should be conform to the "Signed Data Standard"
-        let message_to_sign = Message::from(to_ethereum_signed(&message_hash));
+        let message_to_sign = to_ethereum_signed(&message_hash);
 
         let mut signature = signer
-            .sign(password, &message_to_sign)
+            .sign(&message_to_sign)
             .map_err(|err| EwtSigningError::SigningMessage(err.to_string()))?
-            .into_electrum()
+            .to_electrum()
             .to_vec();
         signature.extend(ETH_SIGN_SUFFIX.as_slice());
 
@@ -174,18 +167,18 @@ impl Token {
             _ => Err(EwtVerifyError::InvalidSignature),
         }?;
 
-        let signature = Signature::from_electrum(stripped_signature);
-        // signature is empty, so it is invalid, see `Signature::from_electrum`
-        if signature == Signature::default() {
-            return Err(EwtVerifyError::InvalidSignature);
-        }
+        let signature =
+            Signature::from_electrum(stripped_signature).ok_or(EwtVerifyError::InvalidSignature)?;
 
         let message_hash = keccak256(format!("{}.{}", header_encoded, payload_encoded).as_bytes());
+        let recover_message = to_ethereum_signed(&message_hash);
 
-        let recover_message = Message::from(to_ethereum_signed(&message_hash));
-        let address = public_to_address(
-            &recover(&signature, &recover_message).map_err(EwtVerifyError::AddressRecovery)?,
-        );
+        // recover the public key using the signature & the recovery message
+        let public_key = signature
+            .recover(&recover_message)
+            .map_err(|ec_err| EwtVerifyError::AddressRecovery(ec_err.to_string()))?;
+
+        let address = Address::from(*public_key.address());
 
         let token = Token {
             header,
@@ -196,7 +189,7 @@ impl Token {
         };
 
         let verified_payload = VerifyPayload {
-            from: Address::from(address.0),
+            from: address,
             payload,
         };
 
@@ -244,8 +237,7 @@ mod test {
             chain_id: ChainId::new(1),
         };
         let wallet = eth_adapter.state.wallet.clone();
-        let token = Token::sign(&wallet, &eth_adapter.state.password, payload)
-            .expect("failed to generate ewt signature");
+        let token = Token::sign(&wallet, payload).expect("failed to generate ewt signature");
         let expected = "eyJ0eXAiOiJKV1QiLCJhbGciOiJFVEgifQ.eyJpZCI6IjB4ODA2OTA3NTE5NjlCMjM0Njk3ZTkwNTllMDRlZDcyMTk1YzM1MDdmYSIsImVyYSI6MTAwMDAwLCJhZGRyZXNzIjoiMHhhQ0JhREEyZDU4MzBkMTg3NWFlM0QyZGUyMDdBMTM2M0IzMTZEZjJGIiwiY2hhaW5faWQiOjF9.GxF4XDXMx-rRty5zQ7-0nx2VlX51R_uEs_7OfA5ezDcyryUS06IWqVgGIfu4chhRJFP7woZ1YJpARNbCE01nWxwB";
         assert_eq!(token.as_str(), expected, "generated wrong ewt signature");
 
