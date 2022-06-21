@@ -10,7 +10,8 @@ use crate::{
         spendable::update_spendable,
         CampaignRemaining, DbPool, RedisError,
     },
-    success_response, Application, Auth, ResponseError,
+    response::{success_response, ResponseError},
+    Application, Auth,
 };
 use adapter::{prelude::*, Adapter, Error as AdaptorError};
 use deadpool_postgres::PoolError;
@@ -573,8 +574,9 @@ pub mod insert_events {
         analytics,
         db::{accounting::spend_amount, CampaignRemaining, DbPool, PoolError, RedisError},
         payout::get_payout,
+        response::ResponseError,
         spender::fee::calculate_fee,
-        Application, Auth, ResponseError, Session,
+        Application, Auth, Session,
     };
     use adapter::prelude::*;
     use hyper::{Body, Request, Response};
@@ -993,12 +995,13 @@ pub mod insert_events {
 #[cfg(test)]
 mod test {
     use super::{
-        update_campaign::{get_delta_budget, modify_campaign},
+        update_campaign::{get_delta_budget, modify_campaign, DeltaBudget},
         *,
     };
-    use crate::db::{fetch_campaign, redis_pool::TESTS_POOL};
-    use crate::test_util::setup_dummy_app;
-    use crate::update_campaign::DeltaBudget;
+    use crate::{
+        db::{fetch_campaign, redis_pool::TESTS_POOL},
+        test_util::setup_dummy_app,
+    };
     use adapter::primitives::Deposit;
     use chrono::{TimeZone, Utc};
     use hyper::StatusCode;

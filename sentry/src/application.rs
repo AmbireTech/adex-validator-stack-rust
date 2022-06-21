@@ -6,16 +6,33 @@ use hyper::{
     Error, Server,
 };
 use once_cell::sync::Lazy;
-use primitives::config::Environment;
+use primitives::{config::Environment, ValidatorId};
 use redis::ConnectionInfo;
 use serde::{Deserialize, Deserializer};
 use slog::{error, info};
 
+use crate::{
+    db::{CampaignRemaining, DbPool},
+    middleware::{
+        auth::Authenticate,
+        cors::{cors, Cors},
+        Middleware,
+    },
+    platform::PlatformApi,
+    response::{map_response_error, ResponseError},
+    routes::{
+        get_cfg,
+        routers::{analytics_router, campaigns_router, channels_router},
+    },
+};
+use adapter::Adapter;
+use hyper::{Body, Method, Request, Response};
+use redis::aio::MultiplexedConnection;
+use slog::Logger;
+
 /// an error used when deserializing a [`Config`] instance from environment variables
 /// see [`Config::from_env()`]
 pub use envy::Error as EnvError;
-
-use crate::Application;
 
 pub const DEFAULT_PORT: u16 = 8005;
 pub const DEFAULT_IP_ADDR: IpAddr = IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0));
@@ -24,26 +41,29 @@ pub static DEFAULT_REDIS_URL: Lazy<ConnectionInfo> = Lazy::new(|| {
         .parse::<ConnectionInfo>()
         .expect("Valid URL")
 });
+/// Sentry Application config set by environment variables
 #[derive(Debug, Deserialize, Clone)]
-pub struct Config {
+pub struct EnvConfig {
     /// Defaults to `Development`: [`Environment::default()`]
     pub env: Environment,
     /// The port on which the Sentry REST API will be accessible.
-    #[serde(default = "default_port")]
+    ///
     /// Defaults to `8005`: [`DEFAULT_PORT`]
+    #[serde(default = "default_port")]
     pub port: u16,
     /// The address on which the Sentry REST API will be accessible.
     /// `0.0.0.0` can be used for Docker.
     /// `127.0.0.1` can be used for locally running servers.
-    #[serde(default = "default_ip_addr")]
+    ///
     /// Defaults to `0.0.0.0`: [`DEFAULT_IP_ADDR`]
+    #[serde(default = "default_ip_addr")]
     pub ip_addr: IpAddr,
     #[serde(deserialize_with = "redis_url", default = "default_redis_url")]
     /// Defaults to locally running Redis server: [`DEFAULT_REDIS_URL`]
     pub redis_url: ConnectionInfo,
 }
 
-impl Config {
+impl EnvConfig {
     /// Deserialize the application [`Config`] from Environment variables.
     pub fn from_env() -> Result<Self, EnvError> {
         envy::from_env()
@@ -67,6 +87,72 @@ fn default_ip_addr() -> IpAddr {
 }
 fn default_redis_url() -> ConnectionInfo {
     DEFAULT_REDIS_URL.clone()
+}
+
+/// The Sentry REST web application
+pub struct Application<C: Locked + 'static> {
+    /// For sentry to work properly, we need an [`adapter::Adapter`] in a [`adapter::LockedState`] state.
+    pub adapter: Adapter<C>,
+    pub config: primitives::Config,
+    pub logger: Logger,
+    pub redis: MultiplexedConnection,
+    pub pool: DbPool,
+    pub campaign_remaining: CampaignRemaining,
+    pub platform_api: PlatformApi,
+}
+
+impl<C> Application<C>
+where
+    C: Locked,
+{
+    pub fn new(
+        adapter: Adapter<C>,
+        config: primitives::Config,
+        logger: Logger,
+        redis: MultiplexedConnection,
+        pool: DbPool,
+        campaign_remaining: CampaignRemaining,
+        platform_api: PlatformApi,
+    ) -> Self {
+        Self {
+            adapter,
+            config,
+            logger,
+            redis,
+            pool,
+            campaign_remaining,
+            platform_api,
+        }
+    }
+
+    pub async fn handle_routing(&self, req: Request<Body>) -> Response<Body> {
+        let headers = match cors(&req) {
+            Some(Cors::Simple(headers)) => headers,
+            // if we have a Preflight, just return the response directly
+            Some(Cors::Preflight(response)) => return response,
+            None => Default::default(),
+        };
+
+        let req = match Authenticate.call(req, self).await {
+            Ok(req) => req,
+            Err(error) => return map_response_error(error),
+        };
+
+        let mut response = match (req.uri().path(), req.method()) {
+            ("/cfg", &Method::GET) => get_cfg(req, self).await,
+            (route, _) if route.starts_with("/v5/analytics") => analytics_router(req, self).await,
+            // This is important because it prevents us from doing
+            // expensive regex matching for routes without /channel
+            (path, _) if path.starts_with("/v5/channel") => channels_router(req, self).await,
+            (path, _) if path.starts_with("/v5/campaign") => campaigns_router(req, self).await,
+            _ => Err(ResponseError::NotFound),
+        }
+        .unwrap_or_else(map_response_error);
+
+        // extend the headers with the initial headers we have from CORS (if there are some)
+        response.headers_mut().extend(headers);
+        response
+    }
 }
 
 impl<C: Locked + 'static> Application<C> {
@@ -105,6 +191,24 @@ impl<C: Locked> Clone for Application<C> {
             platform_api: self.platform_api.clone(),
         }
     }
+}
+
+/// Sentry [`Application`] Session
+#[derive(Debug, Clone)]
+pub struct Session {
+    pub ip: Option<String>,
+    pub country: Option<String>,
+    pub referrer_header: Option<String>,
+    pub os: Option<String>,
+}
+
+/// Validated Authentication for the Sentry [`Application`].
+#[derive(Debug, Clone)]
+pub struct Auth {
+    pub era: i64,
+    pub uid: ValidatorId,
+    /// The Chain for which this authentication was validated
+    pub chain: primitives::Chain,
 }
 
 #[cfg(test)]
