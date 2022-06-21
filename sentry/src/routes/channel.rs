@@ -52,6 +52,7 @@ pub async fn channel_list<C: Locked + 'static>(
         skip,
         app.config.channels_find_limit,
         query.validator,
+        &query.chains,
     )
     .await?;
 
@@ -134,7 +135,7 @@ async fn create_or_update_spendable_document<A: Locked>(
     channel_context: &ChainOf<Channel>,
     spender: Address,
 ) -> Result<Spendable, ResponseError> {
-    insert_channel(&pool, channel_context.context).await?;
+    insert_channel(&pool, channel_context).await?;
 
     let deposit = adapter.get_deposit(channel_context, spender).await?;
     let total = UnifiedNum::from_precision(deposit.total, channel_context.token.precision.get());
@@ -711,7 +712,7 @@ mod test {
             ADVERTISER, CREATOR, DUMMY_CAMPAIGN, FOLLOWER, GUARDIAN, IDS, LEADER, LEADER_2,
             PUBLISHER, PUBLISHER_2,
         },
-        BigNum, Deposit, UnifiedMap, ValidatorId,
+        BigNum, ChainId, Deposit, UnifiedMap, ValidatorId,
     };
 
     #[tokio::test]
@@ -827,7 +828,7 @@ mod test {
             .expect("Dummy channel Token should be present in config!")
             .with(DUMMY_CAMPAIGN.channel);
 
-        insert_channel(&app.pool, channel_context.context)
+        insert_channel(&app.pool, &channel_context)
             .await
             .expect("should insert channel");
         let build_request = |channel_context: &ChainOf<Channel>| {
@@ -879,7 +880,12 @@ mod test {
         {
             let mut second_channel = DUMMY_CAMPAIGN.channel;
             second_channel.leader = IDS[&ADVERTISER]; // channel.id() will be different now
-            insert_channel(&app.pool, second_channel)
+            let channel_context = app
+                .config
+                .find_chain_of(second_channel.token)
+                .expect("Dummy channel Token should be present in config!")
+                .with(second_channel);
+            insert_channel(&app.pool, &channel_context)
                 .await
                 .expect("should insert channel");
 
@@ -950,7 +956,7 @@ mod test {
             deposit.clone(),
         );
 
-        insert_channel(&app.pool, channel_context.context)
+        insert_channel(&app.pool, &channel_context)
             .await
             .expect("should insert channel");
 
@@ -1046,9 +1052,15 @@ mod test {
             token: GANACHE_INFO_1337.tokens["Mocked TOKEN 1337"].address,
             nonce: Nonce::from(987_654_321_u32),
         };
-        insert_channel(&app.pool, channel)
+        let channel_context = app
+            .config
+            .find_chain_of(channel.token)
+            .expect("Dummy channel Token should be present in config!")
+            .with(channel);
+        insert_channel(&app.pool, &channel_context)
             .await
             .expect("should insert");
+
         let channel_other_token = Channel {
             leader: IDS[&LEADER],
             follower: IDS[&FOLLOWER],
@@ -1056,7 +1068,12 @@ mod test {
             token: GANACHE_INFO_1.tokens["Mocked TOKEN 1"].address,
             nonce: Nonce::from(987_654_322_u32),
         };
-        insert_channel(&app.pool, channel_other_token)
+        let channel_context = app
+            .config
+            .find_chain_of(channel_other_token.token)
+            .expect("Dummy channel Token should be present in config!")
+            .with(channel_other_token);
+        insert_channel(&app.pool, &channel_context)
             .await
             .expect("should insert");
 
@@ -1067,7 +1084,12 @@ mod test {
             token: GANACHE_INFO_1337.tokens["Mocked TOKEN 1337"].address,
             nonce: Nonce::from(987_654_323_u32),
         };
-        insert_channel(&app.pool, channel_other_leader)
+        let channel_context = app
+            .config
+            .find_chain_of(channel_other_leader.token)
+            .expect("Dummy channel Token should be present in config!")
+            .with(channel_other_leader);
+        insert_channel(&app.pool, &channel_context)
             .await
             .expect("should insert");
 
@@ -1085,6 +1107,7 @@ mod test {
             let query = ChannelListQuery {
                 page: 0,
                 validator: None,
+                chains: vec![],
             };
             let res = channel_list(build_request(query), &app)
                 .await
@@ -1104,6 +1127,7 @@ mod test {
             let query = ChannelListQuery {
                 page: 1,
                 validator: None,
+                chains: vec![],
             };
             let res = channel_list(build_request(query), &app)
                 .await
@@ -1121,6 +1145,7 @@ mod test {
             let query = ChannelListQuery {
                 page: 0,
                 validator: Some(IDS[&LEADER_2]),
+                chains: vec![],
             };
             let res = channel_list(build_request(query), &app)
                 .await
@@ -1141,6 +1166,7 @@ mod test {
             let query = ChannelListQuery {
                 page: 0,
                 validator: Some(IDS[&FOLLOWER]),
+                chains: vec![],
             };
             let res = channel_list(build_request(query), &app)
                 .await
@@ -1160,6 +1186,7 @@ mod test {
             let query = ChannelListQuery {
                 page: 1,
                 validator: Some(IDS[&FOLLOWER]),
+                chains: vec![],
             };
             let res = channel_list(build_request(query), &app)
                 .await
@@ -1175,6 +1202,59 @@ mod test {
                 "There should be 2 pages in total"
             );
         }
+
+        // Test query with different chains
+        {
+            app.config.channels_find_limit = 10; // no need to test pagination, will ease checking results for this case
+
+            let query_1 = ChannelListQuery {
+                page: 0,
+                validator: Some(IDS[&FOLLOWER]),
+                chains: vec![ChainId::new(1)],
+            };
+
+            let res = channel_list(build_request(query_1), &app)
+                .await
+                .expect("should get channels");
+            let channels_list = res_to_channel_list_response(res).await;
+            assert_eq!(
+                channels_list.channels,
+                vec![channel_other_token],
+                "Response returns the correct channel"
+            );
+
+            let query_1337 = ChannelListQuery {
+                page: 0,
+                validator: Some(IDS[&FOLLOWER]),
+                chains: vec![ChainId::new(1337)],
+            };
+
+            let res = channel_list(build_request(query_1337), &app)
+                .await
+                .expect("should get channels");
+            let channels_list = res_to_channel_list_response(res).await;
+            assert_eq!(
+                channels_list.channels,
+                vec![channel, channel_other_leader],
+                "Response returns the correct channel"
+            );
+
+            let query_both_chains = ChannelListQuery {
+                page: 0,
+                validator: Some(IDS[&FOLLOWER]),
+                chains: vec![ChainId::new(1), ChainId::new(1337)],
+            };
+
+            let res = channel_list(build_request(query_both_chains), &app)
+                .await
+                .expect("should get channels");
+            let channels_list = res_to_channel_list_response(res).await;
+            assert_eq!(
+                channels_list.channels,
+                vec![channel, channel_other_token, channel_other_leader],
+                "Response returns the correct channel"
+            );
+        }
     }
 
     #[tokio::test]
@@ -1186,7 +1266,7 @@ mod test {
             .expect("Dummy channel Token should be present in config!")
             .with(DUMMY_CAMPAIGN.channel);
 
-        insert_channel(&app.pool, channel_context.context)
+        insert_channel(&app.pool, &channel_context)
             .await
             .expect("should insert channel");
         insert_campaign(&app.pool, &DUMMY_CAMPAIGN)

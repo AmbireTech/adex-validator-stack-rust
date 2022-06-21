@@ -550,7 +550,10 @@ impl<'de> Deserialize<'de> for DateHour<Utc> {
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Pagination {
+    /// The total amount of pages available for this request
     pub total_pages: u64,
+    /// The current page number returned from this request
+    /// First page starts from `0`
     pub page: u64,
 }
 
@@ -637,7 +640,7 @@ pub struct ValidationErrorResponse {
 }
 
 pub mod channel_list {
-    use crate::{Channel, ValidatorId};
+    use crate::{ChainId, Channel, ValidatorId};
     use serde::{Deserialize, Serialize};
 
     use super::Pagination;
@@ -652,11 +655,14 @@ pub mod channel_list {
 
     #[derive(Debug, Serialize, Deserialize)]
     pub struct ChannelListQuery {
+        /// default is `u64::default()` = `0`
         #[serde(default)]
-        // default is `u64::default()` = `0`
         pub page: u64,
-        /// filters the channels containing a specific validator if provided
+        /// Returns only the [`Channel`]s containing a specified validator if provided.
         pub validator: Option<ValidatorId>,
+        /// Returns only the Channels from the specified [`ChainId`]s.
+        #[serde(default)]
+        pub chains: Vec<ChainId>,
     }
 }
 
@@ -677,15 +683,15 @@ pub mod campaign_list {
 
     #[derive(Debug, Serialize, Deserialize, PartialEq)]
     pub struct CampaignListQuery {
+        /// default is `u64::default()` = `0`
         #[serde(default)]
-        // default is `u64::default()` = `0`
         pub page: u64,
         /// filters the list on `active.to >= active_to_ge`
         /// It should be the same timestamp format as the `Campaign.active.to`: **seconds**
         #[serde(with = "ts_seconds", default = "Utc::now", rename = "activeTo")]
         pub active_to_ge: DateTime<Utc>,
         pub creator: Option<Address>,
-        /// filters the campaigns containing a specific validator if provided
+        /// Returns only the [`Campaign`]s containing a specified validator if provided.
         #[serde(flatten)]
         pub validator: Option<ValidatorParam>,
     }

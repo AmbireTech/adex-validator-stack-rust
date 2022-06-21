@@ -185,8 +185,9 @@ pub async fn spend_amount(
 
 #[cfg(test)]
 mod test {
-    use primitives::test_util::{
-        ADVERTISER, ADVERTISER_2, CREATOR, DUMMY_CAMPAIGN, PUBLISHER, PUBLISHER_2,
+    use primitives::{
+        config::GANACHE_CONFIG,
+        test_util::{ADVERTISER, ADVERTISER_2, CREATOR, DUMMY_CAMPAIGN, PUBLISHER, PUBLISHER_2},
     };
 
     use crate::db::{
@@ -203,8 +204,14 @@ mod test {
         setup_test_migrations(database.pool.clone())
             .await
             .expect("Migrations should succeed");
+
+        let channel_chain = GANACHE_CONFIG
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect("Channel token should be whitelisted in config!");
+        let channel_context = channel_chain.with_channel(DUMMY_CAMPAIGN.channel);
+
         // insert the channel into the DB
-        let channel = insert_channel(&database.pool, DUMMY_CAMPAIGN.channel)
+        let channel = insert_channel(&database.pool, &channel_context)
             .await
             .expect("Should insert");
 
@@ -399,8 +406,13 @@ mod test {
             .await
             .expect("Migrations should succeed");
 
+        let channel_chain = GANACHE_CONFIG
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect("Channel token should be whitelisted in config!");
+        let channel_context = channel_chain.with_channel(DUMMY_CAMPAIGN.channel);
+
         // insert the channel into the DB
-        let channel = insert_channel(&database.pool, DUMMY_CAMPAIGN.channel)
+        let channel = insert_channel(&database.pool, &channel_context)
             .await
             .expect("Should insert");
 
@@ -486,8 +498,13 @@ mod test {
             .await
             .expect("Migrations should succeed");
 
+        let channel_chain = GANACHE_CONFIG
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect("Channel token should be whitelisted in config!");
+        let channel_context = channel_chain.with_channel(DUMMY_CAMPAIGN.channel);
+
         // insert the channel into the DB
-        let channel = insert_channel(&database.pool, DUMMY_CAMPAIGN.channel)
+        let channel = insert_channel(&database.pool, &channel_context)
             .await
             .expect("Should insert");
 

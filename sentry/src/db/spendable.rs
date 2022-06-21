@@ -117,6 +117,7 @@ mod test {
     use std::collections::HashMap;
 
     use primitives::{
+        config::GANACHE_CONFIG,
         spender::Spendable,
         test_util::DUMMY_CAMPAIGN,
         test_util::{ADVERTISER, CREATOR, FOLLOWER, GUARDIAN, GUARDIAN_2, PUBLISHER},
@@ -148,7 +149,11 @@ mod test {
             },
         };
 
-        insert_channel(&database.pool, spendable.channel)
+        let channel_chain = GANACHE_CONFIG
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect("Channel token should be whitelisted in config!");
+        let channel_context = channel_chain.with_channel(spendable.channel);
+        insert_channel(&database.pool, &channel_context)
             .await
             .expect("Should insert Channel before creating spendable");
 
@@ -190,8 +195,12 @@ mod test {
             .expect("Migrations should succeed");
 
         let channel = DUMMY_CAMPAIGN.channel;
+        let channel_chain = GANACHE_CONFIG
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect("Channel token should be whitelisted in config!");
+        let channel_context = channel_chain.with_channel(channel);
 
-        insert_channel(&database, channel)
+        insert_channel(&database, &channel_context)
             .await
             .expect("Should insert");
 
@@ -233,8 +242,12 @@ mod test {
             .expect("Migrations should succeed");
 
         let channel = DUMMY_CAMPAIGN.channel;
+        let channel_chain = GANACHE_CONFIG
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect("Channel token should be whitelisted in config!");
+        let channel_context = channel_chain.with_channel(channel);
 
-        insert_channel(&database, channel)
+        insert_channel(&database, &channel_context)
             .await
             .expect("Should insert");
 

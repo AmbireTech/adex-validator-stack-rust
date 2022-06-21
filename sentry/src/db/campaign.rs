@@ -579,6 +579,7 @@ mod test {
     use primitives::{
         campaign,
         campaign::Validators,
+        config::GANACHE_CONFIG,
         event_submission::{RateLimit, Rule},
         sentry::{campaign_modify::ModifyCampaign, CLICK, IMPRESSION},
         targeting::Rules,
@@ -603,8 +604,13 @@ mod test {
 
         let campaign = DUMMY_CAMPAIGN.clone();
 
+        let channel_chain = GANACHE_CONFIG
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect("Channel token should be whitelisted in config!");
+        let channel_context = channel_chain.with_channel(DUMMY_CAMPAIGN.channel);
+
         // insert the channel into the DB
-        let _channel = insert_channel(&database.pool, DUMMY_CAMPAIGN.channel)
+        let _channel = insert_channel(&database.pool, &channel_context)
             .await
             .expect("Should insert");
 
@@ -699,10 +705,17 @@ mod test {
         let mut channel_with_different_leader = DUMMY_CAMPAIGN.channel;
         channel_with_different_leader.leader = IDS[&ADVERTISER_2];
 
-        insert_channel(&database, DUMMY_CAMPAIGN.channel)
+        let channel_chain = GANACHE_CONFIG
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect("Channel token should be whitelisted in config!");
+        let channel_context = channel_chain.clone().with_channel(DUMMY_CAMPAIGN.channel);
+        let channel_context_different_leader =
+            channel_chain.with_channel(channel_with_different_leader);
+
+        insert_channel(&database, &channel_context)
             .await
             .expect("Should insert");
-        insert_channel(&database, channel_with_different_leader)
+        insert_channel(&database, &channel_context_different_leader)
             .await
             .expect("Should insert");
 
