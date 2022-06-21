@@ -16,7 +16,11 @@ pub trait Locked: Sync + Send {
     /// Get Adapter whoami
     fn whoami(&self) -> ValidatorId;
 
-    /// Verify, based on the signature & state_root, that the signer is the same
+    /// Verify, based on the `signature` & `state_root`, that the `signer` is the same.
+    ///
+    /// `signature` should be a `0x` prefixed hex string.
+    ///
+    /// `state_root` should be a hex string, with no `0x` prefix.
     fn verify(
         &self,
         signer: ValidatorId,
