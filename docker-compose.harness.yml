@@ -12,6 +12,9 @@ services:
       POSTGRES_HOST: 'localhost'
       POSTGRES_USER: 'postgres'
       POSTGRES_PASSWORD: 'postgres'
+      # harness_* databases are used by the `test_harness` crate for testing
+      # `sentry_leader` is the default database used by `sentry` for running tests
+      # `primitives` is used for running tests in the `primitives` crate
       POSTGRES_MULTIPLE_DATABASES: harness_leader,harness_follower,sentry_leader,primitives
     networks:
       - adex-external
