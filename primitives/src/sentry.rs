@@ -657,6 +657,7 @@ pub mod channel_list {
         pub page: u64,
         /// filters the channels containing a specific validator if provided
         pub validator: Option<ValidatorId>,
+        /// filters the channels by chain_id where the chain id is one of the provided ones
         #[serde(default)]
         pub chains: Vec<ChainId>,
     }

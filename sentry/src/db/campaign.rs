@@ -576,12 +576,12 @@ mod test {
             insert_channel,
             tests_postgres::{setup_test_migrations, DATABASE_POOL},
         },
-        test_util::setup_dummy_app,
     };
     use chrono::TimeZone;
     use primitives::{
         campaign,
         campaign::Validators,
+        config::GANACHE_CONFIG,
         event_submission::{RateLimit, Rule},
         sentry::{campaign_modify::ModifyCampaign, CLICK, IMPRESSION},
         targeting::Rules,
@@ -598,7 +598,6 @@ mod test {
 
     #[tokio::test]
     async fn it_inserts_fetches_and_updates_a_campaign() {
-        let app = setup_dummy_app().await;
         let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
 
         setup_test_migrations(database.pool.clone())
@@ -607,8 +606,7 @@ mod test {
 
         let campaign = DUMMY_CAMPAIGN.clone();
 
-        let channel_chain = app
-            .config
+        let channel_chain = GANACHE_CONFIG
             .find_chain_of(DUMMY_CAMPAIGN.channel.token)
             .expect("Channel token should be whitelisted in config!");
         let channel_context = channel_chain.with_channel(DUMMY_CAMPAIGN.channel);
@@ -700,7 +698,6 @@ mod test {
     #[tokio::test]
     async fn it_lists_campaigns_properly() {
         let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
-        let app = setup_dummy_app().await;
 
         setup_test_migrations(database.pool.clone())
             .await
@@ -710,8 +707,7 @@ mod test {
         let mut channel_with_different_leader = DUMMY_CAMPAIGN.channel;
         channel_with_different_leader.leader = IDS[&ADVERTISER_2];
 
-        let channel_chain = app
-            .config
+        let channel_chain = GANACHE_CONFIG
             .find_chain_of(DUMMY_CAMPAIGN.channel.token)
             .expect("Channel token should be whitelisted in config!");
         let channel_context = channel_chain.clone().with_channel(DUMMY_CAMPAIGN.channel);

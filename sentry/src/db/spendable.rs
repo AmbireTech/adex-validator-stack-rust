@@ -118,6 +118,7 @@ mod test {
 
     use primitives::{
         spender::Spendable,
+        config::GANACHE_CONFIG,
         test_util::DUMMY_CAMPAIGN,
         test_util::{ADVERTISER, CREATOR, FOLLOWER, GUARDIAN, GUARDIAN_2, PUBLISHER},
         Deposit, UnifiedNum,
@@ -127,8 +128,7 @@ mod test {
         db::{
             insert_channel,
             tests_postgres::{setup_test_migrations, DATABASE_POOL},
-        },
-        test_util::setup_dummy_app,
+        }
     };
     use tokio::time::{sleep, Duration};
 
@@ -137,7 +137,6 @@ mod test {
     #[tokio::test]
     async fn it_inserts_and_fetches_and_updates_spendable() {
         let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
-        let app = setup_dummy_app().await;
 
         setup_test_migrations(database.pool.clone())
             .await
@@ -152,8 +151,7 @@ mod test {
             },
         };
 
-        let channel_chain = app
-            .config
+        let channel_chain = GANACHE_CONFIG
             .find_chain_of(DUMMY_CAMPAIGN.channel.token)
             .expect("Channel token should be whitelisted in config!");
         let channel_context = channel_chain.with_channel(spendable.channel);
@@ -193,15 +191,13 @@ mod test {
     #[tokio::test]
     async fn insert_and_get_single_spendable_for_channel() {
         let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
-        let app = setup_dummy_app().await;
 
         setup_test_migrations(database.pool.clone())
             .await
             .expect("Migrations should succeed");
 
         let channel = DUMMY_CAMPAIGN.channel;
-        let channel_chain = app
-            .config
+        let channel_chain = GANACHE_CONFIG
             .find_chain_of(DUMMY_CAMPAIGN.channel.token)
             .expect("Channel token should be whitelisted in config!");
         let channel_context = channel_chain.with_channel(channel);
@@ -242,15 +238,13 @@ mod test {
     #[tokio::test]
     async fn gets_multiple_pages_of_spendables_for_channel() {
         let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
-        let app = setup_dummy_app().await;
 
         setup_test_migrations(database.pool.clone())
             .await
             .expect("Migrations should succeed");
 
         let channel = DUMMY_CAMPAIGN.channel;
-        let channel_chain = app
-            .config
+        let channel_chain = GANACHE_CONFIG
             .find_chain_of(DUMMY_CAMPAIGN.channel.token)
             .expect("Channel token should be whitelisted in config!");
         let channel_context = channel_chain.with_channel(channel);

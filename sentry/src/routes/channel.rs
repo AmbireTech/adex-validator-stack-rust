@@ -31,9 +31,6 @@ use primitives::{
 use slog::{error, Logger};
 use std::{collections::HashMap, str::FromStr};
 
-// TODO:
-// 4. Fix failing tests
-// 5. Add new tests for separate chains
 
 /// `GET /v5/channel/list` request
 ///
@@ -51,7 +48,7 @@ pub async fn channel_list<C: Locked + 'static>(
         .ok_or_else(|| ResponseError::BadRequest("Page and/or limit is too large".into()))?;
 
     let list_response =
-        list_channels(&app.pool, skip, app.config.channels_find_limit, &query).await?;
+        list_channels(&app.pool, skip, app.config.channels_find_limit, query.validator, &query.chains).await?;
 
     Ok(success_response(serde_json::to_string(&list_response)?))
 }
@@ -705,7 +702,7 @@ mod test {
             ADVERTISER, CREATOR, DUMMY_CAMPAIGN, FOLLOWER, GUARDIAN, IDS, LEADER, LEADER_2,
             PUBLISHER, PUBLISHER_2,
         },
-        BigNum, Deposit, UnifiedMap, ValidatorId,
+        BigNum, Deposit, UnifiedMap, ValidatorId, ChainId
     };
 
     #[tokio::test]
@@ -877,7 +874,7 @@ mod test {
                 .config
                 .find_chain_of(second_channel.token)
                 .expect("Dummy channel Token should be present in config!")
-                .with(DUMMY_CAMPAIGN.channel);
+                .with(second_channel);
             insert_channel(&app.pool, &channel_context)
                 .await
                 .expect("should insert channel");
@@ -1195,7 +1192,60 @@ mod test {
                 "There should be 2 pages in total"
             );
         }
-    }
+
+        // Test query with different chains
+        {
+            app.config.channels_find_limit = 10; // no need to test pagination, will ease checking results for this case
+
+            let query_1 = ChannelListQuery {
+                page: 0,
+                validator: Some(IDS[&FOLLOWER]),
+                chains: vec![ChainId::new(1)],
+            };
+
+            let res = channel_list(build_request(query_1), &app)
+                .await
+                .expect("should get channels");
+            let channels_list = res_to_channel_list_response(res).await;
+            assert_eq!(
+                channels_list.channels,
+                vec![channel_other_token],
+                "Response returns the correct channel"
+            );
+
+            let query_1337 = ChannelListQuery {
+                page: 0,
+                validator: Some(IDS[&FOLLOWER]),
+                chains: vec![ChainId::new(1337)],
+            };
+
+            let res = channel_list(build_request(query_1337), &app)
+                .await
+                .expect("should get channels");
+            let channels_list = res_to_channel_list_response(res).await;
+            assert_eq!(
+                channels_list.channels,
+                vec![channel, channel_other_leader],
+                "Response returns the correct channel"
+            );
+
+            let query_both_chains = ChannelListQuery {
+                page: 0,
+                validator: Some(IDS[&FOLLOWER]),
+                chains: vec![ChainId::new(1), ChainId::new(1337)],
+            };
+
+            let res = channel_list(build_request(query_both_chains), &app)
+                .await
+                .expect("should get channels");
+            let channels_list = res_to_channel_list_response(res).await;
+            assert_eq!(
+                channels_list.channels,
+                vec![channel, channel_other_token, channel_other_leader],
+                "Response returns the correct channel"
+            );
+        }
+}
 
     #[tokio::test]
     async fn payouts_for_earners_test() {
