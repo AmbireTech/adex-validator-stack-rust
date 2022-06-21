@@ -117,18 +117,16 @@ mod test {
     use std::collections::HashMap;
 
     use primitives::{
-        spender::Spendable,
         config::GANACHE_CONFIG,
+        spender::Spendable,
         test_util::DUMMY_CAMPAIGN,
         test_util::{ADVERTISER, CREATOR, FOLLOWER, GUARDIAN, GUARDIAN_2, PUBLISHER},
         Deposit, UnifiedNum,
     };
 
-    use crate::{
-        db::{
-            insert_channel,
-            tests_postgres::{setup_test_migrations, DATABASE_POOL},
-        }
+    use crate::db::{
+        insert_channel,
+        tests_postgres::{setup_test_migrations, DATABASE_POOL},
     };
     use tokio::time::{sleep, Duration};
 

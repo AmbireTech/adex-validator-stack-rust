@@ -571,11 +571,9 @@ mod campaign_remaining {
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        db::{
-            insert_channel,
-            tests_postgres::{setup_test_migrations, DATABASE_POOL},
-        },
+    use crate::db::{
+        insert_channel,
+        tests_postgres::{setup_test_migrations, DATABASE_POOL},
     };
     use chrono::TimeZone;
     use primitives::{

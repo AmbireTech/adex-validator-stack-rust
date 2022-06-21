@@ -64,11 +64,8 @@ pub async fn insert_channel(
 
 mod list_channels {
     use primitives::{
-        sentry::{
-            channel_list::ChannelListResponse,
-            Pagination,
-        },
-        Channel, ChainId, ValidatorId,
+        sentry::{channel_list::ChannelListResponse, Pagination},
+        ChainId, Channel, ValidatorId,
     };
 
     use crate::db::{DbPool, PoolError, TotalCount};
@@ -88,7 +85,7 @@ mod list_channels {
         if !chains.is_empty() {
             where_clauses.push(format!(
                 "chain_id IN ({})",
-            chains
+                chains
                     .iter()
                     .map(|id| id.to_u32().to_string())
                     .collect::<Vec<String>>()
@@ -193,13 +190,11 @@ mod list_channels {
 
 #[cfg(test)]
 mod test {
-    use primitives::{test_util::DUMMY_CAMPAIGN, config::GANACHE_CONFIG};
+    use primitives::{config::GANACHE_CONFIG, test_util::DUMMY_CAMPAIGN};
 
-    use crate::{
-        db::{
-            insert_channel,
-            tests_postgres::{setup_test_migrations, DATABASE_POOL},
-        },
+    use crate::db::{
+        insert_channel,
+        tests_postgres::{setup_test_migrations, DATABASE_POOL},
     };
 
     use super::list_channels::list_channels;
@@ -231,9 +226,15 @@ mod test {
             only_select
         };
 
-        let response = list_channels(&database.pool, 0, 10, None, &[channel_context.chain.chain_id])
-            .await
-            .expect("Should list Channels");
+        let response = list_channels(
+            &database.pool,
+            0,
+            10,
+            None,
+            &[channel_context.chain.chain_id],
+        )
+        .await
+        .expect("Should list Channels");
 
         assert_eq!(1, response.channels.len());
         assert_eq!(DUMMY_CAMPAIGN.channel, actual_channel);

@@ -185,15 +185,14 @@ pub async fn spend_amount(
 
 #[cfg(test)]
 mod test {
-    use primitives::{test_util::{
-        ADVERTISER, ADVERTISER_2, CREATOR, DUMMY_CAMPAIGN, PUBLISHER, PUBLISHER_2,
-    }, config::GANACHE_CONFIG};
+    use primitives::{
+        config::GANACHE_CONFIG,
+        test_util::{ADVERTISER, ADVERTISER_2, CREATOR, DUMMY_CAMPAIGN, PUBLISHER, PUBLISHER_2},
+    };
 
-    use crate::{
-        db::{
-            insert_channel,
-            tests_postgres::{setup_test_migrations, DATABASE_POOL},
-        },
+    use crate::db::{
+        insert_channel,
+        tests_postgres::{setup_test_migrations, DATABASE_POOL},
     };
 
     use super::*;

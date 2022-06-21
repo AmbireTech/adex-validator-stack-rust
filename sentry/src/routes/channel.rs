@@ -31,7 +31,6 @@ use primitives::{
 use slog::{error, Logger};
 use std::{collections::HashMap, str::FromStr};
 
-
 /// `GET /v5/channel/list` request
 ///
 /// Query: [`ChannelListQuery`]
@@ -47,8 +46,14 @@ pub async fn channel_list<C: Locked + 'static>(
         .checked_mul(app.config.channels_find_limit.into())
         .ok_or_else(|| ResponseError::BadRequest("Page and/or limit is too large".into()))?;
 
-    let list_response =
-        list_channels(&app.pool, skip, app.config.channels_find_limit, query.validator, &query.chains).await?;
+    let list_response = list_channels(
+        &app.pool,
+        skip,
+        app.config.channels_find_limit,
+        query.validator,
+        &query.chains,
+    )
+    .await?;
 
     Ok(success_response(serde_json::to_string(&list_response)?))
 }
@@ -702,7 +707,7 @@ mod test {
             ADVERTISER, CREATOR, DUMMY_CAMPAIGN, FOLLOWER, GUARDIAN, IDS, LEADER, LEADER_2,
             PUBLISHER, PUBLISHER_2,
         },
-        BigNum, Deposit, UnifiedMap, ValidatorId, ChainId
+        BigNum, ChainId, Deposit, UnifiedMap, ValidatorId,
     };
 
     #[tokio::test]
@@ -1245,7 +1250,7 @@ mod test {
                 "Response returns the correct channel"
             );
         }
-}
+    }
 
     #[tokio::test]
     async fn payouts_for_earners_test() {
