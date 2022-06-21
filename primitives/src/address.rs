@@ -31,6 +31,20 @@ impl Address {
     pub fn from_bytes(bytes: &[u8; 20]) -> Self {
         Self(*bytes)
     }
+
+    /// Creates an address from a bytes slice.
+    ///
+    /// Returns `None` if bytes length != 20
+    pub fn from_slice(slice: &[u8]) -> Option<Self> {
+        if slice.len() != 20 {
+            None
+        } else {
+            let mut address = [0u8; 20];
+            address.copy_from_slice(slice);
+
+            Some(Self(address))
+        }
+    }
 }
 
 impl Serialize for Address {

@@ -37,8 +37,7 @@ pub enum Error {
     #[error("Keystore: {0}")]
     Keystore(#[from] KeystoreError),
     #[error("Wallet unlocking: {0}")]
-    /// Since [`ethstore::Error`] is not [`Sync`] we must use a [`String`] instead.
-    WalletUnlock(String),
+    WalletUnlock(#[from] ethsign::Error),
     #[error("Web3: {0}")]
     Web3(#[from] web3::Error),
     /// When the ChannelId that we get from hashing the EthereumChannel with the contract address
@@ -82,13 +81,16 @@ pub enum Error {
 /// (signer, state_root, signature) **doesn't align**.
 pub enum VerifyError {
     #[error("Recovering the public key from the signature: {0}")]
-    PublicKeyRecovery(#[from] ethstore::ethkey::Error),
+    /// `secp256k1` error
+    PublicKeyRecovery(String),
     #[error("Decoding state root: {0}")]
     StateRootDecoding(#[source] hex::FromHexError),
     #[error("Decoding signature: {0}")]
     SignatureDecoding(#[source] hex::FromHexError),
     #[error("Signature is not prefixed with `0x`")]
     SignatureNotPrefixed,
+    #[error("Signature length or V component of the Signature was incorrect")]
+    SignatureInvalid,
 }
 
 #[derive(Debug, Error)]
@@ -97,8 +99,8 @@ pub enum KeystoreError {
     #[error("\"address\" key missing in keystore file")]
     AddressMissing,
     /// The `address` key in the keystore file is not a valid `ValidatorId`
-    #[error("\"address\" is invalid: {0}")]
-    AddressInvalid(#[source] primitives::address::Error),
+    #[error("\"address\" length should be 20 bytes")]
+    AddressLength,
     /// reading the keystore file failed
     #[error("Reading keystore file: {0}")]
     ReadingFile(#[source] std::io::Error),
@@ -113,7 +115,8 @@ pub enum EwtSigningError {
     HeaderSerialization(#[source] serde_json::Error),
     #[error("Payload serialization: {0}")]
     PayloadSerialization(#[source] serde_json::Error),
-    /// Since [`ethstore::Error`] is not [`Sync`] we must use a [`String`] instead.
+    /// we must use a [`String`] since [`ethsign`] does not export the error from
+    /// the `secp256k1` crate which is returned in the [`ethsign::SecretKey::sign()`] method.
     #[error("Signing message: {0}")]
     SigningMessage(String),
     #[error("Decoding hex of Signature: {0}")]
@@ -128,13 +131,15 @@ pub enum EwtVerifyError {
     InvalidTokenLength,
     #[error("The token does not comply to the format of header.payload.signature")]
     InvalidToken,
+    /// We use a `String` because [`ethsign::Signature::recover()`] returns `secp256k1` error
+    /// which is not exported in `ethsign`.
     #[error("Address recovery: {0}")]
-    AddressRecovery(#[from] ethstore::ethkey::Error),
+    AddressRecovery(String),
     #[error("Signature decoding: {0}")]
     SignatureDecoding(#[source] base64::DecodeError),
-    /// When token is decoded but creating a Signature results in empty Signature.
-    /// Signature is encoded as RSV (V in "Electrum" notation)
-    /// See [`Signature::from_electrum`]
+    /// If there is no suffix in the signature for the mode
+    /// or if Signature length is not 65 bytes
+    /// or if Signature V component is not in "Electrum" notation (`< 27`).
     #[error("Error when decoding token signature")]
     InvalidSignature,
     #[error("Payload decoding: {0}")]
