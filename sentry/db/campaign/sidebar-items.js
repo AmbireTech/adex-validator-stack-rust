@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["fetch_campaign",""],["get_campaign_ids_by_channel",""],["insert_campaign",""],["list_campaigns",""],["list_campaigns_total_count",""],["units_for_slot_get_campaigns",""],["update_campaign",""]],"struct":[["CampaignRemaining",""]]});

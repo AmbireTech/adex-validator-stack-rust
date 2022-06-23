@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Error",""],["ParseError","Errors that can occur during parsing."]],"struct":[["ApiUrl","A safe Url to use in REST API calls."]]});

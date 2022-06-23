@@ -1,0 +1,1 @@
+initSidebarItems({"static":[["DUMMY_CHAIN","The Dummy Chain to be used with this adapter The Chain is not applicable to the adapter, however, it is required for applications because of the `authentication` & [`Channel`] interactions."]],"struct":[["Deposits",""],["Dummy","Dummy adapter implementation intended for testing."],["Options",""]],"type":[["Adapter",""]]});

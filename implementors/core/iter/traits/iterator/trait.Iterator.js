@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["primitives"] = [{"text":"impl&lt;'a&gt; <a class=\"trait\" href=\"https://doc.rust-lang.org/1.61.0/core/iter/traits/iterator/trait.Iterator.html\" title=\"trait core::iter::traits::iterator::Iterator\">Iterator</a> for <a class=\"struct\" href=\"primitives/campaign/validators/struct.Iter.html\" title=\"struct primitives::campaign::validators::Iter\">Iter</a>&lt;'a&gt;","synthetic":false,"types":["primitives::campaign::validators::Iter"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

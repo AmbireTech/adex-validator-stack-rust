@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["prefix_active",""],["validators","Campaign Validators"]],"struct":[["Active",""],["Campaign",""],["CampaignId","an Id of 16 bytes, (de)serialized as a `0x` prefixed hex"],["Pricing",""],["PricingBounds",""]]});

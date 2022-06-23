@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["CreateCampaign","All fields are present except the `CampaignId` which is randomly created This struct defines the Body of the request (in JSON)"]]});

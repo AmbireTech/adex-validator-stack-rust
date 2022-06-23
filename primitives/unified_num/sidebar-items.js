@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["UnifiedNum","Unified Number with a precision of 8 digits after the decimal point."]],"trait":[["FromWhole","Helper trait for handling the creation of special numbers from a whole number"]]});

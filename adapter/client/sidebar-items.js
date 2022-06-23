@@ -1,0 +1,1 @@
+initSidebarItems({"trait":[["Locked","Available methods for Locked clients."],["Unlockable","A client that can be `unlock()`ed and implements both [`Locked`] & [`Unlocked`]."],["Unlocked","Available methods for Unlocked clients."]]});

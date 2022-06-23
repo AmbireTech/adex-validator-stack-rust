@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Validator",""]],"mod":[["messages","Validator Message Types"],["postgres",""]],"struct":[["ValidatorDesc","A Validator description which includes the identity, fee (pro milles) and the Sentry URL."],["ValidatorId",""]]});

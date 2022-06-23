@@ -1,0 +1,1 @@
+window.ALL_CRATES = ["adapter","adview_manager","adview_serve","primitives","sentry","test_harness","validator_worker"];

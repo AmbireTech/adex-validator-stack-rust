@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["get_analytics","`GET /v5/analytics` request with query parameters: [`primitives::analytics::AnalyticsQuery`]."],["get_cfg","`GET /cfg` request"]],"mod":[["campaign","`/v5/campaign` routes"],["channel","`/v5/channel` routes"],["routers","This module contains all the Sentry REST API routers."]]});

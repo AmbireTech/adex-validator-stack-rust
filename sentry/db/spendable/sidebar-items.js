@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["fetch_spendable",""],["get_all_spendables_for_channel",""],["insert_spendable",""],["update_spendable",""]]});
