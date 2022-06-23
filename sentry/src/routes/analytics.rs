@@ -3,7 +3,11 @@
 
 use std::collections::HashSet;
 
-use crate::{db::analytics::get_analytics, success_response, Application, Auth, ResponseError};
+use crate::{
+    db::analytics::get_analytics,
+    response::{success_response, ResponseError},
+    Application, Auth,
+};
 use adapter::client::Locked;
 use hyper::{Body, Request, Response};
 use primitives::analytics::{

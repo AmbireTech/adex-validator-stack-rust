@@ -10,7 +10,8 @@ use crate::{
         spendable::update_spendable,
         CampaignRemaining, DbPool, RedisError,
     },
-    success_response, Application, Auth, ResponseError,
+    response::{success_response, ResponseError},
+    Application, Auth,
 };
 use adapter::{prelude::*, Adapter, Error as AdaptorError};
 use deadpool_postgres::PoolError;
@@ -172,9 +173,18 @@ where
         ));
     }
 
+    let channel_context = app
+        .config
+        .find_chain_of(campaign.channel.token)
+        .ok_or_else(|| {
+            ResponseError::FailedValidation(
+                "Channel token is not whitelisted in this validator".into(),
+            )
+        })?
+        .with_channel(campaign.channel);
     // make sure that the Channel is available in the DB
     // insert Channel
-    insert_channel(&app.pool, campaign.channel)
+    insert_channel(&app.pool, &channel_context)
         .await
         .map_err(|error| {
             error!(&app.logger, "{}", &error; "module" => "create_campaign");
@@ -573,8 +583,9 @@ pub mod insert_events {
         analytics,
         db::{accounting::spend_amount, CampaignRemaining, DbPool, PoolError, RedisError},
         payout::get_payout,
+        response::ResponseError,
         spender::fee::calculate_fee,
-        Application, Auth, ResponseError, Session,
+        Application, Auth, Session,
     };
     use adapter::prelude::*;
     use hyper::{Body, Request, Response};
@@ -809,10 +820,13 @@ pub mod insert_events {
         };
         use redis::aio::MultiplexedConnection;
 
-        use crate::db::{
-            insert_channel,
-            redis_pool::TESTS_POOL,
-            tests_postgres::{setup_test_migrations, DATABASE_POOL},
+        use crate::{
+            db::{
+                insert_channel,
+                redis_pool::TESTS_POOL,
+                tests_postgres::{setup_test_migrations, DATABASE_POOL},
+            },
+            test_util::setup_dummy_app,
         };
 
         use super::*;
@@ -906,15 +920,21 @@ pub mod insert_events {
             let mut redis = TESTS_POOL.get().await.expect("Should get redis connection");
             let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
             let campaign_remaining = CampaignRemaining::new(redis.connection.clone());
+            let app = setup_dummy_app().await;
 
             setup_test_migrations(database.pool.clone())
                 .await
                 .expect("Migrations should succeed");
 
             let campaign = DUMMY_CAMPAIGN.clone();
+            let channel_chain = app
+                .config
+                .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+                .expect("Channel token should be whitelisted in config!");
+            let channel_context = channel_chain.with_channel(DUMMY_CAMPAIGN.channel);
 
             // make sure that the Channel is created in Database for the Accounting to work properly
-            insert_channel(&database.pool, campaign.channel)
+            insert_channel(&database.pool, &channel_context)
                 .await
                 .expect("It should insert Channel");
 
@@ -993,12 +1013,13 @@ pub mod insert_events {
 #[cfg(test)]
 mod test {
     use super::{
-        update_campaign::{get_delta_budget, modify_campaign},
+        update_campaign::{get_delta_budget, modify_campaign, DeltaBudget},
         *,
     };
-    use crate::db::{fetch_campaign, redis_pool::TESTS_POOL};
-    use crate::test_util::setup_dummy_app;
-    use crate::update_campaign::DeltaBudget;
+    use crate::{
+        db::{fetch_campaign, redis_pool::TESTS_POOL},
+        test_util::setup_dummy_app,
+    };
     use adapter::primitives::Deposit;
     use chrono::{TimeZone, Utc};
     use hyper::StatusCode;
@@ -1359,7 +1380,13 @@ mod test {
 
         let app = setup_dummy_app().await;
 
-        insert_channel(&app.pool, campaign.channel)
+        let channel_chain = app
+            .config
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect("Channel token should be whitelisted in config!");
+        let channel_context = channel_chain.with_channel(DUMMY_CAMPAIGN.channel);
+
+        insert_channel(&app.pool, &channel_context)
             .await
             .expect("Should insert dummy channel");
         insert_campaign(&app.pool, &campaign)
@@ -1507,28 +1534,44 @@ mod test {
         campaign_new_leader_and_follower.validators =
             Validators::new((dummy_leader_2.clone(), dummy_follower_2.clone()));
         campaign_new_leader_and_follower.created = Utc.ymd(2021, 2, 1).and_hms(10, 0, 0);
+        let channel_chain = app
+            .config
+            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+            .expect("Channel token should be whitelisted in config!");
 
-        insert_channel(&app.pool, DUMMY_CAMPAIGN.channel)
-            .await
-            .expect("Should insert dummy channel");
+        insert_channel(
+            &app.pool,
+            &channel_chain.clone().with_channel(DUMMY_CAMPAIGN.channel),
+        )
+        .await
+        .expect("Should insert dummy channel");
         insert_campaign(&app.pool, &DUMMY_CAMPAIGN)
             .await
             .expect("Should insert dummy campaign");
-        insert_channel(&app.pool, channel_new_leader)
-            .await
-            .expect("Should insert dummy channel");
+        insert_channel(
+            &app.pool,
+            &channel_chain.clone().with_channel(channel_new_leader),
+        )
+        .await
+        .expect("Should insert dummy channel");
         insert_campaign(&app.pool, &campaign_new_leader)
             .await
             .expect("Should insert dummy campaign");
-        insert_channel(&app.pool, channel_new_follower)
-            .await
-            .expect("Should insert dummy channel");
+        insert_channel(
+            &app.pool,
+            &channel_chain.clone().with_channel(channel_new_follower),
+        )
+        .await
+        .expect("Should insert dummy channel");
         insert_campaign(&app.pool, &campaign_new_follower)
             .await
             .expect("Should insert dummy campaign");
-        insert_channel(&app.pool, channel_new_leader_and_follower)
-            .await
-            .expect("Should insert dummy channel");
+        insert_channel(
+            &app.pool,
+            &channel_chain.with_channel(channel_new_leader_and_follower),
+        )
+        .await
+        .expect("Should insert dummy channel");
         insert_campaign(&app.pool, &campaign_new_leader_and_follower)
             .await
             .expect("Should insert dummy campaign");

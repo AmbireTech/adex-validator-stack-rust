@@ -19,6 +19,9 @@ FROM ubuntu:20.04
 
 RUN apt update && apt-get install -y libssl-dev ca-certificates
 
+# `production` or `development` - default: `development`
+ENV ENV=
+
 # `ethereum` or `dummy`
 ENV ADAPTER=
 

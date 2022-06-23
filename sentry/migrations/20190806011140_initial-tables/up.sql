@@ -6,6 +6,7 @@ CREATE TABLE channels (
     token varchar(42) NOT NULL,
     -- Using varchar for U256 for simplicity
     nonce varchar(78) NOT NULL,
+    chain_id integer NOT NULL,
     -- In order to be able to order the channels for the `GET channel` request
     created timestamp(2) with time zone NOT NULL,
     -- Do not rename the Primary key constraint (`channels_pkey`)!

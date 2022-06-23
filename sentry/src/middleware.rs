@@ -1,10 +1,9 @@
-//! This module contains all the routers
+//! This module contains all the routers' middlewares
 //!
-//! # Middleware
-//!
+
 use std::fmt::Debug;
 
-use crate::{Application, ResponseError};
+use crate::{response::ResponseError, Application};
 use adapter::client::Locked;
 use hyper::{Body, Request};
 

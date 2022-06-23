@@ -45,6 +45,16 @@ FROM ubuntu:20.04
 
 RUN apt update && apt-get install -y libssl-dev ca-certificates
 
+# `production` or `development` - default: `development`
+ENV ENV=
+
+# Redis URL - default: `redis://127.0.0.1:6379`
+ENV READIS_URL=
+# The IP address on which the sentry server will be listening - default: `0.0.0.0`
+ENV IP_ADDR=
+# The Port on which the sentry server will be listening - default: `8005`
+ENV PORT=
+
 # `ethereum` or `dummy`
 ENV ADAPTER=
 

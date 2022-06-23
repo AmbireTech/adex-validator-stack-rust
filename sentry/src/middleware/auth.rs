@@ -8,7 +8,7 @@ use redis::aio::MultiplexedConnection;
 use adapter::{prelude::*, primitives::Session as AdapterSession, Adapter};
 use primitives::ValidatorId;
 
-use crate::{middleware::Middleware, Application, Auth, ResponseError, Session};
+use crate::{middleware::Middleware, response::ResponseError, Application, Auth, Session};
 
 #[derive(Debug)]
 pub struct Authenticate;
@@ -150,7 +150,10 @@ fn get_request_ip(req: &Request<Body>) -> Option<String> {
 
 #[cfg(test)]
 mod test {
-    use adapter::dummy::{Dummy, Options};
+    use adapter::{
+        dummy::{Dummy, Options},
+        Adapter,
+    };
     use hyper::Request;
     use primitives::{
         test_util::IDS,
@@ -166,7 +169,7 @@ mod test {
 
     use super::*;
 
-    async fn setup() -> (crate::Adapter<Dummy>, Object<Manager>) {
+    async fn setup() -> (Adapter<Dummy>, Object<Manager>) {
         let connection = TESTS_POOL.get().await.expect("Should return Object");
         let adapter_options = Options {
             dummy_identity: IDS[&LEADER],

@@ -94,7 +94,7 @@ pub static SNAPSHOT_CONTRACTS_1: Lazy<Contracts> = Lazy::new(|| {
 pub struct TestValidator {
     pub address: Address,
     pub keystore: Options,
-    pub sentry_config: sentry::application::Config,
+    pub sentry_config: sentry::application::EnvConfig,
     /// Sentry REST API url
     pub sentry_url: ApiUrl,
     /// Used for the _Sentry REST API_ [`sentry::Application`] as well as the _Validator worker_ [`validator_worker::Worker`]
@@ -118,7 +118,7 @@ pub static VALIDATORS: Lazy<HashMap<Address, TestValidator>> = Lazy::new(|| {
             TestValidator {
                 address: *LEADER,
                 keystore: KEYSTORES[&LEADER].clone(),
-                sentry_config: sentry::application::Config {
+                sentry_config: sentry::application::EnvConfig {
                     env: Environment::Development,
                     port: 8005,
                     ip_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
@@ -136,7 +136,7 @@ pub static VALIDATORS: Lazy<HashMap<Address, TestValidator>> = Lazy::new(|| {
             TestValidator {
                 address: *FOLLOWER,
                 keystore: KEYSTORES[&FOLLOWER].clone(),
-                sentry_config: sentry::application::Config {
+                sentry_config: sentry::application::EnvConfig {
                     env: Environment::Development,
                     port: 8006,
                     ip_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),

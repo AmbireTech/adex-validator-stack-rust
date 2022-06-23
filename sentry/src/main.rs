@@ -51,7 +51,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .get_matches();
 
-    let env_config = sentry::application::Config::from_env()?;
+    let env_config = sentry::application::EnvConfig::from_env()?;
 
     let socket_addr: SocketAddr = (env_config.ip_addr, env_config.port).into();
 

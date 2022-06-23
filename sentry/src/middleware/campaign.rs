@@ -1,5 +1,5 @@
 use crate::{db::fetch_campaign, middleware::Middleware};
-use crate::{Application, Auth, ResponseError, RouteParams};
+use crate::{response::ResponseError, routes::routers::RouteParams, Application, Auth};
 use adapter::client::Locked;
 use async_trait::async_trait;
 use hyper::{Body, Request};
@@ -137,8 +137,13 @@ mod test {
 
         // existing Campaign
         {
+            let channel_chain = app
+                .config
+                .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+                .expect("Channel token should be whitelisted in config!");
+            let channel_context = channel_chain.with_channel(DUMMY_CAMPAIGN.channel);
             // insert Channel
-            insert_channel(&app.pool, campaign.channel)
+            insert_channel(&app.pool, &channel_context)
                 .await
                 .expect("Should insert Channel");
             // insert Campaign

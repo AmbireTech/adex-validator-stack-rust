@@ -17,6 +17,7 @@ dependencies = [
 args = ["test", "--release", "--all-features"]
 
 [tasks.ganache-up]
+# `--renew-anon-volumes` is required to make sure that the snapshot used for the `ganache` instances is reloaded.
 script = '''
 docker-compose -f ../docker-compose.harness.yml up --renew-anon-volumes -d ganache-1 ganache-1337 \
 && sleep 10
