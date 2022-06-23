@@ -606,9 +606,8 @@ pub mod validator_message {
         validator_id: &Option<ValidatorId>,
         message_types: &[String],
     ) -> Result<Response<Body>, ResponseError> {
-        let query = serde_qs::from_str::<ValidatorMessagesListQuery>(
-            req.uri().query().unwrap_or(""),
-        )?;
+        let query =
+            serde_qs::from_str::<ValidatorMessagesListQuery>(req.uri().query().unwrap_or(""))?;
 
         let channel = req
             .extensions()
