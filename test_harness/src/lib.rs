@@ -259,6 +259,7 @@ mod tests {
         primitives::ChainOf,
         Adapter, Ethereum,
     };
+    use anyhow::Context;
     use chrono::Utc;
     use primitives::{
         analytics::{query::Time, AnalyticsQuery, Metric, Timeframe},
@@ -2786,27 +2787,20 @@ mod tests {
         let endpoint_url = url
             .join(&format!("v5/analytics?{}", query))
             .expect("valid endpoint");
-        let analytics = match token {
-            Some(token) => api_client
-                .get(endpoint_url)
-                .bearer_auth(&token)
-                .send()
-                .await
-                .expect("failed to get analytics")
-                .json::<Vec<FetchedAnalytics>>()
-                .await
-                .expect("failed to get json"),
-            None => api_client
-                .get(endpoint_url)
-                .send()
-                .await
-                .expect("failed to get analytics")
-                .json::<Vec<FetchedAnalytics>>()
-                .await
-                .expect("failed to get json"),
-        };
 
-        Ok(analytics)
+        let mut request = api_client.get(endpoint_url);
+
+        if let Some(token) = token {
+            request = request.bearer_auth(&token);
+        }
+
+        request
+            .send()
+            .await
+            .context("failed to get analytics")?
+            .json::<Vec<FetchedAnalytics>>()
+            .await
+            .context("failed to deserialize json")
     }
 }
 pub mod run {
