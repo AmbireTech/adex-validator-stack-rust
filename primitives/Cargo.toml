@@ -10,6 +10,10 @@ authors = [
 edition = "2021"
 license = "AGPL-3.0"
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [features]
 postgres = ["bytes", "tokio-postgres", "deadpool-postgres"]
 # Enables the testing utilities like addresses, dummy Campaigns, Validators, IPFSes, AdUnits, etc.
@@ -18,44 +22,41 @@ test-util = []
 
 [dependencies]
 # (De)Serialization
-serde = { version = "^1.0", features = ['derive'] }
+serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 # TODO: Remove once we change `ChannelId` Serialize impl
-serde-hex = "0.1.0"
-serde_millis = "0.1.1"
+serde-hex = "0.1"
+serde_millis = "0.1"
 # Used prefixes on field for targeting::Input, and `campaign::Active`
-serde_with = "1.9"
+serde_with = "1"
 # Configuration
 toml = "0.5"
 # Logging
-slog = { version = "^2.5.2", features = ["max_level_trace"] }
-slog-term = "^2.4.2"
-slog-async = "^2.3.0"
+slog = { version = "2", features = ["max_level_trace"] }
+slog-term = "2"
+slog-async = "2"
 # Domain
-thiserror = "^1.0"
+thiserror = "1"
 chrono = { version = "0.4", features = ["serde"] }
-# time = "0.1.42"
-uuid = { version = "0.8", features = ["v4"] }
+uuid = { version = "1", features = ["v4"] }
 # For encoding the Channel to a ChannelId
-ethabi = "14.0.0"
+ethabi = "17"
 # For the nonce U256
-ethereum-types = "0.11"
+ethereum-types = "0.13"
 # Macro for easier derive of Display & FromStr
-parse-display = "^0.5.0"
+parse-display = "0.5"
 # CID & multihash / multibase
 cid = "0.8"
 hex = "0.4"
-merkletree = "0.10.0"
-tiny-keccak = { version = "^2.0", features = ["keccak"] }
-url = { version = "=2.2", features = ["serde"] }
+merkletree = "0.10"
+tiny-keccak = { version = "2", features = ["keccak"] }
+url = { version = "2", features = ["serde"] }
 # Numbers - BigNum, Numbers, Traits and Derives
 num = { version = "0.4", features = ["serde", "num-bigint"] }
 num-traits = "0.2"
 num-derive = "0.3"
-# Fixtures
-rand = "^0.8"
 # postgres feature
-bytes = { version = "^1", optional = true }
+bytes = { version = "1", optional = true }
 tokio-postgres = { version = "0.7", optional = true, features = [
   "with-chrono-0_4",
   "with-serde_json-1",
@@ -63,17 +64,11 @@ tokio-postgres = { version = "0.7", optional = true, features = [
 # testing FromSql & ToSql implementation of structs
 deadpool-postgres = { version = "0.10", optional = true }
 
-# Futures
-futures = "0.3"
 async-trait = "0.1"
 # Other
-once_cell = "^1.8"
+once_cell = "1"
 
 [dev-dependencies]
 pretty_assertions = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
-serde_qs = "^0.9"
-
-[package.metadata.docs.rs]
-all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+serde_qs = "0.9"
