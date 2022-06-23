@@ -653,7 +653,14 @@ pub mod channel_list {
         pub pagination: Pagination,
     }
 
-    #[derive(Debug, Serialize, Deserialize)]
+    /// `GET /v5/channel/list` query
+    ///
+    /// # Examples
+    ///
+    /// ```
+    #[doc = include_str!("../examples/channel_list_query.rs")]
+    /// ```
+    #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
     pub struct ChannelListQuery {
         /// default is `u64::default()` = `0`
         #[serde(default)]
@@ -681,6 +688,13 @@ pub mod campaign_list {
         pub pagination: Pagination,
     }
 
+    /// `GET /v5/campaign/list` query
+    ///
+    /// # Examples
+    ///
+    /// ```
+    #[doc = include_str!("../examples/campaign_list_query.rs")]
+    /// ```
     #[derive(Debug, Serialize, Deserialize, PartialEq)]
     pub struct CampaignListQuery {
         /// default is `u64::default()` = `0`

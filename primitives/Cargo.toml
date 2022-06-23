@@ -16,6 +16,14 @@ postgres = ["bytes", "tokio-postgres", "deadpool-postgres"]
 # All Addresses and keystore files exist in the ganache-cli setup for testing with the EthereumAdapter
 test-util = []
 
+[[example]]
+name = "channel_list_query"
+required-features = ["test-util"]
+
+[[example]]
+name = "campaign_list_query"
+required-features = ["test-util"]
+
 [dependencies]
 # (De)Serialization
 serde = { version = "^1.0", features = ['derive'] }
