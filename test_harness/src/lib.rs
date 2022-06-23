@@ -2262,7 +2262,7 @@ mod tests {
             let analytics = get_analytics(
                 &api_client,
                 &leader.sentry_url,
-                &get_analytics_query(Metric::Count, IMPRESSION, vec![ChainId::new(1)]),
+                &get_analytics_query(Metric::Count, IMPRESSION, vec![GANACHE_1.chain_id]),
                 None,
             )
             .await
@@ -2278,7 +2278,7 @@ mod tests {
             let analytics = get_analytics(
                 &api_client,
                 &leader.sentry_url,
-                &get_analytics_query(Metric::Paid, IMPRESSION, vec![ChainId::new(1)]),
+                &get_analytics_query(Metric::Paid, IMPRESSION, vec![GANACHE_1.chain_id]),
                 None,
             )
             .await
@@ -2287,14 +2287,14 @@ mod tests {
             assert_eq!(analytics.len(), 1, "There should be only one timeframe");
             assert_eq!(
                 analytics[0].value,
-                FetchedMetric::Paid(UnifiedNum::from_u64(3_000_000)),
+                FetchedMetric::Paid(UnifiedNum::from_whole(0.03)),
                 "Channel Leader has 2 x IMPRESSION (0.015) = 0.03 TOKENs"
             );
 
             let analytics = get_analytics(
                 &api_client,
                 &leader.sentry_url,
-                &get_analytics_query(Metric::Count, CLICK, vec![ChainId::new(1)]),
+                &get_analytics_query(Metric::Count, CLICK, vec![GANACHE_1.chain_id]),
                 None,
             )
             .await
@@ -2310,7 +2310,7 @@ mod tests {
             let analytics = get_analytics(
                 &api_client,
                 &leader.sentry_url,
-                &get_analytics_query(Metric::Paid, CLICK, vec![ChainId::new(1)]),
+                &get_analytics_query(Metric::Paid, CLICK, vec![GANACHE_1.chain_id]),
                 None,
             )
             .await
@@ -2319,7 +2319,7 @@ mod tests {
             assert_eq!(analytics.len(), 1, "There should be only one timeframe");
             assert_eq!(
                 analytics[0].value,
-                FetchedMetric::Paid(UnifiedNum::from_u64(7_000_000)),
+                FetchedMetric::Paid(UnifiedNum::from_whole(0.07)),
                 "Channel Leader has 2 x CLICK (0.035) = 0.07 TOKENs"
             );
 
@@ -2327,7 +2327,7 @@ mod tests {
             let analytics = get_analytics(
                 &api_client,
                 &follower.sentry_url,
-                &get_analytics_query(Metric::Count, IMPRESSION, vec![ChainId::new(1)]),
+                &get_analytics_query(Metric::Count, IMPRESSION, vec![GANACHE_1.chain_id]),
                 None,
             )
             .await
@@ -2343,7 +2343,7 @@ mod tests {
             let analytics = get_analytics(
                 &api_client,
                 &follower.sentry_url,
-                &get_analytics_query(Metric::Paid, IMPRESSION, vec![ChainId::new(1)]),
+                &get_analytics_query(Metric::Paid, IMPRESSION, vec![GANACHE_1.chain_id]),
                 None,
             )
             .await
@@ -2352,14 +2352,14 @@ mod tests {
             assert_eq!(analytics.len(), 1, "There should be only one timeframe");
             assert_eq!(
                 analytics[0].value,
-                FetchedMetric::Paid(UnifiedNum::from_u64(3_000_000)),
+                FetchedMetric::Paid(UnifiedNum::from_whole(0.03)),
                 "Channel Follower has 2 x IMPRESSION (0.015) = 0.03 TOKENs"
             );
 
             let analytics = get_analytics(
                 &api_client,
                 &follower.sentry_url,
-                &get_analytics_query(Metric::Count, CLICK, vec![ChainId::new(1)]),
+                &get_analytics_query(Metric::Count, CLICK, vec![GANACHE_1.chain_id]),
                 None,
             )
             .await
@@ -2375,7 +2375,7 @@ mod tests {
             let analytics = get_analytics(
                 &api_client,
                 &follower.sentry_url,
-                &get_analytics_query(Metric::Paid, CLICK, vec![ChainId::new(1)]),
+                &get_analytics_query(Metric::Paid, CLICK, vec![GANACHE_1.chain_id]),
                 None,
             )
             .await
@@ -2384,7 +2384,7 @@ mod tests {
             assert_eq!(analytics.len(), 1, "There should be only one timeframe");
             assert_eq!(
                 analytics[0].value,
-                FetchedMetric::Paid(UnifiedNum::from_u64(7_000_000)),
+                FetchedMetric::Paid(UnifiedNum::from_whole(0.07)),
                 "Channel Follower has 2 x CLICK (0.035) = 0.07 TOKENs"
             );
         }
@@ -2397,7 +2397,7 @@ mod tests {
                 &get_analytics_query(
                     Metric::Count,
                     IMPRESSION,
-                    vec![ChainId::new(1), ChainId::new(1337)],
+                    vec![GANACHE_1.chain_id, GANACHE_1337.chain_id],
                 ),
                 None,
             )
@@ -2417,7 +2417,7 @@ mod tests {
                 &get_analytics_query(
                     Metric::Paid,
                     IMPRESSION,
-                    vec![ChainId::new(1), ChainId::new(1337)],
+                    vec![GANACHE_1.chain_id, GANACHE_1337.chain_id],
                 ),
                 None,
             )
@@ -2427,7 +2427,7 @@ mod tests {
             assert_eq!(analytics.len(), 1, "There should be only one timeframe");
             assert_eq!(
                 analytics[0].value,
-                FetchedMetric::Paid(UnifiedNum::from_u64(5_07_000_000)),
+                FetchedMetric::Paid(UnifiedNum::from_whole(5.07)),
                 "Channel Leader has 2 x IMPRESSION (0.015) + 1 x IMPRESSION (0.04) + 5 x IMPRESSION (1) = 5.07 TOKENs"
             );
 
@@ -2437,7 +2437,7 @@ mod tests {
                 &get_analytics_query(
                     Metric::Count,
                     CLICK,
-                    vec![ChainId::new(1), ChainId::new(1337)],
+                    vec![GANACHE_1.chain_id, GANACHE_1337.chain_id],
                 ),
                 None,
             )
@@ -2457,7 +2457,7 @@ mod tests {
                 &get_analytics_query(
                     Metric::Paid,
                     CLICK,
-                    vec![ChainId::new(1), ChainId::new(1337)],
+                    vec![GANACHE_1.chain_id, GANACHE_1337.chain_id],
                 ),
                 None,
             )
@@ -2467,7 +2467,7 @@ mod tests {
             assert_eq!(analytics.len(), 1, "There should be only one timeframe");
             assert_eq!(
                 analytics[0].value,
-                FetchedMetric::Paid(UnifiedNum::from_u64(9_13_000_000)),
+                FetchedMetric::Paid(UnifiedNum::from_whole(9.13)),
                 "Channel Leader has 2 x CLICK (0.035) + 1 x CLICK (0.06) + 3 x CLICK (3) = 9.13 TOKENs"
             );
 
@@ -2478,7 +2478,7 @@ mod tests {
                 &get_analytics_query(
                     Metric::Count,
                     IMPRESSION,
-                    vec![ChainId::new(1), ChainId::new(1337)],
+                    vec![GANACHE_1.chain_id, GANACHE_1337.chain_id],
                 ),
                 None,
             )
@@ -2498,7 +2498,7 @@ mod tests {
                 &get_analytics_query(
                     Metric::Paid,
                     IMPRESSION,
-                    vec![ChainId::new(1), ChainId::new(1337)],
+                    vec![GANACHE_1.chain_id, GANACHE_1337.chain_id],
                 ),
                 None,
             )
@@ -2508,7 +2508,7 @@ mod tests {
             assert_eq!(analytics.len(), 1, "There should be only one timeframe");
             assert_eq!(
                 analytics[0].value,
-                FetchedMetric::Paid(UnifiedNum::from_u64(5_07_000_000)),
+                FetchedMetric::Paid(UnifiedNum::from_whole(5.07)),
                 "Channel Follower has 2 x IMPRESSION (0.015) + 1 x IMPRESSION (0.04) + 5 x IMPRESSION (1) = 5.07 TOKENs"
             );
 
@@ -2518,7 +2518,7 @@ mod tests {
                 &get_analytics_query(
                     Metric::Count,
                     CLICK,
-                    vec![ChainId::new(1), ChainId::new(1337)],
+                    vec![GANACHE_1.chain_id, GANACHE_1337.chain_id],
                 ),
                 None,
             )
@@ -2538,7 +2538,7 @@ mod tests {
                 &get_analytics_query(
                     Metric::Paid,
                     CLICK,
-                    vec![ChainId::new(1), ChainId::new(1337)],
+                    vec![GANACHE_1.chain_id, GANACHE_1337.chain_id],
                 ),
                 None,
             )
@@ -2548,7 +2548,7 @@ mod tests {
             assert_eq!(analytics.len(), 1, "There should be only one timeframe");
             assert_eq!(
                 analytics[0].value,
-                FetchedMetric::Paid(UnifiedNum::from_u64(9_13_000_000)),
+                FetchedMetric::Paid(UnifiedNum::from_whole(9.13)),
                 "Channel Follower has 2 x CLICK (0.035) + 1 x CLICK (0.06) + 3 x CLICK (3) = 9.13 TOKENs"
             );
         }
@@ -2591,7 +2591,7 @@ mod tests {
             assert_eq!(analytics.len(), 1, "There should be only one timeframe");
             assert_eq!(
                 analytics[0].value,
-                FetchedMetric::Paid(UnifiedNum::from_u64(3_000_000)),
+                FetchedMetric::Paid(UnifiedNum::from_whole(0.03)),
                 "Channel Leader has 2 x IMPRESSION (0.015) = 0.03 TOKENs"
             );
 
@@ -2623,7 +2623,7 @@ mod tests {
             assert_eq!(analytics.len(), 1, "There should be only one timeframe");
             assert_eq!(
                 analytics[0].value,
-                FetchedMetric::Paid(UnifiedNum::from_u64(7_000_000)),
+                FetchedMetric::Paid(UnifiedNum::from_whole(0.07)),
                 "Channel Leader has 2 x CLICK (0.035) = 0.07 TOKENs"
             );
 
@@ -2656,7 +2656,7 @@ mod tests {
             assert_eq!(analytics.len(), 1, "There should be only one timeframe");
             assert_eq!(
                 analytics[0].value,
-                FetchedMetric::Paid(UnifiedNum::from_u64(3_000_000)),
+                FetchedMetric::Paid(UnifiedNum::from_whole(0.03)),
                 "Channel Follower has 2 x IMPRESSION (0.015) = 0.03 TOKENs"
             );
 
@@ -2688,7 +2688,7 @@ mod tests {
             assert_eq!(analytics.len(), 1, "There should be only one timeframe");
             assert_eq!(
                 analytics[0].value,
-                FetchedMetric::Paid(UnifiedNum::from_u64(7_000_000)),
+                FetchedMetric::Paid(UnifiedNum::from_whole(0.07)),
                 "Channel Follower has 2 x CLICK (0.035) = 0.07 TOKENs"
             );
         }
@@ -2783,37 +2783,27 @@ mod tests {
         token: Option<String>,
     ) -> anyhow::Result<Vec<FetchedAnalytics>> {
         let query = serde_qs::to_string(query).expect("should parse query");
-
+        let endpoint_url = url
+            .join(&format!("v5/analytics?{}", query))
+            .expect("valid endpoint");
         let analytics = match token {
-            Some(token) => {
-                let endpoint_url = url
-                    .join(&format!("v5/analytics/for-advertiser?{}", query))
-                    .expect("valid endpoint");
-
-                api_client
-                    .get(endpoint_url)
-                    .bearer_auth(&token)
-                    .send()
-                    .await
-                    .expect("failed to get analytics")
-                    .json::<Vec<FetchedAnalytics>>()
-                    .await
-                    .expect("failed to get json")
-            }
-            None => {
-                let endpoint_url = url
-                    .join(&format!("v5/analytics?{}", query))
-                    .expect("valid endpoint");
-
-                api_client
-                    .get(endpoint_url)
-                    .send()
-                    .await
-                    .expect("failed to get analytics")
-                    .json::<Vec<FetchedAnalytics>>()
-                    .await
-                    .expect("failed to get json")
-            }
+            Some(token) => api_client
+                .get(endpoint_url)
+                .bearer_auth(&token)
+                .send()
+                .await
+                .expect("failed to get analytics")
+                .json::<Vec<FetchedAnalytics>>()
+                .await
+                .expect("failed to get json"),
+            None => api_client
+                .get(endpoint_url)
+                .send()
+                .await
+                .expect("failed to get analytics")
+                .json::<Vec<FetchedAnalytics>>()
+                .await
+                .expect("failed to get json"),
         };
 
         Ok(analytics)
