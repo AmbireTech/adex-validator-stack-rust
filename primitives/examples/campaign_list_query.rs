@@ -87,7 +87,8 @@ fn main() {
     // Query with `leader`
     // You can either have `leader` or `validator` but not both!
     {
-        let with_leader_query = "activeTo=1624192200&leader=0x80690751969B234697e9059e04ed72195c3507fa";
+        let with_leader_query =
+            "activeTo=1624192200&leader=0x80690751969B234697e9059e04ed72195c3507fa";
 
         let with_leader = CampaignListQuery {
             page: 0,

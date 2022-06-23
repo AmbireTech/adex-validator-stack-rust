@@ -290,7 +290,6 @@ where
     Ok(success_response(serde_json::to_string(&campaign)?))
 }
 
-
 /// GET `/v5/campaign/list`
 pub async fn campaign_list<C: Locked + 'static>(
     req: Request<Body>,

@@ -204,9 +204,9 @@
 //! ```
 #![doc = include_str!("../../primitives/examples/campaign_list_query.rs")]
 //! ```
-//! 
+//!
 //! Response:
-//! 
+//!
 //! ```
 #![doc = include_str!("../../primitives/examples/campaign_list_response.rs")]
 //! ```
