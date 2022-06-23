@@ -24,6 +24,10 @@ required-features = ["test-util"]
 name = "campaign_list_query"
 required-features = ["test-util"]
 
+[[example]]
+name = "campaign_list_response"
+required-features = ["test-util"]
+
 [dependencies]
 # (De)Serialization
 serde = { version = "^1.0", features = ['derive'] }
