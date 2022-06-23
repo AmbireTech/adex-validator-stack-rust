@@ -275,7 +275,7 @@ mod tests {
         unified_num::FromWhole,
         util::{logging::new_logger, ApiUrl},
         validator::{ApproveState, Heartbeat, NewState, RejectState},
-        Balances, BigNum, Campaign, CampaignId, Channel, ChannelId, UnifiedNum,
+        Balances, BigNum, Campaign, CampaignId, ChainId, Channel, ChannelId, UnifiedNum,
     };
     use reqwest::{Client, StatusCode};
     use slog::info;
@@ -667,7 +667,7 @@ mod tests {
     fn get_analytics_query(
         metric: Metric,
         event_type: EventType,
-        campaign_id: &CampaignId,
+        chains: Vec<ChainId>,
     ) -> AnalyticsQuery {
         AnalyticsQuery {
             limit: 1000,
@@ -679,7 +679,7 @@ mod tests {
                 start: DateHour::now() - &Timeframe::Day,
                 end: None,
             },
-            campaign_id: Some(*campaign_id),
+            campaign_id: None,
             ad_unit: None,
             ad_slot: None,
             ad_slot_type: None,
@@ -688,7 +688,7 @@ mod tests {
             hostname: None,
             country: None,
             os_name: None,
-            chains: vec![],
+            chains,
         }
     }
 
@@ -1245,122 +1245,6 @@ mod tests {
                 assert_eq!(expected_accounting, actual_accounting);
                 info!(setup.logger, "Channel 1 {:?} has empty Accounting because no events have been submitted to any Campaign", CAMPAIGN_1.channel.id());
             }
-
-            let leader_token = advertiser_adapter
-                .get_auth(chain.chain_id, leader_adapter.whoami())
-                .expect("Get authentication");
-
-            let follower_token = advertiser_adapter
-                .get_auth(chain.chain_id, follower_adapter.whoami())
-                .expect("Get authentication");
-
-            // Analytics
-            let analytics = get_analytics(
-                &api_client,
-                &leader.sentry_url,
-                &get_analytics_query(Metric::Count, IMPRESSION, &CAMPAIGN_2.id),
-                &leader_token,
-            )
-            .await
-            .expect("Should get analytics");
-            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
-            assert_eq!(
-                analytics[0].value,
-                FetchedMetric::Count(5),
-                "Channel Follower (LEADER) has 5 IMPRESSION events"
-            );
-
-            let analytics = get_analytics(
-                &api_client,
-                &leader.sentry_url,
-                &get_analytics_query(Metric::Count, CLICK, &CAMPAIGN_2.id),
-                &leader_token,
-            )
-            .await
-            .expect("Should get analytics");
-            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
-            assert_eq!(
-                analytics[0].value,
-                FetchedMetric::Count(3),
-                "Channel Follower (LEADER) has 3 CLICK events"
-            );
-
-            let analytics = get_analytics(
-                &api_client,
-                &follower.sentry_url,
-                &get_analytics_query(Metric::Count, IMPRESSION, &CAMPAIGN_2.id),
-                &follower_token,
-            )
-            .await
-            .expect("Should get analytics");
-            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
-            assert_eq!(
-                analytics[0].value,
-                FetchedMetric::Count(5),
-                "Channel Leader (FOLLOWER) has 5 IMPRESSION events"
-            );
-
-            let analytics = get_analytics(
-                &api_client,
-                &follower.sentry_url,
-                &get_analytics_query(Metric::Count, CLICK, &CAMPAIGN_2.id),
-                &follower_token,
-            )
-            .await
-            .expect("Should get analytics");
-            assert_eq!(
-                analytics.len(),
-                0,
-                "Channel Leader (FOLLOWER) has 0 CLICK events"
-            );
-
-            // Analytics
-            let analytics = get_analytics(
-                &api_client,
-                &leader.sentry_url,
-                &get_analytics_query(Metric::Paid, IMPRESSION, &CAMPAIGN_2.id),
-                &leader_token,
-            )
-            .await
-            .expect("Should get analytics");
-
-            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
-            assert_eq!(
-                analytics[0].value,
-                FetchedMetric::Paid(UnifiedNum::from_whole(5)),
-                "Channel Follower (LEADER) has 5 x IMPRESSION = 5 TOKENs"
-            );
-
-            let analytics = get_analytics(
-                &api_client,
-                &leader.sentry_url,
-                &get_analytics_query(Metric::Paid, CLICK, &CAMPAIGN_2.id),
-                &leader_token,
-            )
-            .await
-            .expect("Should get analytics");
-            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
-            assert_eq!(
-                analytics[0].value,
-                FetchedMetric::Paid(UnifiedNum::from_whole(9)),
-                "Channel Follower (LEADER) has 3 x CLICK = 9 TOKENs"
-            );
-
-            let analytics = get_analytics(
-                &api_client,
-                &follower.sentry_url,
-                &get_analytics_query(Metric::Paid, IMPRESSION, &CAMPAIGN_2.id),
-                &follower_token,
-            )
-            .await
-            .expect("Should get analytics");
-
-            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
-            assert_eq!(
-                analytics[0].value,
-                FetchedMetric::Paid(UnifiedNum::from_whole(5)),
-                "Channel Leader (FOLLOWER) has 5 x IMPRESSION = 5 TOKENs"
-            );
         }
 
         // leader single worker tick
@@ -1449,41 +1333,6 @@ mod tests {
             assert_eq!(
                 None, latest_reject_state_follower,
                 "Channel's follower should not have RejectState yet"
-            );
-
-            let follower_token = advertiser_adapter
-                .get_auth(chain.chain_id, follower_adapter.whoami())
-                .expect("Get authentication");
-
-            let analytics = get_analytics(
-                &api_client,
-                &follower.sentry_url,
-                &get_analytics_query(Metric::Count, IMPRESSION, &CAMPAIGN_2.id),
-                &follower_token,
-            )
-            .await
-            .expect("Should get analytics");
-            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
-            assert_eq!(
-                analytics[0].value,
-                FetchedMetric::Count(5),
-                "Channel Leader (FOLLOWER) has 5 IMPRESSION events"
-            );
-
-            let analytics = get_analytics(
-                &api_client,
-                &follower.sentry_url,
-                &get_analytics_query(Metric::Paid, IMPRESSION, &CAMPAIGN_2.id),
-                &follower_token,
-            )
-            .await
-            .expect("Should get analytics");
-
-            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
-            assert_eq!(
-                analytics[0].value,
-                FetchedMetric::Paid(UnifiedNum::from_whole(5)),
-                "Channel Leader (FOLLOWER) has 5 x IMPRESSION = 5 TOKENs"
             );
         }
 
@@ -1703,138 +1552,6 @@ mod tests {
 
             pretty_assertions::assert_eq!(expected_accounting, actual_accounting);
             info!(setup.logger, "Successfully validated Accounting Balances for Channel 1 {:?} after CAMPAIGN_1 events {:?}", CAMPAIGN_1.channel.id(), CAMPAIGN_1.id);
-
-            let leader_token = advertiser_adapter
-                .get_auth(chain.chain_id, leader_adapter.whoami())
-                .expect("Get authentication");
-
-            let follower_token = advertiser_adapter
-                .get_auth(chain.chain_id, follower_adapter.whoami())
-                .expect("Get authentication");
-            // Analytics
-            let analytics = get_analytics(
-                &api_client,
-                &leader.sentry_url,
-                &get_analytics_query(Metric::Count, IMPRESSION, &CAMPAIGN_1.id),
-                &leader_token,
-            )
-            .await
-            .expect("Should get analytics");
-            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
-            assert_eq!(
-                analytics[0].value,
-                FetchedMetric::Count(1),
-                "Channel Leader has 1 IMPRESSION events"
-            );
-
-            let analytics = get_analytics(
-                &api_client,
-                &leader.sentry_url,
-                &get_analytics_query(Metric::Count, CLICK, &CAMPAIGN_1.id),
-                &leader_token,
-            )
-            .await
-            .expect("Should get analytics");
-            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
-            assert_eq!(
-                analytics[0].value,
-                FetchedMetric::Count(1),
-                "Channel Leader has 1 CLICK events"
-            );
-
-            let analytics = get_analytics(
-                &api_client,
-                &follower.sentry_url,
-                &get_analytics_query(Metric::Count, IMPRESSION, &CAMPAIGN_1.id),
-                &follower_token,
-            )
-            .await
-            .expect("Should get analytics");
-            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
-            assert_eq!(
-                analytics[0].value,
-                FetchedMetric::Count(1),
-                "Channel Follower has 1 IMPRESSION events"
-            );
-
-            let analytics = get_analytics(
-                &api_client,
-                &follower.sentry_url,
-                &get_analytics_query(Metric::Count, CLICK, &CAMPAIGN_1.id),
-                &follower_token,
-            )
-            .await
-            .expect("Should get analytics");
-            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
-            assert_eq!(
-                analytics[0].value,
-                FetchedMetric::Count(1),
-                "Channel Follower has 1 CLICK events"
-            );
-
-            // Analytics
-            let analytics = get_analytics(
-                &api_client,
-                &leader.sentry_url,
-                &get_analytics_query(Metric::Paid, IMPRESSION, &CAMPAIGN_1.id),
-                &leader_token,
-            )
-            .await
-            .expect("Should get analytics");
-
-            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
-            assert_eq!(
-                analytics[0].value,
-                FetchedMetric::Paid(UnifiedNum::from(4_000_000)),
-                "Channel Leader has 1 x IMPRESSION = 4 TOKENs"
-            );
-
-            let analytics = get_analytics(
-                &api_client,
-                &leader.sentry_url,
-                &get_analytics_query(Metric::Paid, CLICK, &CAMPAIGN_1.id),
-                &leader_token,
-            )
-            .await
-            .expect("Should get analytics");
-            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
-            assert_eq!(
-                analytics[0].value,
-                FetchedMetric::Paid(UnifiedNum::from(6_000_000)),
-                "Channel Leader has 1 x CLICK = 6 TOKENs"
-            );
-
-            let analytics = get_analytics(
-                &api_client,
-                &follower.sentry_url,
-                &get_analytics_query(Metric::Paid, IMPRESSION, &CAMPAIGN_1.id),
-                &follower_token,
-            )
-            .await
-            .expect("Should get analytics");
-
-            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
-            assert_eq!(
-                analytics[0].value,
-                FetchedMetric::Paid(UnifiedNum::from(4_000_000)),
-                "Channel Leader (FOLLOWER) has 1 x IMPRESSION = 4 TOKENs"
-            );
-
-            let analytics = get_analytics(
-                &api_client,
-                &follower.sentry_url,
-                &get_analytics_query(Metric::Paid, CLICK, &CAMPAIGN_1.id),
-                &follower_token,
-            )
-            .await
-            .expect("Should get analytics");
-
-            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
-            assert_eq!(
-                analytics[0].value,
-                FetchedMetric::Paid(UnifiedNum::from(6_000_000)),
-                "Channel Leader (FOLLOWER) has 1 x CLICK = 6 TOKENs"
-            );
         }
 
         // CAMPAIGN_3 & Channel 3 expected Accounting
@@ -1866,7 +1583,6 @@ mod tests {
         // 0.1 + 0.00020 + 0.000175 = 0.100375 = UnifiedNum(10 037 500)
         {
             let mut expected_balances = Balances::new();
-            let second_chain = GANACHE_1.clone();
 
             expected_balances
                 .spend(
@@ -1901,139 +1617,6 @@ mod tests {
 
             pretty_assertions::assert_eq!(expected_accounting, actual_accounting);
             info!(setup.logger, "Successfully validated Accounting Balances for Channel 3 {:?} after CAMPAIGN_3 events {:?}", CAMPAIGN_3.channel.id(), CAMPAIGN_3.id);
-
-            let leader_token = advertiser2_adapter
-                .get_auth(second_chain.chain_id, leader_adapter.whoami())
-                .expect("Get authentication");
-
-            let follower_token = advertiser2_adapter
-                .get_auth(second_chain.chain_id, follower_adapter.whoami())
-                .expect("Get authentication");
-
-            // Analytics
-            let analytics = get_analytics(
-                &api_client,
-                &leader.sentry_url,
-                &get_analytics_query(Metric::Count, IMPRESSION, &CAMPAIGN_3.id),
-                &leader_token,
-            )
-            .await
-            .expect("Should get analytics");
-            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
-            assert_eq!(
-                analytics[0].value,
-                FetchedMetric::Count(2),
-                "Channel Leader has 2 IMPRESSION events"
-            );
-
-            let analytics = get_analytics(
-                &api_client,
-                &leader.sentry_url,
-                &get_analytics_query(Metric::Count, CLICK, &CAMPAIGN_3.id),
-                &leader_token,
-            )
-            .await
-            .expect("Should get analytics");
-            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
-            assert_eq!(
-                analytics[0].value,
-                FetchedMetric::Count(2),
-                "Channel Leader has 2 CLICK events"
-            );
-
-            let analytics = get_analytics(
-                &api_client,
-                &follower.sentry_url,
-                &get_analytics_query(Metric::Count, IMPRESSION, &CAMPAIGN_3.id),
-                &follower_token,
-            )
-            .await
-            .expect("Should get analytics");
-            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
-            assert_eq!(
-                analytics[0].value,
-                FetchedMetric::Count(2),
-                "Channel Follower has 2 IMPRESSION events"
-            );
-
-            let analytics = get_analytics(
-                &api_client,
-                &follower.sentry_url,
-                &get_analytics_query(Metric::Count, CLICK, &CAMPAIGN_3.id),
-                &follower_token,
-            )
-            .await
-            .expect("Should get analytics");
-            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
-            assert_eq!(
-                analytics[0].value,
-                FetchedMetric::Count(2),
-                "Channel Follower has 2 CLICK events"
-            );
-
-            // Analytics
-            let analytics = get_analytics(
-                &api_client,
-                &leader.sentry_url,
-                &get_analytics_query(Metric::Paid, IMPRESSION, &CAMPAIGN_3.id),
-                &leader_token,
-            )
-            .await
-            .expect("Should get analytics");
-
-            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
-            assert_eq!(
-                analytics[0].value,
-                FetchedMetric::Paid(UnifiedNum::from(3_000_000)),
-                "Channel Leader has 2 x IMPRESSION = 3 TOKENs"
-            );
-
-            let analytics = get_analytics(
-                &api_client,
-                &leader.sentry_url,
-                &get_analytics_query(Metric::Paid, CLICK, &CAMPAIGN_3.id),
-                &leader_token,
-            )
-            .await
-            .expect("Should get analytics");
-            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
-            assert_eq!(
-                analytics[0].value,
-                FetchedMetric::Paid(UnifiedNum::from(7_000_000)),
-                "Channel Leader has 2 x CLICK = 7 TOKENs"
-            );
-
-            let analytics = get_analytics(
-                &api_client,
-                &follower.sentry_url,
-                &get_analytics_query(Metric::Paid, IMPRESSION, &CAMPAIGN_3.id),
-                &follower_token,
-            )
-            .await
-            .expect("Should get analytics");
-
-            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
-            assert_eq!(
-                analytics[0].value,
-                FetchedMetric::Paid(UnifiedNum::from(3_000_000)),
-                "Channel Leader (FOLLOWER) has 2 x IMPRESSION = 3 TOKENs"
-            );
-
-            let analytics = get_analytics(
-                &api_client,
-                &follower.sentry_url,
-                &get_analytics_query(Metric::Paid, CLICK, &CAMPAIGN_3.id),
-                &follower_token,
-            )
-            .await
-            .expect("Should get analytics");
-
-            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
-            assert_eq!(
-                analytics[0].value,
-                FetchedMetric::Paid(UnifiedNum::from(7_000_000)),
-                "Channel Leader (FOLLOWER) has 2 x CLICK = 7 TOKENs"
-            );
         }
 
         // leader single worker tick
@@ -2671,6 +2254,444 @@ mod tests {
                 );
             }
         }
+
+        // Testing analytics statistics cases
+
+        // 1. CHAIN_1 in an unauthenticated /analytics call filters results and correctly returns count/paid
+        {
+            let analytics = get_analytics(
+                &api_client,
+                &leader.sentry_url,
+                &get_analytics_query(Metric::Count, IMPRESSION, vec![ChainId::new(1)]),
+                None,
+            )
+            .await
+            .expect("Should get analytics");
+
+            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
+            assert_eq!(
+                analytics[0].value,
+                FetchedMetric::Count(2),
+                "Channel Leader has 2 IMPRESSION events"
+            );
+
+            let analytics = get_analytics(
+                &api_client,
+                &leader.sentry_url,
+                &get_analytics_query(Metric::Paid, IMPRESSION, vec![ChainId::new(1)]),
+                None,
+            )
+            .await
+            .expect("Should get analytics");
+
+            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
+            assert_eq!(
+                analytics[0].value,
+                FetchedMetric::Paid(UnifiedNum::from_u64(3_000_000)),
+                "Channel Leader has 2 x IMPRESSION (0.015) = 0.03 TOKENs"
+            );
+
+            let analytics = get_analytics(
+                &api_client,
+                &leader.sentry_url,
+                &get_analytics_query(Metric::Count, CLICK, vec![ChainId::new(1)]),
+                None,
+            )
+            .await
+            .expect("Should get analytics");
+
+            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
+            assert_eq!(
+                analytics[0].value,
+                FetchedMetric::Count(2),
+                "Channel Leader has 2 CLICK events"
+            );
+
+            let analytics = get_analytics(
+                &api_client,
+                &leader.sentry_url,
+                &get_analytics_query(Metric::Paid, CLICK, vec![ChainId::new(1)]),
+                None,
+            )
+            .await
+            .expect("Should get analytics");
+
+            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
+            assert_eq!(
+                analytics[0].value,
+                FetchedMetric::Paid(UnifiedNum::from_u64(7_000_000)),
+                "Channel Leader has 2 x CLICK (0.035) = 0.07 TOKENs"
+            );
+
+            // Follower
+            let analytics = get_analytics(
+                &api_client,
+                &follower.sentry_url,
+                &get_analytics_query(Metric::Count, IMPRESSION, vec![ChainId::new(1)]),
+                None,
+            )
+            .await
+            .expect("Should get analytics");
+
+            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
+            assert_eq!(
+                analytics[0].value,
+                FetchedMetric::Count(2),
+                "Channel Follower has 2 IMPRESSION events"
+            );
+
+            let analytics = get_analytics(
+                &api_client,
+                &follower.sentry_url,
+                &get_analytics_query(Metric::Paid, IMPRESSION, vec![ChainId::new(1)]),
+                None,
+            )
+            .await
+            .expect("Should get analytics");
+
+            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
+            assert_eq!(
+                analytics[0].value,
+                FetchedMetric::Paid(UnifiedNum::from_u64(3_000_000)),
+                "Channel Follower has 2 x IMPRESSION (0.015) = 0.03 TOKENs"
+            );
+
+            let analytics = get_analytics(
+                &api_client,
+                &follower.sentry_url,
+                &get_analytics_query(Metric::Count, CLICK, vec![ChainId::new(1)]),
+                None,
+            )
+            .await
+            .expect("Should get analytics");
+
+            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
+            assert_eq!(
+                analytics[0].value,
+                FetchedMetric::Count(2),
+                "Channel Follower has 2 CLICK events"
+            );
+
+            let analytics = get_analytics(
+                &api_client,
+                &follower.sentry_url,
+                &get_analytics_query(Metric::Paid, CLICK, vec![ChainId::new(1)]),
+                None,
+            )
+            .await
+            .expect("Should get analytics");
+
+            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
+            assert_eq!(
+                analytics[0].value,
+                FetchedMetric::Paid(UnifiedNum::from_u64(7_000_000)),
+                "Channel Follower has 2 x CLICK (0.035) = 0.07 TOKENs"
+            );
+        }
+
+        // 2. /analytics call for both chains ?chain[]=1&chain[]=1337
+        {
+            let analytics = get_analytics(
+                &api_client,
+                &leader.sentry_url,
+                &get_analytics_query(
+                    Metric::Count,
+                    IMPRESSION,
+                    vec![ChainId::new(1), ChainId::new(1337)],
+                ),
+                None,
+            )
+            .await
+            .expect("Should get analytics");
+
+            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
+            assert_eq!(
+                analytics[0].value,
+                FetchedMetric::Count(8),
+                "Channel Leader has 8 IMPRESSION events (1 for CAMPAIGN_1, 5 for CAMPAIGN_2, 2 for CAMPAIGN_3)"
+            );
+
+            let analytics = get_analytics(
+                &api_client,
+                &leader.sentry_url,
+                &get_analytics_query(
+                    Metric::Paid,
+                    IMPRESSION,
+                    vec![ChainId::new(1), ChainId::new(1337)],
+                ),
+                None,
+            )
+            .await
+            .expect("Should get analytics");
+
+            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
+            assert_eq!(
+                analytics[0].value,
+                FetchedMetric::Paid(UnifiedNum::from_u64(5_07_000_000)),
+                "Channel Leader has 2 x IMPRESSION (0.015) + 1 x IMPRESSION (0.04) + 5 x IMPRESSION (1) = 5.07 TOKENs"
+            );
+
+            let analytics = get_analytics(
+                &api_client,
+                &leader.sentry_url,
+                &get_analytics_query(
+                    Metric::Count,
+                    CLICK,
+                    vec![ChainId::new(1), ChainId::new(1337)],
+                ),
+                None,
+            )
+            .await
+            .expect("Should get analytics");
+
+            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
+            assert_eq!(
+                analytics[0].value,
+                FetchedMetric::Count(6),
+                "Channel Leader has 6 CLICK events (1 for CAMPAIGN_1, 3 for CAMPAIGN_2, 2 for CAMPAIGN_3)"
+            );
+
+            let analytics = get_analytics(
+                &api_client,
+                &leader.sentry_url,
+                &get_analytics_query(
+                    Metric::Paid,
+                    CLICK,
+                    vec![ChainId::new(1), ChainId::new(1337)],
+                ),
+                None,
+            )
+            .await
+            .expect("Should get analytics");
+
+            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
+            assert_eq!(
+                analytics[0].value,
+                FetchedMetric::Paid(UnifiedNum::from_u64(9_13_000_000)),
+                "Channel Leader has 2 x CLICK (0.035) + 1 x CLICK (0.06) + 3 x CLICK (3) = 9.13 TOKENs"
+            );
+
+            // Follower
+            let analytics = get_analytics(
+                &api_client,
+                &follower.sentry_url,
+                &get_analytics_query(
+                    Metric::Count,
+                    IMPRESSION,
+                    vec![ChainId::new(1), ChainId::new(1337)],
+                ),
+                None,
+            )
+            .await
+            .expect("Should get analytics");
+
+            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
+            assert_eq!(
+                analytics[0].value,
+                FetchedMetric::Count(8),
+                "Channel Follower has 8 IMPRESSION events (1 for CAMPAIGN_1, 5 for CAMPAIGN_2, 2 for CAMPAIGN_3)"
+            );
+
+            let analytics = get_analytics(
+                &api_client,
+                &follower.sentry_url,
+                &get_analytics_query(
+                    Metric::Paid,
+                    IMPRESSION,
+                    vec![ChainId::new(1), ChainId::new(1337)],
+                ),
+                None,
+            )
+            .await
+            .expect("Should get analytics");
+
+            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
+            assert_eq!(
+                analytics[0].value,
+                FetchedMetric::Paid(UnifiedNum::from_u64(5_07_000_000)),
+                "Channel Follower has 2 x IMPRESSION (0.015) + 1 x IMPRESSION (0.04) + 5 x IMPRESSION (1) = 5.07 TOKENs"
+            );
+
+            let analytics = get_analytics(
+                &api_client,
+                &follower.sentry_url,
+                &get_analytics_query(
+                    Metric::Count,
+                    CLICK,
+                    vec![ChainId::new(1), ChainId::new(1337)],
+                ),
+                None,
+            )
+            .await
+            .expect("Should get analytics");
+
+            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
+            assert_eq!(
+                analytics[0].value,
+                FetchedMetric::Count(6),
+                "Channel Follower has 6 CLICK events (1 for CAMPAIGN_1, 3 for CAMPAIGN_2, 2 for CAMPAIGN_3)"
+            );
+
+            let analytics = get_analytics(
+                &api_client,
+                &follower.sentry_url,
+                &get_analytics_query(
+                    Metric::Paid,
+                    CLICK,
+                    vec![ChainId::new(1), ChainId::new(1337)],
+                ),
+                None,
+            )
+            .await
+            .expect("Should get analytics");
+
+            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
+            assert_eq!(
+                analytics[0].value,
+                FetchedMetric::Paid(UnifiedNum::from_u64(9_13_000_000)),
+                "Channel Follower has 2 x CLICK (0.035) + 1 x CLICK (0.06) + 3 x CLICK (3) = 9.13 TOKENs"
+            );
+        }
+        // 3. Authenticated /analytics call (just the results for the token chain - CHAIN_1)
+        {
+            let second_chain = GANACHE_1.clone();
+            let leader_token = advertiser2_adapter
+                .get_auth(second_chain.chain_id, leader_adapter.whoami())
+                .expect("Get authentication");
+
+            let follower_token = advertiser2_adapter
+                .get_auth(second_chain.chain_id, follower_adapter.whoami())
+                .expect("Get authentication");
+
+            let analytics = get_analytics(
+                &api_client,
+                &leader.sentry_url,
+                &get_analytics_query(Metric::Count, IMPRESSION, vec![]),
+                Some(leader_token.clone()),
+            )
+            .await
+            .expect("Should get analytics");
+
+            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
+            assert_eq!(
+                analytics[0].value,
+                FetchedMetric::Count(2),
+                "Channel Leader has 2 IMPRESSION events"
+            );
+
+            let analytics = get_analytics(
+                &api_client,
+                &leader.sentry_url,
+                &get_analytics_query(Metric::Paid, IMPRESSION, vec![]),
+                Some(leader_token.clone()),
+            )
+            .await
+            .expect("Should get analytics");
+
+            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
+            assert_eq!(
+                analytics[0].value,
+                FetchedMetric::Paid(UnifiedNum::from_u64(3_000_000)),
+                "Channel Leader has 2 x IMPRESSION (0.015) = 0.03 TOKENs"
+            );
+
+            let analytics = get_analytics(
+                &api_client,
+                &leader.sentry_url,
+                &get_analytics_query(Metric::Count, CLICK, vec![]),
+                Some(leader_token.clone()),
+            )
+            .await
+            .expect("Should get analytics");
+
+            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
+            assert_eq!(
+                analytics[0].value,
+                FetchedMetric::Count(2),
+                "Channel Leader has 2 CLICK events"
+            );
+
+            let analytics = get_analytics(
+                &api_client,
+                &leader.sentry_url,
+                &get_analytics_query(Metric::Paid, CLICK, vec![]),
+                Some(leader_token.clone()),
+            )
+            .await
+            .expect("Should get analytics");
+
+            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
+            assert_eq!(
+                analytics[0].value,
+                FetchedMetric::Paid(UnifiedNum::from_u64(7_000_000)),
+                "Channel Leader has 2 x CLICK (0.035) = 0.07 TOKENs"
+            );
+
+            // Follower
+            let analytics = get_analytics(
+                &api_client,
+                &follower.sentry_url,
+                &get_analytics_query(Metric::Count, IMPRESSION, vec![]),
+                Some(follower_token.clone()),
+            )
+            .await
+            .expect("Should get analytics");
+
+            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
+            assert_eq!(
+                analytics[0].value,
+                FetchedMetric::Count(2),
+                "Channel Follower has 2 IMPRESSION events"
+            );
+
+            let analytics = get_analytics(
+                &api_client,
+                &follower.sentry_url,
+                &get_analytics_query(Metric::Paid, IMPRESSION, vec![]),
+                Some(follower_token.clone()),
+            )
+            .await
+            .expect("Should get analytics");
+
+            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
+            assert_eq!(
+                analytics[0].value,
+                FetchedMetric::Paid(UnifiedNum::from_u64(3_000_000)),
+                "Channel Follower has 2 x IMPRESSION (0.015) = 0.03 TOKENs"
+            );
+
+            let analytics = get_analytics(
+                &api_client,
+                &follower.sentry_url,
+                &get_analytics_query(Metric::Count, CLICK, vec![]),
+                Some(follower_token.clone()),
+            )
+            .await
+            .expect("Should get analytics");
+
+            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
+            assert_eq!(
+                analytics[0].value,
+                FetchedMetric::Count(2),
+                "Channel Follower has 2 CLICK events"
+            );
+
+            let analytics = get_analytics(
+                &api_client,
+                &follower.sentry_url,
+                &get_analytics_query(Metric::Paid, CLICK, vec![]),
+                Some(follower_token.clone()),
+            )
+            .await
+            .expect("Should get analytics");
+
+            assert_eq!(analytics.len(), 1, "There should be only one timeframe");
+            assert_eq!(
+                analytics[0].value,
+                FetchedMetric::Paid(UnifiedNum::from_u64(7_000_000)),
+                "Channel Follower has 2 x CLICK (0.035) = 0.07 TOKENs"
+            );
+        }
     }
 
     async fn setup_sentry(validator: &TestValidator) -> adapter::ethereum::LockedAdapter {
@@ -2759,22 +2780,41 @@ mod tests {
         api_client: &Client,
         url: &ApiUrl,
         query: &AnalyticsQuery,
-        token: &str,
+        token: Option<String>,
     ) -> anyhow::Result<Vec<FetchedAnalytics>> {
         let query = serde_qs::to_string(query).expect("should parse query");
-        let endpoint_url = url
-            .join(&format!("v5/analytics/for-advertiser?{}", query))
-            .expect("valid endpoint");
 
-        let analytics = api_client
-            .get(endpoint_url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .expect("failed to get analytics")
-            .json::<Vec<FetchedAnalytics>>()
-            .await
-            .expect("failed to get json");
+        let analytics = match token {
+            Some(token) => {
+                let endpoint_url = url
+                    .join(&format!("v5/analytics/for-advertiser?{}", query))
+                    .expect("valid endpoint");
+
+                api_client
+                    .get(endpoint_url)
+                    .bearer_auth(&token)
+                    .send()
+                    .await
+                    .expect("failed to get analytics")
+                    .json::<Vec<FetchedAnalytics>>()
+                    .await
+                    .expect("failed to get json")
+            }
+            None => {
+                let endpoint_url = url
+                    .join(&format!("v5/analytics?{}", query))
+                    .expect("valid endpoint");
+
+                api_client
+                    .get(endpoint_url)
+                    .send()
+                    .await
+                    .expect("failed to get analytics")
+                    .json::<Vec<FetchedAnalytics>>()
+                    .await
+                    .expect("failed to get json")
+            }
+        };
 
         Ok(analytics)
     }
