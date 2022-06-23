@@ -1,8 +1,7 @@
 on:
   push:
     branches:
-      - build-docs-on-gh-pages
-    # - aip-61-adex-v5
+      - aip-61-adex-v5
 
 name: Deploy docs
 
