@@ -32,7 +32,7 @@ use primitives::{
 use slog::{error, Logger};
 use std::{collections::HashMap, str::FromStr};
 
-/// `GET /v5/channel/list` request
+/// GET `/v5/channel/list` request
 ///
 /// Query: [`ChannelListQuery`]
 ///
@@ -59,7 +59,7 @@ pub async fn channel_list<C: Locked + 'static>(
     Ok(success_response(serde_json::to_string(&list_response)?))
 }
 
-/// `GET /v5/channel/0xXXX.../last-approved` request
+/// GET `/v5/channel/0xXXX.../last-approved` request
 ///
 /// Query: [`LastApprovedQuery`]
 ///
@@ -173,7 +173,7 @@ fn spender_response_without_leaf(
     Ok(success_response(serde_json::to_string(&res)?))
 }
 
-/// `GET /v5/channel/0xXXX.../spender/0xXXX...` request
+/// GET `/v5/channel/0xXXX.../spender/0xXXX...` request
 ///
 /// Response: [`SpenderResponse`]
 pub async fn get_spender_limits<C: Locked + 'static>(
@@ -230,7 +230,7 @@ pub async fn get_spender_limits<C: Locked + 'static>(
     Ok(success_response(serde_json::to_string(&res)?))
 }
 
-/// `GET /v5/channel/0xXXX.../spender/all` request
+/// GET `/v5/channel/0xXXX.../spender/all` request
 ///
 /// Response: [`AllSpendersResponse`]
 pub async fn get_all_spender_limits<C: Locked + 'static>(
@@ -287,9 +287,9 @@ pub async fn get_all_spender_limits<C: Locked + 'static>(
     Ok(success_response(serde_json::to_string(&res)?))
 }
 
-/// `POST /v5/channel/0xXXX.../spender/0xXXX...` request
+/// POST `/v5/channel/0xXXX.../spender/0xXXX...` request
 ///
-/// internally, to make the validator worker to add a spender leaf in NewState we'll just update Accounting
+/// Internally to make the validator worker add a spender leaf in `NewState` we'll just update `Accounting`
 pub async fn add_spender_leaf<C: Locked + 'static>(
     req: Request<Body>,
     app: &Application<C>,
@@ -377,7 +377,7 @@ async fn get_corresponding_new_state(
     new_state
 }
 
-/// `GET /v5/channel/0xXXX.../accounting` request
+/// GET `/v5/channel/0xXXX.../accounting` request
 ///
 /// Response: [`AccountingResponse::<CheckedState>`]
 pub async fn get_accounting_for_channel<C: Locked + 'static>(
@@ -419,7 +419,7 @@ pub async fn get_accounting_for_channel<C: Locked + 'static>(
     Ok(success_response(serde_json::to_string(&res)?))
 }
 
-/// `POST /v5/channel/0xXXX.../pay` request
+/// POST `/v5/channel/0xXXX.../pay` request
 ///
 /// Body: [`ChannelPayRequest`]
 ///

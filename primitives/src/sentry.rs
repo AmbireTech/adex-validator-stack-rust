@@ -653,7 +653,14 @@ pub mod channel_list {
         pub pagination: Pagination,
     }
 
-    #[derive(Debug, Serialize, Deserialize)]
+    /// `GET /v5/channel/list` query
+    ///
+    /// # Examples
+    ///
+    /// ```
+    #[doc = include_str!("../examples/channel_list_query.rs")]
+    /// ```
+    #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
     pub struct ChannelListQuery {
         /// default is `u64::default()` = `0`
         #[serde(default)]
@@ -673,6 +680,13 @@ pub mod campaign_list {
 
     use super::Pagination;
 
+    /// `GET /v5/campaign/list` response
+    ///
+    /// # Examples
+    ///
+    /// ```
+    #[doc = include_str!("../examples/campaign_list_response.rs")]
+    /// ```
     #[derive(Debug, Serialize, Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub struct CampaignListResponse {
@@ -681,21 +695,33 @@ pub mod campaign_list {
         pub pagination: Pagination,
     }
 
+    /// `GET /v5/campaign/list` query
+    ///
+    /// # Examples
+    ///
+    /// ```
+    #[doc = include_str!("../examples/campaign_list_query.rs")]
+    /// ```
     #[derive(Debug, Serialize, Deserialize, PartialEq)]
     pub struct CampaignListQuery {
-        /// default is `u64::default()` = `0`
+        /// Default is `u64::default()` = `0`.
         #[serde(default)]
         pub page: u64,
-        /// filters the list on `active.to >= active_to_ge`
+        /// Filters the list on `Campaign.active.to >= active_to_ge`.
+        ///
         /// It should be the same timestamp format as the `Campaign.active.to`: **seconds**
+        ///
+        /// **Note:** This field is deserialized from `activeTo`.
         #[serde(with = "ts_seconds", default = "Utc::now", rename = "activeTo")]
         pub active_to_ge: DateTime<Utc>,
+        /// Returns only the [`Campaign`]s containing a specified creator if provided.
         pub creator: Option<Address>,
         /// Returns only the [`Campaign`]s containing a specified validator if provided.
         #[serde(flatten)]
         pub validator: Option<ValidatorParam>,
     }
 
+    /// The `validator` query parameter for [`CampaignListQuery`].
     #[derive(Serialize, Deserialize, Debug, PartialEq)]
     #[serde(rename_all = "camelCase")]
     pub enum ValidatorParam {

@@ -15,9 +15,8 @@ test-util = ["primitives/test-util", "adapter/test-util", "dashmap"]
 
 [dependencies]
 # Futures
-futures = "^0.3"
-async-std = "^1"
-async-trait = "^0.1"
+futures = "0.3"
+async-trait = "0.1"
 # Primitives
 primitives = { path = "../primitives", features = ["postgres", "test-util"] }
 adapter = { version = "0.2", path = "../adapter", features = ["test-util"] }
@@ -26,7 +25,7 @@ chrono = { version = "0.4", features = ["serde"] }
 dashmap = { version = "5", optional = true }
 hex = "0.4"
 # CLI
-clap = { version = "3.1", features = ["cargo"] }
+clap = { version = "3", features = ["cargo"] }
 # Server
 tokio = { version = "1", features = ["macros", "time", "rt-multi-thread"] }
 hyper = { version = "0.14", features = [
@@ -41,11 +40,8 @@ redis = { version = "0.21", features = ["aio", "tokio-comp"] }
 deadpool = "0.9"
 deadpool-postgres = "0.10"
 # Should be the same version as in `primitives` and `deadpool-postgres`!
-tokio-postgres = { version = "0.7", features = [
-  "with-chrono-0_4",
-  "with-serde_json-1",
-] }
-postgres-types = { version = "0.2.1", features = [
+tokio-postgres = { version = "0.7", features = ["with-chrono-0_4", "with-serde_json-1"] }
+postgres-types = { version = "0.2", features = [
   "derive",
   "with-chrono-0_4",
   "with-serde_json-1",
@@ -53,20 +49,20 @@ postgres-types = { version = "0.2.1", features = [
 ] }
 
 # Migrations
-migrant_lib = { version = "^0.32", features = ["d-postgres"] }
+migrant_lib = { version = "0.33", features = ["d-postgres"] }
 # Logger
-slog = { version = "^2.2.3", features = ["max_level_trace"] }
+slog = { version = "2", features = ["max_level_trace"] }
 # Deserialize values from Environment variables for the configuration
 envy = "0.4"
 # Serde
-serde = { version = "^1.0", features = ["derive"] }
-serde_json = "^1.0"
-serde_qs = "^0.9"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_qs = "0.9"
 # Other
-thiserror = "^1.0"
-once_cell = "^1.5"
+thiserror = "1"
+once_cell = "1"
 # UA parsing for `/units-for-slot` route
-woothee = "^0.13"
+woothee = "0.13"
 # Making requests to the platform
 reqwest = { version = "0.11", features = ["json", "cookies"] }
 
