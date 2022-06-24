@@ -1258,6 +1258,32 @@
 <span id="1253">1253</span>
 <span id="1254">1254</span>
 <span id="1255">1255</span>
+<span id="1256">1256</span>
+<span id="1257">1257</span>
+<span id="1258">1258</span>
+<span id="1259">1259</span>
+<span id="1260">1260</span>
+<span id="1261">1261</span>
+<span id="1262">1262</span>
+<span id="1263">1263</span>
+<span id="1264">1264</span>
+<span id="1265">1265</span>
+<span id="1266">1266</span>
+<span id="1267">1267</span>
+<span id="1268">1268</span>
+<span id="1269">1269</span>
+<span id="1270">1270</span>
+<span id="1271">1271</span>
+<span id="1272">1272</span>
+<span id="1273">1273</span>
+<span id="1274">1274</span>
+<span id="1275">1275</span>
+<span id="1276">1276</span>
+<span id="1277">1277</span>
+<span id="1278">1278</span>
+<span id="1279">1279</span>
+<span id="1280">1280</span>
+<span id="1281">1281</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">crate</span>::{
     <span class="ident">analytics</span>::{<span class="ident">OperatingSystem</span>, <span class="ident">Timeframe</span>},
     <span class="ident">balances::BalancesState</span>,
@@ -1913,7 +1939,14 @@
         <span class="kw">pub</span> <span class="ident">pagination</span>: <span class="ident">Pagination</span>,
     }
 
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>)]</span>
+    <span class="doccomment">/// `GET /v5/channel/list` query</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Examples</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// ```</span>
+    <span class="attribute">#[<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../examples/channel_list_query.rs&quot;</span>)]</span>
+    <span class="doccomment">/// ```</span>
+    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
     <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ChannelListQuery</span> {
         <span class="doccomment">/// default is `u64::default()` = `0`</span>
         <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">default</span>)]</span>
@@ -1933,6 +1966,13 @@
 
     <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::Pagination</span>;
 
+    <span class="doccomment">/// `GET /v5/campaign/list` response</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Examples</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// ```</span>
+    <span class="attribute">#[<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../examples/campaign_list_response.rs&quot;</span>)]</span>
+    <span class="doccomment">/// ```</span>
     <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>)]</span>
     <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename_all</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
     <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CampaignListResponse</span> {
@@ -1941,21 +1981,33 @@
         <span class="kw">pub</span> <span class="ident">pagination</span>: <span class="ident">Pagination</span>,
     }
 
+    <span class="doccomment">/// `GET /v5/campaign/list` query</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Examples</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// ```</span>
+    <span class="attribute">#[<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../examples/campaign_list_query.rs&quot;</span>)]</span>
+    <span class="doccomment">/// ```</span>
     <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">PartialEq</span>)]</span>
     <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CampaignListQuery</span> {
-        <span class="doccomment">/// default is `u64::default()` = `0`</span>
+        <span class="doccomment">/// Default is `u64::default()` = `0`.</span>
         <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">default</span>)]</span>
         <span class="kw">pub</span> <span class="ident">page</span>: <span class="ident">u64</span>,
-        <span class="doccomment">/// filters the list on `active.to &gt;= active_to_ge`</span>
+        <span class="doccomment">/// Filters the list on `Campaign.active.to &gt;= active_to_ge`.</span>
+        <span class="doccomment">///</span>
         <span class="doccomment">/// It should be the same timestamp format as the `Campaign.active.to`: **seconds**</span>
+        <span class="doccomment">///</span>
+        <span class="doccomment">/// **Note:** This field is deserialized from `activeTo`.</span>
         <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">with</span> <span class="op">=</span> <span class="string">&quot;ts_seconds&quot;</span>, <span class="ident">default</span> <span class="op">=</span> <span class="string">&quot;Utc::now&quot;</span>, <span class="ident">rename</span> <span class="op">=</span> <span class="string">&quot;activeTo&quot;</span>)]</span>
         <span class="kw">pub</span> <span class="ident">active_to_ge</span>: <span class="ident">DateTime</span><span class="op">&lt;</span><span class="ident">Utc</span><span class="op">&gt;</span>,
+        <span class="doccomment">/// Returns only the [`Campaign`]s containing a specified creator if provided.</span>
         <span class="kw">pub</span> <span class="ident">creator</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>,
         <span class="doccomment">/// Returns only the [`Campaign`]s containing a specified validator if provided.</span>
         <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">flatten</span>)]</span>
         <span class="kw">pub</span> <span class="ident">validator</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ValidatorParam</span><span class="op">&gt;</span>,
     }
 
+    <span class="doccomment">/// The `validator` query parameter for [`CampaignListQuery`].</span>
     <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">PartialEq</span>)]</span>
     <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename_all</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
     <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">ValidatorParam</span> {

@@ -4,7 +4,43 @@
     </nav>
     <nav class="sidebar"><a class="sidebar-logo" href="../../sentry/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
         </a><h2 class="location"><a href="#">Module routes</a></h2><div class="sidebar-elems"><section><div class="block"><ul><li><a href="#modules">Modules</a></li><li><a href="#functions">Functions</a></li></ul></div></section><div id="sidebar-vars" data-name="routes" data-ty="mod" data-relpath="./"></div><script defer src="./sidebar-items.js"></script></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../sentry/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><div class="theme-picker hidden"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="22" height="22" alt="Pick another theme!" src="../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
-    <h1 class="fqn"><span class="in-band">Module <a href="../index.html">sentry</a>::<wbr><a class="mod" href="#">routes</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/sentry/routes.rs.html#1-236">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Sentry REST API documentation</p>
+    <h1 class="fqn"><span class="in-band">Module <a href="../index.html">sentry</a>::<wbr><a class="mod" href="#">routes</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../../src/sentry/routes.rs.html#1-338">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Sentry REST API documentation</p>
+<p>All routes are listed below. Here is an overview and links to all of them:</p>
+<ul>
+<li><a href="#channel">Channel</a> routes
+<ul>
+<li><a href="#get-v5channellist">GET <code>/v5/channel/list</code></a></li>
+<li><a href="#get-v5channelidaccounting">GET <code>/v5/channel/:id/accounting</code></a></li>
+<li><a href="#get-v5channelidspenderaddr-auth-required">GET <code>/v5/channel/:id/spender/:addr</code></a> (auth required)</li>
+<li><a href="#post-v5channelidspenderaddr-auth-required">POST <code>/v5/channel/:id/spender/:addr</code></a> (auth required)</li>
+<li><a href="#get-v5channelidspenderall-auth-required">GET <code>/v5/channel/:id/spender/all</code></a> (auth required)</li>
+<li><a href="#get-v5channelidvalidator-messages">GET <code>/v5/channel/:id/validator-messages</code></a></li>
+<li><a href="#get-v5channelidvalidator-messages">GET <code>/v5/channel/:id/validator-messages/:addr</code></a></li>
+<li><a href="#get-v5channelidvalidator-messages">GET <code>/v5/channel/:id/validator-messages/:addr/:validator_messages</code></a></li>
+<li><a href="#post-v5channelidvalidator-messages-auth-required">POST <code>/v5/channel/:id/validator-messages</code></a> (auth required)</li>
+<li><a href="#get-v5channelidlast-approved">GET <code>/v5/channel/:id/last-approved</code></a></li>
+<li><a href="#post-v5channelidpay-auth-required">POST <code>/v5/channel/:id/pay</code></a> (auth required)</li>
+<li><a href="#get-v5channelidget-leaf">GET <code>/v5/channel/:id/get-leaf</code></a></li>
+</ul>
+</li>
+<li><a href="#campaign">Campaign</a> routes
+<ul>
+<li><a href="#get-v5campaignlist">GET <code>/v5/campaign/list</code></a></li>
+<li><a href="#post-v5campaign-auth-required">POST <code>/v5/campaign</code></a> (auth required)</li>
+<li><a href="#post-v5campaignid-auth-required">POST <code>/v5/campaign/:id</code></a> (auth required)</li>
+<li><a href="#post-v5campaignidevents">POST <code>/v5/campaign/:id/events</code></a> (auth required)</li>
+<li><a href="#post-v5campaignidclose-auth-required">POST <code>/v5/campaign/:id/close</code></a> (auth required)</li>
+</ul>
+</li>
+<li><a href="#analytics">Analytics</a> routes
+<ul>
+<li><a href="#get-v5analytics">GET <code>/v5/analytics</code></a></li>
+<li><a href="#get-v5analyticsfor-publisher-auth-required">GET <code>/v5/analytics/for-publisher</code></a> (auth required)</li>
+<li><a href="#get-v5analyticsfor-advertiser-auth-required">GET <code>/v5/analytics/for-advertiser</code></a> (auth required)</li>
+<li><a href="#get-v5analyticsfor-admin-auth-required">GET <code>/v5/analytics/for-admin</code></a> (auth required)</li>
+</ul>
+</li>
+</ul>
 <h3 id="channel"><a href="#channel">Channel</a></h3>
 <p>All routes are implemented under the module <a href="channel/index.html" title="channel">channel</a>.</p>
 <h4 id="route-parameters"><a href="#route-parameters">Route parameters</a></h4>
@@ -13,37 +49,103 @@
 <li><code>:id</code> - <a href="../../primitives/channel/struct.ChannelId.html"><code>ChannelId</code></a></li>
 <li><code>:addr</code> - a valid <a href="../../primitives/address/struct.Address.html"><code>Address</code></a> or <a href="../../primitives/validator/struct.ValidatorId.html"><code>ValidatorId</code></a>.</li>
 </ul>
-<h4 id="routes"><a href="#routes">Routes</a></h4>
-<ul>
-<li><a href="channel/fn.channel_list.html"><code>GET /v5/channel/list</code></a></li>
-</ul>
+<h4 id="routes"><a href="#routes">Routes</a></h4><h5 id="get-v5channellist"><a href="#get-v5channellist">GET <code>/v5/channel/list</code></a></h5>
+<p>The route is handled by <a href="channel/fn.channel_list.html" title="channel::channel_list()"><code>channel::channel_list()</code></a>.</p>
 <p>Request query parameters: <a href="../../primitives/sentry/channel_list/struct.ChannelListQuery.html"><code>ChannelListQuery</code></a></p>
 <p>Response: <a href="../../primitives/sentry/channel_list/struct.ChannelListResponse.html"><code>ChannelListResponse</code></a></p>
-<ul>
-<li><a href="channel/fn.get_accounting_for_channel.html"><code>GET /v5/channel/:id/accounting</code></a></li>
-</ul>
+<h6 id="examples"><a href="#examples">Examples</a></h6>
+<p>Query:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">primitives</span>::{
+    <span class="ident">sentry::channel_list::ChannelListQuery</span>,
+    <span class="ident">test_util</span>::{<span class="ident">IDS</span>, <span class="ident">LEADER</span>},
+    <span class="ident">ChainId</span>,
+};
+
+<span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="comment">// An empty query</span>
+    {
+        <span class="kw">let</span> <span class="ident">empty</span> <span class="op">=</span> <span class="string">&quot;&quot;</span>;
+        <span class="kw">let</span> <span class="ident">empty_expected</span> <span class="op">=</span> <span class="ident">ChannelListQuery</span> {
+            <span class="ident">page</span>: <span class="number">0</span>,
+            <span class="ident">validator</span>: <span class="prelude-val">None</span>,
+            <span class="ident">chains</span>: <span class="macro">vec!</span>[],
+        };
+
+        <span class="macro">assert_eq!</span>(<span class="ident">empty_expected</span>, <span class="ident">serde_qs::from_str</span>(<span class="ident">empty</span>).<span class="ident">unwrap</span>());
+    }
+
+    <span class="comment">// Query with `page`</span>
+    {
+        <span class="kw">let</span> <span class="ident">only_page</span> <span class="op">=</span> <span class="string">&quot;page=14&quot;</span>;
+        <span class="kw">let</span> <span class="ident">only_page_expected</span> <span class="op">=</span> <span class="ident">ChannelListQuery</span> {
+            <span class="ident">page</span>: <span class="number">14</span>,
+            <span class="ident">validator</span>: <span class="prelude-val">None</span>,
+            <span class="ident">chains</span>: <span class="macro">vec!</span>[],
+        };
+
+        <span class="macro">assert_eq!</span>(<span class="ident">only_page_expected</span>, <span class="ident">serde_qs::from_str</span>(<span class="ident">only_page</span>).<span class="ident">unwrap</span>());
+    }
+
+    <span class="comment">// Query with `validator`</span>
+    {
+        <span class="kw">let</span> <span class="ident">only_validator</span> <span class="op">=</span> <span class="string">&quot;validator=0x80690751969B234697e9059e04ed72195c3507fa&quot;</span>;
+        <span class="kw">let</span> <span class="ident">only_validator_expected</span> <span class="op">=</span> <span class="ident">ChannelListQuery</span> {
+            <span class="ident">page</span>: <span class="number">0</span>,
+            <span class="ident">validator</span>: <span class="prelude-val">Some</span>(<span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>]),
+            <span class="ident">chains</span>: <span class="macro">vec!</span>[],
+        };
+
+        <span class="macro">assert_eq!</span>(
+            <span class="ident">only_validator_expected</span>,
+            <span class="ident">serde_qs::from_str</span>(<span class="ident">only_validator</span>).<span class="ident">unwrap</span>()
+        );
+    }
+
+    <span class="comment">// Query with `chains`</span>
+    {
+        <span class="kw">let</span> <span class="ident">chains_query</span> <span class="op">=</span> <span class="string">&quot;chains[]=1&amp;chains[]=1337&quot;</span>;
+        <span class="kw">let</span> <span class="ident">chains_expected</span> <span class="op">=</span> <span class="ident">ChannelListQuery</span> {
+            <span class="ident">page</span>: <span class="number">0</span>,
+            <span class="ident">validator</span>: <span class="prelude-val">None</span>,
+            <span class="ident">chains</span>: <span class="macro">vec!</span>[<span class="ident">ChainId::new</span>(<span class="number">1</span>), <span class="ident">ChainId::new</span>(<span class="number">1337</span>)],
+        };
+
+        <span class="macro">assert_eq!</span>(<span class="ident">chains_expected</span>, <span class="ident">serde_qs::from_str</span>(<span class="ident">chains_query</span>).<span class="ident">unwrap</span>());
+    }
+
+    <span class="comment">// Query with all parameters</span>
+    {
+        <span class="kw">let</span> <span class="ident">all_query</span> <span class="op">=</span>
+            <span class="string">&quot;page=14&amp;validator=0x80690751969B234697e9059e04ed72195c3507fa&amp;chains[]=1&amp;chains[]=1337&quot;</span>;
+        <span class="kw">let</span> <span class="ident">all_expected</span> <span class="op">=</span> <span class="ident">ChannelListQuery</span> {
+            <span class="ident">page</span>: <span class="number">14</span>,
+            <span class="ident">validator</span>: <span class="prelude-val">Some</span>(<span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>]),
+            <span class="ident">chains</span>: <span class="macro">vec!</span>[<span class="ident">ChainId::new</span>(<span class="number">1</span>), <span class="ident">ChainId::new</span>(<span class="number">1337</span>)],
+        };
+
+        <span class="macro">assert_eq!</span>(<span class="ident">all_expected</span>, <span class="ident">serde_qs::from_str</span>(<span class="ident">all_query</span>).<span class="ident">unwrap</span>());
+    }
+}</code></pre></div>
+<h5 id="get-v5channelidaccounting"><a href="#get-v5channelidaccounting">GET <code>/v5/channel/:id/accounting</code></a></h5>
+<p>The route is handled by <a href="channel/fn.get_accounting_for_channel.html" title="channel::get_accounting_for_channel()"><code>channel::get_accounting_for_channel()</code></a>.</p>
 <p>Response: <a href="../../primitives/sentry/struct.AccountingResponse.html"><code>AccountingResponse::&lt;CheckedState&gt;</code></a></p>
-<ul>
-<li><a href="channel/fn.get_spender_limits.html"><code>GET /v5/channel/:id/spender/:addr</code></a> (auth required)</li>
-</ul>
+<h5 id="get-v5channelidspenderaddr-auth-required"><a href="#get-v5channelidspenderaddr-auth-required">GET <code>/v5/channel/:id/spender/:addr</code> (auth required)</a></h5>
+<p>The route is handled by <a href="channel/fn.get_spender_limits.html" title="channel::get_spender_limits()"><code>channel::get_spender_limits()</code></a>.</p>
 <p>Response: <a href="../../primitives/sentry/struct.SpenderResponse.html"><code>SpenderResponse</code></a></p>
-<ul>
-<li><a href="channel/fn.add_spender_leaf.html"><code>POST /v5/channel/:id/spender/:addr</code></a> (auth required)</li>
-</ul>
+<h5 id="post-v5channelidspenderaddr-auth-required"><a href="#post-v5channelidspenderaddr-auth-required">POST <code>/v5/channel/:id/spender/:addr</code> (auth required)</a></h5>
 <p>This route forces the addition of a spender <a href="../db/accounting/struct.Accounting.html"><code>Accounting</code></a>
 (if one does not exist) to the given <a href="../../primitives/channel/struct.Channel.html"><code>Channel</code></a> with <code>spent = 0</code>.
 This will also ensure that the spender is added to the <a href="../../primitives/validator/messages/struct.NewState.html"><code>NewState</code></a> as well.</p>
+<p>The route is handled by <a href="channel/fn.add_spender_leaf.html" title="channel::add_spender_leaf()"><code>channel::add_spender_leaf()</code></a>.</p>
 <p>Response: <a href="../../primitives/sentry/struct.SuccessResponse.html"><code>SuccessResponse</code></a></p>
-<ul>
-<li><a href="channel/fn.get_all_spender_limits.html"><code>GET /v5/channel/:id/spender/all</code></a> (auth required)</li>
-</ul>
+<h5 id="get-v5channelidspenderall-auth-required"><a href="#get-v5channelidspenderall-auth-required">GET <code>/v5/channel/:id/spender/all</code> (auth required)</a></h5>
+<p>The route is handled by <a href="channel/fn.get_all_spender_limits.html" title="channel::get_all_spender_limits()"><code>channel::get_all_spender_limits()</code></a>.</p>
 <p>Response: <a href="../../primitives/sentry/struct.AllSpendersResponse.html"><code>AllSpendersResponse</code></a></p>
+<h5 id="get-v5channelidvalidator-messages"><a href="#get-v5channelidvalidator-messages">GET <code>/v5/channel/:id/validator-messages</code></a></h5>
 <ul>
-<li>
-<p><a href="channel/validator_message/fn.list_validator_messages.html"><code>GET /v5/channel/:id/validator-messages</code></a></p>
-<ul>
-<li><a href="channel/validator_message/fn.list_validator_messages.html"><code>GET /v5/channel/:id/validator-messages/:addr</code></a> - filter by the given <a href="../../primitives/validator/struct.ValidatorId.html"><code>ValidatorId</code></a></li>
-<li><a href="channel/validator_message/fn.list_validator_messages.html"><code>GET /v5/channel/:id/validator-messages/:addr/:validator_messages</code></a> - filters by the given <a href="../../primitives/validator/struct.ValidatorId.html"><code>ValidatorId</code></a> and a
+<li>GET <code>/v5/channel/:id/validator-messages/:addr</code> - filter by the given <a href="../../primitives/validator/struct.ValidatorId.html"><code>ValidatorId</code></a></li>
+<li>GET <code>/v5/channel/:id/validator-messages/:addr/:validator_messages</code> - filters by the given <a href="../../primitives/validator/struct.ValidatorId.html"><code>ValidatorId</code></a> and a
 <a href="../../primitives/validator/messages/enum.MessageTypes.html"><code>Validator message types</code></a>.
 <ul>
 <li>
@@ -53,13 +155,11 @@ This will also ensure that the spender is added to the <a href="../../primitives
 </ul>
 </li>
 </ul>
-</li>
-</ul>
+<p>The route is handled by <a href="channel/validator_message/fn.list_validator_messages.html" title="channel::validator_message::list_validator_messages()"><code>channel::validator_message::list_validator_messages()</code></a>.</p>
 <p>Request query parameters: <a href="../../primitives/sentry/struct.ValidatorMessagesListQuery.html">ValidatorMessagesListQuery</a></p>
 <p>Response: <a href="../../primitives/sentry/struct.ValidatorMessagesListResponse.html">ValidatorMessagesListResponse</a></p>
-<ul>
-<li><a href="channel/validator_message/fn.create_validator_messages.html"><code>POST /v5/channel/:id/validator-messages</code></a> (auth required)</li>
-</ul>
+<h5 id="post-v5channelidvalidator-messages-auth-required"><a href="#post-v5channelidvalidator-messages-auth-required">POST <code>/v5/channel/:id/validator-messages</code> (auth required)</a></h5>
+<p>The route is handled by <a href="channel/validator_message/fn.create_validator_messages.html" title="channel::validator_message::create_validator_messages()"><code>channel::validator_message::create_validator_messages()</code></a>.</p>
 <p>Request body (json): <a href="../../primitives/sentry/struct.ValidatorMessagesCreateRequest.html"><code>ValidatorMessagesCreateRequest</code></a></p>
 <p>Example:</p>
 <div class="example-wrap"><pre class="language-json"><code>{
@@ -69,28 +169,25 @@ This will also ensure that the spender is added to the <a href="../../primitives
     ]
 }</code></pre></div>
 <p>Validator messages: <a href="../../primitives/validator/messages/enum.MessageTypes.html"><code>MessageTypes</code></a></p>
-<ul>
-<li><a href="channel/fn.last_approved.html"><code>GET /v5/channel/:id/last-approved</code></a></li>
-</ul>
+<h5 id="get-v5channelidlast-approved"><a href="#get-v5channelidlast-approved">GET <code>/v5/channel/:id/last-approved</code></a></h5>
+<p>The route is handled by <a href="channel/fn.last_approved.html" title="channel::last_approved()"><code>channel::last_approved()</code></a>.</p>
 <p>Request query parameters: <a href="../../primitives/sentry/struct.LastApprovedQuery.html" title="primitives::sentry::LastApprovedQuery"><code>LastApprovedQuery</code></a></p>
 <p>Response: <a href="../../primitives/sentry/struct.LastApprovedResponse.html" title="primitives::sentry::LastApprovedResponse"><code>LastApprovedResponse</code></a></p>
-<ul>
-<li><a href="channel/fn.channel_payout.html"><code>POST /v5/channel/:id/pay</code></a> (auth required)</li>
-</ul>
+<h5 id="post-v5channelidpay-auth-required"><a href="#post-v5channelidpay-auth-required">POST <code>/v5/channel/:id/pay</code> (auth required)</a></h5>
 <p>Channel Payout with authentication of the spender.</p>
 <p>This route handles withdrawals of advertiser funds for the authenticated spender.
 It needs to ensure all campaigns are closed. It accepts a JSON body in the request which contains
 all of the earners and updates their balances accordingly. Used when an advertiser/spender wants
 to get their remaining funds back.</p>
+<p>The route is handled by <a href="channel/fn.channel_payout.html" title="channel::channel_payout()"><code>channel::channel_payout()</code></a>.</p>
 <p>Request JSON body: <a href="../../primitives/sentry/struct.ChannelPayRequest.html"><code>ChannelPayRequest</code></a></p>
 <p>Response: <a href="../../primitives/sentry/struct.SuccessResponse.html"><code>SuccessResponse</code></a></p>
-<ul>
-<li><code>GET /v5/channel/:id/get-leaf</code></li>
-</ul>
+<h5 id="get-v5channelidget-leaf"><a href="#get-v5channelidget-leaf">GET <code>/v5/channel/:id/get-leaf</code></a></h5>
 <p>TODO: implement and document as part of issue #382</p>
 <p>This route gets the latest approved state (<a href="../../primitives/validator/messages/struct.NewState.html"><code>NewState</code></a>/<a href="../../primitives/validator/messages/struct.ApproveState.html"><code>ApproveState</code></a> pair),
 and finds the given <code>spender</code>/<code>earner</code> in the balances tree, and produce a merkle proof for it.
 This is useful for the Platform to verify if a spender leaf really exists.</p>
+<p>The route is handled by <code>todo</code>.</p>
 <p>Request query parameters:</p>
 <ul>
 <li><code>spender=[0x...]</code> or <code>earner=[0x...]</code> (required)</li>
@@ -107,14 +204,12 @@ This module includes all routes for <code>Sentry</code> and the documentation of
 <ul>
 <li><code>:id</code> - <a href="../../primitives/campaign/campaign_id/struct.CampaignId.html"><code>CampaignId</code></a></li>
 </ul>
-<h4 id="routes-1"><a href="#routes-1">Routes</a></h4>
-<ul>
-<li><a href="campaign/fn.campaign_list.html"><code>GET /v5/campaign/list</code></a></li>
-</ul>
+<h4 id="routes-1"><a href="#routes-1">Routes</a></h4><h5 id="get-v5campaignlist"><a href="#get-v5campaignlist">GET <code>/v5/campaign/list</code></a></h5>
 <p>Lists all campaigns with pagination and orders them in
-descending order (<code>DESC</code>) by <code>Campaign.created</code>.
+ascending order (<code>ASC</code>) by <code>Campaign.created</code>.
 This ensures that the order in the pages will not change if a new
 <code>Campaign</code> is created while still retrieving a page.</p>
+<p>The route is handled by <a href="campaign/fn.campaign_list.html" title="campaign::campaign_list()"><code>campaign::campaign_list()</code></a>.</p>
 <p>Request query parameters: <a href="../../primitives/sentry/campaign_list/struct.CampaignListQuery.html" title="primitives::sentry::campaign_list::CampaignListQuery"><code>CampaignListQuery</code></a></p>
 <ul>
 <li><code>page=[integer]</code> (optional) default: <code>0</code></li>
@@ -128,51 +223,388 @@ This ensures that the order in the pages will not change if a new
 </li>
 </ul>
 <p>Response: <a href="../../primitives/sentry/campaign_list/struct.CampaignListResponse.html" title="primitives::sentry::campaign_list::CampaignListResponse"><code>CampaignListResponse</code></a></p>
-<ul>
-<li><a href="campaign/fn.create_campaign.html"><code>POST /v5/campaign</code></a> (auth required)</li>
-</ul>
+<h6 id="examples-1"><a href="#examples-1">Examples</a></h6>
+<p>Query:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">chrono</span>::{<span class="ident">TimeZone</span>, <span class="ident">Utc</span>};
+<span class="kw">use</span> <span class="ident">primitives</span>::{
+    <span class="ident">sentry::campaign_list</span>::{<span class="ident">CampaignListQuery</span>, <span class="ident">ValidatorParam</span>},
+    <span class="ident">test_util</span>::{<span class="ident">ADVERTISER</span>, <span class="ident">FOLLOWER</span>, <span class="ident">IDS</span>, <span class="ident">LEADER</span>},
+};
+
+<span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="comment">// Empty query - default values only</span>
+    {
+        <span class="kw">let</span> <span class="ident">empty_query</span> <span class="op">=</span> <span class="string">&quot;&quot;</span>;
+        <span class="kw">let</span> <span class="ident">query</span>: <span class="ident">CampaignListQuery</span> <span class="op">=</span> <span class="ident">serde_qs::from_str</span>(<span class="ident">empty_query</span>).<span class="ident">unwrap</span>();
+
+        <span class="macro">assert_eq!</span>(<span class="number">0</span>, <span class="ident">query</span>.<span class="ident">page</span>);
+        <span class="macro">assert!</span>(
+            <span class="ident">Utc::now</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="ident">query</span>.<span class="ident">active_to_ge</span>,
+            <span class="string">&quot;By default `activeTo` is set to `Utc::now()`&quot;</span>
+        );
+        <span class="macro">assert!</span>(<span class="ident">query</span>.<span class="ident">creator</span>.<span class="ident">is_none</span>());
+        <span class="macro">assert!</span>(<span class="ident">query</span>.<span class="ident">validator</span>.<span class="ident">is_none</span>());
+    }
+
+    <span class="comment">// In the following examples we always use `activeTo`</span>
+    <span class="comment">// as it makes simpler examples for assertions rather than using the default `Utc::now()`</span>
+
+    <span class="comment">// Query with `activeTo` only</span>
+    {
+        <span class="kw">let</span> <span class="ident">active_to_query</span> <span class="op">=</span> <span class="string">&quot;activeTo=1624192200&quot;</span>;
+        <span class="kw">let</span> <span class="ident">active_to</span> <span class="op">=</span> <span class="ident">CampaignListQuery</span> {
+            <span class="ident">page</span>: <span class="number">0</span>,
+            <span class="ident">active_to_ge</span>: <span class="ident">Utc</span>.<span class="ident">ymd</span>(<span class="number">2021</span>, <span class="number">6</span>, <span class="number">20</span>).<span class="ident">and_hms</span>(<span class="number">12</span>, <span class="number">30</span>, <span class="number">0</span>),
+            <span class="ident">creator</span>: <span class="prelude-val">None</span>,
+            <span class="ident">validator</span>: <span class="prelude-val">None</span>,
+        };
+
+        <span class="macro">assert_eq!</span>(<span class="ident">active_to</span>, <span class="ident">serde_qs::from_str</span>(<span class="ident">active_to_query</span>).<span class="ident">unwrap</span>());
+    }
+
+    <span class="comment">// Query with `page` &amp; `activeTo`</span>
+    {
+        <span class="kw">let</span> <span class="ident">with_page_query</span> <span class="op">=</span> <span class="string">&quot;page=14&amp;activeTo=1624192200&quot;</span>;
+        <span class="kw">let</span> <span class="ident">with_page</span> <span class="op">=</span> <span class="ident">CampaignListQuery</span> {
+            <span class="ident">page</span>: <span class="number">14</span>,
+            <span class="ident">active_to_ge</span>: <span class="ident">Utc</span>.<span class="ident">ymd</span>(<span class="number">2021</span>, <span class="number">6</span>, <span class="number">20</span>).<span class="ident">and_hms</span>(<span class="number">12</span>, <span class="number">30</span>, <span class="number">0</span>),
+            <span class="ident">creator</span>: <span class="prelude-val">None</span>,
+            <span class="ident">validator</span>: <span class="prelude-val">None</span>,
+        };
+
+        <span class="macro">assert_eq!</span>(<span class="ident">with_page</span>, <span class="ident">serde_qs::from_str</span>(<span class="ident">with_page_query</span>).<span class="ident">unwrap</span>());
+    }
+
+    <span class="comment">// Query with `creator`</span>
+    {
+        <span class="kw">let</span> <span class="ident">with_creator_query</span> <span class="op">=</span>
+            <span class="string">&quot;activeTo=1624192200&amp;creator=0xDd589B43793934EF6Ad266067A0d1D4896b0dff0&quot;</span>;
+
+        <span class="kw">let</span> <span class="ident">with_creator</span> <span class="op">=</span> <span class="ident">CampaignListQuery</span> {
+            <span class="ident">page</span>: <span class="number">0</span>,
+            <span class="ident">active_to_ge</span>: <span class="ident">Utc</span>.<span class="ident">ymd</span>(<span class="number">2021</span>, <span class="number">6</span>, <span class="number">20</span>).<span class="ident">and_hms</span>(<span class="number">12</span>, <span class="number">30</span>, <span class="number">0</span>),
+            <span class="ident">creator</span>: <span class="prelude-val">Some</span>(<span class="kw-2">*</span><span class="ident">ADVERTISER</span>),
+            <span class="ident">validator</span>: <span class="prelude-val">None</span>,
+        };
+
+        <span class="macro">assert_eq!</span>(
+            <span class="ident">with_creator</span>,
+            <span class="ident">serde_qs::from_str</span>(<span class="ident">with_creator_query</span>).<span class="ident">unwrap</span>()
+        );
+    }
+
+    <span class="comment">// Query with `validator`</span>
+    <span class="comment">// You can either have `leader` or `validator` but not both!</span>
+    {
+        <span class="kw">let</span> <span class="ident">with_creator_validator_query</span> <span class="op">=</span>
+            <span class="string">&quot;activeTo=1624192200&amp;validator=0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7&quot;</span>;
+        <span class="kw">let</span> <span class="ident">with_creator_validator</span> <span class="op">=</span> <span class="ident">CampaignListQuery</span> {
+            <span class="ident">page</span>: <span class="number">0</span>,
+            <span class="ident">active_to_ge</span>: <span class="ident">Utc</span>.<span class="ident">ymd</span>(<span class="number">2021</span>, <span class="number">6</span>, <span class="number">20</span>).<span class="ident">and_hms</span>(<span class="number">12</span>, <span class="number">30</span>, <span class="number">0</span>),
+            <span class="ident">creator</span>: <span class="prelude-val">None</span>,
+            <span class="ident">validator</span>: <span class="prelude-val">Some</span>(<span class="ident">ValidatorParam::Validator</span>(<span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">FOLLOWER</span>])),
+        };
+
+        <span class="macro">assert_eq!</span>(
+            <span class="ident">with_creator_validator</span>,
+            <span class="ident">serde_qs::from_str</span>(<span class="ident">with_creator_validator_query</span>).<span class="ident">unwrap</span>()
+        );
+    }
+
+    <span class="comment">// Query with `leader`</span>
+    <span class="comment">// You can either have `leader` or `validator` but not both!</span>
+    {
+        <span class="kw">let</span> <span class="ident">with_leader_query</span> <span class="op">=</span>
+            <span class="string">&quot;activeTo=1624192200&amp;leader=0x80690751969B234697e9059e04ed72195c3507fa&quot;</span>;
+
+        <span class="kw">let</span> <span class="ident">with_leader</span> <span class="op">=</span> <span class="ident">CampaignListQuery</span> {
+            <span class="ident">page</span>: <span class="number">0</span>,
+            <span class="ident">active_to_ge</span>: <span class="ident">Utc</span>.<span class="ident">ymd</span>(<span class="number">2021</span>, <span class="number">6</span>, <span class="number">20</span>).<span class="ident">and_hms</span>(<span class="number">12</span>, <span class="number">30</span>, <span class="number">0</span>),
+            <span class="ident">creator</span>: <span class="prelude-val">None</span>,
+            <span class="ident">validator</span>: <span class="prelude-val">Some</span>(<span class="ident">ValidatorParam::Leader</span>(<span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>])),
+        };
+
+        <span class="macro">assert_eq!</span>(<span class="ident">with_leader</span>, <span class="ident">serde_qs::from_str</span>(<span class="ident">with_leader_query</span>).<span class="ident">unwrap</span>());
+    }
+
+    <span class="comment">// Query with all parameters and `validator`</span>
+    <span class="comment">// You can either have `leader` or `validator` but not both!</span>
+    {
+        <span class="kw">let</span> <span class="ident">full_query</span> <span class="op">=</span> <span class="string">&quot;page=14&amp;activeTo=1624192200&amp;creator=0xDd589B43793934EF6Ad266067A0d1D4896b0dff0&amp;validator=0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7&quot;</span>;
+        <span class="kw">let</span> <span class="ident">full_expected</span> <span class="op">=</span> <span class="ident">CampaignListQuery</span> {
+            <span class="ident">page</span>: <span class="number">14</span>,
+            <span class="ident">active_to_ge</span>: <span class="ident">Utc</span>.<span class="ident">ymd</span>(<span class="number">2021</span>, <span class="number">6</span>, <span class="number">20</span>).<span class="ident">and_hms</span>(<span class="number">12</span>, <span class="number">30</span>, <span class="number">0</span>),
+            <span class="ident">creator</span>: <span class="prelude-val">Some</span>(<span class="kw-2">*</span><span class="ident">ADVERTISER</span>),
+            <span class="ident">validator</span>: <span class="prelude-val">Some</span>(<span class="ident">ValidatorParam::Validator</span>(<span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">FOLLOWER</span>])),
+        };
+
+        <span class="macro">assert_eq!</span>(<span class="ident">full_expected</span>, <span class="ident">serde_qs::from_str</span>(<span class="ident">full_query</span>).<span class="ident">unwrap</span>());
+    }
+}</code></pre></div>
+<p>Response:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use</span> <span class="ident">primitives::sentry::campaign_list::CampaignListResponse</span>;
+<span class="kw">use</span> <span class="ident">serde_json</span>::{<span class="ident">from_value</span>, <span class="ident">json</span>};
+
+<span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> <span class="ident">json</span> <span class="op">=</span> <span class="macro">json!</span>({
+      <span class="string">&quot;campaigns&quot;</span>: [
+        {
+          <span class="string">&quot;id&quot;</span>: <span class="string">&quot;0x936da01f9abd4d9d80c702af85c822a8&quot;</span>,
+          <span class="string">&quot;channel&quot;</span>: {
+            <span class="string">&quot;leader&quot;</span>: <span class="string">&quot;0x80690751969B234697e9059e04ed72195c3507fa&quot;</span>,
+            <span class="string">&quot;follower&quot;</span>: <span class="string">&quot;0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7&quot;</span>,
+            <span class="string">&quot;guardian&quot;</span>: <span class="string">&quot;0xe061E1EB461EaBE512759aa18A201B20Fe90631D&quot;</span>,
+            <span class="string">&quot;token&quot;</span>: <span class="string">&quot;0x2BCaf6968aEC8A3b5126FBfAb5Fd419da6E8AD8E&quot;</span>,
+            <span class="string">&quot;nonce&quot;</span>: <span class="string">&quot;0&quot;</span>
+          },
+          <span class="string">&quot;creator&quot;</span>: <span class="string">&quot;0xDd589B43793934EF6Ad266067A0d1D4896b0dff0&quot;</span>,
+          <span class="string">&quot;budget&quot;</span>: <span class="string">&quot;15000000000&quot;</span>,
+          <span class="string">&quot;validators&quot;</span>: [
+            {
+              <span class="string">&quot;id&quot;</span>: <span class="string">&quot;0x80690751969B234697e9059e04ed72195c3507fa&quot;</span>,
+              <span class="string">&quot;fee&quot;</span>: <span class="string">&quot;500000000&quot;</span>,
+              <span class="string">&quot;url&quot;</span>: <span class="string">&quot;http://localhost:8005/&quot;</span>
+            },
+            {
+              <span class="string">&quot;id&quot;</span>: <span class="string">&quot;0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7&quot;</span>,
+              <span class="string">&quot;fee&quot;</span>: <span class="string">&quot;400000000&quot;</span>,
+              <span class="string">&quot;url&quot;</span>: <span class="string">&quot;http://localhost:8006/&quot;</span>
+            }
+          ],
+          <span class="string">&quot;title&quot;</span>: <span class="string">&quot;Dummy Campaign&quot;</span>,
+          <span class="string">&quot;pricingBounds&quot;</span>: {
+            <span class="string">&quot;CLICK&quot;</span>: {
+              <span class="string">&quot;min&quot;</span>: <span class="string">&quot;6000000&quot;</span>,
+              <span class="string">&quot;max&quot;</span>: <span class="string">&quot;10000000&quot;</span>
+            },
+            <span class="string">&quot;IMPRESSION&quot;</span>: {
+              <span class="string">&quot;min&quot;</span>: <span class="string">&quot;4000000&quot;</span>,
+              <span class="string">&quot;max&quot;</span>: <span class="string">&quot;5000000&quot;</span>
+            }
+          },
+          <span class="string">&quot;eventSubmission&quot;</span>: {
+            <span class="string">&quot;allow&quot;</span>: []
+          },
+          <span class="string">&quot;adUnits&quot;</span>: [
+            {
+              <span class="string">&quot;ipfs&quot;</span>: <span class="string">&quot;Qmasg8FrbuSQpjFu3kRnZF9beg8rEBFrqgi1uXDRwCbX5f&quot;</span>,
+              <span class="string">&quot;type&quot;</span>: <span class="string">&quot;legacy_250x250&quot;</span>,
+              <span class="string">&quot;mediaUrl&quot;</span>: <span class="string">&quot;ipfs://QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR&quot;</span>,
+              <span class="string">&quot;mediaMime&quot;</span>: <span class="string">&quot;image/jpeg&quot;</span>,
+              <span class="string">&quot;targetUrl&quot;</span>: <span class="string">&quot;https://www.adex.network/?stremio-test-banner-1&quot;</span>,
+              <span class="string">&quot;owner&quot;</span>: <span class="string">&quot;0xE882ebF439207a70dDcCb39E13CA8506c9F45fD9&quot;</span>,
+              <span class="string">&quot;created&quot;</span>: <span class="number">1564390800000_u64</span>,
+              <span class="string">&quot;title&quot;</span>: <span class="string">&quot;Dummy AdUnit 1&quot;</span>,
+              <span class="string">&quot;description&quot;</span>: <span class="string">&quot;Dummy AdUnit description 1&quot;</span>,
+              <span class="string">&quot;archived&quot;</span>: <span class="bool-val">false</span>
+            },
+            {
+              <span class="string">&quot;ipfs&quot;</span>: <span class="string">&quot;QmVhRDGXoM3Fg3HZD5xwMuxtb9ZErwC8wHt8CjsfxaiUbZ&quot;</span>,
+              <span class="string">&quot;type&quot;</span>: <span class="string">&quot;legacy_250x250&quot;</span>,
+              <span class="string">&quot;mediaUrl&quot;</span>: <span class="string">&quot;ipfs://QmQB7uz7Gxfy7wqAnrnBcZFaVJLos8J9gn8mRcHQU6dAi1&quot;</span>,
+              <span class="string">&quot;mediaMime&quot;</span>: <span class="string">&quot;image/jpeg&quot;</span>,
+              <span class="string">&quot;targetUrl&quot;</span>: <span class="string">&quot;https://www.adex.network/?adex-campaign=true&amp;pub=stremio&quot;</span>,
+              <span class="string">&quot;owner&quot;</span>: <span class="string">&quot;0xE882ebF439207a70dDcCb39E13CA8506c9F45fD9&quot;</span>,
+              <span class="string">&quot;created&quot;</span>: <span class="number">1564390800000_u64</span>,
+              <span class="string">&quot;title&quot;</span>: <span class="string">&quot;Dummy AdUnit 2&quot;</span>,
+              <span class="string">&quot;description&quot;</span>: <span class="string">&quot;Dummy AdUnit description 2&quot;</span>,
+              <span class="string">&quot;archived&quot;</span>: <span class="bool-val">false</span>
+            }
+          ],
+          <span class="string">&quot;targetingRules&quot;</span>: [],
+          <span class="string">&quot;created&quot;</span>: <span class="number">1612162800000_u64</span>,
+          <span class="string">&quot;active_to&quot;</span>: <span class="number">4073414400000_u64</span>
+        },
+        {
+          <span class="string">&quot;id&quot;</span>: <span class="string">&quot;0x127b98248f4e4b73af409d10f62daeaa&quot;</span>,
+          <span class="string">&quot;channel&quot;</span>: {
+            <span class="string">&quot;leader&quot;</span>: <span class="string">&quot;0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7&quot;</span>,
+            <span class="string">&quot;follower&quot;</span>: <span class="string">&quot;0x80690751969B234697e9059e04ed72195c3507fa&quot;</span>,
+            <span class="string">&quot;guardian&quot;</span>: <span class="string">&quot;0x79D358a3194d737880B3eFD94ADccD246af9F535&quot;</span>,
+            <span class="string">&quot;token&quot;</span>: <span class="string">&quot;0x2BCaf6968aEC8A3b5126FBfAb5Fd419da6E8AD8E&quot;</span>,
+            <span class="string">&quot;nonce&quot;</span>: <span class="string">&quot;0&quot;</span>
+          },
+          <span class="string">&quot;creator&quot;</span>: <span class="string">&quot;0xDd589B43793934EF6Ad266067A0d1D4896b0dff0&quot;</span>,
+          <span class="string">&quot;budget&quot;</span>: <span class="string">&quot;2000000000&quot;</span>,
+          <span class="string">&quot;validators&quot;</span>: [
+            {
+              <span class="string">&quot;id&quot;</span>: <span class="string">&quot;0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7&quot;</span>,
+              <span class="string">&quot;fee&quot;</span>: <span class="string">&quot;10000000&quot;</span>,
+              <span class="string">&quot;url&quot;</span>: <span class="string">&quot;http://localhost:8006/&quot;</span>
+            },
+            {
+              <span class="string">&quot;id&quot;</span>: <span class="string">&quot;0x80690751969B234697e9059e04ed72195c3507fa&quot;</span>,
+              <span class="string">&quot;fee&quot;</span>: <span class="string">&quot;5000000&quot;</span>,
+              <span class="string">&quot;url&quot;</span>: <span class="string">&quot;http://localhost:8005/&quot;</span>
+            }
+          ],
+          <span class="string">&quot;title&quot;</span>: <span class="string">&quot;Dummy Campaign 2 in Chain #1337&quot;</span>,
+          <span class="string">&quot;pricingBounds&quot;</span>: {
+            <span class="string">&quot;CLICK&quot;</span>: {
+              <span class="string">&quot;min&quot;</span>: <span class="string">&quot;300000000&quot;</span>,
+              <span class="string">&quot;max&quot;</span>: <span class="string">&quot;500000000&quot;</span>
+            },
+            <span class="string">&quot;IMPRESSION&quot;</span>: {
+              <span class="string">&quot;min&quot;</span>: <span class="string">&quot;100000000&quot;</span>,
+              <span class="string">&quot;max&quot;</span>: <span class="string">&quot;200000000&quot;</span>
+            }
+          },
+          <span class="string">&quot;eventSubmission&quot;</span>: {
+            <span class="string">&quot;allow&quot;</span>: []
+          },
+          <span class="string">&quot;adUnits&quot;</span>: [
+            {
+              <span class="string">&quot;ipfs&quot;</span>: <span class="string">&quot;Qmasg8FrbuSQpjFu3kRnZF9beg8rEBFrqgi1uXDRwCbX5f&quot;</span>,
+              <span class="string">&quot;type&quot;</span>: <span class="string">&quot;legacy_250x250&quot;</span>,
+              <span class="string">&quot;mediaUrl&quot;</span>: <span class="string">&quot;ipfs://QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR&quot;</span>,
+              <span class="string">&quot;mediaMime&quot;</span>: <span class="string">&quot;image/jpeg&quot;</span>,
+              <span class="string">&quot;targetUrl&quot;</span>: <span class="string">&quot;https://www.adex.network/?stremio-test-banner-1&quot;</span>,
+              <span class="string">&quot;owner&quot;</span>: <span class="string">&quot;0xE882ebF439207a70dDcCb39E13CA8506c9F45fD9&quot;</span>,
+              <span class="string">&quot;created&quot;</span>: <span class="number">1564390800000_u64</span>,
+              <span class="string">&quot;title&quot;</span>: <span class="string">&quot;Dummy AdUnit 1&quot;</span>,
+              <span class="string">&quot;description&quot;</span>: <span class="string">&quot;Dummy AdUnit description 1&quot;</span>,
+              <span class="string">&quot;archived&quot;</span>: <span class="bool-val">false</span>
+            },
+            {
+              <span class="string">&quot;ipfs&quot;</span>: <span class="string">&quot;QmVhRDGXoM3Fg3HZD5xwMuxtb9ZErwC8wHt8CjsfxaiUbZ&quot;</span>,
+              <span class="string">&quot;type&quot;</span>: <span class="string">&quot;legacy_250x250&quot;</span>,
+              <span class="string">&quot;mediaUrl&quot;</span>: <span class="string">&quot;ipfs://QmQB7uz7Gxfy7wqAnrnBcZFaVJLos8J9gn8mRcHQU6dAi1&quot;</span>,
+              <span class="string">&quot;mediaMime&quot;</span>: <span class="string">&quot;image/jpeg&quot;</span>,
+              <span class="string">&quot;targetUrl&quot;</span>: <span class="string">&quot;https://www.adex.network/?adex-campaign=true&amp;pub=stremio&quot;</span>,
+              <span class="string">&quot;owner&quot;</span>: <span class="string">&quot;0xE882ebF439207a70dDcCb39E13CA8506c9F45fD9&quot;</span>,
+              <span class="string">&quot;created&quot;</span>: <span class="number">1564390800000_u64</span>,
+              <span class="string">&quot;title&quot;</span>: <span class="string">&quot;Dummy AdUnit 2&quot;</span>,
+              <span class="string">&quot;description&quot;</span>: <span class="string">&quot;Dummy AdUnit description 2&quot;</span>,
+              <span class="string">&quot;archived&quot;</span>: <span class="bool-val">false</span>
+            }
+          ],
+          <span class="string">&quot;targetingRules&quot;</span>: [],
+          <span class="string">&quot;created&quot;</span>: <span class="number">1612162800000_u64</span>,
+          <span class="string">&quot;active_to&quot;</span>: <span class="number">4073414400000_u64</span>
+        },
+        {
+          <span class="string">&quot;id&quot;</span>: <span class="string">&quot;0xa78f3492481b41a688488a7aa1ff17df&quot;</span>,
+          <span class="string">&quot;channel&quot;</span>: {
+            <span class="string">&quot;leader&quot;</span>: <span class="string">&quot;0x80690751969B234697e9059e04ed72195c3507fa&quot;</span>,
+            <span class="string">&quot;follower&quot;</span>: <span class="string">&quot;0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7&quot;</span>,
+            <span class="string">&quot;guardian&quot;</span>: <span class="string">&quot;0x79D358a3194d737880B3eFD94ADccD246af9F535&quot;</span>,
+            <span class="string">&quot;token&quot;</span>: <span class="string">&quot;0x12a28f2bfBFfDf5842657235cC058242f40fDEa6&quot;</span>,
+            <span class="string">&quot;nonce&quot;</span>: <span class="string">&quot;1&quot;</span>
+          },
+          <span class="string">&quot;creator&quot;</span>: <span class="string">&quot;0x541b401362Ea1D489D322579552B099e801F3632&quot;</span>,
+          <span class="string">&quot;budget&quot;</span>: <span class="string">&quot;2000000000&quot;</span>,
+          <span class="string">&quot;validators&quot;</span>: [
+            {
+              <span class="string">&quot;id&quot;</span>: <span class="string">&quot;0x80690751969B234697e9059e04ed72195c3507fa&quot;</span>,
+              <span class="string">&quot;fee&quot;</span>: <span class="string">&quot;200000000&quot;</span>,
+              <span class="string">&quot;url&quot;</span>: <span class="string">&quot;http://localhost:8005/&quot;</span>
+            },
+            {
+              <span class="string">&quot;id&quot;</span>: <span class="string">&quot;0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7&quot;</span>,
+              <span class="string">&quot;fee&quot;</span>: <span class="string">&quot;175000000&quot;</span>,
+              <span class="string">&quot;url&quot;</span>: <span class="string">&quot;http://localhost:8006/&quot;</span>
+            }
+          ],
+          <span class="string">&quot;title&quot;</span>: <span class="string">&quot;Dummy Campaign 3 in Chain #1&quot;</span>,
+          <span class="string">&quot;pricingBounds&quot;</span>: {
+            <span class="string">&quot;CLICK&quot;</span>: {
+              <span class="string">&quot;min&quot;</span>: <span class="string">&quot;3500000&quot;</span>,
+              <span class="string">&quot;max&quot;</span>: <span class="string">&quot;6500000&quot;</span>
+            },
+            <span class="string">&quot;IMPRESSION&quot;</span>: {
+              <span class="string">&quot;min&quot;</span>: <span class="string">&quot;1500000&quot;</span>,
+              <span class="string">&quot;max&quot;</span>: <span class="string">&quot;2500000&quot;</span>
+            }
+          },
+          <span class="string">&quot;eventSubmission&quot;</span>: {
+            <span class="string">&quot;allow&quot;</span>: []
+          },
+          <span class="string">&quot;adUnits&quot;</span>: [
+            {
+              <span class="string">&quot;ipfs&quot;</span>: <span class="string">&quot;QmYwcpMjmqJfo9ot1jGe9rfXsszFV1WbEA59QS7dEVHfJi&quot;</span>,
+              <span class="string">&quot;type&quot;</span>: <span class="string">&quot;legacy_250x250&quot;</span>,
+              <span class="string">&quot;mediaUrl&quot;</span>: <span class="string">&quot;ipfs://QmQB7uz7Gxfy7wqAnrnBcZFaVJLos8J9gn8mRcHQU6dAi1&quot;</span>,
+              <span class="string">&quot;mediaMime&quot;</span>: <span class="string">&quot;image/jpeg&quot;</span>,
+              <span class="string">&quot;targetUrl&quot;</span>: <span class="string">&quot;https://www.adex.network/?adex-campaign=true&quot;</span>,
+              <span class="string">&quot;owner&quot;</span>: <span class="string">&quot;0xE882ebF439207a70dDcCb39E13CA8506c9F45fD9&quot;</span>,
+              <span class="string">&quot;created&quot;</span>: <span class="number">1564390800000_u64</span>,
+              <span class="string">&quot;title&quot;</span>: <span class="string">&quot;Dummy AdUnit 3&quot;</span>,
+              <span class="string">&quot;description&quot;</span>: <span class="string">&quot;Dummy AdUnit description 3&quot;</span>,
+              <span class="string">&quot;archived&quot;</span>: <span class="bool-val">false</span>
+            },
+            {
+              <span class="string">&quot;ipfs&quot;</span>: <span class="string">&quot;QmTAF3FsFDS7Ru8WChoD9ofiHTH8gAQfR4mYSnwxqTDpJH&quot;</span>,
+              <span class="string">&quot;type&quot;</span>: <span class="string">&quot;legacy_250x250&quot;</span>,
+              <span class="string">&quot;mediaUrl&quot;</span>: <span class="string">&quot;ipfs://QmQAcfBJpDDuH99A4p3pFtUmQwamS8UYStP5HxHC7bgYXY&quot;</span>,
+              <span class="string">&quot;mediaMime&quot;</span>: <span class="string">&quot;image/jpeg&quot;</span>,
+              <span class="string">&quot;targetUrl&quot;</span>: <span class="string">&quot;https://adex.network&quot;</span>,
+              <span class="string">&quot;owner&quot;</span>: <span class="string">&quot;0xE882ebF439207a70dDcCb39E13CA8506c9F45fD9&quot;</span>,
+              <span class="string">&quot;created&quot;</span>: <span class="number">1564390800000_u64</span>,
+              <span class="string">&quot;title&quot;</span>: <span class="string">&quot;Dummy AdUnit 4&quot;</span>,
+              <span class="string">&quot;description&quot;</span>: <span class="string">&quot;Dummy AdUnit description 4&quot;</span>,
+              <span class="string">&quot;archived&quot;</span>: <span class="bool-val">false</span>
+            }
+          ],
+          <span class="string">&quot;targetingRules&quot;</span>: [],
+          <span class="string">&quot;created&quot;</span>: <span class="number">1612162800000_u64</span>,
+          <span class="string">&quot;active_to&quot;</span>: <span class="number">4073414400000_u64</span>
+        }
+      ],
+      <span class="string">&quot;totalPages&quot;</span>: <span class="number">1</span>,
+      <span class="string">&quot;page&quot;</span>: <span class="number">0</span>
+    });
+
+    <span class="macro">assert!</span>(<span class="ident">from_value</span>::<span class="op">&lt;</span><span class="ident">CampaignListResponse</span><span class="op">&gt;</span>(<span class="ident">json</span>).<span class="ident">is_ok</span>());
+}</code></pre></div>
+<h5 id="post-v5campaign-auth-required"><a href="#post-v5campaign-auth-required">POST <code>/v5/campaign</code> (auth required)</a></h5>
 <p>Create a new Campaign. Request must be sent by the <a href="../../primitives/campaign/struct.Campaign.html#structfield.creator"><code>Campaign.creator</code></a>.</p>
 <p><strong>Authentication is required</strong> to validate <a href="../../primitives/campaign/struct.Campaign.html#structfield.creator"><code>Campaign.creator</code></a> == <a href="../struct.Auth.html#structfield.uid"><code>Auth.uid</code></a></p>
 <p>It will make sure the <code>Channel</code> is created if new and it will update
 the spendable amount using the <a href="../../adapter/adapter/struct.Adapter.html"><code>Adapter</code></a><code>::get_deposit()</code>.</p>
+<p>The route is handled by <a href="campaign/fn.create_campaign.html" title="campaign::create_campaign()"><code>campaign::create_campaign()</code></a>.</p>
 <p>Request body (json): <a href="../../primitives/sentry/campaign_create/struct.CreateCampaign.html" title="primitives::sentry::campaign_create::CreateCampaign"><code>CreateCampaign</code></a></p>
 <p>Response: <a href="../../primitives/campaign/struct.Campaign.html"><code>Campaign</code></a></p>
-<ul>
-<li><a href="campaign/update_campaign/fn.handle_route.html"><code>POST /v5/campaign/:id</code></a> (auth required)</li>
-</ul>
+<h5 id="post-v5campaignid-auth-required"><a href="#post-v5campaignid-auth-required">POST <code>/v5/campaign/:id</code> (auth required)</a></h5>
 <p>Modify the <a href="../../primitives/campaign/struct.Campaign.html"><code>Campaign</code></a>. Request must be sent by the <a href="../../primitives/campaign/struct.Campaign.html#structfield.creator"><code>Campaign.creator</code></a>.</p>
 <p><strong>Authentication is required</strong> to validate <a href="../../primitives/campaign/struct.Campaign.html#structfield.creator"><code>Campaign.creator</code></a> == <a href="../struct.Auth.html#structfield.uid"><code>Auth.uid</code></a></p>
+<p>The route is handled by <a href="campaign/update_campaign/fn.handle_route.html" title="campaign::update_campaign::handle_route()"><code>campaign::update_campaign::handle_route()</code></a>.</p>
 <p>Request body (json): <a href="../../primitives/sentry/campaign_modify/struct.ModifyCampaign.html" title="primitives::sentry::campaign_modify::ModifyCampaign"><code>ModifyCampaign</code></a></p>
 <p>Response: <a href="../../primitives/campaign/struct.Campaign.html"><code>Campaign</code></a></p>
-<ul>
-<li><a href="campaign/fn.close_campaign.html"><code>POST /v5/campaign/:id/close</code></a> (auth required)</li>
-</ul>
+<h5 id="post-v5campaignidevents"><a href="#post-v5campaignidevents">POST <code>/v5/campaign/:id/events</code></a></h5>
+<p>Add new <a href="../../primitives/sentry/event/enum.Event.html"><code>Event</code></a>s (<code>IMPRESSION</code>s &amp; <code>CLICK</code>s) to the <a href="../../primitives/campaign/struct.Campaign.html"><code>Campaign</code></a>.
+Applies <a href="../../primitives/campaign/struct.Campaign.html#structfield.event_submission"><code>Campaign.event_submission</code></a> rules and additional validation using <a href="../access/fn.check_access.html"><code>check_access()</code></a>.</p>
+<p>The route is handled by <a href="campaign/insert_events/fn.handle_route.html" title="campaign::insert_events::handle_route()"><code>campaign::insert_events::handle_route()</code></a>.</p>
+<p>Request body (json):</p>
+<div class="example-wrap"><pre class="language-json"><code>{
+    &quot;events&quot;: [
+        // Events
+   ]
+}</code></pre></div>
+<p>Response: <a href="../../primitives/sentry/struct.SuccessResponse.html"><code>SuccessResponse</code></a></p>
+<h5 id="post-v5campaignidclose-auth-required"><a href="#post-v5campaignidclose-auth-required">POST <code>/v5/campaign/:id/close</code> (auth required)</a></h5>
 <p>Close the campaign.</p>
+<p>The route is handled by <a href="campaign/fn.close_campaign.html" title="campaign::close_campaign()"><code>campaign::close_campaign()</code></a>.</p>
 <p>Request must be sent by the <a href="../../primitives/campaign/struct.Campaign.html#structfield.creator"><code>Campaign.creator</code></a>.</p>
 <p><strong>Authentication is required</strong> to validate <a href="../../primitives/campaign/struct.Campaign.html#structfield.creator"><code>Campaign.creator</code></a> == <a href="../struct.Auth.html#structfield.uid"><code>Auth.uid</code></a></p>
 <p>Closes the campaign by setting <a href="../../primitives/campaign/struct.Campaign.html#structfield.budget"><code>Campaign.budget</code></a> so that <code>remaining budget = 0</code>.</p>
 <p>Response: <a href="../../primitives/sentry/struct.SuccessResponse.html"><code>SuccessResponse</code></a></p>
-<h3 id="analytics"><a href="#analytics">Analytics</a></h3>
-<ul>
-<li><a href="fn.get_analytics.html"><code>GET /v5/analytics</code></a></li>
-</ul>
+<h3 id="analytics"><a href="#analytics">Analytics</a></h3><h5 id="get-v5analytics"><a href="#get-v5analytics">GET <code>/v5/analytics</code></a></h5>
 <p>Allowed keys: <a href="../../primitives/analytics/query/enum.AllowedKey.html#variant.Country" title="primitives::analytics::query::AllowedKey::Country"><code>AllowedKey::Country</code></a>, <a href="../../primitives/analytics/query/enum.AllowedKey.html#variant.AdSlotType" title="primitives::analytics::query::AllowedKey::AdSlotType"><code>AllowedKey::AdSlotType</code></a></p>
-<ul>
-<li><a href="fn.get_analytics.html"><code>GET /v5/analytics/for-publisher</code></a> (auth required)</li>
-</ul>
+<h5 id="get-v5analyticsfor-publisher-auth-required"><a href="#get-v5analyticsfor-publisher-auth-required">GET <code>/v5/analytics/for-publisher</code> (auth required)</a></h5>
 <p>Returns all analytics where the currently authenticated address <a href="../struct.Auth.html#structfield.uid"><code>Auth.uid</code></a> is a <strong>publisher</strong>.</p>
 <p>All <a href="../../primitives/analytics/query/static.ALLOWED_KEYS.html"><code>ALLOWED_KEYS</code></a> are allowed for this route.</p>
-<ul>
-<li><a href="fn.get_analytics.html"><code>GET /v5/analytics/for-advertiser</code></a> (auth required)</li>
-</ul>
+<p>The route is handled by <a href="fn.get_analytics.html" title="get_analytics()"><code>get_analytics()</code></a>.</p>
+<h5 id="get-v5analyticsfor-advertiser-auth-required"><a href="#get-v5analyticsfor-advertiser-auth-required">GET <code>/v5/analytics/for-advertiser</code> (auth required)</a></h5>
 <p>Returns all analytics where the currently authenticated address <a href="../struct.Auth.html#structfield.uid"><code>Auth.uid</code></a> is an <strong>advertiser</strong>.</p>
 <p>All <a href="../../primitives/analytics/query/static.ALLOWED_KEYS.html"><code>ALLOWED_KEYS</code></a> are allowed for this route.</p>
-<ul>
-<li><a href="fn.get_analytics.html"><code>GET /v5/analytics/for-admin</code></a> (auth required)</li>
-</ul>
+<p>The route is handled by <a href="fn.get_analytics.html" title="get_analytics()"><code>get_analytics()</code></a>.</p>
+<h5 id="get-v5analyticsfor-admin-auth-required"><a href="#get-v5analyticsfor-admin-auth-required">GET <code>/v5/analytics/for-admin</code> (auth required)</a></h5>
 <p>Admin access to the analytics with no restrictions on the keys for filtering.</p>
 <p>All <a href="../../primitives/analytics/query/static.ALLOWED_KEYS.html"><code>ALLOWED_KEYS</code></a> are allowed for admins.</p>
-<p>Admin addresses are configured in the <a href="../../primitives/config/struct.Config.html#structfield.admins"><code>Config.admins</code></a></p>
+<p>Admin addresses are configured in the <a href="../../primitives/config/struct.Config.html#structfield.admins"><code>Config.admins</code></a>.</p>
+<p>The route is handled by <a href="fn.get_analytics.html" title="get_analytics()"><code>get_analytics()</code></a>.</p>
 </div></details><h2 id="modules" class="small-section-header"><a href="#modules">Modules</a></h2>
 <div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="mod" href="campaign/index.html" title="sentry::routes::campaign mod">campaign</a></div><div class="item-right docblock-short"><p><code>/v5/campaign</code> routes</p>
 </div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="channel/index.html" title="sentry::routes::channel mod">channel</a></div><div class="item-right docblock-short"><p><code>/v5/channel</code> routes</p>

@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["ValidatorParam",""]],"struct":[["CampaignListQuery",""],["CampaignListResponse",""]]});
+initSidebarItems({"enum":[["ValidatorParam","The `validator` query parameter for [`CampaignListQuery`]."]],"struct":[["CampaignListQuery","`GET /v5/campaign/list` query"],["CampaignListResponse","`GET /v5/campaign/list` response"]]});

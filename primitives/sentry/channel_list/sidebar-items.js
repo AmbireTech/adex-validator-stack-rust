@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["ChannelListQuery",""],["ChannelListResponse",""]]});
+initSidebarItems({"struct":[["ChannelListQuery","`GET /v5/channel/list` query"],["ChannelListResponse",""]]});

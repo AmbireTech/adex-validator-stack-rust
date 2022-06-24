@@ -265,8 +265,8 @@
 <span class="kw">use</span> <span class="ident">redis::aio::MultiplexedConnection</span>;
 <span class="kw">use</span> <span class="ident">slog::Logger</span>;
 
-<span class="doccomment">/// an error used when deserializing a [`Config`] instance from environment variables</span>
-<span class="doccomment">/// see [`Config::from_env()`]</span>
+<span class="doccomment">/// an error used when deserializing a [`EnvConfig`] instance from environment variables</span>
+<span class="doccomment">/// see [`EnvConfig::from_env()`]</span>
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">envy::Error</span> <span class="kw">as</span> <span class="ident">EnvError</span>;
 
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DEFAULT_PORT</span>: <span class="ident">u16</span> <span class="op">=</span> <span class="number">8005</span>;
@@ -293,13 +293,13 @@
     <span class="doccomment">/// Defaults to `0.0.0.0`: [`DEFAULT_IP_ADDR`]</span>
     <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">default</span> <span class="op">=</span> <span class="string">&quot;default_ip_addr&quot;</span>)]</span>
     <span class="kw">pub</span> <span class="ident">ip_addr</span>: <span class="ident">IpAddr</span>,
-    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">deserialize_with</span> <span class="op">=</span> <span class="string">&quot;redis_url&quot;</span>, <span class="ident">default</span> <span class="op">=</span> <span class="string">&quot;default_redis_url&quot;</span>)]</span>
     <span class="doccomment">/// Defaults to locally running Redis server: [`DEFAULT_REDIS_URL`]</span>
+    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">deserialize_with</span> <span class="op">=</span> <span class="string">&quot;redis_url&quot;</span>, <span class="ident">default</span> <span class="op">=</span> <span class="string">&quot;default_redis_url&quot;</span>)]</span>
     <span class="kw">pub</span> <span class="ident">redis_url</span>: <span class="ident">ConnectionInfo</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">EnvConfig</span> {
-    <span class="doccomment">/// Deserialize the application [`Config`] from Environment variables.</span>
+    <span class="doccomment">/// Deserialize the application [`EnvConfig`] from Environment variables.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_env</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">EnvError</span><span class="op">&gt;</span> {
         <span class="ident">envy::from_env</span>()
     }

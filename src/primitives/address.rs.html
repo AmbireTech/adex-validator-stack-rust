@@ -297,6 +297,7 @@
 <span id="292">292</span>
 <span id="293">293</span>
 <span id="294">294</span>
+<span id="295">295</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">hex</span>::{<span class="ident">FromHex</span>, <span class="ident">FromHexError</span>};
 <span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>, <span class="ident">Serializer</span>};
 <span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">fmt</span>, <span class="ident">str::FromStr</span>};
@@ -410,12 +411,13 @@
     }
 }
 
-<span class="doccomment">/// When we have a string literal (&amp;str) representation of the Address in the form of bytes.</span>
+<span class="doccomment">/// When we have a string literal (`&amp;str`) representation of the `Address` in the form of bytes.</span>
 <span class="doccomment">/// Useful for creating static values from strings for testing, configuration, etc.</span>
 <span class="doccomment">///</span>
-<span class="doccomment">/// You can find a test setup example in the [`crate::test_util`] module.</span>
+<span class="doccomment">/// You can find a test setup example in the `crate::test_util` module (requires `test-util` feature).</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// # Example</span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// ```</span>
 <span class="doccomment">/// use once_cell::sync::Lazy;</span>
 <span class="doccomment">/// use primitives::Address;</span>
