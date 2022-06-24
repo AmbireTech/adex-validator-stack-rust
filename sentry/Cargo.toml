@@ -29,14 +29,22 @@ hex = "0.4"
 clap = { version = "3.1", features = ["cargo"] }
 # Server
 tokio = { version = "1", features = ["macros", "time", "rt-multi-thread"] }
-hyper = { version = "0.14", features = ["stream", "runtime", "http1", "server"] }
+hyper = { version = "0.14", features = [
+  "stream",
+  "runtime",
+  "http1",
+  "server",
+] }
 regex = "1"
 # Database
 redis = { version = "0.21", features = ["aio", "tokio-comp"] }
 deadpool = "0.9"
 deadpool-postgres = "0.10"
 # Should be the same version as in `primitives` and `deadpool-postgres`!
-tokio-postgres = { version = "0.7", features = ["with-chrono-0_4", "with-serde_json-1"] }
+tokio-postgres = { version = "0.7", features = [
+  "with-chrono-0_4",
+  "with-serde_json-1",
+] }
 postgres-types = { version = "0.2.1", features = [
   "derive",
   "with-chrono-0_4",

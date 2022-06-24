@@ -54,23 +54,17 @@ sweeper = '0x333420fc6a897356e69b62417cd17ff012177d2b'
     [chain."Ethereum Mainnet".token.DAI]
     address = '0x6B175474E89094C44Da98b954EedeAC495271d0F' # checked
     precision = 18
-    # 1 * 10^-10 = 0.0_000_000_001
-    min_token_units_for_deposit = '100000000'
     min_validator_fee = '100000000'
 
     [chain."Ethereum Mainnet".token.USDT]
     address = '0xdAC17F958D2ee523a2206206994597C13D831ec7' # checked
     precision = 6
-    # 1.000_000
-    min_token_units_for_deposit = '1000000'
     # 0.001
     min_validator_fee = '1000'
 
     [chain."Ethereum Mainnet".token.USDC]
     address = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' # checked
     precision = 6
-    # 1.000_000
-    min_token_units_for_deposit = '1000000'
     # 0.001
     min_validator_fee = '1000'
 
@@ -86,8 +80,6 @@ sweeper = '0x333420fc6a897356e69b62417cd17ff012177d2b'
     [chain."Ethereum Ropsten".token.DAI]
     address = '0x65600c50Ea42e225368Ded6c3789a539284aA62C' # checked
     precision = 18
-    # 1 * 10^-10 = 0.0_000_000_001
-    min_token_units_for_deposit = '100000000'
     min_validator_fee = '100000000'
 
     # [chain."Ethereum Ropsten".token.USDT]

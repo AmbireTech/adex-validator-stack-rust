@@ -10,7 +10,9 @@ publish = false
 
 [dependencies]
 # Domain
-adex_primitives = { path = "../../primitives", package = "primitives", features = ["test-util"] }
+adex_primitives = { path = "../../primitives", package = "primitives", features = [
+  "test-util",
+] }
 adview-manager = { path = "../" }
 chrono = "0.4"
 

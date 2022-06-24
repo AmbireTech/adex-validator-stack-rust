@@ -139,14 +139,12 @@ mod deposit {
     #[serde(rename_all = "camelCase")]
     pub struct Deposit<N> {
         pub total: N,
-        pub still_on_create2: N,
     }
 
     impl Deposit<UnifiedNum> {
         pub fn to_precision(&self, precision: u8) -> Deposit<BigNum> {
             Deposit {
                 total: self.total.to_precision(precision),
-                still_on_create2: self.total.to_precision(precision),
             }
         }
 
@@ -155,15 +153,8 @@ mod deposit {
             precision: u8,
         ) -> Option<Deposit<UnifiedNum>> {
             let total = UnifiedNum::from_precision(deposit.total, precision);
-            let still_on_create2 = UnifiedNum::from_precision(deposit.still_on_create2, precision);
 
-            match (total, still_on_create2) {
-                (Some(total), Some(still_on_create2)) => Some(Deposit {
-                    total,
-                    still_on_create2,
-                }),
-                _ => None,
-            }
+            total.map(|total| Deposit { total })
         }
     }
 }

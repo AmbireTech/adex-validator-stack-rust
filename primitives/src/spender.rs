@@ -43,7 +43,6 @@ mod postgres {
                 channel: Channel::from(row),
                 deposit: Deposit {
                     total: row.get("total"),
-                    still_on_create2: row.get("still_on_create2"),
                 },
             }
         }

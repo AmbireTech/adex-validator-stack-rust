@@ -25,9 +25,6 @@ pub static DUMMY_CHAIN: Lazy<Chain> = Lazy::new(|| Chain {
     outpace: "0x0000000000000000000000000000000000000000"
         .parse()
         .unwrap(),
-    sweeper: "0x0000000000000000000000000000000000000000"
-        .parse()
-        .unwrap(),
 });
 
 /// Dummy adapter implementation intended for testing.
@@ -212,7 +209,6 @@ mod test {
         let channel_context = ChainOf {
             context: channel,
             token: TokenInfo {
-                min_token_units_for_deposit: 1_u64.into(),
                 min_validator_fee: 1_u64.into(),
                 precision: NonZeroU8::new(UnifiedNum::PRECISION).expect("Non zero u8"),
                 address: channel.token,
@@ -234,15 +230,14 @@ mod test {
             assert!(result.is_err());
         }
 
-        let get_deposit = |total: u64, create2: u64| Deposit {
+        let get_deposit = |total: u64| Deposit {
             total: BigNum::from(total),
-            still_on_create2: BigNum::from(create2),
         };
 
         // add two deposit and call 3 times
         // also check if different address does not have access to these calls
         {
-            let deposits = [get_deposit(6969, 69), get_deposit(1000, 0)];
+            let deposits = [get_deposit(6969), get_deposit(1000)];
             dummy_client.add_deposit_call(channel.id(), address, deposits[0].clone());
             dummy_client.add_deposit_call(channel.id(), address, deposits[1].clone());
 
