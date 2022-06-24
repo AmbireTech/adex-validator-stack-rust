@@ -111,12 +111,13 @@ impl TryFrom<&str> for Address {
     }
 }
 
-/// When we have a string literal (&str) representation of the Address in the form of bytes.
+/// When we have a string literal (`&str`) representation of the `Address` in the form of bytes.
 /// Useful for creating static values from strings for testing, configuration, etc.
 ///
-/// You can find a test setup example in the [`crate::test_util`] module.
+/// You can find a test setup example in the `crate::test_util` module (requires `test-util` feature).
 ///
 /// # Example
+///
 /// ```
 /// use once_cell::sync::Lazy;
 /// use primitives::Address;

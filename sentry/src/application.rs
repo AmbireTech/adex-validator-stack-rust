@@ -30,8 +30,8 @@ use hyper::{Body, Method, Request, Response};
 use redis::aio::MultiplexedConnection;
 use slog::Logger;
 
-/// an error used when deserializing a [`Config`] instance from environment variables
-/// see [`Config::from_env()`]
+/// an error used when deserializing a [`EnvConfig`] instance from environment variables
+/// see [`EnvConfig::from_env()`]
 pub use envy::Error as EnvError;
 
 pub const DEFAULT_PORT: u16 = 8005;
@@ -58,13 +58,13 @@ pub struct EnvConfig {
     /// Defaults to `0.0.0.0`: [`DEFAULT_IP_ADDR`]
     #[serde(default = "default_ip_addr")]
     pub ip_addr: IpAddr,
-    #[serde(deserialize_with = "redis_url", default = "default_redis_url")]
     /// Defaults to locally running Redis server: [`DEFAULT_REDIS_URL`]
+    #[serde(deserialize_with = "redis_url", default = "default_redis_url")]
     pub redis_url: ConnectionInfo,
 }
 
 impl EnvConfig {
-    /// Deserialize the application [`Config`] from Environment variables.
+    /// Deserialize the application [`EnvConfig`] from Environment variables.
     pub fn from_env() -> Result<Self, EnvError> {
         envy::from_env()
     }
