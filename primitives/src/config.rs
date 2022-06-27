@@ -164,6 +164,7 @@ impl ChainInfo {
 /// Precision can differ for the same token from one [`Chain`] to another.
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Hash)]
 pub struct TokenInfo {
+    pub min_campaign_budget: BigNum,
     pub min_validator_fee: BigNum,
     pub precision: NonZeroU8,
     pub address: Address,

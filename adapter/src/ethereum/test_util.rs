@@ -258,7 +258,10 @@ impl Erc20Token {
     }
 
     /// Deploys the Mock Token contract from [`LEADER`]
-    pub async fn deploy(web3: &Web3<Http>) -> web3::contract::Result<Self> {
+    pub async fn deploy(
+        web3: &Web3<Http>,
+        min_campaign_budget: u64,
+    ) -> web3::contract::Result<Self> {
         let token_contract = Contract::deploy(web3.eth(), &MOCK_TOKEN_ABI)
             .expect("Invalid ABI of Mock Token contract")
             .confirmations(0)
@@ -272,6 +275,7 @@ impl Erc20Token {
         let token_address = Address::from(token_contract.address().to_fixed_bytes());
 
         let token_info = TokenInfo {
+            min_campaign_budget: BigNum::from(min_campaign_budget),
             precision: NonZeroU8::new(18).expect("should create NonZeroU8"),
             // 0.000_001
             min_validator_fee: BigNum::from(1_000_000_000_000),

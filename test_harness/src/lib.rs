@@ -166,7 +166,7 @@ impl Setup {
         // deploy contracts
         // TOKEN contract is with precision 18 (like DAI)
         // set the minimum token units to 1 TOKEN
-        let token = Erc20Token::deploy(&web3)
+        let token = Erc20Token::deploy(&web3, 10_u64.pow(18))
             .await
             .expect("Correct parameters are passed to the Token constructor.");
 

@@ -684,7 +684,7 @@ mod test {
             let web3 = GANACHE_1.init_web3().expect("Init web3");
 
             // deploy contracts
-            let token = Erc20Token::deploy(&web3)
+            let token = Erc20Token::deploy(&web3, 1_000)
                 .await
                 .expect("Correct parameters are passed to the Token constructor.");
 

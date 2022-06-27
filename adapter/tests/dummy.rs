@@ -82,6 +82,7 @@ async fn main() {
     let channel_context = ChainOf {
         context: DUMMY_CAMPAIGN.channel,
         token: TokenInfo {
+            min_campaign_budget: 1_u64.into(),
             min_validator_fee: 1_u64.into(),
             precision: NonZeroU8::new(18).unwrap(),
             address: "0x6B83e7D6B72c098d48968441e0d05658dc17Adb9"

@@ -209,6 +209,7 @@ mod test {
         let channel_context = ChainOf {
             context: channel,
             token: TokenInfo {
+                min_campaign_budget: 1_u64.into(),
                 min_validator_fee: 1_u64.into(),
                 precision: NonZeroU8::new(UnifiedNum::PRECISION).expect("Non zero u8"),
                 address: channel.token,
