@@ -142,6 +142,7 @@ pub async fn fetch_campaign_ids_for_channel(
     }
 }
 
+/// POST `/v5/campaign`
 pub async fn create_campaign<C>(
     req: Request<Body>,
     app: &Application<C>,
@@ -289,6 +290,7 @@ where
     Ok(success_response(serde_json::to_string(&campaign)?))
 }
 
+/// GET `/v5/campaign/list`
 pub async fn campaign_list<C: Locked + 'static>(
     req: Request<Body>,
     app: &Application<C>,
@@ -313,8 +315,10 @@ pub async fn campaign_list<C: Locked + 'static>(
     Ok(success_response(serde_json::to_string(&list_response)?))
 }
 
-/// Can only be called by creator
-/// to close a campaign, just set it's budget to what it's spent so far (so that remaining == 0)
+/// POST `/v5/campaign/:id/close` (auth required)
+///
+/// Can only be called by the [`Campaign.creator`]!
+/// To close a campaign, just set it's budget to what it's spent so far (so that remaining == 0)
 /// newBudget = totalSpent, i.e. newBudget = oldBudget - remaining
 pub async fn close_campaign<C: Locked + 'static>(
     req: Request<Body>,
@@ -364,6 +368,7 @@ pub mod update_campaign {
 
     use super::*;
 
+    /// POST `/v5/campaign/:id` (auth required)
     pub async fn handle_route<C: Locked + 'static>(
         req: Request<Body>,
         app: &Application<C>,
@@ -623,6 +628,7 @@ pub mod insert_events {
         CampaignOutOfBudget,
     }
 
+    /// POST `/v5/campaign/:id`
     pub async fn handle_route<C: Locked + 'static>(
         req: Request<Body>,
         app: &Application<C>,
