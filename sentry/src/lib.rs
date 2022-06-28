@@ -1,6 +1,5 @@
 #![deny(clippy::all)]
 #![deny(rust_2018_idioms)]
-#![allow(deprecated)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 #[doc(inline)]
