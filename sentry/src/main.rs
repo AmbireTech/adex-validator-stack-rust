@@ -11,10 +11,11 @@ use primitives::{
 use sentry::{
     db::{postgres_connection, redis_connection, setup_migrations, CampaignRemaining},
     platform::PlatformApi,
+    // tls::{load_certs, load_keys, tls_acceptor},
     Application,
 };
 use slog::info;
-use std::{env, net::SocketAddr};
+use std::{env, net::SocketAddr /* , path::PathBuf */};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -47,6 +48,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .long("dummyIdentity")
                 .short('i')
                 .help("the identity to use with the dummy adapter")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("certificates")
+                .long("certificates")
+                .help("Certificates file for TLS")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("privateKeys")
+                .long("privateKeys")
+                .help("The Private keys file for TLS")
                 .takes_value(true),
         )
         .get_matches();
