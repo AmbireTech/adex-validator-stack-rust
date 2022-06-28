@@ -67,7 +67,7 @@ pub async fn postgres_connection(
 }
 
 /// Sets the migrations using the `POSTGRES_*` environment variables
-pub async fn setup_migrations(environment: Environment) {
+pub fn setup_migrations(environment: Environment) {
     use migrant_lib::{Config, Direction, Migrator, Settings};
 
     let settings = Settings::configure_postgres()
@@ -98,10 +98,10 @@ pub async fn setup_migrations(environment: Environment) {
     // `tests_postgres::MIGRATIONS`
     let mut migrations = vec![make_migration!("20190806011140_initial-tables")];
 
-    if let Environment::Development = environment {
-        // seeds database tables for testing
-        migrations.push(make_migration!("20190806011140_initial-tables/seed"));
-    }
+    // if let Environment::Development = environment {
+    //     // seeds database tables for testing
+    //     migrations.push(make_migration!("20190806011140_initial-tables/seed"));
+    // }
 
     // Define Migrations
     config

@@ -2812,6 +2812,7 @@ pub mod run {
         ToETHChecksum, ValidatorId,
     };
     use sentry::{
+        application::EnableTls,
         db::{
             postgres_connection, redis_connection, redis_pool::Manager,
             tests_postgres::setup_test_migrations, CampaignRemaining,
@@ -2882,7 +2883,7 @@ pub mod run {
             .expect("Should run migrations");
 
         info!(&app.logger, "Spawn sentry Hyper server");
-        tokio::spawn(app.run(socket_addr));
+        tokio::spawn(app.run(EnableTls::NoTls(socket_addr)));
 
         Ok(())
     }
