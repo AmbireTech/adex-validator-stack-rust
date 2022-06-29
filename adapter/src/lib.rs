@@ -1,7 +1,6 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
-#![allow(deprecated)]
 
 pub use {
     self::adapter::{

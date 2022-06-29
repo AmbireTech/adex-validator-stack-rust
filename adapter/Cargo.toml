@@ -21,7 +21,6 @@ primitives = { path = "../primitives" }
 # For Ethereum client
 web3 = { version = "0.18", features = ["http-tls", "signing"] }
 ethsign = "0.8"
-create2 = "0.0.2"
 
 # For Dummy client
 dashmap = "5"

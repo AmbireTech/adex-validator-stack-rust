@@ -8,7 +8,7 @@ use web3::signing::keccak256;
 use crate::{Adapter, LockedState, UnlockedState};
 
 pub use {
-    client::{get_counterfactual_address, Ethereum, Options},
+    client::{Ethereum, Options},
     error::Error,
 };
 
@@ -45,12 +45,6 @@ pub static SWEEPER_ABI: Lazy<&'static [u8]> =
     Lazy::new(|| include_bytes!("../../lib/protocol-eth/abi/Sweeper.json"));
 pub static IDENTITY_ABI: Lazy<&'static [u8]> =
     Lazy::new(|| include_bytes!("../../lib/protocol-eth/abi/Identity5.2.json"));
-
-/// Ready to use init code (i.e. decoded) for calculating the create2 address
-pub static DEPOSITOR_BYTECODE_DECODED: Lazy<Vec<u8>> = Lazy::new(|| {
-    let bytecode = include_str!("../../lib/protocol-eth/resources/bytecode/Depositor.bin");
-    hex::decode(bytecode).expect("Decoded properly")
-});
 
 /// Hashes the passed message with the format of `Signed Data Standard`
 /// See https://eips.ethereum.org/EIPS/eip-191

@@ -11,7 +11,9 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 # Domain
-adex_primitives = { path = "../primitives", package = "primitives", features = ["test-util"] }
+adex_primitives = { path = "../primitives", package = "primitives", features = [
+  "test-util",
+] }
 chrono = "0.4"
 num-integer = "0.1"
 # (De)Serialization & Http requests

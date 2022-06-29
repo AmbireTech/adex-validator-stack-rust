@@ -52,15 +52,12 @@ chain_id = 1
 rpc = 'http://localhost:8545'
 # Ganache Snapshot address
 outpace = '0x26CBc2eAAe377f6Ac4b73a982CD1125eF4CEC96f'
-# Ganache Snapshot address
-sweeper = '0x3550A85877002f79db46B01672b5F86f1037cB7c'
 
     [chain."Ganache #1".token."Mocked TOKEN 1"]
     address = '0x12a28f2bfBFfDf5842657235cC058242f40fDEa6' # checked
     precision = 18
-    # Minimum token units for the Create2 deposits to count
     # 1 * 10^18 = 1.0000 TOKEN
-    min_token_units_for_deposit = '1000000000000000000'
+    min_campaign_budget = '1000000000000000000'
     # multiplier = 10^12 - 10^18 (token precision) = 10^-6
     # min_validator_fee = 1 * 10^-6 = 0.000_001
     min_validator_fee = '1000000000000'
@@ -71,15 +68,12 @@ chain_id = 1337
 rpc = 'http://localhost:1337'
 # Ganache Snapshot address
 outpace = '0xAbc27d46a458E2e49DaBfEf45ca74dEDBAc3DD06'
-# Ganache Snapshot address
-sweeper = '0x7dD57C0324284102A757153E18F2Cb1ACdB7d2bD'
 
     [chain."Ganache #1337".token."Mocked TOKEN 1337"]
     address = '0x2bcaf6968aec8a3b5126fbfab5fd419da6e8ad8e' # checked
     precision = 18
-    # Minimum token units for the Create2 deposits to count
     # 1 * 10^18 = 1.0000 TOKEN
-    min_token_units_for_deposit = '1000000000000000000'
+    min_campaign_budget = '1000000000000000000'
     # multiplier = 10^12 - 10^18 (token precision) = 10^-6
     # min_validator_fee = 1 * 10^-6 = 0.000_001
     min_validator_fee = '1000000000000'

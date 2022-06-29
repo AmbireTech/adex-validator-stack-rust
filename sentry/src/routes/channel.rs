@@ -139,25 +139,19 @@ async fn create_or_update_spendable_document<A: Locked>(
 
     let deposit = adapter.get_deposit(channel_context, spender).await?;
     let total = UnifiedNum::from_precision(deposit.total, channel_context.token.precision.get());
-    let still_on_create2 = UnifiedNum::from_precision(
-        deposit.still_on_create2,
-        channel_context.token.precision.get(),
-    );
-    let (total, still_on_create2) = match (total, still_on_create2) {
-        (Some(total), Some(still_on_create2)) => (total, still_on_create2),
+
+    let total = match total {
+        Some(total) => total,
         _ => {
             return Err(ResponseError::BadRequest(
-                "couldn't get deposit from precision".to_string(),
+                "couldn't get total from precision".to_string(),
             ))
         }
     };
 
     let spendable = Spendable {
         channel: channel_context.context,
-        deposit: Deposit {
-            total,
-            still_on_create2,
-        },
+        deposit: Deposit { total },
         spender,
     };
 
@@ -732,7 +726,6 @@ mod test {
         let precision: u8 = channel_context.token.precision.into();
         let deposit = AdapterDeposit {
             total: BigNum::from_str("100000000000000000000").expect("should convert"), // 100 DAI
-            still_on_create2: BigNum::from_str("1000000000000000000").expect("should convert"), // 1 DAI
         };
         app.adapter
             .client
@@ -755,14 +748,9 @@ mod test {
 
         let total_as_unified_num =
             UnifiedNum::from_precision(deposit.total, precision).expect("should convert");
-        let still_on_create2_unified =
-            UnifiedNum::from_precision(deposit.still_on_create2, precision)
-                .expect("should convert");
+
         assert_eq!(new_spendable.deposit.total, total_as_unified_num);
-        assert_eq!(
-            new_spendable.deposit.still_on_create2,
-            still_on_create2_unified
-        );
+
         assert_eq!(new_spendable.spender, *CREATOR);
 
         // Make sure spendable NOW exists
@@ -773,7 +761,6 @@ mod test {
 
         let updated_deposit = AdapterDeposit {
             total: BigNum::from_str("110000000000000000000").expect("should convert"), // 110 DAI
-            still_on_create2: BigNum::from_str("1100000000000000000").expect("should convert"), // 1.1 DAI
         };
 
         app.adapter
@@ -790,14 +777,8 @@ mod test {
         .expect("should update spendable");
         let total_as_unified_num =
             UnifiedNum::from_precision(updated_deposit.total, precision).expect("should convert");
-        let still_on_create2_unified =
-            UnifiedNum::from_precision(updated_deposit.still_on_create2, precision)
-                .expect("should convert");
+
         assert_eq!(updated_spendable.deposit.total, total_as_unified_num);
-        assert_eq!(
-            updated_spendable.deposit.still_on_create2,
-            still_on_create2_unified
-        );
         assert_eq!(updated_spendable.spender, *CREATOR);
     }
 
@@ -948,7 +929,6 @@ mod test {
 
         let deposit = AdapterDeposit {
             total: BigNum::from_str("100000000000000000000").expect("should convert"), // 100 DAI
-            still_on_create2: BigNum::from_str("1000000000000000000").expect("should convert"), // 1 DAI
         };
         app.adapter.client.add_deposit_call(
             channel_context.context.id(),
@@ -1332,7 +1312,6 @@ mod test {
             channel: channel_context.context,
             deposit: Deposit {
                 total: UnifiedNum::from_u64(1000),
-                still_on_create2: UnifiedNum::from_u64(0),
             },
         };
 

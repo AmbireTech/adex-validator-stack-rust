@@ -52,9 +52,6 @@ pub struct Chain {
     pub rpc: ApiUrl,
     /// The OUTPACE contract address on this Chain
     pub outpace: Address,
-    /// The Sweeper contract address on this Chain
-    #[deprecated = "we no longer need the sweeper contract for deposits"]
-    pub sweeper: Address,
 }
 
 /// Context of [`TokenInfo`] & [`Chain`] information for given [`Channel`] or [`Campaign`].

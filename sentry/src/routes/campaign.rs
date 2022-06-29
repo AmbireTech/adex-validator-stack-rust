@@ -1037,7 +1037,7 @@ mod test {
             DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, FOLLOWER, GUARDIAN,
             IDS, LEADER, LEADER_2, PUBLISHER_2,
         },
-        BigNum, ValidatorDesc, ValidatorId,
+        ValidatorDesc, ValidatorId,
     };
 
     #[tokio::test]
@@ -1067,7 +1067,6 @@ mod test {
                     // I.e. 2 000 TOKENS
                     total: UnifiedNum::from(200_000_000_000)
                         .to_precision(channel_context.token.precision.get()),
-                    still_on_create2: BigNum::from(0),
                 },
             )
         };

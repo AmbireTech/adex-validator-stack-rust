@@ -76,7 +76,7 @@ impl Validator for Campaign {
         if self
             .budget
             .to_precision(chain_context.token.precision.get())
-            < chain_context.token.min_token_units_for_deposit
+            < chain_context.token.min_campaign_budget
         {
             return Err(Validation::MinimumDepositNotMet.into());
         }
@@ -362,7 +362,7 @@ mod test {
                     .map(|validator| {
                         let mut new_validator = validator.clone();
                         new_validator.fee = UnifiedNum::from_precision(
-                            campaign_token.min_token_units_for_deposit.clone(),
+                            campaign_token.min_campaign_budget.clone(),
                             campaign_token.precision.into(),
                         )
                         .expect("Should not overflow");
@@ -405,7 +405,7 @@ mod test {
                     .map(|validator| {
                         let mut new_validator = validator.clone();
                         new_validator.fee = UnifiedNum::from_precision(
-                            campaign_token.min_token_units_for_deposit.clone(),
+                            campaign_token.min_campaign_budget.clone(),
                             campaign_token.precision.into(),
                         )
                         .expect("Should not overflow");
