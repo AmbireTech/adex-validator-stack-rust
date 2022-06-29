@@ -223,7 +223,6 @@
 <span id="218">218</span>
 <span id="219">219</span>
 <span id="220">220</span>
-<span id="221">221</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">crate</span>::{
     <span class="ident">chain</span>::{<span class="ident">Chain</span>, <span class="ident">ChainId</span>},
     <span class="ident">event_submission::RateLimit</span>,
@@ -390,8 +389,7 @@
 <span class="doccomment">/// Precision can differ for the same token from one [`Chain`] to another.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>, <span class="ident">Hash</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TokenInfo</span> {
-    <span class="attribute">#[<span class="ident">deprecated</span> <span class="op">=</span> <span class="string">&quot;we no longer need the sweeper contract &amp; create2 addresses for deposits&quot;</span>]</span>
-    <span class="kw">pub</span> <span class="ident">min_token_units_for_deposit</span>: <span class="ident">BigNum</span>,
+    <span class="kw">pub</span> <span class="ident">min_campaign_budget</span>: <span class="ident">BigNum</span>,
     <span class="kw">pub</span> <span class="ident">min_validator_fee</span>: <span class="ident">BigNum</span>,
     <span class="kw">pub</span> <span class="ident">precision</span>: <span class="ident">NonZeroU8</span>,
     <span class="kw">pub</span> <span class="ident">address</span>: <span class="ident">Address</span>,

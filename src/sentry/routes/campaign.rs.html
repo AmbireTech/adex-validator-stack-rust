@@ -1785,7 +1785,6 @@
 <span id="1780">1780</span>
 <span id="1781">1781</span>
 <span id="1782">1782</span>
-<span id="1783">1783</span>
 </pre><pre class="rust"><code><span class="doccomment">//! `/v5/campaign` routes</span>
 <span class="kw">use</span> <span class="kw">crate</span>::{
     <span class="ident">db</span>::{
@@ -2825,7 +2824,7 @@
             <span class="ident">DUMMY_CAMPAIGN</span>, <span class="ident">DUMMY_VALIDATOR_FOLLOWER</span>, <span class="ident">DUMMY_VALIDATOR_LEADER</span>, <span class="ident">FOLLOWER</span>, <span class="ident">GUARDIAN</span>,
             <span class="ident">IDS</span>, <span class="ident">LEADER</span>, <span class="ident">LEADER_2</span>, <span class="ident">PUBLISHER_2</span>,
         },
-        <span class="ident">BigNum</span>, <span class="ident">ValidatorDesc</span>, <span class="ident">ValidatorId</span>,
+        <span class="ident">ValidatorDesc</span>, <span class="ident">ValidatorId</span>,
     };
 
     <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
@@ -2855,7 +2854,6 @@
                     <span class="comment">// I.e. 2 000 TOKENS</span>
                     <span class="ident">total</span>: <span class="ident">UnifiedNum::from</span>(<span class="number">200_000_000_000</span>)
                         .<span class="ident">to_precision</span>(<span class="ident">channel_context</span>.<span class="ident">token</span>.<span class="ident">precision</span>.<span class="ident">get</span>()),
-                    <span class="ident">still_on_create2</span>: <span class="ident">BigNum::from</span>(<span class="number">0</span>),
                 },
             )
         };

@@ -2911,53 +2911,12 @@
 <span id="2906">2906</span>
 <span id="2907">2907</span>
 <span id="2908">2908</span>
-<span id="2909">2909</span>
-<span id="2910">2910</span>
-<span id="2911">2911</span>
-<span id="2912">2912</span>
-<span id="2913">2913</span>
-<span id="2914">2914</span>
-<span id="2915">2915</span>
-<span id="2916">2916</span>
-<span id="2917">2917</span>
-<span id="2918">2918</span>
-<span id="2919">2919</span>
-<span id="2920">2920</span>
-<span id="2921">2921</span>
-<span id="2922">2922</span>
-<span id="2923">2923</span>
-<span id="2924">2924</span>
-<span id="2925">2925</span>
-<span id="2926">2926</span>
-<span id="2927">2927</span>
-<span id="2928">2928</span>
-<span id="2929">2929</span>
-<span id="2930">2930</span>
-<span id="2931">2931</span>
-<span id="2932">2932</span>
-<span id="2933">2933</span>
-<span id="2934">2934</span>
-<span id="2935">2935</span>
-<span id="2936">2936</span>
-<span id="2937">2937</span>
-<span id="2938">2938</span>
-<span id="2939">2939</span>
-<span id="2940">2940</span>
-<span id="2941">2941</span>
-<span id="2942">2942</span>
-<span id="2943">2943</span>
-<span id="2944">2944</span>
-<span id="2945">2945</span>
-<span id="2946">2946</span>
-<span id="2947">2947</span>
-</pre><pre class="rust"><code><span class="attribute">#![<span class="ident">allow</span>(<span class="ident">deprecated</span>)]</span>
-<span class="kw">use</span> <span class="ident">std</span>::{
+</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std</span>::{
     <span class="ident">collections::HashMap</span>,
     <span class="ident">net</span>::{<span class="ident">IpAddr</span>, <span class="ident">Ipv4Addr</span>},
 };
 
 <span class="kw">use</span> <span class="ident">adapter::ethereum</span>::{
-    <span class="ident">get_counterfactual_address</span>,
     <span class="ident">test_util</span>::{<span class="ident">Erc20Token</span>, <span class="ident">Outpace</span>, <span class="ident">Sweeper</span>, <span class="ident">GANACHE_INFO_1</span>, <span class="ident">GANACHE_INFO_1337</span>},
     <span class="ident">Options</span>,
 };
@@ -2993,17 +2952,12 @@
 
     <span class="kw">let</span> <span class="ident">token</span> <span class="op">=</span> <span class="ident">Erc20Token::new</span>(<span class="kw-2">&amp;</span><span class="ident">web3</span>, <span class="ident">token_info</span>.<span class="ident">clone</span>());
 
-    <span class="kw">let</span> <span class="ident">sweeper_address</span> <span class="op">=</span> <span class="ident">ganache_chain_info</span>.<span class="ident">chain</span>.<span class="ident">sweeper</span>;
-
-    <span class="kw">let</span> <span class="ident">sweeper</span> <span class="op">=</span> <span class="ident">Sweeper::new</span>(<span class="kw-2">&amp;</span><span class="ident">web3</span>, <span class="ident">sweeper_address</span>);
-
     <span class="kw">let</span> <span class="ident">outpace_address</span> <span class="op">=</span> <span class="ident">ganache_chain_info</span>.<span class="ident">chain</span>.<span class="ident">outpace</span>;
 
     <span class="kw">let</span> <span class="ident">outpace</span> <span class="op">=</span> <span class="ident">Outpace::new</span>(<span class="kw-2">&amp;</span><span class="ident">web3</span>, <span class="ident">outpace_address</span>);
 
     <span class="ident">Contracts</span> {
         <span class="ident">token</span>,
-        <span class="ident">sweeper</span>,
         <span class="ident">outpace</span>,
         <span class="ident">chain</span>,
     }
@@ -3024,10 +2978,6 @@
 
     <span class="kw">let</span> <span class="ident">token</span> <span class="op">=</span> <span class="ident">Erc20Token::new</span>(<span class="kw-2">&amp;</span><span class="ident">web3</span>, <span class="ident">token_info</span>.<span class="ident">clone</span>());
 
-    <span class="kw">let</span> <span class="ident">sweeper_address</span> <span class="op">=</span> <span class="ident">ganache_chain_info</span>.<span class="ident">chain</span>.<span class="ident">sweeper</span>;
-
-    <span class="kw">let</span> <span class="ident">sweeper</span> <span class="op">=</span> <span class="ident">Sweeper::new</span>(<span class="kw-2">&amp;</span><span class="ident">web3</span>, <span class="ident">sweeper_address</span>);
-
     <span class="kw">let</span> <span class="ident">outpace_address</span> <span class="op">=</span> <span class="ident">ganache_chain_info</span>.<span class="ident">chain</span>.<span class="ident">outpace</span>;
 
     <span class="kw">let</span> <span class="ident">outpace</span> <span class="op">=</span> <span class="ident">Outpace::new</span>(<span class="kw-2">&amp;</span><span class="ident">web3</span>, <span class="ident">outpace_address</span>);
@@ -3036,7 +2986,6 @@
 
     <span class="ident">Contracts</span> {
         <span class="ident">token</span>,
-        <span class="ident">sweeper</span>,
         <span class="ident">outpace</span>,
         <span class="ident">chain</span>,
     }
@@ -3114,8 +3063,6 @@
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Contracts</span> {
     <span class="kw">pub</span> <span class="ident">token</span>: <span class="ident">Erc20Token</span>,
-    <span class="attribute">#[<span class="ident">deprecated</span> <span class="op">=</span> <span class="string">&quot;We are removing the sweeper contract &amp; the create2 addresses for Deposits&quot;</span>]</span>
-    <span class="kw">pub</span> <span class="ident">sweeper</span>: <span class="ident">Sweeper</span>,
     <span class="kw">pub</span> <span class="ident">outpace</span>: <span class="ident">Outpace</span>,
     <span class="kw">pub</span> <span class="ident">chain</span>: <span class="ident">Chain</span>,
 }
@@ -3151,20 +3098,12 @@
 
         <span class="ident">Contracts</span> {
             <span class="ident">token</span>,
-            <span class="ident">sweeper</span>,
             <span class="ident">outpace</span>,
             <span class="ident">chain</span>: <span class="self">self</span>.<span class="ident">chain</span>.<span class="ident">clone</span>(),
         }
     }
 
     <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">deposit</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">contracts</span>: <span class="kw-2">&amp;</span><span class="ident">Contracts</span>, <span class="ident">deposit</span>: <span class="kw-2">&amp;</span><span class="ident">Deposit</span>) {
-        <span class="kw">let</span> <span class="ident">counterfactual_address</span> <span class="op">=</span> <span class="ident">get_counterfactual_address</span>(
-            <span class="ident">contracts</span>.<span class="ident">sweeper</span>.<span class="ident">address</span>,
-            <span class="kw-2">&amp;</span><span class="ident">deposit</span>.<span class="ident">channel</span>,
-            <span class="ident">contracts</span>.<span class="ident">outpace</span>.<span class="ident">address</span>,
-            <span class="ident">deposit</span>.<span class="ident">address</span>,
-        );
-
         <span class="comment">// OUTPACE regular deposit</span>
         <span class="comment">// first set a balance of tokens to be deposited</span>
         <span class="ident">contracts</span>
@@ -3186,17 +3125,6 @@
             )
             .<span class="kw">await</span>
             .<span class="ident">expect</span>(<span class="string">&quot;Should deposit with OUTPACE&quot;</span>);
-
-        <span class="comment">// Counterfactual address deposit</span>
-        <span class="ident">contracts</span>
-            .<span class="ident">token</span>
-            .<span class="ident">set_balance</span>(
-                <span class="ident">deposit</span>.<span class="ident">address</span>.<span class="ident">to_bytes</span>(),
-                <span class="ident">counterfactual_address</span>.<span class="ident">to_bytes</span>(),
-                <span class="kw-2">&amp;</span><span class="ident">deposit</span>.<span class="ident">counterfactual_amount</span>,
-            )
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Failed to set balance&quot;</span>);
     }
 }
 
@@ -3742,16 +3670,13 @@
         <span class="comment">// Advertiser</span>
         <span class="comment">// Channel 1 in Chain #1337:</span>
         <span class="comment">// - Outpace: 150 TOKENs</span>
-        <span class="comment">// - Counterfactual: 10 TOKENs</span>
         <span class="comment">//</span>
         <span class="comment">// Channel 2 in Chain #1337:</span>
         <span class="comment">// - Outpace: 30 TOKENs</span>
-        <span class="comment">// - Counterfactual: 0 TOKENs</span>
         <span class="comment">//</span>
         <span class="comment">// Advertiser 2</span>
         <span class="comment">// Channel 3 in Chain #1:</span>
         <span class="comment">// - Outpace: 100 TOKENS</span>
-        <span class="comment">// - Counterfactual: 20 TOKENs</span>
         {
             <span class="kw">let</span> <span class="ident">advertiser_deposits</span> <span class="op">=</span> [
                 <span class="ident">Deposit</span> {
@@ -3759,21 +3684,18 @@
                     <span class="ident">token</span>: <span class="ident">contracts_1337</span>.<span class="ident">token</span>.<span class="ident">info</span>.<span class="ident">clone</span>(),
                     <span class="ident">address</span>: <span class="ident">advertiser_adapter</span>.<span class="ident">whoami</span>().<span class="ident">to_address</span>(),
                     <span class="ident">outpace_amount</span>: <span class="ident">BigNum::with_precision</span>(<span class="number">150</span>, <span class="ident">token_1337_precision</span>),
-                    <span class="ident">counterfactual_amount</span>: <span class="ident">BigNum::with_precision</span>(<span class="number">10</span>, <span class="ident">token_1337_precision</span>),
                 },
                 <span class="ident">Deposit</span> {
                     <span class="ident">channel</span>: <span class="ident">CAMPAIGN_2</span>.<span class="ident">channel</span>,
                     <span class="ident">token</span>: <span class="ident">contracts_1337</span>.<span class="ident">token</span>.<span class="ident">info</span>.<span class="ident">clone</span>(),
                     <span class="ident">address</span>: <span class="ident">advertiser_adapter</span>.<span class="ident">whoami</span>().<span class="ident">to_address</span>(),
                     <span class="ident">outpace_amount</span>: <span class="ident">BigNum::with_precision</span>(<span class="number">30</span>, <span class="ident">token_1337_precision</span>),
-                    <span class="ident">counterfactual_amount</span>: <span class="ident">BigNum::from</span>(<span class="number">0</span>),
                 },
                 <span class="ident">Deposit</span> {
                     <span class="ident">channel</span>: <span class="ident">CAMPAIGN_3</span>.<span class="ident">channel</span>,
                     <span class="ident">token</span>: <span class="ident">contracts_1</span>.<span class="ident">token</span>.<span class="ident">info</span>.<span class="ident">clone</span>(),
                     <span class="ident">address</span>: <span class="ident">advertiser2_adapter</span>.<span class="ident">whoami</span>().<span class="ident">to_address</span>(),
                     <span class="ident">outpace_amount</span>: <span class="ident">BigNum::with_precision</span>(<span class="number">100</span>, <span class="ident">token_1_precision</span>),
-                    <span class="ident">counterfactual_amount</span>: <span class="ident">BigNum::with_precision</span>(<span class="number">20</span>, <span class="ident">token_1_precision</span>),
                 },
             ];
 
@@ -3864,7 +3786,7 @@
                 .<span class="ident">expect</span>(<span class="string">&quot;Get authentication&quot;</span>);
 
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">no_budget_campaign</span> <span class="op">=</span> <span class="ident">CreateCampaign::from_campaign</span>(<span class="ident">CAMPAIGN_1</span>.<span class="ident">clone</span>());
-            <span class="comment">// Deposit of Advertiser for Channel 1: 150 (outpace) + 10 (create2)</span>
+            <span class="comment">// Deposit of Advertiser for Channel 1: 150 (outpace)</span>
             <span class="comment">// Campaign Budget: 400 TOKENs</span>
             <span class="ident">no_budget_campaign</span>.<span class="ident">budget</span> <span class="op">=</span> <span class="ident">UnifiedNum::from</span>(<span class="number">40_000_000_000</span>);
 
@@ -3902,8 +3824,8 @@
             <span class="kw">let</span> <span class="ident">expected</span> <span class="op">=</span> <span class="macro">vec!</span>[(
                 <span class="ident">advertiser_adapter</span>.<span class="ident">whoami</span>().<span class="ident">to_address</span>(),
                 <span class="ident">Spender</span> {
-                    <span class="comment">// Expected: 160 TOKENs</span>
-                    <span class="ident">total_deposited</span>: <span class="ident">UnifiedNum::from</span>(<span class="number">16_000_000_000</span>),
+                    <span class="comment">// Expected: 150 TOKENs</span>
+                    <span class="ident">total_deposited</span>: <span class="ident">UnifiedNum::from_whole</span>(<span class="number">150</span>),
                     <span class="ident">total_spent</span>: <span class="prelude-val">None</span>,
                 },
             )]

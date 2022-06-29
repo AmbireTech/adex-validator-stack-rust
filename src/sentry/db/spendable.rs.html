@@ -340,12 +340,16 @@
 <span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">DbPool</span>, <span class="ident">PoolError</span>};
 
 <span class="doccomment">/// ```text</span>
-<span class="doccomment">/// INSERT INTO spendable (spender, channel_id, total, still_on_create2, created)</span>
-<span class="doccomment">/// values (&#39;0xce07CbB7e054514D590a0262C93070D838bFBA2e&#39;, &#39;0x061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088&#39;, 10.00000000, 2.00000000, NOW());</span>
+<span class="doccomment">/// INSERT INTO spendable (spender, channel_id, total, created)</span>
+<span class="doccomment">/// values (&#39;0xce07CbB7e054514D590a0262C93070D838bFBA2e&#39;, &#39;0x061d5e2a67d0a9a10f1c732bca12a676d83f79663a396f7d87b3e30b9b411088&#39;, 10.00000000, NOW());</span>
 <span class="doccomment">/// ```</span>
 <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">insert_spendable</span>(<span class="ident">pool</span>: <span class="ident">DbPool</span>, <span class="ident">spendable</span>: <span class="kw-2">&amp;</span><span class="ident">Spendable</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">bool</span>, <span class="ident">PoolError</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">get</span>().<span class="kw">await</span><span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">stmt</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">prepare</span>(<span class="string">&quot;INSERT INTO spendable (spender, channel_id, total, still_on_create2, created) values ($1, $2, $3, $4, $5)&quot;</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="ident">stmt</span> <span class="op">=</span> <span class="ident">client</span>
+        .<span class="ident">prepare</span>(
+            <span class="string">&quot;INSERT INTO spendable (spender, channel_id, total, created) values ($1, $2, $3, $4)&quot;</span>,
+        )
+        .<span class="kw">await</span><span class="question-mark">?</span>;
 
     <span class="kw">let</span> <span class="ident">row</span> <span class="op">=</span> <span class="ident">client</span>
         .<span class="ident">execute</span>(
@@ -354,7 +358,6 @@
                 <span class="kw-2">&amp;</span><span class="ident">spendable</span>.<span class="ident">spender</span>,
                 <span class="kw-2">&amp;</span><span class="ident">spendable</span>.<span class="ident">channel</span>.<span class="ident">id</span>(),
                 <span class="kw-2">&amp;</span><span class="ident">spendable</span>.<span class="ident">deposit</span>.<span class="ident">total</span>,
-                <span class="kw-2">&amp;</span><span class="ident">spendable</span>.<span class="ident">deposit</span>.<span class="ident">still_on_create2</span>,
                 <span class="kw-2">&amp;</span><span class="ident">Utc::now</span>(),
             ],
         )
@@ -365,7 +368,7 @@
 }
 
 <span class="doccomment">/// ```text</span>
-<span class="doccomment">/// SELECT spender, total, still_on_create2, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM spendable INNER JOIN channels ON channels.id = spendable.channel_id WHERE spender = $1 AND channel_id = $2</span>
+<span class="doccomment">/// SELECT spender, total, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM spendable INNER JOIN channels ON channels.id = spendable.channel_id WHERE spender = $1 AND channel_id = $2</span>
 <span class="doccomment">/// ```</span>
 <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">fetch_spendable</span>(
     <span class="ident">pool</span>: <span class="ident">DbPool</span>,
@@ -373,7 +376,7 @@
     <span class="ident">channel_id</span>: <span class="kw-2">&amp;</span><span class="ident">ChannelId</span>,
 ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Spendable</span><span class="op">&gt;</span>, <span class="ident">PoolError</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">get</span>().<span class="kw">await</span><span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">statement</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">prepare</span>(<span class="string">&quot;SELECT spender, total, still_on_create2, spendable.created, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM spendable INNER JOIN channels ON channels.id = spendable.channel_id WHERE spender = $1 AND channel_id = $2&quot;</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="ident">statement</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">prepare</span>(<span class="string">&quot;SELECT spender, total, spendable.created, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM spendable INNER JOIN channels ON channels.id = spendable.channel_id WHERE spender = $1 AND channel_id = $2&quot;</span>).<span class="kw">await</span><span class="question-mark">?</span>;
 
     <span class="kw">let</span> <span class="ident">row</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">query_opt</span>(<span class="kw-2">&amp;</span><span class="ident">statement</span>, <span class="kw-2">&amp;</span>[<span class="ident">spender</span>, <span class="ident">channel_id</span>]).<span class="kw">await</span><span class="question-mark">?</span>;
 
@@ -387,7 +390,7 @@
     <span class="ident">limit</span>: <span class="ident">u64</span>,
 ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Spendable</span><span class="op">&gt;</span>, <span class="ident">Pagination</span>), <span class="ident">PoolError</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">get</span>().<span class="kw">await</span><span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">query</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;SELECT spender, total, still_on_create2, spendable.created, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM spendable INNER JOIN channels ON channels.id = spendable.channel_id WHERE channel_id = $1 ORDER BY spendable.created ASC LIMIT {} OFFSET {}&quot;</span>, <span class="ident">limit</span>, <span class="ident">skip</span>);
+    <span class="kw">let</span> <span class="ident">query</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;SELECT spender, total, spendable.created, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM spendable INNER JOIN channels ON channels.id = spendable.channel_id WHERE channel_id = $1 ORDER BY spendable.created ASC LIMIT {} OFFSET {}&quot;</span>, <span class="ident">limit</span>, <span class="ident">skip</span>);
 
     <span class="kw">let</span> <span class="ident">statement</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">prepare</span>(<span class="kw-2">&amp;</span><span class="ident">query</span>).<span class="kw">await</span><span class="question-mark">?</span>;
 
@@ -411,7 +414,7 @@
     <span class="prelude-val">Ok</span>((<span class="ident">spendables</span>, <span class="ident">pagination</span>))
 }
 
-<span class="kw">static</span> <span class="ident">UPDATE_SPENDABLE_STATEMENT</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;WITH inserted_spendable AS (INSERT INTO spendable(spender, channel_id, total, still_on_create2, created) VALUES($1, $2, $3, $4, $5) ON CONFLICT ON CONSTRAINT spendable_pkey DO UPDATE SET total = $3, still_on_create2 = $4 WHERE spendable.spender = $1 AND spendable.channel_id = $2 RETURNING *) SELECT inserted_spendable.*, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM inserted_spendable INNER JOIN channels ON inserted_spendable.channel_id = channels.id&quot;</span>;
+<span class="kw">static</span> <span class="ident">UPDATE_SPENDABLE_STATEMENT</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;WITH inserted_spendable AS (INSERT INTO spendable(spender, channel_id, total, created) VALUES($1, $2, $3, $4) ON CONFLICT ON CONSTRAINT spendable_pkey DO UPDATE SET total = $3 WHERE spendable.spender = $1 AND spendable.channel_id = $2 RETURNING *) SELECT inserted_spendable.*, channels.leader, channels.follower, channels.guardian, channels.token, channels.nonce FROM inserted_spendable INNER JOIN channels ON inserted_spendable.channel_id = channels.id&quot;</span>;
 
 <span class="comment">// Updates spendable entry deposit or inserts a new spendable entry if it doesn&#39;t exist</span>
 <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">update_spendable</span>(<span class="ident">pool</span>: <span class="ident">DbPool</span>, <span class="ident">spendable</span>: <span class="kw-2">&amp;</span><span class="ident">Spendable</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Spendable</span>, <span class="ident">PoolError</span><span class="op">&gt;</span> {
@@ -425,7 +428,6 @@
                 <span class="kw-2">&amp;</span><span class="ident">spendable</span>.<span class="ident">spender</span>,
                 <span class="kw-2">&amp;</span><span class="ident">spendable</span>.<span class="ident">channel</span>.<span class="ident">id</span>(),
                 <span class="kw-2">&amp;</span><span class="ident">spendable</span>.<span class="ident">deposit</span>.<span class="ident">total</span>,
-                <span class="kw-2">&amp;</span><span class="ident">spendable</span>.<span class="ident">deposit</span>.<span class="ident">still_on_create2</span>,
                 <span class="kw-2">&amp;</span><span class="ident">Utc::now</span>(),
             ],
         )
@@ -480,7 +482,6 @@
             <span class="ident">channel</span>: <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>,
             <span class="ident">deposit</span>: <span class="ident">Deposit</span> {
                 <span class="ident">total</span>: <span class="ident">UnifiedNum::from</span>(<span class="number">100_000_000</span>),
-                <span class="ident">still_on_create2</span>: <span class="ident">UnifiedNum::from</span>(<span class="number">500_000</span>),
             },
         };
 
@@ -516,7 +517,6 @@
             <span class="ident">channel</span>: <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">channel</span>,
             <span class="ident">deposit</span>: <span class="ident">Deposit</span> {
                 <span class="ident">total</span>: <span class="ident">UnifiedNum::from</span>(<span class="number">100_000_000</span>),
-                <span class="ident">still_on_create2</span>: <span class="ident">UnifiedNum::from</span>(<span class="number">500_000</span>),
             },
         }
     }

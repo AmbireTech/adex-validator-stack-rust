@@ -53,7 +53,6 @@
 <span id="48">48</span>
 <span id="49">49</span>
 <span id="50">50</span>
-<span id="51">51</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">Address</span>, <span class="ident">Channel</span>, <span class="ident">Deposit</span>, <span class="ident">UnifiedNum</span>};
 <span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
 
@@ -99,7 +98,6 @@
                 <span class="ident">channel</span>: <span class="ident">Channel::from</span>(<span class="ident">row</span>),
                 <span class="ident">deposit</span>: <span class="ident">Deposit</span> {
                     <span class="ident">total</span>: <span class="ident">row</span>.<span class="ident">get</span>(<span class="string">&quot;total&quot;</span>),
-                    <span class="ident">still_on_create2</span>: <span class="ident">row</span>.<span class="ident">get</span>(<span class="string">&quot;still_on_create2&quot;</span>),
                 },
             }
         }

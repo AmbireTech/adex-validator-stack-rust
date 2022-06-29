@@ -1465,27 +1465,6 @@
 <span id="1460">1460</span>
 <span id="1461">1461</span>
 <span id="1462">1462</span>
-<span id="1463">1463</span>
-<span id="1464">1464</span>
-<span id="1465">1465</span>
-<span id="1466">1466</span>
-<span id="1467">1467</span>
-<span id="1468">1468</span>
-<span id="1469">1469</span>
-<span id="1470">1470</span>
-<span id="1471">1471</span>
-<span id="1472">1472</span>
-<span id="1473">1473</span>
-<span id="1474">1474</span>
-<span id="1475">1475</span>
-<span id="1476">1476</span>
-<span id="1477">1477</span>
-<span id="1478">1478</span>
-<span id="1479">1479</span>
-<span id="1480">1480</span>
-<span id="1481">1481</span>
-<span id="1482">1482</span>
-<span id="1483">1483</span>
 </pre><pre class="rust"><code><span class="doccomment">//! `/v5/channel` routes</span>
 <span class="doccomment">//!</span>
 
@@ -1627,25 +1606,19 @@
 
     <span class="kw">let</span> <span class="ident">deposit</span> <span class="op">=</span> <span class="ident">adapter</span>.<span class="ident">get_deposit</span>(<span class="ident">channel_context</span>, <span class="ident">spender</span>).<span class="kw">await</span><span class="question-mark">?</span>;
     <span class="kw">let</span> <span class="ident">total</span> <span class="op">=</span> <span class="ident">UnifiedNum::from_precision</span>(<span class="ident">deposit</span>.<span class="ident">total</span>, <span class="ident">channel_context</span>.<span class="ident">token</span>.<span class="ident">precision</span>.<span class="ident">get</span>());
-    <span class="kw">let</span> <span class="ident">still_on_create2</span> <span class="op">=</span> <span class="ident">UnifiedNum::from_precision</span>(
-        <span class="ident">deposit</span>.<span class="ident">still_on_create2</span>,
-        <span class="ident">channel_context</span>.<span class="ident">token</span>.<span class="ident">precision</span>.<span class="ident">get</span>(),
-    );
-    <span class="kw">let</span> (<span class="ident">total</span>, <span class="ident">still_on_create2</span>) <span class="op">=</span> <span class="kw">match</span> (<span class="ident">total</span>, <span class="ident">still_on_create2</span>) {
-        (<span class="prelude-val">Some</span>(<span class="ident">total</span>), <span class="prelude-val">Some</span>(<span class="ident">still_on_create2</span>)) =&gt; (<span class="ident">total</span>, <span class="ident">still_on_create2</span>),
+
+    <span class="kw">let</span> <span class="ident">total</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">total</span> {
+        <span class="prelude-val">Some</span>(<span class="ident">total</span>) =&gt; <span class="ident">total</span>,
         <span class="kw">_</span> =&gt; {
             <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">ResponseError::BadRequest</span>(
-                <span class="string">&quot;couldn&#39;t get deposit from precision&quot;</span>.<span class="ident">to_string</span>(),
+                <span class="string">&quot;couldn&#39;t get total from precision&quot;</span>.<span class="ident">to_string</span>(),
             ))
         }
     };
 
     <span class="kw">let</span> <span class="ident">spendable</span> <span class="op">=</span> <span class="ident">Spendable</span> {
         <span class="ident">channel</span>: <span class="ident">channel_context</span>.<span class="ident">context</span>,
-        <span class="ident">deposit</span>: <span class="ident">Deposit</span> {
-            <span class="ident">total</span>,
-            <span class="ident">still_on_create2</span>,
-        },
+        <span class="ident">deposit</span>: <span class="ident">Deposit</span> { <span class="ident">total</span> },
         <span class="ident">spender</span>,
     };
 
@@ -2220,7 +2193,6 @@
         <span class="kw">let</span> <span class="ident">precision</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="ident">channel_context</span>.<span class="ident">token</span>.<span class="ident">precision</span>.<span class="ident">into</span>();
         <span class="kw">let</span> <span class="ident">deposit</span> <span class="op">=</span> <span class="ident">AdapterDeposit</span> {
             <span class="ident">total</span>: <span class="ident">BigNum::from_str</span>(<span class="string">&quot;100000000000000000000&quot;</span>).<span class="ident">expect</span>(<span class="string">&quot;should convert&quot;</span>), <span class="comment">// 100 DAI</span>
-            <span class="ident">still_on_create2</span>: <span class="ident">BigNum::from_str</span>(<span class="string">&quot;1000000000000000000&quot;</span>).<span class="ident">expect</span>(<span class="string">&quot;should convert&quot;</span>), <span class="comment">// 1 DAI</span>
         };
         <span class="ident">app</span>.<span class="ident">adapter</span>
             .<span class="ident">client</span>
@@ -2243,14 +2215,9 @@
 
         <span class="kw">let</span> <span class="ident">total_as_unified_num</span> <span class="op">=</span>
             <span class="ident">UnifiedNum::from_precision</span>(<span class="ident">deposit</span>.<span class="ident">total</span>, <span class="ident">precision</span>).<span class="ident">expect</span>(<span class="string">&quot;should convert&quot;</span>);
-        <span class="kw">let</span> <span class="ident">still_on_create2_unified</span> <span class="op">=</span>
-            <span class="ident">UnifiedNum::from_precision</span>(<span class="ident">deposit</span>.<span class="ident">still_on_create2</span>, <span class="ident">precision</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;should convert&quot;</span>);
+
         <span class="macro">assert_eq!</span>(<span class="ident">new_spendable</span>.<span class="ident">deposit</span>.<span class="ident">total</span>, <span class="ident">total_as_unified_num</span>);
-        <span class="macro">assert_eq!</span>(
-            <span class="ident">new_spendable</span>.<span class="ident">deposit</span>.<span class="ident">still_on_create2</span>,
-            <span class="ident">still_on_create2_unified</span>
-        );
+
         <span class="macro">assert_eq!</span>(<span class="ident">new_spendable</span>.<span class="ident">spender</span>, <span class="kw-2">*</span><span class="ident">CREATOR</span>);
 
         <span class="comment">// Make sure spendable NOW exists</span>
@@ -2261,7 +2228,6 @@
 
         <span class="kw">let</span> <span class="ident">updated_deposit</span> <span class="op">=</span> <span class="ident">AdapterDeposit</span> {
             <span class="ident">total</span>: <span class="ident">BigNum::from_str</span>(<span class="string">&quot;110000000000000000000&quot;</span>).<span class="ident">expect</span>(<span class="string">&quot;should convert&quot;</span>), <span class="comment">// 110 DAI</span>
-            <span class="ident">still_on_create2</span>: <span class="ident">BigNum::from_str</span>(<span class="string">&quot;1100000000000000000&quot;</span>).<span class="ident">expect</span>(<span class="string">&quot;should convert&quot;</span>), <span class="comment">// 1.1 DAI</span>
         };
 
         <span class="ident">app</span>.<span class="ident">adapter</span>
@@ -2278,14 +2244,8 @@
         .<span class="ident">expect</span>(<span class="string">&quot;should update spendable&quot;</span>);
         <span class="kw">let</span> <span class="ident">total_as_unified_num</span> <span class="op">=</span>
             <span class="ident">UnifiedNum::from_precision</span>(<span class="ident">updated_deposit</span>.<span class="ident">total</span>, <span class="ident">precision</span>).<span class="ident">expect</span>(<span class="string">&quot;should convert&quot;</span>);
-        <span class="kw">let</span> <span class="ident">still_on_create2_unified</span> <span class="op">=</span>
-            <span class="ident">UnifiedNum::from_precision</span>(<span class="ident">updated_deposit</span>.<span class="ident">still_on_create2</span>, <span class="ident">precision</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;should convert&quot;</span>);
+
         <span class="macro">assert_eq!</span>(<span class="ident">updated_spendable</span>.<span class="ident">deposit</span>.<span class="ident">total</span>, <span class="ident">total_as_unified_num</span>);
-        <span class="macro">assert_eq!</span>(
-            <span class="ident">updated_spendable</span>.<span class="ident">deposit</span>.<span class="ident">still_on_create2</span>,
-            <span class="ident">still_on_create2_unified</span>
-        );
         <span class="macro">assert_eq!</span>(<span class="ident">updated_spendable</span>.<span class="ident">spender</span>, <span class="kw-2">*</span><span class="ident">CREATOR</span>);
     }
 
@@ -2436,7 +2396,6 @@
 
         <span class="kw">let</span> <span class="ident">deposit</span> <span class="op">=</span> <span class="ident">AdapterDeposit</span> {
             <span class="ident">total</span>: <span class="ident">BigNum::from_str</span>(<span class="string">&quot;100000000000000000000&quot;</span>).<span class="ident">expect</span>(<span class="string">&quot;should convert&quot;</span>), <span class="comment">// 100 DAI</span>
-            <span class="ident">still_on_create2</span>: <span class="ident">BigNum::from_str</span>(<span class="string">&quot;1000000000000000000&quot;</span>).<span class="ident">expect</span>(<span class="string">&quot;should convert&quot;</span>), <span class="comment">// 1 DAI</span>
         };
         <span class="ident">app</span>.<span class="ident">adapter</span>.<span class="ident">client</span>.<span class="ident">add_deposit_call</span>(
             <span class="ident">channel_context</span>.<span class="ident">context</span>.<span class="ident">id</span>(),
@@ -2820,7 +2779,6 @@
             <span class="ident">channel</span>: <span class="ident">channel_context</span>.<span class="ident">context</span>,
             <span class="ident">deposit</span>: <span class="ident">Deposit</span> {
                 <span class="ident">total</span>: <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1000</span>),
-                <span class="ident">still_on_create2</span>: <span class="ident">UnifiedNum::from_u64</span>(<span class="number">0</span>),
             },
         };
 

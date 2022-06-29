@@ -130,12 +130,6 @@
 <span id="125">125</span>
 <span id="126">126</span>
 <span id="127">127</span>
-<span id="128">128</span>
-<span id="129">129</span>
-<span id="130">130</span>
-<span id="131">131</span>
-<span id="132">132</span>
-<span id="133">133</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The [`Ethereum`] client for the [`Adapter`].</span>
 
 <span class="kw">use</span> <span class="ident">ethsign</span>::{<span class="ident">KeyFile</span>, <span class="ident">Protected</span>, <span class="ident">SecretKey</span>, <span class="ident">Signature</span>};
@@ -146,7 +140,7 @@
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">Adapter</span>, <span class="ident">LockedState</span>, <span class="ident">UnlockedState</span>};
 
 <span class="kw">pub</span> <span class="kw">use</span> {
-    <span class="ident">client</span>::{<span class="ident">get_counterfactual_address</span>, <span class="ident">Ethereum</span>, <span class="ident">Options</span>},
+    <span class="ident">client</span>::{<span class="ident">Ethereum</span>, <span class="ident">Options</span>},
     <span class="ident">error::Error</span>,
 };
 
@@ -183,12 +177,6 @@
     <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> <span class="macro">include_bytes!</span>(<span class="string">&quot;../../lib/protocol-eth/abi/Sweeper.json&quot;</span>));
 <span class="kw">pub</span> <span class="kw">static</span> <span class="ident">IDENTITY_ABI</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> [<span class="ident">u8</span>]<span class="op">&gt;</span> <span class="op">=</span>
     <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> <span class="macro">include_bytes!</span>(<span class="string">&quot;../../lib/protocol-eth/abi/Identity5.2.json&quot;</span>));
-
-<span class="doccomment">/// Ready to use init code (i.e. decoded) for calculating the create2 address</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">DEPOSITOR_BYTECODE_DECODED</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
-    <span class="kw">let</span> <span class="ident">bytecode</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../lib/protocol-eth/resources/bytecode/Depositor.bin&quot;</span>);
-    <span class="ident">hex::decode</span>(<span class="ident">bytecode</span>).<span class="ident">expect</span>(<span class="string">&quot;Decoded properly&quot;</span>)
-});
 
 <span class="doccomment">/// Hashes the passed message with the format of `Signed Data Standard`</span>
 <span class="doccomment">/// See https://eips.ethereum.org/EIPS/eip-191</span>

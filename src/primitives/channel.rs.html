@@ -413,10 +413,6 @@
 <span id="408">408</span>
 <span id="409">409</span>
 <span id="410">410</span>
-<span id="411">411</span>
-<span id="412">412</span>
-<span id="413">413</span>
-<span id="414">414</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">error::Error</span>, <span class="ident">fmt</span>, <span class="ident">ops::Deref</span>, <span class="ident">str::FromStr</span>};
 
 <span class="kw">use</span> <span class="ident">ethereum_types::U256</span>;
@@ -628,7 +624,6 @@
     <span class="ident">UnlistedValidator</span>,
     <span class="ident">UnlistedCreator</span>,
     <span class="ident">UnlistedAsset</span>,
-    <span class="ident">MinimumDepositNotMet</span>,
     <span class="ident">MinimumValidatorFeeNotMet</span>,
     <span class="ident">FeeConstraintViolated</span>,
 }
@@ -642,9 +637,6 @@
             <span class="ident">ChannelError::UnlistedValidator</span> =&gt; <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;validators are not in the whitelist&quot;</span>),
             <span class="ident">ChannelError::UnlistedCreator</span> =&gt; <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;channel.creator is not whitelisted&quot;</span>),
             <span class="ident">ChannelError::UnlistedAsset</span> =&gt; <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;channel.depositAsset is not whitelisted&quot;</span>),
-            <span class="ident">ChannelError::MinimumDepositNotMet</span> =&gt; {
-                <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;channel.depositAmount is less than MINIMAL_DEPOSIT&quot;</span>)
-            }
             <span class="ident">ChannelError::MinimumValidatorFeeNotMet</span> =&gt; {
                 <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;channel validator fee is less than MINIMAL_FEE&quot;</span>)
             }

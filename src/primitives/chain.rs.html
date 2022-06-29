@@ -148,9 +148,6 @@
 <span id="143">143</span>
 <span id="144">144</span>
 <span id="145">145</span>
-<span id="146">146</span>
-<span id="147">147</span>
-<span id="148">148</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
 <span class="kw">use</span> <span class="ident">std::fmt</span>;
 
@@ -205,9 +202,6 @@
     <span class="kw">pub</span> <span class="ident">rpc</span>: <span class="ident">ApiUrl</span>,
     <span class="doccomment">/// The OUTPACE contract address on this Chain</span>
     <span class="kw">pub</span> <span class="ident">outpace</span>: <span class="ident">Address</span>,
-    <span class="doccomment">/// The Sweeper contract address on this Chain</span>
-    <span class="attribute">#[<span class="ident">deprecated</span> <span class="op">=</span> <span class="string">&quot;we no longer need the sweeper contract for deposits&quot;</span>]</span>
-    <span class="kw">pub</span> <span class="ident">sweeper</span>: <span class="ident">Address</span>,
 }
 
 <span class="doccomment">/// Context of [`TokenInfo`] &amp; [`Chain`] information for given [`Channel`] or [`Campaign`].</span>

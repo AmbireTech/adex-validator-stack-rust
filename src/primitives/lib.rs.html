@@ -226,20 +226,9 @@
 <span id="221">221</span>
 <span id="222">222</span>
 <span id="223">223</span>
-<span id="224">224</span>
-<span id="225">225</span>
-<span id="226">226</span>
-<span id="227">227</span>
-<span id="228">228</span>
-<span id="229">229</span>
-<span id="230">230</span>
-<span id="231">231</span>
-<span id="232">232</span>
-<span id="233">233</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">deny</span>(<span class="ident">rust_2018_idioms</span>)]</span>
 <span class="attribute">#![<span class="ident">deny</span>(<span class="ident">clippy::all</span>)]</span>
 <span class="attribute">#![<span class="ident">cfg_attr</span>(<span class="ident">docsrs</span>, <span class="ident">feature</span>(<span class="ident">doc_cfg</span>))]</span>
-<span class="attribute">#![<span class="ident">allow</span>(<span class="ident">deprecated</span>)]</span>
 <span class="comment">// TODO: Remove once stabled and upstream num::Integer::div_floor(...) is fixed</span>
 <span class="attribute">#![<span class="ident">allow</span>(<span class="ident">unstable_name_collisions</span>)]</span>
 <span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">error</span>, <span class="ident">fmt</span>};
@@ -377,14 +366,12 @@
     <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename_all</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
     <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Deposit</span><span class="op">&lt;</span><span class="ident">N</span><span class="op">&gt;</span> {
         <span class="kw">pub</span> <span class="ident">total</span>: <span class="ident">N</span>,
-        <span class="kw">pub</span> <span class="ident">still_on_create2</span>: <span class="ident">N</span>,
     }
 
     <span class="kw">impl</span> <span class="ident">Deposit</span><span class="op">&lt;</span><span class="ident">UnifiedNum</span><span class="op">&gt;</span> {
         <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_precision</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">precision</span>: <span class="ident">u8</span>) -&gt; <span class="ident">Deposit</span><span class="op">&lt;</span><span class="ident">BigNum</span><span class="op">&gt;</span> {
             <span class="ident">Deposit</span> {
                 <span class="ident">total</span>: <span class="self">self</span>.<span class="ident">total</span>.<span class="ident">to_precision</span>(<span class="ident">precision</span>),
-                <span class="ident">still_on_create2</span>: <span class="self">self</span>.<span class="ident">total</span>.<span class="ident">to_precision</span>(<span class="ident">precision</span>),
             }
         }
 
@@ -393,15 +380,8 @@
             <span class="ident">precision</span>: <span class="ident">u8</span>,
         ) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Deposit</span><span class="op">&lt;</span><span class="ident">UnifiedNum</span><span class="op">&gt;</span><span class="op">&gt;</span> {
             <span class="kw">let</span> <span class="ident">total</span> <span class="op">=</span> <span class="ident">UnifiedNum::from_precision</span>(<span class="ident">deposit</span>.<span class="ident">total</span>, <span class="ident">precision</span>);
-            <span class="kw">let</span> <span class="ident">still_on_create2</span> <span class="op">=</span> <span class="ident">UnifiedNum::from_precision</span>(<span class="ident">deposit</span>.<span class="ident">still_on_create2</span>, <span class="ident">precision</span>);
 
-            <span class="kw">match</span> (<span class="ident">total</span>, <span class="ident">still_on_create2</span>) {
-                (<span class="prelude-val">Some</span>(<span class="ident">total</span>), <span class="prelude-val">Some</span>(<span class="ident">still_on_create2</span>)) =&gt; <span class="prelude-val">Some</span>(<span class="ident">Deposit</span> {
-                    <span class="ident">total</span>,
-                    <span class="ident">still_on_create2</span>,
-                }),
-                <span class="kw">_</span> =&gt; <span class="prelude-val">None</span>,
-            }
+            <span class="ident">total</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">total</span><span class="op">|</span> <span class="ident">Deposit</span> { <span class="ident">total</span> })
         }
     }
 }
