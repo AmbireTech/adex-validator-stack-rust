@@ -156,6 +156,14 @@ mod deposit {
             total.map(|total| Deposit { total })
         }
     }
+
+    impl<N: Default> Default for Deposit<N> {
+        fn default() -> Self {
+            Self {
+                total: Default::default(),
+            }
+        }
+    }
 }
 
 pub mod util {
