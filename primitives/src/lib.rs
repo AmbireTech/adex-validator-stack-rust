@@ -5,6 +5,7 @@
 #![allow(unstable_name_collisions)]
 use std::{error, fmt};
 
+#[doc(inline)]
 pub use self::{
     ad_slot::AdSlot,
     ad_unit::AdUnit,
@@ -159,6 +160,7 @@ mod deposit {
 }
 
 pub mod util {
+    #[doc(inline)]
     pub use api::ApiUrl;
 
     pub mod api;
