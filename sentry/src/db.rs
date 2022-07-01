@@ -96,7 +96,7 @@ pub fn setup_migrations(environment: Environment) {
 
     // NOTE: Make sure to update list of migrations for the tests as well!
     // `tests_postgres::MIGRATIONS`
-    let mut migrations = vec![make_migration!("20190806011140_initial-tables")];
+    let migrations = vec![make_migration!("20190806011140_initial-tables")];
 
     // if let Environment::Development = environment {
     //     // seeds database tables for testing

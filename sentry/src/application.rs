@@ -1,4 +1,7 @@
-use std::{net::{IpAddr, Ipv4Addr, SocketAddr}, path::Path};
+use std::{
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    path::Path,
+};
 
 use adapter::client::Locked;
 use hyper::{
@@ -9,7 +12,7 @@ use once_cell::sync::Lazy;
 use primitives::{config::Environment, ValidatorId};
 use redis::ConnectionInfo;
 use serde::{Deserialize, Deserializer};
-use simple_hyper_server_tls::{listener_from_pem_files, TlsListener, Protocols};
+use simple_hyper_server_tls::{listener_from_pem_files, Protocols, TlsListener};
 use slog::{error, info};
 
 use crate::{
@@ -185,7 +188,7 @@ impl<C: Locked + 'static> Application<C> {
                 if let Err(e) = server.await {
                     error!(&logger, "server error: {}", e; "main" => "run");
                 }
-            },
+            }
             EnableTls::Tls { listener, .. } => {
                 let make_service = make_service_fn(|_| {
                     let server = self.clone();
@@ -204,7 +207,7 @@ impl<C: Locked + 'static> Application<C> {
                     // This is usually caused by trying to connect on HTTP instead of HTTPS
                     error!(&logger, "server error: {}", e; "main" => "run");
                 }
-            },
+            }
         }
     }
 }
@@ -229,12 +232,17 @@ pub enum EnableTls {
     Tls {
         socket_addr: SocketAddr,
         listener: TlsListener,
-    }
+    },
 }
 
 impl EnableTls {
-    pub fn new_tls<C: AsRef<Path>, K: AsRef<Path>>(certificates: C, private_keys: K, socket_addr: SocketAddr) -> Result<Self, Box<dyn std::error::Error>> {
-        let listener = listener_from_pem_files(certificates, private_keys, Protocols::ALL, &socket_addr)?;
+    pub fn new_tls<C: AsRef<Path>, K: AsRef<Path>>(
+        certificates: C,
+        private_keys: K,
+        socket_addr: SocketAddr,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        let listener =
+            listener_from_pem_files(certificates, private_keys, Protocols::ALL, &socket_addr)?;
 
         Ok(Self::Tls {
             listener,

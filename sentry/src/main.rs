@@ -2,7 +2,7 @@
 #![deny(rust_2018_idioms)]
 
 use adapter::{primitives::AdapterTypes, Adapter};
-use clap::{crate_version, Arg, Command, value_parser};
+use clap::{crate_version, value_parser, Arg, Command};
 
 use primitives::{
     config::configuration, postgres::POSTGRES_CONFIG, test_util::DUMMY_AUTH,
