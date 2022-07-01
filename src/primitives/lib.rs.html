@@ -226,6 +226,8 @@
 <span id="221">221</span>
 <span id="222">222</span>
 <span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">deny</span>(<span class="ident">rust_2018_idioms</span>)]</span>
 <span class="attribute">#![<span class="ident">deny</span>(<span class="ident">clippy::all</span>)]</span>
 <span class="attribute">#![<span class="ident">cfg_attr</span>(<span class="ident">docsrs</span>, <span class="ident">feature</span>(<span class="ident">doc_cfg</span>))]</span>
@@ -233,6 +235,7 @@
 <span class="attribute">#![<span class="ident">allow</span>(<span class="ident">unstable_name_collisions</span>)]</span>
 <span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">error</span>, <span class="ident">fmt</span>};
 
+<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">inline</span>)]</span>
 <span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::{
     <span class="ident">ad_slot::AdSlot</span>,
     <span class="ident">ad_unit::AdUnit</span>,
@@ -387,6 +390,7 @@
 }
 
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">util</span> {
+    <span class="attribute">#[<span class="ident">doc</span>(<span class="ident">inline</span>)]</span>
     <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">api::ApiUrl</span>;
 
     <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">api</span>;

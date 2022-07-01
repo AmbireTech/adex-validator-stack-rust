@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["prefix_active",""],["validators","Campaign Validators"]],"struct":[["Active",""],["Campaign",""],["CampaignId","an Id of 16 bytes, (de)serialized as a `0x` prefixed hex"],["Pricing",""],["PricingBounds",""]]});
+initSidebarItems({"mod":[["prefix_active",""],["validators","Campaign Validators"]],"struct":[["Active",""],["Campaign",""],["CampaignId","an Id of 16 bytes, (de)serialized as a `0x` prefixed hex"],["Pricing",""],["PricingBounds",""],["Validators","Unordered list of the validators representing the leader & follower"]]});

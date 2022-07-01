@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["ChannelError",""]],"mod":[["postgres",""]],"struct":[["ChainContext",""],["Channel",""],["ChannelId",""],["Nonce","The nonce is an Unsigned 256 number"]]});
+initSidebarItems({"mod":[["postgres",""]],"struct":[["Channel",""],["ChannelId",""],["Nonce","The nonce is an Unsigned 256 number"]]});

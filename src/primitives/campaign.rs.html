@@ -495,6 +495,7 @@
 <span id="490">490</span>
 <span id="491">491</span>
 <span id="492">492</span>
+<span id="493">493</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">crate</span>::{
     <span class="ident">sentry::EventType</span>, <span class="ident">targeting::Rules</span>, <span class="ident">AdUnit</span>, <span class="ident">Address</span>, <span class="ident">Channel</span>, <span class="ident">EventSubmission</span>, <span class="ident">UnifiedNum</span>,
     <span class="ident">Validator</span>, <span class="ident">ValidatorDesc</span>, <span class="ident">ValidatorId</span>,
@@ -507,6 +508,7 @@
 <span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
 <span class="kw">use</span> <span class="ident">serde_with::with_prefix</span>;
 
+<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">inline</span>)]</span>
 <span class="kw">pub</span> <span class="kw">use</span> {
     <span class="ident">campaign_id::CampaignId</span>,
     <span class="ident">pricing</span>::{<span class="ident">Pricing</span>, <span class="ident">PricingBounds</span>},
