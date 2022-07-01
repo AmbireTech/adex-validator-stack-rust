@@ -9,6 +9,7 @@ use crate::{
     Address, DomainError, ToETHChecksum, ToHex, UnifiedNum,
 };
 
+#[doc(inline)]
 pub use messages::*;
 
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

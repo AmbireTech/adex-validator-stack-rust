@@ -32,7 +32,7 @@ admins = ['0x5d6A3F1AD7b124ecDFDf4841D9bB246eD5fBF04c']
 # Polygon: https://polygonscan.com/token/0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063
 address = '0x6b175474e89094c44da98b954eedeac495271d0f'
 # 1 * 10^-10 = 0.0_000_000_001
-min_token_units_for_deposit = '100000000'
+min_campaign_budget = '100000000'
 min_validator_fee = '100000000'
 precision = 18
 
@@ -40,7 +40,7 @@ precision = 18
 # SAI
 address = '0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359'
 # 1 * 10^-10 = 0.0_000_000_001
-min_token_units_for_deposit = '100000000'
+min_campaign_budget = '100000000'
 min_validator_fee = '100000000'
 precision = 18
 
@@ -49,7 +49,7 @@ precision = 18
 # Polygon: https://polygonscan.com/token/0xc2132d05d31c914a87c6611c10748aeb04b58e8f
 address = '0xdac17f958d2ee523a2206206994597c13d831ec7'
 # 1.000_000
-min_token_units_for_deposit = '1000000'
+min_campaign_budget = '1000000'
 # 0.001
 min_validator_fee = '1000'
 precision = 6
@@ -59,7 +59,7 @@ precision = 6
 # Polygon: https://polygonscan.com/token/0x2791bca1f2de4661ed88a30c99a7a9449aa84174
 address = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'
 # 1.000_000
-min_token_units_for_deposit = '100000000'
+min_campaign_budget = '100000000'
 # 0.001
 min_validator_fee = '1000'
 precision = 6

@@ -1,11 +1,9 @@
-#![allow(deprecated)]
 use std::{
     collections::HashMap,
     net::{IpAddr, Ipv4Addr},
 };
 
 use adapter::ethereum::{
-    get_counterfactual_address,
     test_util::{Erc20Token, Outpace, Sweeper, GANACHE_INFO_1, GANACHE_INFO_1337},
     Options,
 };
@@ -41,17 +39,12 @@ pub static SNAPSHOT_CONTRACTS_1337: Lazy<Contracts> = Lazy::new(|| {
 
     let token = Erc20Token::new(&web3, token_info.clone());
 
-    let sweeper_address = ganache_chain_info.chain.sweeper;
-
-    let sweeper = Sweeper::new(&web3, sweeper_address);
-
     let outpace_address = ganache_chain_info.chain.outpace;
 
     let outpace = Outpace::new(&web3, outpace_address);
 
     Contracts {
         token,
-        sweeper,
         outpace,
         chain,
     }
@@ -72,10 +65,6 @@ pub static SNAPSHOT_CONTRACTS_1: Lazy<Contracts> = Lazy::new(|| {
 
     let token = Erc20Token::new(&web3, token_info.clone());
 
-    let sweeper_address = ganache_chain_info.chain.sweeper;
-
-    let sweeper = Sweeper::new(&web3, sweeper_address);
-
     let outpace_address = ganache_chain_info.chain.outpace;
 
     let outpace = Outpace::new(&web3, outpace_address);
@@ -84,7 +73,6 @@ pub static SNAPSHOT_CONTRACTS_1: Lazy<Contracts> = Lazy::new(|| {
 
     Contracts {
         token,
-        sweeper,
         outpace,
         chain,
     }
@@ -162,8 +150,6 @@ pub struct Setup {
 #[derive(Debug, Clone)]
 pub struct Contracts {
     pub token: Erc20Token,
-    #[deprecated = "We are removing the sweeper contract & the create2 addresses for Deposits"]
-    pub sweeper: Sweeper,
     pub outpace: Outpace,
     pub chain: Chain,
 }
@@ -199,20 +185,12 @@ impl Setup {
 
         Contracts {
             token,
-            sweeper,
             outpace,
             chain: self.chain.clone(),
         }
     }
 
     pub async fn deposit(&self, contracts: &Contracts, deposit: &Deposit) {
-        let counterfactual_address = get_counterfactual_address(
-            contracts.sweeper.address,
-            &deposit.channel,
-            contracts.outpace.address,
-            deposit.address,
-        );
-
         // OUTPACE regular deposit
         // first set a balance of tokens to be deposited
         contracts
@@ -234,17 +212,6 @@ impl Setup {
             )
             .await
             .expect("Should deposit with OUTPACE");
-
-        // Counterfactual address deposit
-        contracts
-            .token
-            .set_balance(
-                deposit.address.to_bytes(),
-                counterfactual_address.to_bytes(),
-                &deposit.counterfactual_amount,
-            )
-            .await
-            .expect("Failed to set balance");
     }
 }
 
@@ -790,16 +757,13 @@ mod tests {
         // Advertiser
         // Channel 1 in Chain #1337:
         // - Outpace: 150 TOKENs
-        // - Counterfactual: 10 TOKENs
         //
         // Channel 2 in Chain #1337:
         // - Outpace: 30 TOKENs
-        // - Counterfactual: 0 TOKENs
         //
         // Advertiser 2
         // Channel 3 in Chain #1:
         // - Outpace: 100 TOKENS
-        // - Counterfactual: 20 TOKENs
         {
             let advertiser_deposits = [
                 Deposit {
@@ -807,21 +771,18 @@ mod tests {
                     token: contracts_1337.token.info.clone(),
                     address: advertiser_adapter.whoami().to_address(),
                     outpace_amount: BigNum::with_precision(150, token_1337_precision),
-                    counterfactual_amount: BigNum::with_precision(10, token_1337_precision),
                 },
                 Deposit {
                     channel: CAMPAIGN_2.channel,
                     token: contracts_1337.token.info.clone(),
                     address: advertiser_adapter.whoami().to_address(),
                     outpace_amount: BigNum::with_precision(30, token_1337_precision),
-                    counterfactual_amount: BigNum::from(0),
                 },
                 Deposit {
                     channel: CAMPAIGN_3.channel,
                     token: contracts_1.token.info.clone(),
                     address: advertiser2_adapter.whoami().to_address(),
                     outpace_amount: BigNum::with_precision(100, token_1_precision),
-                    counterfactual_amount: BigNum::with_precision(20, token_1_precision),
                 },
             ];
 
@@ -912,7 +873,7 @@ mod tests {
                 .expect("Get authentication");
 
             let mut no_budget_campaign = CreateCampaign::from_campaign(CAMPAIGN_1.clone());
-            // Deposit of Advertiser for Channel 1: 150 (outpace) + 10 (create2)
+            // Deposit of Advertiser for Channel 1: 150 (outpace)
             // Campaign Budget: 400 TOKENs
             no_budget_campaign.budget = UnifiedNum::from(40_000_000_000);
 
@@ -950,8 +911,8 @@ mod tests {
             let expected = vec![(
                 advertiser_adapter.whoami().to_address(),
                 Spender {
-                    // Expected: 160 TOKENs
-                    total_deposited: UnifiedNum::from(16_000_000_000),
+                    // Expected: 150 TOKENs
+                    total_deposited: UnifiedNum::from_whole(150),
                     total_spent: None,
                 },
             )]

@@ -10,6 +10,7 @@ use chrono::{
 use serde::{Deserialize, Serialize};
 use serde_with::with_prefix;
 
+#[doc(inline)]
 pub use {
     campaign_id::CampaignId,
     pricing::{Pricing, PricingBounds},
