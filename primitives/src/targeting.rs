@@ -4,6 +4,7 @@ pub use eval::*;
 use serde_json::Number;
 use std::collections::HashMap;
 
+#[doc(inline)]
 pub use input::{field::GetField, Input};
 
 mod eval;
