@@ -338,7 +338,7 @@ async fn on_error<'a, C: Unlocked + 'static>(
 mod test {
     use super::*;
     use crate::sentry_interface::{ChainsValidators, Validator};
-    use adapter::dummy::{Adapter, Dummy, Options};
+    use adapter::dummy::{test_util::DUMMY_CHAIN_INFO, Adapter, Dummy, Options};
     use chrono::Utc;
     use primitives::{
         balances::UncheckedState,
@@ -371,6 +371,7 @@ mod test {
         let adapter = Adapter::with_unlocked(Dummy::init(Options {
             dummy_identity: IDS[&LEADER],
             dummy_auth_tokens: DUMMY_AUTH.clone(),
+            dummy_chain: DUMMY_CHAIN_INFO.clone(),
         }));
         let logger = discard_logger();
 

@@ -3,7 +3,7 @@
 use std::ops;
 
 use adapter::{
-    dummy::{Dummy, Options},
+    dummy::{test_util::DUMMY_CHAIN_INFO, Dummy, Options},
     Adapter,
 };
 use primitives::{
@@ -53,6 +53,7 @@ pub async fn setup_dummy_app() -> ApplicationGuard {
     let adapter = Adapter::new(Dummy::init(Options {
         dummy_identity: IDS[&LEADER],
         dummy_auth_tokens: DUMMY_AUTH.clone(),
+        dummy_chain: DUMMY_CHAIN_INFO.clone(),
     }));
 
     let redis = TESTS_POOL.get().await.expect("Should return Object");

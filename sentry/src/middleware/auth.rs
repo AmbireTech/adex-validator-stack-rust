@@ -151,7 +151,7 @@ fn get_request_ip(req: &Request<Body>) -> Option<String> {
 #[cfg(test)]
 mod test {
     use adapter::{
-        dummy::{Dummy, Options},
+        dummy::{test_util::DUMMY_CHAIN_INFO, Dummy, Options},
         Adapter,
     };
     use hyper::Request;
@@ -174,6 +174,7 @@ mod test {
         let adapter_options = Options {
             dummy_identity: IDS[&LEADER],
             dummy_auth_tokens: DUMMY_AUTH.clone(),
+            dummy_chain: DUMMY_CHAIN_INFO.clone(),
         };
 
         (Adapter::new(Dummy::init(adapter_options)), connection)

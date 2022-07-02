@@ -6,26 +6,48 @@ use crate::{
     Error,
 };
 use async_trait::async_trait;
-use dashmap::{mapref::entry::Entry, DashMap};
 
-use once_cell::sync::Lazy;
 use primitives::{
-    Address, Chain, ChainId, ChainOf, Channel, ChannelId, ToETHChecksum, ValidatorId,
+    config::ChainInfo, Address, ChainId, ChainOf, Channel, ToETHChecksum, ValidatorId,
 };
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
+
+#[doc(inline)]
+pub use self::deposit::Deposits;
 
 pub type Adapter<S> = crate::Adapter<Dummy, S>;
 
-/// The Dummy Chain to be used with this adapter
-/// The Chain is not applicable to the adapter, however, it is required for
-/// applications because of the `authentication` & [`Channel`] interactions.
-pub static DUMMY_CHAIN: Lazy<Chain> = Lazy::new(|| Chain {
-    chain_id: ChainId::new(1),
-    rpc: "http://dummy.com".parse().expect("Should parse ApiUrl"),
-    outpace: "0x0000000000000000000000000000000000000000"
-        .parse()
-        .unwrap(),
-});
+#[cfg(feature = "test-util")]
+#[cfg_attr(docsrs, doc(cfg(feature = "test-util")))]
+pub mod test_util {
+    use once_cell::sync::Lazy;
+    use primitives::{
+        config::{ChainInfo, TokenInfo, DUMMY_CONFIG},
+        Chain,
+    };
+    pub static DUMMY_TOKEN: Lazy<TokenInfo> =
+        Lazy::new(|| DUMMY_CONFIG.chains["Dummy"].tokens["DUMMY"].clone());
+
+    pub static DUMMY_CHAIN_INFO: Lazy<ChainInfo> =
+        Lazy::new(|| DUMMY_CONFIG.chains["Dummy"].clone());
+
+    /// The Dummy Chain to be used with this adapter
+    /// The Chain is not applicable to the adapter, however, it is required for
+    /// applications because of the `authentication` & [`Channel`] interactions.
+    pub static DUMMY_CHAIN: Lazy<Chain> = Lazy::new(|| DUMMY_CHAIN_INFO.chain.clone());
+}
+
+#[derive(Debug, Clone)]
+pub struct Options {
+    /// The identity used for the Adapter.
+    pub dummy_identity: ValidatorId,
+    /// The authentication tokens that will be used by the adapter
+    /// for returning & validating authentication tokens of requests.
+    pub dummy_auth_tokens: HashMap<Address, String>,
+    /// The [`ChainInfo`] that will be used for the [`Session`]s and
+    /// also for the deposits.
+    pub dummy_chain: ChainInfo,
+}
 
 /// Dummy adapter implementation intended for testing.
 #[derive(Debug, Clone)]
@@ -34,48 +56,8 @@ pub struct Dummy {
     identity: ValidatorId,
     /// Static authentication tokens (address => token)
     authorization_tokens: HashMap<Address, String>,
+    chain_info: ChainInfo,
     deposits: Deposits,
-}
-
-pub struct Options {
-    pub dummy_identity: ValidatorId,
-    pub dummy_auth_tokens: HashMap<Address, String>,
-}
-
-#[derive(Debug, Clone, Default)]
-#[allow(clippy::type_complexity)]
-pub struct Deposits(Arc<DashMap<(ChannelId, Address), (usize, Vec<Deposit>)>>);
-
-impl Deposits {
-    pub fn add_deposit(&self, channel: ChannelId, address: Address, deposit: Deposit) {
-        match self.0.entry((channel, address)) {
-            Entry::Occupied(mut deposit_calls) => {
-                // add the new deposit to the Vec
-                deposit_calls.get_mut().1.push(deposit);
-            }
-            Entry::Vacant(empty) => {
-                // add the new `(ChannelId, Address)` key and init with index 0 and the passed Deposit
-                empty.insert((0, vec![deposit]));
-            }
-        }
-    }
-
-    pub fn get_next_deposit(&self, channel: ChannelId, address: Address) -> Option<Deposit> {
-        match self.0.entry((channel, address)) {
-            Entry::Occupied(mut entry) => {
-                let (call_index, deposit_calls) = entry.get_mut();
-
-                let deposit = deposit_calls.get(*call_index).cloned()?;
-
-                // increment the index for the next call
-                *call_index = call_index
-                    .checked_add(1)
-                    .expect("Deposit call index has overflowed");
-                Some(deposit)
-            }
-            Entry::Vacant(_) => None,
-        }
-    }
 }
 
 impl Dummy {
@@ -83,14 +65,42 @@ impl Dummy {
         Self {
             identity: opts.dummy_identity,
             authorization_tokens: opts.dummy_auth_tokens,
+            chain_info: opts.dummy_chain,
             deposits: Default::default(),
         }
     }
 
-    pub fn add_deposit_call(&self, channel: ChannelId, address: Address, deposit: Deposit) {
-        self.deposits.add_deposit(channel, address, deposit)
+    /// Set the deposit that you want the adapter to return every time
+    /// when the [`get_deposit()`](Locked::get_deposit) get's called
+    /// for the give [`ChannelId`] and [`Address`].
+    ///
+    /// If [`Deposit`] is set to [`None`], it remove the mocked deposit.
+    ///
+    /// # Panics
+    ///
+    /// When [`None`] is passed but there was no mocked deposit.
+    pub fn set_deposit<D: Into<Option<Deposit>>>(
+        &self,
+        channel_context: &ChainOf<Channel>,
+        depositor: Address,
+        deposit: D,
+    ) {
+        use deposit::Key;
+
+        let key = Key::from_chain_of(channel_context, depositor);
+        match deposit.into() {
+            Some(deposit) => {
+                self.deposits.0.insert(key, deposit);
+            }
+            None => {
+                self.deposits.0.remove(&key).unwrap_or_else(|| {
+                    panic!("Couldn't remove a deposit which doesn't exist for {key:?}")
+                });
+            }
+        };
     }
 }
+
 #[async_trait]
 impl Locked for Dummy {
     type Error = Error;
@@ -131,7 +141,7 @@ impl Locked for Dummy {
             Some((address, _token)) => Ok(Session {
                 uid: *address,
                 era: 0,
-                chain: DUMMY_CHAIN.clone(),
+                chain: self.chain_info.chain.clone(),
             }),
             None => Err(Error::authentication(format!(
                 "No identity found that matches authentication token: {}",
@@ -145,11 +155,31 @@ impl Locked for Dummy {
         channel_context: &ChainOf<Channel>,
         depositor_address: Address,
     ) -> Result<Deposit, crate::Error> {
+        // validate that the same chain & token are used for the Channel Context
+        // as the ones setup in the Dummy adapter.
+        if channel_context.token.address != channel_context.context.token {
+            return Err(Error::adapter(
+                "Token context of channel & channel token addresses are different".to_string(),
+            ));
+        }
+
+        if self.chain_info.chain != channel_context.chain
+            || self
+                .chain_info
+                .find_token(channel_context.context.token)
+                .is_none()
+        {
+            return Err(Error::adapter(
+                "Channel's Token & Chain not aligned with Dummy adapter's chain".to_string(),
+            ));
+        }
+
         self.deposits
-            .get_next_deposit(channel_context.context.id(), depositor_address)
+            .get_deposit(channel_context, depositor_address)
             .ok_or_else(|| {
                 Error::adapter(format!(
-                    "No more mocked deposits found for depositor {:?}",
+                    "No mocked deposit found for {:?} & depositor {:?}",
+                    channel_context.context.id(),
                     depositor_address
                 ))
             })
@@ -190,17 +220,68 @@ impl Unlockable for Dummy {
     }
 }
 
+mod deposit {
+    use crate::primitives::Deposit;
+    use dashmap::DashMap;
+    use primitives::{Address, ChainId, ChainOf, Channel, ChannelId};
+    use std::sync::Arc;
+
+    #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
+    pub struct Key {
+        channel_id: ChannelId,
+        chain_id: ChainId,
+        depositor: Address,
+    }
+
+    impl Key {
+        pub fn from_chain_of(channel_context: &ChainOf<Channel>, depositor: Address) -> Self {
+            Self {
+                channel_id: channel_context.context.id(),
+                chain_id: channel_context.chain.chain_id,
+                depositor,
+            }
+        }
+    }
+
+    /// Mocked deposits for the Dummy adapter.
+    ///
+    /// These deposits can be set once and the adapter will return
+    /// the set deposit on every call to [`get_deposit()`](`Locked::get_deposit`).
+    #[derive(Debug, Clone, Default)]
+    pub struct Deposits(pub Arc<DashMap<Key, Deposit>>);
+
+    impl Deposits {
+        pub fn new() -> Self {
+            Self::default()
+        }
+
+        /// Get's the set deposit for the give [`ChannelId`] and [`Address`].
+        ///
+        /// This method will return [`None`] if the deposit for the pair
+        /// [`ChannelId`] & [`Address`] was not set.
+        pub fn get_deposit(
+            &self,
+            channel: &ChainOf<Channel>,
+            depositor: Address,
+        ) -> Option<Deposit> {
+            self.0
+                .get(&Key::from_chain_of(channel, depositor))
+                .map(|dashmap_ref| dashmap_ref.value().clone())
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use std::num::NonZeroU8;
-
     use primitives::{
-        config::TokenInfo,
-        test_util::{CREATOR, DUMMY_CAMPAIGN, IDS, LEADER},
-        BigNum, ChainOf, UnifiedNum,
+        test_util::{CREATOR, DUMMY_CAMPAIGN, IDS, LEADER, PUBLISHER},
+        BigNum, ChainOf,
     };
 
-    use super::*;
+    use super::{
+        test_util::{DUMMY_CHAIN, DUMMY_CHAIN_INFO, DUMMY_TOKEN},
+        *,
+    };
 
     #[tokio::test]
     async fn test_deposits_calls() {
@@ -208,25 +289,22 @@ mod test {
 
         let channel_context = ChainOf {
             context: channel,
-            token: TokenInfo {
-                min_campaign_budget: 1_u64.into(),
-                min_validator_fee: 1_u64.into(),
-                precision: NonZeroU8::new(UnifiedNum::PRECISION).expect("Non zero u8"),
-                address: channel.token,
-            },
+            token: DUMMY_TOKEN.clone(),
             chain: DUMMY_CHAIN.clone(),
         };
 
         let dummy_client = Dummy::init(Options {
             dummy_identity: IDS[&LEADER],
             dummy_auth_tokens: Default::default(),
+            dummy_chain: DUMMY_CHAIN_INFO.clone(),
         });
 
-        let address = *CREATOR;
+        let creator = *CREATOR;
+        let publisher = *PUBLISHER;
 
         // no mocked deposit calls should cause an Error
         {
-            let result = dummy_client.get_deposit(&channel_context, address).await;
+            let result = dummy_client.get_deposit(&channel_context, creator).await;
 
             assert!(result.is_err());
         }
@@ -235,32 +313,50 @@ mod test {
             total: BigNum::from(total),
         };
 
-        // add two deposit and call 3 times
-        // also check if different address does not have access to these calls
+        // add two deposit for CREATOR & PUBLISHER
         {
-            let deposits = [get_deposit(6969), get_deposit(1000)];
-            dummy_client.add_deposit_call(channel.id(), address, deposits[0].clone());
-            dummy_client.add_deposit_call(channel.id(), address, deposits[1].clone());
+            let creator_deposit = get_deposit(6969);
+            let publisher_deposit = get_deposit(1000);
 
-            let first_call = dummy_client
-                .get_deposit(&channel_context, address)
+            dummy_client.set_deposit(&channel_context, creator, creator_deposit.clone());
+            dummy_client.set_deposit(&channel_context, publisher, publisher_deposit.clone());
+
+            let creator_actual = dummy_client
+                .get_deposit(&channel_context, creator)
                 .await
-                .expect("Should get first mocked deposit");
-            assert_eq!(&deposits[0], &first_call);
+                .expect("Should get mocked deposit");
+            assert_eq!(&creator_deposit, &creator_actual);
 
-            // should not affect the Mocked deposit calls and should cause an error
+            // calling an non-mocked address, should cause an error
             let different_address_call = dummy_client.get_deposit(&channel_context, *LEADER).await;
             assert!(different_address_call.is_err());
 
-            let second_call = dummy_client
-                .get_deposit(&channel_context, address)
+            let publisher_actual = dummy_client
+                .get_deposit(&channel_context, publisher)
                 .await
-                .expect("Should get second mocked deposit");
-            assert_eq!(&deposits[1], &second_call);
-
-            // Third call should error, we've only mocked 2 calls!
-            let third_call = dummy_client.get_deposit(&channel_context, address).await;
-            assert!(third_call.is_err());
+                .expect("Should get mocked deposit");
+            assert_eq!(&publisher_deposit, &publisher_actual);
         }
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_set_deposit_to_none_should_panic_on_non_mocked_deposits() {
+        let channel = DUMMY_CAMPAIGN.channel;
+
+        let channel_context = ChainOf {
+            context: channel,
+            token: DUMMY_TOKEN.clone(),
+            chain: DUMMY_CHAIN.clone(),
+        };
+
+        let dummy_client = Dummy::init(Options {
+            dummy_identity: IDS[&LEADER],
+            dummy_auth_tokens: Default::default(),
+            dummy_chain: DUMMY_CHAIN_INFO.clone(),
+        });
+
+        // It should panic when no deposit is set and we try to set it to None
+        dummy_client.set_deposit(&channel_context, *LEADER, None);
     }
 }

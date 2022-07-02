@@ -5,7 +5,9 @@ use std::error::Error;
 
 use clap::{crate_version, Arg, Command};
 
-use adapter::{primitives::AdapterTypes, Adapter, Dummy, Ethereum};
+use adapter::{
+    dummy::test_util::DUMMY_CHAIN_INFO, primitives::AdapterTypes, Adapter, Dummy, Ethereum,
+};
 use primitives::{
     config::{configuration, Environment},
     test_util::DUMMY_AUTH,
@@ -104,6 +106,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let options = adapter::dummy::Options {
                 dummy_identity: ValidatorId::try_from(dummy_identity)?,
                 dummy_auth_tokens: DUMMY_AUTH.clone(),
+                dummy_chain: DUMMY_CHAIN_INFO.clone(),
             };
             let adapter = Adapter::with_unlocked(Dummy::init(options));
 
