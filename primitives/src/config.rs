@@ -21,6 +21,13 @@ pub static GANACHE_CONFIG: Lazy<Config> = Lazy::new(|| {
         .expect("Failed to parse ganache.toml config file")
 });
 
+#[cfg(feature = "test-util")]
+#[cfg_attr(docsrs, doc(cfg(feature = "test-util")))]
+pub static DUMMY_CONFIG: Lazy<Config> = Lazy::new(|| {
+    Config::try_toml(include_str!("../../docs/config/dummy.toml"))
+        .expect("Failed to parse ganache.toml config file")
+});
+
 #[derive(Debug, Deserialize, PartialEq, Eq, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
 /// The environment in which the application is running

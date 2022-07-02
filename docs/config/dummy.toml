@@ -1,0 +1,66 @@
+# WARNING: This configuratio is inteded only for testing!
+# Use this configuratoin when you run the Dummy adapter
+
+# Maximum number of channels to return per request
+max_channels = 512
+
+channels_find_limit = 200
+campaigns_find_limit = 200
+spendable_find_limit = 200
+wait_time = 500
+
+msgs_find_limit = 10
+analytics_find_limit = 5000
+# in milliseconds
+analytics_maxtime = 20000
+
+heartbeat_time = 30000
+health_threshold_promilles = 950
+health_unsignable_promilles = 750
+# 2 seconds
+# TODO: Check the POST /validator-message route performance, more than 1 second for timeout is a lot!
+propagation_timeout = 2000
+
+fetch_timeout = 5000
+all_campaigns_timeout = 5000
+# for test_harness make it larger
+# Default: 5000
+channel_tick_timeout = 8000
+
+ip_rate_limit = { type = 'ip', timeframe = 1200000 }
+sid_rate_limit = { type = 'sid', timeframe = 0 }
+
+creators_whitelist = []
+validators_whitelist = []
+# Leader - 0x80690751969B234697e9059e04ed72195c3507fa
+admins = ['0x80690751969B234697e9059e04ed72195c3507fa']
+
+[platform]
+# This should be changed for tests and use the wiremock url
+url = "https://platform.adex.network"
+# 20 minutes in milliseconds
+keep_alive_interval = 1200000
+
+[limits.units_for_slot]
+# The maximum number of campaigns a publisher can earn from
+# This will limit the returned Campaigns to the set number
+max_campaigns_earning_from = 25
+
+# 0.01 (UnifiedNum) per 1000 impressions
+# 1_000 * (per) 1_000 / 10^8 = 0.01
+global_min_impression_price = '1000000'
+
+[chain."Dummy"]
+chain_id = 1
+rpc = 'http://dummy.com'
+# Ganache Snapshot address
+outpace = '0x0000000000000000000000000000000000000000'
+
+    [chain."Dummy".token."DUMMY"]
+    address = '0x0000000000000000000000000000000000000001'
+    # same as UnifiedNum
+    precision = 8
+    # 1 * 10^8 = 1.0000 TOKEN
+    min_campaign_budget = '100000000'
+    # min_validator_fee = 0.00_000_100
+    min_validator_fee = '100'
