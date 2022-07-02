@@ -129,6 +129,9 @@ pub static DUMMY_AUTH: Lazy<HashMap<Address, String>> = Lazy::new(|| {
     auth.insert(*ADVERTISER, "AUTH_awesomeAdvertiser".into());
     auth.insert(*PUBLISHER, "AUTH_awesomePublisher".into());
     auth.insert(*GUARDIAN_2, "AUTH_awesomeGuardian2".into());
+    auth.insert(*PUBLISHER_2, "AUTH_awesomePublisher2".into());
+    auth.insert(*ADVERTISER_2, "AUTH_awesomeAdvertiser2".into());
+    auth.insert(*LEADER_2, "AUTH_awesomeLeader2".into());
 
     auth
 });
