@@ -90,6 +90,7 @@ mod list_channels {
         let mut params_total: Vec<Box<(dyn ToSql + Send + Sync)>> = vec![];
 
         if !chains.is_empty() {
+            #[allow(clippy::type_complexity)]
             let (chain_params, chain_params_total): (
                 Vec<Box<dyn ToSql + Send + Sync>>,
                 Vec<Box<dyn ToSql + Send + Sync>>,
@@ -110,18 +111,15 @@ mod list_channels {
             where_clauses.push(format!("chain_id IN ({})", params_prepared));
         }
 
-        match validator {
-            Some(validator) => {
-                // params are 1-indexed
-                where_clauses.push(format!(
-                    "(leader = ${validator_param} OR follower = ${validator_param})",
-                    validator_param = params.len() + 1
-                ));
-                // then add the new param to the list!
-                params.push(Box::new(validator) as _);
-                params_total.push(Box::new(validator) as _);
-            }
-            _ => {}
+        if let Some(validator) = validator {
+            // params are 1-indexed
+            where_clauses.push(format!(
+                "(leader = ${validator_param} OR follower = ${validator_param})",
+                validator_param = params.len() + 1
+            ));
+            // then add the new param to the list!
+            params.push(Box::new(validator) as _);
+            params_total.push(Box::new(validator) as _);
         }
 
         // To understand why we use Order by, see Postgres Documentation: https://www.postgresql.org/docs/8.1/queries-limit.html
@@ -169,7 +167,7 @@ limit, skip)
                 where_clauses.join(" AND ")
             )
         } else {
-            format!("SELECT COUNT(id)::varchar FROM channels")
+            "SELECT COUNT(id)::varchar FROM channels".to_string()
         };
 
         let stmt = client.prepare(&statement).await?;
