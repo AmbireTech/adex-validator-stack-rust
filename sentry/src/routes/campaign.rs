@@ -1056,8 +1056,6 @@ mod test {
             .expect("Channel token should be whitelisted in config!");
         let channel_context = channel_chain.with_channel(dummy_channel);
 
-        let multiplier = 10_u64.pow(UnifiedNum::PRECISION.into());
-
         // Set the deposit for the CREATOR use for all campaigns in the test
         assert_eq!(*CREATOR, DUMMY_CAMPAIGN.creator);
         app.adapter.client.set_deposit(
@@ -1288,7 +1286,6 @@ mod test {
     async fn delta_budgets_are_calculated_correctly() {
         let redis = TESTS_POOL.get().await.expect("Should return Object");
         let campaign_remaining = CampaignRemaining::new(redis.connection.clone());
-        let multiplier = 10_u64.pow(UnifiedNum::PRECISION.into());
 
         let campaign = DUMMY_CAMPAIGN.clone();
 
