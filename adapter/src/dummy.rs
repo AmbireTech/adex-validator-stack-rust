@@ -285,7 +285,10 @@ mod test {
 
     #[tokio::test]
     async fn test_deposits_calls() {
-        let channel = DUMMY_CAMPAIGN.channel;
+        let channel = Channel {
+            token: DUMMY_TOKEN.address,
+            ..DUMMY_CAMPAIGN.channel
+        };
 
         let channel_context = ChainOf {
             context: channel,
