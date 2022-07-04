@@ -7,7 +7,7 @@ use clap::{crate_version, Arg, Command};
 
 use adapter::{primitives::AdapterTypes, Adapter, Dummy, Ethereum};
 use primitives::{
-    config::{configuration, Environment, GANACHE_CONFIG},
+    config::{configuration, Environment},
     test_util::DUMMY_AUTH,
     util::logging::new_logger,
     ValidatorId,
@@ -104,7 +104,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let options = adapter::dummy::Options {
                 dummy_identity: ValidatorId::try_from(dummy_identity)?,
                 dummy_auth_tokens: DUMMY_AUTH.clone(),
-                dummy_chains: GANACHE_CONFIG.chains.values().cloned().collect(),
+                dummy_chains: config.chains.values().cloned().collect(),
             };
             let adapter = Adapter::with_unlocked(Dummy::init(options));
 

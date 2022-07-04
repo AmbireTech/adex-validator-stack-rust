@@ -254,7 +254,7 @@ pub async fn channels_router<C: Locked + 'static>(
         channel_payout(req, app).await
     }
     // POST /v5/channel/dummy-deposit
-    // will allow the calling of the method only if we are using the Dummy adapter!
+    // We allow the calling of the method only if we are using the Dummy adapter!
     else if let (Some(caps), &Method::POST, true) = (
         CHANNEL_DUMMY_ADAPTER_DEPOSIT.captures(&path),
         method,
@@ -265,11 +265,7 @@ pub async fn channels_router<C: Locked + 'static>(
             .map_or("".to_string(), |m| m.as_str().to_string())]);
         req.extensions_mut().insert(param);
 
-        req = Chain::new()
-            .chain(AuthRequired)
-            // .chain(ChannelLoad)
-            .apply(req, app)
-            .await?;
+        req = Chain::new().chain(AuthRequired).apply(req, app).await?;
 
         channel_dummy_deposit(req, app).await
     } else {

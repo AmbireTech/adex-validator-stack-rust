@@ -557,7 +557,7 @@ pub async fn channel_payout<C: Locked + 'static>(
 
 /// POST `/v5/channel/dummy-deposit` request
 ///
-/// Request body (json): [`ChannelDummyDeposit`]
+/// Body (json): [`ChannelDummyDeposit`]
 ///
 /// Response: [`SuccessResponse`]
 pub async fn channel_dummy_deposit<C: Locked + 'static>(

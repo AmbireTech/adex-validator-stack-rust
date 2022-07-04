@@ -53,7 +53,7 @@ impl Dummy {
 
     /// Set the deposit that you want the adapter to return every time
     /// when the [`get_deposit()`](Locked::get_deposit) get's called
-    /// for the give [`ChannelId`] and [`Address`].
+    /// for the give [`ChannelId`](primitives::ChannelId) and [`Address`].
     ///
     /// If [`Deposit`] is set to [`None`], it remove the mocked deposit.
     ///
@@ -281,7 +281,7 @@ mod deposit {
     /// Mocked deposits for the Dummy adapter.
     ///
     /// These deposits can be set once and the adapter will return
-    /// the set deposit on every call to [`get_deposit()`](`Locked::get_deposit`).
+    /// the set deposit on every call to [`get_deposit()`](crate::client::Locked::get_deposit).
     #[derive(Debug, Clone, Default)]
     pub struct Deposits(pub Arc<DashMap<Key, Deposit>>);
 
