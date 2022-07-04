@@ -709,7 +709,7 @@
 }
 
 <span class="doccomment">/// Sets the migrations using the `POSTGRES_*` environment variables</span>
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">setup_migrations</span>(<span class="ident">environment</span>: <span class="ident">Environment</span>) {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">setup_migrations</span>(<span class="ident">environment</span>: <span class="ident">Environment</span>) {
     <span class="kw">use</span> <span class="ident">migrant_lib</span>::{<span class="ident">Config</span>, <span class="ident">Direction</span>, <span class="ident">Migrator</span>, <span class="ident">Settings</span>};
 
     <span class="kw">let</span> <span class="ident">settings</span> <span class="op">=</span> <span class="ident">Settings::configure_postgres</span>()
@@ -738,12 +738,12 @@
 
     <span class="comment">// NOTE: Make sure to update list of migrations for the tests as well!</span>
     <span class="comment">// `tests_postgres::MIGRATIONS`</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">migrations</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="macro">make_migration!</span>(<span class="string">&quot;20190806011140_initial-tables&quot;</span>)];
+    <span class="kw">let</span> <span class="ident">migrations</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="macro">make_migration!</span>(<span class="string">&quot;20190806011140_initial-tables&quot;</span>)];
 
-    <span class="kw">if</span> <span class="kw">let</span> <span class="ident">Environment::Development</span> <span class="op">=</span> <span class="ident">environment</span> {
-        <span class="comment">// seeds database tables for testing</span>
-        <span class="ident">migrations</span>.<span class="ident">push</span>(<span class="macro">make_migration!</span>(<span class="string">&quot;20190806011140_initial-tables/seed&quot;</span>));
-    }
+    <span class="comment">// if let Environment::Development = environment {</span>
+    <span class="comment">//     // seeds database tables for testing</span>
+    <span class="comment">//     migrations.push(make_migration!(&quot;20190806011140_initial-tables/seed&quot;));</span>
+    <span class="comment">// }</span>
 
     <span class="comment">// Define Migrations</span>
     <span class="ident">config</span>

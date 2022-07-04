@@ -2911,6 +2911,7 @@
 <span id="2906">2906</span>
 <span id="2907">2907</span>
 <span id="2908">2908</span>
+<span id="2909">2909</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std</span>::{
     <span class="ident">collections::HashMap</span>,
     <span class="ident">net</span>::{<span class="ident">IpAddr</span>, <span class="ident">Ipv4Addr</span>},
@@ -5686,6 +5687,7 @@
         <span class="ident">ToETHChecksum</span>, <span class="ident">ValidatorId</span>,
     };
     <span class="kw">use</span> <span class="ident">sentry</span>::{
+        <span class="ident">application::EnableTls</span>,
         <span class="ident">db</span>::{
             <span class="ident">postgres_connection</span>, <span class="ident">redis_connection</span>, <span class="ident">redis_pool::Manager</span>,
             <span class="ident">tests_postgres::setup_test_migrations</span>, <span class="ident">CampaignRemaining</span>,
@@ -5756,7 +5758,7 @@
             .<span class="ident">expect</span>(<span class="string">&quot;Should run migrations&quot;</span>);
 
         <span class="macro">info!</span>(<span class="kw-2">&amp;</span><span class="ident">app</span>.<span class="ident">logger</span>, <span class="string">&quot;Spawn sentry Hyper server&quot;</span>);
-        <span class="ident">tokio::spawn</span>(<span class="ident">app</span>.<span class="ident">run</span>(<span class="ident">socket_addr</span>));
+        <span class="ident">tokio::spawn</span>(<span class="ident">app</span>.<span class="ident">run</span>(<span class="ident">EnableTls::NoTls</span>(<span class="ident">socket_addr</span>)));
 
         <span class="prelude-val">Ok</span>(())
     }
