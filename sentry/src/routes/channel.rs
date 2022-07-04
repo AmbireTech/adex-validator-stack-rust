@@ -33,6 +33,15 @@ use serde::{Deserialize, Serialize};
 use slog::{error, Logger};
 use std::{any::Any, collections::HashMap, str::FromStr};
 
+/// Request body for Channel deposit when using the Dummy adapter.
+///
+/// **NOTE:** available **only** when using the Dummy adapter!
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ChannelDummyDeposit {
+    pub channel: Channel,
+    pub deposit: Deposit<UnifiedNum>,
+}
+
 /// GET `/v5/channel/list` request
 ///
 /// Query: [`ChannelListQuery`]
@@ -548,19 +557,13 @@ pub async fn channel_payout<C: Locked + 'static>(
 
 /// POST `/v5/channel/dummy-deposit` request
 ///
-/// Body: [`Deposit<BigNum>`]
+/// Request body (json): [`ChannelDummyDeposit`]
 ///
 /// Response: [`SuccessResponse`]
 pub async fn channel_dummy_deposit<C: Locked + 'static>(
     req: Request<Body>,
     app: &Application<C>,
 ) -> Result<Response<Body>, ResponseError> {
-    #[derive(Debug, Serialize, Deserialize)]
-    pub struct ChannelDummyDeposit {
-        pub channel: Channel,
-        pub deposit: Deposit<UnifiedNum>,
-    }
-
     let auth = req
         .extensions()
         .get::<Auth>()
@@ -583,10 +586,10 @@ pub async fn channel_dummy_deposit<C: Locked + 'static>(
     // if this fails, it will cause Bad Request
     insert_channel(&app.pool, &channel_chain).await?;
 
-    // Convert the UnifiedNum to BigNum with the same precision of UnifiedNum::PRECISION
-    let deposit = Deposit {
-        total: request.deposit.total.to_precision(UnifiedNum::PRECISION),
-    };
+    // Convert the UnifiedNum to BigNum with the precision of the token
+    let deposit = request
+        .deposit
+        .to_precision(channel_chain.token.precision.into());
 
     let dummy_adapter = <dyn Any + Send + Sync>::downcast_ref::<Adapter<Dummy>>(&app.adapter)
         .expect("Only Dummy adapter is allowed here!");
