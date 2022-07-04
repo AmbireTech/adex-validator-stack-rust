@@ -5,11 +5,8 @@ use adapter::{primitives::AdapterTypes, Adapter};
 use clap::{crate_version, value_parser, Arg, Command};
 
 use primitives::{
-    config::{configuration, GANACHE_CONFIG},
-    postgres::POSTGRES_CONFIG,
-    test_util::DUMMY_AUTH,
-    util::logging::new_logger,
-    ValidatorId,
+    config::configuration, postgres::POSTGRES_CONFIG, test_util::DUMMY_AUTH,
+    util::logging::new_logger, ValidatorId,
 };
 use sentry::{
     application::EnableTls,
