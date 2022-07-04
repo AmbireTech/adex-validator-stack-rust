@@ -103,7 +103,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 dummy_identity: ValidatorId::try_from(dummy_identity)
                     .expect("failed to parse dummy identity"),
                 dummy_auth_tokens: DUMMY_AUTH.clone(),
-                dummy_chains: GANACHE_CONFIG.chains.values().cloned().collect(),
+                dummy_chains: config.chains.values().cloned().collect(),
             };
 
             let dummy_adapter = Adapter::new(adapter::Dummy::init(options));
