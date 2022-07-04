@@ -314,29 +314,6 @@
 <span id="309">309</span>
 <span id="310">310</span>
 <span id="311">311</span>
-<span id="312">312</span>
-<span id="313">313</span>
-<span id="314">314</span>
-<span id="315">315</span>
-<span id="316">316</span>
-<span id="317">317</span>
-<span id="318">318</span>
-<span id="319">319</span>
-<span id="320">320</span>
-<span id="321">321</span>
-<span id="322">322</span>
-<span id="323">323</span>
-<span id="324">324</span>
-<span id="325">325</span>
-<span id="326">326</span>
-<span id="327">327</span>
-<span id="328">328</span>
-<span id="329">329</span>
-<span id="330">330</span>
-<span id="331">331</span>
-<span id="332">332</span>
-<span id="333">333</span>
-<span id="334">334</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">crate</span>::{
     <span class="ident">db</span>::{<span class="ident">analytics::update_analytics</span>, <span class="ident">DbPool</span>, <span class="ident">PoolError</span>},
     <span class="ident">Session</span>,
@@ -443,8 +420,6 @@
         <span class="ident">UnifiedNum</span>,
     };
 
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::db::tests_postgres</span>::{<span class="ident">setup_test_migrations</span>, <span class="ident">DATABASE_POOL</span>};
-
     <span class="comment">// Currently used for testing</span>
     <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_all_analytics</span>(<span class="ident">pool</span>: <span class="kw-2">&amp;</span><span class="ident">DbPool</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Analytics</span><span class="op">&gt;</span>, <span class="ident">PoolError</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">get</span>().<span class="kw">await</span><span class="question-mark">?</span>;
@@ -509,11 +484,6 @@
         <span class="kw">let</span> <span class="ident">app</span> <span class="op">=</span> <span class="ident">setup_dummy_app</span>().<span class="kw">await</span>;
 
         <span class="kw">let</span> <span class="ident">test_events</span> <span class="op">=</span> <span class="ident">get_test_events</span>();
-        <span class="kw">let</span> <span class="ident">database</span> <span class="op">=</span> <span class="ident">DATABASE_POOL</span>.<span class="ident">get</span>().<span class="kw">await</span>.<span class="ident">expect</span>(<span class="string">&quot;Should get a DB pool&quot;</span>);
-
-        <span class="ident">setup_test_migrations</span>(<span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>())
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Migrations should succeed&quot;</span>);
 
         <span class="kw">let</span> <span class="ident">campaign</span> <span class="op">=</span> <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">clone</span>();
 
@@ -538,16 +508,11 @@
         <span class="kw">let</span> <span class="ident">channel_context</span> <span class="op">=</span> <span class="ident">channel_chain</span>.<span class="ident">with_channel</span>(<span class="ident">dummy_channel</span>);
         <span class="kw">let</span> <span class="ident">campaign_context</span> <span class="op">=</span> <span class="ident">channel_context</span>.<span class="ident">clone</span>().<span class="ident">with</span>(<span class="ident">campaign</span>);
 
-        <span class="ident">record</span>(
-            <span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">clone</span>(),
-            <span class="kw-2">&amp;</span><span class="ident">campaign_context</span>,
-            <span class="kw-2">&amp;</span><span class="ident">session</span>,
-            <span class="ident">input_events</span>.<span class="ident">clone</span>(),
-        )
-        .<span class="kw">await</span>
-        .<span class="ident">expect</span>(<span class="string">&quot;should record&quot;</span>);
+        <span class="ident">record</span>(<span class="kw-2">&amp;</span><span class="ident">app</span>.<span class="ident">pool</span>, <span class="kw-2">&amp;</span><span class="ident">campaign_context</span>, <span class="kw-2">&amp;</span><span class="ident">session</span>, <span class="ident">input_events</span>.<span class="ident">clone</span>())
+            .<span class="kw">await</span>
+            .<span class="ident">expect</span>(<span class="string">&quot;should record&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">analytics</span> <span class="op">=</span> <span class="ident">get_all_analytics</span>(<span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>)
+        <span class="kw">let</span> <span class="ident">analytics</span> <span class="op">=</span> <span class="ident">get_all_analytics</span>(<span class="kw-2">&amp;</span><span class="ident">app</span>.<span class="ident">pool</span>)
             .<span class="kw">await</span>
             .<span class="ident">expect</span>(<span class="string">&quot;should get all analytics&quot;</span>);
         <span class="macro">assert_eq!</span>(<span class="ident">analytics</span>.<span class="ident">len</span>(), <span class="number">2</span>);
@@ -576,12 +541,6 @@
     <span class="attribute">#[<span class="ident">tokio::test</span>]</span>
     <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">test_recording_with_session</span>() {
         <span class="kw">let</span> <span class="ident">app</span> <span class="op">=</span> <span class="ident">setup_dummy_app</span>().<span class="kw">await</span>;
-
-        <span class="kw">let</span> <span class="ident">database</span> <span class="op">=</span> <span class="ident">DATABASE_POOL</span>.<span class="ident">get</span>().<span class="kw">await</span>.<span class="ident">expect</span>(<span class="string">&quot;Should get a DB pool&quot;</span>);
-
-        <span class="ident">setup_test_migrations</span>(<span class="ident">database</span>.<span class="ident">pool</span>.<span class="ident">clone</span>())
-            .<span class="kw">await</span>
-            .<span class="ident">expect</span>(<span class="string">&quot;Migrations should succeed&quot;</span>);
 
         <span class="kw">let</span> <span class="ident">test_events</span> <span class="op">=</span> <span class="ident">get_test_events</span>();
 
@@ -613,16 +572,11 @@
             .<span class="ident">expect</span>(<span class="string">&quot;Channel token should be whitelisted in config!&quot;</span>);
         <span class="kw">let</span> <span class="ident">channel_context</span> <span class="op">=</span> <span class="ident">channel_chain</span>.<span class="ident">with_channel</span>(<span class="ident">dummy_channel</span>);
         <span class="kw">let</span> <span class="ident">campaign_context</span> <span class="op">=</span> <span class="ident">channel_context</span>.<span class="ident">clone</span>().<span class="ident">with</span>(<span class="ident">campaign</span>);
-        <span class="ident">record</span>(
-            <span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">clone</span>(),
-            <span class="kw-2">&amp;</span><span class="ident">campaign_context</span>,
-            <span class="kw-2">&amp;</span><span class="ident">session</span>,
-            <span class="ident">input_events</span>.<span class="ident">clone</span>(),
-        )
-        .<span class="kw">await</span>
-        .<span class="ident">expect</span>(<span class="string">&quot;should record&quot;</span>);
+        <span class="ident">record</span>(<span class="kw-2">&amp;</span><span class="ident">app</span>.<span class="ident">pool</span>, <span class="kw-2">&amp;</span><span class="ident">campaign_context</span>, <span class="kw-2">&amp;</span><span class="ident">session</span>, <span class="ident">input_events</span>.<span class="ident">clone</span>())
+            .<span class="kw">await</span>
+            .<span class="ident">expect</span>(<span class="string">&quot;should record&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">analytics</span> <span class="op">=</span> <span class="ident">get_all_analytics</span>(<span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">pool</span>)
+        <span class="kw">let</span> <span class="ident">analytics</span> <span class="op">=</span> <span class="ident">get_all_analytics</span>(<span class="kw-2">&amp;</span><span class="ident">app</span>.<span class="ident">pool</span>)
             .<span class="kw">await</span>
             .<span class="ident">expect</span>(<span class="string">&quot;should find analytics&quot;</span>);
 
