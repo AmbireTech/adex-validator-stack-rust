@@ -1,12 +1,15 @@
 #![deny(clippy::all)]
 #![deny(rust_2018_idioms)]
 
-use adapter::{dummy::test_util::DUMMY_CHAIN_INFO, primitives::AdapterTypes, Adapter};
+use adapter::{primitives::AdapterTypes, Adapter};
 use clap::{crate_version, value_parser, Arg, Command};
 
 use primitives::{
-    config::configuration, postgres::POSTGRES_CONFIG, test_util::DUMMY_AUTH,
-    util::logging::new_logger, ValidatorId,
+    config::{configuration, GANACHE_CONFIG},
+    postgres::POSTGRES_CONFIG,
+    test_util::DUMMY_AUTH,
+    util::logging::new_logger,
+    ValidatorId,
 };
 use sentry::{
     application::EnableTls,
@@ -100,7 +103,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 dummy_identity: ValidatorId::try_from(dummy_identity)
                     .expect("failed to parse dummy identity"),
                 dummy_auth_tokens: DUMMY_AUTH.clone(),
-                dummy_chain: DUMMY_CHAIN_INFO.clone(),
+                dummy_chains: GANACHE_CONFIG.chains.values().cloned().collect(),
             };
 
             let dummy_adapter = Adapter::new(adapter::Dummy::init(options));

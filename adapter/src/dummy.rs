@@ -7,6 +7,7 @@ use crate::{
 };
 use async_trait::async_trait;
 
+use parse_display::{Display, FromStr};
 use primitives::{
     config::ChainInfo, Address, ChainId, ChainOf, Channel, ToETHChecksum, ValidatorId,
 };
@@ -17,26 +18,6 @@ pub use self::deposit::Deposits;
 
 pub type Adapter<S> = crate::Adapter<Dummy, S>;
 
-#[cfg(feature = "test-util")]
-#[cfg_attr(docsrs, doc(cfg(feature = "test-util")))]
-pub mod test_util {
-    use once_cell::sync::Lazy;
-    use primitives::{
-        config::{ChainInfo, TokenInfo, DUMMY_CONFIG},
-        Chain,
-    };
-    pub static DUMMY_TOKEN: Lazy<TokenInfo> =
-        Lazy::new(|| DUMMY_CONFIG.chains["Dummy"].tokens["DUMMY"].clone());
-
-    pub static DUMMY_CHAIN_INFO: Lazy<ChainInfo> =
-        Lazy::new(|| DUMMY_CONFIG.chains["Dummy"].clone());
-
-    /// The Dummy Chain to be used with this adapter
-    /// The Chain is not applicable to the adapter, however, it is required for
-    /// applications because of the `authentication` & [`Channel`] interactions.
-    pub static DUMMY_CHAIN: Lazy<Chain> = Lazy::new(|| DUMMY_CHAIN_INFO.chain.clone());
-}
-
 #[derive(Debug, Clone)]
 pub struct Options {
     /// The identity used for the Adapter.
@@ -46,7 +27,7 @@ pub struct Options {
     pub dummy_auth_tokens: HashMap<Address, String>,
     /// The [`ChainInfo`] that will be used for the [`Session`]s and
     /// also for the deposits.
-    pub dummy_chain: ChainInfo,
+    pub dummy_chains: Vec<ChainInfo>,
 }
 
 /// Dummy adapter implementation intended for testing.
@@ -56,7 +37,7 @@ pub struct Dummy {
     identity: ValidatorId,
     /// Static authentication tokens (address => token)
     authorization_tokens: HashMap<Address, String>,
-    chain_info: ChainInfo,
+    chains: Vec<ChainInfo>,
     deposits: Deposits,
 }
 
@@ -65,7 +46,7 @@ impl Dummy {
         Self {
             identity: opts.dummy_identity,
             authorization_tokens: opts.dummy_auth_tokens,
-            chain_info: opts.dummy_chain,
+            chains: opts.dummy_chains,
             deposits: Default::default(),
         }
     }
@@ -130,24 +111,45 @@ impl Locked for Dummy {
     }
 
     /// Finds the authorization token from the configured values
-    /// and creates a [`Session`] out of it using a [`ChainId`] of `1`.
-    async fn session_from_token(&self, token: &str) -> Result<Session, crate::Error> {
-        let identity = self
+    /// and creates a [`Session`] out of it by using the ChainId included in the header:
+    ///
+    /// `{Auth token}:chain_id:{ChainId}`
+    ///
+    /// # Examples
+    ///
+    /// `AUTH_awesomeLeader:chain_id:1`
+    /// `AUTH_awesomeAdvertiser:chain_id:1337`
+    async fn session_from_token(&self, header_token: &str) -> Result<Session, crate::Error> {
+        let header_token = header_token.parse::<HeaderToken>().map_err(|_parse| {
+            Error::authentication(format!("Dummy Authentication token format should be in the format: `{{Auth Token}}:chain_id:{{Chain Id}}` but '{header_token}' was provided"))
+        })?;
+
+        // find the chain
+        let chain_info = self
+            .chains
+            .iter()
+            .find(|chain_info| chain_info.chain.chain_id == header_token.chain_id)
+            .ok_or_else(|| {
+                Error::authentication(format!("Unknown chain id {:?}", header_token.chain_id))
+            })?;
+
+        // find the authentication token
+        let (identity, _) = self
             .authorization_tokens
             .iter()
-            .find(|(_, address_token)| *address_token == token);
+            .find(|(_, address_token)| *address_token == &header_token.token)
+            .ok_or_else(|| {
+                Error::authentication(format!(
+                    "No identity found that matches authentication token: {}",
+                    &header_token.token
+                ))
+            })?;
 
-        match identity {
-            Some((address, _token)) => Ok(Session {
-                uid: *address,
-                era: 0,
-                chain: self.chain_info.chain.clone(),
-            }),
-            None => Err(Error::authentication(format!(
-                "No identity found that matches authentication token: {}",
-                token
-            ))),
-        }
+        Ok(Session {
+            uid: *identity,
+            era: 0,
+            chain: chain_info.chain.clone(),
+        })
     }
 
     async fn get_deposit(
@@ -163,15 +165,26 @@ impl Locked for Dummy {
             ));
         }
 
-        if self.chain_info.chain != channel_context.chain
-            || self
-                .chain_info
-                .find_token(channel_context.context.token)
-                .is_none()
+        // Check if the combination of Chain & Token are set in the dummy adapter configuration
         {
-            return Err(Error::adapter(
-                "Channel's Token & Chain not aligned with Dummy adapter's chain".to_string(),
-            ));
+            let found_chain = self
+                .chains
+                .iter()
+                .find(|chain_info| chain_info.chain == channel_context.chain)
+                .ok_or_else(|| {
+                    Error::adapter(
+                        "Channel Chain not found in Dummy adapter's configuration".to_string(),
+                    )
+                })?;
+
+            let _found_token = found_chain
+                .find_token(channel_context.context.token)
+                .ok_or_else(|| {
+                    Error::adapter(format!(
+                        "Channel Token not found in configured adapter chain: {:?}",
+                        found_chain.chain.chain_id
+                    ))
+                })?;
         }
 
         self.deposits
@@ -199,8 +212,11 @@ impl Unlocked for Dummy {
     }
 
     // requires Unlocked
-    fn get_auth(&self, _for_chain: ChainId, _intended_for: ValidatorId) -> Result<String, Error> {
-        self.authorization_tokens
+    // Builds the authentication token as:
+    // `{Auth token}:chain_id:{Chain Id}`
+    fn get_auth(&self, for_chain: ChainId, _intended_for: ValidatorId) -> Result<String, Error> {
+        let token = self
+            .authorization_tokens
             .get(&self.identity.to_address())
             .cloned()
             .ok_or_else(|| {
@@ -208,7 +224,13 @@ impl Unlocked for Dummy {
                     "No auth token for this identity: {}",
                     self.identity
                 ))
-            })
+            })?;
+
+        Ok(HeaderToken {
+            token,
+            chain_id: for_chain,
+        }
+        .to_string())
     }
 }
 
@@ -218,6 +240,19 @@ impl Unlockable for Dummy {
     fn unlock(&self) -> Result<Self::Unlocked, Error> {
         Ok(self.clone())
     }
+}
+
+/// The dummy Header token used for the `Bearer` `Authorization` header
+///
+/// The format for the header token is:
+/// `{Auth token}:chain_id:{Chain Id}`
+#[derive(Debug, Clone, Display, FromStr)]
+#[display("{token}:chain_id:{chain_id}")]
+pub struct HeaderToken {
+    /// the Authentication Token
+    pub token: String,
+    /// The [`ChainId`] for which we authenticate
+    pub chain_id: ChainId,
 }
 
 mod deposit {
@@ -274,32 +309,30 @@ mod deposit {
 #[cfg(test)]
 mod test {
     use primitives::{
+        config::GANACHE_CONFIG,
         test_util::{CREATOR, DUMMY_CAMPAIGN, IDS, LEADER, PUBLISHER},
         BigNum, ChainOf,
     };
 
-    use super::{
-        test_util::{DUMMY_CHAIN, DUMMY_CHAIN_INFO, DUMMY_TOKEN},
-        *,
-    };
+    use crate::ethereum::test_util::{GANACHE_1337, GANACHE_INFO_1337};
+
+    use super::*;
 
     #[tokio::test]
     async fn test_deposits_calls() {
-        let channel = Channel {
-            token: DUMMY_TOKEN.address,
-            ..DUMMY_CAMPAIGN.channel
-        };
-
-        let channel_context = ChainOf {
-            context: channel,
-            token: DUMMY_TOKEN.clone(),
-            chain: DUMMY_CHAIN.clone(),
-        };
+        let channel_context = ChainOf::new(
+            GANACHE_1337.clone(),
+            GANACHE_INFO_1337
+                .find_token(DUMMY_CAMPAIGN.channel.token)
+                .cloned()
+                .unwrap(),
+        )
+        .with_channel(DUMMY_CAMPAIGN.channel);
 
         let dummy_client = Dummy::init(Options {
             dummy_identity: IDS[&LEADER],
             dummy_auth_tokens: Default::default(),
-            dummy_chain: DUMMY_CHAIN_INFO.clone(),
+            dummy_chains: GANACHE_CONFIG.chains.values().cloned().collect(),
         });
 
         let creator = *CREATOR;
@@ -347,16 +380,21 @@ mod test {
     fn test_set_deposit_to_none_should_panic_on_non_mocked_deposits() {
         let channel = DUMMY_CAMPAIGN.channel;
 
+        let token = GANACHE_INFO_1337
+            .find_token(channel.token)
+            .cloned()
+            .unwrap();
+
         let channel_context = ChainOf {
             context: channel,
-            token: DUMMY_TOKEN.clone(),
-            chain: DUMMY_CHAIN.clone(),
+            token,
+            chain: GANACHE_1337.clone(),
         };
 
         let dummy_client = Dummy::init(Options {
             dummy_identity: IDS[&LEADER],
             dummy_auth_tokens: Default::default(),
-            dummy_chain: DUMMY_CHAIN_INFO.clone(),
+            dummy_chains: GANACHE_CONFIG.chains.values().cloned().collect(),
         });
 
         // It should panic when no deposit is set and we try to set it to None

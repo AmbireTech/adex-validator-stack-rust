@@ -621,7 +621,7 @@ pub mod campaigns {
 mod test {
     use super::*;
     use adapter::{
-        dummy::{test_util::DUMMY_CHAIN_INFO, Adapter, Dummy, Options},
+        dummy::{Adapter, Dummy, Options},
         ethereum::test_util::GANACHE_INFO_1,
     };
     use primitives::{
@@ -653,7 +653,7 @@ mod test {
         let adapter = Adapter::with_unlocked(Dummy::init(Options {
             dummy_identity: whoami,
             dummy_auth_tokens: DUMMY_AUTH.clone(),
-            dummy_chain: DUMMY_CHAIN_INFO.clone(),
+            dummy_chains: GANACHE_CONFIG.chains.values().cloned().collect(),
         }));
         let logger = discard_logger();
 
@@ -768,7 +768,7 @@ mod test {
         let leader_adapter = Adapter::with_unlocked(Dummy::init(Options {
             dummy_identity: IDS[&LEADER],
             dummy_auth_tokens: DUMMY_AUTH.clone(),
-            dummy_chain: DUMMY_CHAIN_INFO.clone(),
+            dummy_chains: GANACHE_CONFIG.chains.values().cloned().collect(),
         }));
         let logger = discard_logger();
 

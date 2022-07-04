@@ -400,7 +400,7 @@ mod analytics_router_test {
     };
 
     use super::*;
-    use adapter::dummy::test_util::DUMMY_CHAIN;
+    use adapter::ethereum::test_util::{GANACHE_1, GANACHE_1337};
     use chrono::Utc;
     use hyper::{Body, Request};
     use primitives::{
@@ -409,9 +409,8 @@ mod analytics_router_test {
             AnalyticsQuery, Metric, OperatingSystem, Timeframe,
         },
         sentry::{DateHour, FetchedAnalytics, FetchedMetric, UpdateAnalytics, CLICK, IMPRESSION},
-        test_util::{ADVERTISER, PUBLISHER, PUBLISHER_2},
-        test_util::{DUMMY_CAMPAIGN, DUMMY_IPFS, IDS, LEADER},
-        ChainId, UnifiedNum,
+        test_util::{ADVERTISER, DUMMY_CAMPAIGN, DUMMY_IPFS, IDS, LEADER, PUBLISHER, PUBLISHER_2},
+        UnifiedNum,
     };
 
     async fn insert_mock_analytics(pool: &DbPool, base_datehour: DateHour<Utc>) {
@@ -426,7 +425,7 @@ mod analytics_router_test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            chain_id: ChainId::new(1),
+            chain_id: GANACHE_1337.chain_id,
             event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
@@ -446,7 +445,7 @@ mod analytics_router_test {
             hostname: None,
             country: Some("Japan".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            chain_id: ChainId::new(1),
+            chain_id: GANACHE_1337.chain_id,
             event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
@@ -466,7 +465,7 @@ mod analytics_router_test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            chain_id: ChainId::new(1),
+            chain_id: GANACHE_1337.chain_id,
             event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
@@ -486,7 +485,7 @@ mod analytics_router_test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            chain_id: ChainId::new(1),
+            chain_id: GANACHE_1337.chain_id,
             event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
@@ -506,7 +505,7 @@ mod analytics_router_test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            chain_id: ChainId::new(1),
+            chain_id: GANACHE_1337.chain_id,
             event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
@@ -526,7 +525,7 @@ mod analytics_router_test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            chain_id: ChainId::new(1),
+            chain_id: GANACHE_1337.chain_id,
             event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
@@ -546,7 +545,7 @@ mod analytics_router_test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            chain_id: ChainId::new(1),
+            chain_id: GANACHE_1337.chain_id,
             event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
@@ -566,7 +565,7 @@ mod analytics_router_test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            chain_id: ChainId::new(1),
+            chain_id: GANACHE_1337.chain_id,
             event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
@@ -586,10 +585,10 @@ mod analytics_router_test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            chain_id: ChainId::new(2),
+            chain_id: GANACHE_1.chain_id,
             event_type: CLICK,
-            amount_to_add: UnifiedNum::from_u64(1_000_000),
-            count_to_add: 1,
+            amount_to_add: UnifiedNum::from_u64(69_000_000),
+            count_to_add: 69,
         };
         update_analytics(pool, analytics_other_chain)
             .await
@@ -631,7 +630,7 @@ mod analytics_router_test {
                 hostname: None,
                 country: Some("Bulgaria".to_string()),
                 os_name: OperatingSystem::map_os("Windows"),
-                chain_id: ChainId::new(1),
+                chain_id: GANACHE_1337.chain_id,
                 event_type: IMPRESSION,
                 amount_to_add: UnifiedNum::from_u64(25_000_000),
                 count_to_add: 25,
@@ -653,7 +652,7 @@ mod analytics_router_test {
                 hostname: None,
                 country: Some("Bulgaria".to_string()),
                 os_name: OperatingSystem::map_os("Windows"),
-                chain_id: ChainId::new(1),
+                chain_id: GANACHE_1337.chain_id,
                 event_type: IMPRESSION,
                 amount_to_add: UnifiedNum::from_u64(17_000_000),
                 count_to_add: 17,
@@ -675,7 +674,7 @@ mod analytics_router_test {
                 hostname: None,
                 country: Some("Bulgaria".to_string()),
                 os_name: OperatingSystem::map_os("Windows"),
-                chain_id: ChainId::new(1),
+                chain_id: GANACHE_1337.chain_id,
                 event_type: IMPRESSION,
                 amount_to_add: UnifiedNum::from_u64(58_000_000),
                 count_to_add: 58,
@@ -739,7 +738,7 @@ mod analytics_router_test {
                 hostname: None,
                 country: None,
                 os_name: None,
-                chains: vec![ChainId::new(1)],
+                chains: vec![GANACHE_1337.chain_id],
             };
             let query = serde_qs::to_string(&query).expect("should parse query");
             let req = Request::builder()
@@ -786,7 +785,7 @@ mod analytics_router_test {
                 hostname: None,
                 country: None,
                 os_name: None,
-                chains: vec![ChainId::new(1)],
+                chains: vec![GANACHE_1337.chain_id],
             };
             let query = serde_qs::to_string(&query).expect("should parse query");
             let req = Request::builder()
@@ -837,7 +836,7 @@ mod analytics_router_test {
                 hostname: None,
                 country: None,
                 os_name: None,
-                chains: vec![ChainId::new(1)],
+                chains: vec![GANACHE_1337.chain_id],
             };
             let query = serde_qs::to_string(&query).expect("should parse query");
             let req = Request::builder()
@@ -889,7 +888,7 @@ mod analytics_router_test {
                 hostname: None,
                 country: Some("Bulgaria".into()),
                 os_name: None,
-                chains: vec![ChainId::new(1)],
+                chains: vec![GANACHE_1337.chain_id],
             };
             let query = serde_qs::to_string(&query).expect("should parse query");
             let req = Request::builder()
@@ -1211,7 +1210,7 @@ mod analytics_router_test {
                 hostname: None,
                 country: None,
                 os_name: None,
-                chains: vec![ChainId::new(2)],
+                chains: vec![GANACHE_1.chain_id],
             };
             let query = serde_qs::to_string(&query).expect("should parse query");
             let req = Request::builder()
@@ -1229,7 +1228,7 @@ mod analytics_router_test {
             let fetched_analytics: Vec<FetchedAnalytics> =
                 serde_json::from_slice(&json).expect("Should get analytics response");
             assert_eq!(
-                vec![FetchedMetric::Count(1)],
+                vec![FetchedMetric::Count(69)],
                 fetched_analytics
                     .iter()
                     .map(|analytics| analytics.value)
@@ -1254,7 +1253,7 @@ mod analytics_router_test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            chain_id: ChainId::new(1),
+            chain_id: GANACHE_1337.chain_id,
             event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
@@ -1274,7 +1273,7 @@ mod analytics_router_test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            chain_id: ChainId::new(1),
+            chain_id: GANACHE_1337.chain_id,
             event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
@@ -1294,7 +1293,7 @@ mod analytics_router_test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            chain_id: ChainId::new(1),
+            chain_id: GANACHE_1337.chain_id,
             event_type: IMPRESSION,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
@@ -1314,7 +1313,7 @@ mod analytics_router_test {
             hostname: Some("localhost".to_string()),
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            chain_id: ChainId::new(1),
+            chain_id: GANACHE_1337.chain_id,
             event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
@@ -1334,7 +1333,7 @@ mod analytics_router_test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            chain_id: ChainId::new(1),
+            chain_id: GANACHE_1337.chain_id,
             event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
@@ -1354,7 +1353,7 @@ mod analytics_router_test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            chain_id: ChainId::new(1),
+            chain_id: GANACHE_1337.chain_id,
             event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
@@ -1374,7 +1373,7 @@ mod analytics_router_test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            chain_id: ChainId::new(1),
+            chain_id: GANACHE_1337.chain_id,
             event_type: CLICK,
             amount_to_add: UnifiedNum::from_u64(1_000_000),
             count_to_add: 1,
@@ -1393,10 +1392,10 @@ mod analytics_router_test {
             hostname: None,
             country: Some("Bulgaria".to_string()),
             os_name: OperatingSystem::map_os("Windows"),
-            chain_id: ChainId::new(2),
+            chain_id: GANACHE_1.chain_id,
             event_type: CLICK,
-            amount_to_add: UnifiedNum::from_u64(1_000_000),
-            count_to_add: 1,
+            amount_to_add: UnifiedNum::from_u64(69_000_000),
+            count_to_add: 69,
         };
         update_analytics(pool, analytics_different_chain)
             .await
@@ -1437,24 +1436,22 @@ mod analytics_router_test {
         let publisher_auth = Auth {
             era: 0,
             uid: IDS[&PUBLISHER],
-            chain: DUMMY_CHAIN.clone(),
+            chain: GANACHE_1337.clone(),
         };
         let advertiser_auth = Auth {
             era: 0,
             uid: IDS[&ADVERTISER],
-            chain: DUMMY_CHAIN.clone(),
+            chain: GANACHE_1337.clone(),
         };
         let admin_auth = Auth {
             era: 0,
             uid: IDS[&LEADER],
-            chain: DUMMY_CHAIN.clone(),
+            chain: GANACHE_1337.clone(),
         };
-        let mut different_chain = DUMMY_CHAIN.clone();
-        different_chain.chain_id = ChainId::new(2);
         let admin_auth_other_chain = Auth {
             era: 0,
             uid: IDS[&LEADER],
-            chain: different_chain,
+            chain: GANACHE_1.clone(),
         };
 
         // test for publisher
@@ -1567,7 +1564,7 @@ mod analytics_router_test {
                 hostname: Some("localhost".into()),
                 country: Some("Bulgaria".into()),
                 os_name: Some(OperatingSystem::map_os("Windows")),
-                chains: vec![ChainId::new(1)],
+                chains: vec![GANACHE_1337.chain_id],
             };
             let query = serde_qs::to_string(&query).expect("should parse query");
             let req = Request::builder()
@@ -1613,7 +1610,7 @@ mod analytics_router_test {
             let fetched_analytics: Vec<FetchedAnalytics> =
                 serde_json::from_slice(&json).expect("Should get analytics response");
             assert_eq!(
-                vec![FetchedMetric::Count(1)],
+                vec![FetchedMetric::Count(69)],
                 fetched_analytics
                     .iter()
                     .map(|fetched| fetched.value)
