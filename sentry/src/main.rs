@@ -2,19 +2,20 @@
 #![deny(rust_2018_idioms)]
 
 use adapter::{primitives::AdapterTypes, Adapter};
-use clap::{crate_version, Arg, Command};
+use clap::{crate_version, value_parser, Arg, Command};
 
 use primitives::{
     config::configuration, postgres::POSTGRES_CONFIG, test_util::DUMMY_AUTH,
     util::logging::new_logger, ValidatorId,
 };
 use sentry::{
+    application::EnableTls,
     db::{postgres_connection, redis_connection, setup_migrations, CampaignRemaining},
     platform::PlatformApi,
     Application,
 };
 use slog::info;
-use std::{env, net::SocketAddr};
+use std::{env, net::SocketAddr, path::PathBuf};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -47,6 +48,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .long("dummyIdentity")
                 .short('i')
                 .help("the identity to use with the dummy adapter")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("certificates")
+                .long("certificates")
+                .help("Certificates .pem file for TLS")
+                .value_parser(value_parser!(PathBuf))
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("privateKeys")
+                .long("privateKeys")
+                .help("The Private keys .pem file for TLS (PKCS8)")
+                .value_parser(value_parser!(PathBuf))
                 .takes_value(true),
         )
         .get_matches();
@@ -93,11 +108,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         _ => panic!("You can only use `ethereum` & `dummy` adapters!"),
     };
 
+    let enable_tls = match (
+        cli.get_one::<PathBuf>("certificates"),
+        cli.get_one::<PathBuf>("privateKeys"),
+    ) {
+        (Some(certs_path), Some(private_keys)) => {
+            EnableTls::new_tls(certs_path, private_keys, socket_addr)
+                .expect("Failed to load certificates & private key files")
+        }
+        (None, None) => EnableTls::no_tls(socket_addr),
+        _ => panic!(
+            "You should pass both --certificates & --privateKeys options to enable TLS or neither"
+        ),
+    };
+
     let logger = new_logger("sentry");
     let redis = redis_connection(env_config.redis_url).await?;
     info!(&logger, "Checking connection and applying migrations...");
     // Check connection and setup migrations before setting up Postgres
-    setup_migrations(env_config.env).await;
+    tokio::task::block_in_place(|| {
+        // Migrations are blocking, so we need to wrap it with block_in_place
+        // otherwise we get a tokio error
+        setup_migrations(env_config.env)
+    });
 
     // use the environmental variables to setup the Postgres connection
     let postgres = match postgres_connection(42, POSTGRES_CONFIG.clone()).await {
@@ -124,7 +157,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 campaign_remaining,
                 platform_api,
             )
-            .run(socket_addr)
+            .run(enable_tls)
             .await
         }
         AdapterTypes::Dummy(adapter) => {
@@ -137,7 +170,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 campaign_remaining,
                 platform_api,
             )
-            .run(socket_addr)
+            .run(enable_tls)
             .await
         }
     };

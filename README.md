@@ -57,7 +57,13 @@ cargo run -p sentry -- --help
 
 Starting the Sentry API in will always run migrations, this will make sure the database is always up to date with the latest migrations, before starting and exposing the web server.
 
-By default, we use the `development` environment ( [`ENV` environment variable](#environment-variables) ) as it will also seed the database.
+By default, we use the `development` environment ( [`ENV` environment variable](#environment-variables) ) ~~as it will also seed the database~~ (seeding is disabled, see #514).
+
+To enable TLS for the sentry server you need to pass both `--privateKeys` and
+`--certificates` cli options (paths to `.pem` files) otherwise the cli will
+exit with an error.
+
+For full list of available addresses see [primitives/src/test_util.rs#L39-L118](./primitives/src/test_util.rs#L39-L118)
 
 #### Using the `Ethereum` adapter
 
@@ -100,7 +106,7 @@ POSTGRES_DB="sentry_follower" PORT=8006 KEYSTORE_PWD=ganache1 cargo run -p sentr
 IP_ADDR=127.0.0.1 REDIS_URL="redis://127.0.0.1:6379/1" \
 POSTGRES_DB="sentry_leader" PORT=8005 cargo run -p sentry -- \
     --adapter dummy \
-    --dummyIdentity 80690751969B234697e9059e04ed72195c3507fa \
+    --dummyIdentity 0x80690751969B234697e9059e04ed72195c3507fa \
     ./docs/config/prod.toml
 ```
 ##### Follower (`0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7`)
@@ -109,11 +115,9 @@ POSTGRES_DB="sentry_leader" PORT=8005 cargo run -p sentry -- \
 IP_ADDR=127.0.0.1 REDIS_URL="redis://127.0.0.1:6379/2" \
 POSTGRES_DB="sentry_follower" PORT=8006 cargo run -p sentry -- \
     --adapter dummy \
-    --dummyIdentity f3f583AEC5f7C030722Fe992A5688557e1B86ef7 \
+    --dummyIdentity 0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7 \
     ./docs/config/prod.toml
 ```
-
-For full list, check out [primitives/src/util/tests/prep_db.rs#L29-L43](./primitives/src/util/tests/prep_db.rs#L29-L43)
 
 #### Environment variables
 
@@ -122,6 +126,7 @@ For full list, check out [primitives/src/util/tests/prep_db.rs#L29-L43](./primit
 - `IP_ADDR` - *default*: `0.0.0.0` - the IP address that the API should be listening to
 
 ##### Adapter
+
 - `KEYSTORE_PWD` - Password for the `Keystore file`, only available when using `Ethereum` adapter (`--adapter ethereum`)
 
 ##### Redis

@@ -65,6 +65,11 @@ ENV KEYSTORE_PWD=
 # Only applicable if you use the `--adapter dummy`
 ENV DUMMY_IDENTITY=
 
+# To setup TLS supply both `PRIVATE_KEYS` & `CERTIFICATES`
+# Otherwise you will get an error
+ENV PRIVATE_KEYS=
+ENV CERTIFICATES=
+
 # If set it will override the configuration file used
 ENV CONFIG=
 
@@ -85,4 +90,6 @@ ENTRYPOINT ["./scripts/entrypoint.sh"]
 CMD sentry -a ${ADAPTER:-ethereum} \
             ${KEYSTORE_FILE:+-k $KEYSTORE_FILE} \
             ${DUMMY_IDENTITY:+-i $DUMMY_IDENTITY} \
+            ${PRIVATE_KEYS:+--privateKeys $PRIVATE_KEYS} \
+            ${CERTIFICATES:+--certificates $CERTIFICATES} \
             ${CONFIG}
