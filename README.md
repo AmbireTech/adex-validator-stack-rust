@@ -136,7 +136,7 @@ POSTGRES_DB="sentry_follower" PORT=8006 cargo run -p sentry -- \
 
 #### Environment variables
 
-- `ENV` - `production` or `development`; *default*: `development` - passing this env. variable will use the default configuration paths - [`docs/config/ganache.toml`](./docs/config/ganache.toml) (for `development`) or [`docs/config/prod.toml`](./docs/config/prod.toml) (for `production`). Otherwise you can pass your own configuration file path to the binary (check `cargo run -p sentry --help` for more information). In `development` it will make sure Sentry to seed the database.
+- `ENV` - `production` or `development`; *default*: `development` - passing this env. variable will use the default configuration paths - [`docs/config/ganache.toml`](./docs/config/ganache.toml) (for `development`) or [`docs/config/prod.toml`](./docs/config/prod.toml) (for `production`). Otherwise you can pass your own configuration file path to the binary (check `cargo run -p sentry --help` for more information). ~~In `development` it will make sure Sentry to seed the database~~ (seeding is disabled, see #514).
 - `PORT` - *default*: `8005` - The local port that Sentry API will be accessible at
 - `IP_ADDR` - *default*: `0.0.0.0` - the IP address that the API should be listening to
 
@@ -219,7 +219,7 @@ cargo run -p validator_worker -- \
 
 #### Environment variables
 
-- `ENV` - `production` or `development`; *default*: `development` - passing this env. variable will use the default configuration paths - [`docs/config/ganache.toml`](./docs/config/ganache.toml) (for `development`) or [`docs/config/prod.toml`](./docs/config/prod.toml) (for `production`). Otherwise you can pass your own configuration file path to the binary (check `cargo run -p sentry --help` for more information). In `development` it will make sure that Sentry seeds the database.
+- `ENV` - `production` or `development`; *default*: `development` - passing this env. variable will use the default configuration paths - [`docs/config/ganache.toml`](./docs/config/ganache.toml) (for `development`) or [`docs/config/prod.toml`](./docs/config/prod.toml) (for `production`). Otherwise you can pass your own configuration file path to the binary (check `cargo run -p sentry --help` for more information).
 
 ##### Adapter
 

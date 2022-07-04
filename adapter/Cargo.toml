@@ -12,7 +12,7 @@ license = "AGPL-3.0"
 
 [features]
 
-# Enables testing untilites for working with Ganache and the Dummy adapter.
+# Enables testing untilites for working with Ganache
 test-util = ["primitives/test-util"]
 
 [dependencies]
