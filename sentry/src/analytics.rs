@@ -104,8 +104,6 @@ mod test {
         UnifiedNum,
     };
 
-    use crate::db::tests_postgres::{setup_test_migrations, DATABASE_POOL};
-
     // Currently used for testing
     async fn get_all_analytics(pool: &DbPool) -> Result<Vec<Analytics>, PoolError> {
         let client = pool.get().await?;
@@ -170,11 +168,6 @@ mod test {
         let app = setup_dummy_app().await;
 
         let test_events = get_test_events();
-        let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
-
-        setup_test_migrations(database.pool.clone())
-            .await
-            .expect("Migrations should succeed");
 
         let campaign = DUMMY_CAMPAIGN.clone();
 
@@ -199,16 +192,11 @@ mod test {
         let channel_context = channel_chain.with_channel(dummy_channel);
         let campaign_context = channel_context.clone().with(campaign);
 
-        record(
-            &database.clone(),
-            &campaign_context,
-            &session,
-            input_events.clone(),
-        )
-        .await
-        .expect("should record");
+        record(&app.pool, &campaign_context, &session, input_events.clone())
+            .await
+            .expect("should record");
 
-        let analytics = get_all_analytics(&database.pool)
+        let analytics = get_all_analytics(&app.pool)
             .await
             .expect("should get all analytics");
         assert_eq!(analytics.len(), 2);
@@ -237,12 +225,6 @@ mod test {
     #[tokio::test]
     async fn test_recording_with_session() {
         let app = setup_dummy_app().await;
-
-        let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
-
-        setup_test_migrations(database.pool.clone())
-            .await
-            .expect("Migrations should succeed");
 
         let test_events = get_test_events();
 
@@ -274,16 +256,11 @@ mod test {
             .expect("Channel token should be whitelisted in config!");
         let channel_context = channel_chain.with_channel(dummy_channel);
         let campaign_context = channel_context.clone().with(campaign);
-        record(
-            &database.clone(),
-            &campaign_context,
-            &session,
-            input_events.clone(),
-        )
-        .await
-        .expect("should record");
+        record(&app.pool, &campaign_context, &session, input_events.clone())
+            .await
+            .expect("should record");
 
-        let analytics = get_all_analytics(&database.pool)
+        let analytics = get_all_analytics(&app.pool)
             .await
             .expect("should find analytics");
 
