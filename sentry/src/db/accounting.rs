@@ -131,16 +131,9 @@ pub async fn spend_amount(
     channel_id: ChannelId,
     delta_balances: Balances<CheckedState>,
 ) -> Result<(Vec<Accounting>, Vec<Accounting>), PoolError> {
-    let mut client = pool.get().await?;
+    let client = pool.get().await?;
 
-    // The reads and writes in this transaction must be able to be committed as an atomic “unit” with respect to reads and writes of all other concurrent serializable transactions without interleaving.
-    let transaction = client
-        .build_transaction()
-        .isolation_level(IsolationLevel::Serializable)
-        .start()
-        .await?;
-
-    let statement = transaction.prepare(UPDATE_ACCOUNTING_STATEMENT).await?;
+    let statement = client.prepare(UPDATE_ACCOUNTING_STATEMENT).await?;
 
     let now = Utc::now();
     let updated: Option<DateTime<Utc>> = None;
@@ -149,7 +142,7 @@ pub async fn spend_amount(
 
     // Earners
     for (earner, amount) in delta_balances.earners {
-        let row = transaction
+        let row = client
             .query_one(
                 &statement,
                 &[&channel_id, &Side::Earner, &earner, &amount, &updated, &now],
@@ -161,7 +154,7 @@ pub async fn spend_amount(
 
     // Spenders
     for (spender, amount) in delta_balances.spenders {
-        let row = transaction
+        let row = client
             .query_one(
                 &statement,
                 &[
@@ -177,8 +170,6 @@ pub async fn spend_amount(
 
         spenders.push(Accounting::from(&row))
     }
-
-    transaction.commit().await?;
 
     Ok((earners, spenders))
 }
