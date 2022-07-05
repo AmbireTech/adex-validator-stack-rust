@@ -1,3 +1,5 @@
+extend = "../Makefile.toml"
+
 [tasks.dev-test-flow]
 description = "Development testing flow will first format the code, and than run cargo build and test"
 category = "Development"
@@ -16,7 +18,6 @@ args = ["test", "--release"]
 
 [tasks.local-test-flow]
 dependencies = ["services-up", "test-flow", "services-down"]
-
 
 [tasks.services-up]
 # `--renew-anon-volumes` will force the recreation of the services
