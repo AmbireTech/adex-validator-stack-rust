@@ -355,8 +355,8 @@ mod tests {
             targeting_rules: Rules::new(),
             created: Utc.ymd(2021, 2, 1).and_hms(7, 0, 0),
             active: Active {
+                from: Some(Utc.ymd(2022, 6, 27).and_hms(0, 0, 0)),
                 to: Utc.ymd(2099, 1, 30).and_hms(0, 0, 0),
-                from: None,
             },
         }
     });
@@ -450,8 +450,8 @@ mod tests {
             targeting_rules: Rules::new(),
             created: Utc.ymd(2021, 2, 1).and_hms(7, 0, 0),
             active: Active {
-                to: Utc.ymd(2099, 1, 30).and_hms(0, 0, 0),
                 from: None,
+                to: Utc.ymd(2099, 1, 30).and_hms(0, 0, 0),
             },
         }
     });
@@ -537,8 +537,8 @@ mod tests {
             targeting_rules: Rules::new(),
             created: Utc.ymd(2021, 2, 1).and_hms(7, 0, 0),
             active: Active {
-                to: Utc.ymd(2099, 1, 30).and_hms(0, 0, 0),
                 from: None,
+                to: Utc.ymd(2099, 1, 30).and_hms(0, 0, 0),
             },
         }
     });
