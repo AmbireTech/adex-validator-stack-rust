@@ -3,8 +3,58 @@ on: [push, pull_request]
 name: Continuous Integration
 
 jobs:
-  ci-flow:
-    name: cargo make ci-flow - Tests, clippy & rustfmt
+  lint-rustfmt:
+    name: Running lint - rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - uses: actions-rs/toolchain@v1
+        with:
+          # We need nightly in order to trigger clippy & rustfmt in cargo-make
+          toolchain: nightly
+          profile: minimal
+          override: true
+          components: rustfmt
+      - uses: davidB/rust-cargo-make@v1
+      - name: Rustfmt
+        run: cargo make check-format-ci-flow
+  lint-clippy:
+    name: Running lint - clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - uses: actions-rs/toolchain@v1
+        with:
+          # We need nightly in order to trigger clippy & rustfmt in cargo-make
+          toolchain: nightly
+          profile: minimal
+          override: true
+          components: clippy
+      - uses: davidB/rust-cargo-make@v1
+      - name: Run Clippy
+        run: cargo make clippy-ci-flow
+  check-docs:
+    name: Rustdoc build check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - uses: actions-rs/toolchain@v1
+        with:
+          # We need nightly in order to trigger clippy & rustfmt
+          profile: minimal
+          components: rust-docs
+      - name: Build docs with no features
+        run: cargo doc --workspace --no-deps --no-default-features
+      - name: Build docs with --all-features
+        run: cargo doc --workspace --no-deps --all-features
+  test-flow:
+    name: cargo make ci-flow - Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -19,9 +69,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           # No need to add `toolchain`, it will use `rust-toolchain` file instead
-          profile: default
-          override: true
-          components: clippy, rustfmt
+          profile: minimal
       - uses: davidB/rust-cargo-make@v1
       - name: Run `cargo make ci-flow`
         # Running cargo make doesn't successfully start `ganache`
