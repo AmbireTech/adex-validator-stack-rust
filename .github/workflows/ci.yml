@@ -12,11 +12,12 @@ jobs:
     name: Running lint - rustfmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: true
       - uses: actions-rs/toolchain@v1
         with:
+          # No need to add `toolchain`, it will use `rust-toolchain` file instead
           profile: minimal
           components: rustfmt
       - uses: davidB/rust-cargo-make@v1
@@ -27,11 +28,12 @@ jobs:
     name: Running lint - clippy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: true
       - uses: actions-rs/toolchain@v1
         with:
+          # No need to add `toolchain`, it will use `rust-toolchain` file instead
           profile: minimal
           components: clippy
       - uses: davidB/rust-cargo-make@v1
@@ -42,11 +44,12 @@ jobs:
     name: Rustdoc build check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: true
       - uses: actions-rs/toolchain@v1
         with:
+          # No need to add `toolchain`, it will use `rust-toolchain` file instead
           profile: minimal
           components: rust-docs
       - name: Build docs with no features
