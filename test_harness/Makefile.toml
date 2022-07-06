@@ -1,6 +1,4 @@
-[env]
-CARGO_MAKE_RUN_CHECK_FORMAT = "true"
-CARGO_MAKE_RUN_CLIPPY = "true"
+extend = "../Makefile.toml"
 
 [tasks.dev-test-flow]
 description = "Development testing flow will first format the code, and than run cargo build and test"

@@ -1,5 +1,10 @@
 on: [push, pull_request]
 
+# Stops the running workflow of previous pushes
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
 name: Continuous Integration
 
 jobs:
@@ -12,10 +17,7 @@ jobs:
           submodules: true
       - uses: actions-rs/toolchain@v1
         with:
-          # We need nightly in order to trigger clippy & rustfmt in cargo-make
-          toolchain: nightly
           profile: minimal
-          override: true
           components: rustfmt
       - uses: davidB/rust-cargo-make@v1
       - name: Rustfmt
@@ -29,10 +31,7 @@ jobs:
           submodules: true
       - uses: actions-rs/toolchain@v1
         with:
-          # We need nightly in order to trigger clippy & rustfmt in cargo-make
-          toolchain: nightly
           profile: minimal
-          override: true
           components: clippy
       - uses: davidB/rust-cargo-make@v1
       - name: Run Clippy
@@ -46,7 +45,6 @@ jobs:
           submodules: true
       - uses: actions-rs/toolchain@v1
         with:
-          # We need nightly in order to trigger clippy & rustfmt
           profile: minimal
           components: rust-docs
       - name: Build docs with no features
