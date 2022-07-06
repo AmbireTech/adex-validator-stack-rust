@@ -49,7 +49,7 @@ const auth = {
 request({
     url: "http://localhost:8005/v5/campaign",
     method: "POST",
-    json: true,  
+    json: true,
     body: JSON.stringify(valid_campaign)
 }, (err, res, body) => {
     console.log(body); // should be a Campaign object
