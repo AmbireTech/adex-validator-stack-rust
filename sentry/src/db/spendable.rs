@@ -263,8 +263,12 @@ mod test {
         for (address, spendable) in create_spendables.iter() {
             insert_spendable(database.pool.clone(), spendable)
                 .await
-                .unwrap_or_else(|_| panic!("Failed to insert spendable for {:?} with Spendable: {:?}",
-                    address, spendable));
+                .unwrap_or_else(|_| {
+                    panic!(
+                        "Failed to insert spendable for {:?} with Spendable: {:?}",
+                        address, spendable
+                    )
+                });
             // use sleep to make all spendables with different time
             // they will follow the order in which they were defined in the variable
             sleep(Duration::from_millis(100)).await;

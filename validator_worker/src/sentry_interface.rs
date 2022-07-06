@@ -1007,10 +1007,7 @@ mod test {
             };
 
             let second_page_response = ChannelListResponse {
-                channels: vec![
-                    channel_new_follower,
-                    channel_new_leader_and_follower,
-                ],
+                channels: vec![channel_new_follower, channel_new_leader_and_follower],
                 pagination: Pagination {
                     page: 1,
                     total_pages: 2,

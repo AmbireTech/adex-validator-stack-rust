@@ -273,8 +273,6 @@ impl UnifiedNum {
         let value_length = string_value.len();
         let precision: usize = Self::PRECISION.into();
 
-        
-
         if value_length > precision {
             string_value.insert(value_length - precision, Self::DEBUG_DELIMITER);
 

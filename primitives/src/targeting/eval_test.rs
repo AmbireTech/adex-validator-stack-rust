@@ -247,16 +247,12 @@ mod dsl_test {
             ),
             // with rounding up
             (
-                Value::Number(
-                    Number::from_f64(9.999_999_999).expect("should create float number"),
-                ),
+                Value::Number(Number::from_f64(9.999_999_999).expect("should create float number")),
                 Value::UnifiedNum(UnifiedNum::from_whole(10)),
             ),
             // rounding down
             (
-                Value::Number(
-                    Number::from_f64(8.999_999_994).expect("should create float number"),
-                ),
+                Value::Number(Number::from_f64(8.999_999_994).expect("should create float number")),
                 Value::UnifiedNum(UnifiedNum::from(899_999_999)),
             ),
         ];

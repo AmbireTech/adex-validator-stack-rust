@@ -1653,14 +1653,12 @@ mod tests {
                 last_approved_response_leader
                     .heartbeats
                     .expect("Leader response should have heartbeats")
-                    
                     .into_iter()
                     .map(|message| message.msg)
                     .collect::<Vec<_>>(),
                 last_approved_response_follower
                     .heartbeats
                     .expect("Follower response should have heartbeats")
-                    
                     .into_iter()
                     .map(|message| message.msg)
                     .collect::<Vec<_>>(),
@@ -1716,14 +1714,12 @@ mod tests {
 
                 let new_state_leader = msg_new_state_leader
                     .msg
-                    
                     .into_inner()
                     .try_checked()
                     .expect("NewState should have valid CheckedState Balances");
 
                 let new_state_follower = msg_new_state_follower
                     .msg
-                    
                     .into_inner()
                     .try_checked()
                     .expect("NewState should have valid CheckedState Balances");
@@ -1864,14 +1860,12 @@ mod tests {
                 last_approved_response_leader
                     .heartbeats
                     .expect("Leader response should have heartbeats")
-                    
                     .into_iter()
                     .map(|message| message.msg)
                     .collect::<Vec<_>>(),
                 last_approved_response_follower
                     .heartbeats
                     .expect("Follower response should have heartbeats")
-                    
                     .into_iter()
                     .map(|message| message.msg)
                     .collect::<Vec<_>>(),
@@ -1927,14 +1921,12 @@ mod tests {
 
                 let new_state_leader = msg_new_state_leader
                     .msg
-                    
                     .into_inner()
                     .try_checked()
                     .expect("NewState should have valid CheckedState Balances");
 
                 let new_state_follower = msg_new_state_follower
                     .msg
-                    
                     .into_inner()
                     .try_checked()
                     .expect("NewState should have valid CheckedState Balances");

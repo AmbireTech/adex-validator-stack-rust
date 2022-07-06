@@ -138,7 +138,8 @@ impl Token {
         }
 
         let token_parts = token.splitn(3, '.').collect::<Vec<_>>();
-        let ((header_encoded, payload_encoded), signature_encoded) = token_parts.first()
+        let ((header_encoded, payload_encoded), signature_encoded) = token_parts
+            .first()
             .zip(token_parts.get(1))
             .zip(token_parts.get(2))
             .ok_or(EwtVerifyError::InvalidToken)?;

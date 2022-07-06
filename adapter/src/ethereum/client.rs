@@ -701,7 +701,8 @@ mod test {
             assert!(
                 !ganache_1
                     .tokens
-                    .values().any(|existing_token| { existing_token.address == token.info.address }),
+                    .values()
+                    .any(|existing_token| { existing_token.address == token.info.address }),
                 "The deployed token address should not have existed previously in the config!"
             );
 

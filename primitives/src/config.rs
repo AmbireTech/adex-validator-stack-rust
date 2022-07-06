@@ -162,7 +162,6 @@ pub struct TokenInfo {
     pub address: Address,
 }
 
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Limits {
     pub units_for_slot: limits::UnitsForSlot,

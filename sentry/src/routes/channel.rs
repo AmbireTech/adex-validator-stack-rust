@@ -358,8 +358,6 @@ async fn get_corresponding_new_state(
 
     let state_root = approve_state.msg.state_root.clone();
 
-    
-
     match latest_new_state(pool, channel, &state_root).await? {
         Some(new_state) => {
             let new_state = new_state.msg.into_inner().try_checked().map_err(|err| {
@@ -580,7 +578,8 @@ pub mod validator_message {
             ));
         }
 
-        let validator_id = split.first()
+        let validator_id = split
+            .first()
             // filter an empty string
             .filter(|string| !string.is_empty())
             // then try to map it to ValidatorId
