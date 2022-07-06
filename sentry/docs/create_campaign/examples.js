@@ -49,10 +49,10 @@ const auth = {
 request({
     url: "http://localhost:8005/v5/campaign",
     method: "POST",
-    json: true,   // <--Very important!!!
+    json: true,  
     body: JSON.stringify(valid_campaign)
 }, (err, res, body) => {
-    console.log(res); // should be a Campaign object
+    console.log(body); // should be a Campaign object
 });
 
 // Request with a broken campaign
