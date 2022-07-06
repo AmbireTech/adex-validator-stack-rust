@@ -237,8 +237,7 @@ pub async fn channels_router<C: Locked + 'static>(
 
         get_accounting_for_channel(req, app).await
     }
-    // POST /v5/channel/:id/dummy-deposit
-    // will allow the calling of the method only if we are using the Dummy adapter!
+    // POST /v5/channel/:id/pay
     else if let (Some(caps), &Method::POST) = (CHANNEL_PAY.captures(&path), method) {
         let param = RouteParams(vec![caps
             .get(1)

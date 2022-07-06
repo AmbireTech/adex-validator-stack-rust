@@ -290,10 +290,10 @@ mod deposit {
             Self::default()
         }
 
-        /// Get's the set deposit for the give [`ChannelId`] and [`Address`].
+        /// Get's the set deposit for the given [`Key`].
         ///
-        /// This method will return [`None`] if the deposit for the pair
-        /// [`ChannelId`] & [`Address`] was not set.
+        /// This method will return [`None`] if the deposit for the
+        /// [`Key`] was not set.
         pub fn get_deposit(
             &self,
             channel: &ChainOf<Channel>,
