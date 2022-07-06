@@ -79,7 +79,7 @@ fn redis_url<'a, 'de: 'a, D>(deserializer: D) -> Result<ConnectionInfo, D::Error
 where
     D: Deserializer<'de>,
 {
-    let url_string = <&'a str>::deserialize(deserializer)?;
+    let url_string = String::deserialize(deserializer)?;
 
     url_string.parse().map_err(serde::de::Error::custom)
 }

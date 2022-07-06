@@ -1034,9 +1034,10 @@ mod test {
         config::GANACHE_CONFIG,
         sentry::campaign_list::{CampaignListResponse, ValidatorParam},
         test_util::{
-            DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, FOLLOWER, GUARDIAN,
-            IDS, LEADER, LEADER_2, PUBLISHER_2,
+            CREATOR, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, FOLLOWER,
+            GUARDIAN, IDS, LEADER, LEADER_2, PUBLISHER_2,
         },
+        unified_num::FromWhole,
         ValidatorDesc, ValidatorId,
     };
 
@@ -1055,21 +1056,18 @@ mod test {
             .expect("Channel token should be whitelisted in config!");
         let channel_context = channel_chain.with_channel(dummy_channel);
 
-        let multiplier = 10_u64.pow(UnifiedNum::PRECISION.into());
-
-        // this function should be called before each creation/modification of a Campaign!
-        let add_deposit_call = |channel_context: &ChainOf<Channel>, for_address: Address| {
-            app.adapter.client.add_deposit_call(
-                channel_context.context.id(),
-                for_address,
-                Deposit {
-                    // a deposit 4 times larger than the first Campaign.budget = 500
-                    // I.e. 2 000 TOKENS
-                    total: UnifiedNum::from(200_000_000_000)
-                        .to_precision(channel_context.token.precision.get()),
-                },
-            )
-        };
+        // Set the deposit for the CREATOR use for all campaigns in the test
+        assert_eq!(*CREATOR, DUMMY_CAMPAIGN.creator);
+        app.adapter.client.set_deposit(
+            &channel_context,
+            *CREATOR,
+            Deposit {
+                // a deposit 4 times larger than the first Campaign.budget = 500
+                // I.e. 2 000 TOKENS
+                total: UnifiedNum::from_whole(2_000)
+                    .to_precision(channel_context.token.precision.get()),
+            },
+        );
 
         let build_request = |create_campaign: CreateCampaign| -> Request<Body> {
             let auth = Auth {
@@ -1090,9 +1088,7 @@ mod test {
         let campaign_context: ChainOf<Campaign> = {
             // erases the CampaignId for the CreateCampaign request
             let mut create = CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
-            create.budget = UnifiedNum::from(500 * multiplier);
-            // prepare for Campaign creation
-            add_deposit_call(&channel_context, create.creator);
+            create.budget = UnifiedNum::from_whole(500);
 
             let create_response = create_campaign(build_request(create), &app)
                 .await
@@ -1130,7 +1126,7 @@ mod test {
         // new Campaign.budget = 1 000
         // Deposit left = 1 000
         let modified = {
-            let new_budget = UnifiedNum::from(1000 * multiplier);
+            let new_budget = UnifiedNum::from_whole(1000);
             let modify = ModifyCampaign {
                 budget: Some(new_budget),
                 validators: None,
@@ -1140,10 +1136,6 @@ mod test {
                 ad_units: None,
                 targeting_rules: None,
             };
-
-            // prepare for Campaign modification.
-            // does not alter the deposit amount
-            add_deposit_call(&channel_context, campaign_context.context.creator);
 
             let modified_campaign = modify_campaign(
                 app.adapter.clone(),
@@ -1170,10 +1162,7 @@ mod test {
             // erases the CampaignId for the CreateCampaign request
             let mut create_second =
                 CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
-            create_second.budget = UnifiedNum::from(500 * multiplier);
-
-            // prepare for Campaign creation
-            add_deposit_call(&channel_context, create_second.creator);
+            create_second.budget = UnifiedNum::from_whole(500);
 
             let create_response = create_campaign(build_request(create_second), &app)
                 .await
@@ -1196,10 +1185,7 @@ mod test {
         {
             // erases the CampaignId for the CreateCampaign request
             let mut create = CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
-            create.budget = UnifiedNum::from(600 * multiplier);
-
-            // prepare for Campaign creation
-            add_deposit_call(&channel_context, create.creator);
+            create.budget = UnifiedNum::from_whole(600);
 
             let create_err = create_campaign(build_request(create), &app)
                 .await
@@ -1215,7 +1201,7 @@ mod test {
 
         // modify first campaign, by lowering the budget from 1000 to 900
         let modified = {
-            let lower_budget = UnifiedNum::from(90_000_000_000);
+            let lower_budget = UnifiedNum::from_whole(900);
             let modify = ModifyCampaign {
                 budget: Some(lower_budget),
                 validators: None,
@@ -1225,9 +1211,6 @@ mod test {
                 ad_units: None,
                 targeting_rules: None,
             };
-
-            // prepare for Campaign modification
-            add_deposit_call(&channel_context, modified.context.creator);
 
             let modified_campaign = modify_campaign(
                 app.adapter.clone(),
@@ -1251,10 +1234,7 @@ mod test {
         {
             // erases the CampaignId for the CreateCampaign request
             let mut create = CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
-            create.budget = UnifiedNum::from(600 * multiplier);
-
-            // prepare for Campaign creation
-            add_deposit_call(&channel_context, create.creator);
+            create.budget = UnifiedNum::from_whole(600);
 
             let create_response = create_campaign(build_request(create), &app)
                 .await
@@ -1273,7 +1253,7 @@ mod test {
         // new Campaign.budget = 1100
         // current Campaign.budget = 900
         {
-            let new_budget = UnifiedNum::from(110_000_000_000);
+            let new_budget = UnifiedNum::from_whole(1_100);
             let modify = ModifyCampaign {
                 budget: Some(new_budget),
                 validators: None,
@@ -1283,9 +1263,6 @@ mod test {
                 ad_units: None,
                 targeting_rules: None,
             };
-
-            // prepare for Campaign modification
-            add_deposit_call(&channel_context, modified.context.creator);
 
             let modify_err = modify_campaign(
                 app.adapter.clone(),
@@ -1309,7 +1286,6 @@ mod test {
     async fn delta_budgets_are_calculated_correctly() {
         let redis = TESTS_POOL.get().await.expect("Should return Object");
         let campaign_remaining = CampaignRemaining::new(redis.connection.clone());
-        let multiplier = 10_u64.pow(UnifiedNum::PRECISION.into());
 
         let campaign = DUMMY_CAMPAIGN.clone();
 
@@ -1323,12 +1299,12 @@ mod test {
         // Spent cant be higher than the new budget
         {
             campaign_remaining
-                .set_initial(campaign.id, UnifiedNum::from_u64(600 * multiplier))
+                .set_initial(campaign.id, UnifiedNum::from_whole(600))
                 .await
                 .expect("should set");
 
             // campaign_spent > new_budget
-            let new_budget = UnifiedNum::from_u64(300 * multiplier);
+            let new_budget = UnifiedNum::from_whole(300);
             let delta_budget = get_delta_budget(&campaign_remaining, &campaign, new_budget).await;
 
             assert!(
@@ -1337,7 +1313,7 @@ mod test {
             );
 
             // campaign_spent == new_budget
-            let new_budget = UnifiedNum::from_u64(400 * multiplier);
+            let new_budget = UnifiedNum::from_whole(400);
             let delta_budget = get_delta_budget(&campaign_remaining, &campaign, new_budget).await;
 
             assert!(
@@ -1348,30 +1324,30 @@ mod test {
         // Increasing budget
         {
             campaign_remaining
-                .set_initial(campaign.id, UnifiedNum::from_u64(900 * multiplier))
+                .set_initial(campaign.id, UnifiedNum::from_whole(900))
                 .await
                 .expect("should set");
-            let new_budget = UnifiedNum::from_u64(1100 * multiplier);
+            let new_budget = UnifiedNum::from_whole(1_100);
             let delta_budget = get_delta_budget(&campaign_remaining, &campaign, new_budget)
                 .await
                 .expect("should get delta budget");
             assert!(delta_budget.is_some());
-            let increase_by = UnifiedNum::from_u64(100 * multiplier);
+            let increase_by = UnifiedNum::from_whole(100);
 
             assert_eq!(delta_budget, Some(DeltaBudget::Increase(increase_by)));
         }
         // Decreasing budget
         {
             campaign_remaining
-                .set_initial(campaign.id, UnifiedNum::from_u64(900 * multiplier))
+                .set_initial(campaign.id, UnifiedNum::from_whole(900))
                 .await
                 .expect("should set");
-            let new_budget = UnifiedNum::from_u64(800 * multiplier);
+            let new_budget = UnifiedNum::from_whole(800);
             let delta_budget = get_delta_budget(&campaign_remaining, &campaign, new_budget)
                 .await
                 .expect("should get delta budget");
             assert!(delta_budget.is_some());
-            let decrease_by = UnifiedNum::from_u64(200 * multiplier);
+            let decrease_by = UnifiedNum::from_whole(200);
 
             assert_eq!(delta_budget, Some(DeltaBudget::Decrease(decrease_by)));
         }

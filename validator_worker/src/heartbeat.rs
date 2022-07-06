@@ -128,6 +128,7 @@ mod test {
         let adapter = Adapter::with_unlocked(Dummy::init(Options {
             dummy_identity: IDS[&LEADER],
             dummy_auth_tokens: DUMMY_AUTH.clone(),
+            dummy_chains: config.chains.values().cloned().collect(),
         }));
         let logger = discard_logger();
 
