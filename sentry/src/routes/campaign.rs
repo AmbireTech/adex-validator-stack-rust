@@ -143,6 +143,19 @@ pub async fn fetch_campaign_ids_for_channel(
 }
 
 /// POST `/v5/campaign`
+///
+/// Creates a new `Campaign` making sure its `Channel` exists if it's new and updates the `Spendable` entry.
+///
+/// # Tutorial:
+#[doc = include_str!("../../docs/create_campaign/tutorial.md")]
+///
+/// # Examples:
+/// ```
+#[doc = include_str!("../../docs/create_campaign/examples.rs")]
+/// ```
+///
+/// # Glossary:
+#[doc = include_str!("../../docs/create_campaign/glossary.md")]
 pub async fn create_campaign<C>(
     req: Request<Body>,
     app: &Application<C>,
@@ -317,7 +330,7 @@ pub async fn campaign_list<C: Locked + 'static>(
 
 /// POST `/v5/campaign/:id/close` (auth required)
 ///
-/// Can only be called by the [`Campaign.creator`]!
+/// **Can only be called by the [`Campaign.creator`]!**
 /// To close a campaign, just set it's budget to what it's spent so far (so that remaining == 0)
 /// newBudget = totalSpent, i.e. newBudget = oldBudget - remaining
 pub async fn close_campaign<C: Locked + 'static>(
@@ -369,6 +382,14 @@ pub mod update_campaign {
     use super::*;
 
     /// POST `/v5/campaign/:id` (auth required)
+    ///
+    /// Request body is [`ModifyCampaign`](`primitives::sentry::campaign_modify::ModifyCampaign`)
+    /// which consists of all the editable fields of the [`Campaign`]
+    ///
+    /// Returns the updated [`Campaign`] serialized
+    ///
+    /// Ensures that the remaining funds for all campaigns <= total remaining funds (total deposited - total spent)
+    ///
     pub async fn handle_route<C: Locked + 'static>(
         req: Request<Body>,
         app: &Application<C>,
@@ -628,7 +649,22 @@ pub mod insert_events {
         CampaignOutOfBudget,
     }
 
-    /// POST `/v5/campaign/:id`
+    /// POST `/v5/campaign/:id/events`
+    ///
+    /// The route is used to send events (`IMPRESSION`/`CLICK`) for the provided `Campaign`.
+    /// First we verify that all the rules are met for each event, we then caluclate the payputs and validator fees
+    /// and we record the changes in Postgres/Redis. After that we record the events in the analytics.
+    ///
+    /// # Tutorial:
+    #[doc = include_str!("../../docs/post_events/tutorial.md")]
+    ///
+    /// # Examples:
+    /// ```
+    #[doc = include_str!("../../docs/post_events/examples.rs")]
+    /// ```
+    ///
+    /// # Glossary:
+    #[doc = include_str!("../../docs/post_events/glossary.md")]
     pub async fn handle_route<C: Locked + 'static>(
         req: Request<Body>,
         app: &Application<C>,

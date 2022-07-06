@@ -247,6 +247,7 @@ pub async fn channels_router<C: Locked + 'static>(
     }
 }
 
+/// `/v5/campaign` router
 pub async fn campaigns_router<C: Locked + 'static>(
     mut req: Request<Body>,
     app: &Application<C>,

@@ -72,7 +72,7 @@ impl Validator for Campaign {
             .find_chain_of(self.channel.token)
             .ok_or(Validation::UnlistedAsset)?;
 
-        // Check if the campaign budget is above the minimum deposit configured
+        // Check if the campaign budget is above the minimum campaign budget configured
         if self
             .budget
             .to_precision(chain_context.token.precision.get())

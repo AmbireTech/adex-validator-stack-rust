@@ -17,6 +17,17 @@ use primitives::analytics::{
 
 /// `GET /v5/analytics` request
 /// with query parameters: [`primitives::analytics::AnalyticsQuery`].
+///
+/// # Tutorial:
+#[doc = include_str!("../../docs/create_campaign/tutorial.md")]
+///
+/// # Examples:
+/// ```
+#[doc = include_str!("../../docs/create_campaign/examples.rs")]
+/// ```
+///
+/// # Glossary:
+#[doc = include_str!("../../docs/create_campaign/glossary.md")]
 pub async fn analytics<C: Locked + 'static>(
     req: Request<Body>,
     app: &Application<C>,

@@ -802,6 +802,12 @@ pub mod campaign_create {
 
     /// All fields are present except the `CampaignId` which is randomly created
     /// This struct defines the Body of the request (in JSON)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    #[doc = include_str!("../examples/create_campaign.rs")]
+    /// ```
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     #[serde(rename_all = "camelCase")]
     pub struct CreateCampaign {
@@ -889,7 +895,12 @@ pub mod campaign_modify {
         AdUnit, Campaign, EventSubmission, UnifiedNum,
     };
 
-    // All editable fields stored in one place, used for checking when a budget is changed
+    /// All editable fields stored in one place, used for checking when a budget is changed
+    ///
+    /// # Examples:
+    /// ```
+    #[doc = include_str!("../examples/modify_campaign.rs")]
+    /// ```
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     pub struct ModifyCampaign {
         pub budget: Option<UnifiedNum>,
