@@ -2081,7 +2081,7 @@
     <span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
 
     <span class="kw">use</span> <span class="kw">crate</span>::{
-        <span class="ident">campaign</span>::{<span class="ident">prefix_active</span>, <span class="ident">Active</span>, <span class="ident">PricingBounds</span>, <span class="ident">Validators</span>},
+        <span class="ident">campaign</span>::{<span class="ident">Active</span>, <span class="ident">PricingBounds</span>, <span class="ident">Validators</span>},
         <span class="ident">targeting::Rules</span>,
         <span class="ident">AdUnit</span>, <span class="ident">Address</span>, <span class="ident">Campaign</span>, <span class="ident">CampaignId</span>, <span class="ident">Channel</span>, <span class="ident">EventSubmission</span>, <span class="ident">UnifiedNum</span>,
     };
@@ -2114,7 +2114,7 @@
         <span class="kw">pub</span> <span class="ident">created</span>: <span class="ident">DateTime</span><span class="op">&lt;</span><span class="ident">Utc</span><span class="op">&gt;</span>,
         <span class="doccomment">/// A millisecond timestamp representing the time you want this campaign to become active (optional)</span>
         <span class="doccomment">/// Used by the AdViewManager &amp; Targeting AIP#31</span>
-        <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">flatten</span>, <span class="ident">with</span> <span class="op">=</span> <span class="string">&quot;prefix_active&quot;</span>)]</span>
+        <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">flatten</span>)]</span>
         <span class="kw">pub</span> <span class="ident">active</span>: <span class="ident">Active</span>,
     }
 
