@@ -2,16 +2,6 @@
 CARGO_MAKE_EXTEND_WORKSPACE_MAKEFILE = "true"
 CARGO_MAKE_CLIPPY_ARGS = "--all-features -- -D warnings"
 CARGO_MAKE_RUN_TOML_FORMAT = "true"
-CARGO_MAKE_RUN_CHECK_FORMAT = "true"
-CARGO_MAKE_RUN_CLIPPY = "true"
-
-[tasks.check-format-ci-flow]
-# we've removed the coniditions for nighlty channel & linux
-condition = { env_set = ["CARGO_MAKE_RUN_CHECK_FORMAT"] }
-
-[tasks.clippy-ci-flow]
-# we've removed the coniditions for nighlty channel & linux
-condition = { env_set = ["CARGO_MAKE_RUN_CLIPPY"] }
 
 [tasks.dev-test-flow]
 dependencies = [
