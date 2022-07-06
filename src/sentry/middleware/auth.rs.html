@@ -255,6 +255,13 @@
 <span id="250">250</span>
 <span id="251">251</span>
 <span id="252">252</span>
+<span id="253">253</span>
+<span id="254">254</span>
+<span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std::error</span>;
 
 <span class="kw">use</span> <span class="ident">async_trait::async_trait</span>;
@@ -408,11 +415,13 @@
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="kw">mod</span> <span class="ident">test</span> {
     <span class="kw">use</span> <span class="ident">adapter</span>::{
-        <span class="ident">dummy</span>::{<span class="ident">Dummy</span>, <span class="ident">Options</span>},
+        <span class="ident">dummy</span>::{<span class="ident">Dummy</span>, <span class="ident">HeaderToken</span>, <span class="ident">Options</span>},
+        <span class="ident">ethereum::test_util::GANACHE_1</span>,
         <span class="ident">Adapter</span>,
     };
     <span class="kw">use</span> <span class="ident">hyper::Request</span>;
     <span class="kw">use</span> <span class="ident">primitives</span>::{
+        <span class="ident">config::GANACHE_CONFIG</span>,
         <span class="ident">test_util::IDS</span>,
         <span class="ident">test_util</span>::{<span class="ident">DUMMY_AUTH</span>, <span class="ident">LEADER</span>},
     };
@@ -431,6 +440,7 @@
         <span class="kw">let</span> <span class="ident">adapter_options</span> <span class="op">=</span> <span class="ident">Options</span> {
             <span class="ident">dummy_identity</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>],
             <span class="ident">dummy_auth_tokens</span>: <span class="ident">DUMMY_AUTH</span>.<span class="ident">clone</span>(),
+            <span class="ident">dummy_chains</span>: <span class="ident">GANACHE_CONFIG</span>.<span class="ident">chains</span>.<span class="ident">values</span>().<span class="ident">cloned</span>().<span class="ident">collect</span>(),
         };
 
         (<span class="ident">Adapter::new</span>(<span class="ident">Dummy::init</span>(<span class="ident">adapter_options</span>)), <span class="ident">connection</span>)
@@ -472,7 +482,7 @@
             .<span class="ident">unwrap</span>();
         <span class="kw">match</span> <span class="ident">for_request</span>(<span class="ident">non_existent_token_req</span>, <span class="kw-2">&amp;</span><span class="ident">dummy_adapter</span>, <span class="kw-2">&amp;</span><span class="ident">database</span>).<span class="kw">await</span> {
             <span class="prelude-val">Err</span>(<span class="ident">error</span>) =&gt; {
-                <span class="macro">assert!</span>(<span class="ident">error</span>.<span class="ident">to_string</span>().<span class="ident">contains</span>(<span class="string">&quot;No identity found that matches authentication token: wrong-token&quot;</span>), <span class="string">&quot;Wrong error received&quot;</span>);
+                <span class="macro">assert_eq!</span>(<span class="ident">error</span>.<span class="ident">to_string</span>(), <span class="string">&quot;Authentication: Dummy Authentication token format should be in the format: `{Auth Token}:chain_id:{Chain Id}` but &#39;wrong-token&#39; was provided&quot;</span>);
             }
             <span class="kw">_</span> =&gt; <span class="macro">panic!</span>(<span class="string">&quot;We shouldn&#39;t get a success response nor a different Error than BadRequest for this call&quot;</span>),
         };
@@ -482,8 +492,12 @@
     <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">session_from_correct_authentication_token</span>() {
         <span class="kw">let</span> (<span class="ident">dummy_adapter</span>, <span class="ident">database</span>) <span class="op">=</span> <span class="ident">setup</span>().<span class="kw">await</span>;
 
-        <span class="kw">let</span> <span class="ident">token</span> <span class="op">=</span> <span class="ident">DUMMY_AUTH</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>].<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">auth_header</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;Bearer {}&quot;</span>, <span class="ident">token</span>);
+        <span class="kw">let</span> <span class="ident">header_token</span> <span class="op">=</span> <span class="ident">HeaderToken</span> {
+            <span class="ident">token</span>: <span class="ident">DUMMY_AUTH</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>].<span class="ident">clone</span>(),
+            <span class="ident">chain_id</span>: <span class="ident">GANACHE_1</span>.<span class="ident">chain_id</span>,
+        };
+
+        <span class="kw">let</span> <span class="ident">auth_header</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;Bearer {header_token}&quot;</span>);
         <span class="kw">let</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">Request::builder</span>()
             .<span class="ident">header</span>(<span class="ident">AUTHORIZATION</span>, <span class="ident">auth_header</span>)
             .<span class="ident">body</span>(<span class="ident">Body::empty</span>())

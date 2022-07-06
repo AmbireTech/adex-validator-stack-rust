@@ -1465,6 +1465,64 @@
 <span id="1460">1460</span>
 <span id="1461">1461</span>
 <span id="1462">1462</span>
+<span id="1463">1463</span>
+<span id="1464">1464</span>
+<span id="1465">1465</span>
+<span id="1466">1466</span>
+<span id="1467">1467</span>
+<span id="1468">1468</span>
+<span id="1469">1469</span>
+<span id="1470">1470</span>
+<span id="1471">1471</span>
+<span id="1472">1472</span>
+<span id="1473">1473</span>
+<span id="1474">1474</span>
+<span id="1475">1475</span>
+<span id="1476">1476</span>
+<span id="1477">1477</span>
+<span id="1478">1478</span>
+<span id="1479">1479</span>
+<span id="1480">1480</span>
+<span id="1481">1481</span>
+<span id="1482">1482</span>
+<span id="1483">1483</span>
+<span id="1484">1484</span>
+<span id="1485">1485</span>
+<span id="1486">1486</span>
+<span id="1487">1487</span>
+<span id="1488">1488</span>
+<span id="1489">1489</span>
+<span id="1490">1490</span>
+<span id="1491">1491</span>
+<span id="1492">1492</span>
+<span id="1493">1493</span>
+<span id="1494">1494</span>
+<span id="1495">1495</span>
+<span id="1496">1496</span>
+<span id="1497">1497</span>
+<span id="1498">1498</span>
+<span id="1499">1499</span>
+<span id="1500">1500</span>
+<span id="1501">1501</span>
+<span id="1502">1502</span>
+<span id="1503">1503</span>
+<span id="1504">1504</span>
+<span id="1505">1505</span>
+<span id="1506">1506</span>
+<span id="1507">1507</span>
+<span id="1508">1508</span>
+<span id="1509">1509</span>
+<span id="1510">1510</span>
+<span id="1511">1511</span>
+<span id="1512">1512</span>
+<span id="1513">1513</span>
+<span id="1514">1514</span>
+<span id="1515">1515</span>
+<span id="1516">1516</span>
+<span id="1517">1517</span>
+<span id="1518">1518</span>
+<span id="1519">1519</span>
+<span id="1520">1520</span>
 </pre><pre class="rust"><code><span class="doccomment">//! `/v5/channel` routes</span>
 <span class="doccomment">//!</span>
 
@@ -1482,7 +1540,7 @@
     <span class="ident">routes</span>::{<span class="ident">campaign::fetch_campaign_ids_for_channel</span>, <span class="ident">routers::RouteParams</span>},
     <span class="ident">Application</span>, <span class="ident">Auth</span>,
 };
-<span class="kw">use</span> <span class="ident">adapter</span>::{<span class="ident">client::Locked</span>, <span class="ident">Adapter</span>};
+<span class="kw">use</span> <span class="ident">adapter</span>::{<span class="ident">client::Locked</span>, <span class="ident">Adapter</span>, <span class="ident">Dummy</span>};
 <span class="kw">use</span> <span class="ident">futures::future::try_join_all</span>;
 <span class="kw">use</span> <span class="ident">hyper</span>::{<span class="ident">Body</span>, <span class="ident">Request</span>, <span class="ident">Response</span>};
 <span class="kw">use</span> <span class="ident">primitives</span>::{
@@ -1496,8 +1554,18 @@
     <span class="ident">validator::NewState</span>,
     <span class="ident">Address</span>, <span class="ident">ChainOf</span>, <span class="ident">Channel</span>, <span class="ident">Deposit</span>, <span class="ident">UnifiedNum</span>,
 };
+<span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
 <span class="kw">use</span> <span class="ident">slog</span>::{<span class="ident">error</span>, <span class="ident">Logger</span>};
-<span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">collections::HashMap</span>, <span class="ident">str::FromStr</span>};
+<span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">any::Any</span>, <span class="ident">collections::HashMap</span>, <span class="ident">str::FromStr</span>};
+
+<span class="doccomment">/// Request body for Channel deposit when using the Dummy adapter.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// **NOTE:** available **only** when using the Dummy adapter!</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ChannelDummyDeposit</span> {
+    <span class="kw">pub</span> <span class="ident">channel</span>: <span class="ident">Channel</span>,
+    <span class="kw">pub</span> <span class="ident">deposit</span>: <span class="ident">Deposit</span><span class="op">&lt;</span><span class="ident">UnifiedNum</span><span class="op">&gt;</span>,
+}
 
 <span class="doccomment">/// GET `/v5/channel/list` request</span>
 <span class="doccomment">///</span>
@@ -2011,6 +2079,56 @@
         <span class="ident">success</span>: <span class="bool-val">true</span>,
     })<span class="question-mark">?</span>))
 }
+
+<span class="doccomment">/// POST `/v5/channel/dummy-deposit` request</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Body (json): [`ChannelDummyDeposit`]</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Response: [`SuccessResponse`]</span>
+<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">channel_dummy_deposit</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Locked</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span>(
+    <span class="ident">req</span>: <span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>,
+    <span class="ident">app</span>: <span class="kw-2">&amp;</span><span class="ident">Application</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
+) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Response</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>, <span class="ident">ResponseError</span><span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">auth</span> <span class="op">=</span> <span class="ident">req</span>
+        .<span class="ident">extensions</span>()
+        .<span class="ident">get</span>::<span class="op">&lt;</span><span class="ident">Auth</span><span class="op">&gt;</span>()
+        .<span class="ident">ok_or</span>(<span class="ident">ResponseError::Unauthorized</span>)<span class="question-mark">?</span>
+        .<span class="ident">to_owned</span>();
+
+    <span class="kw">let</span> <span class="ident">depositor</span> <span class="op">=</span> <span class="ident">auth</span>.<span class="ident">uid</span>.<span class="ident">to_address</span>();
+
+    <span class="kw">let</span> <span class="ident">body</span> <span class="op">=</span> <span class="ident">hyper::body::to_bytes</span>(<span class="ident">req</span>.<span class="ident">into_body</span>()).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="ident">request</span> <span class="op">=</span> <span class="ident">serde_json::from_slice</span>::<span class="op">&lt;</span><span class="ident">ChannelDummyDeposit</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">body</span>)
+        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">ResponseError::FailedValidation</span>(<span class="ident">e</span>.<span class="ident">to_string</span>()))<span class="question-mark">?</span>;
+
+    <span class="comment">// Insert the channel if it does not exist yet</span>
+    <span class="kw">let</span> <span class="ident">channel_chain</span> <span class="op">=</span> <span class="ident">app</span>
+        .<span class="ident">config</span>
+        .<span class="ident">find_chain_of</span>(<span class="ident">request</span>.<span class="ident">channel</span>.<span class="ident">token</span>)
+        .<span class="ident">expect</span>(<span class="string">&quot;The Chain of Channel&#39;s token was not found in configuration!&quot;</span>)
+        .<span class="ident">with_channel</span>(<span class="ident">request</span>.<span class="ident">channel</span>);
+
+    <span class="comment">// if this fails, it will cause Bad Request</span>
+    <span class="ident">insert_channel</span>(<span class="kw-2">&amp;</span><span class="ident">app</span>.<span class="ident">pool</span>, <span class="kw-2">&amp;</span><span class="ident">channel_chain</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+
+    <span class="comment">// Convert the UnifiedNum to BigNum with the precision of the token</span>
+    <span class="kw">let</span> <span class="ident">deposit</span> <span class="op">=</span> <span class="ident">request</span>
+        .<span class="ident">deposit</span>
+        .<span class="ident">to_precision</span>(<span class="ident">channel_chain</span>.<span class="ident">token</span>.<span class="ident">precision</span>.<span class="ident">into</span>());
+
+    <span class="kw">let</span> <span class="ident">dummy_adapter</span> <span class="op">=</span> <span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Any</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span><span class="op">&gt;</span><span class="ident">::downcast_ref</span>::<span class="op">&lt;</span><span class="ident">Adapter</span><span class="op">&lt;</span><span class="ident">Dummy</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">app</span>.<span class="ident">adapter</span>)
+        .<span class="ident">expect</span>(<span class="string">&quot;Only Dummy adapter is allowed here!&quot;</span>);
+
+    <span class="comment">// set the deposit in the Dummy adapter&#39;s client</span>
+    <span class="ident">dummy_adapter</span>
+        .<span class="ident">client</span>
+        .<span class="ident">set_deposit</span>(<span class="kw-2">&amp;</span><span class="ident">channel_chain</span>, <span class="ident">depositor</span>, <span class="ident">deposit</span>);
+
+    <span class="prelude-val">Ok</span>(<span class="ident">success_response</span>(<span class="ident">serde_json::to_string</span>(<span class="kw-2">&amp;</span><span class="ident">SuccessResponse</span> {
+        <span class="ident">success</span>: <span class="bool-val">true</span>,
+    })<span class="question-mark">?</span>))
+}
+
 <span class="doccomment">/// [`Channel`] [validator messages](primitives::validator::MessageTypes) routes</span>
 <span class="doccomment">/// starting with `/v5/channel/0xXXX.../validator-messages`</span>
 <span class="doccomment">///</span>
@@ -2196,7 +2314,7 @@
         };
         <span class="ident">app</span>.<span class="ident">adapter</span>
             .<span class="ident">client</span>
-            .<span class="ident">add_deposit_call</span>(<span class="ident">channel</span>.<span class="ident">id</span>(), <span class="kw-2">*</span><span class="ident">CREATOR</span>, <span class="ident">deposit</span>.<span class="ident">clone</span>());
+            .<span class="ident">set_deposit</span>(<span class="kw-2">&amp;</span><span class="ident">channel_context</span>, <span class="kw-2">*</span><span class="ident">CREATOR</span>, <span class="ident">deposit</span>.<span class="ident">clone</span>());
         <span class="comment">// Making sure spendable does not yet exist</span>
         <span class="kw">let</span> <span class="ident">spendable</span> <span class="op">=</span> <span class="ident">fetch_spendable</span>(<span class="ident">app</span>.<span class="ident">pool</span>.<span class="ident">clone</span>(), <span class="kw-2">&amp;</span><span class="ident">CREATOR</span>, <span class="kw-2">&amp;</span><span class="ident">channel</span>.<span class="ident">id</span>())
             .<span class="kw">await</span>
@@ -2232,7 +2350,7 @@
 
         <span class="ident">app</span>.<span class="ident">adapter</span>
             .<span class="ident">client</span>
-            .<span class="ident">add_deposit_call</span>(<span class="ident">channel</span>.<span class="ident">id</span>(), <span class="kw-2">*</span><span class="ident">CREATOR</span>, <span class="ident">updated_deposit</span>.<span class="ident">clone</span>());
+            .<span class="ident">set_deposit</span>(<span class="kw-2">&amp;</span><span class="ident">channel_context</span>, <span class="kw-2">*</span><span class="ident">CREATOR</span>, <span class="ident">updated_deposit</span>.<span class="ident">clone</span>());
 
         <span class="kw">let</span> <span class="ident">updated_spendable</span> <span class="op">=</span> <span class="ident">create_or_update_spendable_document</span>(
             <span class="kw-2">&amp;</span><span class="ident">app</span>.<span class="ident">adapter</span>,
@@ -2397,11 +2515,9 @@
         <span class="kw">let</span> <span class="ident">deposit</span> <span class="op">=</span> <span class="ident">AdapterDeposit</span> {
             <span class="ident">total</span>: <span class="ident">BigNum::from_str</span>(<span class="string">&quot;100000000000000000000&quot;</span>).<span class="ident">expect</span>(<span class="string">&quot;should convert&quot;</span>), <span class="comment">// 100 DAI</span>
         };
-        <span class="ident">app</span>.<span class="ident">adapter</span>.<span class="ident">client</span>.<span class="ident">add_deposit_call</span>(
-            <span class="ident">channel_context</span>.<span class="ident">context</span>.<span class="ident">id</span>(),
-            <span class="kw-2">*</span><span class="ident">CREATOR</span>,
-            <span class="ident">deposit</span>.<span class="ident">clone</span>(),
-        );
+        <span class="ident">app</span>.<span class="ident">adapter</span>
+            .<span class="ident">client</span>
+            .<span class="ident">set_deposit</span>(<span class="kw-2">&amp;</span><span class="ident">channel_context</span>, <span class="kw-2">*</span><span class="ident">CREATOR</span>, <span class="ident">deposit</span>.<span class="ident">clone</span>());
 
         <span class="ident">insert_channel</span>(<span class="kw-2">&amp;</span><span class="ident">app</span>.<span class="ident">pool</span>, <span class="kw-2">&amp;</span><span class="ident">channel_context</span>)
             .<span class="kw">await</span>

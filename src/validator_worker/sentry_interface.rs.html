@@ -1052,6 +1052,8 @@
 <span id="1047">1047</span>
 <span id="1048">1048</span>
 <span id="1049">1049</span>
+<span id="1050">1050</span>
+<span id="1051">1051</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std</span>::{
     <span class="ident">collections</span>::{<span class="ident">hash_map::Entry</span>, <span class="ident">HashMap</span>, <span class="ident">HashSet</span>},
     <span class="ident">time::Duration</span>,
@@ -1707,6 +1709,7 @@
         <span class="kw">let</span> <span class="ident">adapter</span> <span class="op">=</span> <span class="ident">Adapter::with_unlocked</span>(<span class="ident">Dummy::init</span>(<span class="ident">Options</span> {
             <span class="ident">dummy_identity</span>: <span class="ident">whoami</span>,
             <span class="ident">dummy_auth_tokens</span>: <span class="ident">DUMMY_AUTH</span>.<span class="ident">clone</span>(),
+            <span class="ident">dummy_chains</span>: <span class="ident">config</span>.<span class="ident">chains</span>.<span class="ident">values</span>().<span class="ident">cloned</span>().<span class="ident">collect</span>(),
         }));
         <span class="kw">let</span> <span class="ident">logger</span> <span class="op">=</span> <span class="ident">discard_logger</span>();
 
@@ -1821,6 +1824,7 @@
         <span class="kw">let</span> <span class="ident">leader_adapter</span> <span class="op">=</span> <span class="ident">Adapter::with_unlocked</span>(<span class="ident">Dummy::init</span>(<span class="ident">Options</span> {
             <span class="ident">dummy_identity</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>],
             <span class="ident">dummy_auth_tokens</span>: <span class="ident">DUMMY_AUTH</span>.<span class="ident">clone</span>(),
+            <span class="ident">dummy_chains</span>: <span class="ident">config</span>.<span class="ident">chains</span>.<span class="ident">values</span>().<span class="ident">cloned</span>().<span class="ident">collect</span>(),
         }));
         <span class="kw">let</span> <span class="ident">logger</span> <span class="op">=</span> <span class="ident">discard_logger</span>();
 

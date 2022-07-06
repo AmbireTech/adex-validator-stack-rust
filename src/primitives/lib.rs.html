@@ -228,8 +228,18 @@
 <span id="223">223</span>
 <span id="224">224</span>
 <span id="225">225</span>
+<span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
+<span id="231">231</span>
+<span id="232">232</span>
+<span id="233">233</span>
+<span id="234">234</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">deny</span>(<span class="ident">rust_2018_idioms</span>)]</span>
 <span class="attribute">#![<span class="ident">deny</span>(<span class="ident">clippy::all</span>)]</span>
+<span class="attribute">#![<span class="ident">deny</span>(<span class="ident">rustdoc::broken_intra_doc_links</span>)]</span>
 <span class="attribute">#![<span class="ident">cfg_attr</span>(<span class="ident">docsrs</span>, <span class="ident">feature</span>(<span class="ident">doc_cfg</span>))]</span>
 <span class="comment">// TODO: Remove once stabled and upstream num::Integer::div_floor(...) is fixed</span>
 <span class="attribute">#![<span class="ident">allow</span>(<span class="ident">unstable_name_collisions</span>)]</span>
@@ -385,6 +395,14 @@
             <span class="kw">let</span> <span class="ident">total</span> <span class="op">=</span> <span class="ident">UnifiedNum::from_precision</span>(<span class="ident">deposit</span>.<span class="ident">total</span>, <span class="ident">precision</span>);
 
             <span class="ident">total</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">total</span><span class="op">|</span> <span class="ident">Deposit</span> { <span class="ident">total</span> })
+        }
+    }
+
+    <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">N</span>: <span class="ident">Default</span><span class="op">&gt;</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">Deposit</span><span class="op">&lt;</span><span class="ident">N</span><span class="op">&gt;</span> {
+        <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="self">Self</span> {
+            <span class="self">Self</span> {
+                <span class="ident">total</span>: <span class="ident">Default::default</span>(),
+            }
         }
     }
 }

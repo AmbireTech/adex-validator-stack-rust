@@ -152,19 +152,19 @@
 <span class="kw">use</span> <span class="ident">std::fmt</span>;
 
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">config::TokenInfo</span>, <span class="ident">util::ApiUrl</span>, <span class="ident">Address</span>, <span class="ident">Campaign</span>, <span class="ident">Channel</span>};
-<span class="kw">use</span> <span class="ident">parse_display::Display</span>;
+<span class="kw">use</span> <span class="ident">parse_display</span>::{<span class="ident">Display</span>, <span class="ident">FromStr</span>};
 
 <span class="doccomment">/// The Id of the chain</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// # Ethereum Virtual Machine</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// For all the EVM-compatible Chain IDs visit &lt;https://chainid.network&gt;</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Hash</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>, <span class="ident">Display</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Hash</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>, <span class="ident">Display</span>, <span class="ident">FromStr</span>)]</span>
 <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">transparent</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ChainId</span>(<span class="ident">u32</span>);
 
 <span class="kw">impl</span> <span class="ident">ChainId</span> {
-    <span class="doccomment">/// # Panics:</span>
+    <span class="doccomment">/// # Panics</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// If `id` is `0`.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">id</span>: <span class="ident">u32</span>) -&gt; <span class="self">Self</span> {

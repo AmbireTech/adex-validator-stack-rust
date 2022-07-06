@@ -99,7 +99,7 @@
 
     <span class="kw">use</span> <span class="ident">primitives</span>::{<span class="ident">Address</span>, <span class="ident">DomainError</span>, <span class="ident">UnifiedNum</span>, <span class="ident">ValidatorDesc</span>};
 
-    <span class="doccomment">/// Pro mile (`1 000`) in [`UnifiedNum`] precision, i.e. `1_000.00_000_000`.</span>
+    <span class="doccomment">/// Pro mile (per thousands, `1000`) in `UnifiedNum` precision, i.e. `1_000.00_000_000`.</span>
     <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">PRO_MILLE</span>: <span class="ident">UnifiedNum</span> <span class="op">=</span> <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1_000</span> <span class="op">*</span> <span class="ident">UnifiedNum::MULTIPLIER</span>);
 
     <span class="doccomment">/// Calculates the fee for a given payout of the specified validator</span>

@@ -1761,30 +1761,6 @@
 <span id="1756">1756</span>
 <span id="1757">1757</span>
 <span id="1758">1758</span>
-<span id="1759">1759</span>
-<span id="1760">1760</span>
-<span id="1761">1761</span>
-<span id="1762">1762</span>
-<span id="1763">1763</span>
-<span id="1764">1764</span>
-<span id="1765">1765</span>
-<span id="1766">1766</span>
-<span id="1767">1767</span>
-<span id="1768">1768</span>
-<span id="1769">1769</span>
-<span id="1770">1770</span>
-<span id="1771">1771</span>
-<span id="1772">1772</span>
-<span id="1773">1773</span>
-<span id="1774">1774</span>
-<span id="1775">1775</span>
-<span id="1776">1776</span>
-<span id="1777">1777</span>
-<span id="1778">1778</span>
-<span id="1779">1779</span>
-<span id="1780">1780</span>
-<span id="1781">1781</span>
-<span id="1782">1782</span>
 </pre><pre class="rust"><code><span class="doccomment">//! `/v5/campaign` routes</span>
 <span class="kw">use</span> <span class="kw">crate</span>::{
     <span class="ident">db</span>::{
@@ -2821,9 +2797,10 @@
         <span class="ident">config::GANACHE_CONFIG</span>,
         <span class="ident">sentry::campaign_list</span>::{<span class="ident">CampaignListResponse</span>, <span class="ident">ValidatorParam</span>},
         <span class="ident">test_util</span>::{
-            <span class="ident">DUMMY_CAMPAIGN</span>, <span class="ident">DUMMY_VALIDATOR_FOLLOWER</span>, <span class="ident">DUMMY_VALIDATOR_LEADER</span>, <span class="ident">FOLLOWER</span>, <span class="ident">GUARDIAN</span>,
-            <span class="ident">IDS</span>, <span class="ident">LEADER</span>, <span class="ident">LEADER_2</span>, <span class="ident">PUBLISHER_2</span>,
+            <span class="ident">CREATOR</span>, <span class="ident">DUMMY_CAMPAIGN</span>, <span class="ident">DUMMY_VALIDATOR_FOLLOWER</span>, <span class="ident">DUMMY_VALIDATOR_LEADER</span>, <span class="ident">FOLLOWER</span>,
+            <span class="ident">GUARDIAN</span>, <span class="ident">IDS</span>, <span class="ident">LEADER</span>, <span class="ident">LEADER_2</span>, <span class="ident">PUBLISHER_2</span>,
         },
+        <span class="ident">unified_num::FromWhole</span>,
         <span class="ident">ValidatorDesc</span>, <span class="ident">ValidatorId</span>,
     };
 
@@ -2842,21 +2819,18 @@
             .<span class="ident">expect</span>(<span class="string">&quot;Channel token should be whitelisted in config!&quot;</span>);
         <span class="kw">let</span> <span class="ident">channel_context</span> <span class="op">=</span> <span class="ident">channel_chain</span>.<span class="ident">with_channel</span>(<span class="ident">dummy_channel</span>);
 
-        <span class="kw">let</span> <span class="ident">multiplier</span> <span class="op">=</span> <span class="number">10_u64</span>.<span class="ident">pow</span>(<span class="ident">UnifiedNum::PRECISION</span>.<span class="ident">into</span>());
-
-        <span class="comment">// this function should be called before each creation/modification of a Campaign!</span>
-        <span class="kw">let</span> <span class="ident">add_deposit_call</span> <span class="op">=</span> <span class="op">|</span><span class="ident">channel_context</span>: <span class="kw-2">&amp;</span><span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">Channel</span><span class="op">&gt;</span>, <span class="ident">for_address</span>: <span class="ident">Address</span><span class="op">|</span> {
-            <span class="ident">app</span>.<span class="ident">adapter</span>.<span class="ident">client</span>.<span class="ident">add_deposit_call</span>(
-                <span class="ident">channel_context</span>.<span class="ident">context</span>.<span class="ident">id</span>(),
-                <span class="ident">for_address</span>,
-                <span class="ident">Deposit</span> {
-                    <span class="comment">// a deposit 4 times larger than the first Campaign.budget = 500</span>
-                    <span class="comment">// I.e. 2 000 TOKENS</span>
-                    <span class="ident">total</span>: <span class="ident">UnifiedNum::from</span>(<span class="number">200_000_000_000</span>)
-                        .<span class="ident">to_precision</span>(<span class="ident">channel_context</span>.<span class="ident">token</span>.<span class="ident">precision</span>.<span class="ident">get</span>()),
-                },
-            )
-        };
+        <span class="comment">// Set the deposit for the CREATOR use for all campaigns in the test</span>
+        <span class="macro">assert_eq!</span>(<span class="kw-2">*</span><span class="ident">CREATOR</span>, <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">creator</span>);
+        <span class="ident">app</span>.<span class="ident">adapter</span>.<span class="ident">client</span>.<span class="ident">set_deposit</span>(
+            <span class="kw-2">&amp;</span><span class="ident">channel_context</span>,
+            <span class="kw-2">*</span><span class="ident">CREATOR</span>,
+            <span class="ident">Deposit</span> {
+                <span class="comment">// a deposit 4 times larger than the first Campaign.budget = 500</span>
+                <span class="comment">// I.e. 2 000 TOKENS</span>
+                <span class="ident">total</span>: <span class="ident">UnifiedNum::from_whole</span>(<span class="number">2_000</span>)
+                    .<span class="ident">to_precision</span>(<span class="ident">channel_context</span>.<span class="ident">token</span>.<span class="ident">precision</span>.<span class="ident">get</span>()),
+            },
+        );
 
         <span class="kw">let</span> <span class="ident">build_request</span> <span class="op">=</span> <span class="op">|</span><span class="ident">create_campaign</span>: <span class="ident">CreateCampaign</span><span class="op">|</span> -&gt; <span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span> {
             <span class="kw">let</span> <span class="ident">auth</span> <span class="op">=</span> <span class="ident">Auth</span> {
@@ -2877,9 +2851,7 @@
         <span class="kw">let</span> <span class="ident">campaign_context</span>: <span class="ident">ChainOf</span><span class="op">&lt;</span><span class="ident">Campaign</span><span class="op">&gt;</span> <span class="op">=</span> {
             <span class="comment">// erases the CampaignId for the CreateCampaign request</span>
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">create</span> <span class="op">=</span> <span class="ident">CreateCampaign::from_campaign_erased</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">clone</span>(), <span class="prelude-val">None</span>);
-            <span class="ident">create</span>.<span class="ident">budget</span> <span class="op">=</span> <span class="ident">UnifiedNum::from</span>(<span class="number">500</span> <span class="op">*</span> <span class="ident">multiplier</span>);
-            <span class="comment">// prepare for Campaign creation</span>
-            <span class="ident">add_deposit_call</span>(<span class="kw-2">&amp;</span><span class="ident">channel_context</span>, <span class="ident">create</span>.<span class="ident">creator</span>);
+            <span class="ident">create</span>.<span class="ident">budget</span> <span class="op">=</span> <span class="ident">UnifiedNum::from_whole</span>(<span class="number">500</span>);
 
             <span class="kw">let</span> <span class="ident">create_response</span> <span class="op">=</span> <span class="ident">create_campaign</span>(<span class="ident">build_request</span>(<span class="ident">create</span>), <span class="kw-2">&amp;</span><span class="ident">app</span>)
                 .<span class="kw">await</span>
@@ -2917,7 +2889,7 @@
         <span class="comment">// new Campaign.budget = 1 000</span>
         <span class="comment">// Deposit left = 1 000</span>
         <span class="kw">let</span> <span class="ident">modified</span> <span class="op">=</span> {
-            <span class="kw">let</span> <span class="ident">new_budget</span> <span class="op">=</span> <span class="ident">UnifiedNum::from</span>(<span class="number">1000</span> <span class="op">*</span> <span class="ident">multiplier</span>);
+            <span class="kw">let</span> <span class="ident">new_budget</span> <span class="op">=</span> <span class="ident">UnifiedNum::from_whole</span>(<span class="number">1000</span>);
             <span class="kw">let</span> <span class="ident">modify</span> <span class="op">=</span> <span class="ident">ModifyCampaign</span> {
                 <span class="ident">budget</span>: <span class="prelude-val">Some</span>(<span class="ident">new_budget</span>),
                 <span class="ident">validators</span>: <span class="prelude-val">None</span>,
@@ -2927,10 +2899,6 @@
                 <span class="ident">ad_units</span>: <span class="prelude-val">None</span>,
                 <span class="ident">targeting_rules</span>: <span class="prelude-val">None</span>,
             };
-
-            <span class="comment">// prepare for Campaign modification.</span>
-            <span class="comment">// does not alter the deposit amount</span>
-            <span class="ident">add_deposit_call</span>(<span class="kw-2">&amp;</span><span class="ident">channel_context</span>, <span class="ident">campaign_context</span>.<span class="ident">context</span>.<span class="ident">creator</span>);
 
             <span class="kw">let</span> <span class="ident">modified_campaign</span> <span class="op">=</span> <span class="ident">modify_campaign</span>(
                 <span class="ident">app</span>.<span class="ident">adapter</span>.<span class="ident">clone</span>(),
@@ -2957,10 +2925,7 @@
             <span class="comment">// erases the CampaignId for the CreateCampaign request</span>
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">create_second</span> <span class="op">=</span>
                 <span class="ident">CreateCampaign::from_campaign_erased</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">clone</span>(), <span class="prelude-val">None</span>);
-            <span class="ident">create_second</span>.<span class="ident">budget</span> <span class="op">=</span> <span class="ident">UnifiedNum::from</span>(<span class="number">500</span> <span class="op">*</span> <span class="ident">multiplier</span>);
-
-            <span class="comment">// prepare for Campaign creation</span>
-            <span class="ident">add_deposit_call</span>(<span class="kw-2">&amp;</span><span class="ident">channel_context</span>, <span class="ident">create_second</span>.<span class="ident">creator</span>);
+            <span class="ident">create_second</span>.<span class="ident">budget</span> <span class="op">=</span> <span class="ident">UnifiedNum::from_whole</span>(<span class="number">500</span>);
 
             <span class="kw">let</span> <span class="ident">create_response</span> <span class="op">=</span> <span class="ident">create_campaign</span>(<span class="ident">build_request</span>(<span class="ident">create_second</span>), <span class="kw-2">&amp;</span><span class="ident">app</span>)
                 .<span class="kw">await</span>
@@ -2983,10 +2948,7 @@
         {
             <span class="comment">// erases the CampaignId for the CreateCampaign request</span>
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">create</span> <span class="op">=</span> <span class="ident">CreateCampaign::from_campaign_erased</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">clone</span>(), <span class="prelude-val">None</span>);
-            <span class="ident">create</span>.<span class="ident">budget</span> <span class="op">=</span> <span class="ident">UnifiedNum::from</span>(<span class="number">600</span> <span class="op">*</span> <span class="ident">multiplier</span>);
-
-            <span class="comment">// prepare for Campaign creation</span>
-            <span class="ident">add_deposit_call</span>(<span class="kw-2">&amp;</span><span class="ident">channel_context</span>, <span class="ident">create</span>.<span class="ident">creator</span>);
+            <span class="ident">create</span>.<span class="ident">budget</span> <span class="op">=</span> <span class="ident">UnifiedNum::from_whole</span>(<span class="number">600</span>);
 
             <span class="kw">let</span> <span class="ident">create_err</span> <span class="op">=</span> <span class="ident">create_campaign</span>(<span class="ident">build_request</span>(<span class="ident">create</span>), <span class="kw-2">&amp;</span><span class="ident">app</span>)
                 .<span class="kw">await</span>
@@ -3002,7 +2964,7 @@
 
         <span class="comment">// modify first campaign, by lowering the budget from 1000 to 900</span>
         <span class="kw">let</span> <span class="ident">modified</span> <span class="op">=</span> {
-            <span class="kw">let</span> <span class="ident">lower_budget</span> <span class="op">=</span> <span class="ident">UnifiedNum::from</span>(<span class="number">90_000_000_000</span>);
+            <span class="kw">let</span> <span class="ident">lower_budget</span> <span class="op">=</span> <span class="ident">UnifiedNum::from_whole</span>(<span class="number">900</span>);
             <span class="kw">let</span> <span class="ident">modify</span> <span class="op">=</span> <span class="ident">ModifyCampaign</span> {
                 <span class="ident">budget</span>: <span class="prelude-val">Some</span>(<span class="ident">lower_budget</span>),
                 <span class="ident">validators</span>: <span class="prelude-val">None</span>,
@@ -3012,9 +2974,6 @@
                 <span class="ident">ad_units</span>: <span class="prelude-val">None</span>,
                 <span class="ident">targeting_rules</span>: <span class="prelude-val">None</span>,
             };
-
-            <span class="comment">// prepare for Campaign modification</span>
-            <span class="ident">add_deposit_call</span>(<span class="kw-2">&amp;</span><span class="ident">channel_context</span>, <span class="ident">modified</span>.<span class="ident">context</span>.<span class="ident">creator</span>);
 
             <span class="kw">let</span> <span class="ident">modified_campaign</span> <span class="op">=</span> <span class="ident">modify_campaign</span>(
                 <span class="ident">app</span>.<span class="ident">adapter</span>.<span class="ident">clone</span>(),
@@ -3038,10 +2997,7 @@
         {
             <span class="comment">// erases the CampaignId for the CreateCampaign request</span>
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">create</span> <span class="op">=</span> <span class="ident">CreateCampaign::from_campaign_erased</span>(<span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">clone</span>(), <span class="prelude-val">None</span>);
-            <span class="ident">create</span>.<span class="ident">budget</span> <span class="op">=</span> <span class="ident">UnifiedNum::from</span>(<span class="number">600</span> <span class="op">*</span> <span class="ident">multiplier</span>);
-
-            <span class="comment">// prepare for Campaign creation</span>
-            <span class="ident">add_deposit_call</span>(<span class="kw-2">&amp;</span><span class="ident">channel_context</span>, <span class="ident">create</span>.<span class="ident">creator</span>);
+            <span class="ident">create</span>.<span class="ident">budget</span> <span class="op">=</span> <span class="ident">UnifiedNum::from_whole</span>(<span class="number">600</span>);
 
             <span class="kw">let</span> <span class="ident">create_response</span> <span class="op">=</span> <span class="ident">create_campaign</span>(<span class="ident">build_request</span>(<span class="ident">create</span>), <span class="kw-2">&amp;</span><span class="ident">app</span>)
                 .<span class="kw">await</span>
@@ -3060,7 +3016,7 @@
         <span class="comment">// new Campaign.budget = 1100</span>
         <span class="comment">// current Campaign.budget = 900</span>
         {
-            <span class="kw">let</span> <span class="ident">new_budget</span> <span class="op">=</span> <span class="ident">UnifiedNum::from</span>(<span class="number">110_000_000_000</span>);
+            <span class="kw">let</span> <span class="ident">new_budget</span> <span class="op">=</span> <span class="ident">UnifiedNum::from_whole</span>(<span class="number">1_100</span>);
             <span class="kw">let</span> <span class="ident">modify</span> <span class="op">=</span> <span class="ident">ModifyCampaign</span> {
                 <span class="ident">budget</span>: <span class="prelude-val">Some</span>(<span class="ident">new_budget</span>),
                 <span class="ident">validators</span>: <span class="prelude-val">None</span>,
@@ -3070,9 +3026,6 @@
                 <span class="ident">ad_units</span>: <span class="prelude-val">None</span>,
                 <span class="ident">targeting_rules</span>: <span class="prelude-val">None</span>,
             };
-
-            <span class="comment">// prepare for Campaign modification</span>
-            <span class="ident">add_deposit_call</span>(<span class="kw-2">&amp;</span><span class="ident">channel_context</span>, <span class="ident">modified</span>.<span class="ident">context</span>.<span class="ident">creator</span>);
 
             <span class="kw">let</span> <span class="ident">modify_err</span> <span class="op">=</span> <span class="ident">modify_campaign</span>(
                 <span class="ident">app</span>.<span class="ident">adapter</span>.<span class="ident">clone</span>(),
@@ -3096,7 +3049,6 @@
     <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">delta_budgets_are_calculated_correctly</span>() {
         <span class="kw">let</span> <span class="ident">redis</span> <span class="op">=</span> <span class="ident">TESTS_POOL</span>.<span class="ident">get</span>().<span class="kw">await</span>.<span class="ident">expect</span>(<span class="string">&quot;Should return Object&quot;</span>);
         <span class="kw">let</span> <span class="ident">campaign_remaining</span> <span class="op">=</span> <span class="ident">CampaignRemaining::new</span>(<span class="ident">redis</span>.<span class="ident">connection</span>.<span class="ident">clone</span>());
-        <span class="kw">let</span> <span class="ident">multiplier</span> <span class="op">=</span> <span class="number">10_u64</span>.<span class="ident">pow</span>(<span class="ident">UnifiedNum::PRECISION</span>.<span class="ident">into</span>());
 
         <span class="kw">let</span> <span class="ident">campaign</span> <span class="op">=</span> <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">clone</span>();
 
@@ -3110,12 +3062,12 @@
         <span class="comment">// Spent cant be higher than the new budget</span>
         {
             <span class="ident">campaign_remaining</span>
-                .<span class="ident">set_initial</span>(<span class="ident">campaign</span>.<span class="ident">id</span>, <span class="ident">UnifiedNum::from_u64</span>(<span class="number">600</span> <span class="op">*</span> <span class="ident">multiplier</span>))
+                .<span class="ident">set_initial</span>(<span class="ident">campaign</span>.<span class="ident">id</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">600</span>))
                 .<span class="kw">await</span>
                 .<span class="ident">expect</span>(<span class="string">&quot;should set&quot;</span>);
 
             <span class="comment">// campaign_spent &gt; new_budget</span>
-            <span class="kw">let</span> <span class="ident">new_budget</span> <span class="op">=</span> <span class="ident">UnifiedNum::from_u64</span>(<span class="number">300</span> <span class="op">*</span> <span class="ident">multiplier</span>);
+            <span class="kw">let</span> <span class="ident">new_budget</span> <span class="op">=</span> <span class="ident">UnifiedNum::from_whole</span>(<span class="number">300</span>);
             <span class="kw">let</span> <span class="ident">delta_budget</span> <span class="op">=</span> <span class="ident">get_delta_budget</span>(<span class="kw-2">&amp;</span><span class="ident">campaign_remaining</span>, <span class="kw-2">&amp;</span><span class="ident">campaign</span>, <span class="ident">new_budget</span>).<span class="kw">await</span>;
 
             <span class="macro">assert!</span>(
@@ -3124,7 +3076,7 @@
             );
 
             <span class="comment">// campaign_spent == new_budget</span>
-            <span class="kw">let</span> <span class="ident">new_budget</span> <span class="op">=</span> <span class="ident">UnifiedNum::from_u64</span>(<span class="number">400</span> <span class="op">*</span> <span class="ident">multiplier</span>);
+            <span class="kw">let</span> <span class="ident">new_budget</span> <span class="op">=</span> <span class="ident">UnifiedNum::from_whole</span>(<span class="number">400</span>);
             <span class="kw">let</span> <span class="ident">delta_budget</span> <span class="op">=</span> <span class="ident">get_delta_budget</span>(<span class="kw-2">&amp;</span><span class="ident">campaign_remaining</span>, <span class="kw-2">&amp;</span><span class="ident">campaign</span>, <span class="ident">new_budget</span>).<span class="kw">await</span>;
 
             <span class="macro">assert!</span>(
@@ -3135,30 +3087,30 @@
         <span class="comment">// Increasing budget</span>
         {
             <span class="ident">campaign_remaining</span>
-                .<span class="ident">set_initial</span>(<span class="ident">campaign</span>.<span class="ident">id</span>, <span class="ident">UnifiedNum::from_u64</span>(<span class="number">900</span> <span class="op">*</span> <span class="ident">multiplier</span>))
+                .<span class="ident">set_initial</span>(<span class="ident">campaign</span>.<span class="ident">id</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">900</span>))
                 .<span class="kw">await</span>
                 .<span class="ident">expect</span>(<span class="string">&quot;should set&quot;</span>);
-            <span class="kw">let</span> <span class="ident">new_budget</span> <span class="op">=</span> <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1100</span> <span class="op">*</span> <span class="ident">multiplier</span>);
+            <span class="kw">let</span> <span class="ident">new_budget</span> <span class="op">=</span> <span class="ident">UnifiedNum::from_whole</span>(<span class="number">1_100</span>);
             <span class="kw">let</span> <span class="ident">delta_budget</span> <span class="op">=</span> <span class="ident">get_delta_budget</span>(<span class="kw-2">&amp;</span><span class="ident">campaign_remaining</span>, <span class="kw-2">&amp;</span><span class="ident">campaign</span>, <span class="ident">new_budget</span>)
                 .<span class="kw">await</span>
                 .<span class="ident">expect</span>(<span class="string">&quot;should get delta budget&quot;</span>);
             <span class="macro">assert!</span>(<span class="ident">delta_budget</span>.<span class="ident">is_some</span>());
-            <span class="kw">let</span> <span class="ident">increase_by</span> <span class="op">=</span> <span class="ident">UnifiedNum::from_u64</span>(<span class="number">100</span> <span class="op">*</span> <span class="ident">multiplier</span>);
+            <span class="kw">let</span> <span class="ident">increase_by</span> <span class="op">=</span> <span class="ident">UnifiedNum::from_whole</span>(<span class="number">100</span>);
 
             <span class="macro">assert_eq!</span>(<span class="ident">delta_budget</span>, <span class="prelude-val">Some</span>(<span class="ident">DeltaBudget::Increase</span>(<span class="ident">increase_by</span>)));
         }
         <span class="comment">// Decreasing budget</span>
         {
             <span class="ident">campaign_remaining</span>
-                .<span class="ident">set_initial</span>(<span class="ident">campaign</span>.<span class="ident">id</span>, <span class="ident">UnifiedNum::from_u64</span>(<span class="number">900</span> <span class="op">*</span> <span class="ident">multiplier</span>))
+                .<span class="ident">set_initial</span>(<span class="ident">campaign</span>.<span class="ident">id</span>, <span class="ident">UnifiedNum::from_whole</span>(<span class="number">900</span>))
                 .<span class="kw">await</span>
                 .<span class="ident">expect</span>(<span class="string">&quot;should set&quot;</span>);
-            <span class="kw">let</span> <span class="ident">new_budget</span> <span class="op">=</span> <span class="ident">UnifiedNum::from_u64</span>(<span class="number">800</span> <span class="op">*</span> <span class="ident">multiplier</span>);
+            <span class="kw">let</span> <span class="ident">new_budget</span> <span class="op">=</span> <span class="ident">UnifiedNum::from_whole</span>(<span class="number">800</span>);
             <span class="kw">let</span> <span class="ident">delta_budget</span> <span class="op">=</span> <span class="ident">get_delta_budget</span>(<span class="kw-2">&amp;</span><span class="ident">campaign_remaining</span>, <span class="kw-2">&amp;</span><span class="ident">campaign</span>, <span class="ident">new_budget</span>)
                 .<span class="kw">await</span>
                 .<span class="ident">expect</span>(<span class="string">&quot;should get delta budget&quot;</span>);
             <span class="macro">assert!</span>(<span class="ident">delta_budget</span>.<span class="ident">is_some</span>());
-            <span class="kw">let</span> <span class="ident">decrease_by</span> <span class="op">=</span> <span class="ident">UnifiedNum::from_u64</span>(<span class="number">200</span> <span class="op">*</span> <span class="ident">multiplier</span>);
+            <span class="kw">let</span> <span class="ident">decrease_by</span> <span class="op">=</span> <span class="ident">UnifiedNum::from_whole</span>(<span class="number">200</span>);
 
             <span class="macro">assert_eq!</span>(<span class="ident">delta_budget</span>, <span class="prelude-val">Some</span>(<span class="ident">DeltaBudget::Decrease</span>(<span class="ident">decrease_by</span>)));
         }

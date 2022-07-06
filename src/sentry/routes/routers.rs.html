@@ -1611,6 +1611,28 @@
 <span id="1606">1606</span>
 <span id="1607">1607</span>
 <span id="1608">1608</span>
+<span id="1609">1609</span>
+<span id="1610">1610</span>
+<span id="1611">1611</span>
+<span id="1612">1612</span>
+<span id="1613">1613</span>
+<span id="1614">1614</span>
+<span id="1615">1615</span>
+<span id="1616">1616</span>
+<span id="1617">1617</span>
+<span id="1618">1618</span>
+<span id="1619">1619</span>
+<span id="1620">1620</span>
+<span id="1621">1621</span>
+<span id="1622">1622</span>
+<span id="1623">1623</span>
+<span id="1624">1624</span>
+<span id="1625">1625</span>
+<span id="1626">1626</span>
+<span id="1627">1627</span>
+<span id="1628">1628</span>
+<span id="1629">1629</span>
+<span id="1630">1630</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This module contains all the Sentry REST API routers.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! Ideally these routers will be replaced with proper routing,</span>
@@ -1638,8 +1660,8 @@
         <span class="ident">campaign</span>,
         <span class="ident">campaign</span>::{<span class="ident">campaign_list</span>, <span class="ident">create_campaign</span>, <span class="ident">update_campaign</span>},
         <span class="ident">channel</span>::{
-            <span class="ident">add_spender_leaf</span>, <span class="ident">channel_list</span>, <span class="ident">channel_payout</span>, <span class="ident">get_accounting_for_channel</span>,
-            <span class="ident">get_all_spender_limits</span>, <span class="ident">get_spender_limits</span>, <span class="ident">last_approved</span>,
+            <span class="ident">add_spender_leaf</span>, <span class="ident">channel_dummy_deposit</span>, <span class="ident">channel_list</span>, <span class="ident">channel_payout</span>,
+            <span class="ident">get_accounting_for_channel</span>, <span class="ident">get_all_spender_limits</span>, <span class="ident">get_spender_limits</span>, <span class="ident">last_approved</span>,
             <span class="ident">validator_message</span>::{
                 <span class="ident">create_validator_messages</span>, <span class="ident">extract_params</span>, <span class="ident">list_validator_messages</span>,
             },
@@ -1647,7 +1669,7 @@
     },
     <span class="ident">Application</span>, <span class="ident">Auth</span>,
 };
-<span class="kw">use</span> <span class="ident">adapter::prelude</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident">adapter</span>::{<span class="ident">prelude</span>::<span class="kw-2">*</span>, <span class="ident">Adapter</span>, <span class="ident">Dummy</span>};
 <span class="kw">use</span> <span class="ident">hyper</span>::{<span class="ident">Body</span>, <span class="ident">Method</span>, <span class="ident">Request</span>, <span class="ident">Response</span>};
 <span class="kw">use</span> <span class="ident">once_cell::sync::Lazy</span>;
 <span class="kw">use</span> <span class="ident">primitives::analytics</span>::{<span class="ident">query::AllowedKey</span>, <span class="ident">AuthenticateAs</span>};
@@ -1665,6 +1687,7 @@
     <span class="ident">Regex::new</span>(<span class="string">r&quot;^/v5/channel/0x([a-zA-Z0-9]{64})/validator-messages(/.*)?$&quot;</span>)
         .<span class="ident">expect</span>(<span class="string">&quot;The regex should be valid&quot;</span>)
 });
+
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">static</span> <span class="ident">CHANNEL_SPENDER_LEAF_AND_TOTAL_DEPOSITED</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Regex</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
     <span class="ident">Regex::new</span>(<span class="string">r&quot;^/v5/channel/0x([a-zA-Z0-9]{64})/spender/0x([a-zA-Z0-9]{40})/?$&quot;</span>)
         .<span class="ident">expect</span>(<span class="string">&quot;This regex should be valid&quot;</span>)
@@ -1681,17 +1704,24 @@
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">static</span> <span class="ident">CAMPAIGN_UPDATE_BY_ID</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Regex</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
     <span class="ident">Regex::new</span>(<span class="string">r&quot;^/v5/campaign/(0x[a-zA-Z0-9]{32})/?$&quot;</span>).<span class="ident">expect</span>(<span class="string">&quot;The regex should be valid&quot;</span>)
 });
+
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">static</span> <span class="ident">CHANNEL_ALL_SPENDER_LIMITS</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Regex</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
     <span class="ident">Regex::new</span>(<span class="string">r&quot;^/v5/channel/0x([a-zA-Z0-9]{64})/spender/all/?$&quot;</span>)
         .<span class="ident">expect</span>(<span class="string">&quot;The regex should be valid&quot;</span>)
 });
+
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">static</span> <span class="ident">CHANNEL_ACCOUNTING</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Regex</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
     <span class="ident">Regex::new</span>(<span class="string">r&quot;^/v5/channel/0x([a-zA-Z0-9]{64})/accounting/?$&quot;</span>)
         .<span class="ident">expect</span>(<span class="string">&quot;The regex should be valid&quot;</span>)
 });
+
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">static</span> <span class="ident">CHANNEL_PAY</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Regex</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> {
     <span class="ident">Regex::new</span>(<span class="string">r&quot;^/v5/channel/0x([a-zA-Z0-9]{64})/pay/?$&quot;</span>).<span class="ident">expect</span>(<span class="string">&quot;The regex should be valid&quot;</span>)
 });
+
+<span class="doccomment">/// When using [`adapter::Dummy`] you can set the Channel deposit for the Authenticated address.</span>
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">static</span> <span class="ident">CHANNEL_DUMMY_ADAPTER_DEPOSIT</span>: <span class="ident">Lazy</span><span class="op">&lt;</span><span class="ident">Regex</span><span class="op">&gt;</span> <span class="op">=</span>
+    <span class="ident">Lazy::new</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">Regex::new</span>(<span class="string">r&quot;^/v5/channel/dummy-deposit/?$&quot;</span>).<span class="ident">expect</span>(<span class="string">&quot;The regex should be valid&quot;</span>));
 
 <span class="doccomment">/// Regex extracted parameters.</span>
 <span class="doccomment">/// This struct is created manually on each of the matched routes.</span>
@@ -1714,6 +1744,7 @@
     <span class="kw-2">mut</span> <span class="ident">req</span>: <span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>,
     <span class="ident">app</span>: <span class="kw-2">&amp;</span><span class="ident">Application</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
 ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Response</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>, <span class="ident">ResponseError</span><span class="op">&gt;</span> {
+    <span class="kw">use</span> <span class="ident">std::any::Any</span>;
     <span class="kw">let</span> (<span class="ident">path</span>, <span class="ident">method</span>) <span class="op">=</span> (<span class="ident">req</span>.<span class="ident">uri</span>().<span class="ident">path</span>().<span class="ident">to_owned</span>(), <span class="ident">req</span>.<span class="ident">method</span>());
 
     <span class="comment">// `GET /v5/channel/list`</span>
@@ -1855,6 +1886,22 @@
             .<span class="kw">await</span><span class="question-mark">?</span>;
 
         <span class="ident">channel_payout</span>(<span class="ident">req</span>, <span class="ident">app</span>).<span class="kw">await</span>
+    }
+    <span class="comment">// POST /v5/channel/dummy-deposit</span>
+    <span class="comment">// We allow the calling of the method only if we are using the Dummy adapter!</span>
+    <span class="kw">else</span> <span class="kw">if</span> <span class="kw">let</span> (<span class="prelude-val">Some</span>(<span class="ident">caps</span>), <span class="kw-2">&amp;</span><span class="ident">Method::POST</span>, <span class="bool-val">true</span>) <span class="op">=</span> (
+        <span class="ident">CHANNEL_DUMMY_ADAPTER_DEPOSIT</span>.<span class="ident">captures</span>(<span class="kw-2">&amp;</span><span class="ident">path</span>),
+        <span class="ident">method</span>,
+        <span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Any</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span><span class="op">&gt;</span><span class="ident">::downcast_ref</span>::<span class="op">&lt;</span><span class="ident">Adapter</span><span class="op">&lt;</span><span class="ident">Dummy</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">app</span>.<span class="ident">adapter</span>).<span class="ident">is_some</span>(),
+    ) {
+        <span class="kw">let</span> <span class="ident">param</span> <span class="op">=</span> <span class="ident">RouteParams</span>(<span class="macro">vec!</span>[<span class="ident">caps</span>
+            .<span class="ident">get</span>(<span class="number">1</span>)
+            .<span class="ident">map_or</span>(<span class="string">&quot;&quot;</span>.<span class="ident">to_string</span>(), <span class="op">|</span><span class="ident">m</span><span class="op">|</span> <span class="ident">m</span>.<span class="ident">as_str</span>().<span class="ident">to_string</span>())]);
+        <span class="ident">req</span>.<span class="ident">extensions_mut</span>().<span class="ident">insert</span>(<span class="ident">param</span>);
+
+        <span class="ident">req</span> <span class="op">=</span> <span class="ident">Chain::new</span>().<span class="ident">chain</span>(<span class="ident">AuthRequired</span>).<span class="ident">apply</span>(<span class="ident">req</span>, <span class="ident">app</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+
+        <span class="ident">channel_dummy_deposit</span>(<span class="ident">req</span>, <span class="ident">app</span>).<span class="kw">await</span>
     } <span class="kw">else</span> {
         <span class="prelude-val">Err</span>(<span class="ident">ResponseError::NotFound</span>)
     }
@@ -1983,7 +2030,7 @@
     };
 
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
-    <span class="kw">use</span> <span class="ident">adapter::dummy::DUMMY_CHAIN</span>;
+    <span class="kw">use</span> <span class="ident">adapter::ethereum::test_util</span>::{<span class="ident">GANACHE_1</span>, <span class="ident">GANACHE_1337</span>};
     <span class="kw">use</span> <span class="ident">chrono::Utc</span>;
     <span class="kw">use</span> <span class="ident">hyper</span>::{<span class="ident">Body</span>, <span class="ident">Request</span>};
     <span class="kw">use</span> <span class="ident">primitives</span>::{
@@ -1992,9 +2039,8 @@
             <span class="ident">AnalyticsQuery</span>, <span class="ident">Metric</span>, <span class="ident">OperatingSystem</span>, <span class="ident">Timeframe</span>,
         },
         <span class="ident">sentry</span>::{<span class="ident">DateHour</span>, <span class="ident">FetchedAnalytics</span>, <span class="ident">FetchedMetric</span>, <span class="ident">UpdateAnalytics</span>, <span class="ident">CLICK</span>, <span class="ident">IMPRESSION</span>},
-        <span class="ident">test_util</span>::{<span class="ident">ADVERTISER</span>, <span class="ident">PUBLISHER</span>, <span class="ident">PUBLISHER_2</span>},
-        <span class="ident">test_util</span>::{<span class="ident">DUMMY_CAMPAIGN</span>, <span class="ident">DUMMY_IPFS</span>, <span class="ident">IDS</span>, <span class="ident">LEADER</span>},
-        <span class="ident">ChainId</span>, <span class="ident">UnifiedNum</span>,
+        <span class="ident">test_util</span>::{<span class="ident">ADVERTISER</span>, <span class="ident">DUMMY_CAMPAIGN</span>, <span class="ident">DUMMY_IPFS</span>, <span class="ident">IDS</span>, <span class="ident">LEADER</span>, <span class="ident">PUBLISHER</span>, <span class="ident">PUBLISHER_2</span>},
+        <span class="ident">UnifiedNum</span>,
     };
 
     <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">insert_mock_analytics</span>(<span class="ident">pool</span>: <span class="kw-2">&amp;</span><span class="ident">DbPool</span>, <span class="ident">base_datehour</span>: <span class="ident">DateHour</span><span class="op">&lt;</span><span class="ident">Utc</span><span class="op">&gt;</span>) {
@@ -2009,7 +2055,7 @@
             <span class="ident">hostname</span>: <span class="prelude-val">None</span>,
             <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.<span class="ident">to_string</span>()),
             <span class="ident">os_name</span>: <span class="ident">OperatingSystem::map_os</span>(<span class="string">&quot;Windows&quot;</span>),
-            <span class="ident">chain_id</span>: <span class="ident">ChainId::new</span>(<span class="number">1</span>),
+            <span class="ident">chain_id</span>: <span class="ident">GANACHE_1337</span>.<span class="ident">chain_id</span>,
             <span class="ident">event_type</span>: <span class="ident">CLICK</span>,
             <span class="ident">amount_to_add</span>: <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1_000_000</span>),
             <span class="ident">count_to_add</span>: <span class="number">1</span>,
@@ -2029,7 +2075,7 @@
             <span class="ident">hostname</span>: <span class="prelude-val">None</span>,
             <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Japan&quot;</span>.<span class="ident">to_string</span>()),
             <span class="ident">os_name</span>: <span class="ident">OperatingSystem::map_os</span>(<span class="string">&quot;Windows&quot;</span>),
-            <span class="ident">chain_id</span>: <span class="ident">ChainId::new</span>(<span class="number">1</span>),
+            <span class="ident">chain_id</span>: <span class="ident">GANACHE_1337</span>.<span class="ident">chain_id</span>,
             <span class="ident">event_type</span>: <span class="ident">CLICK</span>,
             <span class="ident">amount_to_add</span>: <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1_000_000</span>),
             <span class="ident">count_to_add</span>: <span class="number">1</span>,
@@ -2049,7 +2095,7 @@
             <span class="ident">hostname</span>: <span class="prelude-val">None</span>,
             <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.<span class="ident">to_string</span>()),
             <span class="ident">os_name</span>: <span class="ident">OperatingSystem::map_os</span>(<span class="string">&quot;Windows&quot;</span>),
-            <span class="ident">chain_id</span>: <span class="ident">ChainId::new</span>(<span class="number">1</span>),
+            <span class="ident">chain_id</span>: <span class="ident">GANACHE_1337</span>.<span class="ident">chain_id</span>,
             <span class="ident">event_type</span>: <span class="ident">CLICK</span>,
             <span class="ident">amount_to_add</span>: <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1_000_000</span>),
             <span class="ident">count_to_add</span>: <span class="number">1</span>,
@@ -2069,7 +2115,7 @@
             <span class="ident">hostname</span>: <span class="prelude-val">None</span>,
             <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.<span class="ident">to_string</span>()),
             <span class="ident">os_name</span>: <span class="ident">OperatingSystem::map_os</span>(<span class="string">&quot;Windows&quot;</span>),
-            <span class="ident">chain_id</span>: <span class="ident">ChainId::new</span>(<span class="number">1</span>),
+            <span class="ident">chain_id</span>: <span class="ident">GANACHE_1337</span>.<span class="ident">chain_id</span>,
             <span class="ident">event_type</span>: <span class="ident">CLICK</span>,
             <span class="ident">amount_to_add</span>: <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1_000_000</span>),
             <span class="ident">count_to_add</span>: <span class="number">1</span>,
@@ -2089,7 +2135,7 @@
             <span class="ident">hostname</span>: <span class="prelude-val">None</span>,
             <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.<span class="ident">to_string</span>()),
             <span class="ident">os_name</span>: <span class="ident">OperatingSystem::map_os</span>(<span class="string">&quot;Windows&quot;</span>),
-            <span class="ident">chain_id</span>: <span class="ident">ChainId::new</span>(<span class="number">1</span>),
+            <span class="ident">chain_id</span>: <span class="ident">GANACHE_1337</span>.<span class="ident">chain_id</span>,
             <span class="ident">event_type</span>: <span class="ident">CLICK</span>,
             <span class="ident">amount_to_add</span>: <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1_000_000</span>),
             <span class="ident">count_to_add</span>: <span class="number">1</span>,
@@ -2109,7 +2155,7 @@
             <span class="ident">hostname</span>: <span class="prelude-val">None</span>,
             <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.<span class="ident">to_string</span>()),
             <span class="ident">os_name</span>: <span class="ident">OperatingSystem::map_os</span>(<span class="string">&quot;Windows&quot;</span>),
-            <span class="ident">chain_id</span>: <span class="ident">ChainId::new</span>(<span class="number">1</span>),
+            <span class="ident">chain_id</span>: <span class="ident">GANACHE_1337</span>.<span class="ident">chain_id</span>,
             <span class="ident">event_type</span>: <span class="ident">CLICK</span>,
             <span class="ident">amount_to_add</span>: <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1_000_000</span>),
             <span class="ident">count_to_add</span>: <span class="number">1</span>,
@@ -2129,7 +2175,7 @@
             <span class="ident">hostname</span>: <span class="prelude-val">None</span>,
             <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.<span class="ident">to_string</span>()),
             <span class="ident">os_name</span>: <span class="ident">OperatingSystem::map_os</span>(<span class="string">&quot;Windows&quot;</span>),
-            <span class="ident">chain_id</span>: <span class="ident">ChainId::new</span>(<span class="number">1</span>),
+            <span class="ident">chain_id</span>: <span class="ident">GANACHE_1337</span>.<span class="ident">chain_id</span>,
             <span class="ident">event_type</span>: <span class="ident">CLICK</span>,
             <span class="ident">amount_to_add</span>: <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1_000_000</span>),
             <span class="ident">count_to_add</span>: <span class="number">1</span>,
@@ -2149,7 +2195,7 @@
             <span class="ident">hostname</span>: <span class="prelude-val">None</span>,
             <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.<span class="ident">to_string</span>()),
             <span class="ident">os_name</span>: <span class="ident">OperatingSystem::map_os</span>(<span class="string">&quot;Windows&quot;</span>),
-            <span class="ident">chain_id</span>: <span class="ident">ChainId::new</span>(<span class="number">1</span>),
+            <span class="ident">chain_id</span>: <span class="ident">GANACHE_1337</span>.<span class="ident">chain_id</span>,
             <span class="ident">event_type</span>: <span class="ident">CLICK</span>,
             <span class="ident">amount_to_add</span>: <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1_000_000</span>),
             <span class="ident">count_to_add</span>: <span class="number">1</span>,
@@ -2169,10 +2215,10 @@
             <span class="ident">hostname</span>: <span class="prelude-val">None</span>,
             <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.<span class="ident">to_string</span>()),
             <span class="ident">os_name</span>: <span class="ident">OperatingSystem::map_os</span>(<span class="string">&quot;Windows&quot;</span>),
-            <span class="ident">chain_id</span>: <span class="ident">ChainId::new</span>(<span class="number">2</span>),
+            <span class="ident">chain_id</span>: <span class="ident">GANACHE_1</span>.<span class="ident">chain_id</span>,
             <span class="ident">event_type</span>: <span class="ident">CLICK</span>,
-            <span class="ident">amount_to_add</span>: <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1_000_000</span>),
-            <span class="ident">count_to_add</span>: <span class="number">1</span>,
+            <span class="ident">amount_to_add</span>: <span class="ident">UnifiedNum::from_u64</span>(<span class="number">69_000_000</span>),
+            <span class="ident">count_to_add</span>: <span class="number">69</span>,
         };
         <span class="ident">update_analytics</span>(<span class="ident">pool</span>, <span class="ident">analytics_other_chain</span>)
             .<span class="kw">await</span>
@@ -2214,7 +2260,7 @@
                 <span class="ident">hostname</span>: <span class="prelude-val">None</span>,
                 <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.<span class="ident">to_string</span>()),
                 <span class="ident">os_name</span>: <span class="ident">OperatingSystem::map_os</span>(<span class="string">&quot;Windows&quot;</span>),
-                <span class="ident">chain_id</span>: <span class="ident">ChainId::new</span>(<span class="number">1</span>),
+                <span class="ident">chain_id</span>: <span class="ident">GANACHE_1337</span>.<span class="ident">chain_id</span>,
                 <span class="ident">event_type</span>: <span class="ident">IMPRESSION</span>,
                 <span class="ident">amount_to_add</span>: <span class="ident">UnifiedNum::from_u64</span>(<span class="number">25_000_000</span>),
                 <span class="ident">count_to_add</span>: <span class="number">25</span>,
@@ -2236,7 +2282,7 @@
                 <span class="ident">hostname</span>: <span class="prelude-val">None</span>,
                 <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.<span class="ident">to_string</span>()),
                 <span class="ident">os_name</span>: <span class="ident">OperatingSystem::map_os</span>(<span class="string">&quot;Windows&quot;</span>),
-                <span class="ident">chain_id</span>: <span class="ident">ChainId::new</span>(<span class="number">1</span>),
+                <span class="ident">chain_id</span>: <span class="ident">GANACHE_1337</span>.<span class="ident">chain_id</span>,
                 <span class="ident">event_type</span>: <span class="ident">IMPRESSION</span>,
                 <span class="ident">amount_to_add</span>: <span class="ident">UnifiedNum::from_u64</span>(<span class="number">17_000_000</span>),
                 <span class="ident">count_to_add</span>: <span class="number">17</span>,
@@ -2258,7 +2304,7 @@
                 <span class="ident">hostname</span>: <span class="prelude-val">None</span>,
                 <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.<span class="ident">to_string</span>()),
                 <span class="ident">os_name</span>: <span class="ident">OperatingSystem::map_os</span>(<span class="string">&quot;Windows&quot;</span>),
-                <span class="ident">chain_id</span>: <span class="ident">ChainId::new</span>(<span class="number">1</span>),
+                <span class="ident">chain_id</span>: <span class="ident">GANACHE_1337</span>.<span class="ident">chain_id</span>,
                 <span class="ident">event_type</span>: <span class="ident">IMPRESSION</span>,
                 <span class="ident">amount_to_add</span>: <span class="ident">UnifiedNum::from_u64</span>(<span class="number">58_000_000</span>),
                 <span class="ident">count_to_add</span>: <span class="number">58</span>,
@@ -2322,7 +2368,7 @@
                 <span class="ident">hostname</span>: <span class="prelude-val">None</span>,
                 <span class="ident">country</span>: <span class="prelude-val">None</span>,
                 <span class="ident">os_name</span>: <span class="prelude-val">None</span>,
-                <span class="ident">chains</span>: <span class="macro">vec!</span>[<span class="ident">ChainId::new</span>(<span class="number">1</span>)],
+                <span class="ident">chains</span>: <span class="macro">vec!</span>[<span class="ident">GANACHE_1337</span>.<span class="ident">chain_id</span>],
             };
             <span class="kw">let</span> <span class="ident">query</span> <span class="op">=</span> <span class="ident">serde_qs::to_string</span>(<span class="kw-2">&amp;</span><span class="ident">query</span>).<span class="ident">expect</span>(<span class="string">&quot;should parse query&quot;</span>);
             <span class="kw">let</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">Request::builder</span>()
@@ -2369,7 +2415,7 @@
                 <span class="ident">hostname</span>: <span class="prelude-val">None</span>,
                 <span class="ident">country</span>: <span class="prelude-val">None</span>,
                 <span class="ident">os_name</span>: <span class="prelude-val">None</span>,
-                <span class="ident">chains</span>: <span class="macro">vec!</span>[<span class="ident">ChainId::new</span>(<span class="number">1</span>)],
+                <span class="ident">chains</span>: <span class="macro">vec!</span>[<span class="ident">GANACHE_1337</span>.<span class="ident">chain_id</span>],
             };
             <span class="kw">let</span> <span class="ident">query</span> <span class="op">=</span> <span class="ident">serde_qs::to_string</span>(<span class="kw-2">&amp;</span><span class="ident">query</span>).<span class="ident">expect</span>(<span class="string">&quot;should parse query&quot;</span>);
             <span class="kw">let</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">Request::builder</span>()
@@ -2420,7 +2466,7 @@
                 <span class="ident">hostname</span>: <span class="prelude-val">None</span>,
                 <span class="ident">country</span>: <span class="prelude-val">None</span>,
                 <span class="ident">os_name</span>: <span class="prelude-val">None</span>,
-                <span class="ident">chains</span>: <span class="macro">vec!</span>[<span class="ident">ChainId::new</span>(<span class="number">1</span>)],
+                <span class="ident">chains</span>: <span class="macro">vec!</span>[<span class="ident">GANACHE_1337</span>.<span class="ident">chain_id</span>],
             };
             <span class="kw">let</span> <span class="ident">query</span> <span class="op">=</span> <span class="ident">serde_qs::to_string</span>(<span class="kw-2">&amp;</span><span class="ident">query</span>).<span class="ident">expect</span>(<span class="string">&quot;should parse query&quot;</span>);
             <span class="kw">let</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">Request::builder</span>()
@@ -2472,7 +2518,7 @@
                 <span class="ident">hostname</span>: <span class="prelude-val">None</span>,
                 <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.<span class="ident">into</span>()),
                 <span class="ident">os_name</span>: <span class="prelude-val">None</span>,
-                <span class="ident">chains</span>: <span class="macro">vec!</span>[<span class="ident">ChainId::new</span>(<span class="number">1</span>)],
+                <span class="ident">chains</span>: <span class="macro">vec!</span>[<span class="ident">GANACHE_1337</span>.<span class="ident">chain_id</span>],
             };
             <span class="kw">let</span> <span class="ident">query</span> <span class="op">=</span> <span class="ident">serde_qs::to_string</span>(<span class="kw-2">&amp;</span><span class="ident">query</span>).<span class="ident">expect</span>(<span class="string">&quot;should parse query&quot;</span>);
             <span class="kw">let</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">Request::builder</span>()
@@ -2794,7 +2840,7 @@
                 <span class="ident">hostname</span>: <span class="prelude-val">None</span>,
                 <span class="ident">country</span>: <span class="prelude-val">None</span>,
                 <span class="ident">os_name</span>: <span class="prelude-val">None</span>,
-                <span class="ident">chains</span>: <span class="macro">vec!</span>[<span class="ident">ChainId::new</span>(<span class="number">2</span>)],
+                <span class="ident">chains</span>: <span class="macro">vec!</span>[<span class="ident">GANACHE_1</span>.<span class="ident">chain_id</span>],
             };
             <span class="kw">let</span> <span class="ident">query</span> <span class="op">=</span> <span class="ident">serde_qs::to_string</span>(<span class="kw-2">&amp;</span><span class="ident">query</span>).<span class="ident">expect</span>(<span class="string">&quot;should parse query&quot;</span>);
             <span class="kw">let</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">Request::builder</span>()
@@ -2812,7 +2858,7 @@
             <span class="kw">let</span> <span class="ident">fetched_analytics</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FetchedAnalytics</span><span class="op">&gt;</span> <span class="op">=</span>
                 <span class="ident">serde_json::from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>).<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>);
             <span class="macro">assert_eq!</span>(
-                <span class="macro">vec!</span>[<span class="ident">FetchedMetric::Count</span>(<span class="number">1</span>)],
+                <span class="macro">vec!</span>[<span class="ident">FetchedMetric::Count</span>(<span class="number">69</span>)],
                 <span class="ident">fetched_analytics</span>
                     .<span class="ident">iter</span>()
                     .<span class="ident">map</span>(<span class="op">|</span><span class="ident">analytics</span><span class="op">|</span> <span class="ident">analytics</span>.<span class="ident">value</span>)
@@ -2837,7 +2883,7 @@
             <span class="ident">hostname</span>: <span class="prelude-val">None</span>,
             <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.<span class="ident">to_string</span>()),
             <span class="ident">os_name</span>: <span class="ident">OperatingSystem::map_os</span>(<span class="string">&quot;Windows&quot;</span>),
-            <span class="ident">chain_id</span>: <span class="ident">ChainId::new</span>(<span class="number">1</span>),
+            <span class="ident">chain_id</span>: <span class="ident">GANACHE_1337</span>.<span class="ident">chain_id</span>,
             <span class="ident">event_type</span>: <span class="ident">CLICK</span>,
             <span class="ident">amount_to_add</span>: <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1_000_000</span>),
             <span class="ident">count_to_add</span>: <span class="number">1</span>,
@@ -2857,7 +2903,7 @@
             <span class="ident">hostname</span>: <span class="prelude-val">None</span>,
             <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.<span class="ident">to_string</span>()),
             <span class="ident">os_name</span>: <span class="ident">OperatingSystem::map_os</span>(<span class="string">&quot;Windows&quot;</span>),
-            <span class="ident">chain_id</span>: <span class="ident">ChainId::new</span>(<span class="number">1</span>),
+            <span class="ident">chain_id</span>: <span class="ident">GANACHE_1337</span>.<span class="ident">chain_id</span>,
             <span class="ident">event_type</span>: <span class="ident">CLICK</span>,
             <span class="ident">amount_to_add</span>: <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1_000_000</span>),
             <span class="ident">count_to_add</span>: <span class="number">1</span>,
@@ -2877,7 +2923,7 @@
             <span class="ident">hostname</span>: <span class="prelude-val">None</span>,
             <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.<span class="ident">to_string</span>()),
             <span class="ident">os_name</span>: <span class="ident">OperatingSystem::map_os</span>(<span class="string">&quot;Windows&quot;</span>),
-            <span class="ident">chain_id</span>: <span class="ident">ChainId::new</span>(<span class="number">1</span>),
+            <span class="ident">chain_id</span>: <span class="ident">GANACHE_1337</span>.<span class="ident">chain_id</span>,
             <span class="ident">event_type</span>: <span class="ident">IMPRESSION</span>,
             <span class="ident">amount_to_add</span>: <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1_000_000</span>),
             <span class="ident">count_to_add</span>: <span class="number">1</span>,
@@ -2897,7 +2943,7 @@
             <span class="ident">hostname</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;localhost&quot;</span>.<span class="ident">to_string</span>()),
             <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.<span class="ident">to_string</span>()),
             <span class="ident">os_name</span>: <span class="ident">OperatingSystem::map_os</span>(<span class="string">&quot;Windows&quot;</span>),
-            <span class="ident">chain_id</span>: <span class="ident">ChainId::new</span>(<span class="number">1</span>),
+            <span class="ident">chain_id</span>: <span class="ident">GANACHE_1337</span>.<span class="ident">chain_id</span>,
             <span class="ident">event_type</span>: <span class="ident">CLICK</span>,
             <span class="ident">amount_to_add</span>: <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1_000_000</span>),
             <span class="ident">count_to_add</span>: <span class="number">1</span>,
@@ -2917,7 +2963,7 @@
             <span class="ident">hostname</span>: <span class="prelude-val">None</span>,
             <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.<span class="ident">to_string</span>()),
             <span class="ident">os_name</span>: <span class="ident">OperatingSystem::map_os</span>(<span class="string">&quot;Windows&quot;</span>),
-            <span class="ident">chain_id</span>: <span class="ident">ChainId::new</span>(<span class="number">1</span>),
+            <span class="ident">chain_id</span>: <span class="ident">GANACHE_1337</span>.<span class="ident">chain_id</span>,
             <span class="ident">event_type</span>: <span class="ident">CLICK</span>,
             <span class="ident">amount_to_add</span>: <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1_000_000</span>),
             <span class="ident">count_to_add</span>: <span class="number">1</span>,
@@ -2937,7 +2983,7 @@
             <span class="ident">hostname</span>: <span class="prelude-val">None</span>,
             <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.<span class="ident">to_string</span>()),
             <span class="ident">os_name</span>: <span class="ident">OperatingSystem::map_os</span>(<span class="string">&quot;Windows&quot;</span>),
-            <span class="ident">chain_id</span>: <span class="ident">ChainId::new</span>(<span class="number">1</span>),
+            <span class="ident">chain_id</span>: <span class="ident">GANACHE_1337</span>.<span class="ident">chain_id</span>,
             <span class="ident">event_type</span>: <span class="ident">CLICK</span>,
             <span class="ident">amount_to_add</span>: <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1_000_000</span>),
             <span class="ident">count_to_add</span>: <span class="number">1</span>,
@@ -2957,7 +3003,7 @@
             <span class="ident">hostname</span>: <span class="prelude-val">None</span>,
             <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.<span class="ident">to_string</span>()),
             <span class="ident">os_name</span>: <span class="ident">OperatingSystem::map_os</span>(<span class="string">&quot;Windows&quot;</span>),
-            <span class="ident">chain_id</span>: <span class="ident">ChainId::new</span>(<span class="number">1</span>),
+            <span class="ident">chain_id</span>: <span class="ident">GANACHE_1337</span>.<span class="ident">chain_id</span>,
             <span class="ident">event_type</span>: <span class="ident">CLICK</span>,
             <span class="ident">amount_to_add</span>: <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1_000_000</span>),
             <span class="ident">count_to_add</span>: <span class="number">1</span>,
@@ -2976,10 +3022,10 @@
             <span class="ident">hostname</span>: <span class="prelude-val">None</span>,
             <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.<span class="ident">to_string</span>()),
             <span class="ident">os_name</span>: <span class="ident">OperatingSystem::map_os</span>(<span class="string">&quot;Windows&quot;</span>),
-            <span class="ident">chain_id</span>: <span class="ident">ChainId::new</span>(<span class="number">2</span>),
+            <span class="ident">chain_id</span>: <span class="ident">GANACHE_1</span>.<span class="ident">chain_id</span>,
             <span class="ident">event_type</span>: <span class="ident">CLICK</span>,
-            <span class="ident">amount_to_add</span>: <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1_000_000</span>),
-            <span class="ident">count_to_add</span>: <span class="number">1</span>,
+            <span class="ident">amount_to_add</span>: <span class="ident">UnifiedNum::from_u64</span>(<span class="number">69_000_000</span>),
+            <span class="ident">count_to_add</span>: <span class="number">69</span>,
         };
         <span class="ident">update_analytics</span>(<span class="ident">pool</span>, <span class="ident">analytics_different_chain</span>)
             .<span class="kw">await</span>
@@ -3020,24 +3066,22 @@
         <span class="kw">let</span> <span class="ident">publisher_auth</span> <span class="op">=</span> <span class="ident">Auth</span> {
             <span class="ident">era</span>: <span class="number">0</span>,
             <span class="ident">uid</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">PUBLISHER</span>],
-            <span class="ident">chain</span>: <span class="ident">DUMMY_CHAIN</span>.<span class="ident">clone</span>(),
+            <span class="ident">chain</span>: <span class="ident">GANACHE_1337</span>.<span class="ident">clone</span>(),
         };
         <span class="kw">let</span> <span class="ident">advertiser_auth</span> <span class="op">=</span> <span class="ident">Auth</span> {
             <span class="ident">era</span>: <span class="number">0</span>,
             <span class="ident">uid</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">ADVERTISER</span>],
-            <span class="ident">chain</span>: <span class="ident">DUMMY_CHAIN</span>.<span class="ident">clone</span>(),
+            <span class="ident">chain</span>: <span class="ident">GANACHE_1337</span>.<span class="ident">clone</span>(),
         };
         <span class="kw">let</span> <span class="ident">admin_auth</span> <span class="op">=</span> <span class="ident">Auth</span> {
             <span class="ident">era</span>: <span class="number">0</span>,
             <span class="ident">uid</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>],
-            <span class="ident">chain</span>: <span class="ident">DUMMY_CHAIN</span>.<span class="ident">clone</span>(),
+            <span class="ident">chain</span>: <span class="ident">GANACHE_1337</span>.<span class="ident">clone</span>(),
         };
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">different_chain</span> <span class="op">=</span> <span class="ident">DUMMY_CHAIN</span>.<span class="ident">clone</span>();
-        <span class="ident">different_chain</span>.<span class="ident">chain_id</span> <span class="op">=</span> <span class="ident">ChainId::new</span>(<span class="number">2</span>);
         <span class="kw">let</span> <span class="ident">admin_auth_other_chain</span> <span class="op">=</span> <span class="ident">Auth</span> {
             <span class="ident">era</span>: <span class="number">0</span>,
             <span class="ident">uid</span>: <span class="ident">IDS</span>[<span class="kw-2">&amp;</span><span class="ident">LEADER</span>],
-            <span class="ident">chain</span>: <span class="ident">different_chain</span>,
+            <span class="ident">chain</span>: <span class="ident">GANACHE_1</span>.<span class="ident">clone</span>(),
         };
 
         <span class="comment">// test for publisher</span>
@@ -3150,7 +3194,7 @@
                 <span class="ident">hostname</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;localhost&quot;</span>.<span class="ident">into</span>()),
                 <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.<span class="ident">into</span>()),
                 <span class="ident">os_name</span>: <span class="prelude-val">Some</span>(<span class="ident">OperatingSystem::map_os</span>(<span class="string">&quot;Windows&quot;</span>)),
-                <span class="ident">chains</span>: <span class="macro">vec!</span>[<span class="ident">ChainId::new</span>(<span class="number">1</span>)],
+                <span class="ident">chains</span>: <span class="macro">vec!</span>[<span class="ident">GANACHE_1337</span>.<span class="ident">chain_id</span>],
             };
             <span class="kw">let</span> <span class="ident">query</span> <span class="op">=</span> <span class="ident">serde_qs::to_string</span>(<span class="kw-2">&amp;</span><span class="ident">query</span>).<span class="ident">expect</span>(<span class="string">&quot;should parse query&quot;</span>);
             <span class="kw">let</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">Request::builder</span>()
@@ -3196,7 +3240,7 @@
             <span class="kw">let</span> <span class="ident">fetched_analytics</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FetchedAnalytics</span><span class="op">&gt;</span> <span class="op">=</span>
                 <span class="ident">serde_json::from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>).<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>);
             <span class="macro">assert_eq!</span>(
-                <span class="macro">vec!</span>[<span class="ident">FetchedMetric::Count</span>(<span class="number">1</span>)],
+                <span class="macro">vec!</span>[<span class="ident">FetchedMetric::Count</span>(<span class="number">69</span>)],
                 <span class="ident">fetched_analytics</span>
                     .<span class="ident">iter</span>()
                     .<span class="ident">map</span>(<span class="op">|</span><span class="ident">fetched</span><span class="op">|</span> <span class="ident">fetched</span>.<span class="ident">value</span>)

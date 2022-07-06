@@ -341,6 +341,19 @@
 <span id="336">336</span>
 <span id="337">337</span>
 <span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Sentry REST API documentation</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//!</span>
@@ -358,6 +371,7 @@
 <span class="doccomment">//!   - [GET `/v5/channel/:id/last-approved`](#get-v5channelidlast-approved)</span>
 <span class="doccomment">//!   - [POST `/v5/channel/:id/pay`](#post-v5channelidpay-auth-required) (auth required)</span>
 <span class="doccomment">//!   - [GET `/v5/channel/:id/get-leaf`](#get-v5channelidget-leaf)</span>
+<span class="doccomment">//!   - [POST `/v5/channel/dummy-deposit`](#post-v5channeldummy-deposit-auth-required) (auth required) available only with Dummy adapter</span>
 <span class="doccomment">//! - [Campaign](#campaign) routes</span>
 <span class="doccomment">//!     - [GET `/v5/campaign/list`](#get-v5campaignlist)</span>
 <span class="doccomment">//!     - [POST `/v5/campaign`](#post-v5campaign-auth-required) (auth required)</span>
@@ -506,6 +520,18 @@
 <span class="doccomment">//!</span>
 <span class="doccomment">//! `/get-leaf?earner=0x....`</span>
 <span class="doccomment">//! This module includes all routes for `Sentry` and the documentation of each Request/Response.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! #### POST `/v5/channel/dummy-deposit` (auth required)</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Set a deposit for a Channel and depositor (the authenticated address) in the Dummy adapter.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! **NOTE:** This route is available **only** when using the Dummy adapter.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! The route is handled by [`channel::channel_dummy_deposit()`].</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Request body (json): [`ChannelDummyDeposit`](crate::routes::channel::ChannelDummyDeposit)</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Response: [`SuccessResponse`](primitives::sentry::SuccessResponse)</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! ## Campaign</span>
 <span class="doccomment">//!</span>
