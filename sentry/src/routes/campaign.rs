@@ -614,7 +614,7 @@ pub mod insert_events {
         Overflow(#[from] OverflowError),
     }
 
-    #[derive(Debug, Error, PartialEq)]
+    #[derive(Debug, Error, PartialEq, Eq)]
     pub enum EventError {
         #[error("Overflow when calculating Event payout for Event")]
         EventPayoutOverflow,

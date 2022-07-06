@@ -619,7 +619,7 @@ mod test {
     async fn multi_chain_deposit_from_config() -> Result<(), Box<dyn std::error::Error>> {
         let config = GANACHE_CONFIG.clone();
 
-        let mut channel_1 = DUMMY_CAMPAIGN.channel.clone();
+        let mut channel_1 = DUMMY_CAMPAIGN.channel;
         let channel_1_token = GANACHE_INFO_1.tokens["Mocked TOKEN 1"].clone();
         channel_1.token = channel_1_token.address;
 
@@ -699,11 +699,9 @@ mod test {
                 .expect("Should have Ganache #1 already in config");
 
             assert!(
-                ganache_1
+                !ganache_1
                     .tokens
-                    .values()
-                    .find(|existing_token| { existing_token.address == token.info.address })
-                    .is_none(),
+                    .values().any(|existing_token| { existing_token.address == token.info.address }),
                 "The deployed token address should not have existed previously in the config!"
             );
 

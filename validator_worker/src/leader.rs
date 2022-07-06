@@ -215,7 +215,7 @@ mod test {
             .respond_with(ResponseTemplate::new(200).set_body_json(&new_state_res))
             .expect(1)
             .named("GET NewState helper")
-            .mount_as_scoped(&server)
+            .mount_as_scoped(server)
             .await
     }
 

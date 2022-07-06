@@ -28,7 +28,7 @@ pub type ChainsValidators = HashMap<ChainId, Validators>;
 pub type Validators = HashMap<ValidatorId, Validator>;
 pub type AuthToken = String;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Validator {
     /// Sentry API url
     pub url: ApiUrl,
@@ -999,7 +999,7 @@ mod test {
         {
             // Get Wiremock to return the channels
             let first_page_response = ChannelListResponse {
-                channels: vec![DUMMY_CAMPAIGN.channel.clone(), channel_new_leader],
+                channels: vec![DUMMY_CAMPAIGN.channel, channel_new_leader],
                 pagination: Pagination {
                     page: 0,
                     total_pages: 2,
@@ -1008,8 +1008,8 @@ mod test {
 
             let second_page_response = ChannelListResponse {
                 channels: vec![
-                    channel_new_follower.clone(),
-                    channel_new_leader_and_follower.clone(),
+                    channel_new_follower,
+                    channel_new_leader_and_follower,
                 ],
                 pagination: Pagination {
                     page: 1,

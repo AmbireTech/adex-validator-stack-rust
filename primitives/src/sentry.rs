@@ -290,7 +290,7 @@ pub struct UpdateAnalytics {
     pub count_to_add: i32,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Analytics {
     pub time: DateHour<Utc>,
@@ -308,7 +308,7 @@ pub struct Analytics {
     pub payout_count: u32,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct FetchedAnalytics {
     // time is represented as a timestamp
@@ -547,7 +547,7 @@ impl<'de> Deserialize<'de> for DateHour<Utc> {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Pagination {
     /// The total amount of pages available for this request
@@ -702,7 +702,7 @@ pub mod campaign_list {
     /// ```
     #[doc = include_str!("../examples/campaign_list_query.rs")]
     /// ```
-    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
     pub struct CampaignListQuery {
         /// Default is `u64::default()` = `0`.
         #[serde(default)]
@@ -722,7 +722,7 @@ pub mod campaign_list {
     }
 
     /// The `validator` query parameter for [`CampaignListQuery`].
-    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
     #[serde(rename_all = "camelCase")]
     pub enum ValidatorParam {
         /// Results will include all campaigns that have the provided address as a leader
@@ -1203,7 +1203,7 @@ mod test {
         // Serialize & deserialize
         let json_datetime = Value::String("2021-12-01T16:00:00+02:00".into());
         let datehour: DateHour<Utc> =
-            serde_json::from_value(json_datetime.clone()).expect("Should deserialize");
+            serde_json::from_value(json_datetime).expect("Should deserialize");
         assert_eq!(
             DateHour::from_ymdh(2021, 12, 1, 14),
             datehour,

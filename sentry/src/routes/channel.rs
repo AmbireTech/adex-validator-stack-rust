@@ -358,7 +358,9 @@ async fn get_corresponding_new_state(
 
     let state_root = approve_state.msg.state_root.clone();
 
-    let new_state = match latest_new_state(pool, channel, &state_root).await? {
+    
+
+    match latest_new_state(pool, channel, &state_root).await? {
         Some(new_state) => {
             let new_state = new_state.msg.into_inner().try_checked().map_err(|err| {
                 error!(&logger, "Balances are not aligned in an approved NewState: {}", &err; "module" => "get_spender_limits");
@@ -368,13 +370,11 @@ async fn get_corresponding_new_state(
         }
         None => {
             error!(&logger, "{}", "Fatal error! The NewState for the last ApproveState was not found"; "module" => "get_spender_limits");
-            return Err(ResponseError::BadRequest(
+            Err(ResponseError::BadRequest(
                 "Fatal error! The NewState for the last ApproveState was not found".to_string(),
-            ));
+            ))
         }
-    };
-
-    new_state
+    }
 }
 
 /// GET `/v5/channel/0xXXX.../accounting` request
@@ -580,8 +580,7 @@ pub mod validator_message {
             ));
         }
 
-        let validator_id = split
-            .get(0)
+        let validator_id = split.first()
             // filter an empty string
             .filter(|string| !string.is_empty())
             // then try to map it to ValidatorId
@@ -1077,7 +1076,7 @@ mod test {
             let query = serde_qs::to_string(&query).expect("should parse query");
             Request::builder()
                 .uri(format!("http://127.0.0.1/v5/channel/list?{}", query))
-                .extension(DUMMY_CAMPAIGN.channel.clone())
+                .extension(DUMMY_CAMPAIGN.channel)
                 .body(Body::empty())
                 .expect("Should build Request")
         };
