@@ -8,7 +8,6 @@ use chrono::{
     DateTime, Utc,
 };
 use serde::{Deserialize, Serialize};
-use serde_with::with_prefix;
 
 #[doc(inline)]
 pub use {
@@ -16,8 +15,6 @@ pub use {
     pricing::{Pricing, PricingBounds},
     validators::Validators,
 };
-
-with_prefix!(pub prefix_active "active_");
 
 mod campaign_id {
     use crate::ToHex;
@@ -197,7 +194,7 @@ pub struct Campaign {
     #[serde(with = "ts_milliseconds")]
     pub created: DateTime<Utc>,
     /// Used by the AdViewManager & Targeting AIP#31
-    #[serde(flatten, with = "prefix_active")]
+    #[serde(flatten)]
     pub active: Active,
 }
 
@@ -236,13 +233,14 @@ pub struct Active {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "ts_milliseconds_option"
+        with = "ts_milliseconds_option",
+        rename = "activeFrom"
     )]
     pub from: Option<DateTime<Utc>>,
     /// Campaign active to in a milliseconds timestamp
     ///
     /// The time at which you want this campaign to become inactive (mandatory)
-    #[serde(with = "ts_milliseconds")]
+    #[serde(with = "ts_milliseconds", rename = "activeTo")]
     pub to: DateTime<Utc>,
 }
 
@@ -291,6 +289,7 @@ mod pricing {
         }
     }
 }
+
 /// Campaign Validators
 pub mod validators {
     use std::ops::Index;
@@ -298,8 +297,8 @@ pub mod validators {
     use crate::{ValidatorDesc, ValidatorId};
     use serde::{Deserialize, Serialize};
 
-    #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
     /// Unordered list of the validators representing the leader & follower
+    #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
     pub struct Validators(ValidatorDesc, ValidatorDesc);
 
     impl Validators {
@@ -489,5 +488,17 @@ mod postgres {
 
         accepts!(JSONB);
         to_sql_checked!();
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::test_util::DUMMY_CAMPAIGN;
+
+    #[test]
+    fn test_campaign_de_serialization() {
+        let campaign = DUMMY_CAMPAIGN.clone();
+
+        dbg!(serde_json::to_string_pretty(&campaign));
     }
 }

@@ -795,7 +795,7 @@ pub mod campaign_create {
     use serde::{Deserialize, Serialize};
 
     use crate::{
-        campaign::{prefix_active, Active, PricingBounds, Validators},
+        campaign::{Active, PricingBounds, Validators},
         targeting::Rules,
         AdUnit, Address, Campaign, CampaignId, Channel, EventSubmission, UnifiedNum,
     };
@@ -828,7 +828,7 @@ pub mod campaign_create {
         pub created: DateTime<Utc>,
         /// A millisecond timestamp representing the time you want this campaign to become active (optional)
         /// Used by the AdViewManager & Targeting AIP#31
-        #[serde(flatten, with = "prefix_active")]
+        #[serde(flatten)]
         pub active: Active,
     }
 
