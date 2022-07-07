@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use self::query::{AllowedKey, Time};
 
 #[cfg(feature = "postgres")]
-pub mod postgres {
+mod postgres {
     use super::{query::AllowedKey, AnalyticsQuery, OperatingSystem};
     use bytes::BytesMut;
     use std::error::Error;
@@ -160,6 +160,7 @@ pub enum AuthenticateAs {
 
 impl Metric {
     #[cfg(feature = "postgres")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "postgres")))]
     /// Returns the query column name of the [`Metric`].
     ///
     /// Available only when the `postgres` feature is enabled.
