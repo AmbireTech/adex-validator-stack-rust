@@ -1,5 +1,6 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
+#![deny(rustdoc::broken_intra_doc_links)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 // TODO: Remove once stabled and upstream num::Integer::div_floor(...) is fixed
 #![allow(unstable_name_collisions)]
@@ -155,6 +156,14 @@ mod deposit {
             let total = UnifiedNum::from_precision(deposit.total, precision);
 
             total.map(|total| Deposit { total })
+        }
+    }
+
+    impl<N: Default> Default for Deposit<N> {
+        fn default() -> Self {
+            Self {
+                total: Default::default(),
+            }
         }
     }
 }

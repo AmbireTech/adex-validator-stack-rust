@@ -20,7 +20,6 @@ args = ["test", "--release"]
 [tasks.local-test-flow]
 dependencies = ["services-up", "test-flow", "services-down"]
 
-
 [tasks.services-up]
 # `--renew-anon-volumes` will force the recreation of the services
 # it's used primarily for `ganache-cli`.

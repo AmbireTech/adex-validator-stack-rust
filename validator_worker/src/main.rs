@@ -104,6 +104,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let options = adapter::dummy::Options {
                 dummy_identity: ValidatorId::try_from(dummy_identity)?,
                 dummy_auth_tokens: DUMMY_AUTH.clone(),
+                dummy_chains: config.chains.values().cloned().collect(),
             };
             let adapter = Adapter::with_unlocked(Dummy::init(options));
 

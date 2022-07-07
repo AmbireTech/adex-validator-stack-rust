@@ -46,13 +46,14 @@ impl ops::DerefMut for ApplicationGuard {
 }
 
 /// Uses development and therefore the local ganache addresses of the tokens
-/// but still uses the `DummyAdapter`.
+/// but still uses the `Dummy` adapter.
 pub async fn setup_dummy_app() -> ApplicationGuard {
     let config = GANACHE_CONFIG.clone();
 
     let adapter = Adapter::new(Dummy::init(Options {
         dummy_identity: IDS[&LEADER],
         dummy_auth_tokens: DUMMY_AUTH.clone(),
+        dummy_chains: config.chains.values().cloned().collect(),
     }));
 
     let redis = TESTS_POOL.get().await.expect("Should return Object");

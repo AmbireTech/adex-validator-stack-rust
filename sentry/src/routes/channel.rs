@@ -15,7 +15,7 @@ use crate::{
     routes::{campaign::fetch_campaign_ids_for_channel, routers::RouteParams},
     Application, Auth,
 };
-use adapter::{client::Locked, Adapter};
+use adapter::{client::Locked, Adapter, Dummy};
 use futures::future::try_join_all;
 use hyper::{Body, Request, Response};
 use primitives::{
@@ -29,8 +29,18 @@ use primitives::{
     validator::NewState,
     Address, ChainOf, Channel, Deposit, UnifiedNum,
 };
+use serde::{Deserialize, Serialize};
 use slog::{error, Logger};
-use std::{collections::HashMap, str::FromStr};
+use std::{any::Any, collections::HashMap, str::FromStr};
+
+/// Request body for Channel deposit when using the Dummy adapter.
+///
+/// **NOTE:** available **only** when using the Dummy adapter!
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ChannelDummyDeposit {
+    pub channel: Channel,
+    pub deposit: Deposit<UnifiedNum>,
+}
 
 /// GET `/v5/channel/list` request
 ///
@@ -542,6 +552,56 @@ pub async fn channel_payout<C: Locked + 'static>(
         success: true,
     })?))
 }
+
+/// POST `/v5/channel/dummy-deposit` request
+///
+/// Body (json): [`ChannelDummyDeposit`]
+///
+/// Response: [`SuccessResponse`]
+pub async fn channel_dummy_deposit<C: Locked + 'static>(
+    req: Request<Body>,
+    app: &Application<C>,
+) -> Result<Response<Body>, ResponseError> {
+    let auth = req
+        .extensions()
+        .get::<Auth>()
+        .ok_or(ResponseError::Unauthorized)?
+        .to_owned();
+
+    let depositor = auth.uid.to_address();
+
+    let body = hyper::body::to_bytes(req.into_body()).await?;
+    let request = serde_json::from_slice::<ChannelDummyDeposit>(&body)
+        .map_err(|e| ResponseError::FailedValidation(e.to_string()))?;
+
+    // Insert the channel if it does not exist yet
+    let channel_chain = app
+        .config
+        .find_chain_of(request.channel.token)
+        .expect("The Chain of Channel's token was not found in configuration!")
+        .with_channel(request.channel);
+
+    // if this fails, it will cause Bad Request
+    insert_channel(&app.pool, &channel_chain).await?;
+
+    // Convert the UnifiedNum to BigNum with the precision of the token
+    let deposit = request
+        .deposit
+        .to_precision(channel_chain.token.precision.into());
+
+    let dummy_adapter = <dyn Any + Send + Sync>::downcast_ref::<Adapter<Dummy>>(&app.adapter)
+        .expect("Only Dummy adapter is allowed here!");
+
+    // set the deposit in the Dummy adapter's client
+    dummy_adapter
+        .client
+        .set_deposit(&channel_chain, depositor, deposit);
+
+    Ok(success_response(serde_json::to_string(&SuccessResponse {
+        success: true,
+    })?))
+}
+
 /// [`Channel`] [validator messages](primitives::validator::MessageTypes) routes
 /// starting with `/v5/channel/0xXXX.../validator-messages`
 ///
@@ -727,7 +787,7 @@ mod test {
         };
         app.adapter
             .client
-            .add_deposit_call(channel.id(), *CREATOR, deposit.clone());
+            .set_deposit(&channel_context, *CREATOR, deposit.clone());
         // Making sure spendable does not yet exist
         let spendable = fetch_spendable(app.pool.clone(), &CREATOR, &channel.id())
             .await
@@ -763,7 +823,7 @@ mod test {
 
         app.adapter
             .client
-            .add_deposit_call(channel.id(), *CREATOR, updated_deposit.clone());
+            .set_deposit(&channel_context, *CREATOR, updated_deposit.clone());
 
         let updated_spendable = create_or_update_spendable_document(
             &app.adapter,
@@ -928,11 +988,9 @@ mod test {
         let deposit = AdapterDeposit {
             total: BigNum::from_str("100000000000000000000").expect("should convert"), // 100 DAI
         };
-        app.adapter.client.add_deposit_call(
-            channel_context.context.id(),
-            *CREATOR,
-            deposit.clone(),
-        );
+        app.adapter
+            .client
+            .set_deposit(&channel_context, *CREATOR, deposit.clone());
 
         insert_channel(&app.pool, &channel_context)
             .await
