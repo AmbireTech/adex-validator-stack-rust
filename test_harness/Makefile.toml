@@ -13,10 +13,6 @@ dependencies = [
   "local-test-flow",
 ]
 
-[tasks.test]
-# run tests in release because of slow unlock time of Ethereum adapter (i.e. keystore decryption)
-args = ["test", "--release"]
-
 [tasks.local-test-flow]
 dependencies = ["services-up", "test-flow", "services-down"]
 
