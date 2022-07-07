@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["ApproveStateResult",""],["Error",""],["Health",""],["InvalidNewState",""]],"fn":[["tick",""]],"struct":[["TickStatus",""]]});
+window.SIDEBAR_ITEMS = {"enum":[["ApproveStateResult",""],["Error",""],["Health",""],["InvalidNewState",""]],"fn":[["tick",""]],"struct":[["TickStatus",""]]};

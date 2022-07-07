@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["MessageError",""],["MessageTypes",""]],"struct":[["ApproveState",""],["Heartbeat",""],["NewState",""],["RejectState",""]],"trait":[["Type",""]]});
+window.SIDEBAR_ITEMS = {"enum":[["MessageError",""],["MessageTypes",""]],"struct":[["ApproveState",""],["Heartbeat",""],["NewState",""],["RejectState",""]],"trait":[["Type",""]]};

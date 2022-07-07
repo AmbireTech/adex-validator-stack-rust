@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["Error",""]],"fn":[["cmd","Re-export [`redis::cmd`] for testing purposes Shortcut function to creating a command with a single argument."]],"static":[["TESTS_POOL",""]],"struct":[["Database",""],["Manager",""]],"type":[["Pool",""]]});
+window.SIDEBAR_ITEMS = {"enum":[["Error",""]],"fn":[["cmd","Re-export [`redis::cmd`] for testing purposes Shortcut function to creating a command with a single argument."]],"static":[["TESTS_POOL",""]],"struct":[["Database",""],["Manager",""]],"type":[["Pool",""]]};

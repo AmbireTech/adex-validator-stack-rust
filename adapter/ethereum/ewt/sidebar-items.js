@@ -1,1 +1,1 @@
-initSidebarItems({"static":[["ETH_HEADER",""],["ETH_HEADER_BASE64",""],["ETH_SIGN_SUFFIX",""]],"struct":[["Header",""],["Payload","The [`Payload`] of the Ethereum Web Token"],["Token","EWT Authentication Token"],["VerifyPayload","EWT verified payload"]]});
+window.SIDEBAR_ITEMS = {"static":[["ETH_HEADER",""],["ETH_HEADER_BASE64",""],["ETH_SIGN_SUFFIX",""]],"struct":[["Header",""],["Payload","The [`Payload`] of the Ethereum Web Token"],["Token","EWT Authentication Token"],["VerifyPayload","EWT verified payload"]]};

@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["Error",""],["Prefix",""]],"fn":[["parse_bytes",""]],"mod":[["postgres",""]],"struct":[["Address",""]]});
+window.SIDEBAR_ITEMS = {"enum":[["Error",""],["Prefix",""]],"fn":[["parse_bytes",""]],"struct":[["Address",""]]};

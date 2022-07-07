@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["follower_rules",""]]});
+window.SIDEBAR_ITEMS = {"mod":[["follower_rules",""]]};

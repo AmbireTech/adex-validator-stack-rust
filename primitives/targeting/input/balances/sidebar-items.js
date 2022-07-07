@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["Getter",""],["Values",""]],"type":[["GetBalances",""]]});
+window.SIDEBAR_ITEMS = {"struct":[["Getter",""],["Values",""]],"type":[["GetBalances",""]]};

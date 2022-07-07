@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["FullCampaign",""],["Values",""]],"type":[["GetCampaign",""]]});
+window.SIDEBAR_ITEMS = {"struct":[["FullCampaign",""],["Values",""]],"type":[["GetCampaign",""]]};

@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["all_channels",""]]});
+window.SIDEBAR_ITEMS = {"fn":[["all_channels",""]]};

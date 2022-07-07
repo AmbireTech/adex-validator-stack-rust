@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["Error",""]],"fn":[["heartbeat",""]],"type":[["HeartbeatStatus",""]]});
+window.SIDEBAR_ITEMS = {"enum":[["Error",""]],"fn":[["heartbeat",""]],"type":[["HeartbeatStatus",""]]};

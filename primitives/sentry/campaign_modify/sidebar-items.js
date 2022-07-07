@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["ModifyCampaign",""]]});
+window.SIDEBAR_ITEMS = {"struct":[["ModifyCampaign",""]]};

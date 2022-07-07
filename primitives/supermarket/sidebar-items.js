@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["units_for_slot",""]]});
+window.SIDEBAR_ITEMS = {"mod":[["units_for_slot",""]]};

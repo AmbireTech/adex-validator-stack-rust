@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["postgres",""]],"struct":[["Channel",""],["ChannelId",""],["Nonce","The nonce is an Unsigned 256 number"]]});
+window.SIDEBAR_ITEMS = {"struct":[["Channel",""],["ChannelId",""],["Nonce","The nonce is an Unsigned 256 number"]]};

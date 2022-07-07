@@ -1,4 +1,4 @@
-var N = null;var sourcesIndex = {};
+var sourcesIndex = {};
 sourcesIndex["adapter"] = {"name":"","dirs":[{"name":"ethereum","files":["channel.rs","client.rs","error.rs","ewt.rs","test_util.rs"]}],"files":["adapter.rs","client.rs","dummy.rs","error.rs","ethereum.rs","lib.rs","util.rs"]};
 sourcesIndex["adview_manager"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["adview_serve"] = {"name":"","files":["main.rs"]};

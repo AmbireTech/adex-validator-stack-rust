@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["Error",""]],"fn":[["check_access",""]]});
+window.SIDEBAR_ITEMS = {"enum":[["Error",""]],"fn":[["check_access",""]]};

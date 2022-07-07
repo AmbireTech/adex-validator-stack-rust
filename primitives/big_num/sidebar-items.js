@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["postgres",""]],"struct":[["BigNum",""],["ParseBigIntError","Re-export of the [`num::bigint::ParseBigIntError`] when using [`BigNum`]"]]});
+window.SIDEBAR_ITEMS = {"struct":[["BigNum",""],["ParseBigIntError","Re-export of the [`num::bigint::ParseBigIntError`] when using [`BigNum`]"]]};

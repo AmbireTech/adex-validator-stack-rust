@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["Error",""],["OverflowError",""]],"struct":[["Balances",""],["CheckedState",""],["UncheckedState",""]],"trait":[["BalancesState",""]]});
+window.SIDEBAR_ITEMS = {"enum":[["Error",""],["OverflowError",""]],"struct":[["Balances",""],["CheckedState",""],["UncheckedState",""]],"trait":[["BalancesState",""]]};

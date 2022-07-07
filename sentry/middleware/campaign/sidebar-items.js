@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["CalledByCreator",""],["CampaignLoad",""]]});
+window.SIDEBAR_ITEMS = {"struct":[["CalledByCreator",""],["CampaignLoad",""]]};

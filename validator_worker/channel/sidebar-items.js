@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["channel_tick",""]]});
+window.SIDEBAR_ITEMS = {"fn":[["channel_tick",""]]};

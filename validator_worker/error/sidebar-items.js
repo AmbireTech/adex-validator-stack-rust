@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["Error",""],["TickError",""]]});
+window.SIDEBAR_ITEMS = {"enum":[["Error",""],["TickError",""]]};

@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["Cors",""]]});
+window.SIDEBAR_ITEMS = {"enum":[["Cors",""]]};

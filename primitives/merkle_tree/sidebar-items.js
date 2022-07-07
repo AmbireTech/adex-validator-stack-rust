@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["Error",""]],"struct":[["MerkleTree",""]]});
+window.SIDEBAR_ITEMS = {"enum":[["Error",""]],"struct":[["MerkleTree",""]]};

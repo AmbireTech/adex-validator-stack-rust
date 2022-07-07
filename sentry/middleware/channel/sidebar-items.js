@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["ChannelLoad",""]]});
+window.SIDEBAR_ITEMS = {"struct":[["ChannelLoad",""]]};

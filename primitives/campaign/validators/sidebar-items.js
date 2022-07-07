@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["Iter",""],["Validators","Unordered list of the validators representing the leader & follower"]]});
+window.SIDEBAR_ITEMS = {"struct":[["Iter",""],["Validators","Unordered list of the validators representing the leader & follower"]]};

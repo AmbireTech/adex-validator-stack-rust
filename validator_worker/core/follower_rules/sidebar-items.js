@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["get_health",""],["is_valid_transition",""]]});
+window.SIDEBAR_ITEMS = {"fn":[["get_health",""],["is_valid_transition",""]]};

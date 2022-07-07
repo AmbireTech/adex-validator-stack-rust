@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["get_analytics",""],["update_analytics","This will update a record when it’s present by incrementing its payout_amount and payout_count fields"]]});
+window.SIDEBAR_ITEMS = {"fn":[["get_analytics",""],["update_analytics","This will update a record when it’s present by incrementing its payout_amount and payout_count fields"]]};

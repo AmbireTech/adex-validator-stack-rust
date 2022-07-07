@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["response",""]]});
+window.SIDEBAR_ITEMS = {"mod":[["response",""]]};

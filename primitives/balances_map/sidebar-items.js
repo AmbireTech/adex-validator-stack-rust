@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["Map",""]],"type":[["BalancesMap",""],["UnifiedMap",""]]});
+window.SIDEBAR_ITEMS = {"struct":[["Map",""]],"type":[["BalancesMap",""],["UnifiedMap",""]]};

@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["get_payout","If None is returned this means that the targeting rules evaluation has set `show = false`"]],"type":[["Result",""]]});
+window.SIDEBAR_ITEMS = {"fn":[["get_payout","If None is returned this means that the targeting rules evaluation has set `show = false`"]],"type":[["Result",""]]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["UnitsForSlot","Limits applied to the `POST /units-for-slot` route"]]};

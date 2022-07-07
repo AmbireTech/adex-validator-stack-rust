@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["EventSubmission",""],["RateLimit",""],["Rule",""]]});
+window.SIDEBAR_ITEMS = {"struct":[["EventSubmission",""],["RateLimit",""],["Rule",""]]};

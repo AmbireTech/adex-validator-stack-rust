@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["run_sentry",""],["run_sentry_app",""]]});
+window.SIDEBAR_ITEMS = {"fn":[["run_sentry",""],["run_sentry_app",""]]};

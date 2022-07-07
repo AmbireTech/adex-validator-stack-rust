@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["AuthRequired",""],["Authenticate",""],["IsAdmin",""]]});
+window.SIDEBAR_ITEMS = {"struct":[["AuthRequired",""],["Authenticate",""],["IsAdmin",""]]};

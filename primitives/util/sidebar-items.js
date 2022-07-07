@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["api",""],["logging",""]],"struct":[["ApiUrl","A safe Url to use in REST API calls."]]});
+window.SIDEBAR_ITEMS = {"mod":[["api",""],["logging",""]],"struct":[["ApiUrl","A safe Url to use in REST API calls."]]};

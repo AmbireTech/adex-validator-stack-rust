@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["Error",""]],"fn":[["tick",""]],"struct":[["TickStatus",""]]});
+window.SIDEBAR_ITEMS = {"enum":[["Error",""]],"fn":[["tick",""]],"struct":[["TickStatus",""]]};

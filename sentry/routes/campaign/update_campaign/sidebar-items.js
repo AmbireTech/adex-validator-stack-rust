@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["handle_route","POST `/v5/campaign/:id` (auth required)"],["modify_campaign",""]]});
+window.SIDEBAR_ITEMS = {"fn":[["handle_route","POST `/v5/campaign/:id` (auth required)"],["modify_campaign",""]]};

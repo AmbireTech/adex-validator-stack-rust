@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["AdUnit",""],["Campaign",""],["Response",""],["UnitsWithPrice",""]]});
+window.SIDEBAR_ITEMS = {"struct":[["AdUnit",""],["Campaign",""],["Response",""],["UnitsWithPrice",""]]};
