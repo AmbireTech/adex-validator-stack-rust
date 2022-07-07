@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":[["GetStateRootError",""]],"mod":[["channel",""],["core",""],["error",""],["follower",""],["heartbeat",""],["leader",""],["sentry_interface",""],["worker",""]],"trait":[["GetStateRoot",""]]};
+window.SIDEBAR_ITEMS = {"enum":[["GetStateRootError",""]],"mod":[["channel",""],["core",""],["error",""],["follower",""],["heartbeat",""],["leader",""],["sentry_interface",""],["worker",""]],"struct":[["SentryApi",""],["Worker",""]],"trait":[["GetStateRoot",""]]};
