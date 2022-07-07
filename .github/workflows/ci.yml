@@ -53,9 +53,9 @@ jobs:
           profile: minimal
           components: rust-docs
       - name: Build docs with no features
-        run: cargo doc --workspace --no-deps --no-default-features
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --no-default-features
       - name: Build docs with --all-features
-        run: cargo doc --workspace --no-deps --all-features
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --all-features
   test-flow:
     name: cargo make ci-flow - Tests
     runs-on: ubuntu-latest
