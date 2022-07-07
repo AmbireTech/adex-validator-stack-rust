@@ -11,7 +11,9 @@ use primitives::{
 };
 use thiserror::Error;
 
+#[doc(inline)]
 pub use self::sentry_interface::SentryApi;
+#[doc(inline)]
 pub use worker::Worker;
 
 pub mod channel;

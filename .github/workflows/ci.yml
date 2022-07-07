@@ -60,7 +60,7 @@ jobs:
     name: cargo make ci-flow - Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: true
       # Runs all services needed for testing
