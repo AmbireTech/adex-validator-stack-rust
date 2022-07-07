@@ -17,7 +17,7 @@ dependencies = [
 
 [tasks.test]
 # run tests in release because of slow unlock time of Ethereum adapter (i.e. keystore decryption)
-args = ["test", "--release", "--all-features"]
+args = ["test", "--all-features"]
 
 [tasks.ganache-up]
 # `--renew-anon-volumes` is required to make sure that the snapshot used for the `ganache` instances is reloaded.
