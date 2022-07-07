@@ -139,7 +139,7 @@ impl Token {
 
         let token_parts = token.splitn(3, '.').collect::<Vec<_>>();
         let ((header_encoded, payload_encoded), signature_encoded) = token_parts
-            .get(0)
+            .first()
             .zip(token_parts.get(1))
             .zip(token_parts.get(2))
             .ok_or(EwtVerifyError::InvalidToken)?;
@@ -236,7 +236,7 @@ mod test {
             // Eth
             chain_id: ChainId::new(1),
         };
-        let wallet = eth_adapter.state.wallet.clone();
+        let wallet = eth_adapter.state.wallet;
         let token = Token::sign(&wallet, payload).expect("failed to generate ewt signature");
         let expected = "eyJ0eXAiOiJKV1QiLCJhbGciOiJFVEgifQ.eyJpZCI6IjB4ODA2OTA3NTE5NjlCMjM0Njk3ZTkwNTllMDRlZDcyMTk1YzM1MDdmYSIsImVyYSI6MTAwMDAwLCJhZGRyZXNzIjoiMHhhQ0JhREEyZDU4MzBkMTg3NWFlM0QyZGUyMDdBMTM2M0IzMTZEZjJGIiwiY2hhaW5faWQiOjF9.GxF4XDXMx-rRty5zQ7-0nx2VlX51R_uEs_7OfA5ezDcyryUS06IWqVgGIfu4chhRJFP7woZ1YJpARNbCE01nWxwB";
         assert_eq!(token.as_str(), expected, "generated wrong ewt signature");

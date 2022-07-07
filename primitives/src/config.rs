@@ -11,20 +11,30 @@ use thiserror::Error;
 
 pub use toml::de::Error as TomlError;
 
+/// Production configuration found in `docs/config/prod.toml`
+///
+/// ```toml
+#[doc = include_str!("../../docs/config/prod.toml")]
+/// ```
 pub static PRODUCTION_CONFIG: Lazy<Config> = Lazy::new(|| {
     toml::from_str(include_str!("../../docs/config/prod.toml"))
         .expect("Failed to parse prod.toml config file")
 });
 
+/// Ganache (dev) configuration found in `docs/config/ganache.toml`
+///
+/// ```toml
+#[doc = include_str!("../../docs/config/ganache.toml")]
+/// ```
 pub static GANACHE_CONFIG: Lazy<Config> = Lazy::new(|| {
     Config::try_toml(include_str!("../../docs/config/ganache.toml"))
         .expect("Failed to parse ganache.toml config file")
 });
 
-#[derive(Debug, Deserialize, PartialEq, Eq, Clone, Copy)]
-#[serde(rename_all = "camelCase")]
 /// The environment in which the application is running
 /// Defaults to [`Environment::Development`]
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
 pub enum Environment {
     /// The default development setup is running `ganache-cli` locally.
     Development,
@@ -89,31 +99,6 @@ pub struct Config {
     pub limits: Limits,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-
-pub struct PlatformConfig {
-    pub url: ApiUrl,
-    #[serde(deserialize_with = "milliseconds_to_std_duration")]
-    pub keep_alive_interval: Duration,
-}
-
-fn milliseconds_to_std_duration<'de, D>(deserializer: D) -> Result<Duration, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    use serde::de::Error;
-    use toml::Value;
-
-    let toml_value: Value = Value::deserialize(deserializer)?;
-
-    let milliseconds = match toml_value {
-        Value::Integer(mills) => u64::try_from(mills).map_err(Error::custom),
-        _ => Err(Error::custom("Only integers allowed for this value")),
-    }?;
-
-    Ok(Duration::from_millis(milliseconds))
-}
-
 impl Config {
     /// Utility method that will deserialize a Toml file content into a [`Config`].
     ///
@@ -139,6 +124,13 @@ impl Config {
                 .map(|token_info| ChainOf::new(chain_info.chain.clone(), token_info.clone()))
         })
     }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PlatformConfig {
+    pub url: ApiUrl,
+    #[serde(deserialize_with = "milliseconds_to_std_duration")]
+    pub keep_alive_interval: Duration,
 }
 
 /// Configured chain with tokens.
@@ -174,13 +166,31 @@ pub struct TokenInfo {
 pub struct Limits {
     pub units_for_slot: limits::UnitsForSlot,
 }
-mod limits {
+
+fn milliseconds_to_std_duration<'de, D>(deserializer: D) -> Result<Duration, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de::Error;
+    use toml::Value;
+
+    let toml_value: Value = Value::deserialize(deserializer)?;
+
+    let milliseconds = match toml_value {
+        Value::Integer(mills) => u64::try_from(mills).map_err(Error::custom),
+        _ => Err(Error::custom("Only integers allowed for this value")),
+    }?;
+
+    Ok(Duration::from_millis(milliseconds))
+}
+
+pub mod limits {
     use serde::{Deserialize, Serialize};
 
     use crate::UnifiedNum;
 
-    #[derive(Serialize, Deserialize, Debug, Clone)]
     /// Limits applied to the `POST /units-for-slot` route
+    #[derive(Serialize, Deserialize, Debug, Clone)]
     pub struct UnitsForSlot {
         /// The maximum number of campaigns a publisher can earn from.
         /// This will limit the returned Campaigns to the set number.

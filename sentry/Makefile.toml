@@ -4,8 +4,9 @@ extend = "../Makefile.toml"
 description = "Development testing flow will first format the code, and than run cargo build and test"
 category = "Development"
 dependencies = [
-  "format-flow",
   "format-toml-conditioned-flow",
+  "format-flow",
+  "clippy-flow",
   "pre-build",
   "build",
   "post-build",

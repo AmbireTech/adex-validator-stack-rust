@@ -175,7 +175,7 @@ mod test {
             .and(query_param("limit", "1"))
             .respond_with(ResponseTemplate::new(200).set_body_json(&heartbeat_res))
             .expect(1)
-            .mount_as_scoped(&server)
+            .mount_as_scoped(server)
             .await
     }
 

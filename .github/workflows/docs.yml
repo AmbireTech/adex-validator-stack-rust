@@ -10,11 +10,17 @@ jobs:
     name: Deploy docs on gh-pages
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: true
+      - uses: actions-rs/toolchain@v1
+        with:
+          # Use nightly to build the docs with `--cfg docsrs`
+          toolchain: nightly
+          profile: minimal
+          components: rust-docs
       - name: Build docs
-        run: cargo doc --no-deps
+        run: RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features --no-deps --workspace
       - name: Prepare /docs & index file
         run: |
           rm -rf ./docs

@@ -14,7 +14,7 @@ use primitives::{
 use std::collections::HashMap;
 
 #[doc(inline)]
-pub use self::deposit::Deposits;
+pub use self::deposit::{Deposits, Key};
 
 pub type Adapter<S> = crate::Adapter<Dummy, S>;
 
@@ -66,8 +66,6 @@ impl Dummy {
         depositor: Address,
         deposit: D,
     ) {
-        use deposit::Key;
-
         let key = Key::from_chain_of(channel_context, depositor);
         match deposit.into() {
             Some(deposit) => {
@@ -261,6 +259,7 @@ mod deposit {
     use primitives::{Address, ChainId, ChainOf, Channel, ChannelId};
     use std::sync::Arc;
 
+    /// The Key for deposits that are unique for retrieving a Dummy deposit.
     #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
     pub struct Key {
         channel_id: ChannelId,

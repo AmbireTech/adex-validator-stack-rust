@@ -10,7 +10,7 @@ use std::collections::HashMap;
 ///
 /// [protocol]: https://github.com/AdExNetwork/adex-protocol/blob/master/adSlot.md
 /// [adex-models]: https://github.com/AdExNetwork/adex-models/blob/master/src/models/AdSlot.js
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct AdSlot {
     /// valid ipfs hash of spec props below

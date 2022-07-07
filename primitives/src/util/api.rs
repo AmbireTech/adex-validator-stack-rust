@@ -9,7 +9,7 @@ use url::Url;
 // `url::Url::scheme()` returns lower-cased ASCII string without `:`
 const SCHEMES: [&str; 2] = ["http", "https"];
 
-#[derive(Debug, Error, PartialEq)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub enum Error {
     #[error("Invalid scheme '{0}', only 'http' & 'https' are allowed")]
     InvalidScheme(String),

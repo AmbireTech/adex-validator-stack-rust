@@ -371,7 +371,7 @@ pub mod messages {
     }
 }
 #[cfg(feature = "postgres")]
-pub mod postgres {
+mod postgres {
     use super::ValidatorId;
     use crate::ToETHChecksum;
     use bytes::BytesMut;

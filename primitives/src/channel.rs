@@ -250,7 +250,7 @@ mod test {
 }
 
 #[cfg(feature = "postgres")]
-pub mod postgres {
+mod postgres {
     use super::{Channel, ChannelId, Nonce};
     use bytes::BytesMut;
     use hex::FromHex;

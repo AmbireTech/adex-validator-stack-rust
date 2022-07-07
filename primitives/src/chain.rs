@@ -114,7 +114,7 @@ impl ChainOf<Campaign> {
 }
 
 #[cfg(feature = "postgres")]
-pub mod postgres {
+mod postgres {
     use super::ChainId;
     use bytes::BytesMut;
     use std::error::Error;

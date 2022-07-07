@@ -4,17 +4,14 @@ extend = "../Makefile.toml"
 description = "Development testing flow will first format the code, and than run cargo build and test"
 category = "Development"
 dependencies = [
-  "format-flow",
   "format-toml-conditioned-flow",
+  "format-flow",
+  "clippy-flow",
   "pre-build",
   "build",
   "post-build",
   "local-test-flow",
 ]
-
-[tasks.test]
-# run tests in release because of slow unlock time of Ethereum adapter (i.e. keystore decryption)
-args = ["test", "--release"]
 
 [tasks.local-test-flow]
 dependencies = ["services-up", "test-flow", "services-down"]

@@ -1152,7 +1152,7 @@ mod tests {
                 &follower_sentry,
                 token_chain_1337.clone().with(CAMPAIGN_2.id),
                 // the Leader of this channel is FOLLOWER!
-                &channel_leader_events,
+                channel_leader_events,
             )
             .await
             .expect("Posted events");
@@ -1653,14 +1653,12 @@ mod tests {
                 last_approved_response_leader
                     .heartbeats
                     .expect("Leader response should have heartbeats")
-                    .clone()
                     .into_iter()
                     .map(|message| message.msg)
                     .collect::<Vec<_>>(),
                 last_approved_response_follower
                     .heartbeats
                     .expect("Follower response should have heartbeats")
-                    .clone()
                     .into_iter()
                     .map(|message| message.msg)
                     .collect::<Vec<_>>(),
@@ -1716,14 +1714,12 @@ mod tests {
 
                 let new_state_leader = msg_new_state_leader
                     .msg
-                    .clone()
                     .into_inner()
                     .try_checked()
                     .expect("NewState should have valid CheckedState Balances");
 
                 let new_state_follower = msg_new_state_follower
                     .msg
-                    .clone()
                     .into_inner()
                     .try_checked()
                     .expect("NewState should have valid CheckedState Balances");
@@ -1864,14 +1860,12 @@ mod tests {
                 last_approved_response_leader
                     .heartbeats
                     .expect("Leader response should have heartbeats")
-                    .clone()
                     .into_iter()
                     .map(|message| message.msg)
                     .collect::<Vec<_>>(),
                 last_approved_response_follower
                     .heartbeats
                     .expect("Follower response should have heartbeats")
-                    .clone()
                     .into_iter()
                     .map(|message| message.msg)
                     .collect::<Vec<_>>(),
@@ -1927,14 +1921,12 @@ mod tests {
 
                 let new_state_leader = msg_new_state_leader
                     .msg
-                    .clone()
                     .into_inner()
                     .try_checked()
                     .expect("NewState should have valid CheckedState Balances");
 
                 let new_state_follower = msg_new_state_follower
                     .msg
-                    .clone()
                     .into_inner()
                     .try_checked()
                     .expect("NewState should have valid CheckedState Balances");
@@ -2016,7 +2008,7 @@ mod tests {
                 // the Leader of this channel is FOLLOWER!
                 &follower_sentry,
                 token_chain_1337.clone().with(CAMPAIGN_2.id),
-                &channel_leader_events,
+                channel_leader_events,
             )
             .await
             .expect("Posted events");
@@ -2662,7 +2654,7 @@ mod tests {
                 .expect("EthereumAdapter::init"),
         );
 
-        run_sentry_app(adapter.clone(), &validator)
+        run_sentry_app(adapter.clone(), validator)
             .await
             .expect("To run Sentry API server");
 

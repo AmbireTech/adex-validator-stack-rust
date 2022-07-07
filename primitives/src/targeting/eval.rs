@@ -1236,7 +1236,7 @@ fn math_operator(lhs: Number, rhs: Number, ops: MathOperator) -> Result<Number, 
 }
 
 #[cfg(feature = "postgres")]
-pub mod postgres {
+mod postgres {
     use super::*;
     use bytes::BytesMut;
     use std::error::Error;

@@ -204,7 +204,7 @@ pub fn parse_bytes<T: AsRef<[u8]>>(from: T, prefix: Prefix) -> Result<[u8; 20], 
 }
 
 #[cfg(feature = "postgres")]
-pub mod postgres {
+mod postgres {
     use super::Address;
     use crate::ToETHChecksum;
     use bytes::BytesMut;

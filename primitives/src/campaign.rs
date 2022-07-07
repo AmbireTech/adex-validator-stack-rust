@@ -490,15 +490,3 @@ mod postgres {
         to_sql_checked!();
     }
 }
-
-#[cfg(test)]
-mod test {
-    use crate::test_util::DUMMY_CAMPAIGN;
-
-    #[test]
-    fn test_campaign_de_serialization() {
-        let campaign = DUMMY_CAMPAIGN.clone();
-
-        dbg!(serde_json::to_string_pretty(&campaign));
-    }
-}
