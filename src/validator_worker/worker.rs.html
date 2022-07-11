@@ -104,7 +104,7 @@
 <span class="kw">use</span> <span class="ident">adapter</span>::{<span class="ident">prelude</span>::<span class="kw-2">*</span>, <span class="ident">Adapter</span>};
 <span class="kw">use</span> <span class="ident">primitives::Config</span>;
 <span class="kw">use</span> <span class="ident">slog</span>::{<span class="ident">error</span>, <span class="ident">info</span>, <span class="ident">Logger</span>};
-<span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">error::Error</span>, <span class="ident">time::Duration</span>};
+<span class="kw">use</span> <span class="ident">std::error::Error</span>;
 
 <span class="kw">use</span> <span class="ident">futures</span>::{
     <span class="ident">future</span>::{<span class="ident">join</span>, <span class="ident">join_all</span>},
@@ -151,7 +151,7 @@
 
     <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">infinite</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="kw">loop</span> {
-            <span class="kw">let</span> <span class="ident">wait_time_future</span> <span class="op">=</span> <span class="ident">sleep</span>(<span class="ident">Duration::from_millis</span>(<span class="self">self</span>.<span class="ident">config</span>.<span class="ident">wait_time</span> <span class="kw">as</span> <span class="ident">u64</span>));
+            <span class="kw">let</span> <span class="ident">wait_time_future</span> <span class="op">=</span> <span class="ident">sleep</span>(<span class="self">self</span>.<span class="ident">config</span>.<span class="ident">wait_time</span>);
 
             <span class="kw">let</span> <span class="ident">_result</span> <span class="op">=</span> <span class="ident">join</span>(<span class="self">self</span>.<span class="ident">all_channels_tick</span>(), <span class="ident">wait_time_future</span>).<span class="kw">await</span>;
         }
@@ -197,5 +197,5 @@
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="validator_worker" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (7665c3543 2022-07-06)" ></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="validator_worker" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (c396bb3b8 2022-07-10)" ></div>
 </body></html>

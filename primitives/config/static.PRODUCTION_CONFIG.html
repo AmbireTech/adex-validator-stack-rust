@@ -26,34 +26,72 @@ fetch_timeout = 10000
 all_campaigns_timeout = 10000
 channel_tick_timeout = 10000
 
-ip_rate_limit = { type = &#39;ip&#39;, timeframe = 1200000 }
-sid_rate_limit = { type = &#39;sid&#39;, timeframe = 0 }
+ip_rate_limit = { type = &#39;ip&#39;, timeframe = 7200000 }
 
 creators_whitelist = []
 validators_whitelist = []
 admins = [&#39;0x5d6A3F1AD7b124ecDFDf4841D9bB246eD5fBF04c&#39;]
 
-[[token_address_whitelist]]
-address = &#39;0x6b175474e89094c44da98b954eedeac495271d0f&#39;
-min_campaign_budget = &#39;100000000&#39;
-min_validator_fee = &#39;100000000&#39;
-precision = 18
+[platform]
+url = &quot;https://platform.adex.network&quot;
+keep_alive_interval = 1200000
 
-[[token_address_whitelist]]
-address = &#39;0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359&#39;
-min_campaign_budget = &#39;100000000&#39;
-min_validator_fee = &#39;100000000&#39;
-precision = 18
+[limits.units_for_slot]
+max_campaigns_earning_from = 25
 
-[[token_address_whitelist]]
-address = &#39;0xdac17f958d2ee523a2206206994597c13d831ec7&#39;
-min_campaign_budget = &#39;1000000&#39;
-min_validator_fee = &#39;1000&#39;
-precision = 6
+global_min_impression_price = &#39;1000000&#39;
 
-[[token_address_whitelist]]
-address = &#39;0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48&#39;
-min_campaign_budget = &#39;100000000&#39;
-min_validator_fee = &#39;1000&#39;
-precision = 6</code></pre></div></div></details></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (7665c3543 2022-07-06)" ></div>
+[chain.&quot;Ethereum Mainnet&quot;]
+chain_id = 1
+rpc = &#39;https://mainnet.infura.io/v3/&#39; # todo
+outpace = &#39;0x0000000000000000000000000000000000000000&#39; # todo
+
+    [chain.&quot;Ethereum Mainnet&quot;.token.&quot;DAI&quot;]
+    address = &#39;0x6b175474e89094c44da98b954eedeac495271d0f&#39; # checked
+    precision = 18
+    min_campaign_budget = &#39;1000000000000000000&#39; # todo
+    min_validator_fee = &#39;1000000000000&#39; # todo
+
+    [chain.&quot;Ethereum Mainnet&quot;.token.&quot;SAI&quot;]
+    address = &#39;0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359&#39; # checked
+    precision = 18
+    min_campaign_budget = &#39;100000000&#39; # todo
+    min_validator_fee = &#39;100000000&#39; # todo
+
+    [chain.&quot;Ethereum Mainnet&quot;.token.&quot;USDT&quot;]
+    address = &#39;0xdac17f958d2ee523a2206206994597c13d831ec7&#39; # checked
+    precision = 6
+    min_campaign_budget = &#39;1000000&#39; # todo
+    min_validator_fee = &#39;1&#39; # todo
+
+    [chain.&quot;Ethereum Mainnet&quot;.token.&quot;USDC&quot;]
+    address = &#39;0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48&#39; # checked
+    precision = 6
+    min_campaign_budget = &#39;1000000&#39; # todo
+    min_validator_fee = &#39;1000&#39; # todo
+
+
+[chain.&quot;Polygon Mainnet&quot;]
+chain_id = 137
+rpc = &#39;https://rpc-mainnet.maticvigil.com/&#39; # todo
+outpace = &#39;0x0000000000000000000000000000000000000000&#39; # todo
+
+    [chain.&quot;Polygon Mainnet&quot;.token.&quot;DAI&quot;]
+    address = &#39;0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063&#39; # checked
+    precision = 18
+    min_campaign_budget = &#39;1000000000000000000&#39; # todo
+    min_validator_fee = &#39;1000000000000&#39; # todo
+
+    [chain.&quot;Polygon Mainnet&quot;.token.&quot;USDT&quot;]
+    address = &#39;0xc2132d05d31c914a87c6611c10748aeb04b58e8f&#39; # checked
+    precision = 6
+    min_campaign_budget = &#39;1000000&#39; # todo
+    min_validator_fee = &#39;1&#39; # todo
+
+    [chain.&quot;Ethereum Mainnet&quot;.token.&quot;USDC&quot;]
+    address = &#39;0x2791bca1f2de4661ed88a30c99a7a9449aa84174&#39; # checked
+    precision = 6
+    min_campaign_budget = &#39;1000000&#39; # todo
+    min_validator_fee = &#39;1000&#39; # todo
+</code></pre></div></div></details></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (c396bb3b8 2022-07-10)" ></div>
 </body></html>

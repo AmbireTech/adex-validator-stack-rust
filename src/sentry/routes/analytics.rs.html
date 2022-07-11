@@ -97,6 +97,11 @@
 <span id="91">91</span>
 <span id="92">92</span>
 <span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
 </pre><pre class="rust"><code><span class="doccomment">//! `/v5/analytics` routes</span>
 <span class="doccomment">//!</span>
 
@@ -114,8 +119,15 @@
     <span class="ident">AnalyticsQuery</span>, <span class="ident">AuthenticateAs</span>,
 };
 
-<span class="doccomment">/// `GET /v5/analytics` request</span>
+<span class="doccomment">/// GET `/v5/analytics` routes</span>
 <span class="doccomment">/// with query parameters: [`primitives::analytics::AnalyticsQuery`].</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Analytics routes:</span>
+<span class="doccomment">/// - GET `/v5/analytics`</span>
+<span class="doccomment">/// - GET `/v5/analytics/for-publisher`</span>
+<span class="doccomment">/// - GET `/v5/analytics/for-advertiser`</span>
+<span class="doccomment">/// - GET `/v5/analytics/for-admin`</span>
+<span class="doccomment">///</span>
 <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">analytics</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Locked</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span>(
     <span class="ident">req</span>: <span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>,
     <span class="ident">app</span>: <span class="kw-2">&amp;</span><span class="ident">Application</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
@@ -163,10 +175,8 @@
         )));
     }
 
-    <span class="kw">let</span> <span class="ident">analytics_maxtime</span> <span class="op">=</span> <span class="ident">std::time::Duration::from_millis</span>(<span class="ident">app</span>.<span class="ident">config</span>.<span class="ident">analytics_maxtime</span>.<span class="ident">into</span>());
-
     <span class="kw">let</span> <span class="ident">analytics</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">tokio::time::timeout</span>(
-        <span class="ident">analytics_maxtime</span>,
+        <span class="ident">app</span>.<span class="ident">config</span>.<span class="ident">analytics_maxtime</span>,
         <span class="ident">get_analytics</span>(
             <span class="kw-2">&amp;</span><span class="ident">app</span>.<span class="ident">pool</span>,
             <span class="ident">query</span>.<span class="ident">clone</span>(),
@@ -191,5 +201,5 @@
     <span class="prelude-val">Ok</span>(<span class="ident">success_response</span>(<span class="ident">serde_json::to_string</span>(<span class="kw-2">&amp;</span><span class="ident">analytics</span>)<span class="question-mark">?</span>))
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (7665c3543 2022-07-06)" ></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (c396bb3b8 2022-07-10)" ></div>
 </body></html>

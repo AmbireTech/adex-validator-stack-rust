@@ -1761,7 +1761,6 @@
 <span id="1755">1755</span>
 <span id="1756">1756</span>
 <span id="1757">1757</span>
-<span id="1758">1758</span>
 </pre><pre class="rust"><code><span class="doccomment">//! `/v5/campaign` routes</span>
 <span class="kw">use</span> <span class="kw">crate</span>::{
     <span class="ident">db</span>::{
@@ -2447,7 +2446,6 @@
         .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="kw">match</span> <span class="ident">e</span> {
             <span class="ident">access::Error::ForbiddenReferrer</span> =&gt; <span class="ident">ResponseError::Forbidden</span>(<span class="ident">e</span>.<span class="ident">to_string</span>()),
             <span class="ident">access::Error::RulesError</span>(<span class="ident">error</span>) =&gt; <span class="ident">ResponseError::TooManyRequests</span>(<span class="ident">error</span>),
-            <span class="ident">access::Error::UnAuthenticated</span> =&gt; <span class="ident">ResponseError::Unauthorized</span>,
             <span class="kw">_</span> =&gt; <span class="ident">ResponseError::BadRequest</span>(<span class="ident">e</span>.<span class="ident">to_string</span>()),
         })<span class="question-mark">?</span>;
 
@@ -3521,5 +3519,5 @@
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (7665c3543 2022-07-06)" ></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (c396bb3b8 2022-07-10)" ></div>
 </body></html>
