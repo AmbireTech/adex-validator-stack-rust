@@ -64,7 +64,7 @@ impl<C: Locked + 'static> Middleware<C> for IsAdmin {
             .expect("request should have session")
             .to_owned();
 
-        if !application.config.admins.contains(&auth.uid.to_string()) {
+        if !application.config.admins.contains(auth.uid.as_address()) {
             return Err(ResponseError::Unauthorized);
         }
         Ok(request)

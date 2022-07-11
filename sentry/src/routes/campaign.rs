@@ -683,7 +683,6 @@ pub mod insert_events {
         .map_err(|e| match e {
             access::Error::ForbiddenReferrer => ResponseError::Forbidden(e.to_string()),
             access::Error::RulesError(error) => ResponseError::TooManyRequests(error),
-            access::Error::UnAuthenticated => ResponseError::Unauthorized,
             _ => ResponseError::BadRequest(e.to_string()),
         })?;
 

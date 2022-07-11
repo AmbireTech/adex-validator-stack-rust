@@ -15,8 +15,15 @@ use primitives::analytics::{
     AnalyticsQuery, AuthenticateAs,
 };
 
-/// `GET /v5/analytics` request
+/// GET `/v5/analytics` routes
 /// with query parameters: [`primitives::analytics::AnalyticsQuery`].
+///
+/// Analytics routes:
+/// - GET `/v5/analytics`
+/// - GET `/v5/analytics/for-publisher`
+/// - GET `/v5/analytics/for-advertiser`
+/// - GET `/v5/analytics/for-admin`
+///
 pub async fn analytics<C: Locked + 'static>(
     req: Request<Body>,
     app: &Application<C>,
@@ -64,10 +71,8 @@ pub async fn analytics<C: Locked + 'static>(
         )));
     }
 
-    let analytics_maxtime = std::time::Duration::from_millis(app.config.analytics_maxtime.into());
-
     let analytics = match tokio::time::timeout(
-        analytics_maxtime,
+        app.config.analytics_maxtime,
         get_analytics(
             &app.pool,
             query.clone(),
