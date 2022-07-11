@@ -48,42 +48,123 @@ impl Default for Environment {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-// TODO: use `milliseconds_to_std_duration` for all u32 values with "In milliseconds" in docs.
 pub struct Config {
-    /// Maximum number of channels to return per request
+    /// The maximum number of [`Channel`](crate::Channel)s that the worker
+    /// can process for one tick.
     pub max_channels: u32,
+    /// The maximum number of [`Channel`](crate::Channel)s per page
+    /// returned by Sentry's GET `/v5/channel/list` route.
+    ///
+    /// Also see: [`ChannelListResponse`](crate::sentry::channel_list::ChannelListResponse)
     pub channels_find_limit: u32,
+    /// The maximum number of [`Campaign`](crate::Campaign)s per page
+    /// returned by Sentry's GET `/v5/campaign/list` route.
+    ///
+    /// Also see: [`CampaignListResponse`](crate::sentry::campaign_list::CampaignListResponse)
     pub campaigns_find_limit: u32,
+    /// The maximum number of [`Spender`](crate::spender::Spender)s per page
+    /// returned by Sentry's GET `/v5/channel/0xXXX.../spender/all` route.
+    ///
+    /// Also see: [`AllSpendersResponse`](crate::sentry::AllSpendersResponse)
     pub spendable_find_limit: u32,
-    pub wait_time: u32,
+    /// The Validator Worker tick time.
+    ///
+    /// The [`Channel`](crate::Channel)s' tick and the wait time should both
+    /// finish before running a new tick in the Validator Worker.
+    ///
+    /// In milliseconds
+    #[serde(deserialize_with = "milliseconds_to_std_duration")]
+    pub wait_time: Duration,
+    /// The maximum allowed limit of [`ValidatorMessage`](crate::sentry::ValidatorMessage)s per page
+    /// returned by Sentry's GET `/v5/channel/0xXXX.../validator-messages` route.
+    ///
+    /// Request query also has a `limit` parameter, which can be used to return
+    /// <= `msgs_find_limit` messages in the request.
+    ///
+    /// Also see: [`ValidatorMessagesListResponse`](crate::sentry::ValidatorMessagesListResponse),
+    /// [`ValidatorMessagesListQuery`](crate::sentry::ValidatorMessagesListQuery)
     pub msgs_find_limit: u32,
-    /// The maximum analytic results you can receive per request.
+    /// The maximum allowed limit of [`FetchedAnalytics`](crate::sentry::FetchedAnalytics)s per page
+    /// returned by Sentry's GET `/v5/analytics` routes:
+    ///
+    /// - GET `/v5/analytics`
+    /// - GET `/v5/analytics/for-publisher`
+    /// - GET `/v5/analytics/for-advertiser`
+    /// - GET `/v5/analytics/for-admin`
+    ///
+    /// Request query also has a `limit` parameter, which can be used to return
+    /// <= `analytics_find_limit` messages in the request.
+    ///
+    /// Also see: [`AnalyticsQuery`](crate::analytics::AnalyticsQuery)
     pub analytics_find_limit: u32,
-    /// A timeout to be used when collecting the Analytics for a request.
+    /// A timeout to be used when collecting the Analytics for a requests:
+    /// - GET `/v5/analytics`
+    /// - GET `/v5/analytics/for-publisher`
+    /// - GET `/v5/analytics/for-advertiser`
+    /// - GET `/v5/analytics/for-admin`
+    ///
     /// In milliseconds
-    pub analytics_maxtime: u32,
-    /// The amount of time between heartbeats.
+    #[serde(deserialize_with = "milliseconds_to_std_duration")]
+    pub analytics_maxtime: Duration,
+    /// The amount of time that should have passed before sending a new heartbeat.
+    ///
     /// In milliseconds
-    pub heartbeat_time: u32,
+    #[serde(deserialize_with = "milliseconds_to_std_duration")]
+    pub heartbeat_time: Duration,
+    /// The pro miles below which the [`ApproveState`](crate::validator::ApproveState)
+    /// becomes **unhealthy** in the [`Channel`](crate::Channel)'s Follower.
+    ///
+    /// Also see: [`ApproveState.is_healthy`](crate::validator::ApproveState::is_healthy)
+    ///
+    /// In pro milles (<= 1000)
     pub health_threshold_promilles: u32,
+    /// The pro milles below which the [`ApproveState`](crate::validator::ApproveState)
+    /// will not be triggered and instead a [`RejectState`](crate::validator::RejectState)
+    /// will be propagated by the [`Channel`](crate::Channel)'s Follower.
+    ///
+    /// In pro milles (<= 1000)
     pub health_unsignable_promilles: u32,
-    /// Sets the timeout for propagating a Validator message to a validator
-    /// In Milliseconds
-    pub propagation_timeout: u32,
-    /// in milliseconds
-    /// Set's the Client timeout for `SentryApi`
+    /// Sets the timeout for propagating a Validator message ([`MessageTypes`](crate::validator::MessageTypes))
+    /// to a validator.
+    ///
+    /// In milliseconds
+    #[serde(deserialize_with = "milliseconds_to_std_duration")]
+    pub propagation_timeout: Duration,
+    /// The Client timeout for `SentryApi`.
+    ///
     /// This includes all requests made to sentry except propagating messages.
-    /// When propagating messages we make requests to foreign Sentry instances as well.
-    pub fetch_timeout: u32,
-    /// In Milliseconds
-    pub all_campaigns_timeout: u32,
-    /// In Milliseconds
-    pub channel_tick_timeout: u32,
+    /// When propagating messages we make requests to foreign Sentry
+    /// instances and we use a separate timeout -
+    /// [`Config.propagation_timeout`](Config::propagation_timeout).
+    ///
+    /// In milliseconds
+    #[serde(deserialize_with = "milliseconds_to_std_duration")]
+    pub fetch_timeout: Duration,
+    /// The Client timeout for `SentryApi` when collecting all channels
+    /// and Validators using the `/campaign/list` route.
+    ///
+    /// In milliseconds
+    #[serde(deserialize_with = "milliseconds_to_std_duration")]
+    pub all_campaigns_timeout: Duration,
+    /// The timeout for a single tick of a [`Channel`](crate::Channel) in
+    /// the Validator Worker.
+    /// This timeout is applied to both the leader and follower ticks.
+    ///
+    /// In milliseconds
+    #[serde(deserialize_with = "milliseconds_to_std_duration")]
+    pub channel_tick_timeout: Duration,
+    /// The default IP rate limit that will be imposed if
+    /// [`Campaign.event_submission`](crate::Campaign::event_submission) is [`None`].
     pub ip_rate_limit: RateLimit,
-    pub sid_rate_limit: RateLimit,
+    /// An optional whitelisted addresses for [`Campaign.creator`](crate::Campaign::creator)s.
+    ///
+    /// If empty, any address will be allowed to create a [`Campaign`](crate::Campaign).
     pub creators_whitelist: Vec<Address>,
+    /// An optional whitelisted Validator addresses for [`Campaign.validators`](crate::Campaign::validators).
+    ///
+    /// If empty, any address will be allowed to be a validator in a [`Campaign`](crate::Campaign).
     pub validators_whitelist: Vec<ValidatorId>,
-    pub admins: Vec<String>,
+    pub admins: Vec<Address>,
     /// The key of this map is a human-readable text of the Chain name
     /// for readability in the configuration file.
     ///
@@ -102,7 +183,7 @@ pub struct Config {
 impl Config {
     /// Utility method that will deserialize a Toml file content into a [`Config`].
     ///
-    /// Instead of relying on the `toml` crate directly, use this method instead.
+    /// Rather than relying on the `toml` crate directly, use this method instead.
     pub fn try_toml(toml: &str) -> Result<Self, TomlError> {
         toml::from_str(toml)
     }

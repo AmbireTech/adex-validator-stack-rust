@@ -1,4 +1,4 @@
-use chrono::{Duration, Utc};
+use chrono::Utc;
 
 use adapter::{prelude::*, util::get_signable_state_root, Error as AdapterError};
 use byteorder::{BigEndian, ByteOrder};
@@ -36,8 +36,11 @@ pub async fn heartbeat<C: Unlocked + 'static>(
     };
 
     let should_send = heartbeat_msg.map_or(true, |heartbeat| {
-        let duration = Utc::now() - heartbeat.timestamp;
-        duration > Duration::milliseconds(iface.config.heartbeat_time.into())
+        let duration = (Utc::now() - heartbeat.timestamp)
+            .to_std()
+            .expect("Should never panic because Now > heartbeat.timestamp");
+
+        duration > iface.config.heartbeat_time
     });
 
     if should_send {

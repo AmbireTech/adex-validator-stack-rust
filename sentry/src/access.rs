@@ -19,8 +19,6 @@ pub enum Error {
     ForbiddenReferrer,
     #[error("{0}")]
     RulesError(String),
-    #[error("unauthenticated")]
-    UnAuthenticated,
 }
 
 // @TODO: Make pub(crate)

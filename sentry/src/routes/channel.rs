@@ -240,7 +240,7 @@ pub async fn get_spender_limits<C: Locked + 'static>(
     Ok(success_response(serde_json::to_string(&res)?))
 }
 
-/// GET `/v5/channel/0xXXX.../spender/all` request
+/// GET `/v5/channel/0xXXX.../spender/all` request.
 ///
 /// Response: [`AllSpendersResponse`]
 pub async fn get_all_spender_limits<C: Locked + 'static>(
@@ -655,7 +655,7 @@ pub mod validator_message {
         Ok((validator_id, message_types.unwrap_or_default()))
     }
 
-    /// `GET /v5/channel/0xXXX.../validator-messages`
+    /// GET `/v5/channel/0xXXX.../validator-messages`
     /// with query parameters: [`ValidatorMessagesListQuery`].
     pub async fn list_validator_messages<C: Locked + 'static>(
         req: Request<Body>,

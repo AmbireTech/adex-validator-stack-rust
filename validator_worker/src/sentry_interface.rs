@@ -107,7 +107,7 @@ impl<C: Unlocked + 'static> SentryApi<C, ()> {
         sentry_url: ApiUrl,
     ) -> Result<SentryApi<C, ()>, Error> {
         let client = Client::builder()
-            .timeout(Duration::from_millis(config.fetch_timeout.into()))
+            .timeout(config.fetch_timeout)
             .build()
             .map_err(Error::BuildingClient)?;
 
@@ -341,9 +341,8 @@ impl<C: Unlocked + 'static, P> SentryApi<C, P> {
     pub async fn collect_channels(
         &self,
     ) -> Result<(HashSet<ChainOf<Channel>>, ChainsValidators), Error> {
-        let all_campaigns_timeout = Duration::from_millis(self.config.all_campaigns_timeout as u64);
         let client = reqwest::Client::builder()
-            .timeout(all_campaigns_timeout)
+            .timeout(self.config.all_campaigns_timeout)
             .build()?;
 
         let campaigns =
@@ -467,7 +466,7 @@ impl<C: Unlocked + 'static> SentryApi<C> {
 
 async fn propagate_to<C: Unlocked>(
     client: &Client,
-    timeout: u32,
+    timeout: Duration,
     channel_id: ChannelId,
     (validator_id, validator): (ValidatorId, &Validator),
     messages: &[MessageTypes],
@@ -483,7 +482,7 @@ async fn propagate_to<C: Unlocked>(
 
     let _response: SuccessResponse = client
         .request(Method::POST, endpoint)
-        .timeout(Duration::from_millis(timeout.into()))
+        .timeout(timeout)
         .bearer_auth(&validator.token)
         .json(&request_body)
         .send()

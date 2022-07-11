@@ -31,6 +31,10 @@ impl ValidatorId {
         self.0
     }
 
+    pub fn as_address(&self) -> &Address {
+        &self.0
+    }
+
     pub fn inner(&self) -> &[u8; 20] {
         self.0.as_bytes()
     }
