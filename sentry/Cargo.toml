@@ -9,6 +9,16 @@ authors = [
 ]
 edition = "2021"
 
+default-run = "sentry"
+
+[[bin]]
+name = "seed"
+test = false # Is tested by default.
+doctest = false # Documentation examples are tested by default.
+bench = false # Is benchmarked by default.
+doc = false # Is documented by default.
+required-features = ["test-util"]
+
 [features]
 
 test-util = ["primitives/test-util", "adapter/test-util", "dashmap"]
@@ -18,8 +28,8 @@ test-util = ["primitives/test-util", "adapter/test-util", "dashmap"]
 futures = "0.3"
 async-trait = "0.1"
 # Primitives
-primitives = { path = "../primitives", features = ["postgres", "test-util"] }
-adapter = { version = "0.2", path = "../adapter", features = ["test-util"] }
+primitives = { path = "../primitives", features = ["postgres"] }
+adapter = { version = "0.2", path = "../adapter" }
 chrono = { version = "0.4", features = ["serde"] }
 # used for redis test pool
 dashmap = { version = "5", optional = true }
@@ -64,6 +74,9 @@ reqwest = { version = "0.11", features = ["json", "cookies"] }
 
 [dev-dependencies]
 pretty_assertions = "1"
+
+primitives = { path = "../primitives", features = ["postgres", "test-util"] }
+adapter = { version = "0.2", path = "../adapter", features = ["test-util"] }
 
 [package.metadata.docs.rs]
 all-features = true

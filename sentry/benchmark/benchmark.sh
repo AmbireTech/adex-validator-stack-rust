@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Run the benchmark using 
-# t3 - one thread
+# t3 - three threads
 # c100 - one hundred concurrent connections
 # d30s - 30 seconds
 # R2000 - 2000 requests per second (total, across all connections combined)

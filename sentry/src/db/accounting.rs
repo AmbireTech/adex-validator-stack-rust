@@ -5,7 +5,7 @@ use primitives::{
 };
 use tokio_postgres::{
     types::{FromSql, ToSql},
-    IsolationLevel, Row,
+    Row,
 };
 
 use super::{DbPool, PoolError};
