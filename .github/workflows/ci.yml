@@ -68,7 +68,7 @@ jobs:
         uses: sudo-bot/action-docker-compose@latest
         with:
           # https://docs.docker.com/compose/reference/overview/
-          cli-args: "-f docker-compose.harness.yml up -d --build"
+          cli-args: "-f docker-compose.harness.yml up -d --build adex-postgres adex-redis ganache-1 ganache-1337"
       - uses: actions-rs/toolchain@v1
         with:
           # No need to add `toolchain`, it will use `rust-toolchain` file instead

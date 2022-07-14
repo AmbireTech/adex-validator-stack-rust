@@ -25,3 +25,12 @@ to create them for you.
 in [Migrant.dist.toml](Migrant.dist.toml).
 
 For more options see the [migrant homepage](https://github.com/jaemk/migrant)
+
+#### Benchmarks
+
+Starts the `Sentry` application along side `redis` and `postgres` databases,
+and runs `wrk2` on the POST `/v5/campaign/0xXXXX../events` route for 3 campaigns:
+
+```bash
+cargo make run-benchmark
+```
