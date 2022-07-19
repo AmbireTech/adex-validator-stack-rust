@@ -109,7 +109,7 @@ outpace = '0x0000000000000000000000000000000000000000' # todo
     # 1 * 10^-6 = 0.000_001
     min_validator_fee = '1' # todo
 
-    [chain."Ethereum Mainnet".token."USDC"]
+    [chain."Polygon Mainnet".token."USDC"]
     # https://polygonscan.com/token/0x2791bca1f2de4661ed88a30c99a7a9449aa84174
     address = '0x2791bca1f2de4661ed88a30c99a7a9449aa84174' # checked
     precision = 6
