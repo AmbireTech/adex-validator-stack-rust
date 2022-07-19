@@ -134,7 +134,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // use the environmental variables to setup the Postgres connection
-    let postgres = match postgres_connection(420, POSTGRES_CONFIG.clone()).await {
+    let postgres = match postgres_connection(POSTGRES_CONFIG.clone()).await {
         Ok(pool) => pool,
         Err(build_err) => panic!("Failed to build postgres database pool: {build_err}"),
     };

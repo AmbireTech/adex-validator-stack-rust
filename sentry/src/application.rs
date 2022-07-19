@@ -183,7 +183,9 @@ impl<C: Locked + 'static> Application<C> {
                     }
                 });
 
-                let server = Server::bind(&socket_addr).serve(make_service);
+                let server = Server::bind(&socket_addr)
+                    .serve(make_service)
+                    .with_graceful_shutdown(shutdown_signal(logger.clone()));
 
                 if let Err(e) = server.await {
                     error!(&logger, "server error: {}", e; "main" => "run");
@@ -201,7 +203,10 @@ impl<C: Locked + 'static> Application<C> {
                 });
 
                 // TODO: Find a way to redirect to HTTPS
-                let mut server = Server::builder(listener).serve(make_service);
+                let server = Server::builder(listener)
+                    .serve(make_service)
+                    .with_graceful_shutdown(shutdown_signal(logger.clone()));
+                tokio::pin!(server);
 
                 while let Err(e) = (&mut server).await {
                     // This is usually caused by trying to connect on HTTP instead of HTTPS
@@ -271,6 +276,16 @@ pub struct Auth {
     pub uid: ValidatorId,
     /// The Chain for which this authentication was validated
     pub chain: primitives::Chain,
+}
+
+/// A Ctrl+C signal to gracefully shutdown the server
+async fn shutdown_signal(logger: Logger) {
+    // Wait for the Ctrl+C signal
+    tokio::signal::ctrl_c()
+        .await
+        .expect("failed to install CTRL+C signal handler");
+
+    info!(&logger, "Received Ctrl+C signal. Shutting down..")
 }
 
 #[cfg(test)]

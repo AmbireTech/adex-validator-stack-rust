@@ -309,3 +309,16 @@ pub fn configuration(
         },
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::{GANACHE_CONFIG, PRODUCTION_CONFIG};
+
+    /// Makes sure that both config files are correct and won't be left in a
+    /// broken state.
+    #[test]
+    fn correct_config_files() {
+        let _ganache = GANACHE_CONFIG.clone();
+        let _production = PRODUCTION_CONFIG.clone();
+    }
+}
