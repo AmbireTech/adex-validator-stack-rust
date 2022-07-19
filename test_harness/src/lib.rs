@@ -2800,7 +2800,7 @@ pub mod run {
             config
         };
 
-        let postgres = postgres_connection(42, postgres_config).await?;
+        let postgres = postgres_connection(postgres_config).await?;
         let mut redis = redis_connection(validator.sentry_config.redis_url.clone()).await?;
 
         Manager::flush_db(&mut redis)

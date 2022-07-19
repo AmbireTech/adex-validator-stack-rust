@@ -46,7 +46,7 @@ pub mod sentry;
 pub mod spender;
 pub mod supermarket;
 pub mod targeting;
-#[cfg(feature = "test-util")]
+#[cfg(any(test, feature = "test-util"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "test-util")))]
 pub mod test_util;
 pub mod unified_num;
