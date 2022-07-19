@@ -296,6 +296,21 @@
 <span id="290">290</span>
 <span id="291">291</span>
 <span id="292">292</span>
+<span id="293">293</span>
+<span id="294">294</span>
+<span id="295">295</span>
+<span id="296">296</span>
+<span id="297">297</span>
+<span id="298">298</span>
+<span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
+<span id="303">303</span>
+<span id="304">304</span>
+<span id="305">305</span>
+<span id="306">306</span>
+<span id="307">307</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std</span>::{
     <span class="ident">net</span>::{<span class="ident">IpAddr</span>, <span class="ident">Ipv4Addr</span>, <span class="ident">SocketAddr</span>},
     <span class="ident">path::Path</span>,
@@ -481,7 +496,9 @@
                     }
                 });
 
-                <span class="kw">let</span> <span class="ident">server</span> <span class="op">=</span> <span class="ident">Server::bind</span>(<span class="kw-2">&amp;</span><span class="ident">socket_addr</span>).<span class="ident">serve</span>(<span class="ident">make_service</span>);
+                <span class="kw">let</span> <span class="ident">server</span> <span class="op">=</span> <span class="ident">Server::bind</span>(<span class="kw-2">&amp;</span><span class="ident">socket_addr</span>)
+                    .<span class="ident">serve</span>(<span class="ident">make_service</span>)
+                    .<span class="ident">with_graceful_shutdown</span>(<span class="ident">shutdown_signal</span>(<span class="ident">logger</span>.<span class="ident">clone</span>()));
 
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">server</span>.<span class="kw">await</span> {
                     <span class="macro">error!</span>(<span class="kw-2">&amp;</span><span class="ident">logger</span>, <span class="string">&quot;server error: {}&quot;</span>, <span class="ident">e</span>; <span class="string">&quot;main&quot;</span> =&gt; <span class="string">&quot;run&quot;</span>);
@@ -499,7 +516,10 @@
                 });
 
                 <span class="comment">// TODO: Find a way to redirect to HTTPS</span>
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">server</span> <span class="op">=</span> <span class="ident">Server::builder</span>(<span class="ident">listener</span>).<span class="ident">serve</span>(<span class="ident">make_service</span>);
+                <span class="kw">let</span> <span class="ident">server</span> <span class="op">=</span> <span class="ident">Server::builder</span>(<span class="ident">listener</span>)
+                    .<span class="ident">serve</span>(<span class="ident">make_service</span>)
+                    .<span class="ident">with_graceful_shutdown</span>(<span class="ident">shutdown_signal</span>(<span class="ident">logger</span>.<span class="ident">clone</span>()));
+                <span class="macro">tokio::pin!</span>(<span class="ident">server</span>);
 
                 <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> (<span class="kw-2">&amp;mut</span> <span class="ident">server</span>).<span class="kw">await</span> {
                     <span class="comment">// This is usually caused by trying to connect on HTTP instead of HTTPS</span>
@@ -569,6 +589,16 @@
     <span class="kw">pub</span> <span class="ident">uid</span>: <span class="ident">ValidatorId</span>,
     <span class="doccomment">/// The Chain for which this authentication was validated</span>
     <span class="kw">pub</span> <span class="ident">chain</span>: <span class="ident">primitives::Chain</span>,
+}
+
+<span class="doccomment">/// A Ctrl+C signal to gracefully shutdown the server</span>
+<span class="kw">async</span> <span class="kw">fn</span> <span class="ident">shutdown_signal</span>(<span class="ident">logger</span>: <span class="ident">Logger</span>) {
+    <span class="comment">// Wait for the Ctrl+C signal</span>
+    <span class="ident">tokio::signal::ctrl_c</span>()
+        .<span class="kw">await</span>
+        .<span class="ident">expect</span>(<span class="string">&quot;failed to install CTRL+C signal handler&quot;</span>);
+
+    <span class="macro">info!</span>(<span class="kw-2">&amp;</span><span class="ident">logger</span>, <span class="string">&quot;Received Ctrl+C signal. Shutting down..&quot;</span>)
 }
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>

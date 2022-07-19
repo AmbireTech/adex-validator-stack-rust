@@ -5707,7 +5707,7 @@
             <span class="ident">config</span>
         };
 
-        <span class="kw">let</span> <span class="ident">postgres</span> <span class="op">=</span> <span class="ident">postgres_connection</span>(<span class="number">42</span>, <span class="ident">postgres_config</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">postgres</span> <span class="op">=</span> <span class="ident">postgres_connection</span>(<span class="ident">postgres_config</span>).<span class="kw">await</span><span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">redis</span> <span class="op">=</span> <span class="ident">redis_connection</span>(<span class="ident">validator</span>.<span class="ident">sentry_config</span>.<span class="ident">redis_url</span>.<span class="ident">clone</span>()).<span class="kw">await</span><span class="question-mark">?</span>;
 
         <span class="ident">Manager::flush_db</span>(<span class="kw-2">&amp;mut</span> <span class="ident">redis</span>)
