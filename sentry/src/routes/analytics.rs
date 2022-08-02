@@ -15,19 +15,16 @@ use primitives::analytics::{
     AnalyticsQuery, AuthenticateAs,
 };
 
-/// `GET /v5/analytics` request
+/// GET `/v5/analytics` routes
 /// with query parameters: [`primitives::analytics::AnalyticsQuery`].
 ///
-/// # Tutorial:
-#[doc = include_str!("../../docs/create_campaign/tutorial.md")]
+/// Returns `Vec<[FetchedAnalytics](primitives::sentry::FethedAnalytics)>`
+/// Analytics routes:
+/// - GET `/v5/analytics`
+/// - GET `/v5/analytics/for-publisher`
+/// - GET `/v5/analytics/for-advertiser`
+/// - GET `/v5/analytics/for-admin`
 ///
-/// # Examples:
-/// ```
-#[doc = include_str!("../../docs/create_campaign/examples.rs")]
-/// ```
-///
-/// # Glossary:
-#[doc = include_str!("../../docs/create_campaign/glossary.md")]
 pub async fn analytics<C: Locked + 'static>(
     req: Request<Body>,
     app: &Application<C>,

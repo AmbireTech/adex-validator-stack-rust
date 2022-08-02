@@ -144,18 +144,9 @@ pub async fn fetch_campaign_ids_for_channel(
 
 /// POST `/v5/campaign`
 ///
-/// Creates a new `Campaign` making sure its `Channel` exists if it's new and updates the `Spendable` entry.
+/// Expected request body: [`CreateCampaign`](`primitives::campaign::campaign_create::CreateCampaign`)
 ///
-/// # Tutorial:
-#[doc = include_str!("../../docs/create_campaign/tutorial.md")]
-///
-/// # Examples:
-/// ```
-#[doc = include_str!("../../docs/create_campaign/examples.rs")]
-/// ```
-///
-/// # Glossary:
-#[doc = include_str!("../../docs/create_campaign/glossary.md")]
+/// Expected response: [Campaign](`primitives::Campaign`)
 pub async fn create_campaign<C>(
     req: Request<Body>,
     app: &Application<C>,
@@ -651,20 +642,9 @@ pub mod insert_events {
 
     /// POST `/v5/campaign/:id/events`
     ///
-    /// The route is used to send events (`IMPRESSION`/`CLICK`) for the provided `Campaign`.
-    /// First we verify that all the rules are met for each event, we then caluclate the payputs and validator fees
-    /// and we record the changes in Postgres/Redis. After that we record the events in the analytics.
+    /// The expected request body is `Vec<[Event](primitives::Event)>`
     ///
-    /// # Tutorial:
-    #[doc = include_str!("../../docs/post_events/tutorial.md")]
-    ///
-    /// # Examples:
-    /// ```
-    #[doc = include_str!("../../docs/post_events/examples.rs")]
-    /// ```
-    ///
-    /// # Glossary:
-    #[doc = include_str!("../../docs/post_events/glossary.md")]
+    /// The expected Response is [`SuccessResponse`](primitives::sentry::SuccessResponse)
     pub async fn handle_route<C: Locked + 'static>(
         req: Request<Body>,
         app: &Application<C>,
