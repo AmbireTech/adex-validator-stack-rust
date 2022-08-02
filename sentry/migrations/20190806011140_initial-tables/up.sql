@@ -72,7 +72,7 @@ CREATE TABLE accounting (
     side AccountingSide NOT NULL,
     "address" varchar(42) NOT NULL,
     amount bigint NOT NULL,
-    updated timestamp(2) with time zone DEFAULT NULL NULL,
+    updated timestamp(2) with time zone DEFAULT NULL,
     created timestamp(2) with time zone NOT NULL,
     -- Do not rename the Primary key constraint (`accounting_pkey`)!
     PRIMARY KEY (channel_id, side, "address"),

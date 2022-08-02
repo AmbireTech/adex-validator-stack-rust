@@ -2,6 +2,7 @@ use crate::{
     db::{analytics::update_analytics, DbPool, PoolError},
     Session,
 };
+use futures::future::join_all;
 use primitives::{
     analytics::OperatingSystem,
     sentry::{DateHour, Event, UpdateAnalytics},
@@ -14,7 +15,7 @@ pub async fn record(
     pool: &DbPool,
     campaign_context: &ChainOf<Campaign>,
     session: &Session,
-    events_with_payouts: Vec<(Event, Address, UnifiedNum)>,
+    events_with_payouts: &[(Event, Address, UnifiedNum)],
 ) -> Result<(), PoolError> {
     let os_name = session
         .os
@@ -65,7 +66,7 @@ pub async fn record(
         };
 
         batch_update
-            .entry(event)
+            .entry(event.clone())
             .and_modify(|analytics| {
                 analytics.amount_to_add += &payout_amount;
                 analytics.count_to_add += 1;
@@ -83,14 +84,24 @@ pub async fn record(
                 os_name: os_name.clone(),
                 chain_id: campaign_context.chain.chain_id,
                 event_type,
-                amount_to_add: payout_amount,
+                amount_to_add: *payout_amount,
                 count_to_add: 1,
             });
     }
 
-    for (_event, update) in batch_update.into_iter() {
-        update_analytics(pool, update).await?;
-    }
+    let batch_futures = join_all(
+        batch_update
+            .into_iter()
+            .map(|(_event, update)| update_analytics(pool, update)),
+    );
+
+    // execute the batched futures, collect the result afterwards,
+    // in order execute all futures first and then return an error if occurred
+    batch_futures
+        .await
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()?;
+
     Ok(())
 }
 
@@ -192,7 +203,7 @@ mod test {
         let channel_context = channel_chain.with_channel(dummy_channel);
         let campaign_context = channel_context.clone().with(campaign);
 
-        record(&app.pool, &campaign_context, &session, input_events.clone())
+        record(&app.pool, &campaign_context, &session, &input_events)
             .await
             .expect("should record");
 
@@ -256,7 +267,7 @@ mod test {
             .expect("Channel token should be whitelisted in config!");
         let channel_context = channel_chain.with_channel(dummy_channel);
         let campaign_context = channel_context.clone().with(campaign);
-        record(&app.pool, &campaign_context, &session, input_events.clone())
+        record(&app.pool, &campaign_context, &session, &input_events)
             .await
             .expect("should record");
 
