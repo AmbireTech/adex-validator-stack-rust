@@ -1,4 +1,7 @@
+use std::fmt;
+
 use chrono::{DateTime, Utc};
+use futures::future::{join, join_all};
 use primitives::{
     balances::{Balances, CheckedState},
     Address, ChannelId, UnifiedNum,
@@ -11,7 +14,7 @@ use tokio_postgres::{
 use super::{DbPool, PoolError};
 use thiserror::Error;
 
-static UPDATE_ACCOUNTING_STATEMENT: &str = "INSERT INTO accounting(channel_id, side, address, amount, updated, created) VALUES($1, $2, $3, $4, $5, $6) ON CONFLICT ON CONSTRAINT accounting_pkey DO UPDATE SET amount = accounting.amount + $4, updated = $6 WHERE accounting.channel_id = $1 AND accounting.side = $2 AND accounting.address = $3 RETURNING channel_id, side, address, amount, updated, created";
+static UPDATE_ACCOUNTING_STATEMENT: &str = "INSERT INTO accounting(channel_id, side, address, amount, updated, created) VALUES($1, $2, $3, $4, NULL, NOW()) ON CONFLICT ON CONSTRAINT accounting_pkey DO UPDATE SET amount = accounting.amount + EXCLUDED.amount, updated = NOW() WHERE accounting.channel_id = $1 AND accounting.side = $2 AND accounting.address = $3 RETURNING channel_id, side, address, amount, updated, created";
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -57,12 +60,16 @@ pub enum Side {
     Spender,
 }
 
-pub enum SpendError {
-    Pool(PoolError),
-    NoRecordsUpdated,
+impl fmt::Display for Side {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Side::Earner => write!(f, "Earner"),
+            Side::Spender => write!(f, "Spender"),
+        }
+    }
 }
 
-/// ```text
+/// ```sql
 /// SELECT channel_id, side, address, amount, updated, created FROM accounting WHERE channel_id = $1 AND address = $2 AND side = $3
 /// ```
 pub async fn get_accounting(
@@ -110,14 +117,8 @@ pub async fn update_accounting(
     let client = pool.get().await?;
     let statement = client.prepare(UPDATE_ACCOUNTING_STATEMENT).await?;
 
-    let now = Utc::now();
-    let updated: Option<DateTime<Utc>> = None;
-
     let row = client
-        .query_one(
-            &statement,
-            &[&channel_id, &side, &address, &amount, &updated, &now],
-        )
+        .query_one(&statement, &[&channel_id, &side, &address, &amount])
         .await?;
 
     Ok(Accounting::from(&row))
@@ -126,52 +127,63 @@ pub async fn update_accounting(
 /// `delta_balances` defines the Balances that need to be added to the spending or earnings of the `Accounting`s.
 /// It will **not** override the whole `Accounting` value
 /// Returns a tuple of `(Vec<Earners Accounting>, Vec<Spenders Accounting>)`
+///
+/// # Error
+///
+/// It will return an error if any of the updates fails but it would have updated the rest of them.
+///
+/// This way we ensure that even if a single or multiple Accounting updates fail,
+/// we will still pay out the rest of them.
 pub async fn spend_amount(
     pool: DbPool,
     channel_id: ChannelId,
     delta_balances: Balances<CheckedState>,
 ) -> Result<(Vec<Accounting>, Vec<Accounting>), PoolError> {
-    let client = pool.get().await?;
+    let client = &pool.get().await?;
 
-    let statement = client.prepare(UPDATE_ACCOUNTING_STATEMENT).await?;
-
-    let now = Utc::now();
-    let updated: Option<DateTime<Utc>> = None;
-
-    let (mut earners, mut spenders) = (vec![], vec![]);
+    let statement = client.prepare_cached(UPDATE_ACCOUNTING_STATEMENT).await?;
 
     // Earners
-    for (earner, amount) in delta_balances.earners {
-        let row = client
-            .query_one(
-                &statement,
-                &[&channel_id, &Side::Earner, &earner, &amount, &updated, &now],
-            )
-            .await?;
+    let earners_futures = delta_balances.earners.into_iter().map(|(earner, amount)| {
+        let statement = statement.clone();
 
-        earners.push(Accounting::from(&row))
-    }
+        async move {
+            client
+                .query_one(&statement, &[&channel_id, &Side::Earner, &earner, &amount])
+                .await
+                .map(|row| Accounting::from(&row))
+        }
+    });
 
     // Spenders
-    for (spender, amount) in delta_balances.spenders {
-        let row = client
-            .query_one(
-                &statement,
-                &[
-                    &channel_id,
-                    &Side::Spender,
-                    &spender,
-                    &amount,
-                    &updated,
-                    &now,
-                ],
-            )
-            .await?;
+    let spenders_futures = delta_balances
+        .spenders
+        .into_iter()
+        .map(|(spender, amount)| {
+            let statement = statement.clone();
 
-        spenders.push(Accounting::from(&row))
-    }
+            async move {
+                client
+                    .query_one(
+                        &statement,
+                        &[&channel_id, &Side::Spender, &spender, &amount],
+                    )
+                    .await
+                    .map(|row| Accounting::from(&row))
+            }
+        });
 
-    Ok((earners, spenders))
+    let earners = join_all(earners_futures);
+    let spenders = join_all(spenders_futures);
+
+    // collect all the Accounting updates into Vectors
+    let (earners, spenders) = join(earners, spenders).await;
+
+    // Return an error if any of the Accounting updates failed
+    Ok((
+        earners.into_iter().collect::<Result<_, _>>()?,
+        spenders.into_iter().collect::<Result<_, _>>()?,
+    ))
 }
 
 #[cfg(test)]
@@ -531,7 +543,7 @@ mod test {
                 earners_acc
                     .iter()
                     .find(|a| a.address == earner)
-                    .unwrap()
+                    .expect("Should find Accounting")
                     .clone(),
                 false,
             );
@@ -540,7 +552,7 @@ mod test {
                 earners_acc
                     .iter()
                     .find(|a| a.address == other_earner)
-                    .unwrap()
+                    .expect("Should find Accounting")
                     .clone(),
                 false,
             );
@@ -551,7 +563,7 @@ mod test {
                 spenders_acc
                     .iter()
                     .find(|a| a.address == spender)
-                    .unwrap()
+                    .expect("Should find Accounting")
                     .clone(),
                 false,
             );
@@ -560,7 +572,7 @@ mod test {
                 spenders_acc
                     .iter()
                     .find(|a| a.address == other_spender)
-                    .unwrap()
+                    .expect("Should find Accounting")
                     .clone(),
                 false,
             );

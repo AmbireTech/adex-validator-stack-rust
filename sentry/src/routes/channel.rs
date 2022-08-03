@@ -546,6 +546,7 @@ pub async fn channel_payout<C: Locked + 'static>(
         balances.spend(spender, earner, amount)?;
     }
 
+    // will return an error if one of the updates fails
     spend_amount(app.pool.clone(), channel_context.context.id(), balances).await?;
 
     Ok(success_response(serde_json::to_string(&SuccessResponse {

@@ -42,6 +42,7 @@ pub async fn check_access(
         return Err(Error::ForbiddenReferrer);
     }
 
+    // Used when `Campaign::event_submission` is `None`
     let default_rules = [
         Rule {
             uids: Some(vec![campaign.creator.to_string()]),
@@ -84,7 +85,7 @@ pub async fn check_access(
 }
 
 async fn apply_rule(
-    redis: MultiplexedConnection,
+    mut redis: MultiplexedConnection,
     rule: &Rule,
     events: &[Event],
     campaign: &Campaign,
@@ -116,7 +117,7 @@ async fn apply_rule(
 
             if redis::cmd("EXISTS")
                 .arg(&key)
-                .query_async::<_, i8>(&mut redis.clone())
+                .query_async::<_, i8>(&mut redis)
                 .await
                 .map(|exists| exists == 1)
                 .map_err(|error| format!("{}", error))?
@@ -129,7 +130,7 @@ async fn apply_rule(
                 .arg(&key)
                 .arg(seconds as i32)
                 .arg("1")
-                .query_async::<_, ()>(&mut redis.clone())
+                .query_async::<_, ()>(&mut redis)
                 .await
                 .map_err(|error| format!("{}", error))
         }

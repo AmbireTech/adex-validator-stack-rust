@@ -11,7 +11,7 @@ use std::cmp::{max, min};
 
 pub type Result = std::result::Result<Option<(Address, UnifiedNum)>, Error>;
 
-/// If None is returned this means that the targeting rules evaluation has set `show = false`
+/// If `None` is returned this means that the targeting rules evaluation has set `show = false`
 pub fn get_payout(
     logger: &Logger,
     campaign: &Campaign,

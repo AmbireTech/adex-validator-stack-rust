@@ -1,3 +1,5 @@
+-- Multiple campaigns with a single event in the request
+--
 -- This script will submit events for 3 campaigns
 -- The 3 campaigns can be found in `primitives::test_util`
 wrk.method = "POST"
@@ -6,7 +8,6 @@ wrk.body   = "{ \"events\": [ {\"type\": \"IMPRESSION\", \"publisher\": \"0xE882
 wrk.headers["Content-Type"] = "application/json"
 -- uses the DUMMY_AUTH[CREATOR] token
 -- wrk.headers["authorization"] = "Bearer AUTH_awesomeCreator:chain_id:1337"
-
 
 init = function(args)
     local r = {}
