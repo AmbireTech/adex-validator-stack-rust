@@ -1,6 +1,6 @@
 use primitives::{sentry::campaign_create::CreateCampaign, test_util::DUMMY_CAMPAIGN, CampaignId};
-use std::str::FromStr;
 use serde_json::json;
+use std::str::FromStr;
 
 fn main() {
     // CreateCampaign in an HTTP request
@@ -38,16 +38,21 @@ fn main() {
             "activeTo":4073414400000_u64
         });
 
-        let create_campaign_json = serde_json::to_string(&create_campaign_json).expect("should serialize");
-        let deserialized: CreateCampaign = serde_json::from_str(&create_campaign_json).expect("should deserialize");
+        let create_campaign_json =
+            serde_json::to_string(&create_campaign_json).expect("should serialize");
+        let deserialized: CreateCampaign =
+            serde_json::from_str(&create_campaign_json).expect("should deserialize");
 
         assert_eq!(create_campaign, deserialized);
     }
 
     // CreateCampaign with a provided ID
     {
-        let mut create_campaign = CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
-        create_campaign.id = Some(CampaignId::from_str("0x936da01f9abd4d9d80c702af85c822a8").expect("Should be valid id"));
+        let mut create_campaign =
+            CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
+        create_campaign.id = Some(
+            CampaignId::from_str("0x936da01f9abd4d9d80c702af85c822a8").expect("Should be valid id"),
+        );
 
         let create_campaign_json = json!({
             "id":"0x936da01f9abd4d9d80c702af85c822a8",
@@ -80,8 +85,10 @@ fn main() {
             "activeTo":4073414400000_u64
         });
 
-        let create_campaign_json = serde_json::to_string(&create_campaign_json).expect("should serialize");
-        let deserialized: CreateCampaign = serde_json::from_str(&create_campaign_json).expect("should deserialize");
+        let create_campaign_json =
+            serde_json::to_string(&create_campaign_json).expect("should serialize");
+        let deserialized: CreateCampaign =
+            serde_json::from_str(&create_campaign_json).expect("should deserialize");
 
         assert_eq!(create_campaign, deserialized);
     }

@@ -1,6 +1,6 @@
 use primitives::{sentry::campaign_modify::ModifyCampaign, unified_num::FromWhole, UnifiedNum};
-use std::str::FromStr;
 use serde_json::json;
+use std::str::FromStr;
 
 fn main() {
     {
@@ -24,8 +24,10 @@ fn main() {
             "targeting_rules": null,
         });
 
-        let modify_campaign_json = serde_json::to_string(&modify_campaign_json).expect("should serialize");
-        let deserialized: ModifyCampaign = serde_json::from_str(&modify_campaign_json).expect("should deserialize");
+        let modify_campaign_json =
+            serde_json::to_string(&modify_campaign_json).expect("should serialize");
+        let deserialized: ModifyCampaign =
+            serde_json::from_str(&modify_campaign_json).expect("should deserialize");
 
         assert_eq!(modify_campaign, deserialized);
     }
