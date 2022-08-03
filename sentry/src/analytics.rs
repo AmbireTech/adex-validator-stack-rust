@@ -68,7 +68,7 @@ pub async fn record(
         batch_update
             .entry(event.clone())
             .and_modify(|analytics| {
-                analytics.amount_to_add += &payout_amount;
+                analytics.amount_to_add += payout_amount;
                 analytics.count_to_add += 1;
             })
             .or_insert_with(|| UpdateAnalytics {

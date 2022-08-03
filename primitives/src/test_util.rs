@@ -149,14 +149,14 @@ mod logger {
 pub static DUMMY_VALIDATOR_LEADER: Lazy<ValidatorDesc> = Lazy::new(|| ValidatorDesc {
     id: IDS[&LEADER],
     url: "http://localhost:8005".to_string(),
-    fee: UnifiedNum::from_whole(0.02),
+    fee: UnifiedNum::from_whole(0.03),
     fee_addr: None,
 });
 
 pub static DUMMY_VALIDATOR_FOLLOWER: Lazy<ValidatorDesc> = Lazy::new(|| ValidatorDesc {
     id: IDS[&FOLLOWER],
     url: "http://localhost:8006".to_string(),
-    fee: UnifiedNum::from_whole(0.03),
+    fee: UnifiedNum::from_whole(0.02),
     fee_addr: None,
 });
 
