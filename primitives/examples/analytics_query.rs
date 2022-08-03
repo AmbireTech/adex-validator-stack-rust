@@ -48,8 +48,8 @@ fn main() {
             &timeframe=week
             &start=420
             &campaignId=0x936da01f9abd4d9d80c702af85c822a8
-            &adUnit=Qmasg8FrbuSQpjFu3kRnZF9beg8rEBFrqgi1uXDRwCbX5f
-            &adSlot=QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR
+            &adUnit=QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR
+            &adSlot=Qmasg8FrbuSQpjFu3kRnZF9beg8rEBFrqgi1uXDRwCbX5f
             &adSlotType=legacy_300x100
             &avertiser=0xDd589B43793934EF6Ad266067A0d1D4896b0dff0
             &publisher=0xE882ebF439207a70dDcCb39E13CA8506c9F45fD9
@@ -82,14 +82,14 @@ fn main() {
         assert_eq!(
             query.ad_unit,
             Some(
-                IPFS::from_str("Qmasg8FrbuSQpjFu3kRnZF9beg8rEBFrqgi1uXDRwCbX5f")
+                IPFS::from_str("QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR")
                     .expect("should be valid")
             )
         );
         assert_eq!(
             query.ad_slot,
             Some(
-                IPFS::from_str("QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR")
+                IPFS::from_str("Qmasg8FrbuSQpjFu3kRnZF9beg8rEBFrqgi1uXDRwCbX5f")
                     .expect("should be valid")
             )
         );

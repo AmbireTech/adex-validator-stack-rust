@@ -24,12 +24,12 @@ fn main() {
             "validators":[
                 {
                     "id":"0x80690751969B234697e9059e04ed72195c3507fa",
-                    "fee":"2000000",
+                    "fee":"3000000",
                     "url":"http://localhost:8005"
                 },
                 {
                     "id":"0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7",
-                    "fee":"3000000",
+                    "fee":"2000000",
                     "url":"http://localhost:8006"
                 }
             ],
@@ -38,7 +38,7 @@ fn main() {
             "eventSubmission":{"allow":[]},
             "targetingRules":[],
             "created":1612162800000_u64,
-            "active_to":4073414400000_u64
+            "activeTo":4073414400000_u64
         });
 
         let create_campaign_json =
@@ -71,12 +71,12 @@ fn main() {
             "validators":[
                 {
                     "id":"0x80690751969B234697e9059e04ed72195c3507fa",
-                    "fee":"2000000",
+                    "fee":"3000000",
                     "url":"http://localhost:8005"
                 },
                 {
                     "id":"0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7",
-                    "fee":"3000000",
+                    "fee":"2000000",
                     "url":"http://localhost:8006"
                 }
             ],
@@ -85,7 +85,7 @@ fn main() {
             "eventSubmission":{"allow":[]},
             "targetingRules":[],
             "created":1612162800000_u64,
-            "active_to":4073414400000_u64
+            "activeTo":4073414400000_u64
         });
 
         let create_campaign_json =
