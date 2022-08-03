@@ -15,6 +15,7 @@
 //!   - [GET `/v5/channel/:id/last-approved`](#get-v5channelidlast-approved)
 //!   - [POST `/v5/channel/:id/pay`](#post-v5channelidpay-auth-required) (auth required)
 //!   - [GET `/v5/channel/:id/get-leaf`](#get-v5channelidget-leaf)
+//!   - [POST `/v5/channel/dummy-deposit`](#post-v5channeldummy-deposit-auth-required) (auth required) available only with Dummy adapter
 //! - [Campaign](#campaign) routes
 //!     - [GET `/v5/campaign/list`](#get-v5campaignlist)
 //!     - [POST `/v5/campaign`](#post-v5campaign-auth-required) (auth required)
@@ -163,6 +164,18 @@
 //!
 //! `/get-leaf?earner=0x....`
 //! This module includes all routes for `Sentry` and the documentation of each Request/Response.
+//!
+//! #### POST `/v5/channel/dummy-deposit` (auth required)
+//!
+//! Set a deposit for a Channel and depositor (the authenticated address) in the Dummy adapter.
+//!
+//! **NOTE:** This route is available **only** when using the Dummy adapter.
+//!
+//! The route is handled by [`channel::channel_dummy_deposit()`].
+//!
+//! Request body (json): [`ChannelDummyDeposit`](crate::routes::channel::ChannelDummyDeposit)
+//!
+//! Response: [`SuccessResponse`](primitives::sentry::SuccessResponse)
 //!
 //! ## Campaign
 //!

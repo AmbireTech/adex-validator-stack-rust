@@ -6,7 +6,6 @@ use crate::{
 use adapter::prelude::*;
 use primitives::{config::Config, ChainOf, Channel, ChannelId};
 use slog::info;
-use std::time::Duration;
 use tokio::time::timeout;
 
 pub async fn channel_tick<C: Unlocked + 'static>(
@@ -45,11 +44,9 @@ pub async fn channel_tick<C: Unlocked + 'static>(
         return Err(Error::Validation);
     }
 
-    let duration = Duration::from_millis(config.channel_tick_timeout as u64);
-
     match tick {
         primitives::Validator::Leader(_v) => match timeout(
-            duration,
+            config.channel_tick_timeout,
             leader::tick(sentry, &channel_context, accounting.balances),
         )
         .await
@@ -70,7 +67,7 @@ pub async fn channel_tick<C: Unlocked + 'static>(
         primitives::Validator::Follower(_v) => {
             let follower_fut =
                 follower::tick(sentry, &channel_context, all_spenders, accounting.balances);
-            match timeout(duration, follower_fut).await {
+            match timeout(config.channel_tick_timeout, follower_fut).await {
                 Err(timeout_e) => Err(Error::FollowerTick(
                     channel.id(),
                     TickError::TimedOut(timeout_e),

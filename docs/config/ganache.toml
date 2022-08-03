@@ -25,7 +25,6 @@ all_campaigns_timeout = 5000
 channel_tick_timeout = 8000
 
 ip_rate_limit = { type = 'ip', timeframe = 1200000 }
-sid_rate_limit = { type = 'sid', timeframe = 0 }
 
 creators_whitelist = []
 validators_whitelist = []

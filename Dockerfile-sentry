@@ -10,18 +10,21 @@ WORKDIR /usr/src/app
 RUN mkdir -p primitives/src/ adapter/src/ sentry/src/
 
 COPY ./primitives/Cargo.toml ./primitives/Cargo.toml
+# we also need to copy the examples otherwise we will get error for them
+COPY ./primitives/examples ./primitives/examples
 RUN touch ./primitives/src/lib.rs && echo "pub fn main() {println!(\"cargo:rerun-if-changed=\\\"/tmp/build.rs\\\"\");}" >> ./primitives/src/lib.rs
 
 COPY ./adapter/Cargo.toml ./adapter/Cargo.toml
 RUN touch ./adapter/src/lib.rs && echo "pub fn main() {println!(\"cargo:rerun-if-changed=\\\"/tmp/build.rs\\\"\");}" >> ./adapter/src/lib.rs
 
 COPY ./sentry/Cargo.toml ./sentry/Cargo.toml
+COPY ./sentry/src/bin ./sentry/src/bin
 RUN touch ./sentry/src/main.rs && echo "fn main() {println!(\"cargo:rerun-if-changed=\\\"/tmp/build.rs\\\"\");}" >> ./sentry/src/main.rs
 
 COPY ./Cargo.lock ./Cargo.lock
 RUN touch Cargo.toml && echo "[workspace]\n members = [ 'primitives', 'adapter', 'sentry' ]" >> Cargo.toml
 
-RUN cargo build -p sentry --release
+RUN cargo build -p sentry --bin sentry --release
 
 # remove the not needed build artifacts
 RUN rm -f target/release/deps/sentry*
@@ -35,7 +38,7 @@ COPY . .
 # We install the sentry binary with all features in Release mode
 # Include the full backtrace for easier debugging
 
-RUN RUST_BACKTRACE=full cargo install --locked --path sentry --all-features
+RUN RUST_BACKTRACE=full cargo install --locked --path sentry --bin sentry --all-features
 
 WORKDIR /usr/local/bin
 
@@ -65,6 +68,11 @@ ENV KEYSTORE_PWD=
 # Only applicable if you use the `--adapter dummy`
 ENV DUMMY_IDENTITY=
 
+# To setup TLS supply both `PRIVATE_KEYS` & `CERTIFICATES`
+# Otherwise you will get an error
+ENV PRIVATE_KEYS=
+ENV CERTIFICATES=
+
 # If set it will override the configuration file used
 ENV CONFIG=
 
@@ -74,15 +82,15 @@ COPY docs/config/cloudflare_origin.crt /usr/local/share/ca-certificates/
 
 RUN update-ca-certificates
 
-RUN mkdir scripts
-
-COPY ./scripts/sentry-docker ./scripts
+COPY ./scripts/sentry-docker ./scripts/sentry-docker
 
 COPY --from=builder /usr/local/bin/sentry .
 
-ENTRYPOINT ["./scripts/entrypoint.sh"]
+ENTRYPOINT ["./scripts/sentry-docker/entrypoint.sh"]
 
 CMD sentry -a ${ADAPTER:-ethereum} \
             ${KEYSTORE_FILE:+-k $KEYSTORE_FILE} \
             ${DUMMY_IDENTITY:+-i $DUMMY_IDENTITY} \
+            ${PRIVATE_KEYS:+--privateKeys $PRIVATE_KEYS} \
+            ${CERTIFICATES:+--certificates $CERTIFICATES} \
             ${CONFIG}

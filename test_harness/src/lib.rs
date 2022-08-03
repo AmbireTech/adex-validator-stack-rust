@@ -355,8 +355,8 @@ mod tests {
             targeting_rules: Rules::new(),
             created: Utc.ymd(2021, 2, 1).and_hms(7, 0, 0),
             active: Active {
+                from: Some(Utc.ymd(2022, 6, 27).and_hms(0, 0, 0)),
                 to: Utc.ymd(2099, 1, 30).and_hms(0, 0, 0),
-                from: None,
             },
         }
     });
@@ -450,8 +450,8 @@ mod tests {
             targeting_rules: Rules::new(),
             created: Utc.ymd(2021, 2, 1).and_hms(7, 0, 0),
             active: Active {
-                to: Utc.ymd(2099, 1, 30).and_hms(0, 0, 0),
                 from: None,
+                to: Utc.ymd(2099, 1, 30).and_hms(0, 0, 0),
             },
         }
     });
@@ -537,8 +537,8 @@ mod tests {
             targeting_rules: Rules::new(),
             created: Utc.ymd(2021, 2, 1).and_hms(7, 0, 0),
             active: Active {
-                to: Utc.ymd(2099, 1, 30).and_hms(0, 0, 0),
                 from: None,
+                to: Utc.ymd(2099, 1, 30).and_hms(0, 0, 0),
             },
         }
     });
@@ -1152,7 +1152,7 @@ mod tests {
                 &follower_sentry,
                 token_chain_1337.clone().with(CAMPAIGN_2.id),
                 // the Leader of this channel is FOLLOWER!
-                &channel_leader_events,
+                channel_leader_events,
             )
             .await
             .expect("Posted events");
@@ -1653,14 +1653,12 @@ mod tests {
                 last_approved_response_leader
                     .heartbeats
                     .expect("Leader response should have heartbeats")
-                    .clone()
                     .into_iter()
                     .map(|message| message.msg)
                     .collect::<Vec<_>>(),
                 last_approved_response_follower
                     .heartbeats
                     .expect("Follower response should have heartbeats")
-                    .clone()
                     .into_iter()
                     .map(|message| message.msg)
                     .collect::<Vec<_>>(),
@@ -1716,14 +1714,12 @@ mod tests {
 
                 let new_state_leader = msg_new_state_leader
                     .msg
-                    .clone()
                     .into_inner()
                     .try_checked()
                     .expect("NewState should have valid CheckedState Balances");
 
                 let new_state_follower = msg_new_state_follower
                     .msg
-                    .clone()
                     .into_inner()
                     .try_checked()
                     .expect("NewState should have valid CheckedState Balances");
@@ -1864,14 +1860,12 @@ mod tests {
                 last_approved_response_leader
                     .heartbeats
                     .expect("Leader response should have heartbeats")
-                    .clone()
                     .into_iter()
                     .map(|message| message.msg)
                     .collect::<Vec<_>>(),
                 last_approved_response_follower
                     .heartbeats
                     .expect("Follower response should have heartbeats")
-                    .clone()
                     .into_iter()
                     .map(|message| message.msg)
                     .collect::<Vec<_>>(),
@@ -1927,14 +1921,12 @@ mod tests {
 
                 let new_state_leader = msg_new_state_leader
                     .msg
-                    .clone()
                     .into_inner()
                     .try_checked()
                     .expect("NewState should have valid CheckedState Balances");
 
                 let new_state_follower = msg_new_state_follower
                     .msg
-                    .clone()
                     .into_inner()
                     .try_checked()
                     .expect("NewState should have valid CheckedState Balances");
@@ -2016,7 +2008,7 @@ mod tests {
                 // the Leader of this channel is FOLLOWER!
                 &follower_sentry,
                 token_chain_1337.clone().with(CAMPAIGN_2.id),
-                &channel_leader_events,
+                channel_leader_events,
             )
             .await
             .expect("Posted events");
@@ -2662,7 +2654,7 @@ mod tests {
                 .expect("EthereumAdapter::init"),
         );
 
-        run_sentry_app(adapter.clone(), &validator)
+        run_sentry_app(adapter.clone(), validator)
             .await
             .expect("To run Sentry API server");
 
@@ -2773,6 +2765,7 @@ pub mod run {
         ToETHChecksum, ValidatorId,
     };
     use sentry::{
+        application::EnableTls,
         db::{
             postgres_connection, redis_connection, redis_pool::Manager,
             tests_postgres::setup_test_migrations, CampaignRemaining,
@@ -2807,7 +2800,7 @@ pub mod run {
             config
         };
 
-        let postgres = postgres_connection(42, postgres_config).await?;
+        let postgres = postgres_connection(postgres_config).await?;
         let mut redis = redis_connection(validator.sentry_config.redis_url.clone()).await?;
 
         Manager::flush_db(&mut redis)
@@ -2843,7 +2836,7 @@ pub mod run {
             .expect("Should run migrations");
 
         info!(&app.logger, "Spawn sentry Hyper server");
-        tokio::spawn(app.run(socket_addr));
+        tokio::spawn(app.run(EnableTls::NoTls(socket_addr)));
 
         Ok(())
     }

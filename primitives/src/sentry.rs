@@ -290,7 +290,7 @@ pub struct UpdateAnalytics {
     pub count_to_add: i32,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Analytics {
     pub time: DateHour<Utc>,
@@ -308,7 +308,7 @@ pub struct Analytics {
     pub payout_count: u32,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct FetchedAnalytics {
     // time is represented as a timestamp
@@ -547,7 +547,7 @@ impl<'de> Deserialize<'de> for DateHour<Utc> {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Pagination {
     /// The total amount of pages available for this request
@@ -702,7 +702,7 @@ pub mod campaign_list {
     /// ```
     #[doc = include_str!("../examples/campaign_list_query.rs")]
     /// ```
-    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
     pub struct CampaignListQuery {
         /// Default is `u64::default()` = `0`.
         #[serde(default)]
@@ -722,7 +722,7 @@ pub mod campaign_list {
     }
 
     /// The `validator` query parameter for [`CampaignListQuery`].
-    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
     #[serde(rename_all = "camelCase")]
     pub enum ValidatorParam {
         /// Results will include all campaigns that have the provided address as a leader
@@ -795,7 +795,7 @@ pub mod campaign_create {
     use serde::{Deserialize, Serialize};
 
     use crate::{
-        campaign::{prefix_active, Active, PricingBounds, Validators},
+        campaign::{Active, PricingBounds, Validators},
         targeting::Rules,
         AdUnit, Address, Campaign, CampaignId, Channel, EventSubmission, UnifiedNum,
     };
@@ -834,7 +834,7 @@ pub mod campaign_create {
         pub created: DateTime<Utc>,
         /// A millisecond timestamp representing the time you want this campaign to become active (optional)
         /// Used by the AdViewManager & Targeting AIP#31
-        #[serde(flatten, with = "prefix_active")]
+        #[serde(flatten)]
         pub active: Active,
     }
 
@@ -1140,15 +1140,55 @@ mod postgres {
             }
         }
     }
+
+    #[cfg(test)]
+    mod test {
+        use chrono::{TimeZone, Utc};
+
+        use crate::{postgres::POSTGRES_POOL, sentry::DateHour};
+
+        #[tokio::test]
+        pub async fn datehour_from_to_sql() {
+            let client = POSTGRES_POOL.get().await.unwrap();
+            let sql_type = "TIMESTAMPTZ";
+
+            let example_datehour = DateHour::<Utc>::from_ymdh(2021, 1, 1, 1);
+            let expected_datehour = DateHour::try_from(Utc.ymd(2021, 1, 1).and_hms(1, 0, 0))
+                .expect("Should get DateHour");
+            assert_eq!(
+                example_datehour, expected_datehour,
+                "Example and expected datehour must be the same"
+            );
+
+            // from SQL
+            let actual_datehour: DateHour<Utc> = client
+                .query_one(
+                    &*format!("SELECT '{}'::{}", example_datehour.to_datetime(), sql_type),
+                    &[],
+                )
+                .await
+                .unwrap()
+                .get(0);
+
+            assert_eq!(&expected_datehour, &actual_datehour);
+
+            // to SQL
+            let actual_datehour: DateHour<Utc> = client
+                .query_one(&*format!("SELECT $1::{}", sql_type), &[&example_datehour])
+                .await
+                .unwrap()
+                .get(0);
+
+            assert_eq!(&expected_datehour, &actual_datehour);
+        }
+    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        postgres::POSTGRES_POOL,
-        test_util::{DUMMY_IPFS, PUBLISHER},
-    };
+    use crate::test_util::{DUMMY_IPFS, PUBLISHER};
+
     use serde_json::{json, Value};
 
     #[test]
@@ -1214,7 +1254,7 @@ mod test {
         // Serialize & deserialize
         let json_datetime = Value::String("2021-12-01T16:00:00+02:00".into());
         let datehour: DateHour<Utc> =
-            serde_json::from_value(json_datetime.clone()).expect("Should deserialize");
+            serde_json::from_value(json_datetime).expect("Should deserialize");
         assert_eq!(
             DateHour::from_ymdh(2021, 12, 1, 14),
             datehour,
@@ -1253,40 +1293,5 @@ mod test {
             map["UTC+0"] >= map["UTC+2"],
             "UTC+0 value should be equal to UTC+2"
         );
-    }
-
-    #[tokio::test]
-    pub async fn datehour_from_to_sql() {
-        let client = POSTGRES_POOL.get().await.unwrap();
-        let sql_type = "TIMESTAMPTZ";
-
-        let example_datehour = DateHour::<Utc>::from_ymdh(2021, 1, 1, 1);
-        let expected_datehour =
-            DateHour::try_from(Utc.ymd(2021, 1, 1).and_hms(1, 0, 0)).expect("Should get DateHour");
-        assert_eq!(
-            example_datehour, expected_datehour,
-            "Example and expected datehour must be the same"
-        );
-
-        // from SQL
-        let actual_datehour: DateHour<Utc> = client
-            .query_one(
-                &*format!("SELECT '{}'::{}", example_datehour.to_datetime(), sql_type),
-                &[],
-            )
-            .await
-            .unwrap()
-            .get(0);
-
-        assert_eq!(&expected_datehour, &actual_datehour);
-
-        // to SQL
-        let actual_datehour: DateHour<Utc> = client
-            .query_one(&*format!("SELECT $1::{}", sql_type), &[&example_datehour])
-            .await
-            .unwrap()
-            .get(0);
-
-        assert_eq!(&expected_datehour, &actual_datehour);
     }
 }

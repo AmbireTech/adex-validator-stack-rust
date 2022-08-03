@@ -2,7 +2,7 @@ pub mod fee {
 
     use primitives::{Address, DomainError, UnifiedNum, ValidatorDesc};
 
-    /// Pro mile (`1 000`) in [`UnifiedNum`] precision, i.e. `1_000.00_000_000`.
+    /// Pro mile (per thousands, `1000`) in `UnifiedNum` precision, i.e. `1_000.00_000_000`.
     pub const PRO_MILLE: UnifiedNum = UnifiedNum::from_u64(1_000 * UnifiedNum::MULTIPLIER);
 
     /// Calculates the fee for a given payout of the specified validator

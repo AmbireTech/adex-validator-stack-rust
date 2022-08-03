@@ -30,7 +30,7 @@ Two services are needed to run `Sentry`: `Postgres` and `Redis`.
 
 The easiest way to run these services locally is by using the provided `docker-compose` file:
 
-`docker-compose -f ../docker-compose.harness.yml up -d adex-redis adex-postgres`
+`docker-compose -f docker-compose.harness.yml up -d adex-redis adex-postgres`
 
 If you want to run them manually without `docker-compose`:
 
@@ -57,7 +57,13 @@ cargo run -p sentry -- --help
 
 Starting the Sentry API in will always run migrations, this will make sure the database is always up to date with the latest migrations, before starting and exposing the web server.
 
-By default, we use the `development` environment ( [`ENV` environment variable](#environment-variables) ) as it will also seed the database.
+By default, we use the `development` environment ( [`ENV` environment variable](#environment-variables) ) ~~as it will also seed the database~~ (seeding is disabled, see #514).
+
+To enable TLS for the sentry server you need to pass both `--privateKeys` and
+`--certificates` cli options (paths to `.pem` files) otherwise the cli will
+exit with an error.
+
+For full list of available addresses see [primitives/src/test_util.rs#L39-L118](./primitives/src/test_util.rs#L39-L118)
 
 #### Using the `Ethereum` adapter
 
@@ -75,7 +81,7 @@ POSTGRES_DB="sentry_leader" PORT=8005 KEYSTORE_PWD=ganache0 \
 cargo run -p sentry -- \
     --adapter ethereum \
     --keystoreFile ./adapter/tests/resources/0x80690751969B234697e9059e04ed72195c3507fa_keystore.json \
-    ./docs/config/prod.toml
+    ./docs/config/ganache.toml
 ```
 
 ##### Follower (`0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7`)
@@ -87,10 +93,25 @@ IP_ADDR=127.0.0.1 REDIS_URL="redis://127.0.0.1:6379/2" \
 POSTGRES_DB="sentry_follower" PORT=8006 KEYSTORE_PWD=ganache1 cargo run -p sentry -- \
     --adapter ethereum \
     --keystoreFile ./adapter/test/resources/0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7_keystore.json
-    ./docs/config/prod.toml
+    ./docs/config/ganache.toml
 ```
 
 #### Using the `Dummy` adapter
+
+Using the dummy adapter you get access to additional route
+for adding deposits to the dummy adapter. The authenticated address
+is used to set the deposit in the adapter for the given Chain id.
+
+##### `POST /v5/channel/dummy-deposit` (auth required)
+
+Request body (`JSON`):
+
+```json
+{
+    "channel": { "leader": "0x000..", ...},
+    "deposit": { "total": "10000000" }
+}
+```
 
 **Dummy** identities:
 
@@ -100,8 +121,8 @@ POSTGRES_DB="sentry_follower" PORT=8006 KEYSTORE_PWD=ganache1 cargo run -p sentr
 IP_ADDR=127.0.0.1 REDIS_URL="redis://127.0.0.1:6379/1" \
 POSTGRES_DB="sentry_leader" PORT=8005 cargo run -p sentry -- \
     --adapter dummy \
-    --dummyIdentity 80690751969B234697e9059e04ed72195c3507fa \
-    ./docs/config/prod.toml
+    --dummyIdentity 0x80690751969B234697e9059e04ed72195c3507fa \
+    ./docs/config/ganache.toml
 ```
 ##### Follower (`0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7`)
 
@@ -109,19 +130,18 @@ POSTGRES_DB="sentry_leader" PORT=8005 cargo run -p sentry -- \
 IP_ADDR=127.0.0.1 REDIS_URL="redis://127.0.0.1:6379/2" \
 POSTGRES_DB="sentry_follower" PORT=8006 cargo run -p sentry -- \
     --adapter dummy \
-    --dummyIdentity f3f583AEC5f7C030722Fe992A5688557e1B86ef7 \
-    ./docs/config/prod.toml
+    --dummyIdentity 0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7 \
+    ./docs/config/ganache.toml
 ```
-
-For full list, check out [primitives/src/util/tests/prep_db.rs#L29-L43](./primitives/src/util/tests/prep_db.rs#L29-L43)
 
 #### Environment variables
 
-- `ENV` - `production` or `development`; *default*: `development` - passing this env. variable will use the default configuration paths - [`docs/config/dev.toml`](./docs/config/dev.toml) (for `development`) or [`docs/config/prod.toml`](./docs/config/prod.toml) (for `production`). Otherwise you can pass your own configuration file path to the binary (check `cargo run -p sentry --help` for more information). In `development` it will make sure Sentry to seed the database.
+- `ENV` - `production` or `development`; *default*: `development` - passing this env. variable will use the default configuration paths - [`docs/config/ganache.toml`](./docs/config/ganache.toml) (for `development`) or [`docs/config/prod.toml`](./docs/config/prod.toml) (for `production`). Otherwise you can pass your own configuration file path to the binary (check `cargo run -p sentry --help` for more information). ~~In `development` it will make sure Sentry to seed the database~~ (seeding is disabled, see #514).
 - `PORT` - *default*: `8005` - The local port that Sentry API will be accessible at
 - `IP_ADDR` - *default*: `0.0.0.0` - the IP address that the API should be listening to
 
 ##### Adapter
+
 - `KEYSTORE_PWD` - Password for the `Keystore file`, only available when using `Ethereum` adapter (`--adapter ethereum`)
 
 ##### Redis
@@ -149,14 +169,14 @@ cargo run -p validator_worker -- --help
 The password for the Keystore file can be set using the environment variable `KEYSTORE_PWD`.
 
 ##### Validator Leader (`0x80690751969B234697e9059e04ed72195c3507fa`)
-    Assuming you have [Sentry API running](#running-sentry-rest-api) for the **Leader** on port `8005`:
+Assuming you have [Sentry API running](#running-sentry-rest-api) for the **Leader** on port `8005`:
 
 ```bash
 KEYSTORE_PWD=ganache0 cargo run -p validator_worker -- \
     --adapter ethereum \
     --keystoreFile ./adapter/test/resources/0x80690751969B234697e9059e04ed72195c3507fa_keystore.json \
     --sentryUrl http://127.0.0.1:8005 \
-    ./docs/config/prod.toml
+    ./docs/config/ganache.toml
 ```
 
 ##### Validator Follower
@@ -168,7 +188,7 @@ KEYSTORE_PWD=ganache1 cargo run -p validator_worker -- \
     --adapter ethereum \
     --keystoreFile ./adapter/test/resources/0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7_keystore.json \
     --sentryUrl http://127.0.0.1:8006 \
-    ./docs/config/prod.toml
+    ./docs/config/ganache.toml
 ```
 
 #### Using the `Dummy` adapter
@@ -182,7 +202,7 @@ cargo run -p validator_worker -- \
     --adapter dummy \
     --dummyIdentity 0x80690751969B234697e9059e04ed72195c3507fa \
     --sentryUrl http://127.0.0.1:8005 \
-    ./docs/config/prod.toml
+    ./docs/config/ganache.toml
 ```
 
 ##### Follower: `0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7`
@@ -194,13 +214,12 @@ cargo run -p validator_worker -- \
     --adapter dummy \
     --dummyIdentity 0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7 \
     --sentryUrl http://127.0.0.1:8006 \
-    ./docs/config/prod.toml
+    ./docs/config/ganache.toml
 ```
 
 #### Environment variables
 
-- `ENV` - `production` or `development` - *default*: `development` - passing this env. variable will use the default configuration paths - [`docs/config/dev.toml`](./docs/config/dev.toml) (for `development`) or [`docs/config/prod.toml`](./docs/config/prod.toml) (for `production`). Otherwise you can pass your own configuration file path to the binary (check `cargo run -p sentry --help` for more information). In `development` it will make sure that Sentry seeds the database.
-- `PORT` - The local port that Sentry API will accessible at
+- `ENV` - `production` or `development`; *default*: `development` - passing this env. variable will use the default configuration paths - [`docs/config/ganache.toml`](./docs/config/ganache.toml) (for `development`) or [`docs/config/prod.toml`](./docs/config/prod.toml) (for `production`). Otherwise you can pass your own configuration file path to the binary (check `cargo run -p sentry --help` for more information).
 
 ##### Adapter
 

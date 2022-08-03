@@ -53,8 +53,8 @@ pub async fn redis_connection(
     client.get_multiplexed_async_connection().await
 }
 
+/// Uses the default `max_size` of the `PoolConfig` which is `num_cpus::get_physical() * 4`
 pub async fn postgres_connection(
-    max_size: usize,
     config: tokio_postgres::Config,
 ) -> Result<DbPool, deadpool_postgres::BuildError> {
     let mgr_config = ManagerConfig {
@@ -63,11 +63,13 @@ pub async fn postgres_connection(
 
     let manager = Manager::from_config(config, NoTls, mgr_config);
 
-    DbPool::builder(manager).max_size(max_size).build()
+    // use default max_size which is set by PoolConfig::default()
+    // num_cpus::get_physical() * 4
+    DbPool::builder(manager).build()
 }
 
 /// Sets the migrations using the `POSTGRES_*` environment variables
-pub async fn setup_migrations(environment: Environment) {
+pub fn setup_migrations(environment: Environment) {
     use migrant_lib::{Config, Direction, Migrator, Settings};
 
     let settings = Settings::configure_postgres()
@@ -96,12 +98,12 @@ pub async fn setup_migrations(environment: Environment) {
 
     // NOTE: Make sure to update list of migrations for the tests as well!
     // `tests_postgres::MIGRATIONS`
-    let mut migrations = vec![make_migration!("20190806011140_initial-tables")];
+    let migrations = vec![make_migration!("20190806011140_initial-tables")];
 
-    if let Environment::Development = environment {
-        // seeds database tables for testing
-        migrations.push(make_migration!("20190806011140_initial-tables/seed"));
-    }
+    // if let Environment::Development = environment {
+    //     // seeds database tables for testing
+    //     migrations.push(make_migration!("20190806011140_initial-tables/seed"));
+    // }
 
     // Define Migrations
     config
@@ -138,7 +140,7 @@ pub async fn setup_migrations(environment: Environment) {
         .expect("Reloading config for migration failed");
 }
 
-#[cfg(feature = "test-util")]
+#[cfg(any(test, feature = "test-util"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "test-util")))]
 pub mod tests_postgres {
     use std::{
@@ -230,7 +232,7 @@ pub mod tests_postgres {
     #[derive(Debug, Error)]
     pub enum Error {
         #[error(transparent)]
-        Build(#[from] deadpool::managed::BuildError<tokio_postgres::Error>),
+        Build(#[from] deadpool_postgres::BuildError),
         #[error(transparent)]
         Pool(#[from] PoolError),
     }
@@ -480,7 +482,7 @@ pub mod tests_postgres {
     }
 }
 
-#[cfg(feature = "test-util")]
+#[cfg(any(test, feature = "test-util"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "test-util")))]
 pub mod redis_pool {
 

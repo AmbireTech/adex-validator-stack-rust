@@ -349,7 +349,7 @@ where
 }
 
 #[cfg(feature = "postgres")]
-pub mod postgres {
+mod postgres {
     use super::BigNum;
     use bytes::BytesMut;
     use std::error::Error;

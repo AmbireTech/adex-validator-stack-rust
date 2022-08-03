@@ -28,7 +28,7 @@ pub type ChainsValidators = HashMap<ChainId, Validators>;
 pub type Validators = HashMap<ValidatorId, Validator>;
 pub type AuthToken = String;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Validator {
     /// Sentry API url
     pub url: ApiUrl,
@@ -107,7 +107,7 @@ impl<C: Unlocked + 'static> SentryApi<C, ()> {
         sentry_url: ApiUrl,
     ) -> Result<SentryApi<C, ()>, Error> {
         let client = Client::builder()
-            .timeout(Duration::from_millis(config.fetch_timeout.into()))
+            .timeout(config.fetch_timeout)
             .build()
             .map_err(Error::BuildingClient)?;
 
@@ -341,9 +341,8 @@ impl<C: Unlocked + 'static, P> SentryApi<C, P> {
     pub async fn collect_channels(
         &self,
     ) -> Result<(HashSet<ChainOf<Channel>>, ChainsValidators), Error> {
-        let all_campaigns_timeout = Duration::from_millis(self.config.all_campaigns_timeout as u64);
         let client = reqwest::Client::builder()
-            .timeout(all_campaigns_timeout)
+            .timeout(self.config.all_campaigns_timeout)
             .build()?;
 
         let campaigns =
@@ -467,7 +466,7 @@ impl<C: Unlocked + 'static> SentryApi<C> {
 
 async fn propagate_to<C: Unlocked>(
     client: &Client,
-    timeout: u32,
+    timeout: Duration,
     channel_id: ChannelId,
     (validator_id, validator): (ValidatorId, &Validator),
     messages: &[MessageTypes],
@@ -483,7 +482,7 @@ async fn propagate_to<C: Unlocked>(
 
     let _response: SuccessResponse = client
         .request(Method::POST, endpoint)
-        .timeout(Duration::from_millis(timeout.into()))
+        .timeout(timeout)
         .bearer_auth(&validator.token)
         .json(&request_body)
         .send()
@@ -653,6 +652,7 @@ mod test {
         let adapter = Adapter::with_unlocked(Dummy::init(Options {
             dummy_identity: whoami,
             dummy_auth_tokens: DUMMY_AUTH.clone(),
+            dummy_chains: config.chains.values().cloned().collect(),
         }));
         let logger = discard_logger();
 
@@ -767,6 +767,7 @@ mod test {
         let leader_adapter = Adapter::with_unlocked(Dummy::init(Options {
             dummy_identity: IDS[&LEADER],
             dummy_auth_tokens: DUMMY_AUTH.clone(),
+            dummy_chains: config.chains.values().cloned().collect(),
         }));
         let logger = discard_logger();
 
@@ -999,7 +1000,7 @@ mod test {
         {
             // Get Wiremock to return the channels
             let first_page_response = ChannelListResponse {
-                channels: vec![DUMMY_CAMPAIGN.channel.clone(), channel_new_leader],
+                channels: vec![DUMMY_CAMPAIGN.channel, channel_new_leader],
                 pagination: Pagination {
                     page: 0,
                     total_pages: 2,
@@ -1007,10 +1008,7 @@ mod test {
             };
 
             let second_page_response = ChannelListResponse {
-                channels: vec![
-                    channel_new_follower.clone(),
-                    channel_new_leader_and_follower.clone(),
-                ],
+                channels: vec![channel_new_follower, channel_new_leader_and_follower],
                 pagination: Pagination {
                     page: 1,
                     total_pages: 2,

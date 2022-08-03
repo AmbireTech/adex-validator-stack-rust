@@ -1,4 +1,7 @@
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::{
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    path::Path,
+};
 
 use adapter::client::Locked;
 use hyper::{
@@ -9,6 +12,7 @@ use once_cell::sync::Lazy;
 use primitives::{config::Environment, ValidatorId};
 use redis::ConnectionInfo;
 use serde::{Deserialize, Deserializer};
+use simple_hyper_server_tls::{listener_from_pem_files, Protocols, TlsListener};
 use slog::{error, info};
 
 use crate::{
@@ -45,6 +49,7 @@ pub static DEFAULT_REDIS_URL: Lazy<ConnectionInfo> = Lazy::new(|| {
 #[derive(Debug, Deserialize, Clone)]
 pub struct EnvConfig {
     /// Defaults to `Development`: [`Environment::default()`]
+    #[serde(default)]
     pub env: Environment,
     /// The port on which the Sentry REST API will be accessible.
     ///
@@ -74,7 +79,7 @@ fn redis_url<'a, 'de: 'a, D>(deserializer: D) -> Result<ConnectionInfo, D::Error
 where
     D: Deserializer<'de>,
 {
-    let url_string = <&'a str>::deserialize(deserializer)?;
+    let url_string = String::deserialize(deserializer)?;
 
     url_string.parse().map_err(serde::de::Error::custom)
 }
@@ -157,24 +162,57 @@ where
 
 impl<C: Locked + 'static> Application<C> {
     /// Starts the `hyper` `Server`.
-    pub async fn run(self, socket_addr: SocketAddr) {
+    pub async fn run(self, enable_tls: EnableTls) {
         let logger = self.logger.clone();
+        let socket_addr = match &enable_tls {
+            EnableTls::NoTls(socket_addr) => socket_addr,
+            EnableTls::Tls { socket_addr, .. } => socket_addr,
+        };
+
         info!(&logger, "Listening on socket address: {}!", socket_addr);
 
-        let make_service = make_service_fn(|_| {
-            let server = self.clone();
-            async move {
-                Ok::<_, Error>(service_fn(move |req| {
-                    let server = server.clone();
-                    async move { Ok::<_, Error>(server.handle_routing(req).await) }
-                }))
+        match enable_tls {
+            EnableTls::NoTls(socket_addr) => {
+                let make_service = make_service_fn(|_| {
+                    let server = self.clone();
+                    async move {
+                        Ok::<_, Error>(service_fn(move |req| {
+                            let server = server.clone();
+                            async move { Ok::<_, Error>(server.handle_routing(req).await) }
+                        }))
+                    }
+                });
+
+                let server = Server::bind(&socket_addr)
+                    .serve(make_service)
+                    .with_graceful_shutdown(shutdown_signal(logger.clone()));
+
+                if let Err(e) = server.await {
+                    error!(&logger, "server error: {}", e; "main" => "run");
+                }
             }
-        });
+            EnableTls::Tls { listener, .. } => {
+                let make_service = make_service_fn(|_| {
+                    let server = self.clone();
+                    async move {
+                        Ok::<_, Error>(service_fn(move |req| {
+                            let server = server.clone();
+                            async move { Ok::<_, Error>(server.handle_routing(req).await) }
+                        }))
+                    }
+                });
 
-        let server = Server::bind(&socket_addr).serve(make_service);
+                // TODO: Find a way to redirect to HTTPS
+                let server = Server::builder(listener)
+                    .serve(make_service)
+                    .with_graceful_shutdown(shutdown_signal(logger.clone()));
+                tokio::pin!(server);
 
-        if let Err(e) = server.await {
-            error!(&logger, "server error: {}", e; "main" => "run");
+                while let Err(e) = (&mut server).await {
+                    // This is usually caused by trying to connect on HTTP instead of HTTPS
+                    error!(&logger, "server error: {}", e; "main" => "run");
+                }
+            }
         }
     }
 }
@@ -190,6 +228,35 @@ impl<C: Locked> Clone for Application<C> {
             campaign_remaining: self.campaign_remaining.clone(),
             platform_api: self.platform_api.clone(),
         }
+    }
+}
+
+/// Either enable or do not the Tls support.
+pub enum EnableTls {
+    NoTls(SocketAddr),
+    Tls {
+        socket_addr: SocketAddr,
+        listener: TlsListener,
+    },
+}
+
+impl EnableTls {
+    pub fn new_tls<C: AsRef<Path>, K: AsRef<Path>>(
+        certificates: C,
+        private_keys: K,
+        socket_addr: SocketAddr,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        let listener =
+            listener_from_pem_files(certificates, private_keys, Protocols::ALL, &socket_addr)?;
+
+        Ok(Self::Tls {
+            listener,
+            socket_addr,
+        })
+    }
+
+    pub fn no_tls(socket_addr: SocketAddr) -> Self {
+        Self::NoTls(socket_addr)
     }
 }
 
@@ -209,6 +276,16 @@ pub struct Auth {
     pub uid: ValidatorId,
     /// The Chain for which this authentication was validated
     pub chain: primitives::Chain,
+}
+
+/// A Ctrl+C signal to gracefully shutdown the server
+async fn shutdown_signal(logger: Logger) {
+    // Wait for the Ctrl+C signal
+    tokio::signal::ctrl_c()
+        .await
+        .expect("failed to install CTRL+C signal handler");
+
+    info!(&logger, "Received Ctrl+C signal. Shutting down..")
 }
 
 #[cfg(test)]

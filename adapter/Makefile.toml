@@ -1,9 +1,12 @@
+extend = "../Makefile.toml"
+
 [tasks.dev-test-flow]
 description = "Development testing flow will first format the code, and than run cargo build and test"
 category = "Development"
 dependencies = [
-  "format-flow",
   "format-toml-conditioned-flow",
+  "format-flow",
+  "clippy-flow",
   "pre-build",
   "build",
   "post-build",
@@ -13,14 +16,13 @@ dependencies = [
 ]
 
 [tasks.test]
-# run tests in release because of slow unlock time of Ethereum adapter (i.e. keystore decryption)
-args = ["test", "--release", "--all-features"]
+args = ["test", "--all-features"]
 
 [tasks.ganache-up]
 # `--renew-anon-volumes` is required to make sure that the snapshot used for the `ganache` instances is reloaded.
 script = '''
 docker-compose -f ../docker-compose.harness.yml up --renew-anon-volumes -d ganache-1 ganache-1337 \
-&& sleep 10
+&& sleep 6
 '''
 
 [tasks.ganache-down]

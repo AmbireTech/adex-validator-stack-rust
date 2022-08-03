@@ -10,7 +10,7 @@ use std::collections::HashMap;
 ///
 /// [protocol]: https://github.com/AdExNetwork/adex-protocol/blob/master/adSlot.md
 /// [adex-models]: https://github.com/AdExNetwork/adex-models/blob/master/src/models/AdSlot.js
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct AdSlot {
     /// valid ipfs hash of spec props below
@@ -25,7 +25,7 @@ pub struct AdSlot {
     /// see IAB ad unit guidelines and iab_flex_{adUnitName} (see IAB's new ad portfolio and PDF)
     #[serde(rename = "type")]
     pub ad_type: String,
-    // HashMap<DepositAsset, UnifiedNum> for the minimum payment accepted per impression
+    /// HashMap<DepositAsset, UnifiedNum> for the minimum payment accepted per impression
     #[serde(default)]
     pub min_per_impression: Option<HashMap<Address, UnifiedNum>>,
     #[serde(default)]

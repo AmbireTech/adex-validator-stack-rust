@@ -1,10 +1,12 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
+#![deny(rustdoc::broken_intra_doc_links)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 // TODO: Remove once stabled and upstream num::Integer::div_floor(...) is fixed
 #![allow(unstable_name_collisions)]
 use std::{error, fmt};
 
+#[doc(inline)]
 pub use self::{
     ad_slot::AdSlot,
     ad_unit::AdUnit,
@@ -44,7 +46,7 @@ pub mod sentry;
 pub mod spender;
 pub mod supermarket;
 pub mod targeting;
-#[cfg(feature = "test-util")]
+#[cfg(any(test, feature = "test-util"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "test-util")))]
 pub mod test_util;
 pub mod unified_num;
@@ -156,9 +158,18 @@ mod deposit {
             total.map(|total| Deposit { total })
         }
     }
+
+    impl<N: Default> Default for Deposit<N> {
+        fn default() -> Self {
+            Self {
+                total: Default::default(),
+            }
+        }
+    }
 }
 
 pub mod util {
+    #[doc(inline)]
     pub use api::ApiUrl;
 
     pub mod api;

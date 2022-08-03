@@ -2,7 +2,7 @@ use crate::{channel::channel_tick, SentryApi};
 use adapter::{prelude::*, Adapter};
 use primitives::Config;
 use slog::{error, info, Logger};
-use std::{error::Error, time::Duration};
+use std::error::Error;
 
 use futures::{
     future::{join, join_all},
@@ -49,7 +49,7 @@ impl<C: Unlocked + 'static> Worker<C> {
 
     pub async fn infinite(&self) {
         loop {
-            let wait_time_future = sleep(Duration::from_millis(self.config.wait_time as u64));
+            let wait_time_future = sleep(self.config.wait_time);
 
             let _result = join(self.all_channels_tick(), wait_time_future).await;
         }

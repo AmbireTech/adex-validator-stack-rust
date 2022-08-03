@@ -81,7 +81,7 @@ mod whole_number {
             );
             assert_eq!(
                 UnifiedNum::from(800_000_009_u64),
-                UnifiedNum::from_whole(8.00_000_009_f64)
+                UnifiedNum::from_whole(8.000_000_09_f64)
             );
 
             assert_eq!(
@@ -97,7 +97,7 @@ mod whole_number {
             );
 
             assert_eq!(
-                UnifiedNum::from(123_456_789_000_000_00_u64),
+                UnifiedNum::from(12_345_678_900_000_000_u64),
                 UnifiedNum::from_whole(123_456_789.000_000_004_f64),
                 "Should round down the floating number"
             );
@@ -273,15 +273,13 @@ impl UnifiedNum {
         let value_length = string_value.len();
         let precision: usize = Self::PRECISION.into();
 
-        let value = if value_length > precision {
+        if value_length > precision {
             string_value.insert(value_length - precision, Self::DEBUG_DELIMITER);
 
             string_value
         } else {
             format!("0{}{:0>8}", Self::DEBUG_DELIMITER, string_value)
-        };
-
-        value
+        }
     }
 }
 
@@ -492,7 +490,7 @@ impl<'a> Sum<&'a UnifiedNum> for Option<UnifiedNum> {
     }
 }
 
-impl<'a> Sum<UnifiedNum> for Option<UnifiedNum> {
+impl Sum<UnifiedNum> for Option<UnifiedNum> {
     fn sum<I: Iterator<Item = UnifiedNum>>(mut iter: I) -> Self {
         iter.try_fold(0_u64, |acc, unified| acc.checked_add(unified.0))
             .map(UnifiedNum)
@@ -785,10 +783,10 @@ mod test {
         let one = UnifiedNum::ONE;
 
         // 2.0
-        let two = UnifiedNum::from(2_00_000_000);
+        let two = UnifiedNum::from(200_000_000);
 
         // 3.0
-        let three = UnifiedNum::from(3_00_000_000);
+        let three = UnifiedNum::from(300_000_000);
 
         let fifteen = UnifiedNum::from_whole(15);
 
@@ -808,7 +806,7 @@ mod test {
             assert_eq!(three, three / one);
 
             // 3.0 / 2.0 = 1.5
-            assert_eq!(UnifiedNum::from(1_50_000_000), three / two);
+            assert_eq!(UnifiedNum::from(150_000_000), three / two);
 
             // 2.0 / 3.0 = 0.6666666...
             assert_eq!(UnifiedNum::from(66_666_666), two / three);
@@ -823,7 +821,7 @@ mod test {
             assert_eq!(one_tenth, one_tenth / one);
 
             // 15.0 / 2 = 7.5
-            assert_eq!(UnifiedNum::from_whole(7.5), fifteen / &two);
+            assert_eq!(UnifiedNum::from_whole(7.5), fifteen / two);
         }
 
         // multiplication
@@ -887,7 +885,7 @@ mod test {
         {
             assert_eq!(
                 UnifiedNum::ONE,
-                UnifiedNum::from(10_00_000_000) % UnifiedNum::from(3_00_000_000)
+                UnifiedNum::from(1_000_000_000) % UnifiedNum::from(300_000_000)
             );
 
             assert_eq!(
@@ -909,7 +907,7 @@ mod test {
         {
             assert_eq!(
                 UnifiedNum::from_whole(10.0),
-                UnifiedNum::from(10_00_000_000) % UnifiedNum::from_whole(30_000_000)
+                UnifiedNum::from(1_000_000_000) % UnifiedNum::from_whole(30_000_000)
             );
 
             assert_eq!(
@@ -927,7 +925,7 @@ mod test {
         {
             assert_eq!(
                 UnifiedNum::from_whole(10.0),
-                UnifiedNum::from(10_00_000_000) % UnifiedNum::from_whole(3_000_000)
+                UnifiedNum::from(1_000_000_000) % UnifiedNum::from_whole(3_000_000)
             );
 
             assert_eq!(
@@ -945,7 +943,7 @@ mod test {
         {
             assert_eq!(
                 UnifiedNum::from(30_000_000),
-                UnifiedNum::from(30_000_000) % UnifiedNum::from(10_00_000_000)
+                UnifiedNum::from(30_000_000) % UnifiedNum::from(1_000_000_000)
             );
 
             assert_eq!(

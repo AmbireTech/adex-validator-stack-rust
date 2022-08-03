@@ -11,6 +11,6 @@ pub struct Deposit {
 
 impl PartialEq<primitives::Deposit<BigNum>> for Deposit {
     fn eq(&self, other: &primitives::Deposit<BigNum>) -> bool {
-        &self.outpace_amount == &other.total
+        self.outpace_amount == other.total
     }
 }

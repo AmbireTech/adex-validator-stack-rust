@@ -1,4 +1,4 @@
-use std::{error::Error, fmt, ops::Deref, str::FromStr};
+use std::{fmt, ops::Deref, str::FromStr};
 
 use ethereum_types::U256;
 
@@ -7,7 +7,7 @@ use serde_hex::{SerHex, StrictPfx};
 
 use hex::{FromHex, FromHexError};
 
-use crate::{chain::Chain, config::TokenInfo, Address, Validator, ValidatorId};
+use crate::{Address, Validator, ValidatorId};
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Copy, Clone, Hash)]
 #[serde(transparent)]
@@ -88,12 +88,6 @@ impl FromStr for ChannelId {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         validate_channel_id(s).map(ChannelId)
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChainContext {
-    pub token: TokenInfo,
-    pub chain: Chain,
 }
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -198,46 +192,6 @@ impl Serialize for Nonce {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum ChannelError {
-    InvalidArgument(String),
-    /// When the Adapter address is not listed in the `channel.spec.validators`
-    /// which in terms means, that the adapter shouldn't handle this Channel
-    AdapterNotIncluded,
-    /// when `channel.valid_until` has passed (< now), the channel should be handled
-    InvalidValidUntil(String),
-    UnlistedValidator,
-    UnlistedCreator,
-    UnlistedAsset,
-    MinimumValidatorFeeNotMet,
-    FeeConstraintViolated,
-}
-
-impl fmt::Display for ChannelError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ChannelError::InvalidArgument(error) => write!(f, "{}", error),
-            ChannelError::AdapterNotIncluded => write!(f, "channel is not validated by us"),
-            ChannelError::InvalidValidUntil(error) => write!(f, "{}", error),
-            ChannelError::UnlistedValidator => write!(f, "validators are not in the whitelist"),
-            ChannelError::UnlistedCreator => write!(f, "channel.creator is not whitelisted"),
-            ChannelError::UnlistedAsset => write!(f, "channel.depositAsset is not whitelisted"),
-            ChannelError::MinimumValidatorFeeNotMet => {
-                write!(f, "channel validator fee is less than MINIMAL_FEE")
-            }
-            ChannelError::FeeConstraintViolated => {
-                write!(f, "total fees <= deposit: fee constraint violated")
-            }
-        }
-    }
-}
-
-impl Error for ChannelError {
-    fn cause(&self) -> Option<&dyn Error> {
-        None
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -296,7 +250,7 @@ mod test {
 }
 
 #[cfg(feature = "postgres")]
-pub mod postgres {
+mod postgres {
     use super::{Channel, ChannelId, Nonce};
     use bytes::BytesMut;
     use hex::FromHex;

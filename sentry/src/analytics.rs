@@ -2,6 +2,7 @@ use crate::{
     db::{analytics::update_analytics, DbPool, PoolError},
     Session,
 };
+use futures::future::join_all;
 use primitives::{
     analytics::OperatingSystem,
     sentry::{DateHour, Event, UpdateAnalytics},
@@ -14,7 +15,7 @@ pub async fn record(
     pool: &DbPool,
     campaign_context: &ChainOf<Campaign>,
     session: &Session,
-    events_with_payouts: Vec<(Event, Address, UnifiedNum)>,
+    events_with_payouts: &[(Event, Address, UnifiedNum)],
 ) -> Result<(), PoolError> {
     let os_name = session
         .os
@@ -65,9 +66,9 @@ pub async fn record(
         };
 
         batch_update
-            .entry(event)
+            .entry(event.clone())
             .and_modify(|analytics| {
-                analytics.amount_to_add += &payout_amount;
+                analytics.amount_to_add += payout_amount;
                 analytics.count_to_add += 1;
             })
             .or_insert_with(|| UpdateAnalytics {
@@ -83,14 +84,24 @@ pub async fn record(
                 os_name: os_name.clone(),
                 chain_id: campaign_context.chain.chain_id,
                 event_type,
-                amount_to_add: payout_amount,
+                amount_to_add: *payout_amount,
                 count_to_add: 1,
             });
     }
 
-    for (_event, update) in batch_update.into_iter() {
-        update_analytics(pool, update).await?;
-    }
+    let batch_futures = join_all(
+        batch_update
+            .into_iter()
+            .map(|(_event, update)| update_analytics(pool, update)),
+    );
+
+    // execute the batched futures, collect the result afterwards,
+    // in order execute all futures first and then return an error if occurred
+    batch_futures
+        .await
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()?;
+
     Ok(())
 }
 
@@ -103,8 +114,6 @@ mod test {
         test_util::{DUMMY_CAMPAIGN, DUMMY_IPFS, PUBLISHER},
         UnifiedNum,
     };
-
-    use crate::db::tests_postgres::{setup_test_migrations, DATABASE_POOL};
 
     // Currently used for testing
     async fn get_all_analytics(pool: &DbPool) -> Result<Vec<Analytics>, PoolError> {
@@ -170,11 +179,6 @@ mod test {
         let app = setup_dummy_app().await;
 
         let test_events = get_test_events();
-        let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
-
-        setup_test_migrations(database.pool.clone())
-            .await
-            .expect("Migrations should succeed");
 
         let campaign = DUMMY_CAMPAIGN.clone();
 
@@ -199,16 +203,11 @@ mod test {
         let channel_context = channel_chain.with_channel(dummy_channel);
         let campaign_context = channel_context.clone().with(campaign);
 
-        record(
-            &database.clone(),
-            &campaign_context,
-            &session,
-            input_events.clone(),
-        )
-        .await
-        .expect("should record");
+        record(&app.pool, &campaign_context, &session, &input_events)
+            .await
+            .expect("should record");
 
-        let analytics = get_all_analytics(&database.pool)
+        let analytics = get_all_analytics(&app.pool)
             .await
             .expect("should get all analytics");
         assert_eq!(analytics.len(), 2);
@@ -237,12 +236,6 @@ mod test {
     #[tokio::test]
     async fn test_recording_with_session() {
         let app = setup_dummy_app().await;
-
-        let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
-
-        setup_test_migrations(database.pool.clone())
-            .await
-            .expect("Migrations should succeed");
 
         let test_events = get_test_events();
 
@@ -274,16 +267,11 @@ mod test {
             .expect("Channel token should be whitelisted in config!");
         let channel_context = channel_chain.with_channel(dummy_channel);
         let campaign_context = channel_context.clone().with(campaign);
-        record(
-            &database.clone(),
-            &campaign_context,
-            &session,
-            input_events.clone(),
-        )
-        .await
-        .expect("should record");
+        record(&app.pool, &campaign_context, &session, &input_events)
+            .await
+            .expect("should record");
 
-        let analytics = get_all_analytics(&database.pool)
+        let analytics = get_all_analytics(&app.pool)
             .await
             .expect("should find analytics");
 

@@ -72,10 +72,8 @@ pub async fn analytics<C: Locked + 'static>(
         )));
     }
 
-    let analytics_maxtime = std::time::Duration::from_millis(app.config.analytics_maxtime.into());
-
     let analytics = match tokio::time::timeout(
-        analytics_maxtime,
+        app.config.analytics_maxtime,
         get_analytics(
             &app.pool,
             query.clone(),

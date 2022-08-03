@@ -124,12 +124,12 @@ pub async fn update_analytics(
     let client = pool.get().await?;
 
     let query = "INSERT INTO analytics(campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os_name, chain_id, event_type, payout_amount, payout_count)
-    VALUES ($1, date_trunc('hour', cast($2 as timestamp with time zone)), $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
     ON CONFLICT ON CONSTRAINT analytics_pkey DO UPDATE
-    SET payout_amount = analytics.payout_amount + $13, payout_count = analytics.payout_count + 1
+    SET payout_amount = analytics.payout_amount + EXCLUDED.payout_amount, payout_count = analytics.payout_count + EXCLUDED.payout_count
     RETURNING campaign_id, time, ad_unit, ad_slot, ad_slot_type, advertiser, publisher, hostname, country, os_name, event_type, payout_amount, payout_count";
 
-    let stmt = client.prepare(query).await?;
+    let stmt = client.prepare_cached(query).await?;
 
     let row = client
         .query_one(
@@ -840,7 +840,7 @@ mod test {
             time: DateHour::from_ymdh(2021, 12, day, hour),
             campaign_id: DUMMY_CAMPAIGN.id,
             ad_unit: ad_unit.ipfs,
-            ad_slot: ad_slot,
+            ad_slot,
             ad_slot_type: Some(ad_unit.ad_type.clone()),
             advertiser: *CREATOR,
             publisher: *PUBLISHER,
@@ -867,7 +867,7 @@ mod test {
             time: DateHour::from_ymdh(2021, 12, day, hour),
             campaign_id: DUMMY_CAMPAIGN.id,
             ad_unit: ad_unit.ipfs,
-            ad_slot: ad_slot,
+            ad_slot,
             ad_slot_type: Some(ad_unit.ad_type.clone()),
             advertiser: *CREATOR,
             publisher: *PUBLISHER,

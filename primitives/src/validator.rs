@@ -9,6 +9,7 @@ use crate::{
     Address, DomainError, ToETHChecksum, ToHex, UnifiedNum,
 };
 
+#[doc(inline)]
 pub use messages::*;
 
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -28,6 +29,10 @@ impl ValidatorId {
 
     pub fn to_address(self) -> Address {
         self.0
+    }
+
+    pub fn as_address(&self) -> &Address {
+        &self.0
     }
 
     pub fn inner(&self) -> &[u8; 20] {
@@ -370,7 +375,7 @@ pub mod messages {
     }
 }
 #[cfg(feature = "postgres")]
-pub mod postgres {
+mod postgres {
     use super::ValidatorId;
     use crate::ToETHChecksum;
     use bytes::BytesMut;

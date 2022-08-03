@@ -1,5 +1,6 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
+#![deny(rustdoc::broken_intra_doc_links)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 use adex_primitives::{
@@ -36,7 +37,7 @@ const IPFS_GATEWAY: &str = "https://ipfs.moonicorn.network/ipfs/";
 /// Related: <https://github.com/AdExNetwork/adex-adview-manager/issues/17>, <https://github.com/AdExNetwork/adex-adview-manager/issues/35>, <https://github.com/AdExNetwork/adex-adview-manager/issues/46>
 ///
 /// Used for JS [setTimeout](https://developer.mozilla.org/en-US/docs/Web/API/setTimeout) function
-const WAIT_FOR_IMPRESSION: u32 = 8000;
+pub const WAIT_FOR_IMPRESSION: u32 = 8000;
 // The number of impressions (won auctions) kept in history
 const HISTORY_LIMIT: u32 = 50;
 

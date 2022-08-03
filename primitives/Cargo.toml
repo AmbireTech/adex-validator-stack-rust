@@ -44,7 +44,7 @@ serde_json = "1.0"
 serde-hex = "0.1"
 serde_millis = "0.1"
 # Used prefixes on field for targeting::Input, and `campaign::Active`
-serde_with = "1"
+serde_with = "2"
 # Configuration
 toml = "0.5"
 # Logging
@@ -87,4 +87,4 @@ once_cell = "1"
 [dev-dependencies]
 pretty_assertions = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
-serde_qs = "0.9"
+serde_qs = "0.10"

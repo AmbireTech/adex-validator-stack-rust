@@ -1,5 +1,6 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
+#![deny(rustdoc::broken_intra_doc_links)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 use adapter::util::{get_balance_leaf, get_signable_state_root, BalanceLeafError};
@@ -10,7 +11,9 @@ use primitives::{
 };
 use thiserror::Error;
 
+#[doc(inline)]
 pub use self::sentry_interface::SentryApi;
+#[doc(inline)]
 pub use worker::Worker;
 
 pub mod channel;

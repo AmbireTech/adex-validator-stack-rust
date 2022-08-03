@@ -2,19 +2,19 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use crate::{config::TokenInfo, util::ApiUrl, Address, Campaign, Channel};
-use parse_display::Display;
+use parse_display::{Display, FromStr};
 
 /// The Id of the chain
 ///
 /// # Ethereum Virtual Machine
 ///
 /// For all the EVM-compatible Chain IDs visit <https://chainid.network>
-#[derive(Serialize, Deserialize, Hash, Clone, Copy, Eq, PartialEq, Display)]
+#[derive(Serialize, Deserialize, Hash, Clone, Copy, Eq, PartialEq, Display, FromStr)]
 #[serde(transparent)]
 pub struct ChainId(u32);
 
 impl ChainId {
-    /// # Panics:
+    /// # Panics
     ///
     /// If `id` is `0`.
     pub fn new(id: u32) -> Self {
@@ -114,7 +114,7 @@ impl ChainOf<Campaign> {
 }
 
 #[cfg(feature = "postgres")]
-pub mod postgres {
+mod postgres {
     use super::ChainId;
     use bytes::BytesMut;
     use std::error::Error;

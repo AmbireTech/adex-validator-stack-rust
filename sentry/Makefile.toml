@@ -1,9 +1,12 @@
+extend = "../Makefile.toml"
+
 [tasks.dev-test-flow]
 description = "Development testing flow will first format the code, and than run cargo build and test"
 category = "Development"
 dependencies = [
-  "format-flow",
   "format-toml-conditioned-flow",
+  "format-flow",
+  "clippy-flow",
   "pre-build",
   "build",
   "post-build",
@@ -19,4 +22,44 @@ env = { "POSTGRES_DB" = "sentry_leader" }
 script = "docker-compose -f ../docker-compose.harness.yml up -d adex-redis adex-postgres && sleep 3"
 
 [tasks.services-down]
+script = "docker-compose -f ../docker-compose.harness.yml down"
+
+[tasks.run-benchmark]
+category = "Development"
+
+dependencies = [
+  "benchmark-services-up",
+  "run-seed",
+  "run-wrk2",
+  "benchmark-services-down",
+]
+
+[tasks.run-seed]
+category = "Development"
+
+command = "cargo"
+
+args = ["run", "--bin", "seed", "--features=test-util"]
+
+[tasks.run-wrk2]
+category = "Development"
+
+command = "wrk2"
+
+args = [
+  "-s",
+  "./benchmark/multiple_benchmark.lua",
+  "-t3",
+  "-c100",
+  "-d30s",
+  "-R3000",
+  "--latency",
+  "http://127.0.0.1:8005/v5/campaign",
+]
+
+[tasks.benchmark-services-up]
+# `--renew-anon-volumes` is required to make sure that the Databases are dumpped.
+script = "docker-compose -f ../docker-compose.harness.yml up --renew-anon-volumes -d adex-redis adex-postgres sentry-dummy-leader-release && sleep 3"
+
+[tasks.benchmark-services-down]
 script = "docker-compose -f ../docker-compose.harness.yml down"

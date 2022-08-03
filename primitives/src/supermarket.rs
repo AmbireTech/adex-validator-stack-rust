@@ -14,7 +14,7 @@ pub mod units_for_slot {
             pub campaigns: Vec<Campaign>,
         }
 
-        #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+        #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
         #[serde(rename_all = "camelCase")]
         pub struct UnitsWithPrice {
             pub unit: AdUnit,

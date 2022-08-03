@@ -64,7 +64,7 @@ impl<C: Locked + 'static> Middleware<C> for IsAdmin {
             .expect("request should have session")
             .to_owned();
 
-        if !application.config.admins.contains(&auth.uid.to_string()) {
+        if !application.config.admins.contains(auth.uid.as_address()) {
             return Err(ResponseError::Unauthorized);
         }
         Ok(request)
@@ -151,11 +151,13 @@ fn get_request_ip(req: &Request<Body>) -> Option<String> {
 #[cfg(test)]
 mod test {
     use adapter::{
-        dummy::{Dummy, Options},
+        dummy::{Dummy, HeaderToken, Options},
+        ethereum::test_util::GANACHE_1,
         Adapter,
     };
     use hyper::Request;
     use primitives::{
+        config::GANACHE_CONFIG,
         test_util::IDS,
         test_util::{DUMMY_AUTH, LEADER},
     };
@@ -174,6 +176,7 @@ mod test {
         let adapter_options = Options {
             dummy_identity: IDS[&LEADER],
             dummy_auth_tokens: DUMMY_AUTH.clone(),
+            dummy_chains: GANACHE_CONFIG.chains.values().cloned().collect(),
         };
 
         (Adapter::new(Dummy::init(adapter_options)), connection)
@@ -215,7 +218,7 @@ mod test {
             .unwrap();
         match for_request(non_existent_token_req, &dummy_adapter, &database).await {
             Err(error) => {
-                assert!(error.to_string().contains("No identity found that matches authentication token: wrong-token"), "Wrong error received");
+                assert_eq!(error.to_string(), "Authentication: Dummy Authentication token format should be in the format: `{Auth Token}:chain_id:{Chain Id}` but 'wrong-token' was provided");
             }
             _ => panic!("We shouldn't get a success response nor a different Error than BadRequest for this call"),
         };
@@ -225,8 +228,12 @@ mod test {
     async fn session_from_correct_authentication_token() {
         let (dummy_adapter, database) = setup().await;
 
-        let token = DUMMY_AUTH[&LEADER].clone();
-        let auth_header = format!("Bearer {}", token);
+        let header_token = HeaderToken {
+            token: DUMMY_AUTH[&LEADER].clone(),
+            chain_id: GANACHE_1.chain_id,
+        };
+
+        let auth_header = format!("Bearer {header_token}");
         let req = Request::builder()
             .header(AUTHORIZATION, auth_header)
             .body(Body::empty())

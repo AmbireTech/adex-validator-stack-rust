@@ -69,7 +69,7 @@ fn main() {
           ],
           "targetingRules": [],
           "created": 1612162800000_u64,
-          "active_to": 4073414400000_u64
+          "activeTo": 4073414400000_u64
         },
         {
           "id": "0x127b98248f4e4b73af409d10f62daeaa",
@@ -136,7 +136,8 @@ fn main() {
           ],
           "targetingRules": [],
           "created": 1612162800000_u64,
-          "active_to": 4073414400000_u64
+          "activeFrom": 1656280800000_u64,
+          "activeTo": 4073414400000_u64
         },
         {
           "id": "0xa78f3492481b41a688488a7aa1ff17df",
@@ -203,7 +204,7 @@ fn main() {
           ],
           "targetingRules": [],
           "created": 1612162800000_u64,
-          "active_to": 4073414400000_u64
+          "activeTo": 4073414400000_u64
         }
       ],
       "totalPages": 1,

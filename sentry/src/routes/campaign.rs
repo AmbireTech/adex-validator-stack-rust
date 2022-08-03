@@ -611,7 +611,7 @@ pub mod insert_events {
         sentry::{Event, SuccessResponse},
         Address, Campaign, CampaignId, ChainOf, DomainError, UnifiedNum, ValidatorDesc,
     };
-    use slog::error;
+    use slog::{error, Logger};
     use thiserror::Error;
 
     #[derive(Debug, Error)]
@@ -626,7 +626,7 @@ pub mod insert_events {
         Overflow(#[from] OverflowError),
     }
 
-    #[derive(Debug, Error, PartialEq)]
+    #[derive(Debug, Error, PartialEq, Eq)]
     pub enum EventError {
         #[error("Overflow when calculating Event payout for Event")]
         EventPayoutOverflow,
@@ -699,7 +699,6 @@ pub mod insert_events {
         .map_err(|e| match e {
             access::Error::ForbiddenReferrer => ResponseError::Forbidden(e.to_string()),
             access::Error::RulesError(error) => ResponseError::TooManyRequests(error),
-            access::Error::UnAuthenticated => ResponseError::Unauthorized,
             _ => ResponseError::BadRequest(e.to_string()),
         })?;
 
@@ -714,110 +713,144 @@ pub mod insert_events {
             (Some(leader), Some(follower)) => (leader, follower),
         };
 
-        let mut events_success = vec![];
-        for event in events.into_iter() {
-            let event_payout = {
-                // calculate earners payouts
-                let payout = get_payout(&app.logger, &campaign_context.context, &event, session)?;
-
-                match payout {
-                    Some((earner, payout)) => {
-                        let spending_result = spend_for_event(
-                            &app.pool,
-                            &app.campaign_remaining,
-                            &campaign_context.context,
-                            earner,
-                            leader,
-                            follower,
-                            payout,
-                        )
-                        .await;
-
-                        // Log unsuccessfully spending
-                        match spending_result {
-                            Ok(()) => Some((event, earner, payout)),
-                            Err(err) => {
-                                error!(&app.logger, "Payout spending failed: {}", err; "campaign" => ?campaign_context, "event" => ?event, "earner" => ?earner, "unpaid amount" => %payout, "err" => ?err);
-
-                                None
-                            }
-                        }
-                    }
-                    // if None, then ad was never show
-                    None => None,
-                }
-            };
-
-            if let Some(event_payout) = event_payout {
-                events_success.push(event_payout);
-            }
-        }
+        let events_success = spend_for_events(
+            app,
+            &campaign_context.context,
+            events,
+            session,
+            leader,
+            follower,
+        )
+        .await?;
 
         // Record successfully paid out events to Analytics
-        if let Err(err) =
-            analytics::record(&app.pool, campaign_context, session, events_success).await
-        {
-            error!(&app.logger, "Analytics recording failed: {}", err; "campaign" => ?campaign_context, "err" => ?err)
-        }
+        analytics_record_spawn(
+            app.pool.clone(),
+            app.logger.clone(),
+            campaign_context.clone(),
+            session.clone(),
+            events_success,
+        );
 
         Ok(true)
     }
 
-    /// This function calculates the fee for each validator.
+    /// Max retries is `5` after which an error logging message will be recorded.
+    fn analytics_record_spawn(
+        pool: DbPool,
+        logger: Logger,
+        campaign_context: ChainOf<Campaign>,
+        session: Session,
+        events: Vec<(Event, Address, UnifiedNum)>,
+    ) {
+        tokio::spawn(async move {
+            let max_retries = 5;
+
+            for retry in 1..=5 {
+                let result = analytics::record(&pool, &campaign_context, &session, &events).await;
+
+                match (result, retry) {
+                    // if the recording was successful, break the loop early
+                    (Ok(_), _) => break,
+                    // if we have reached the max retries, log a message
+                    (Err(err), retry) if retry == max_retries => {
+                        error!(&logger, "Analytics recording failed after {max_retries} retries: {}", err; "campaign" => ?campaign_context, "err" => ?err, "events" => ?events, "session" => ?session);
+                    }
+                    // If we have not reached the max_retries, just continue to the next loop
+                    _ => {}
+                }
+            }
+        });
+    }
+
+    /// This function calculates the fee for each validator and each `Event`.
     ///
     /// It then spends the given amounts for:
     ///
-    /// - `Publisher` - payout
-    ///
-    /// `Leader` and `Follower` - Validator fees
-    pub async fn spend_for_event(
-        pool: &DbPool,
-        campaign_remaining: &CampaignRemaining,
+    /// - [`Event`] `Publisher` - for payout
+    /// - `Leader` and `Follower` - for validator fees
+    pub async fn spend_for_events<C: Locked + 'static>(
+        app: &Application<C>,
         campaign: &Campaign,
-        earner: Address,
+        events: Vec<Event>,
+        session: &Session,
         leader: &ValidatorDesc,
         follower: &ValidatorDesc,
-        amount: UnifiedNum,
-    ) -> Result<(), Error> {
-        // distribute fees
-        let leader_fee =
-            calculate_fee((earner, amount), leader).map_err(EventError::FeeCalculation)?;
-        let follower_fee =
-            calculate_fee((earner, amount), follower).map_err(EventError::FeeCalculation)?;
+    ) -> Result<Vec<(Event, Address, UnifiedNum)>, Error> {
+        let event_payouts = events
+            .into_iter()
+            // If payout returns None, then the ad was not shown (`show = false`)
+            .filter_map(|event| {
+                get_payout(&app.logger, campaign, &event, session)
+                    .map_err(|err| {
+                        EventError::FeeCalculation(DomainError::InvalidArgument(err.to_string()))
+                    })
+                    .transpose()
+                    .map(|result| result.map(|earner_amount| (event, earner_amount)))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
-        // First update redis `campaignRemaining:{CampaignId}` key
-        let spending = [amount, leader_fee, follower_fee]
-            .iter()
-            .sum::<Option<UnifiedNum>>()
-            .ok_or(EventError::EventPayoutOverflow)?;
+        let event_balances = event_payouts
+            .into_iter()
+            .map(|(event, earner_amount)| {
+                let leader_fee =
+                    calculate_fee(earner_amount, leader).map_err(EventError::FeeCalculation)?;
+                let follower_fee =
+                    calculate_fee(earner_amount, follower).map_err(EventError::FeeCalculation)?;
 
-        if !has_enough_remaining_budget(campaign_remaining, campaign.id, spending).await? {
+                Ok((event, earner_amount, leader_fee, follower_fee))
+            })
+            .collect::<Result<Vec<_>, EventError>>()?;
+
+        let (spending, delta_balances) = event_balances.iter().try_fold::<_, _, Result<_, Error>>(
+            (UnifiedNum::ZERO, Balances::<CheckedState>::new()),
+            |(mut spending, mut balances), (_event, earner_amount, leader_fee, follower_fee)| {
+                let event_spending = [earner_amount.1, *leader_fee, *follower_fee]
+                    .iter()
+                    .sum::<Option<UnifiedNum>>()
+                    .ok_or(EventError::EventPayoutOverflow)?;
+                spending = spending
+                    .checked_add(&event_spending)
+                    .ok_or(EventError::EventPayoutOverflow)?;
+
+                balances.spend(campaign.creator, leader.id.to_address(), *leader_fee)?;
+                balances.spend(campaign.creator, follower.id.to_address(), *follower_fee)?;
+                balances.spend(campaign.creator, earner_amount.0, earner_amount.1)?;
+
+                Ok((spending, balances))
+            },
+        )?;
+
+        // First check & update redis `campaignRemaining:{CampaignId}` key
+        if !has_enough_remaining_budget(&app.campaign_remaining, campaign.id, spending).await? {
             return Err(Error::Event(
                 EventError::CampaignRemainingNotEnoughForPayout,
             ));
         }
 
-        // The event payout decreases the remaining budget for the Campaign
-        let remaining = campaign_remaining
+        // The events payout decreases the remaining budget for the Campaign
+        let remaining = app
+            .campaign_remaining
             .decrease_by(campaign.id, spending)
             .await?;
 
         // Update the Accounting records accordingly
         let channel_id = campaign.channel.id();
-        let spender = campaign.creator;
 
-        let mut delta_balances = Balances::<CheckedState>::default();
-        delta_balances.spend(spender, earner, amount)?;
-        delta_balances.spend(spender, leader.id.to_address(), leader_fee)?;
-        delta_balances.spend(spender, follower.id.to_address(), follower_fee)?;
-
-        let (_earners, _spenders) = spend_amount(pool.clone(), channel_id, delta_balances).await?;
+        spend_amount(app.pool.clone(), channel_id, delta_balances).await?;
 
         // check if we still have budget to spend, after we've updated both Redis and Postgres
         if remaining.is_negative() {
             Err(Error::Event(EventError::CampaignOutOfBudget))
         } else {
-            Ok(())
+            let result = event_balances
+                .into_iter()
+                .map(|(event, earner_amount, _leader_fee, _follower_fee)| {
+                    (event, earner_amount.0, earner_amount.1)
+                })
+                .collect();
+
+            Ok(result)
         }
     }
 
@@ -837,17 +870,15 @@ pub mod insert_events {
     #[cfg(test)]
     mod test {
         use primitives::{
-            test_util::{DUMMY_CAMPAIGN, PUBLISHER},
+            campaign::Pricing,
+            sentry::IMPRESSION,
+            test_util::{DUMMY_CAMPAIGN, DUMMY_IPFS, PUBLISHER},
             unified_num::FromWhole,
         };
         use redis::aio::MultiplexedConnection;
 
         use crate::{
-            db::{
-                insert_channel,
-                redis_pool::TESTS_POOL,
-                tests_postgres::{setup_test_migrations, DATABASE_POOL},
-            },
+            db::{insert_channel, redis_pool::TESTS_POOL},
             test_util::setup_dummy_app,
         };
 
@@ -939,16 +970,23 @@ pub mod insert_events {
 
         #[tokio::test]
         async fn test_spending_for_events_with_enough_remaining_budget() {
-            let mut redis = TESTS_POOL.get().await.expect("Should get redis connection");
-            let database = DATABASE_POOL.get().await.expect("Should get a DB pool");
-            let campaign_remaining = CampaignRemaining::new(redis.connection.clone());
-            let app = setup_dummy_app().await;
+            let mut app = setup_dummy_app().await;
 
-            setup_test_migrations(database.pool.clone())
-                .await
-                .expect("Migrations should succeed");
-
-            let campaign = DUMMY_CAMPAIGN.clone();
+            let campaign = Campaign {
+                // 1000.00000000
+                budget: UnifiedNum::from_whole(1_000),
+                pricing_bounds: vec![(
+                    IMPRESSION,
+                    Pricing {
+                        // 0.03
+                        min: UnifiedNum::from_whole(0.03),
+                        max: UnifiedNum::from_whole(0.1),
+                    },
+                )]
+                .into_iter()
+                .collect(),
+                ..DUMMY_CAMPAIGN.clone()
+            };
             let channel_chain = app
                 .config
                 .find_chain_of(DUMMY_CAMPAIGN.channel.token)
@@ -956,28 +994,33 @@ pub mod insert_events {
             let channel_context = channel_chain.with_channel(DUMMY_CAMPAIGN.channel);
 
             // make sure that the Channel is created in Database for the Accounting to work properly
-            insert_channel(&database.pool, &channel_context)
+            insert_channel(&app.pool, &channel_context)
                 .await
                 .expect("It should insert Channel");
 
             let publisher = *PUBLISHER;
+            let session = Session {
+                ip: None,
+                country: None,
+                referrer_header: None,
+                os: None,
+            };
 
             let leader = campaign.leader().unwrap();
             let follower = campaign.follower().unwrap();
-            let payout = UnifiedNum::from_whole(0.03);
+
+            let events = vec![Event::Impression {
+                publisher,
+                ad_unit: DUMMY_IPFS[0],
+                ad_slot: DUMMY_IPFS[1],
+                referrer: None,
+            }];
 
             // No Campaign Remaining set, should error
             {
-                let spend_event = spend_for_event(
-                    &database.pool,
-                    &campaign_remaining,
-                    &campaign,
-                    publisher,
-                    leader,
-                    follower,
-                    payout,
-                )
-                .await;
+                let spend_event =
+                    spend_for_events(&app, &campaign, events.clone(), &session, leader, follower)
+                        .await;
 
                 assert!(
                     matches!(
@@ -992,37 +1035,34 @@ pub mod insert_events {
 
             // Repeat the same call, but set the Campaign remaining budget in Redis
             {
-                // 0.11 budget left
-                set_campaign_remaining(&mut redis, campaign.id, 11_000_000).await;
-
-                let spend_event = spend_for_event(
-                    &database.pool,
-                    &campaign_remaining,
-                    &campaign,
-                    publisher,
-                    leader,
-                    follower,
-                    payout,
+                set_campaign_remaining(
+                    &mut app.redis,
+                    campaign.id,
+                    campaign.budget.to_u64() as i64,
                 )
                 .await;
+
+                let spend_event =
+                    spend_for_events(&app, &campaign, events.clone(), &session, leader, follower)
+                        .await;
 
                 assert!(
                     spend_event.is_ok(),
                     "Campaign budget has no remaining funds to spend or an error occurred"
                 );
 
-                // Payout: 0.03
+                // Payout: 0.03 (min pricing bound)
                 // Leader fee: 0.03
                 // Leader payout: 0.03 * 0.03 / 1000.0 = 0.00 000 090 = UnifiedNum(90)
                 //
                 // Follower fee: 0.02
                 // Follower payout: 0.03 * 0.02 / 1000.0 = 0.00 000 060 = UnifiedNum(60)
-
+                //
                 // campaign budget left - payout - leader fee - follower fee
-                // 0.11 - 0.03 - 0.00 000 090 - 0.00 000 060 = 0.07999850
+                // 1000.0 - 0.03 - 0.00 000 090 - 0.00 000 060 = 999.9699985
                 assert_eq!(
-                    Some(7_999_850_i64),
-                    campaign_remaining
+                    Some(99_996_999_850),
+                    app.campaign_remaining
                         .get_remaining_opt(campaign.id)
                         .await
                         .expect("Should have key")
@@ -1050,9 +1090,10 @@ mod test {
         config::GANACHE_CONFIG,
         sentry::campaign_list::{CampaignListResponse, ValidatorParam},
         test_util::{
-            DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, FOLLOWER, GUARDIAN,
-            IDS, LEADER, LEADER_2, PUBLISHER_2,
+            CREATOR, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, FOLLOWER,
+            GUARDIAN, IDS, LEADER, LEADER_2, PUBLISHER_2,
         },
+        unified_num::FromWhole,
         ValidatorDesc, ValidatorId,
     };
 
@@ -1071,21 +1112,18 @@ mod test {
             .expect("Channel token should be whitelisted in config!");
         let channel_context = channel_chain.with_channel(dummy_channel);
 
-        let multiplier = 10_u64.pow(UnifiedNum::PRECISION.into());
-
-        // this function should be called before each creation/modification of a Campaign!
-        let add_deposit_call = |channel_context: &ChainOf<Channel>, for_address: Address| {
-            app.adapter.client.add_deposit_call(
-                channel_context.context.id(),
-                for_address,
-                Deposit {
-                    // a deposit 4 times larger than the first Campaign.budget = 500
-                    // I.e. 2 000 TOKENS
-                    total: UnifiedNum::from(200_000_000_000)
-                        .to_precision(channel_context.token.precision.get()),
-                },
-            )
-        };
+        // Set the deposit for the CREATOR use for all campaigns in the test
+        assert_eq!(*CREATOR, DUMMY_CAMPAIGN.creator);
+        app.adapter.client.set_deposit(
+            &channel_context,
+            *CREATOR,
+            Deposit {
+                // a deposit 4 times larger than the first Campaign.budget = 500
+                // I.e. 2 000 TOKENS
+                total: UnifiedNum::from_whole(2_000)
+                    .to_precision(channel_context.token.precision.get()),
+            },
+        );
 
         let build_request = |create_campaign: CreateCampaign| -> Request<Body> {
             let auth = Auth {
@@ -1106,9 +1144,7 @@ mod test {
         let campaign_context: ChainOf<Campaign> = {
             // erases the CampaignId for the CreateCampaign request
             let mut create = CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
-            create.budget = UnifiedNum::from(500 * multiplier);
-            // prepare for Campaign creation
-            add_deposit_call(&channel_context, create.creator);
+            create.budget = UnifiedNum::from_whole(500);
 
             let create_response = create_campaign(build_request(create), &app)
                 .await
@@ -1146,7 +1182,7 @@ mod test {
         // new Campaign.budget = 1 000
         // Deposit left = 1 000
         let modified = {
-            let new_budget = UnifiedNum::from(1000 * multiplier);
+            let new_budget = UnifiedNum::from_whole(1000);
             let modify = ModifyCampaign {
                 budget: Some(new_budget),
                 validators: None,
@@ -1156,10 +1192,6 @@ mod test {
                 ad_units: None,
                 targeting_rules: None,
             };
-
-            // prepare for Campaign modification.
-            // does not alter the deposit amount
-            add_deposit_call(&channel_context, campaign_context.context.creator);
 
             let modified_campaign = modify_campaign(
                 app.adapter.clone(),
@@ -1186,10 +1218,7 @@ mod test {
             // erases the CampaignId for the CreateCampaign request
             let mut create_second =
                 CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
-            create_second.budget = UnifiedNum::from(500 * multiplier);
-
-            // prepare for Campaign creation
-            add_deposit_call(&channel_context, create_second.creator);
+            create_second.budget = UnifiedNum::from_whole(500);
 
             let create_response = create_campaign(build_request(create_second), &app)
                 .await
@@ -1212,10 +1241,7 @@ mod test {
         {
             // erases the CampaignId for the CreateCampaign request
             let mut create = CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
-            create.budget = UnifiedNum::from(600 * multiplier);
-
-            // prepare for Campaign creation
-            add_deposit_call(&channel_context, create.creator);
+            create.budget = UnifiedNum::from_whole(600);
 
             let create_err = create_campaign(build_request(create), &app)
                 .await
@@ -1231,7 +1257,7 @@ mod test {
 
         // modify first campaign, by lowering the budget from 1000 to 900
         let modified = {
-            let lower_budget = UnifiedNum::from(90_000_000_000);
+            let lower_budget = UnifiedNum::from_whole(900);
             let modify = ModifyCampaign {
                 budget: Some(lower_budget),
                 validators: None,
@@ -1241,9 +1267,6 @@ mod test {
                 ad_units: None,
                 targeting_rules: None,
             };
-
-            // prepare for Campaign modification
-            add_deposit_call(&channel_context, modified.context.creator);
 
             let modified_campaign = modify_campaign(
                 app.adapter.clone(),
@@ -1267,10 +1290,7 @@ mod test {
         {
             // erases the CampaignId for the CreateCampaign request
             let mut create = CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
-            create.budget = UnifiedNum::from(600 * multiplier);
-
-            // prepare for Campaign creation
-            add_deposit_call(&channel_context, create.creator);
+            create.budget = UnifiedNum::from_whole(600);
 
             let create_response = create_campaign(build_request(create), &app)
                 .await
@@ -1289,7 +1309,7 @@ mod test {
         // new Campaign.budget = 1100
         // current Campaign.budget = 900
         {
-            let new_budget = UnifiedNum::from(110_000_000_000);
+            let new_budget = UnifiedNum::from_whole(1_100);
             let modify = ModifyCampaign {
                 budget: Some(new_budget),
                 validators: None,
@@ -1299,9 +1319,6 @@ mod test {
                 ad_units: None,
                 targeting_rules: None,
             };
-
-            // prepare for Campaign modification
-            add_deposit_call(&channel_context, modified.context.creator);
 
             let modify_err = modify_campaign(
                 app.adapter.clone(),
@@ -1325,7 +1342,6 @@ mod test {
     async fn delta_budgets_are_calculated_correctly() {
         let redis = TESTS_POOL.get().await.expect("Should return Object");
         let campaign_remaining = CampaignRemaining::new(redis.connection.clone());
-        let multiplier = 10_u64.pow(UnifiedNum::PRECISION.into());
 
         let campaign = DUMMY_CAMPAIGN.clone();
 
@@ -1339,12 +1355,12 @@ mod test {
         // Spent cant be higher than the new budget
         {
             campaign_remaining
-                .set_initial(campaign.id, UnifiedNum::from_u64(600 * multiplier))
+                .set_initial(campaign.id, UnifiedNum::from_whole(600))
                 .await
                 .expect("should set");
 
             // campaign_spent > new_budget
-            let new_budget = UnifiedNum::from_u64(300 * multiplier);
+            let new_budget = UnifiedNum::from_whole(300);
             let delta_budget = get_delta_budget(&campaign_remaining, &campaign, new_budget).await;
 
             assert!(
@@ -1353,7 +1369,7 @@ mod test {
             );
 
             // campaign_spent == new_budget
-            let new_budget = UnifiedNum::from_u64(400 * multiplier);
+            let new_budget = UnifiedNum::from_whole(400);
             let delta_budget = get_delta_budget(&campaign_remaining, &campaign, new_budget).await;
 
             assert!(
@@ -1364,30 +1380,30 @@ mod test {
         // Increasing budget
         {
             campaign_remaining
-                .set_initial(campaign.id, UnifiedNum::from_u64(900 * multiplier))
+                .set_initial(campaign.id, UnifiedNum::from_whole(900))
                 .await
                 .expect("should set");
-            let new_budget = UnifiedNum::from_u64(1100 * multiplier);
+            let new_budget = UnifiedNum::from_whole(1_100);
             let delta_budget = get_delta_budget(&campaign_remaining, &campaign, new_budget)
                 .await
                 .expect("should get delta budget");
             assert!(delta_budget.is_some());
-            let increase_by = UnifiedNum::from_u64(100 * multiplier);
+            let increase_by = UnifiedNum::from_whole(100);
 
             assert_eq!(delta_budget, Some(DeltaBudget::Increase(increase_by)));
         }
         // Decreasing budget
         {
             campaign_remaining
-                .set_initial(campaign.id, UnifiedNum::from_u64(900 * multiplier))
+                .set_initial(campaign.id, UnifiedNum::from_whole(900))
                 .await
                 .expect("should set");
-            let new_budget = UnifiedNum::from_u64(800 * multiplier);
+            let new_budget = UnifiedNum::from_whole(800);
             let delta_budget = get_delta_budget(&campaign_remaining, &campaign, new_budget)
                 .await
                 .expect("should get delta budget");
             assert!(delta_budget.is_some());
-            let decrease_by = UnifiedNum::from_u64(200 * multiplier);
+            let decrease_by = UnifiedNum::from_whole(200);
 
             assert_eq!(delta_budget, Some(DeltaBudget::Decrease(decrease_by)));
         }

@@ -247,17 +247,13 @@ mod dsl_test {
             ),
             // with rounding up
             (
-                Value::Number(
-                    Number::from_f64(9.99_999_999_9).expect("should create float number"),
-                ),
+                Value::Number(Number::from_f64(9.999_999_999).expect("should create float number")),
                 Value::UnifiedNum(UnifiedNum::from_whole(10)),
             ),
             // rounding down
             (
-                Value::Number(
-                    Number::from_f64(8.99_999_999_4).expect("should create float number"),
-                ),
-                Value::UnifiedNum(UnifiedNum::from(8_99_999_999)),
+                Value::Number(Number::from_f64(8.999_999_994).expect("should create float number")),
+                Value::UnifiedNum(UnifiedNum::from(899_999_999)),
             ),
         ];
 
@@ -390,13 +386,13 @@ mod math_functions {
                 Value::new_number(100),
                 Value::UnifiedNum(UnifiedNum::from_whole(3)),
                 // 33.33 333 333
-                Value::UnifiedNum(UnifiedNum::from(33_33_333_333)),
+                Value::UnifiedNum(UnifiedNum::from(3_333_333_333)),
             ),
             (
                 Value::UnifiedNum(UnifiedNum::from_whole(100)),
                 Value::new_number(3),
                 // 33.33 333 333
-                Value::UnifiedNum(UnifiedNum::from(33_33_333_333)),
+                Value::UnifiedNum(UnifiedNum::from(3_333_333_333)),
             ),
             (
                 Value::Number(Number::from_f64(100.0).expect("should create float number")),
@@ -974,7 +970,7 @@ mod math_functions {
         ));
         assert_eq!(
             Ok(Some(Value::UnifiedNum(UnifiedNum::from_whole(50)))),
-            rule.clone().eval(&input, &mut output),
+            rule.eval(&input, &mut output),
             "rule: {rule:?}"
         );
     }
