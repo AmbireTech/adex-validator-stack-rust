@@ -7,6 +7,9 @@ fn main() {
     {
         let create_campaign = CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
 
+        let create_campaign_str =
+            serde_json::to_string(&create_campaign).expect("should serialize");
+
         let create_campaign_json = json!({
             "id":null,
             "channel":{
@@ -35,7 +38,7 @@ fn main() {
             "eventSubmission":{"allow":[]},
             "targetingRules":[],
             "created":1612162800000_u64,
-            "activeTo":4073414400000_u64
+            "active_to":4073414400000_u64
         });
 
         let create_campaign_json =
@@ -82,7 +85,7 @@ fn main() {
             "eventSubmission":{"allow":[]},
             "targetingRules":[],
             "created":1612162800000_u64,
-            "activeTo":4073414400000_u64
+            "active_to":4073414400000_u64
         });
 
         let create_campaign_json =
