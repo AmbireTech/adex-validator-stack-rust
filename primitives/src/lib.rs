@@ -46,6 +46,11 @@ pub mod sentry;
 pub mod spender;
 pub mod supermarket;
 pub mod targeting;
+// It's not possible to enable this feature for doctest,
+// so we always must pass `--feature=test-util` or `--all-features` when running doctests:
+// `cargo test --doc --all-features`
+//
+// See issue: <https://github.com/rust-lang/rust/issues/67295>
 #[cfg(any(test, feature = "test-util"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "test-util")))]
 pub mod test_util;
