@@ -41,23 +41,8 @@ fn main() {
 
     // Query with all possible fields (publisher/advertiser/admin)
     {
-        let query_str = r#"limit=200
-            &eventType=CLICK
-            &metric=paid
-            &segmentBy=country
-            &timeframe=week
-            &start=420
-            &campaignId=0x936da01f9abd4d9d80c702af85c822a8
-            &adUnit=QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR
-            &adSlot=Qmasg8FrbuSQpjFu3kRnZF9beg8rEBFrqgi1uXDRwCbX5f
-            &adSlotType=legacy_300x100
-            &avertiser=0xDd589B43793934EF6Ad266067A0d1D4896b0dff0
-            &publisher=0xE882ebF439207a70dDcCb39E13CA8506c9F45fD9
-            &hostname=localhost
-            &country=Bulgaria
-            &osName=Windows
-            &chains[0]=1&chains[1]=1337
-        "#;
+        let query_str = "limit=200&eventType=CLICK&metric=paid&segmentBy=country&timeframe=week&start=2022-08-04+09:00:00.000000000+UTC&campaignId=0x936da01f9abd4d9d80c702af85c822a8&adUnit=QmcUVX7fvoLMM93uN2bD3wGTH8MXSxeL8hojYfL2Lhp7mR&adSlot=Qmasg8FrbuSQpjFu3kRnZF9beg8rEBFrqgi1uXDRwCbX5f&adSlotType=legacy_300x100&advertiser=0xDd589B43793934EF6Ad266067A0d1D4896b0dff0&publisher=0xE882ebF439207a70dDcCb39E13CA8506c9F45fD9\
+        &hostname=localhost&country=Bulgaria&osName=Windows&chains[0]=1&chains[1]=1337";
         let query: AnalyticsQuery = serde_qs::from_str(query_str).unwrap();
 
         assert_eq!(query.limit, 200);
@@ -68,7 +53,7 @@ fn main() {
             query.time,
             Time {
                 timeframe: Timeframe::Week,
-                start: DateHour::from_ymdh(2021, 12, 31, 22),
+                start: DateHour::from_ymdh(2022, 8, 4, 9),
                 end: None,
             }
         );
