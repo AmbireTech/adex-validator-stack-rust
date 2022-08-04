@@ -36,6 +36,18 @@ required-features = ["test-util"]
 name = "create_campaign"
 required-features = ["test-util"]
 
+[[example]]
+name = "modify_campaign"
+required-features = ["test-util"]
+
+[[example]]
+name = "analytics_query"
+required-features = ["test-util"]
+
+[[example]]
+name = "analytics_response"
+required-features = ["test-util"]
+
 [dependencies]
 # (De)Serialization
 serde = { version = "1.0", features = ["derive"] }
