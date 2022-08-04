@@ -10,15 +10,19 @@ use crate::{
 };
 use adapter::client::Locked;
 use hyper::{Body, Request, Response};
-use primitives::analytics::{
-    query::{AllowedKey, ALLOWED_KEYS},
-    AnalyticsQuery, AuthenticateAs,
+use primitives::{
+    analytics::{
+        query::{AllowedKey, ALLOWED_KEYS},
+        AnalyticsQuery, AuthenticateAs,
+    },
+    sentry::AnalyticsResponse,
 };
 
 /// GET `/v5/analytics` routes
 /// with query parameters: [`primitives::analytics::AnalyticsQuery`].
 ///
-/// Returns `Vec<[FetchedAnalytics](primitives::sentry::FethedAnalytics)>`
+/// Response: [`primitives::sentry::AnalyticsResponse`]
+///
 /// Analytics routes:
 /// - GET `/v5/analytics`
 /// - GET `/v5/analytics/for-publisher`
@@ -84,7 +88,7 @@ pub async fn analytics<C: Locked + 'static>(
     )
     .await
     {
-        Ok(Ok(analytics)) => analytics,
+        Ok(Ok(analytics)) => AnalyticsResponse { analytics },
         // Error getting the analytics
         Ok(Err(err)) => return Err(err.into()),
         // Timeout error

@@ -290,6 +290,10 @@
 //!
 //! Allowed keys: [`AllowedKey::Country`][primitives::analytics::query::AllowedKey::Country], [`AllowedKey::AdSlotType`][primitives::analytics::query::AllowedKey::AdSlotType]
 //!
+//! Request query parameters: [`AnalyticsQuery`][primitives::analytics::AnalyticsQuery]
+//!
+//! Response: [`AnalyticsResponse`]
+//!
 //! #### GET `/v5/analytics/for-publisher` (auth required)
 //!
 //! Returns all analytics where the currently authenticated address [`Auth.uid`](crate::Auth::uid) is a **publisher**.
@@ -298,6 +302,10 @@
 //!
 //! The route is handled by [`get_analytics()`].
 //!
+//! Request query parameters: [`AnalyticsQuery`][primitives::analytics::AnalyticsQuery]
+//!
+//! Response: [`AnalyticsResponse`]
+//!
 //! #### GET `/v5/analytics/for-advertiser` (auth required)
 //!
 //! Returns all analytics where the currently authenticated address [`Auth.uid`](crate::Auth::uid) is an **advertiser**.
@@ -305,6 +313,10 @@
 //! All [`ALLOWED_KEYS`] are allowed for this route.
 //!
 //! The route is handled by [`get_analytics()`].
+//!
+//! Request query parameters: [`AnalyticsQuery`][primitives::analytics::AnalyticsQuery]
+//!
+//! Response: [`AnalyticsResponse`]
 //!
 //! #### GET `/v5/analytics/for-admin` (auth required)
 //!
@@ -315,6 +327,10 @@
 //! Admin addresses are configured in the [`Config.admins`](primitives::Config::admins).
 //!
 //! The route is handled by [`get_analytics()`].
+//!
+//! Request query parameters: [`AnalyticsQuery`][primitives::analytics::AnalyticsQuery]
+//!
+//! Response: [`AnalyticsResponse`]
 //!
 //! [`Adapter`]: adapter::Adapter
 //! [`Address`]: primitives::Address
@@ -334,6 +350,8 @@
 //! [`check_access()`]: crate::access::check_access
 //! [`SuccessResponse`]: primitives::sentry::SuccessResponse
 //! [`ValidatorId`]: primitives::ValidatorId
+//! [`AnalyticsResponse`]: primitives::sentry::AnalyticsResponse
+//! [`AnalyticsQuery`]: primitives::analytics::AnalyticsQuery
 
 pub use analytics::analytics as get_analytics;
 

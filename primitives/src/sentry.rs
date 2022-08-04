@@ -319,6 +319,12 @@ pub struct FetchedAnalytics {
     pub segment: Option<String>,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AnalyticsResponse {
+    pub analytics: Vec<FetchedAnalytics>,
+}
+
 /// The value of the requested analytics [`crate::analytics::Metric`].
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
 #[serde(untagged)]

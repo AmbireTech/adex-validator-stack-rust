@@ -232,8 +232,8 @@ mod tests {
         analytics::{query::Time, AnalyticsQuery, Metric, Timeframe},
         balances::CheckedState,
         sentry::{
-            campaign_create::CreateCampaign, AccountingResponse, DateHour, Event, EventType,
-            FetchedAnalytics, FetchedMetric, SuccessResponse, CLICK, IMPRESSION,
+            campaign_create::CreateCampaign, AccountingResponse, AnalyticsResponse, DateHour,
+            Event, EventType, FetchedAnalytics, FetchedMetric, SuccessResponse, CLICK, IMPRESSION,
         },
         spender::Spender,
         test_util::{
@@ -2751,8 +2751,9 @@ mod tests {
             .send()
             .await
             .context("failed to get analytics")?
-            .json::<Vec<FetchedAnalytics>>()
+            .json::<AnalyticsResponse>()
             .await
+            .map(|response| response.analytics)
             .context("failed to deserialize json")
     }
 }
