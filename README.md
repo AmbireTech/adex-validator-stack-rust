@@ -255,3 +255,10 @@ all the required services for the specific crate/application before executing th
 ### License
 
 This project is licensed under the [AGPL-3.0 license](./LICENSE)
+
+### Contribution
+
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in AdEx Validator by you, shall be licensed as AGPL-3.0, without any additional terms or conditions.
+
+#### Sign the CLA
+When you contribute to a AdEx Validator open source project on GitHub with a new pull request, a bot will evaluate whether you have signed the CLA. If required, the bot will comment on the pull request, including a link to this system to accept the agreement. 
