@@ -319,6 +319,12 @@ pub struct FetchedAnalytics {
     pub segment: Option<String>,
 }
 
+// Response returned when getting Analytics - an array of FetchedAnalytics
+//
+/// # Examples:
+/// ```
+#[doc = include_str!("../examples/analytics_response.rs")]
+/// ```
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct AnalyticsResponse {
