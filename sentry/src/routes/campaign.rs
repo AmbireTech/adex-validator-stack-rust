@@ -146,7 +146,7 @@ pub async fn fetch_campaign_ids_for_channel(
 ///
 /// Expected request body: [`CreateCampaign`](`primitives::sentry::campaign_create::CreateCampaign`)
 ///
-/// Expected response: [Campaign](`primitives::Campaign`)
+/// Expected response: [`Campaign`](primitives::Campaign)
 pub async fn create_campaign<C>(
     req: Request<Body>,
     app: &Application<C>,
