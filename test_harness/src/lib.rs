@@ -233,7 +233,7 @@ mod tests {
         balances::CheckedState,
         sentry::{
             campaign_create::CreateCampaign, AccountingResponse, AnalyticsResponse, DateHour,
-            Event, EventType, FetchedAnalytics, FetchedMetric, SuccessResponse, CLICK, IMPRESSION,
+            Event, EventType, FetchedAnalytics, FetchedMetric, SuccessResponse, CLICK, IMPRESSION, InsertEventsRequest,
         },
         spender::Spender,
         test_util::{
@@ -2692,9 +2692,9 @@ mod tests {
             .join(&format!("v5/campaign/{}/events", campaign_context.context))
             .expect("valid endpoint");
 
-        let request_body = vec![("events".to_string(), events)]
-            .into_iter()
-            .collect::<HashMap<_, _>>();
+        let request_body = InsertEventsRequest {
+            events: events.to_vec(),
+        };
 
         let auth_token = sentry
             .adapter
