@@ -233,7 +233,8 @@ mod tests {
         balances::CheckedState,
         sentry::{
             campaign_create::CreateCampaign, AccountingResponse, AnalyticsResponse, DateHour,
-            Event, EventType, FetchedAnalytics, FetchedMetric, SuccessResponse, CLICK, IMPRESSION, InsertEventsRequest,
+            Event, EventType, FetchedAnalytics, FetchedMetric, InsertEventsRequest,
+            SuccessResponse, CLICK, IMPRESSION,
         },
         spender::Spender,
         test_util::{

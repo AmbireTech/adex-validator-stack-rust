@@ -606,7 +606,7 @@ pub mod insert_events {
     use hyper::{Body, Request, Response};
     use primitives::{
         balances::{Balances, CheckedState, OverflowError},
-        sentry::{Event, SuccessResponse, InsertEventsRequest},
+        sentry::{Event, InsertEventsRequest, SuccessResponse},
         Address, Campaign, CampaignId, ChainOf, DomainError, UnifiedNum, ValidatorDesc,
     };
     use slog::{error, Logger};
