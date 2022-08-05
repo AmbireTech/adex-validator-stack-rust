@@ -144,9 +144,9 @@ pub async fn fetch_campaign_ids_for_channel(
 
 /// POST `/v5/campaign`
 ///
-/// Expected request body: [`CreateCampaign`](`primitives::sentry::campaign_create::CreateCampaign`)
+/// Request body (json): [`CreateCampaign`](`primitives::sentry::campaign_create::CreateCampaign`)
 ///
-/// Expected response: [Campaign](`primitives::Campaign`)
+/// Response: [Campaign](`primitives::Campaign`)
 pub async fn create_campaign<C>(
     req: Request<Body>,
     app: &Application<C>,
@@ -374,10 +374,10 @@ pub mod update_campaign {
 
     /// POST `/v5/campaign/:id` (auth required)
     ///
-    /// Request body is [`ModifyCampaign`](`primitives::sentry::campaign_modify::ModifyCampaign`)
-    /// which consists of all the editable fields of the [`Campaign`]
+    /// Request body (json): [`ModifyCampaign`](`primitives::sentry::campaign_modify::ModifyCampaign`)
+    /// consists of all of the editable fields of the [`Campaign`]
     ///
-    /// Returns the updated [`Campaign`] serialized
+    /// Response[`Campaign`](`primitives::Campaign`)
     ///
     /// Ensures that the remaining funds for all campaigns <= total remaining funds (total deposited - total spent)
     ///
@@ -642,9 +642,15 @@ pub mod insert_events {
 
     /// POST `/v5/campaign/:id/events`
     ///
-    /// The expected request body is `Vec<[Event](primitives::Event)>`
+    /// Request body (json):
     ///
-    /// The expected Response is [`SuccessResponse`](primitives::sentry::SuccessResponse)
+    /// ```json
+    /// {
+    ///     "events": [[`Event`](`primitives::Event`)]
+    /// }
+    /// ```
+    ///
+    /// Response: [`SuccessResponse`](primitives::sentry::SuccessResponse)
     pub async fn handle_route<C: Locked + 'static>(
         req: Request<Body>,
         app: &Application<C>,
