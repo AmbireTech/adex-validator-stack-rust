@@ -295,7 +295,7 @@
 //!
 //! Allowed keys: [`AllowedKey::Country`][primitives::analytics::query::AllowedKey::Country], [`AllowedKey::AdSlotType`][primitives::analytics::query::AllowedKey::AdSlotType]
 //!
-//! Request query parameters: [`AnalyticsQuery`][primitives::analytics::AnalyticsQuery]
+//! Request query parameters: [`AnalyticsQuery`]
 //!
 //! Response: [`AnalyticsResponse`]
 //!
@@ -321,7 +321,7 @@
 //!
 //! The route is handled by [`get_analytics()`].
 //!
-//! Request query parameters: [`AnalyticsQuery`][primitives::analytics::AnalyticsQuery]
+//! Request query parameters: [`AnalyticsQuery`]
 //!
 //! Response: [`AnalyticsResponse`]
 //!
@@ -337,7 +337,7 @@
 //!
 //! The route is handled by [`get_analytics()`].
 //!
-//! Request query parameters: [`AnalyticsQuery`][primitives::analytics::AnalyticsQuery]
+//! Request query parameters: [`AnalyticsQuery`]
 //!
 //! Response: [`AnalyticsResponse`]
 //!
@@ -355,7 +355,7 @@
 //!
 //! The route is handled by [`get_analytics()`].
 //!
-//! Request query parameters: [`AnalyticsQuery`][primitives::analytics::AnalyticsQuery]
+//! Request query parameters: [`AnalyticsQuery`]
 //!
 //! Response: [`AnalyticsResponse`]
 //!
