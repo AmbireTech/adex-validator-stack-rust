@@ -19,7 +19,7 @@ use primitives::{
 };
 
 /// GET `/v5/analytics` routes
-/// with query parameters: [`primitives::analytics::AnalyticsQuery`].
+/// Request query parameters: [`primitives::analytics::AnalyticsQuery`].
 ///
 /// Response: [`primitives::sentry::AnalyticsResponse`]
 ///
