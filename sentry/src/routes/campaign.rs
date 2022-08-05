@@ -593,8 +593,6 @@ pub mod update_campaign {
 
 pub mod insert_events {
 
-    use std::collections::HashMap;
-
     use crate::{
         access::{self, check_access},
         analytics,
@@ -608,7 +606,7 @@ pub mod insert_events {
     use hyper::{Body, Request, Response};
     use primitives::{
         balances::{Balances, CheckedState, OverflowError},
-        sentry::{Event, SuccessResponse},
+        sentry::{Event, SuccessResponse, InsertEventsRequest},
         Address, Campaign, CampaignId, ChainOf, DomainError, UnifiedNum, ValidatorDesc,
     };
     use slog::{error, Logger};
@@ -642,9 +640,9 @@ pub mod insert_events {
 
     /// POST `/v5/campaign/:id/events`
     ///
-    /// The expected request body is `Vec<[Event](primitives::Event)>`
+    /// Request body (json): [`InsertEventsRequest`]
     ///
-    /// The expected Response is [`SuccessResponse`](primitives::sentry::SuccessResponse)
+    /// Response: [`SuccessResponse`]
     pub async fn handle_route<C: Locked + 'static>(
         req: Request<Body>,
         app: &Application<C>,
@@ -663,17 +661,13 @@ pub mod insert_events {
             .expect("request should have a Campaign loaded");
 
         let body_bytes = hyper::body::to_bytes(req_body).await?;
-        let mut request_body = serde_json::from_slice::<HashMap<String, Vec<Event>>>(&body_bytes)?;
+        let request_body = serde_json::from_slice::<InsertEventsRequest>(&body_bytes)?;
 
-        let events = request_body
-            .remove("events")
-            .ok_or_else(|| ResponseError::BadRequest("invalid request".to_string()))?;
-
-        let processed = process_events(app, auth, session, campaign_context, events).await?;
+        process_events(app, auth, session, campaign_context, request_body.events).await?;
 
         Ok(Response::builder()
             .header("Content-type", "application/json")
-            .body(serde_json::to_string(&SuccessResponse { success: processed })?.into())
+            .body(serde_json::to_string(&SuccessResponse { success: true })?.into())
             .unwrap())
     }
 
@@ -683,7 +677,7 @@ pub mod insert_events {
         session: &Session,
         campaign_context: &ChainOf<Campaign>,
         events: Vec<Event>,
-    ) -> Result<bool, ResponseError> {
+    ) -> Result<(), ResponseError> {
         let campaign = &campaign_context.context;
 
         // handle events - check access
@@ -732,7 +726,7 @@ pub mod insert_events {
             events_success,
         );
 
-        Ok(true)
+        Ok(())
     }
 
     /// Max retries is `5` after which an error logging message will be recorded.
