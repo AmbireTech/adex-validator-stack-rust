@@ -17,9 +17,7 @@ fn main() {
         "time": 1659592800,
         "value": "100000000",
         "segment": "country"
-      }],
-      "totalPages": 1,
-      "page": 0
+      }]
     });
 
     assert!(from_value::<AnalyticsResponse>(json).is_ok());
