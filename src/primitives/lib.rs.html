@@ -232,6 +232,11 @@
 <span id="232">232</span>
 <span id="233">233</span>
 <span id="234">234</span>
+<span id="235">235</span>
+<span id="236">236</span>
+<span id="237">237</span>
+<span id="238">238</span>
+<span id="239">239</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">deny</span>(<span class="ident">rust_2018_idioms</span>)]</span>
 <span class="attribute">#![<span class="ident">deny</span>(<span class="ident">clippy::all</span>)]</span>
 <span class="attribute">#![<span class="ident">deny</span>(<span class="ident">rustdoc::broken_intra_doc_links</span>)]</span>
@@ -280,6 +285,11 @@
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">spender</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">supermarket</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">targeting</span>;
+<span class="comment">// It&#39;s not possible to enable this feature for doctest,</span>
+<span class="comment">// so we always must pass `--feature=test-util` or `--all-features` when running doctests:</span>
+<span class="comment">// `cargo test --doc --all-features`</span>
+<span class="comment">//</span>
+<span class="comment">// See issue: &lt;https://github.com/rust-lang/rust/issues/67295&gt;</span>
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">any</span>(<span class="ident">test</span>, <span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;test-util&quot;</span>))]</span>
 <span class="attribute">#[<span class="ident">cfg_attr</span>(<span class="ident">docsrs</span>, <span class="ident">doc</span>(<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;test-util&quot;</span>)))]</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">test_util</span>;
@@ -467,4 +477,4 @@
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (4493a0f47 2022-08-02)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (d394408fb 2022-08-07)" ></div></body></html>
