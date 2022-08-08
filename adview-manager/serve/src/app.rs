@@ -5,7 +5,7 @@ use log::info;
 
 use tera::Tera;
 
-use crate::routes::{get_ad, get_index, get_preview_video};
+use crate::routes::{get_preview_ad, get_index, get_preview_video};
 
 #[derive(Debug)]
 pub struct State {
@@ -45,7 +45,7 @@ impl Application {
         // build our application with a single route
         let app = Router::new()
             .route("/", get(get_index))
-            .route("/preview/ad", get(get_ad))
+            .route("/preview/ad", get(get_preview_ad))
             .route("/preview/video", get(get_preview_video))
             .layer(Extension(self.state.clone()));
 

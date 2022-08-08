@@ -32,8 +32,8 @@ pub async fn get_index(Extension(state): Extension<Arc<State>>) -> Html<String> 
     Html(html)
 }
 
-/// `GET /ad`
-pub async fn get_ad(Extension(state): Extension<Arc<State>>) -> Html<String> {
+/// `GET /preview/ad`
+pub async fn get_preview_ad(Extension(state): Extension<Arc<State>>) -> Html<String> {
     // For mocking the `get_market_demand_resp` call
     let mock_server = MockServer::start().await;
 
