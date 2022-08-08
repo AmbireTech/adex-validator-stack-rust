@@ -2,7 +2,7 @@
 authors = ["Ambire <dev@ambire.com>", "Lachezar Lechev <lachezar@ambire.com>"]
 edition = "2021"
 name = "adview-manager"
-version = "0.1.0"
+version = "0.2.0"
 license = "AGPL-3.0"
 
 [package.metadata.docs.rs]
@@ -11,7 +11,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 # Domain
-adex_primitives = { path = "../primitives", package = "primitives", features = ["test-util"] }
+adex_primitives = { version="0.2.0", path = "../primitives", package = "primitives" }
 chrono = "0.4"
 num-integer = "0.1"
 # (De)Serialization & Http requests
@@ -27,3 +27,8 @@ async-std = "1"
 once_cell = "1"
 thiserror = "1"
 rand = "0.8"
+
+[dev-dependencies]
+# enable the `test-util` only in dev
+adex_primitives = { version="0.2.0", path = "../primitives", package = "primitives", features = ["test-util"] }
+
