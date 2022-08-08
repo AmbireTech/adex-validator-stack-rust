@@ -94,6 +94,12 @@ mod postgres {
 
 pub mod query;
 
+// Query used for filtering analytics
+//
+/// # Examples:
+/// ```
+#[doc = include_str!("../examples/analytics_query.rs")]
+/// ```
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct AnalyticsQuery {

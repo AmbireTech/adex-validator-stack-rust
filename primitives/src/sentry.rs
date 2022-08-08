@@ -319,6 +319,19 @@ pub struct FetchedAnalytics {
     pub segment: Option<String>,
 }
 
+/// Response returned when getting Analytics which returns the [`FetchedAnalytics`].
+///
+/// # Examples
+///
+/// ```
+#[doc = include_str!("../examples/analytics_response.rs")]
+/// ```
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AnalyticsResponse {
+    pub analytics: Vec<FetchedAnalytics>,
+}
+
 /// The value of the requested analytics [`crate::analytics::Metric`].
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
 #[serde(untagged)]
@@ -639,6 +652,13 @@ pub struct ValidationErrorResponse {
     pub validation: Vec<String>,
 }
 
+/// Request body for posting new [`Event`]s to a [`Campaign`](crate::Campaign).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct InsertEventsRequest {
+    pub events: Vec<Event>,
+}
+
 pub mod channel_list {
     use crate::{ChainId, Channel, ValidatorId};
     use serde::{Deserialize, Serialize};
@@ -802,6 +822,12 @@ pub mod campaign_create {
 
     /// All fields are present except the `CampaignId` which is randomly created
     /// This struct defines the Body of the request (in JSON)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    #[doc = include_str!("../examples/create_campaign.rs")]
+    /// ```
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     #[serde(rename_all = "camelCase")]
     pub struct CreateCampaign {
@@ -889,7 +915,12 @@ pub mod campaign_modify {
         AdUnit, Campaign, EventSubmission, UnifiedNum,
     };
 
-    // All editable fields stored in one place, used for checking when a budget is changed
+    /// All editable fields stored in one place, used for checking when a budget is changed
+    ///
+    /// # Examples:
+    /// ```
+    #[doc = include_str!("../examples/modify_campaign.rs")]
+    /// ```
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     pub struct ModifyCampaign {
         pub budget: Option<UnifiedNum>,

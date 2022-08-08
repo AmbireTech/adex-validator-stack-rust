@@ -272,6 +272,7 @@ pub async fn channels_router<C: Locked + 'static>(
     }
 }
 
+/// `/v5/campaign` router
 pub async fn campaigns_router<C: Locked + 'static>(
     mut req: Request<Body>,
     app: &Application<C>,
@@ -403,7 +404,10 @@ mod analytics_router_test {
             query::{AllowedKey, Time},
             AnalyticsQuery, Metric, OperatingSystem, Timeframe,
         },
-        sentry::{DateHour, FetchedAnalytics, FetchedMetric, UpdateAnalytics, CLICK, IMPRESSION},
+        sentry::{
+            AnalyticsResponse, DateHour, FetchedAnalytics, FetchedMetric, UpdateAnalytics, CLICK,
+            IMPRESSION,
+        },
         test_util::{ADVERTISER, DUMMY_CAMPAIGN, DUMMY_IPFS, IDS, LEADER, PUBLISHER, PUBLISHER_2},
         UnifiedNum,
     };
@@ -690,8 +694,9 @@ mod analytics_router_test {
                 .await
                 .expect("Should get json");
 
-            let fetched_analytics: Vec<FetchedAnalytics> =
-                serde_json::from_slice(&json).expect("Should get analytics response");
+            let fetched_analytics = serde_json::from_slice::<AnalyticsResponse>(&json)
+                .expect("Should get analytics response")
+                .analytics;
 
             assert_eq!(
                 vec![
@@ -748,8 +753,9 @@ mod analytics_router_test {
                 .await
                 .expect("Should get json");
 
-            let fetched_analytics: Vec<FetchedAnalytics> =
-                serde_json::from_slice(&json).expect("Should get analytics response");
+            let fetched_analytics = serde_json::from_slice::<AnalyticsResponse>(&json)
+                .expect("Should get analytics response")
+                .analytics;
             assert_eq!(
                 vec![FetchedMetric::Count(2)],
                 fetched_analytics
@@ -795,8 +801,9 @@ mod analytics_router_test {
                 .await
                 .expect("Should get json");
 
-            let fetched_analytics: Vec<FetchedAnalytics> =
-                serde_json::from_slice(&json).expect("Should get analytics response");
+            let fetched_analytics = serde_json::from_slice::<AnalyticsResponse>(&json)
+                .expect("Should get analytics response")
+                .analytics;
 
             assert_eq!(
                 vec![FetchedMetric::Count(1), FetchedMetric::Count(1)],
@@ -845,8 +852,9 @@ mod analytics_router_test {
                 .await
                 .expect("Should get json");
 
-            let fetched_analytics: Vec<FetchedAnalytics> =
-                serde_json::from_slice(&json).expect("Should get analytics response");
+            let fetched_analytics = serde_json::from_slice::<AnalyticsResponse>(&json)
+                .expect("Should get analytics response")
+                .analytics;
 
             assert_eq!(
                 vec![
@@ -898,8 +906,9 @@ mod analytics_router_test {
                 .await
                 .expect("Should get json");
 
-            let fetched_analytics: Vec<FetchedAnalytics> =
-                serde_json::from_slice(&json).expect("Should get analytics response");
+            let fetched_analytics = serde_json::from_slice::<AnalyticsResponse>(&json)
+                .expect("Should get analytics response")
+                .analytics;
 
             assert_eq!(
                 vec![
@@ -973,8 +982,9 @@ mod analytics_router_test {
                 .await
                 .expect("Should get json");
 
-            let fetched_analytics: Vec<FetchedAnalytics> =
-                serde_json::from_slice(&json).expect("Should get analytics response");
+            let fetched_analytics = serde_json::from_slice::<AnalyticsResponse>(&json)
+                .expect("Should get analytics response")
+                .analytics;
 
             assert_eq!(
                 vec![
@@ -1008,8 +1018,9 @@ mod analytics_router_test {
                 .await
                 .expect("Should get json");
 
-            let fetched_analytics: Vec<FetchedAnalytics> =
-                serde_json::from_slice(&json).expect("Should get analytics response");
+            let fetched_analytics = serde_json::from_slice::<AnalyticsResponse>(&json)
+                .expect("Should get analytics response")
+                .analytics;
 
             assert_eq!(
                 vec![
@@ -1045,8 +1056,9 @@ mod analytics_router_test {
                 .await
                 .expect("Should get json");
 
-            let fetched_analytics: Vec<FetchedAnalytics> =
-                serde_json::from_slice(&json).expect("Should get analytics response");
+            let fetched_analytics = serde_json::from_slice::<AnalyticsResponse>(&json)
+                .expect("Should get analytics response")
+                .analytics;
 
             assert_eq!(
                 // Limit is 2
@@ -1081,8 +1093,9 @@ mod analytics_router_test {
                 .await
                 .expect("Should get json");
 
-            let fetched_analytics: Vec<FetchedAnalytics> =
-                serde_json::from_slice(&json).expect("Should get analytics response");
+            let fetched_analytics = serde_json::from_slice::<AnalyticsResponse>(&json)
+                .expect("Should get analytics response")
+                .analytics;
 
             assert_eq!(
                 vec![
@@ -1114,8 +1127,9 @@ mod analytics_router_test {
                 .await
                 .expect("Should get json");
 
-            let fetched_analytics: Vec<FetchedAnalytics> =
-                serde_json::from_slice(&json).expect("Should get analytics response");
+            let fetched_analytics = serde_json::from_slice::<AnalyticsResponse>(&json)
+                .expect("Should get analytics response")
+                .analytics;
 
             assert_eq!(
                 vec![FetchedMetric::Count(100)],
@@ -1166,8 +1180,9 @@ mod analytics_router_test {
                 .await
                 .expect("Should get json");
 
-            let fetched_analytics: Vec<FetchedAnalytics> =
-                serde_json::from_slice(&json).expect("Should get analytics response");
+            let fetched_analytics = serde_json::from_slice::<AnalyticsResponse>(&json)
+                .expect("Should get analytics response")
+                .analytics;
 
             assert_eq!(
                 vec![
@@ -1220,8 +1235,9 @@ mod analytics_router_test {
                 .await
                 .expect("Should get json");
 
-            let fetched_analytics: Vec<FetchedAnalytics> =
-                serde_json::from_slice(&json).expect("Should get analytics response");
+            let fetched_analytics = serde_json::from_slice::<AnalyticsResponse>(&json)
+                .expect("Should get analytics response")
+                .analytics;
             assert_eq!(
                 vec![FetchedMetric::Count(69)],
                 fetched_analytics
@@ -1467,8 +1483,9 @@ mod analytics_router_test {
                 .await
                 .expect("Should get json");
 
-            let fetched_analytics: Vec<FetchedAnalytics> =
-                serde_json::from_slice(&json).expect("Should get analytics response");
+            let fetched_analytics = serde_json::from_slice::<AnalyticsResponse>(&json)
+                .expect("Should get analytics response")
+                .analytics;
 
             assert_eq!(
                 vec![FetchedMetric::Count(1), FetchedMetric::Count(3)],
@@ -1496,8 +1513,9 @@ mod analytics_router_test {
                 .await
                 .expect("Should get json");
 
-            let fetched_analytics: Vec<FetchedAnalytics> =
-                serde_json::from_slice(&json).expect("Should get analytics response");
+            let fetched_analytics = serde_json::from_slice::<AnalyticsResponse>(&json)
+                .expect("Should get analytics response")
+                .analytics;
 
             assert_eq!(
                 vec![FetchedMetric::Count(1), FetchedMetric::Count(5)],
@@ -1525,8 +1543,9 @@ mod analytics_router_test {
                 .await
                 .expect("Should get json");
 
-            let fetched_analytics: Vec<FetchedAnalytics> =
-                serde_json::from_slice(&json).expect("Should get analytics response");
+            let fetched_analytics = serde_json::from_slice::<AnalyticsResponse>(&json)
+                .expect("Should get analytics response")
+                .analytics;
             assert_eq!(
                 vec![FetchedMetric::Count(1), FetchedMetric::Count(5)],
                 fetched_analytics
@@ -1575,8 +1594,9 @@ mod analytics_router_test {
                 .await
                 .expect("Should get json");
 
-            let fetched_analytics: Vec<FetchedAnalytics> =
-                serde_json::from_slice(&json).expect("Should get analytics response");
+            let fetched_analytics = serde_json::from_slice::<AnalyticsResponse>(&json)
+                .expect("Should get analytics response")
+                .analytics;
             assert_eq!(1, fetched_analytics.len());
             assert_eq!(
                 FetchedMetric::Count(1),
@@ -1602,8 +1622,9 @@ mod analytics_router_test {
                 .await
                 .expect("Should get json");
 
-            let fetched_analytics: Vec<FetchedAnalytics> =
-                serde_json::from_slice(&json).expect("Should get analytics response");
+            let fetched_analytics = serde_json::from_slice::<AnalyticsResponse>(&json)
+                .expect("Should get analytics response")
+                .analytics;
             assert_eq!(
                 vec![FetchedMetric::Count(69)],
                 fetched_analytics
