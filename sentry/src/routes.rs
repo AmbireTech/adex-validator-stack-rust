@@ -106,7 +106,8 @@
 //!
 //! Request body (json): [`ValidatorMessagesCreateRequest`](primitives::sentry::ValidatorMessagesCreateRequest)
 //!
-//! Example:
+//! ##### Examples:
+//!
 //! ```json
 //! {
 //!     "messages": [
@@ -231,13 +232,19 @@
 //! **Authentication is required** to validate [`Campaign.creator`](primitives::Campaign::creator) == [`Auth.uid`](crate::Auth::uid)
 //!
 //! It will make sure the `Channel` is created if new and it will update
-//! the spendable amount using the [`Adapter`]`::get_deposit()`.
+//! the spendable amount using the [`Adapter.get_deposit()`](adapter::client::Locked::get_deposit).
 //!
 //! The route is handled by [`campaign::create_campaign()`].
 //!
 //! Request body (json): [`CreateCampaign`][primitives::sentry::campaign_create::CreateCampaign]
 //!
 //! Response: [`Campaign`]
+//!
+//! ##### Examples
+//!
+//! ```
+#![doc = include_str!("../../primitives/examples/create_campaign.rs")]
+//! ```
 //!
 //! #### POST `/v5/campaign/:id` (auth required)
 //!
@@ -251,6 +258,12 @@
 //!
 //! Response: [`Campaign`]
 //!
+//! ##### Examples
+//!
+//! ```
+#![doc = include_str!("../../primitives/examples/modify_campaign.rs")]
+//! ```
+//!
 //! #### POST `/v5/campaign/:id/events`
 //!
 //! Add new [`Event`]s (`IMPRESSION`s & `CLICK`s) to the [`Campaign`].
@@ -258,15 +271,7 @@
 //!
 //! The route is handled by [`campaign::insert_events::handle_route()`].
 //!
-//! Request body (json):
-//!
-//! ```json
-//! {
-//!     "events": [
-//!         // Events
-//!    ]
-//! }
-//! ```
+//! Request body (json): [`InsertEventsRequest`](primitives::sentry::InsertEventsRequest)
 //!
 //! Response: [`SuccessResponse`]
 //!
@@ -290,9 +295,23 @@
 //!
 //! Allowed keys: [`AllowedKey::Country`][primitives::analytics::query::AllowedKey::Country], [`AllowedKey::AdSlotType`][primitives::analytics::query::AllowedKey::AdSlotType]
 //!
-//! Request query parameters: [`AnalyticsQuery`][primitives::analytics::AnalyticsQuery]
+//! Request query parameters: [`AnalyticsQuery`]
 //!
 //! Response: [`AnalyticsResponse`]
+//!
+//! ##### Examples
+//!
+//! Query:
+//!
+//! ```
+#![doc = include_str!("../../primitives/examples/analytics_query.rs")]
+//! ```
+//!
+//! Response:
+//!
+//! ```
+#![doc = include_str!("../../primitives/examples/analytics_response.rs")]
+//! ```
 //!
 //! #### GET `/v5/analytics/for-publisher` (auth required)
 //!
@@ -302,9 +321,13 @@
 //!
 //! The route is handled by [`get_analytics()`].
 //!
-//! Request query parameters: [`AnalyticsQuery`][primitives::analytics::AnalyticsQuery]
+//! Request query parameters: [`AnalyticsQuery`]
 //!
 //! Response: [`AnalyticsResponse`]
+//!
+//! ##### Examples
+//!
+//! See [GET `/v5/analytics`](#get-v5analytics)
 //!
 //! #### GET `/v5/analytics/for-advertiser` (auth required)
 //!
@@ -314,9 +337,13 @@
 //!
 //! The route is handled by [`get_analytics()`].
 //!
-//! Request query parameters: [`AnalyticsQuery`][primitives::analytics::AnalyticsQuery]
+//! Request query parameters: [`AnalyticsQuery`]
 //!
 //! Response: [`AnalyticsResponse`]
+//!
+//! ##### Examples
+//!
+//! See [GET `/v5/analytics`](#get-v5analytics)
 //!
 //! #### GET `/v5/analytics/for-admin` (auth required)
 //!
@@ -328,9 +355,13 @@
 //!
 //! The route is handled by [`get_analytics()`].
 //!
-//! Request query parameters: [`AnalyticsQuery`][primitives::analytics::AnalyticsQuery]
+//! Request query parameters: [`AnalyticsQuery`]
 //!
 //! Response: [`AnalyticsResponse`]
+//!
+//! ##### Examples
+//!
+//! See [GET `/v5/analytics`](#get-v5analytics)
 //!
 //! [`Adapter`]: adapter::Adapter
 //! [`Address`]: primitives::Address

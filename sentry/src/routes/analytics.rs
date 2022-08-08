@@ -19,9 +19,9 @@ use primitives::{
 };
 
 /// GET `/v5/analytics` routes
-/// Request query parameters: [`primitives::analytics::AnalyticsQuery`].
+/// Request query parameters: [`AnalyticsQuery`].
 ///
-/// Response: [`primitives::sentry::AnalyticsResponse`]
+/// Response: [`AnalyticsResponse`]
 ///
 /// Analytics routes:
 /// - GET `/v5/analytics`

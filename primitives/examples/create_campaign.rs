@@ -3,15 +3,15 @@ use serde_json::json;
 use std::str::FromStr;
 
 fn main() {
-    // CreateCampaign in an HTTP request
+    // CreateCampaign in an HTTP request.
+    // A CampaignId will be randomly generated for the newly created Campaign.
     {
         let create_campaign = CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
 
-        let create_campaign_str =
+        let _create_campaign_str =
             serde_json::to_string(&create_campaign).expect("should serialize");
 
         let create_campaign_json = json!({
-            "id":null,
             "channel":{
                 "leader":"0x80690751969B234697e9059e04ed72195c3507fa",
                 "follower":"0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7",
@@ -34,7 +34,10 @@ fn main() {
                 }
             ],
             "title":"Dummy Campaign",
-            "pricingBounds":{"CLICK":{"min":"0","max":"0"},"IMPRESSION":{"min":"1","max":"10"}},
+            "pricingBounds":{
+                "CLICK":{"min":"0","max":"0"},
+                "IMPRESSION":{"min":"1","max":"10"}
+            },
             "eventSubmission":{"allow":[]},
             "targetingRules":[],
             "created":1612162800000_u64,
@@ -43,6 +46,7 @@ fn main() {
 
         let create_campaign_json =
             serde_json::to_string(&create_campaign_json).expect("should serialize");
+
         let deserialized: CreateCampaign =
             serde_json::from_str(&create_campaign_json).expect("should deserialize");
 

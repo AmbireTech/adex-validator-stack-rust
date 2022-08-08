@@ -319,9 +319,10 @@ pub struct FetchedAnalytics {
     pub segment: Option<String>,
 }
 
-// Response returned when getting Analytics - an array of FetchedAnalytics
-//
-/// # Examples:
+/// Response returned when getting Analytics which returns the [`FetchedAnalytics`].
+///
+/// # Examples
+///
 /// ```
 #[doc = include_str!("../examples/analytics_response.rs")]
 /// ```
@@ -649,6 +650,13 @@ pub struct ValidationErrorResponse {
     pub status_code: u64,
     pub message: String,
     pub validation: Vec<String>,
+}
+
+/// Request body for posting new [`Event`]s to a [`Campaign`](crate::Campaign).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct InsertEventsRequest {
+    pub events: Vec<Event>,
 }
 
 pub mod channel_list {
