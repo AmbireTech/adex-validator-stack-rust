@@ -175,6 +175,12 @@ mod event {
         }
     }
 
+    impl std::borrow::Borrow<str> for EventType {
+        fn borrow(&self) -> &str {
+            &self.as_str()
+        }
+    }
+
     impl From<EventType> for String {
         fn from(event_type: EventType) -> Self {
             event_type.to_string()
