@@ -1247,6 +1247,77 @@ mod analytics_router_test {
             );
         }
 
+        // Test where we add more than one event count
+        // with base date hour
+        // event type: CLICK
+        {
+            let analytics_base_hour = UpdateAnalytics {
+                time: base_datehour,
+                campaign_id: DUMMY_CAMPAIGN.id,
+                ad_unit: DUMMY_IPFS[0],
+                ad_slot: DUMMY_IPFS[1],
+                ad_slot_type: None,
+                advertiser: *ADVERTISER,
+                publisher: *PUBLISHER,
+                hostname: None,
+                country: Some("Bulgaria".to_string()),
+                os_name: OperatingSystem::map_os("Windows"),
+                chain_id: GANACHE_1337.chain_id,
+                event_type: CLICK,
+                amount_to_add: UnifiedNum::from_u64(1_000_000),
+                count_to_add: 69,
+            };
+            update_analytics(&app.pool, analytics_base_hour)
+                .await
+                .expect("Should update analytics");
+
+            let query = AnalyticsQuery {
+                limit: 1000,
+                event_type: CLICK,
+                metric: Metric::Count,
+                segment_by: None,
+                time: Time {
+                    timeframe: Timeframe::Day,
+                    start: base_datehour - 1,
+                    end: None,
+                },
+                campaign_id: None,
+                ad_unit: None,
+                ad_slot: None,
+                ad_slot_type: None,
+                advertiser: None,
+                publisher: None,
+                hostname: None,
+                country: None,
+                os_name: None,
+                chains: vec![GANACHE_1337.chain_id],
+            };
+            let query = serde_qs::to_string(&query).expect("should parse query");
+            let req = Request::builder()
+                .uri(format!("http://127.0.0.1/v5/analytics?{}", query))
+                .body(Body::empty())
+                .expect("Should build Request");
+
+            let analytics_response = analytics_router(req, &app)
+                .await
+                .expect("Should get analytics data");
+            let json = hyper::body::to_bytes(analytics_response.into_body())
+                .await
+                .expect("Should get json");
+
+            let fetched_analytics = serde_json::from_slice::<AnalyticsResponse>(&json)
+                .expect("Should get analytics response")
+                .analytics;
+
+            // 1 + 1 (from previous events) + 69 (from update in this test case) = 71
+            assert_eq!(
+                vec![FetchedMetric::Count(71)],
+                fetched_analytics
+                    .iter()
+                    .map(|analytics| analytics.value)
+                    .collect::<Vec<_>>(),
+            );
+        }
         // Test with timeframe=day and start_date= 2 or more days ago to check if the results vec is split properly
     }
 
