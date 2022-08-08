@@ -1628,6 +1628,27 @@
 <span id="1628">1628</span>
 <span id="1629">1629</span>
 <span id="1630">1630</span>
+<span id="1631">1631</span>
+<span id="1632">1632</span>
+<span id="1633">1633</span>
+<span id="1634">1634</span>
+<span id="1635">1635</span>
+<span id="1636">1636</span>
+<span id="1637">1637</span>
+<span id="1638">1638</span>
+<span id="1639">1639</span>
+<span id="1640">1640</span>
+<span id="1641">1641</span>
+<span id="1642">1642</span>
+<span id="1643">1643</span>
+<span id="1644">1644</span>
+<span id="1645">1645</span>
+<span id="1646">1646</span>
+<span id="1647">1647</span>
+<span id="1648">1648</span>
+<span id="1649">1649</span>
+<span id="1650">1650</span>
+<span id="1651">1651</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This module contains all the Sentry REST API routers.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! Ideally these routers will be replaced with proper routing,</span>
@@ -1902,6 +1923,7 @@
     }
 }
 
+<span class="doccomment">/// `/v5/campaign` router</span>
 <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">campaigns_router</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Locked</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span>(
     <span class="kw-2">mut</span> <span class="ident">req</span>: <span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>,
     <span class="ident">app</span>: <span class="kw-2">&amp;</span><span class="ident">Application</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
@@ -2033,7 +2055,10 @@
             <span class="ident">query</span>::{<span class="ident">AllowedKey</span>, <span class="ident">Time</span>},
             <span class="ident">AnalyticsQuery</span>, <span class="ident">Metric</span>, <span class="ident">OperatingSystem</span>, <span class="ident">Timeframe</span>,
         },
-        <span class="ident">sentry</span>::{<span class="ident">DateHour</span>, <span class="ident">FetchedAnalytics</span>, <span class="ident">FetchedMetric</span>, <span class="ident">UpdateAnalytics</span>, <span class="ident">CLICK</span>, <span class="ident">IMPRESSION</span>},
+        <span class="ident">sentry</span>::{
+            <span class="ident">AnalyticsResponse</span>, <span class="ident">DateHour</span>, <span class="ident">FetchedAnalytics</span>, <span class="ident">FetchedMetric</span>, <span class="ident">UpdateAnalytics</span>, <span class="ident">CLICK</span>,
+            <span class="ident">IMPRESSION</span>,
+        },
         <span class="ident">test_util</span>::{<span class="ident">ADVERTISER</span>, <span class="ident">DUMMY_CAMPAIGN</span>, <span class="ident">DUMMY_IPFS</span>, <span class="ident">IDS</span>, <span class="ident">LEADER</span>, <span class="ident">PUBLISHER</span>, <span class="ident">PUBLISHER_2</span>},
         <span class="ident">UnifiedNum</span>,
     };
@@ -2320,8 +2345,9 @@
                 .<span class="kw">await</span>
                 .<span class="ident">expect</span>(<span class="string">&quot;Should get json&quot;</span>);
 
-            <span class="kw">let</span> <span class="ident">fetched_analytics</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FetchedAnalytics</span><span class="op">&gt;</span> <span class="op">=</span>
-                <span class="ident">serde_json::from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>).<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>);
+            <span class="kw">let</span> <span class="ident">fetched_analytics</span> <span class="op">=</span> <span class="ident">serde_json::from_slice</span>::<span class="op">&lt;</span><span class="ident">AnalyticsResponse</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>)
+                .<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>)
+                .<span class="ident">analytics</span>;
 
             <span class="macro">assert_eq!</span>(
                 <span class="macro">vec!</span>[
@@ -2378,8 +2404,9 @@
                 .<span class="kw">await</span>
                 .<span class="ident">expect</span>(<span class="string">&quot;Should get json&quot;</span>);
 
-            <span class="kw">let</span> <span class="ident">fetched_analytics</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FetchedAnalytics</span><span class="op">&gt;</span> <span class="op">=</span>
-                <span class="ident">serde_json::from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>).<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>);
+            <span class="kw">let</span> <span class="ident">fetched_analytics</span> <span class="op">=</span> <span class="ident">serde_json::from_slice</span>::<span class="op">&lt;</span><span class="ident">AnalyticsResponse</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>)
+                .<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>)
+                .<span class="ident">analytics</span>;
             <span class="macro">assert_eq!</span>(
                 <span class="macro">vec!</span>[<span class="ident">FetchedMetric::Count</span>(<span class="number">2</span>)],
                 <span class="ident">fetched_analytics</span>
@@ -2425,8 +2452,9 @@
                 .<span class="kw">await</span>
                 .<span class="ident">expect</span>(<span class="string">&quot;Should get json&quot;</span>);
 
-            <span class="kw">let</span> <span class="ident">fetched_analytics</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FetchedAnalytics</span><span class="op">&gt;</span> <span class="op">=</span>
-                <span class="ident">serde_json::from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>).<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>);
+            <span class="kw">let</span> <span class="ident">fetched_analytics</span> <span class="op">=</span> <span class="ident">serde_json::from_slice</span>::<span class="op">&lt;</span><span class="ident">AnalyticsResponse</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>)
+                .<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>)
+                .<span class="ident">analytics</span>;
 
             <span class="macro">assert_eq!</span>(
                 <span class="macro">vec!</span>[<span class="ident">FetchedMetric::Count</span>(<span class="number">1</span>), <span class="ident">FetchedMetric::Count</span>(<span class="number">1</span>)],
@@ -2475,8 +2503,9 @@
                 .<span class="kw">await</span>
                 .<span class="ident">expect</span>(<span class="string">&quot;Should get json&quot;</span>);
 
-            <span class="kw">let</span> <span class="ident">fetched_analytics</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FetchedAnalytics</span><span class="op">&gt;</span> <span class="op">=</span>
-                <span class="ident">serde_json::from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>).<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>);
+            <span class="kw">let</span> <span class="ident">fetched_analytics</span> <span class="op">=</span> <span class="ident">serde_json::from_slice</span>::<span class="op">&lt;</span><span class="ident">AnalyticsResponse</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>)
+                .<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>)
+                .<span class="ident">analytics</span>;
 
             <span class="macro">assert_eq!</span>(
                 <span class="macro">vec!</span>[
@@ -2528,8 +2557,9 @@
                 .<span class="kw">await</span>
                 .<span class="ident">expect</span>(<span class="string">&quot;Should get json&quot;</span>);
 
-            <span class="kw">let</span> <span class="ident">fetched_analytics</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FetchedAnalytics</span><span class="op">&gt;</span> <span class="op">=</span>
-                <span class="ident">serde_json::from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>).<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>);
+            <span class="kw">let</span> <span class="ident">fetched_analytics</span> <span class="op">=</span> <span class="ident">serde_json::from_slice</span>::<span class="op">&lt;</span><span class="ident">AnalyticsResponse</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>)
+                .<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>)
+                .<span class="ident">analytics</span>;
 
             <span class="macro">assert_eq!</span>(
                 <span class="macro">vec!</span>[
@@ -2603,8 +2633,9 @@
                 .<span class="kw">await</span>
                 .<span class="ident">expect</span>(<span class="string">&quot;Should get json&quot;</span>);
 
-            <span class="kw">let</span> <span class="ident">fetched_analytics</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FetchedAnalytics</span><span class="op">&gt;</span> <span class="op">=</span>
-                <span class="ident">serde_json::from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>).<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>);
+            <span class="kw">let</span> <span class="ident">fetched_analytics</span> <span class="op">=</span> <span class="ident">serde_json::from_slice</span>::<span class="op">&lt;</span><span class="ident">AnalyticsResponse</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>)
+                .<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>)
+                .<span class="ident">analytics</span>;
 
             <span class="macro">assert_eq!</span>(
                 <span class="macro">vec!</span>[
@@ -2638,8 +2669,9 @@
                 .<span class="kw">await</span>
                 .<span class="ident">expect</span>(<span class="string">&quot;Should get json&quot;</span>);
 
-            <span class="kw">let</span> <span class="ident">fetched_analytics</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FetchedAnalytics</span><span class="op">&gt;</span> <span class="op">=</span>
-                <span class="ident">serde_json::from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>).<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>);
+            <span class="kw">let</span> <span class="ident">fetched_analytics</span> <span class="op">=</span> <span class="ident">serde_json::from_slice</span>::<span class="op">&lt;</span><span class="ident">AnalyticsResponse</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>)
+                .<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>)
+                .<span class="ident">analytics</span>;
 
             <span class="macro">assert_eq!</span>(
                 <span class="macro">vec!</span>[
@@ -2675,8 +2707,9 @@
                 .<span class="kw">await</span>
                 .<span class="ident">expect</span>(<span class="string">&quot;Should get json&quot;</span>);
 
-            <span class="kw">let</span> <span class="ident">fetched_analytics</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FetchedAnalytics</span><span class="op">&gt;</span> <span class="op">=</span>
-                <span class="ident">serde_json::from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>).<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>);
+            <span class="kw">let</span> <span class="ident">fetched_analytics</span> <span class="op">=</span> <span class="ident">serde_json::from_slice</span>::<span class="op">&lt;</span><span class="ident">AnalyticsResponse</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>)
+                .<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>)
+                .<span class="ident">analytics</span>;
 
             <span class="macro">assert_eq!</span>(
                 <span class="comment">// Limit is 2</span>
@@ -2711,8 +2744,9 @@
                 .<span class="kw">await</span>
                 .<span class="ident">expect</span>(<span class="string">&quot;Should get json&quot;</span>);
 
-            <span class="kw">let</span> <span class="ident">fetched_analytics</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FetchedAnalytics</span><span class="op">&gt;</span> <span class="op">=</span>
-                <span class="ident">serde_json::from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>).<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>);
+            <span class="kw">let</span> <span class="ident">fetched_analytics</span> <span class="op">=</span> <span class="ident">serde_json::from_slice</span>::<span class="op">&lt;</span><span class="ident">AnalyticsResponse</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>)
+                .<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>)
+                .<span class="ident">analytics</span>;
 
             <span class="macro">assert_eq!</span>(
                 <span class="macro">vec!</span>[
@@ -2744,8 +2778,9 @@
                 .<span class="kw">await</span>
                 .<span class="ident">expect</span>(<span class="string">&quot;Should get json&quot;</span>);
 
-            <span class="kw">let</span> <span class="ident">fetched_analytics</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FetchedAnalytics</span><span class="op">&gt;</span> <span class="op">=</span>
-                <span class="ident">serde_json::from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>).<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>);
+            <span class="kw">let</span> <span class="ident">fetched_analytics</span> <span class="op">=</span> <span class="ident">serde_json::from_slice</span>::<span class="op">&lt;</span><span class="ident">AnalyticsResponse</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>)
+                .<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>)
+                .<span class="ident">analytics</span>;
 
             <span class="macro">assert_eq!</span>(
                 <span class="macro">vec!</span>[<span class="ident">FetchedMetric::Count</span>(<span class="number">100</span>)],
@@ -2796,8 +2831,9 @@
                 .<span class="kw">await</span>
                 .<span class="ident">expect</span>(<span class="string">&quot;Should get json&quot;</span>);
 
-            <span class="kw">let</span> <span class="ident">fetched_analytics</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FetchedAnalytics</span><span class="op">&gt;</span> <span class="op">=</span>
-                <span class="ident">serde_json::from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>).<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>);
+            <span class="kw">let</span> <span class="ident">fetched_analytics</span> <span class="op">=</span> <span class="ident">serde_json::from_slice</span>::<span class="op">&lt;</span><span class="ident">AnalyticsResponse</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>)
+                .<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>)
+                .<span class="ident">analytics</span>;
 
             <span class="macro">assert_eq!</span>(
                 <span class="macro">vec!</span>[
@@ -2850,8 +2886,9 @@
                 .<span class="kw">await</span>
                 .<span class="ident">expect</span>(<span class="string">&quot;Should get json&quot;</span>);
 
-            <span class="kw">let</span> <span class="ident">fetched_analytics</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FetchedAnalytics</span><span class="op">&gt;</span> <span class="op">=</span>
-                <span class="ident">serde_json::from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>).<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>);
+            <span class="kw">let</span> <span class="ident">fetched_analytics</span> <span class="op">=</span> <span class="ident">serde_json::from_slice</span>::<span class="op">&lt;</span><span class="ident">AnalyticsResponse</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>)
+                .<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>)
+                .<span class="ident">analytics</span>;
             <span class="macro">assert_eq!</span>(
                 <span class="macro">vec!</span>[<span class="ident">FetchedMetric::Count</span>(<span class="number">69</span>)],
                 <span class="ident">fetched_analytics</span>
@@ -3097,8 +3134,9 @@
                 .<span class="kw">await</span>
                 .<span class="ident">expect</span>(<span class="string">&quot;Should get json&quot;</span>);
 
-            <span class="kw">let</span> <span class="ident">fetched_analytics</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FetchedAnalytics</span><span class="op">&gt;</span> <span class="op">=</span>
-                <span class="ident">serde_json::from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>).<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>);
+            <span class="kw">let</span> <span class="ident">fetched_analytics</span> <span class="op">=</span> <span class="ident">serde_json::from_slice</span>::<span class="op">&lt;</span><span class="ident">AnalyticsResponse</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>)
+                .<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>)
+                .<span class="ident">analytics</span>;
 
             <span class="macro">assert_eq!</span>(
                 <span class="macro">vec!</span>[<span class="ident">FetchedMetric::Count</span>(<span class="number">1</span>), <span class="ident">FetchedMetric::Count</span>(<span class="number">3</span>)],
@@ -3126,8 +3164,9 @@
                 .<span class="kw">await</span>
                 .<span class="ident">expect</span>(<span class="string">&quot;Should get json&quot;</span>);
 
-            <span class="kw">let</span> <span class="ident">fetched_analytics</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FetchedAnalytics</span><span class="op">&gt;</span> <span class="op">=</span>
-                <span class="ident">serde_json::from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>).<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>);
+            <span class="kw">let</span> <span class="ident">fetched_analytics</span> <span class="op">=</span> <span class="ident">serde_json::from_slice</span>::<span class="op">&lt;</span><span class="ident">AnalyticsResponse</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>)
+                .<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>)
+                .<span class="ident">analytics</span>;
 
             <span class="macro">assert_eq!</span>(
                 <span class="macro">vec!</span>[<span class="ident">FetchedMetric::Count</span>(<span class="number">1</span>), <span class="ident">FetchedMetric::Count</span>(<span class="number">5</span>)],
@@ -3155,8 +3194,9 @@
                 .<span class="kw">await</span>
                 .<span class="ident">expect</span>(<span class="string">&quot;Should get json&quot;</span>);
 
-            <span class="kw">let</span> <span class="ident">fetched_analytics</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FetchedAnalytics</span><span class="op">&gt;</span> <span class="op">=</span>
-                <span class="ident">serde_json::from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>).<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>);
+            <span class="kw">let</span> <span class="ident">fetched_analytics</span> <span class="op">=</span> <span class="ident">serde_json::from_slice</span>::<span class="op">&lt;</span><span class="ident">AnalyticsResponse</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>)
+                .<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>)
+                .<span class="ident">analytics</span>;
             <span class="macro">assert_eq!</span>(
                 <span class="macro">vec!</span>[<span class="ident">FetchedMetric::Count</span>(<span class="number">1</span>), <span class="ident">FetchedMetric::Count</span>(<span class="number">5</span>)],
                 <span class="ident">fetched_analytics</span>
@@ -3205,8 +3245,9 @@
                 .<span class="kw">await</span>
                 .<span class="ident">expect</span>(<span class="string">&quot;Should get json&quot;</span>);
 
-            <span class="kw">let</span> <span class="ident">fetched_analytics</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FetchedAnalytics</span><span class="op">&gt;</span> <span class="op">=</span>
-                <span class="ident">serde_json::from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>).<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>);
+            <span class="kw">let</span> <span class="ident">fetched_analytics</span> <span class="op">=</span> <span class="ident">serde_json::from_slice</span>::<span class="op">&lt;</span><span class="ident">AnalyticsResponse</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>)
+                .<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>)
+                .<span class="ident">analytics</span>;
             <span class="macro">assert_eq!</span>(<span class="number">1</span>, <span class="ident">fetched_analytics</span>.<span class="ident">len</span>());
             <span class="macro">assert_eq!</span>(
                 <span class="ident">FetchedMetric::Count</span>(<span class="number">1</span>),
@@ -3232,8 +3273,9 @@
                 .<span class="kw">await</span>
                 .<span class="ident">expect</span>(<span class="string">&quot;Should get json&quot;</span>);
 
-            <span class="kw">let</span> <span class="ident">fetched_analytics</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FetchedAnalytics</span><span class="op">&gt;</span> <span class="op">=</span>
-                <span class="ident">serde_json::from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>).<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>);
+            <span class="kw">let</span> <span class="ident">fetched_analytics</span> <span class="op">=</span> <span class="ident">serde_json::from_slice</span>::<span class="op">&lt;</span><span class="ident">AnalyticsResponse</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">json</span>)
+                .<span class="ident">expect</span>(<span class="string">&quot;Should get analytics response&quot;</span>)
+                .<span class="ident">analytics</span>;
             <span class="macro">assert_eq!</span>(
                 <span class="macro">vec!</span>[<span class="ident">FetchedMetric::Count</span>(<span class="number">69</span>)],
                 <span class="ident">fetched_analytics</span>

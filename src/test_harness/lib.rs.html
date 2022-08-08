@@ -2899,6 +2899,8 @@
 <span id="2899">2899</span>
 <span id="2900">2900</span>
 <span id="2901">2901</span>
+<span id="2902">2902</span>
+<span id="2903">2903</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std</span>::{
     <span class="ident">collections::HashMap</span>,
     <span class="ident">net</span>::{<span class="ident">IpAddr</span>, <span class="ident">Ipv4Addr</span>},
@@ -3133,8 +3135,9 @@
         <span class="ident">analytics</span>::{<span class="ident">query::Time</span>, <span class="ident">AnalyticsQuery</span>, <span class="ident">Metric</span>, <span class="ident">Timeframe</span>},
         <span class="ident">balances::CheckedState</span>,
         <span class="ident">sentry</span>::{
-            <span class="ident">campaign_create::CreateCampaign</span>, <span class="ident">AccountingResponse</span>, <span class="ident">DateHour</span>, <span class="ident">Event</span>, <span class="ident">EventType</span>,
-            <span class="ident">FetchedAnalytics</span>, <span class="ident">FetchedMetric</span>, <span class="ident">SuccessResponse</span>, <span class="ident">CLICK</span>, <span class="ident">IMPRESSION</span>,
+            <span class="ident">campaign_create::CreateCampaign</span>, <span class="ident">AccountingResponse</span>, <span class="ident">AnalyticsResponse</span>, <span class="ident">DateHour</span>,
+            <span class="ident">Event</span>, <span class="ident">EventType</span>, <span class="ident">FetchedAnalytics</span>, <span class="ident">FetchedMetric</span>, <span class="ident">InsertEventsRequest</span>,
+            <span class="ident">SuccessResponse</span>, <span class="ident">CLICK</span>, <span class="ident">IMPRESSION</span>,
         },
         <span class="ident">spender::Spender</span>,
         <span class="ident">test_util</span>::{
@@ -5593,9 +5596,9 @@
             .<span class="ident">join</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;v5/campaign/{}/events&quot;</span>, <span class="ident">campaign_context</span>.<span class="ident">context</span>))
             .<span class="ident">expect</span>(<span class="string">&quot;valid endpoint&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">request_body</span> <span class="op">=</span> <span class="macro">vec!</span>[(<span class="string">&quot;events&quot;</span>.<span class="ident">to_string</span>(), <span class="ident">events</span>)]
-            .<span class="ident">into_iter</span>()
-            .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">HashMap</span><span class="op">&lt;</span><span class="kw">_</span>, <span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+        <span class="kw">let</span> <span class="ident">request_body</span> <span class="op">=</span> <span class="ident">InsertEventsRequest</span> {
+            <span class="ident">events</span>: <span class="ident">events</span>.<span class="ident">to_vec</span>(),
+        };
 
         <span class="kw">let</span> <span class="ident">auth_token</span> <span class="op">=</span> <span class="ident">sentry</span>
             .<span class="ident">adapter</span>
@@ -5652,8 +5655,9 @@
             .<span class="ident">send</span>()
             .<span class="kw">await</span>
             .<span class="ident">context</span>(<span class="string">&quot;failed to get analytics&quot;</span>)<span class="question-mark">?</span>
-            .<span class="ident">json</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FetchedAnalytics</span><span class="op">&gt;</span><span class="op">&gt;</span>()
+            .<span class="ident">json</span>::<span class="op">&lt;</span><span class="ident">AnalyticsResponse</span><span class="op">&gt;</span>()
             .<span class="kw">await</span>
+            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">response</span><span class="op">|</span> <span class="ident">response</span>.<span class="ident">analytics</span>)
             .<span class="ident">context</span>(<span class="string">&quot;failed to deserialize json&quot;</span>)
     }
 }

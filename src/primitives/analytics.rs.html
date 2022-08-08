@@ -375,6 +375,12 @@
 <span id="375">375</span>
 <span id="376">376</span>
 <span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">crate</span>::{
     <span class="ident">sentry</span>::{<span class="ident">EventType</span>, <span class="ident">IMPRESSION</span>},
     <span class="ident">Address</span>, <span class="ident">CampaignId</span>, <span class="ident">ChainId</span>, <span class="ident">ValidatorId</span>, <span class="ident">IPFS</span>,
@@ -471,6 +477,12 @@
 
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">query</span>;
 
+<span class="comment">// Query used for filtering analytics</span>
+<span class="comment">//</span>
+<span class="doccomment">/// # Examples:</span>
+<span class="doccomment">/// ```</span>
+<span class="attribute">#[<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../examples/analytics_query.rs&quot;</span>)]</span>
+<span class="doccomment">/// ```</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">Clone</span>)]</span>
 <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename_all</span> <span class="op">=</span> <span class="string">&quot;camelCase&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">AnalyticsQuery</span> {

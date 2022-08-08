@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":[["AuthenticateAs",""],["Metric",""],["OperatingSystem",""],["Timeframe",""]],"mod":[["query",""]],"struct":[["AnalyticsQuery",""]]};
+window.SIDEBAR_ITEMS = {"enum":[["AuthenticateAs",""],["Metric",""],["OperatingSystem",""],["Timeframe",""]],"mod":[["query",""]],"struct":[["AnalyticsQuery","Examples:"]]};

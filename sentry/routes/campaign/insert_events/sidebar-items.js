@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":[["Error",""],["EventError",""]],"fn":[["handle_route","POST `/v5/campaign/:id`"],["spend_for_events","This function calculates the fee for each validator and each `Event`."]]};
+window.SIDEBAR_ITEMS = {"enum":[["Error",""],["EventError",""]],"fn":[["handle_route","POST `/v5/campaign/:id/events`"],["spend_for_events","This function calculates the fee for each validator and each `Event`."]]};

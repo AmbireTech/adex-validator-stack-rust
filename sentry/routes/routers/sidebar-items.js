@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["analytics_router","`/v5/analytics` router"],["campaigns_router",""],["channels_router",""],["units_for_slot_router",""]],"struct":[["RouteParams","Regex extracted parameters. This struct is created manually on each of the matched routes."]]};
+window.SIDEBAR_ITEMS = {"fn":[["analytics_router","`/v5/analytics` router"],["campaigns_router","`/v5/campaign` router"],["channels_router",""],["units_for_slot_router",""]],"struct":[["RouteParams","Regex extracted parameters. This struct is created manually on each of the matched routes."]]};

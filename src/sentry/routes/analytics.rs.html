@@ -96,6 +96,11 @@
 <span id="96">96</span>
 <span id="97">97</span>
 <span id="98">98</span>
+<span id="99">99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
 </pre><pre class="rust"><code><span class="doccomment">//! `/v5/analytics` routes</span>
 <span class="doccomment">//!</span>
 
@@ -108,13 +113,18 @@
 };
 <span class="kw">use</span> <span class="ident">adapter::client::Locked</span>;
 <span class="kw">use</span> <span class="ident">hyper</span>::{<span class="ident">Body</span>, <span class="ident">Request</span>, <span class="ident">Response</span>};
-<span class="kw">use</span> <span class="ident">primitives::analytics</span>::{
-    <span class="ident">query</span>::{<span class="ident">AllowedKey</span>, <span class="ident">ALLOWED_KEYS</span>},
-    <span class="ident">AnalyticsQuery</span>, <span class="ident">AuthenticateAs</span>,
+<span class="kw">use</span> <span class="ident">primitives</span>::{
+    <span class="ident">analytics</span>::{
+        <span class="ident">query</span>::{<span class="ident">AllowedKey</span>, <span class="ident">ALLOWED_KEYS</span>},
+        <span class="ident">AnalyticsQuery</span>, <span class="ident">AuthenticateAs</span>,
+    },
+    <span class="ident">sentry::AnalyticsResponse</span>,
 };
 
 <span class="doccomment">/// GET `/v5/analytics` routes</span>
-<span class="doccomment">/// with query parameters: [`primitives::analytics::AnalyticsQuery`].</span>
+<span class="doccomment">/// Request query parameters: [`AnalyticsQuery`].</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Response: [`AnalyticsResponse`]</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Analytics routes:</span>
 <span class="doccomment">/// - GET `/v5/analytics`</span>
@@ -181,7 +191,7 @@
     )
     .<span class="kw">await</span>
     {
-        <span class="prelude-val">Ok</span>(<span class="prelude-val">Ok</span>(<span class="ident">analytics</span>)) =&gt; <span class="ident">analytics</span>,
+        <span class="prelude-val">Ok</span>(<span class="prelude-val">Ok</span>(<span class="ident">analytics</span>)) =&gt; <span class="ident">AnalyticsResponse</span> { <span class="ident">analytics</span> },
         <span class="comment">// Error getting the analytics</span>
         <span class="prelude-val">Ok</span>(<span class="prelude-val">Err</span>(<span class="ident">err</span>)) =&gt; <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">err</span>.<span class="ident">into</span>()),
         <span class="comment">// Timeout error</span>

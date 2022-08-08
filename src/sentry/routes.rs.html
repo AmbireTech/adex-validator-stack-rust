@@ -349,6 +349,55 @@
 <span id="349">349</span>
 <span id="350">350</span>
 <span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Sentry REST API documentation</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//!</span>
@@ -457,7 +506,8 @@
 <span class="doccomment">//!</span>
 <span class="doccomment">//! Request body (json): [`ValidatorMessagesCreateRequest`](primitives::sentry::ValidatorMessagesCreateRequest)</span>
 <span class="doccomment">//!</span>
-<span class="doccomment">//! Example:</span>
+<span class="doccomment">//! ##### Examples:</span>
+<span class="doccomment">//!</span>
 <span class="doccomment">//! ```json</span>
 <span class="doccomment">//! {</span>
 <span class="doccomment">//!     &quot;messages&quot;: [</span>
@@ -582,13 +632,19 @@
 <span class="doccomment">//! **Authentication is required** to validate [`Campaign.creator`](primitives::Campaign::creator) == [`Auth.uid`](crate::Auth::uid)</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! It will make sure the `Channel` is created if new and it will update</span>
-<span class="doccomment">//! the spendable amount using the [`Adapter`]`::get_deposit()`.</span>
+<span class="doccomment">//! the spendable amount using the [`Adapter.get_deposit()`](adapter::client::Locked::get_deposit).</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! The route is handled by [`campaign::create_campaign()`].</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! Request body (json): [`CreateCampaign`][primitives::sentry::campaign_create::CreateCampaign]</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! Response: [`Campaign`]</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ##### Examples</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ```</span>
+<span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/create_campaign.rs&quot;</span>)]</span>
+<span class="doccomment">//! ```</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! #### POST `/v5/campaign/:id` (auth required)</span>
 <span class="doccomment">//!</span>
@@ -602,6 +658,12 @@
 <span class="doccomment">//!</span>
 <span class="doccomment">//! Response: [`Campaign`]</span>
 <span class="doccomment">//!</span>
+<span class="doccomment">//! ##### Examples</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ```</span>
+<span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/modify_campaign.rs&quot;</span>)]</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//!</span>
 <span class="doccomment">//! #### POST `/v5/campaign/:id/events`</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! Add new [`Event`]s (`IMPRESSION`s &amp; `CLICK`s) to the [`Campaign`].</span>
@@ -609,15 +671,7 @@
 <span class="doccomment">//!</span>
 <span class="doccomment">//! The route is handled by [`campaign::insert_events::handle_route()`].</span>
 <span class="doccomment">//!</span>
-<span class="doccomment">//! Request body (json):</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ```json</span>
-<span class="doccomment">//! {</span>
-<span class="doccomment">//!     &quot;events&quot;: [</span>
-<span class="doccomment">//!         // Events</span>
-<span class="doccomment">//!    ]</span>
-<span class="doccomment">//! }</span>
-<span class="doccomment">//! ```</span>
+<span class="doccomment">//! Request body (json): [`InsertEventsRequest`](primitives::sentry::InsertEventsRequest)</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! Response: [`SuccessResponse`]</span>
 <span class="doccomment">//!</span>
@@ -641,6 +695,24 @@
 <span class="doccomment">//!</span>
 <span class="doccomment">//! Allowed keys: [`AllowedKey::Country`][primitives::analytics::query::AllowedKey::Country], [`AllowedKey::AdSlotType`][primitives::analytics::query::AllowedKey::AdSlotType]</span>
 <span class="doccomment">//!</span>
+<span class="doccomment">//! Request query parameters: [`AnalyticsQuery`]</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Response: [`AnalyticsResponse`]</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ##### Examples</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Query:</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ```</span>
+<span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/analytics_query.rs&quot;</span>)]</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Response:</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ```</span>
+<span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/analytics_response.rs&quot;</span>)]</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//!</span>
 <span class="doccomment">//! #### GET `/v5/analytics/for-publisher` (auth required)</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! Returns all analytics where the currently authenticated address [`Auth.uid`](crate::Auth::uid) is a **publisher**.</span>
@@ -649,6 +721,14 @@
 <span class="doccomment">//!</span>
 <span class="doccomment">//! The route is handled by [`get_analytics()`].</span>
 <span class="doccomment">//!</span>
+<span class="doccomment">//! Request query parameters: [`AnalyticsQuery`]</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Response: [`AnalyticsResponse`]</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ##### Examples</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! See [GET `/v5/analytics`](#get-v5analytics)</span>
+<span class="doccomment">//!</span>
 <span class="doccomment">//! #### GET `/v5/analytics/for-advertiser` (auth required)</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! Returns all analytics where the currently authenticated address [`Auth.uid`](crate::Auth::uid) is an **advertiser**.</span>
@@ -656,6 +736,14 @@
 <span class="doccomment">//! All [`ALLOWED_KEYS`] are allowed for this route.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! The route is handled by [`get_analytics()`].</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Request query parameters: [`AnalyticsQuery`]</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Response: [`AnalyticsResponse`]</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ##### Examples</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! See [GET `/v5/analytics`](#get-v5analytics)</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! #### GET `/v5/analytics/for-admin` (auth required)</span>
 <span class="doccomment">//!</span>
@@ -666,6 +754,14 @@
 <span class="doccomment">//! Admin addresses are configured in the [`Config.admins`](primitives::Config::admins).</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! The route is handled by [`get_analytics()`].</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Request query parameters: [`AnalyticsQuery`]</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Response: [`AnalyticsResponse`]</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ##### Examples</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! See [GET `/v5/analytics`](#get-v5analytics)</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! [`Adapter`]: adapter::Adapter</span>
 <span class="doccomment">//! [`Address`]: primitives::Address</span>
@@ -685,6 +781,8 @@
 <span class="doccomment">//! [`check_access()`]: crate::access::check_access</span>
 <span class="doccomment">//! [`SuccessResponse`]: primitives::sentry::SuccessResponse</span>
 <span class="doccomment">//! [`ValidatorId`]: primitives::ValidatorId</span>
+<span class="doccomment">//! [`AnalyticsResponse`]: primitives::sentry::AnalyticsResponse</span>
+<span class="doccomment">//! [`AnalyticsQuery`]: primitives::analytics::AnalyticsQuery</span>
 
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">analytics::analytics</span> <span class="kw">as</span> <span class="ident">get_analytics</span>;
 

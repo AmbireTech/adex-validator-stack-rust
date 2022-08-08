@@ -517,7 +517,7 @@
             .<span class="ident">find_chain_of</span>(<span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">token</span>)
             .<span class="ident">ok_or</span>(<span class="ident">Validation::UnlistedAsset</span>)<span class="question-mark">?</span>;
 
-        <span class="comment">// Check if the campaign budget is above the minimum deposit configured</span>
+        <span class="comment">// Check if the campaign budget is above the minimum campaign budget configured</span>
         <span class="kw">if</span> <span class="self">self</span>
             .<span class="ident">budget</span>
             .<span class="ident">to_precision</span>(<span class="ident">chain_context</span>.<span class="ident">token</span>.<span class="ident">precision</span>.<span class="ident">get</span>())

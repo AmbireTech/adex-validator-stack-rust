@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["ModifyCampaign",""]]};
+window.SIDEBAR_ITEMS = {"struct":[["ModifyCampaign","All editable fields stored in one place, used for checking when a budget is changed"]]};
