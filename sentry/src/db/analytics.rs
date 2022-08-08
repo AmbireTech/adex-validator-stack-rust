@@ -229,14 +229,32 @@ mod test {
             assert_eq!(UnifiedNum::from_u64(1_000_000), analytics.payout_amount);
             assert_eq!(1, analytics.payout_count);
 
-            let analytics_updated = update_analytics(&database.clone(), update.clone())
+            let new_update = UpdateAnalytics {
+                time: DateHour::from_ymdh(2021, 2, 1, 1),
+                campaign_id: DUMMY_CAMPAIGN.id,
+                ad_unit: ad_unit.ipfs,
+                ad_slot: ad_slot_ipfs,
+                ad_slot_type: Some(ad_unit.ad_type.clone()),
+                advertiser: *CREATOR,
+                publisher: *PUBLISHER,
+                hostname: Some("localhost".to_string()),
+                country: Some("Bulgaria".to_string()),
+                os_name: OperatingSystem::Linux,
+                chain_id: ChainId::new(1),
+                event_type: IMPRESSION,
+                amount_to_add: UnifiedNum::from_u64(1_000_000),
+                count_to_add: 69,
+            };
+
+            let analytics_updated = update_analytics(&database.clone(), new_update.clone())
                 .await
                 .expect("Should update");
+
             assert_eq!(
                 analytics_updated.payout_amount,
                 UnifiedNum::from_u64(2_000_000)
             );
-            assert_eq!(analytics_updated.payout_count, 2);
+            assert_eq!(analytics_updated.payout_count, 70);
         }
 
         // On empty fields marked as `NOT NULL` it should successfully insert a new analytics
