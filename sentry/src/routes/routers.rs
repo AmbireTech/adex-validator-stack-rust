@@ -404,10 +404,7 @@ mod analytics_router_test {
             query::{AllowedKey, Time},
             AnalyticsQuery, Metric, OperatingSystem, Timeframe,
         },
-        sentry::{
-            AnalyticsResponse, DateHour, FetchedAnalytics, FetchedMetric, UpdateAnalytics, CLICK,
-            IMPRESSION,
-        },
+        sentry::{AnalyticsResponse, DateHour, FetchedMetric, UpdateAnalytics, CLICK, IMPRESSION},
         test_util::{ADVERTISER, DUMMY_CAMPAIGN, DUMMY_IPFS, IDS, LEADER, PUBLISHER, PUBLISHER_2},
         UnifiedNum,
     };

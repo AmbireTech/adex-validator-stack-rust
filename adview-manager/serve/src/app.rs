@@ -1,11 +1,11 @@
-use std::{sync::Arc, net::SocketAddr};
+use std::{net::SocketAddr, sync::Arc};
 
 use axum::{routing::get, Extension, Router, Server};
 use log::info;
 
 use tera::Tera;
 
-use crate::routes::{get_preview_ad, get_index, get_preview_video};
+use crate::routes::{get_index, get_preview_ad, get_preview_video};
 
 #[derive(Debug)]
 pub struct State {

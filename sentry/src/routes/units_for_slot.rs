@@ -357,7 +357,7 @@ async fn apply_targeting(
                                 show: true,
                                 boost: 1.0,
                                 // only "IMPRESSION" event can be used for this `Output`
-                                price: vec![(IMPRESSION.into(), pricing_bounds.min)]
+                                price: [(IMPRESSION, pricing_bounds.min)]
                                     .into_iter()
                                     .collect(),
                             };

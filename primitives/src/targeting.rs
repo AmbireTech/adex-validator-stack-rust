@@ -84,7 +84,7 @@ mod test {
         let output = Output {
             show: false,
             boost: 5.5,
-            price: vec![(IMPRESSION, 100.into())].into_iter().collect(),
+            price: [(IMPRESSION, 100.into())].into_iter().collect(),
         };
 
         assert_eq!(Ok(Value::Bool(false)), output.try_get("show"));
