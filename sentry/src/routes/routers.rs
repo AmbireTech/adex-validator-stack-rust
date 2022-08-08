@@ -1309,7 +1309,7 @@ mod analytics_router_test {
                 .expect("Should get analytics response")
                 .analytics;
 
-            // 1 + 1 (from previous events) + 69 (from update in this test case) = 71
+            // 1 + 1 (events from previous updates) + 69 (events from update in this test case) = 71
             assert_eq!(
                 vec![FetchedMetric::Count(71)],
                 fetched_analytics
