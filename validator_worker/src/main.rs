@@ -1,7 +1,7 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::all)]
 
-use std::error::Error;
+use std::{env::VarError, error::Error};
 
 use clap::{crate_version, Arg, Command};
 
@@ -64,10 +64,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         )
         .get_matches();
 
-    let environment: Environment = serde_json::from_value(serde_json::Value::String(
-        std::env::var("ENV").expect("Valid environment variable"),
-    ))
-    .expect("Valid Environment - development or production");
+    let environment: Environment = match std::env::var("ENV") {
+        Ok(string) => serde_json::from_value(serde_json::Value::String(string))
+            .expect("Valid Environment - development or production"),
+        Err(VarError::NotPresent) => Environment::default(),
+        Err(err) => panic!("Invalid `ENV`: {err}"),
+    };
 
     let config_file = cli.value_of("config");
     let config = configuration(environment, config_file).expect("failed to parse configuration");
