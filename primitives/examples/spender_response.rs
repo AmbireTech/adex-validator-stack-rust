@@ -1,4 +1,4 @@
-use primitives::{sentry::SpenderResponse};
+use primitives::sentry::SpenderResponse;
 use serde_json::{from_value, json};
 
 fn main() {
