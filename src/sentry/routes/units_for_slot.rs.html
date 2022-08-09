@@ -768,7 +768,7 @@
                                 <span class="ident">show</span>: <span class="bool-val">true</span>,
                                 <span class="ident">boost</span>: <span class="number">1.0</span>,
                                 <span class="comment">// only &quot;IMPRESSION&quot; event can be used for this `Output`</span>
-                                <span class="ident">price</span>: <span class="macro">vec!</span>[(<span class="ident">IMPRESSION</span>.<span class="ident">into</span>(), <span class="ident">pricing_bounds</span>.<span class="ident">min</span>)]
+                                <span class="ident">price</span>: [(<span class="ident">IMPRESSION</span>, <span class="ident">pricing_bounds</span>.<span class="ident">min</span>)]
                                     .<span class="ident">into_iter</span>()
                                     .<span class="ident">collect</span>(),
                             };

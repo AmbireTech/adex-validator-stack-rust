@@ -1646,9 +1646,6 @@
 <span id="1646">1646</span>
 <span id="1647">1647</span>
 <span id="1648">1648</span>
-<span id="1649">1649</span>
-<span id="1650">1650</span>
-<span id="1651">1651</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This module contains all the Sentry REST API routers.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! Ideally these routers will be replaced with proper routing,</span>
@@ -2055,10 +2052,7 @@
             <span class="ident">query</span>::{<span class="ident">AllowedKey</span>, <span class="ident">Time</span>},
             <span class="ident">AnalyticsQuery</span>, <span class="ident">Metric</span>, <span class="ident">OperatingSystem</span>, <span class="ident">Timeframe</span>,
         },
-        <span class="ident">sentry</span>::{
-            <span class="ident">AnalyticsResponse</span>, <span class="ident">DateHour</span>, <span class="ident">FetchedAnalytics</span>, <span class="ident">FetchedMetric</span>, <span class="ident">UpdateAnalytics</span>, <span class="ident">CLICK</span>,
-            <span class="ident">IMPRESSION</span>,
-        },
+        <span class="ident">sentry</span>::{<span class="ident">AnalyticsResponse</span>, <span class="ident">DateHour</span>, <span class="ident">FetchedMetric</span>, <span class="ident">UpdateAnalytics</span>, <span class="ident">CLICK</span>, <span class="ident">IMPRESSION</span>},
         <span class="ident">test_util</span>::{<span class="ident">ADVERTISER</span>, <span class="ident">DUMMY_CAMPAIGN</span>, <span class="ident">DUMMY_IPFS</span>, <span class="ident">IDS</span>, <span class="ident">LEADER</span>, <span class="ident">PUBLISHER</span>, <span class="ident">PUBLISHER_2</span>},
         <span class="ident">UnifiedNum</span>,
     };

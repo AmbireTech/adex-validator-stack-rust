@@ -175,7 +175,7 @@
     <span class="doccomment">/// For example: price.IMPRESSION</span>
     <span class="doccomment">/// The default is the min of the bound of event type:</span>
     <span class="doccomment">/// Default: pricingBounds.IMPRESSION.min</span>
-    <span class="kw">pub</span> <span class="ident">price</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">UnifiedNum</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">price</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">EventType</span>, <span class="ident">UnifiedNum</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">Output</span> {
@@ -203,7 +203,7 @@
         <span class="kw">let</span> <span class="ident">price</span> <span class="op">=</span> <span class="ident">campaign</span>
             .<span class="ident">pricing_bounds</span>
             .<span class="ident">iter</span>()
-            .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">key</span>, <span class="ident">price</span>)<span class="op">|</span> (<span class="ident">key</span>.<span class="ident">to_string</span>(), <span class="ident">price</span>.<span class="ident">min</span>))
+            .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">key</span>, <span class="ident">price</span>)<span class="op">|</span> (<span class="kw-2">*</span><span class="ident">key</span>, <span class="ident">price</span>.<span class="ident">min</span>))
             .<span class="ident">collect</span>();
 
         <span class="self">Self</span> {
@@ -225,7 +225,7 @@
         <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">Output</span> {
             <span class="ident">show</span>: <span class="bool-val">false</span>,
             <span class="ident">boost</span>: <span class="number">5.5</span>,
-            <span class="ident">price</span>: <span class="macro">vec!</span>[(<span class="string">&quot;one&quot;</span>.<span class="ident">to_string</span>(), <span class="number">100</span>.<span class="ident">into</span>())].<span class="ident">into_iter</span>().<span class="ident">collect</span>(),
+            <span class="ident">price</span>: [(<span class="ident">IMPRESSION</span>, <span class="number">100</span>.<span class="ident">into</span>())].<span class="ident">into_iter</span>().<span class="ident">collect</span>(),
         };
 
         <span class="macro">assert_eq!</span>(<span class="prelude-val">Ok</span>(<span class="ident">Value::Bool</span>(<span class="bool-val">false</span>)), <span class="ident">output</span>.<span class="ident">try_get</span>(<span class="string">&quot;show&quot;</span>));
@@ -237,7 +237,7 @@
         );
         <span class="macro">assert_eq!</span>(
             <span class="prelude-val">Ok</span>(<span class="ident">Value::UnifiedNum</span>(<span class="number">100</span>.<span class="ident">into</span>())),
-            <span class="ident">output</span>.<span class="ident">try_get</span>(<span class="string">&quot;price.one&quot;</span>)
+            <span class="ident">output</span>.<span class="ident">try_get</span>(<span class="string">&quot;price.IMPRESSION&quot;</span>)
         );
         <span class="macro">assert_eq!</span>(<span class="prelude-val">Err</span>(<span class="ident">Error::UnknownVariable</span>), <span class="ident">output</span>.<span class="ident">try_get</span>(<span class="string">&quot;price.unknown&quot;</span>));
         <span class="macro">assert_eq!</span>(<span class="prelude-val">Err</span>(<span class="ident">Error::UnknownVariable</span>), <span class="ident">output</span>.<span class="ident">try_get</span>(<span class="string">&quot;unknown&quot;</span>));

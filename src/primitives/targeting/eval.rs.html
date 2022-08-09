@@ -1265,7 +1265,15 @@
 <span id="1265">1265</span>
 <span id="1266">1266</span>
 <span id="1267">1267</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">unified_num::FromWhole</span>, <span class="ident">UnifiedNum</span>};
+<span id="1268">1268</span>
+<span id="1269">1269</span>
+<span id="1270">1270</span>
+<span id="1271">1271</span>
+</pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">crate</span>::{
+    <span class="ident">sentry</span>::{<span class="ident">CLICK</span>, <span class="ident">IMPRESSION</span>},
+    <span class="ident">unified_num::FromWhole</span>,
+    <span class="ident">UnifiedNum</span>,
+};
 <span class="kw">use</span> <span class="ident">serde</span>::{<span class="ident">Deserialize</span>, <span class="ident">Serialize</span>};
 <span class="kw">use</span> <span class="ident">serde_json</span>::{<span class="ident">value::Value</span> <span class="kw">as</span> <span class="ident">SerdeValue</span>, <span class="ident">Number</span>};
 <span class="kw">use</span> <span class="ident">std</span>::{
@@ -2271,7 +2279,7 @@
                         .<span class="ident">try_unified</span>()<span class="question-mark">?</span>;
 
                     <span class="comment">// we do not care about any other old value</span>
-                    <span class="ident">output</span>.<span class="ident">price</span>.<span class="ident">insert</span>(<span class="string">&quot;IMPRESSION&quot;</span>.<span class="ident">to_string</span>(), <span class="ident">price</span>);
+                    <span class="ident">output</span>.<span class="ident">price</span>.<span class="ident">insert</span>(<span class="ident">IMPRESSION</span>, <span class="ident">price</span>);
                 }
                 <span class="string">&quot;price.CLICK&quot;</span> =&gt; {
                     <span class="kw">let</span> <span class="ident">price</span> <span class="op">=</span> <span class="ident">rule</span>
@@ -2280,7 +2288,7 @@
                         .<span class="ident">try_unified</span>()<span class="question-mark">?</span>;
 
                     <span class="comment">// we do not care about any other old value</span>
-                    <span class="ident">output</span>.<span class="ident">price</span>.<span class="ident">insert</span>(<span class="string">&quot;CLICK&quot;</span>.<span class="ident">to_string</span>(), <span class="ident">price</span>);
+                    <span class="ident">output</span>.<span class="ident">price</span>.<span class="ident">insert</span>(<span class="ident">CLICK</span>, <span class="ident">price</span>);
                 }
                 <span class="kw">_</span> =&gt; <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::UnknownVariable</span>),
             }

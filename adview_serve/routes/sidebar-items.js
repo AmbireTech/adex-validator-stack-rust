@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["get_index","`GET /`"],["get_preview_ad","`GET /preview/ad`"],["get_preview_video","`GET /preview/video`"]]};

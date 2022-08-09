@@ -185,8 +185,6 @@
 <span id="185">185</span>
 <span id="186">186</span>
 <span id="187">187</span>
-<span id="188">188</span>
-<span id="189">189</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::Session</span>;
 <span class="kw">use</span> <span class="ident">chrono::Utc</span>;
 <span class="kw">use</span> <span class="ident">primitives</span>::{
@@ -254,9 +252,7 @@
                 <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">Output</span> {
                     <span class="ident">show</span>: <span class="bool-val">true</span>,
                     <span class="ident">boost</span>: <span class="number">1.0</span>,
-                    <span class="ident">price</span>: <span class="macro">vec!</span>[(<span class="ident">event_type</span>.<span class="ident">to_string</span>(), <span class="ident">pricing</span>.<span class="ident">min</span>)]
-                        .<span class="ident">into_iter</span>()
-                        .<span class="ident">collect</span>(),
+                    <span class="ident">price</span>: [(<span class="ident">event_type</span>, <span class="ident">pricing</span>.<span class="ident">min</span>)].<span class="ident">into_iter</span>().<span class="ident">collect</span>(),
                 };
 
                 <span class="kw">let</span> <span class="ident">on_type_error</span> <span class="op">=</span> <span class="op">|</span><span class="ident">error</span>, <span class="ident">rule</span><span class="op">|</span> <span class="macro">error!</span>(<span class="ident">logger</span>, <span class="string">&quot;Rule evaluation error for {:?}&quot;</span>, <span class="ident">campaign</span>.<span class="ident">id</span>; <span class="string">&quot;error&quot;</span> =&gt; <span class="question-mark">?</span><span class="ident">error</span>, <span class="string">&quot;rule&quot;</span> =&gt; <span class="question-mark">?</span><span class="ident">rule</span>);
@@ -264,7 +260,7 @@
                 <span class="ident">eval_with_callback</span>(<span class="kw-2">&amp;</span><span class="ident">targeting_rules</span>, <span class="kw-2">&amp;</span><span class="ident">input</span>, <span class="kw-2">&amp;mut</span> <span class="ident">output</span>, <span class="prelude-val">Some</span>(<span class="ident">on_type_error</span>));
 
                 <span class="kw">if</span> <span class="ident">output</span>.<span class="ident">show</span> {
-                    <span class="kw">let</span> <span class="ident">price</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">output</span>.<span class="ident">price</span>.<span class="ident">get</span>(<span class="ident">event_type</span>.<span class="ident">as_str</span>()) {
+                    <span class="kw">let</span> <span class="ident">price</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">output</span>.<span class="ident">price</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">event_type</span>) {
                         <span class="prelude-val">Some</span>(<span class="ident">output_price</span>) =&gt; <span class="ident">max</span>(<span class="ident">pricing</span>.<span class="ident">min</span>, <span class="ident">min</span>(<span class="ident">pricing</span>.<span class="ident">max</span>, <span class="kw-2">*</span><span class="ident">output_price</span>)),
                         <span class="prelude-val">None</span> =&gt; <span class="ident">max</span>(<span class="ident">pricing</span>.<span class="ident">min</span>, <span class="ident">pricing</span>.<span class="ident">max</span>),
                     };
