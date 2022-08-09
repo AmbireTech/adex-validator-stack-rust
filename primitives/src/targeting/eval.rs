@@ -1,4 +1,8 @@
-use crate::{unified_num::FromWhole, UnifiedNum};
+use crate::{
+    sentry::{CLICK, IMPRESSION},
+    unified_num::FromWhole,
+    UnifiedNum,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{value::Value as SerdeValue, Number};
 use std::{
@@ -1004,7 +1008,7 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
                         .try_unified()?;
 
                     // we do not care about any other old value
-                    output.price.insert("IMPRESSION".to_string(), price);
+                    output.price.insert(IMPRESSION, price);
                 }
                 "price.CLICK" => {
                     let price = rule
@@ -1013,7 +1017,7 @@ fn eval(input: &Input, output: &mut Output, rule: &Rule) -> Result<Option<Value>
                         .try_unified()?;
 
                     // we do not care about any other old value
-                    output.price.insert("CLICK".to_string(), price);
+                    output.price.insert(CLICK, price);
                 }
                 _ => return Err(Error::UnknownVariable),
             }

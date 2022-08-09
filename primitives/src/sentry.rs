@@ -133,7 +133,10 @@ mod event {
     use once_cell::sync::Lazy;
     use parse_display::{Display, FromStr};
     use serde::{Deserialize, Serialize};
-    use std::fmt;
+    use std::{
+        fmt,
+        hash::{Hash, Hasher},
+    };
 
     use crate::{Address, IPFS};
 
@@ -145,20 +148,7 @@ mod event {
     static IMPRESSION_STRING: Lazy<String> = Lazy::new(|| EventType::Impression.to_string());
     static CLICK_STRING: Lazy<String> = Lazy::new(|| EventType::Click.to_string());
 
-    #[derive(
-        Debug,
-        Display,
-        FromStr,
-        Serialize,
-        Deserialize,
-        Hash,
-        Ord,
-        Eq,
-        PartialEq,
-        PartialOrd,
-        Clone,
-        Copy,
-    )]
+    #[derive(Debug, Display, FromStr, Serialize, Deserialize, Ord, Eq, PartialOrd, Clone, Copy)]
     #[display(style = "SNAKE_CASE")]
     #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
     pub enum EventType {
@@ -175,12 +165,34 @@ mod event {
         }
     }
 
+    /// Due to the fact that we want to impl `Borrow<str>`
+    /// we must provide custom hash impl using the capitalized
+    /// version of the [`EventType`] as a string.
+    impl Hash for EventType {
+        fn hash<H: Hasher>(&self, state: &mut H) {
+            self.as_str().hash(state);
+        }
+    }
+
+    impl PartialEq for EventType {
+        fn eq(&self, other: &Self) -> bool {
+            self.as_str() == other.as_str()
+        }
+    }
+
+    impl std::borrow::Borrow<str> for EventType {
+        fn borrow(&self) -> &str {
+            self.as_str()
+        }
+    }
+
     impl From<EventType> for String {
         fn from(event_type: EventType) -> Self {
             event_type.to_string()
         }
     }
 
+    /// All the [`Event`]s available in the validator stack.
     #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
     #[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
     pub enum Event {
@@ -244,12 +256,14 @@ mod event {
 
     #[cfg(test)]
     mod test {
+        use std::borrow::Borrow;
+
         use crate::sentry::event::{CLICK_STRING, IMPRESSION_STRING};
 
         use super::EventType;
 
         #[test]
-        fn event_type_parsing_and_de_serialization() {
+        fn test_event_type_parsing_and_de_serialization() {
             let impression_parse = "IMPRESSION"
                 .parse::<EventType>()
                 .expect("Should parse IMPRESSION");
@@ -267,6 +281,8 @@ mod event {
             assert_eq!(EventType::Impression, impression_json);
             assert_eq!(EventType::Click, click_parse);
             assert_eq!(EventType::Click, click_json);
+
+            assert_eq!(Borrow::<str>::borrow(&EventType::Impression), "IMPRESSION");
         }
     }
 }
