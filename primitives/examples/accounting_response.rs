@@ -1,15 +1,13 @@
-use primitives::{sentry::AccountingResponse, balances::CheckedState};
+use primitives::{balances::CheckedState, sentry::AccountingResponse};
 use serde_json::{from_value, json};
 
 fn main() {
-
-
     // Empty balances
     {
         let json = json!({
-            "earners": {},
-            "spenders": {},
-          });
+          "earners": {},
+          "spenders": {},
+        });
         assert!(from_value::<AccountingResponse::<CheckedState>>(json).is_ok());
     }
 
