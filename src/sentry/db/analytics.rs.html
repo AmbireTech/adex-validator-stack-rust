@@ -904,6 +904,24 @@
 <span id="904">904</span>
 <span id="905">905</span>
 <span id="906">906</span>
+<span id="907">907</span>
+<span id="908">908</span>
+<span id="909">909</span>
+<span id="910">910</span>
+<span id="911">911</span>
+<span id="912">912</span>
+<span id="913">913</span>
+<span id="914">914</span>
+<span id="915">915</span>
+<span id="916">916</span>
+<span id="917">917</span>
+<span id="918">918</span>
+<span id="919">919</span>
+<span id="920">920</span>
+<span id="921">921</span>
+<span id="922">922</span>
+<span id="923">923</span>
+<span id="924">924</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std::collections::HashSet</span>;
 
 <span class="kw">use</span> <span class="ident">futures::TryStreamExt</span>;
@@ -1135,14 +1153,32 @@
             <span class="macro">assert_eq!</span>(<span class="ident">UnifiedNum::from_u64</span>(<span class="number">1_000_000</span>), <span class="ident">analytics</span>.<span class="ident">payout_amount</span>);
             <span class="macro">assert_eq!</span>(<span class="number">1</span>, <span class="ident">analytics</span>.<span class="ident">payout_count</span>);
 
-            <span class="kw">let</span> <span class="ident">analytics_updated</span> <span class="op">=</span> <span class="ident">update_analytics</span>(<span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">clone</span>(), <span class="ident">update</span>.<span class="ident">clone</span>())
+            <span class="kw">let</span> <span class="ident">new_update</span> <span class="op">=</span> <span class="ident">UpdateAnalytics</span> {
+                <span class="ident">time</span>: <span class="ident">DateHour::from_ymdh</span>(<span class="number">2021</span>, <span class="number">2</span>, <span class="number">1</span>, <span class="number">1</span>),
+                <span class="ident">campaign_id</span>: <span class="ident">DUMMY_CAMPAIGN</span>.<span class="ident">id</span>,
+                <span class="ident">ad_unit</span>: <span class="ident">ad_unit</span>.<span class="ident">ipfs</span>,
+                <span class="ident">ad_slot</span>: <span class="ident">ad_slot_ipfs</span>,
+                <span class="ident">ad_slot_type</span>: <span class="prelude-val">Some</span>(<span class="ident">ad_unit</span>.<span class="ident">ad_type</span>.<span class="ident">clone</span>()),
+                <span class="ident">advertiser</span>: <span class="kw-2">*</span><span class="ident">CREATOR</span>,
+                <span class="ident">publisher</span>: <span class="kw-2">*</span><span class="ident">PUBLISHER</span>,
+                <span class="ident">hostname</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;localhost&quot;</span>.<span class="ident">to_string</span>()),
+                <span class="ident">country</span>: <span class="prelude-val">Some</span>(<span class="string">&quot;Bulgaria&quot;</span>.<span class="ident">to_string</span>()),
+                <span class="ident">os_name</span>: <span class="ident">OperatingSystem::Linux</span>,
+                <span class="ident">chain_id</span>: <span class="ident">ChainId::new</span>(<span class="number">1</span>),
+                <span class="ident">event_type</span>: <span class="ident">IMPRESSION</span>,
+                <span class="ident">amount_to_add</span>: <span class="ident">UnifiedNum::from_u64</span>(<span class="number">1_000_000</span>),
+                <span class="ident">count_to_add</span>: <span class="number">69</span>,
+            };
+
+            <span class="kw">let</span> <span class="ident">analytics_updated</span> <span class="op">=</span> <span class="ident">update_analytics</span>(<span class="kw-2">&amp;</span><span class="ident">database</span>.<span class="ident">clone</span>(), <span class="ident">new_update</span>.<span class="ident">clone</span>())
                 .<span class="kw">await</span>
                 .<span class="ident">expect</span>(<span class="string">&quot;Should update&quot;</span>);
+
             <span class="macro">assert_eq!</span>(
                 <span class="ident">analytics_updated</span>.<span class="ident">payout_amount</span>,
                 <span class="ident">UnifiedNum::from_u64</span>(<span class="number">2_000_000</span>)
             );
-            <span class="macro">assert_eq!</span>(<span class="ident">analytics_updated</span>.<span class="ident">payout_count</span>, <span class="number">2</span>);
+            <span class="macro">assert_eq!</span>(<span class="ident">analytics_updated</span>.<span class="ident">payout_count</span>, <span class="number">70</span>);
         }
 
         <span class="comment">// On empty fields marked as `NOT NULL` it should successfully insert a new analytics</span>
@@ -1811,4 +1847,4 @@
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (d394408fb 2022-08-07)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (f03ce3096 2022-08-08)" ></div></body></html>
