@@ -21,6 +21,9 @@ postgres = ["bytes", "tokio-postgres", "deadpool-postgres"]
 test-util = []
 
 [[example]]
+name = "accounting_response"
+
+[[example]]
 name = "analytics_query"
 
 [[example]]

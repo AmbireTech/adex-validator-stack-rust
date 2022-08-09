@@ -24,6 +24,12 @@ pub use event::{Event, EventType, CLICK, IMPRESSION};
 #[serde(rename_all = "camelCase")]
 /// Channel Accounting response
 /// A collection of all `Accounting`s for a specific `Channel`
+///
+/// # Examples
+///
+/// ```
+#[doc = include_str!("../examples/accounting_response.rs")]
+/// ```
 pub struct AccountingResponse<S: BalancesState> {
     #[serde(flatten, bound = "S: BalancesState")]
     pub balances: Balances<S>,

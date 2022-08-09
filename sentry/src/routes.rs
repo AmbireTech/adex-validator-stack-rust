@@ -59,9 +59,15 @@
 //!
 //! #### GET `/v5/channel/:id/accounting`
 //!
+//! Gets all of the accounting entries for a channel from the database and checks the balances.
+//!
 //! The route is handled by [`channel::get_accounting_for_channel()`].
 //!
-//! Response: [`AccountingResponse::<CheckedState>`](primitives::sentry::AccountingResponse)
+//! Response:
+//!
+//! ```
+#![doc = include_str!("../../primitives/examples/accounting_response.rs")]
+//! ```
 //!
 //! #### GET `/v5/channel/:id/spender/:addr` (auth required)
 //!
