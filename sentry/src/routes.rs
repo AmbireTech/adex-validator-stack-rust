@@ -88,17 +88,31 @@
 //! #### GET `/v5/channel/:id/validator-messages`
 //!
 //! - GET `/v5/channel/:id/validator-messages/:addr` - filter by the given [`ValidatorId`]
-//! - GET `/v5/channel/:id/validator-messages/:addr/:validator_messages` - filters by the given [`ValidatorId`] and a
-//!   [`Validator message types`][`MessageTypes`].
-//!    - `:validator_messages` - url encoded list of [`Validator message types`][`MessageTypes`] separated by a `+`.
+//! - GET `/v5/channel/:id/validator-messages/:addr/:validator_messages` - filters by the given [`ValidatorId`] and
+//!   Validator [`MessageTypes`].
+//!    - `:validator_messages` - url encoded list of Validator [`MessageTypes`] separated by a `+`.
 //!
 //!       E.g. `NewState+ApproveState` becomes `NewState%2BApproveState`
 //!
 //! The route is handled by [`channel::validator_message::list_validator_messages()`].
 //!
-//! Request query parameters: [ValidatorMessagesListQuery](primitives::sentry::ValidatorMessagesListQuery)
+//! Request query parameters: [`ValidatorMessagesListQuery`](primitives::sentry::ValidatorMessagesListQuery)
 //!
-//! Response: [ValidatorMessagesListResponse](primitives::sentry::ValidatorMessagesListResponse)
+//! Response: [`ValidatorMessagesListResponse`](primitives::sentry::ValidatorMessagesListResponse)
+//!
+//! ##### Examples
+//!
+//! Query:
+//!
+//! ```
+#![doc = include_str!("../../primitives/examples/validator_messages_list_query.rs")]
+//! ```
+//!
+//! Response:
+//!
+//! ```
+#![doc = include_str!("../../primitives/examples/validator_messages_list_response.rs")]
+//! ```
 //!
 //! #### POST `/v5/channel/:id/validator-messages` (auth required)
 //!
@@ -106,18 +120,15 @@
 //!
 //! Request body (json): [`ValidatorMessagesCreateRequest`](primitives::sentry::ValidatorMessagesCreateRequest)
 //!
-//! ##### Examples:
+//! Response: [`SuccessResponse`]
 //!
-//! ```json
-//! {
-//!     "messages": [
-//!         /// validator messages
-//!         ...
-//!     ]
-//! }
+//! ##### Examples
+//!
+//! Request:
+//!
 //! ```
-//!
-//! Validator messages: [`MessageTypes`]
+#![doc = include_str!("../../primitives/examples/validator_messages_create_request.rs")]
+//! ```
 //!
 //! #### GET `/v5/channel/:id/last-approved`
 //!
