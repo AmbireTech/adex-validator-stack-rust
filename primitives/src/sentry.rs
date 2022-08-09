@@ -598,6 +598,13 @@ pub struct SuccessResponse {
     pub success: bool,
 }
 
+/// Spender limits for a spender on a channel.
+///
+/// # Examples
+///
+/// ```
+#[doc = include_str!("../examples/spender_response.rs")]
+/// ```
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct SpenderResponse {

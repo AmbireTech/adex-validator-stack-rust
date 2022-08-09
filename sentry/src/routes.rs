@@ -70,10 +70,19 @@
 //! ```
 //!
 //! #### GET `/v5/channel/:id/spender/:addr` (auth required)
+//! 
+//! Gets the spender limits for a spender on a channel. It does so by fetching the
+//! latest Spendable entry from the database (or creating one if it doesn't exist yet) from which
+//! the total deposited amount is retrieved, and the latest NewState from which the total spent
+//! amount is retrieved.
 //!
 //! The route is handled by [`channel::get_spender_limits()`].
 //!
-//! Response: [`SpenderResponse`](primitives::sentry::SpenderResponse)
+//! Response:
+//!
+//! ```
+#![doc = include_str!("../../primitives/examples/spender_response.rs")]
+//! ```
 //!
 //! #### POST `/v5/channel/:id/spender/:addr` (auth required)
 //!

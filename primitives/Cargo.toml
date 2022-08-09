@@ -48,6 +48,9 @@ required-features = ["test-util"]
 [[example]]
 name = "modify_campaign"
 
+[[example]]
+name = "spender_response"
+
 [dependencies]
 # (De)Serialization
 serde = { version = "1.0", features = ["derive"] }
