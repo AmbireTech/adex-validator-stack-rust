@@ -12,6 +12,9 @@ pub use {
     error::Error,
 };
 
+#[cfg(any(test, feature = "test-util"))]
+pub use client::ChainTransport;
+
 pub type UnlockedAdapter = Adapter<client::Ethereum<UnlockedWallet>, UnlockedState>;
 pub type LockedAdapter = Adapter<client::Ethereum<LockedWallet>, LockedState>;
 pub type LockedClient = Ethereum<LockedWallet>;

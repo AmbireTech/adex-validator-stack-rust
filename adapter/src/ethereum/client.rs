@@ -37,10 +37,12 @@ pub struct Ethereum<S = LockedWallet> {
     pub(crate) state: S,
 }
 
-pub(crate) trait ChainTransport {
+#[cfg(any(test, feature = "test-util"))]
+pub trait ChainTransport {
     fn init_web3(&self) -> web3::Result<Web3<Http>>;
 }
 
+#[cfg(any(test, feature = "test-util"))]
 impl ChainTransport for Chain {
     fn init_web3(&self) -> web3::Result<Web3<Http>> {
         let transport = Http::new(self.rpc.as_str())?;
