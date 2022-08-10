@@ -146,11 +146,32 @@
 //!
 //! #### GET `/v5/channel/:id/last-approved`
 //!
+//! Retrieves the latest [`ApproveState`] and the corresponding [`NewState`]
+//! validator messages for the given [`Channel`].
+//!
+//! If the [`Channel`] is new one or both of the states might have not been generated yet.
+//!
+//! The same is true of the [`Heartbeat`]s messages if they are requested with the query parameter.
+//!
 //! The route is handled by [`channel::last_approved()`].
 //!
 //! Request query parameters: [`LastApprovedQuery`][primitives::sentry::LastApprovedQuery]
 //!
 //! Response: [`LastApprovedResponse`][primitives::sentry::LastApprovedResponse]
+//!
+//! ##### Examples
+//!
+//! Query:
+//!
+//! ```
+#![doc = include_str!("../../primitives/examples/channel_last_approved_query.rs")]
+//! ```
+//!
+//! Response:
+//!
+//! ```
+#![doc = include_str!("../../primitives/examples/channel_last_approved_response.rs")]
+//! ```
 //!
 //! #### POST `/v5/channel/:id/pay` (auth required)
 //!
@@ -395,24 +416,25 @@
 //! [`ApproveState`]: primitives::validator::ApproveState
 //! [`Accounting`]: crate::db::accounting::Accounting
 //! [`AccountingResponse`]: primitives::sentry::AccountingResponse
+//! [`AnalyticsResponse`]: primitives::sentry::AnalyticsResponse
+//! [`AnalyticsQuery`]: primitives::analytics::AnalyticsQuery
 //! [`Auth.uid`]: crate::Auth::uid
 //! [`Campaign`]: primitives::Campaign
 //! [`Campaign.creator`]: primitives::Campaign::creator
+//! [`Campaign.event_submission`]: primitives::Campaign::event_submission
 //! [`CampaignId`]: primitives::CampaignId
-//! [`ChannelId`]: primitives::ChannelId
 //! [`Channel`]: primitives::Channel
 //! [`Channel.leader`]: primitives::Channel::leader
 //! [`Channel.follower`]: primitives::Channel::follower
+//! [`ChannelId`]: primitives::ChannelId
+//! [`check_access()`]: crate::access::check_access
 //! [`Config.msgs_find_limit`]: primitives::Config::msgs_find_limit
+//! [`Event`]: primitives::sentry::Event
+//! [`Heartbeat`]: primitives::validator::Heartbeat
 //! [`MessageTypes`]: primitives::validator::MessageTypes
 //! [`NewState`]: primitives::validator::NewState
-//! [`Event`]: primitives::sentry::Event
-//! [`Campaign.event_submission`]: primitives::Campaign::event_submission
-//! [`check_access()`]: crate::access::check_access
 //! [`SuccessResponse`]: primitives::sentry::SuccessResponse
 //! [`ValidatorId`]: primitives::ValidatorId
-//! [`AnalyticsResponse`]: primitives::sentry::AnalyticsResponse
-//! [`AnalyticsQuery`]: primitives::analytics::AnalyticsQuery
 
 pub use analytics::analytics as get_analytics;
 
