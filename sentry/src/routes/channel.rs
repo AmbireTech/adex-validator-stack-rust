@@ -740,7 +740,7 @@ pub mod validator_message {
             None => Err(ResponseError::Unauthorized),
             _ => {
                 try_join_all(create_request.messages.iter().map(|message| {
-                    insert_validator_message(&app.pool, &channel, &session.uid, message)
+                    insert_validator_message(&app.pool, &channel, &auth.uid, message)
                 }))
                 .await?;
 

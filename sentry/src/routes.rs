@@ -152,7 +152,6 @@
 //! the [`Channel.leader`] or [`Channel.follower`].
 //!
 //! The route is handled by [`channel::validator_message::create_validator_messages()`].
->>>>>>> 630f89827d679c2e72268d956742d91f556d9e89
 //!
 //! Request body (json): [`ValidatorMessagesCreateRequest`](primitives::sentry::ValidatorMessagesCreateRequest)
 //!
