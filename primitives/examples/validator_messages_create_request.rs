@@ -3,7 +3,6 @@ use serde_json::json;
 use std::str::FromStr;
 
 fn main() {
-
     let messages_json = json!({
         "messages": [
             {
@@ -43,8 +42,7 @@ fn main() {
         ]
     });
 
-    let messages_json =
-        serde_json::to_string(&messages_json).expect("should serialize");
+    let messages_json = serde_json::to_string(&messages_json).expect("should serialize");
 
     // assert!(serde_json::from_str::<ValidatorMessagesCreateRequest>(&messages_json).is_ok());
 }
