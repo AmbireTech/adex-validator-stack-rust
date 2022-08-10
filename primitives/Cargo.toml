@@ -45,6 +45,9 @@ name = "channel_list_query"
 required-features = ["test-util"]
 
 [[example]]
+name = "channel_pay_request"
+
+[[example]]
 name = "create_campaign_request"
 required-features = ["test-util"]
 

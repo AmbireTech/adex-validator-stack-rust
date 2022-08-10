@@ -155,8 +155,11 @@
 //!
 //! The route is handled by [`channel::channel_payout()`].
 //!
-//! Request JSON body: [`ChannelPayRequest`](primitives::sentry::ChannelPayRequest)
+//! Request JSON body:
 //!
+//! ```
+#![doc = include_str!("../../primitives/examples/channel_pay_request.rs")]
+//! ```
 //! Response: [`SuccessResponse`](primitives::sentry::SuccessResponse)
 //!
 //!

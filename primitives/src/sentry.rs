@@ -633,6 +633,13 @@ pub struct AllSpendersQuery {
     pub page: u64,
 }
 
+/// Includes all the payouts that need to be done for that channel
+///
+/// # Examples
+///
+/// ```
+#[doc = include_str!("../examples/channel_pay_request.rs")]
+/// ```
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ChannelPayRequest {
     pub payouts: UnifiedMap,
