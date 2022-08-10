@@ -113,6 +113,7 @@ pub async fn last_approved<C: Locked + 'static>(
     let query = serde_qs::from_str::<LastApprovedQuery>(req.uri().query().unwrap_or(""))?;
     let validators = vec![channel.leader, channel.follower];
     let channel_id = channel.id();
+
     let heartbeats = if query.with_heartbeat.unwrap_or_default() {
         let result = try_join_all(
             validators
@@ -557,6 +558,8 @@ pub async fn channel_payout<C: Locked + 'static>(
 }
 
 /// POST `/v5/channel/dummy-deposit` request
+///
+/// Full details about the route's API and intend can be found in the [`routes`](crate::routes#post-v5channeldummy-deposit-auth-required) module
 ///
 /// Request body (json): [`ChannelDummyDeposit`]
 ///

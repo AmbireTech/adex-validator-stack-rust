@@ -216,13 +216,22 @@
 //!
 //! Set a deposit for a Channel and depositor (the authenticated address) in the Dummy adapter.
 //!
-//! **NOTE:** This route is available **only** when using the Dummy adapter.
+//! **NOTE:** This route is available **only** when using the Dummy adapter and it's not
+//! an official production route!
 //!
 //! The route is handled by [`channel::channel_dummy_deposit()`].
 //!
 //! Request body (json): [`ChannelDummyDeposit`](crate::routes::channel::ChannelDummyDeposit)
 //!
 //! Response: [`SuccessResponse`](primitives::sentry::SuccessResponse)
+//!
+//! ##### Examples
+//!
+//! Request:
+//!
+//! ```
+#![doc = include_str!("../examples/channel_dummy_deposit.rs")]
+//! ```
 //!
 //! ## Campaign
 //!
@@ -245,7 +254,7 @@
 //!
 //! The route is handled by [`campaign::campaign_list()`].
 //!
-//! Request query parameters: [`CampaignListQuery`][primitives::sentry::campaign_list::CampaignListQuery]
+//! Request query parameters: [`CampaignListQuery`](primitives::sentry::campaign_list::CampaignListQuery)
 //!
 //!   - `page=[integer]` (optional) default: `0`
 //!   - `creator=[0x....]` (optional) - address of the creator to be filtered by
@@ -255,7 +264,7 @@
 //!     - `leader=[0x...]` - it will return all `Campaign`s where this address is `Channel.leader`
 //!
 //!
-//! Response: [`CampaignListResponse`][primitives::sentry::campaign_list::CampaignListResponse]
+//! Response: [`CampaignListResponse`](primitives::sentry::campaign_list::CampaignListResponse)
 //!
 //! ##### Examples
 //!
