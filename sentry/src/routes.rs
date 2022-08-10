@@ -87,9 +87,17 @@
 //!
 //! #### GET `/v5/channel/:id/validator-messages`
 //!
+//! Retrieve the latest validator [`MessageTypes`] for a given [`Channel`].
+//!
+//! The query `limit` parameter is constraint to a maximum of [`Config.msgs_find_limit`],
+//! if a large value is passed it will use the [`Config.msgs_find_limit`] instead.
+//!
+//!
+//! **Sub-routes** with additional filtering:
+//!
 //! - GET `/v5/channel/:id/validator-messages/:addr` - filter by the given [`ValidatorId`]
 //! - GET `/v5/channel/:id/validator-messages/:addr/:validator_messages` - filters by the given [`ValidatorId`] and
-//!   Validator [`MessageTypes`].
+//!   validator [`MessageTypes`].
 //!    - `:validator_messages` - url encoded list of Validator [`MessageTypes`] separated by a `+`.
 //!
 //!       E.g. `NewState+ApproveState` becomes `NewState%2BApproveState`
@@ -115,6 +123,12 @@
 //! ```
 //!
 //! #### POST `/v5/channel/:id/validator-messages` (auth required)
+//!
+//! Create new validator [`MessageTypes`] for the given [`Channel`],
+//! used when propagating messages from the validator worker.
+//!
+//! **Authentication is required** to validate that the [`Auth.uid`] is either
+//! the [`Channel.leader`] or [`Channel.follower`].
 //!
 //! The route is handled by [`channel::validator_message::create_validator_messages()`].
 //!
@@ -238,9 +252,9 @@
 //!
 //! #### POST `/v5/campaign` (auth required)
 //!
-//! Create a new Campaign. Request must be sent by the [`Campaign.creator`](primitives::Campaign::creator).
+//! Create a new Campaign. Request must be sent by the [`Campaign.creator`].
 //!
-//! **Authentication is required** to validate [`Campaign.creator`](primitives::Campaign::creator) == [`Auth.uid`](crate::Auth::uid)
+//! **Authentication is required** to validate [`Campaign.creator`] == [`Auth.uid`]
 //!
 //! It will make sure the `Channel` is created if new and it will update
 //! the spendable amount using the [`Adapter.get_deposit()`](adapter::client::Locked::get_deposit).
@@ -259,9 +273,9 @@
 //!
 //! #### POST `/v5/campaign/:id` (auth required)
 //!
-//! Modify the [`Campaign`]. Request must be sent by the [`Campaign.creator`](primitives::Campaign::creator).
+//! Modify the [`Campaign`]. Request must be sent by the [`Campaign.creator`].
 //!
-//! **Authentication is required** to validate [`Campaign.creator`](primitives::Campaign::creator) == [`Auth.uid`](crate::Auth::uid)
+//! **Authentication is required** to validate [`Campaign.creator`] == [`Auth.uid`]
 //!
 //! The route is handled by [`campaign::update_campaign::handle_route()`].
 //!
@@ -292,9 +306,9 @@
 //!
 //! The route is handled by [`campaign::close_campaign()`].
 //!
-//! Request must be sent by the [`Campaign.creator`](primitives::Campaign::creator).
+//! Request must be sent by the [`Campaign.creator`].
 //!
-//! **Authentication is required** to validate [`Campaign.creator`](primitives::Campaign::creator) == [`Auth.uid`](crate::Auth::uid)
+//! **Authentication is required** to validate [`Campaign.creator`] == [`Auth.uid`]
 //!
 //! Closes the campaign by setting [`Campaign.budget`](primitives::Campaign::budget) so that `remaining budget = 0`.
 //!
@@ -326,7 +340,7 @@
 //!
 //! #### GET `/v5/analytics/for-publisher` (auth required)
 //!
-//! Returns all analytics where the currently authenticated address [`Auth.uid`](crate::Auth::uid) is a **publisher**.
+//! Returns all analytics where the currently authenticated address [`Auth.uid`] is a **publisher**.
 //!
 //! All [`ALLOWED_KEYS`] are allowed for this route.
 //!
@@ -342,7 +356,7 @@
 //!
 //! #### GET `/v5/analytics/for-advertiser` (auth required)
 //!
-//! Returns all analytics where the currently authenticated address [`Auth.uid`](crate::Auth::uid) is an **advertiser**.
+//! Returns all analytics where the currently authenticated address [`Auth.uid`] is an **advertiser**.
 //!
 //! All [`ALLOWED_KEYS`] are allowed for this route.
 //!
@@ -381,10 +395,15 @@
 //! [`ApproveState`]: primitives::validator::ApproveState
 //! [`Accounting`]: crate::db::accounting::Accounting
 //! [`AccountingResponse`]: primitives::sentry::AccountingResponse
+//! [`Auth.uid`]: crate::Auth::uid
 //! [`Campaign`]: primitives::Campaign
+//! [`Campaign.creator`]: primitives::Campaign::creator
 //! [`CampaignId`]: primitives::CampaignId
 //! [`ChannelId`]: primitives::ChannelId
 //! [`Channel`]: primitives::Channel
+//! [`Channel.leader`]: primitives::Channel::leader
+//! [`Channel.follower`]: primitives::Channel::follower
+//! [`Config.msgs_find_limit`]: primitives::Config::msgs_find_limit
 //! [`MessageTypes`]: primitives::validator::MessageTypes
 //! [`NewState`]: primitives::validator::NewState
 //! [`Event`]: primitives::sentry::Event
