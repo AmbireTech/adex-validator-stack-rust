@@ -92,7 +92,7 @@ Sentry API will be accessible at `localhost:8006`
 IP_ADDR=127.0.0.1 REDIS_URL="redis://127.0.0.1:6379/2" \
 POSTGRES_DB="sentry_follower" PORT=8006 KEYSTORE_PWD=ganache1 cargo run -p sentry -- \
     --adapter ethereum \
-    --keystoreFile ./adapter/test/resources/0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7_keystore.json
+    --keystoreFile ./adapter/tests/resources/0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7_keystore.json \
     ./docs/config/ganache.toml
 ```
 
@@ -174,7 +174,7 @@ Assuming you have [Sentry API running](#running-sentry-rest-api) for the **Leade
 ```bash
 KEYSTORE_PWD=ganache0 cargo run -p validator_worker -- \
     --adapter ethereum \
-    --keystoreFile ./adapter/test/resources/0x80690751969B234697e9059e04ed72195c3507fa_keystore.json \
+    --keystoreFile ./adapter/tests/resources/0x80690751969B234697e9059e04ed72195c3507fa_keystore.json \
     --sentryUrl http://127.0.0.1:8005 \
     ./docs/config/ganache.toml
 ```
@@ -186,7 +186,7 @@ Assuming you have [Sentry API running](#running-sentry-rest-api) for the **Follo
 ```bash
 KEYSTORE_PWD=ganache1 cargo run -p validator_worker -- \
     --adapter ethereum \
-    --keystoreFile ./adapter/test/resources/0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7_keystore.json \
+    --keystoreFile ./adapter/tests/resources/0xf3f583AEC5f7C030722Fe992A5688557e1B86ef7_keystore.json \
     --sentryUrl http://127.0.0.1:8006 \
     ./docs/config/ganache.toml
 ```
@@ -255,3 +255,10 @@ all the required services for the specific crate/application before executing th
 ### License
 
 This project is licensed under the [AGPL-3.0 license](./LICENSE)
+
+### Contribution
+
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in AdEx Validator by you, shall be licensed as AGPL-3.0, without any additional terms or conditions.
+
+#### Sign the CLA
+When you contribute to a AdEx Validator open source project on GitHub with a new pull request, a bot will evaluate whether you have signed the CLA. If required, the bot will comment on the pull request, including a link to this system to accept the agreement. 

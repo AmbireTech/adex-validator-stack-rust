@@ -44,7 +44,7 @@ pub struct ChannelDummyDeposit {
 
 /// GET `/v5/channel/list` request
 ///
-/// Query: [`ChannelListQuery`]
+/// Request query parameters: [`ChannelListQuery`]
 ///
 /// Response: [`ChannelListResponse`](primitives::sentry::channel_list::ChannelListResponse)
 pub async fn channel_list<C: Locked + 'static>(
@@ -71,7 +71,9 @@ pub async fn channel_list<C: Locked + 'static>(
 
 /// GET `/v5/channel/0xXXX.../last-approved` request
 ///
-/// Query: [`LastApprovedQuery`]
+/// Full details about the route's API and intend can be found in the [`routes`](crate::routes#get-v5channelidlast-approved) module
+///
+/// Request query parameters: [`LastApprovedQuery`]
 ///
 /// Response: [`LastApprovedResponse`]
 pub async fn last_approved<C: Locked + 'static>(
@@ -111,7 +113,7 @@ pub async fn last_approved<C: Locked + 'static>(
     let query = serde_qs::from_str::<LastApprovedQuery>(req.uri().query().unwrap_or(""))?;
     let validators = vec![channel.leader, channel.follower];
     let channel_id = channel.id();
-    let heartbeats = if query.with_heartbeat.is_some() {
+    let heartbeats = if query.with_heartbeat.unwrap_or_default() {
         let result = try_join_all(
             validators
                 .iter()
@@ -556,7 +558,7 @@ pub async fn channel_payout<C: Locked + 'static>(
 
 /// POST `/v5/channel/dummy-deposit` request
 ///
-/// Body (json): [`ChannelDummyDeposit`]
+/// Request body (json): [`ChannelDummyDeposit`]
 ///
 /// Response: [`SuccessResponse`]
 pub async fn channel_dummy_deposit<C: Locked + 'static>(
@@ -657,7 +659,13 @@ pub mod validator_message {
     }
 
     /// GET `/v5/channel/0xXXX.../validator-messages`
-    /// with query parameters: [`ValidatorMessagesListQuery`].
+    ///
+    /// Full details about the route's API and intend can be found in the [`routes`](crate::routes#get-v5channelidvalidator-messages) module
+    ///
+    /// Request query parameters: [`ValidatorMessagesListQuery`]
+    ///
+    /// Response: [`ValidatorMessagesListResponse`]
+    ///
     pub async fn list_validator_messages<C: Locked + 'static>(
         req: Request<Body>,
         app: &Application<C>,
@@ -691,28 +699,26 @@ pub mod validator_message {
         Ok(success_response(serde_json::to_string(&response)?))
     }
 
-    /// `POST /v5/channel/0xXXX.../validator-messages`
-    /// with Request body (json): [ValidatorMessagesCreateRequest]
+    /// POST `/v5/channel/0xXXX.../validator-messages`
     ///
-    /// # Example
+    /// Full details about the route's API and intend can be found in the [`routes`](crate::routes#post-v5channelidvalidator-messages-auth-required) module
     ///
-    /// ```json
-    /// {
-    ///     "messages": [
-    ///         /// validator messages
-    ///         ...
-    ///     ]
-    /// }
-    /// ```
-    ///
-    /// Validator messages: [`MessageTypes`][primitives::validator::MessageTypes]
+    /// Request body (json): [`ValidatorMessagesCreateRequest`]
     ///
     /// Response: [`SuccessResponse`]
+    ///
+    /// # Examples
+    ///
+    /// Request:
+    ///
+    /// ```
+    #[doc = include_str!("../../../primitives/examples/validator_messages_create_request.rs")]
+    /// ```
     pub async fn create_validator_messages<C: Locked + 'static>(
         req: Request<Body>,
         app: &Application<C>,
     ) -> Result<Response<Body>, ResponseError> {
-        let session = req
+        let auth = req
             .extensions()
             .get::<Auth>()
             .ok_or(ResponseError::Unauthorized)?
@@ -730,7 +736,7 @@ pub mod validator_message {
         let create_request = serde_json::from_slice::<ValidatorMessagesCreateRequest>(&body)
             .map_err(|_err| ResponseError::BadRequest("Bad Request body json".to_string()))?;
 
-        match channel.find_validator(session.uid) {
+        match channel.find_validator(auth.uid) {
             None => Err(ResponseError::Unauthorized),
             _ => {
                 try_join_all(create_request.messages.iter().map(|message| {

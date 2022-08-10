@@ -34,7 +34,7 @@ pub struct Output {
     /// For example: price.IMPRESSION
     /// The default is the min of the bound of event type:
     /// Default: pricingBounds.IMPRESSION.min
-    pub price: HashMap<String, UnifiedNum>,
+    pub price: HashMap<EventType, UnifiedNum>,
 }
 
 impl Output {
@@ -62,7 +62,7 @@ impl From<&Campaign> for Output {
         let price = campaign
             .pricing_bounds
             .iter()
-            .map(|(key, price)| (key.to_string(), price.min))
+            .map(|(key, price)| (*key, price.min))
             .collect();
 
         Self {
@@ -84,7 +84,7 @@ mod test {
         let output = Output {
             show: false,
             boost: 5.5,
-            price: vec![("one".to_string(), 100.into())].into_iter().collect(),
+            price: [(IMPRESSION, 100.into())].into_iter().collect(),
         };
 
         assert_eq!(Ok(Value::Bool(false)), output.try_get("show"));
@@ -96,7 +96,7 @@ mod test {
         );
         assert_eq!(
             Ok(Value::UnifiedNum(100.into())),
-            output.try_get("price.one")
+            output.try_get("price.IMPRESSION")
         );
         assert_eq!(Err(Error::UnknownVariable), output.try_get("price.unknown"));
         assert_eq!(Err(Error::UnknownVariable), output.try_get("unknown"));

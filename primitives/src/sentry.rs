@@ -23,7 +23,7 @@ pub use event::{Event, EventType, CLICK, IMPRESSION};
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 /// Channel Accounting response
-/// A collection of all `Accounting`s for a specific `Channel`
+/// A collection of all `Accounting`s for a specific [`Channel`](`crate::Channel`)
 ///
 /// # Examples
 ///
@@ -35,13 +35,14 @@ pub struct AccountingResponse<S: BalancesState> {
     pub balances: Balances<S>,
 }
 
+/// The last approved [`NewState`] and [`ApproveState`] accordingly to the validator.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LastApproved<S: BalancesState> {
-    /// NewState can be None if the channel is brand new
+    /// [`NewState`] can be `None` if the [`Channel`](crate::Channel) is brand new.
     #[serde(bound = "S: BalancesState")]
     pub new_state: Option<MessageResponse<NewState<S>>>,
-    /// ApproveState can be None if the channel is brand new
+    /// [`ApproveState`] can be `None` if the [`Channel`](crate::Channel) is brand new.
     pub approve_state: Option<MessageResponse<ApproveState>>,
 }
 
@@ -139,7 +140,10 @@ mod event {
     use once_cell::sync::Lazy;
     use parse_display::{Display, FromStr};
     use serde::{Deserialize, Serialize};
-    use std::fmt;
+    use std::{
+        fmt,
+        hash::{Hash, Hasher},
+    };
 
     use crate::{Address, IPFS};
 
@@ -151,20 +155,7 @@ mod event {
     static IMPRESSION_STRING: Lazy<String> = Lazy::new(|| EventType::Impression.to_string());
     static CLICK_STRING: Lazy<String> = Lazy::new(|| EventType::Click.to_string());
 
-    #[derive(
-        Debug,
-        Display,
-        FromStr,
-        Serialize,
-        Deserialize,
-        Hash,
-        Ord,
-        Eq,
-        PartialEq,
-        PartialOrd,
-        Clone,
-        Copy,
-    )]
+    #[derive(Debug, Display, FromStr, Serialize, Deserialize, Ord, Eq, PartialOrd, Clone, Copy)]
     #[display(style = "SNAKE_CASE")]
     #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
     pub enum EventType {
@@ -181,12 +172,34 @@ mod event {
         }
     }
 
+    /// Due to the fact that we want to impl `Borrow<str>`
+    /// we must provide custom hash impl using the capitalized
+    /// version of the [`EventType`] as a string.
+    impl Hash for EventType {
+        fn hash<H: Hasher>(&self, state: &mut H) {
+            self.as_str().hash(state);
+        }
+    }
+
+    impl PartialEq for EventType {
+        fn eq(&self, other: &Self) -> bool {
+            self.as_str() == other.as_str()
+        }
+    }
+
+    impl std::borrow::Borrow<str> for EventType {
+        fn borrow(&self) -> &str {
+            self.as_str()
+        }
+    }
+
     impl From<EventType> for String {
         fn from(event_type: EventType) -> Self {
             event_type.to_string()
         }
     }
 
+    /// All the [`Event`]s available in the validator stack.
     #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
     #[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
     pub enum Event {
@@ -250,12 +263,14 @@ mod event {
 
     #[cfg(test)]
     mod test {
+        use std::borrow::Borrow;
+
         use crate::sentry::event::{CLICK_STRING, IMPRESSION_STRING};
 
         use super::EventType;
 
         #[test]
-        fn event_type_parsing_and_de_serialization() {
+        fn test_event_type_parsing_and_de_serialization() {
             let impression_parse = "IMPRESSION"
                 .parse::<EventType>()
                 .expect("Should parse IMPRESSION");
@@ -273,6 +288,8 @@ mod event {
             assert_eq!(EventType::Impression, impression_json);
             assert_eq!(EventType::Click, click_parse);
             assert_eq!(EventType::Click, click_json);
+
+            assert_eq!(Borrow::<str>::borrow(&EventType::Impression), "IMPRESSION");
         }
     }
 }
@@ -576,21 +593,39 @@ pub struct Pagination {
     pub page: u64,
 }
 
+/// GET `/v5/channel/0xXXX.../last-approved` response
+///
+/// # Examples
+///
+/// ```
+#[doc = include_str!("../../primitives/examples/channel_last_approved_response.rs")]
+/// ```
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LastApprovedResponse<S: BalancesState> {
+    /// The last approved [`NewState`] and [`ApproveState`] accordingly to the validator.
     #[serde(bound = "S: BalancesState")]
     pub last_approved: Option<LastApproved<S>>,
-    /// None -> withHeartbeat=true wasn't passed
-    /// Some(vec![]) (empty vec) or Some(heartbeats) - withHeartbeat=true was passed
+    /// - None -> `withHeartbeat=true` wasn't passed
+    /// - `Some(vec![])` (empty vec) or `Some(heartbeats)` - `withHeartbeat=true` was passed
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub heartbeats: Option<Vec<MessageResponse<Heartbeat>>>,
 }
 
-#[derive(Debug, Deserialize)]
+/// GET `/v5/channel/0xXXX.../last-approved` query parameters
+///
+/// # Examples
+///
+/// ```
+#[doc = include_str!("../../primitives/examples/channel_last_approved_query.rs")]
+/// ```
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct LastApprovedQuery {
-    pub with_heartbeat: Option<String>,
+    /// Whether or not to return the latest 2 [`Heartbeat`] validator messages
+    /// from each of the [`Channel`](crate::Channel) validators.
+    #[serde(default)]
+    pub with_heartbeat: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]

@@ -108,41 +108,102 @@
 //!
 //! #### GET `/v5/channel/:id/validator-messages`
 //!
+//! Retrieve the latest validator [`MessageTypes`] for a given [`Channel`].
+//!
+//! The query `limit` parameter is constraint to a maximum of [`Config.msgs_find_limit`],
+//! if a large value is passed it will use the [`Config.msgs_find_limit`] instead.
+//!
+//!
+//! **Sub-routes** with additional filtering:
+//!
 //! - GET `/v5/channel/:id/validator-messages/:addr` - filter by the given [`ValidatorId`]
-//! - GET `/v5/channel/:id/validator-messages/:addr/:validator_messages` - filters by the given [`ValidatorId`] and a
-//!   [`Validator message types`][`MessageTypes`].
-//!    - `:validator_messages` - url encoded list of [`Validator message types`][`MessageTypes`] separated by a `+`.
+//! - GET `/v5/channel/:id/validator-messages/:addr/:validator_messages` - filters by the given [`ValidatorId`] and
+//!   validator [`MessageTypes`].
+//!    - `:validator_messages` - url encoded list of Validator [`MessageTypes`] separated by a `+`.
 //!
 //!       E.g. `NewState+ApproveState` becomes `NewState%2BApproveState`
 //!
 //! The route is handled by [`channel::validator_message::list_validator_messages()`].
 //!
-//! Request query parameters: [ValidatorMessagesListQuery](primitives::sentry::ValidatorMessagesListQuery)
+//! Request query parameters: [`ValidatorMessagesListQuery`](primitives::sentry::ValidatorMessagesListQuery)
 //!
-//! Response: [ValidatorMessagesListResponse](primitives::sentry::ValidatorMessagesListResponse)
+//! Response: [`ValidatorMessagesListResponse`](primitives::sentry::ValidatorMessagesListResponse)
+//!
+//! ##### Examples
+//!
+//! Query:
+//!
+//! ```
+#![doc = include_str!("../../primitives/examples/validator_messages_list_query.rs")]
+//! ```
+//!
+//! Response:
+//!
+//! ```
+#![doc = include_str!("../../primitives/examples/validator_messages_list_response.rs")]
+//! ```
 //!
 //! #### POST `/v5/channel/:id/validator-messages` (auth required)
 //!
-//! Inserts the validator messages in the request body in the databse for a specific [`Channel`].
-//! The request sender must be a [`Validator`] of the [`Channel`].
+//! Create new validator [`MessageTypes`] for the given [`Channel`],
+//! used when propagating messages from the validator worker.
+//!
+//! **Authentication is required** to validate that the [`Auth.uid`] is either
+//! the [`Channel.leader`] or [`Channel.follower`].
 //!
 //! The route is handled by [`channel::validator_message::create_validator_messages()`].
+>>>>>>> 630f89827d679c2e72268d956742d91f556d9e89
 //!
-//! Request body (json):
+//! Request body (json): [`ValidatorMessagesCreateRequest`](primitives::sentry::ValidatorMessagesCreateRequest)
+//!
+//! Response: [`SuccessResponse`]
+//!
+//! ##### Examples
+//!
+//! Request:
 //!
 //! ```
 #![doc = include_str!("../../primitives/examples/validator_messages_create_request.rs")]
 //! ```
+//! Response: [`SuccessResponse`]
 //!
 //! Validator messages: [`MessageTypes`]
 //!
 //! #### GET `/v5/channel/:id/last-approved`
+//!
+//! Retrieves the latest [`ApproveState`] and the corresponding [`NewState`]
+//! validator messages for the given [`Channel`].
+//!
+//! If the [`Channel`] is new one or both of the states might have not been generated yet.
+//!
+//! The same is true of the [`Heartbeat`]s messages if they are requested with the query parameter.
+//!
+//! Retrieves the latest [`ApproveState`] and the corresponding [`NewState`]
+//! validator messages for the given [`Channel`].
+//!
+//! If the [`Channel`] is new one or both of the states might have not been generated yet.
+//!
+//! The same is true of the [`Heartbeat`]s messages if they are requested with the query parameter.
 //!
 //! The route is handled by [`channel::last_approved()`].
 //!
 //! Request query parameters: [`LastApprovedQuery`][primitives::sentry::LastApprovedQuery]
 //!
 //! Response: [`LastApprovedResponse`][primitives::sentry::LastApprovedResponse]
+//!
+//! ##### Examples
+//!
+//! Query:
+//!
+//! ```
+#![doc = include_str!("../../primitives/examples/channel_last_approved_query.rs")]
+//! ```
+//!
+//! Response:
+//!
+//! ```
+#![doc = include_str!("../../primitives/examples/channel_last_approved_response.rs")]
+//! ```
 //!
 //! #### POST `/v5/channel/:id/pay` (auth required)
 //!
@@ -247,9 +308,9 @@
 //!
 //! #### POST `/v5/campaign` (auth required)
 //!
-//! Create a new Campaign. Request must be sent by the [`Campaign.creator`](primitives::Campaign::creator).
+//! Create a new Campaign. Request must be sent by the [`Campaign.creator`].
 //!
-//! **Authentication is required** to validate [`Campaign.creator`](primitives::Campaign::creator) == [`Auth.uid`](crate::Auth::uid)
+//! **Authentication is required** to validate [`Campaign.creator`] == [`Auth.uid`]
 //!
 //! It will make sure the `Channel` is created if new and it will update
 //! the spendable amount using the [`Adapter.get_deposit()`](adapter::client::Locked::get_deposit).
@@ -268,9 +329,9 @@
 //!
 //! #### POST `/v5/campaign/:id` (auth required)
 //!
-//! Modify the [`Campaign`]. Request must be sent by the [`Campaign.creator`](primitives::Campaign::creator).
+//! Modify the [`Campaign`]. Request must be sent by the [`Campaign.creator`].
 //!
-//! **Authentication is required** to validate [`Campaign.creator`](primitives::Campaign::creator) == [`Auth.uid`](crate::Auth::uid)
+//! **Authentication is required** to validate [`Campaign.creator`] == [`Auth.uid`]
 //!
 //! The route is handled by [`campaign::update_campaign::handle_route()`].
 //!
@@ -301,9 +362,9 @@
 //!
 //! The route is handled by [`campaign::close_campaign()`].
 //!
-//! Request must be sent by the [`Campaign.creator`](primitives::Campaign::creator).
+//! Request must be sent by the [`Campaign.creator`].
 //!
-//! **Authentication is required** to validate [`Campaign.creator`](primitives::Campaign::creator) == [`Auth.uid`](crate::Auth::uid)
+//! **Authentication is required** to validate [`Campaign.creator`] == [`Auth.uid`]
 //!
 //! Closes the campaign by setting [`Campaign.budget`](primitives::Campaign::budget) so that `remaining budget = 0`.
 //!
@@ -335,7 +396,7 @@
 //!
 //! #### GET `/v5/analytics/for-publisher` (auth required)
 //!
-//! Returns all analytics where the currently authenticated address [`Auth.uid`](crate::Auth::uid) is a **publisher**.
+//! Returns all analytics where the currently authenticated address [`Auth.uid`] is a **publisher**.
 //!
 //! All [`ALLOWED_KEYS`] are allowed for this route.
 //!
@@ -351,7 +412,7 @@
 //!
 //! #### GET `/v5/analytics/for-advertiser` (auth required)
 //!
-//! Returns all analytics where the currently authenticated address [`Auth.uid`](crate::Auth::uid) is an **advertiser**.
+//! Returns all analytics where the currently authenticated address [`Auth.uid`] is an **advertiser**.
 //!
 //! All [`ALLOWED_KEYS`] are allowed for this route.
 //!
@@ -390,19 +451,25 @@
 //! [`ApproveState`]: primitives::validator::ApproveState
 //! [`Accounting`]: crate::db::accounting::Accounting
 //! [`AccountingResponse`]: primitives::sentry::AccountingResponse
-//! [`Campaign`]: primitives::Campaign
-//! [`CampaignId`]: primitives::CampaignId
-//! [`ChannelId`]: primitives::ChannelId
-//! [`Channel`]: primitives::Channel
-//! [`MessageTypes`]: primitives::validator::MessageTypes
-//! [`NewState`]: primitives::validator::NewState
-//! [`Event`]: primitives::sentry::Event
-//! [`Campaign.event_submission`]: primitives::Campaign::event_submission
-//! [`check_access()`]: crate::access::check_access
-//! [`SuccessResponse`]: primitives::sentry::SuccessResponse
-//! [`ValidatorId`]: primitives::ValidatorId
 //! [`AnalyticsResponse`]: primitives::sentry::AnalyticsResponse
 //! [`AnalyticsQuery`]: primitives::analytics::AnalyticsQuery
+//! [`Auth.uid`]: crate::Auth::uid
+//! [`Campaign`]: primitives::Campaign
+//! [`Campaign.creator`]: primitives::Campaign::creator
+//! [`Campaign.event_submission`]: primitives::Campaign::event_submission
+//! [`CampaignId`]: primitives::CampaignId
+//! [`Channel`]: primitives::Channel
+//! [`Channel.leader`]: primitives::Channel::leader
+//! [`Channel.follower`]: primitives::Channel::follower
+//! [`ChannelId`]: primitives::ChannelId
+//! [`check_access()`]: crate::access::check_access
+//! [`Config.msgs_find_limit`]: primitives::Config::msgs_find_limit
+//! [`Event`]: primitives::sentry::Event
+//! [`Heartbeat`]: primitives::validator::Heartbeat
+//! [`MessageTypes`]: primitives::validator::MessageTypes
+//! [`NewState`]: primitives::validator::NewState
+//! [`SuccessResponse`]: primitives::sentry::SuccessResponse
+//! [`ValidatorId`]: primitives::ValidatorId
 
 pub use analytics::analytics as get_analytics;
 

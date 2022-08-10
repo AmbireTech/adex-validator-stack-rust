@@ -1,6 +1,6 @@
 [package]
 name = "primitives"
-version = "0.1.0"
+version = "0.2.0"
 authors = [
   "Ambire <dev@ambire.com>",
   "Lachezar Lechev <lachezar@ambire.com>",
@@ -45,6 +45,12 @@ name = "channel_list_query"
 required-features = ["test-util"]
 
 [[example]]
+name = "channel_last_approved_response"
+
+[[example]]
+name = "channel_last_approved_query"
+
+[[example]]
 name = "channel_pay_request"
 
 [[example]]
@@ -59,6 +65,12 @@ name = "spender_response"
 
 [[example]]
 name = "validator_messages_create_request"
+
+[[example]]
+name = "validator_messages_list_query"
+
+[[example]]
+name = "validator_messages_list_response"
 
 [dependencies]
 # (De)Serialization
