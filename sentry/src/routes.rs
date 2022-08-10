@@ -123,19 +123,15 @@
 //!
 //! #### POST `/v5/channel/:id/validator-messages` (auth required)
 //!
+//! Inserts the validator messages in the request body in the databse for a specific [`Channel`].
+//! The request sender must be a [`Validator`] of the [`Channel`].
+//!
 //! The route is handled by [`channel::validator_message::create_validator_messages()`].
 //!
-//! Request body (json): [`ValidatorMessagesCreateRequest`](primitives::sentry::ValidatorMessagesCreateRequest)
+//! Request body (json):
 //!
-//! ##### Examples:
-//!
-//! ```json
-//! {
-//!     "messages": [
-//!         /// validator messages
-//!         ...
-//!     ]
-//! }
+//! ```
+#![doc = include_str!("../../primitives/examples/validator_messages_create_request.rs")]
 //! ```
 //!
 //! Validator messages: [`MessageTypes`]
@@ -264,7 +260,7 @@
 //! ##### Examples
 //!
 //! ```
-#![doc = include_str!("../../primitives/examples/create_campaign.rs")]
+#![doc = include_str!("../../primitives/examples/create_campaign_request.rs")]
 //! ```
 //!
 //! #### POST `/v5/campaign/:id` (auth required)
@@ -282,7 +278,7 @@
 //! ##### Examples
 //!
 //! ```
-#![doc = include_str!("../../primitives/examples/modify_campaign.rs")]
+#![doc = include_str!("../../primitives/examples/modify_campaign_request.rs")]
 //! ```
 //!
 //! #### POST `/v5/campaign/:id/events`

@@ -45,14 +45,17 @@ name = "channel_list_query"
 required-features = ["test-util"]
 
 [[example]]
-name = "create_campaign"
+name = "create_campaign_request"
 required-features = ["test-util"]
 
 [[example]]
-name = "modify_campaign"
+name = "modify_campaign_request"
 
 [[example]]
 name = "spender_response"
+
+[[example]]
+name = "validator_messages_create_request"
 
 [dependencies]
 # (De)Serialization

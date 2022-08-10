@@ -28,7 +28,7 @@ pub use event::{Event, EventType, CLICK, IMPRESSION};
 /// # Examples
 ///
 /// ```
-#[doc = include_str!("../examples/accounting_response.rs")]
+#[doc = include_str!("../examples/validator_messages_create_request.rs")]
 /// ```
 pub struct AccountingResponse<S: BalancesState> {
     #[serde(flatten, bound = "S: BalancesState")]
@@ -651,6 +651,13 @@ pub struct ValidatorMessagesListResponse {
     pub messages: Vec<ValidatorMessage>,
 }
 
+/// Contains all the different validator messages to be inserted
+///
+/// # Examples
+///
+/// ```
+#[doc = include_str!("../examples/validator_messages_create_request.rs")]
+/// ```
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ValidatorMessagesCreateRequest {
@@ -846,7 +853,7 @@ pub mod campaign_create {
     /// # Examples
     ///
     /// ```
-    #[doc = include_str!("../examples/create_campaign.rs")]
+    #[doc = include_str!("../examples/create_campaign_request.rs")]
     /// ```
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     #[serde(rename_all = "camelCase")]
@@ -939,7 +946,7 @@ pub mod campaign_modify {
     ///
     /// # Examples:
     /// ```
-    #[doc = include_str!("../examples/modify_campaign.rs")]
+    #[doc = include_str!("../examples/modify_campaign_request.rs")]
     /// ```
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     pub struct ModifyCampaign {
