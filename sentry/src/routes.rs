@@ -63,6 +63,10 @@
 //!
 //! The route is handled by [`channel::get_accounting_for_channel()`].
 //!
+//! Response: [`AccountingResponse`]
+//!
+//! ##### Examples
+//!
 //! Response:
 //!
 //! ```
@@ -77,6 +81,10 @@
 //! amount is retrieved.
 //!
 //! The route is handled by [`channel::get_spender_limits()`].
+//!
+//! Response: [`SpenderResponse`]
+//!
+//! ##### Examples
 //!
 //! Response:
 //!
@@ -99,6 +107,10 @@
 //! This routes gets total_deposited and total_spent for every spender on a [`Channel`]
 //!
 //! The route is handled by [`channel::get_all_spender_limits()`].
+//!
+//! Response: [`AllSpendersResponse`]
+//!
+//! ##### Examples
 //!
 //! Response:
 //!
@@ -164,9 +176,6 @@
 //! ```
 #![doc = include_str!("../../primitives/examples/validator_messages_create_request.rs")]
 //! ```
-//! Response: [`SuccessResponse`]
-//!
-//! Validator messages: [`MessageTypes`]
 //!
 //! #### GET `/v5/channel/:id/last-approved`
 //!
@@ -215,12 +224,17 @@
 //!
 //! The route is handled by [`channel::channel_payout()`].
 //!
-//! Request JSON body:
+//! Request JSON body: [`ChannelPayRequest`]
+//!
+//! Response: [`SuccessResponse`](primitives::sentry::SuccessResponse)
+//!
+//! ##### Examples
+//!
+//! Request (json):
 //!
 //! ```
 #![doc = include_str!("../../primitives/examples/channel_pay_request.rs")]
 //! ```
-//! Response: [`SuccessResponse`](primitives::sentry::SuccessResponse)
 //!
 //!
 //! #### GET `/v5/channel/:id/get-leaf`
@@ -450,6 +464,7 @@
 //! [`ApproveState`]: primitives::validator::ApproveState
 //! [`Accounting`]: crate::db::accounting::Accounting
 //! [`AccountingResponse`]: primitives::sentry::AccountingResponse
+//! [`AllSpendersResponse`]: primitives::sentry::AllSpendersResponse
 //! [`AnalyticsResponse`]: primitives::sentry::AnalyticsResponse
 //! [`AnalyticsQuery`]: primitives::analytics::AnalyticsQuery
 //! [`Auth.uid`]: crate::Auth::uid
@@ -461,12 +476,14 @@
 //! [`Channel.leader`]: primitives::Channel::leader
 //! [`Channel.follower`]: primitives::Channel::follower
 //! [`ChannelId`]: primitives::ChannelId
+//! [`ChannelPayRequest`]: primitives::sentry::ChannelPayRequest
 //! [`check_access()`]: crate::access::check_access
 //! [`Config.msgs_find_limit`]: primitives::Config::msgs_find_limit
 //! [`Event`]: primitives::sentry::Event
 //! [`Heartbeat`]: primitives::validator::Heartbeat
 //! [`MessageTypes`]: primitives::validator::MessageTypes
 //! [`NewState`]: primitives::validator::NewState
+//! [`SpenderResponse`]: primitives::sentry::SpenderResponse
 //! [`SuccessResponse`]: primitives::sentry::SuccessResponse
 //! [`ValidatorId`]: primitives::ValidatorId
 

@@ -23,12 +23,13 @@ pub use event::{Event, EventType, CLICK, IMPRESSION};
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 /// Channel Accounting response
+///
 /// A collection of all `Accounting`s for a specific [`Channel`](`crate::Channel`)
 ///
 /// # Examples
 ///
 /// ```
-#[doc = include_str!("../examples/validator_messages_create_request.rs")]
+#[doc = include_str!("../examples/accounting_response.rs")]
 /// ```
 pub struct AccountingResponse<S: BalancesState> {
     #[serde(flatten, bound = "S: BalancesState")]
@@ -633,7 +634,7 @@ pub struct SuccessResponse {
     pub success: bool,
 }
 
-/// Spender limits for a spender on a `Channel`
+/// Spender limits for a spender on a `Channel`.
 ///
 /// # Examples
 ///
@@ -646,7 +647,7 @@ pub struct SpenderResponse {
     pub spender: Spender,
 }
 
-/// Spender limits for all spenders on a `Channel`
+/// Spender limits for all spenders on a `Channel`.
 ///
 /// # Examples
 ///
@@ -668,7 +669,7 @@ pub struct AllSpendersQuery {
     pub page: u64,
 }
 
-/// Includes all the payouts that need to be done for that channel
+/// Payouts to be performed for the given [`Channel`](`crate::Channel`).
 ///
 /// # Examples
 ///
@@ -693,7 +694,7 @@ pub struct ValidatorMessagesListResponse {
     pub messages: Vec<ValidatorMessage>,
 }
 
-/// Contains all the different validator messages to be inserted
+/// Contains all the different validator messages to be created.
 ///
 /// # Examples
 ///
