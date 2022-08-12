@@ -22,20 +22,22 @@ pub use event::{Event, EventType, CLICK, IMPRESSION};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-/// Channel Accounting response
-/// A collection of all `Accounting`s for a specific `Channel`
+/// Channel Accounting response.
+///
+/// A collection of all `Accounting`s for a specific [`Channel`](crate::Channel).
 pub struct AccountingResponse<S: BalancesState> {
     #[serde(flatten, bound = "S: BalancesState")]
     pub balances: Balances<S>,
 }
 
+/// The last approved [`NewState`] and [`ApproveState`] accordingly to the validator.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LastApproved<S: BalancesState> {
-    /// NewState can be None if the channel is brand new
+    /// [`NewState`] can be `None` if the [`Channel`](crate::Channel) is brand new.
     #[serde(bound = "S: BalancesState")]
     pub new_state: Option<MessageResponse<NewState<S>>>,
-    /// ApproveState can be None if the channel is brand new
+    /// [`ApproveState`] can be `None` if the [`Channel`](crate::Channel) is brand new.
     pub approve_state: Option<MessageResponse<ApproveState>>,
 }
 
@@ -586,21 +588,39 @@ pub struct Pagination {
     pub page: u64,
 }
 
+/// GET `/v5/channel/0xXXX.../last-approved` response
+///
+/// # Examples
+///
+/// ```
+#[doc = include_str!("../../primitives/examples/channel_last_approved_response.rs")]
+/// ```
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LastApprovedResponse<S: BalancesState> {
+    /// The last approved [`NewState`] and [`ApproveState`] accordingly to the validator.
     #[serde(bound = "S: BalancesState")]
     pub last_approved: Option<LastApproved<S>>,
-    /// None -> withHeartbeat=true wasn't passed
-    /// Some(vec![]) (empty vec) or Some(heartbeats) - withHeartbeat=true was passed
+    /// - None -> `withHeartbeat=true` wasn't passed
+    /// - `Some(vec![])` (empty vec) or `Some(heartbeats)` - `withHeartbeat=true` was passed
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub heartbeats: Option<Vec<MessageResponse<Heartbeat>>>,
 }
 
-#[derive(Debug, Deserialize)]
+/// GET `/v5/channel/0xXXX.../last-approved` query parameters
+///
+/// # Examples
+///
+/// ```
+#[doc = include_str!("../../primitives/examples/channel_last_approved_query.rs")]
+/// ```
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct LastApprovedQuery {
-    pub with_heartbeat: Option<String>,
+    /// Whether or not to return the latest 2 [`Heartbeat`] validator messages
+    /// from each of the [`Channel`](crate::Channel) validators.
+    #[serde(default)]
+    pub with_heartbeat: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]

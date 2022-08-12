@@ -39,11 +39,26 @@ name = "channel_list_query"
 required-features = ["test-util"]
 
 [[example]]
+name = "channel_last_approved_response"
+
+[[example]]
+name = "channel_last_approved_query"
+
+[[example]]
 name = "create_campaign"
 required-features = ["test-util"]
 
 [[example]]
 name = "modify_campaign"
+
+[[example]]
+name = "validator_messages_create_request"
+
+[[example]]
+name = "validator_messages_list_query"
+
+[[example]]
+name = "validator_messages_list_response"
 
 [dependencies]
 # (De)Serialization

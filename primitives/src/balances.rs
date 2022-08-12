@@ -9,6 +9,7 @@ use thiserror::Error;
 pub struct Balances<S: BalancesState = CheckedState> {
     pub earners: UnifiedMap,
     pub spenders: UnifiedMap,
+    #[serde(skip)]
     state: PhantomData<S>,
 }
 
