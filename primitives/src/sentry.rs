@@ -24,7 +24,7 @@ pub use event::{Event, EventType, CLICK, IMPRESSION};
 #[serde(rename_all = "camelCase")]
 /// Channel Accounting response
 ///
-/// A collection of all `Accounting`s for a specific [`Channel`](`crate::Channel`)
+/// A collection of all `Accounting`s for a specific [`Channel`](crate::Channel)
 ///
 /// # Examples
 ///
@@ -669,7 +669,7 @@ pub struct AllSpendersQuery {
     pub page: u64,
 }
 
-/// Payouts to be performed for the given [`Channel`](`crate::Channel`).
+/// Payouts to be performed for the given [`Channel`](crate::Channel).
 ///
 /// # Examples
 ///
