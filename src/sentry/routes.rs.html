@@ -459,6 +459,57 @@
 <span id="459">459</span>
 <span id="460">460</span>
 <span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
+<span id="464">464</span>
+<span id="465">465</span>
+<span id="466">466</span>
+<span id="467">467</span>
+<span id="468">468</span>
+<span id="469">469</span>
+<span id="470">470</span>
+<span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
+<span id="485">485</span>
+<span id="486">486</span>
+<span id="487">487</span>
+<span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
+<span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
+<span id="496">496</span>
+<span id="497">497</span>
+<span id="498">498</span>
+<span id="499">499</span>
+<span id="500">500</span>
+<span id="501">501</span>
+<span id="502">502</span>
+<span id="503">503</span>
+<span id="504">504</span>
+<span id="505">505</span>
+<span id="506">506</span>
+<span id="507">507</span>
+<span id="508">508</span>
+<span id="509">509</span>
+<span id="510">510</span>
+<span id="511">511</span>
+<span id="512">512</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Sentry REST API documentation</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//!</span>
@@ -520,15 +571,38 @@
 <span class="doccomment">//!</span>
 <span class="doccomment">//! #### GET `/v5/channel/:id/accounting`</span>
 <span class="doccomment">//!</span>
+<span class="doccomment">//! Gets all of the accounting entries for a channel from the database and checks the balances.</span>
+<span class="doccomment">//!</span>
 <span class="doccomment">//! The route is handled by [`channel::get_accounting_for_channel()`].</span>
 <span class="doccomment">//!</span>
-<span class="doccomment">//! Response: [`AccountingResponse::&lt;CheckedState&gt;`](primitives::sentry::AccountingResponse)</span>
+<span class="doccomment">//! Response: [`AccountingResponse`]</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ##### Examples</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Response:</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ```</span>
+<span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/accounting_response.rs&quot;</span>)]</span>
+<span class="doccomment">//! ```</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! #### GET `/v5/channel/:id/spender/:addr` (auth required)</span>
 <span class="doccomment">//!</span>
+<span class="doccomment">//! Gets the spender limits for a spender on a [`Channel`]. It does so by fetching the</span>
+<span class="doccomment">//! latest Spendable entry from the database (or creating one if it doesn&#39;t exist yet) from which</span>
+<span class="doccomment">//! the total deposited amount is retrieved, and the latest NewState from which the total spent</span>
+<span class="doccomment">//! amount is retrieved.</span>
+<span class="doccomment">//!</span>
 <span class="doccomment">//! The route is handled by [`channel::get_spender_limits()`].</span>
 <span class="doccomment">//!</span>
-<span class="doccomment">//! Response: [`SpenderResponse`](primitives::sentry::SpenderResponse)</span>
+<span class="doccomment">//! Response: [`SpenderResponse`]</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ##### Examples</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Response:</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ```</span>
+<span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/spender_response.rs&quot;</span>)]</span>
+<span class="doccomment">//! ```</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! #### POST `/v5/channel/:id/spender/:addr` (auth required)</span>
 <span class="doccomment">//!</span>
@@ -542,9 +616,19 @@
 <span class="doccomment">//!</span>
 <span class="doccomment">//! #### GET `/v5/channel/:id/spender/all` (auth required)</span>
 <span class="doccomment">//!</span>
+<span class="doccomment">//! This routes gets total_deposited and total_spent for every spender on a [`Channel`]</span>
+<span class="doccomment">//!</span>
 <span class="doccomment">//! The route is handled by [`channel::get_all_spender_limits()`].</span>
 <span class="doccomment">//!</span>
-<span class="doccomment">//! Response: [`AllSpendersResponse`](primitives::sentry::AllSpendersResponse)</span>
+<span class="doccomment">//! Response: [`AllSpendersResponse`]</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ##### Examples</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Response:</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ```</span>
+<span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/all_spenders_response.rs&quot;</span>)]</span>
+<span class="doccomment">//! ```</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! #### GET `/v5/channel/:id/validator-messages`</span>
 <span class="doccomment">//!</span>
@@ -614,6 +698,13 @@
 <span class="doccomment">//!</span>
 <span class="doccomment">//! The same is true of the [`Heartbeat`]s messages if they are requested with the query parameter.</span>
 <span class="doccomment">//!</span>
+<span class="doccomment">//! Retrieves the latest [`ApproveState`] and the corresponding [`NewState`]</span>
+<span class="doccomment">//! validator messages for the given [`Channel`].</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! If the [`Channel`] is new one or both of the states might have not been generated yet.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! The same is true of the [`Heartbeat`]s messages if they are requested with the query parameter.</span>
+<span class="doccomment">//!</span>
 <span class="doccomment">//! The route is handled by [`channel::last_approved()`].</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! Request query parameters: [`LastApprovedQuery`][primitives::sentry::LastApprovedQuery]</span>
@@ -645,9 +736,17 @@
 <span class="doccomment">//!</span>
 <span class="doccomment">//! The route is handled by [`channel::channel_payout()`].</span>
 <span class="doccomment">//!</span>
-<span class="doccomment">//! Request JSON body: [`ChannelPayRequest`](primitives::sentry::ChannelPayRequest)</span>
+<span class="doccomment">//! Request JSON body: [`ChannelPayRequest`]</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! Response: [`SuccessResponse`](primitives::sentry::SuccessResponse)</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ##### Examples</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Request (json):</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ```</span>
+<span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/channel_pay_request.rs&quot;</span>)]</span>
+<span class="doccomment">//! ```</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! #### GET `/v5/channel/:id/get-leaf`</span>
@@ -759,7 +858,7 @@
 <span class="doccomment">//! ##### Examples</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! ```</span>
-<span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/create_campaign.rs&quot;</span>)]</span>
+<span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/create_campaign_request.rs&quot;</span>)]</span>
 <span class="doccomment">//! ```</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! #### POST `/v5/campaign/:id` (auth required)</span>
@@ -777,7 +876,7 @@
 <span class="doccomment">//! ##### Examples</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! ```</span>
-<span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/modify_campaign.rs&quot;</span>)]</span>
+<span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../primitives/examples/modify_campaign_request.rs&quot;</span>)]</span>
 <span class="doccomment">//! ```</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! #### POST `/v5/campaign/:id/events`</span>
@@ -886,6 +985,7 @@
 <span class="doccomment">//! [`ApproveState`]: primitives::validator::ApproveState</span>
 <span class="doccomment">//! [`Accounting`]: crate::db::accounting::Accounting</span>
 <span class="doccomment">//! [`AccountingResponse`]: primitives::sentry::AccountingResponse</span>
+<span class="doccomment">//! [`AllSpendersResponse`]: primitives::sentry::AllSpendersResponse</span>
 <span class="doccomment">//! [`AnalyticsResponse`]: primitives::sentry::AnalyticsResponse</span>
 <span class="doccomment">//! [`AnalyticsQuery`]: primitives::analytics::AnalyticsQuery</span>
 <span class="doccomment">//! [`Auth.uid`]: crate::Auth::uid</span>
@@ -897,12 +997,14 @@
 <span class="doccomment">//! [`Channel.leader`]: primitives::Channel::leader</span>
 <span class="doccomment">//! [`Channel.follower`]: primitives::Channel::follower</span>
 <span class="doccomment">//! [`ChannelId`]: primitives::ChannelId</span>
+<span class="doccomment">//! [`ChannelPayRequest`]: primitives::sentry::ChannelPayRequest</span>
 <span class="doccomment">//! [`check_access()`]: crate::access::check_access</span>
 <span class="doccomment">//! [`Config.msgs_find_limit`]: primitives::Config::msgs_find_limit</span>
 <span class="doccomment">//! [`Event`]: primitives::sentry::Event</span>
 <span class="doccomment">//! [`Heartbeat`]: primitives::validator::Heartbeat</span>
 <span class="doccomment">//! [`MessageTypes`]: primitives::validator::MessageTypes</span>
 <span class="doccomment">//! [`NewState`]: primitives::validator::NewState</span>
+<span class="doccomment">//! [`SpenderResponse`]: primitives::sentry::SpenderResponse</span>
 <span class="doccomment">//! [`SuccessResponse`]: primitives::sentry::SuccessResponse</span>
 <span class="doccomment">//! [`ValidatorId`]: primitives::ValidatorId</span>
 

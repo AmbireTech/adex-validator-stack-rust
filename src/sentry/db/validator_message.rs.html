@@ -151,7 +151,7 @@
 <span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">DbPool</span>, <span class="ident">PoolError</span>};
 
 <span class="doccomment">/// Inserts a new validator [`MessageTypes`] using the `from` [`ValidatorId`] and `received` at: [`Utc::now()`][Utc]</span>
-<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">insert_validator_messages</span>(
+<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">insert_validator_message</span>(
     <span class="ident">pool</span>: <span class="kw-2">&amp;</span><span class="ident">DbPool</span>,
     <span class="ident">channel</span>: <span class="kw-2">&amp;</span><span class="ident">Channel</span>,
     <span class="ident">from</span>: <span class="kw-2">&amp;</span><span class="ident">ValidatorId</span>,
