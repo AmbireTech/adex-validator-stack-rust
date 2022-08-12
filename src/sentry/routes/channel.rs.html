@@ -1517,6 +1517,15 @@
 <span id="1517">1517</span>
 <span id="1518">1518</span>
 <span id="1519">1519</span>
+<span id="1520">1520</span>
+<span id="1521">1521</span>
+<span id="1522">1522</span>
+<span id="1523">1523</span>
+<span id="1524">1524</span>
+<span id="1525">1525</span>
+<span id="1526">1526</span>
+<span id="1527">1527</span>
+<span id="1528">1528</span>
 </pre><pre class="rust"><code><span class="doccomment">//! `/v5/channel` routes</span>
 <span class="doccomment">//!</span>
 
@@ -1563,7 +1572,7 @@
 
 <span class="doccomment">/// GET `/v5/channel/list` request</span>
 <span class="doccomment">///</span>
-<span class="doccomment">/// Query: [`ChannelListQuery`]</span>
+<span class="doccomment">/// Request query parameters: [`ChannelListQuery`]</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Response: [`ChannelListResponse`](primitives::sentry::channel_list::ChannelListResponse)</span>
 <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">channel_list</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Locked</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span>(
@@ -1590,7 +1599,9 @@
 
 <span class="doccomment">/// GET `/v5/channel/0xXXX.../last-approved` request</span>
 <span class="doccomment">///</span>
-<span class="doccomment">/// Query: [`LastApprovedQuery`]</span>
+<span class="doccomment">/// Full details about the route&#39;s API and intend can be found in the [`routes`](crate::routes#get-v5channelidlast-approved) module</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Request query parameters: [`LastApprovedQuery`]</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Response: [`LastApprovedResponse`]</span>
 <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">last_approved</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Locked</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span>(
@@ -1630,7 +1641,8 @@
     <span class="kw">let</span> <span class="ident">query</span> <span class="op">=</span> <span class="ident">serde_qs::from_str</span>::<span class="op">&lt;</span><span class="ident">LastApprovedQuery</span><span class="op">&gt;</span>(<span class="ident">req</span>.<span class="ident">uri</span>().<span class="ident">query</span>().<span class="ident">unwrap_or</span>(<span class="string">&quot;&quot;</span>))<span class="question-mark">?</span>;
     <span class="kw">let</span> <span class="ident">validators</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="ident">channel</span>.<span class="ident">leader</span>, <span class="ident">channel</span>.<span class="ident">follower</span>];
     <span class="kw">let</span> <span class="ident">channel_id</span> <span class="op">=</span> <span class="ident">channel</span>.<span class="ident">id</span>();
-    <span class="kw">let</span> <span class="ident">heartbeats</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">query</span>.<span class="ident">with_heartbeat</span>.<span class="ident">is_some</span>() {
+
+    <span class="kw">let</span> <span class="ident">heartbeats</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">query</span>.<span class="ident">with_heartbeat</span>.<span class="ident">unwrap_or_default</span>() {
         <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">try_join_all</span>(
             <span class="ident">validators</span>
                 .<span class="ident">iter</span>()
@@ -2075,7 +2087,9 @@
 
 <span class="doccomment">/// POST `/v5/channel/dummy-deposit` request</span>
 <span class="doccomment">///</span>
-<span class="doccomment">/// Body (json): [`ChannelDummyDeposit`]</span>
+<span class="doccomment">/// Full details about the route&#39;s API and intend can be found in the [`routes`](crate::routes#post-v5channeldummy-deposit-auth-required) module</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Request body (json): [`ChannelDummyDeposit`]</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Response: [`SuccessResponse`]</span>
 <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">channel_dummy_deposit</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Locked</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span>(
@@ -2176,7 +2190,13 @@
     }
 
     <span class="doccomment">/// GET `/v5/channel/0xXXX.../validator-messages`</span>
-    <span class="doccomment">/// with query parameters: [`ValidatorMessagesListQuery`].</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Full details about the route&#39;s API and intend can be found in the [`routes`](crate::routes#get-v5channelidvalidator-messages) module</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Request query parameters: [`ValidatorMessagesListQuery`]</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Response: [`ValidatorMessagesListResponse`]</span>
+    <span class="doccomment">///</span>
     <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">list_validator_messages</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Locked</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span>(
         <span class="ident">req</span>: <span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>,
         <span class="ident">app</span>: <span class="kw-2">&amp;</span><span class="ident">Application</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
@@ -2210,28 +2230,26 @@
         <span class="prelude-val">Ok</span>(<span class="ident">success_response</span>(<span class="ident">serde_json::to_string</span>(<span class="kw-2">&amp;</span><span class="ident">response</span>)<span class="question-mark">?</span>))
     }
 
-    <span class="doccomment">/// `POST /v5/channel/0xXXX.../validator-messages`</span>
-    <span class="doccomment">/// with Request body (json): [ValidatorMessagesCreateRequest]</span>
+    <span class="doccomment">/// POST `/v5/channel/0xXXX.../validator-messages`</span>
     <span class="doccomment">///</span>
-    <span class="doccomment">/// # Example</span>
+    <span class="doccomment">/// Full details about the route&#39;s API and intend can be found in the [`routes`](crate::routes#post-v5channelidvalidator-messages-auth-required) module</span>
     <span class="doccomment">///</span>
-    <span class="doccomment">/// ```json</span>
-    <span class="doccomment">/// {</span>
-    <span class="doccomment">///     &quot;messages&quot;: [</span>
-    <span class="doccomment">///         /// validator messages</span>
-    <span class="doccomment">///         ...</span>
-    <span class="doccomment">///     ]</span>
-    <span class="doccomment">/// }</span>
-    <span class="doccomment">/// ```</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Validator messages: [`MessageTypes`][primitives::validator::MessageTypes]</span>
+    <span class="doccomment">/// Request body (json): [`ValidatorMessagesCreateRequest`]</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Response: [`SuccessResponse`]</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Examples</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Request:</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// ```</span>
+    <span class="attribute">#[<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../../../primitives/examples/validator_messages_create_request.rs&quot;</span>)]</span>
+    <span class="doccomment">/// ```</span>
     <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">create_validator_messages</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Locked</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span>(
         <span class="ident">req</span>: <span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>,
         <span class="ident">app</span>: <span class="kw-2">&amp;</span><span class="ident">Application</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
     ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Response</span><span class="op">&lt;</span><span class="ident">Body</span><span class="op">&gt;</span>, <span class="ident">ResponseError</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">session</span> <span class="op">=</span> <span class="ident">req</span>
+        <span class="kw">let</span> <span class="ident">auth</span> <span class="op">=</span> <span class="ident">req</span>
             .<span class="ident">extensions</span>()
             .<span class="ident">get</span>::<span class="op">&lt;</span><span class="ident">Auth</span><span class="op">&gt;</span>()
             .<span class="ident">ok_or</span>(<span class="ident">ResponseError::Unauthorized</span>)<span class="question-mark">?</span>
@@ -2249,11 +2267,11 @@
         <span class="kw">let</span> <span class="ident">create_request</span> <span class="op">=</span> <span class="ident">serde_json::from_slice</span>::<span class="op">&lt;</span><span class="ident">ValidatorMessagesCreateRequest</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">body</span>)
             .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_err</span><span class="op">|</span> <span class="ident">ResponseError::BadRequest</span>(<span class="string">&quot;Bad Request body json&quot;</span>.<span class="ident">to_string</span>()))<span class="question-mark">?</span>;
 
-        <span class="kw">match</span> <span class="ident">channel</span>.<span class="ident">find_validator</span>(<span class="ident">session</span>.<span class="ident">uid</span>) {
+        <span class="kw">match</span> <span class="ident">channel</span>.<span class="ident">find_validator</span>(<span class="ident">auth</span>.<span class="ident">uid</span>) {
             <span class="prelude-val">None</span> =&gt; <span class="prelude-val">Err</span>(<span class="ident">ResponseError::Unauthorized</span>),
             <span class="kw">_</span> =&gt; {
                 <span class="ident">try_join_all</span>(<span class="ident">create_request</span>.<span class="ident">messages</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">message</span><span class="op">|</span> {
-                    <span class="ident">insert_validator_messages</span>(<span class="kw-2">&amp;</span><span class="ident">app</span>.<span class="ident">pool</span>, <span class="kw-2">&amp;</span><span class="ident">channel</span>, <span class="kw-2">&amp;</span><span class="ident">session</span>.<span class="ident">uid</span>, <span class="ident">message</span>)
+                    <span class="ident">insert_validator_messages</span>(<span class="kw-2">&amp;</span><span class="ident">app</span>.<span class="ident">pool</span>, <span class="kw-2">&amp;</span><span class="ident">channel</span>, <span class="kw-2">&amp;</span><span class="ident">auth</span>.<span class="ident">uid</span>, <span class="ident">message</span>)
                 }))
                 .<span class="kw">await</span><span class="question-mark">?</span>;
 
@@ -3037,4 +3055,4 @@
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (f03ce3096 2022-08-08)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="sentry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>

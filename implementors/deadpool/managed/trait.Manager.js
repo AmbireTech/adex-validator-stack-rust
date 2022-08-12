@@ -1,3 +1,3 @@
-(function() {var implementors = {};
-implementors["sentry"] = [{"text":"impl Manager for <a class=\"struct\" href=\"sentry/db/tests_postgres/struct.Manager.html\" title=\"struct sentry::db::tests_postgres::Manager\">Manager</a>","synthetic":false,"types":["sentry::db::tests_postgres::Manager"]},{"text":"impl Manager for <a class=\"struct\" href=\"sentry/db/redis_pool/struct.Manager.html\" title=\"struct sentry::db::redis_pool::Manager\">Manager</a>","synthetic":false,"types":["sentry::db::redis_pool::Manager"]}];
-if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
+(function() {var implementors = {
+"sentry":[["impl Manager for <a class=\"struct\" href=\"sentry/db/tests_postgres/struct.Manager.html\" title=\"struct sentry::db::tests_postgres::Manager\">Manager</a>"],["impl Manager for <a class=\"struct\" href=\"sentry/db/redis_pool/struct.Manager.html\" title=\"struct sentry::db::redis_pool::Manager\">Manager</a>"]]
+};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

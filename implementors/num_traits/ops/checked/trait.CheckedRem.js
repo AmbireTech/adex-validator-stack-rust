@@ -1,3 +1,3 @@
-(function() {var implementors = {};
-implementors["primitives"] = [{"text":"impl <a class=\"trait\" href=\"https://docs.rs/num-traits/0.2/num_traits/ops/checked/trait.CheckedRem.html\" title=\"trait num_traits::ops::checked::CheckedRem\">CheckedRem</a> for <a class=\"struct\" href=\"primitives/struct.UnifiedNum.html\" title=\"struct primitives::UnifiedNum\">UnifiedNum</a>","synthetic":false,"types":["primitives::unified_num::UnifiedNum"]}];
-if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
+(function() {var implementors = {
+"primitives":[["impl <a class=\"trait\" href=\"https://docs.rs/num-traits/0.2/num_traits/ops/checked/trait.CheckedRem.html\" title=\"trait num_traits::ops::checked::CheckedRem\">CheckedRem</a> for <a class=\"struct\" href=\"primitives/struct.UnifiedNum.html\" title=\"struct primitives::UnifiedNum\">UnifiedNum</a>"]]
+};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

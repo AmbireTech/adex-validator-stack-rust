@@ -1,3 +1,3 @@
-(function() {var implementors = {};
-implementors["sentry"] = [{"text":"impl <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/convert/trait.AsMut.html\" title=\"trait core::convert::AsMut\">AsMut</a>&lt;Pool&lt;Manager, Object&lt;Manager&gt;&gt;&gt; for <a class=\"struct\" href=\"sentry/db/tests_postgres/struct.Database.html\" title=\"struct sentry::db::tests_postgres::Database\">Database</a>","synthetic":false,"types":["sentry::db::tests_postgres::Database"]}];
-if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
+(function() {var implementors = {
+"sentry":[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/convert/trait.AsMut.html\" title=\"trait core::convert::AsMut\">AsMut</a>&lt;Pool&lt;Manager, Object&lt;Manager&gt;&gt;&gt; for <a class=\"struct\" href=\"sentry/db/tests_postgres/struct.Database.html\" title=\"struct sentry::db::tests_postgres::Database\">Database</a>"]]
+};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

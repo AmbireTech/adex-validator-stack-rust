@@ -188,6 +188,7 @@
 <span id="188">188</span>
 <span id="189">189</span>
 <span id="190">190</span>
+<span id="191">191</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std::marker::PhantomData</span>;
 
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">Address</span>, <span class="ident">UnifiedMap</span>, <span class="ident">UnifiedNum</span>};
@@ -199,6 +200,7 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Balances</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">BalancesState</span> <span class="op">=</span> <span class="ident">CheckedState</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="ident">earners</span>: <span class="ident">UnifiedMap</span>,
     <span class="kw">pub</span> <span class="ident">spenders</span>: <span class="ident">UnifiedMap</span>,
+    <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">skip</span>)]</span>
     <span class="ident">state</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>,
 }
 
@@ -379,4 +381,4 @@
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (f03ce3096 2022-08-08)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="primitives" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (20ffea693 2022-08-11)" ></div></body></html>
