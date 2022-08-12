@@ -59,15 +59,38 @@
 //!
 //! #### GET `/v5/channel/:id/accounting`
 //!
+//! Gets all of the accounting entries for a channel from the database and checks the balances.
+//!
 //! The route is handled by [`channel::get_accounting_for_channel()`].
 //!
-//! Response: [`AccountingResponse::<CheckedState>`](primitives::sentry::AccountingResponse)
+//! Response: [`AccountingResponse`]
+//!
+//! ##### Examples
+//!
+//! Response:
+//!
+//! ```
+#![doc = include_str!("../../primitives/examples/accounting_response.rs")]
+//! ```
 //!
 //! #### GET `/v5/channel/:id/spender/:addr` (auth required)
 //!
+//! Gets the spender limits for a spender on a [`Channel`]. It does so by fetching the
+//! latest Spendable entry from the database (or creating one if it doesn't exist yet) from which
+//! the total deposited amount is retrieved, and the latest NewState from which the total spent
+//! amount is retrieved.
+//!
 //! The route is handled by [`channel::get_spender_limits()`].
 //!
-//! Response: [`SpenderResponse`](primitives::sentry::SpenderResponse)
+//! Response: [`SpenderResponse`]
+//!
+//! ##### Examples
+//!
+//! Response:
+//!
+//! ```
+#![doc = include_str!("../../primitives/examples/spender_response.rs")]
+//! ```
 //!
 //! #### POST `/v5/channel/:id/spender/:addr` (auth required)
 //!
@@ -81,9 +104,19 @@
 //!
 //! #### GET `/v5/channel/:id/spender/all` (auth required)
 //!
+//! This routes gets total_deposited and total_spent for every spender on a [`Channel`]
+//!
 //! The route is handled by [`channel::get_all_spender_limits()`].
 //!
-//! Response: [`AllSpendersResponse`](primitives::sentry::AllSpendersResponse)
+//! Response: [`AllSpendersResponse`]
+//!
+//! ##### Examples
+//!
+//! Response:
+//!
+//! ```
+#![doc = include_str!("../../primitives/examples/all_spenders_response.rs")]
+//! ```
 //!
 //! #### GET `/v5/channel/:id/validator-messages`
 //!
@@ -153,6 +186,13 @@
 //!
 //! The same is true of the [`Heartbeat`]s messages if they are requested with the query parameter.
 //!
+//! Retrieves the latest [`ApproveState`] and the corresponding [`NewState`]
+//! validator messages for the given [`Channel`].
+//!
+//! If the [`Channel`] is new one or both of the states might have not been generated yet.
+//!
+//! The same is true of the [`Heartbeat`]s messages if they are requested with the query parameter.
+//!
 //! The route is handled by [`channel::last_approved()`].
 //!
 //! Request query parameters: [`LastApprovedQuery`][primitives::sentry::LastApprovedQuery]
@@ -184,9 +224,17 @@
 //!
 //! The route is handled by [`channel::channel_payout()`].
 //!
-//! Request JSON body: [`ChannelPayRequest`](primitives::sentry::ChannelPayRequest)
+//! Request JSON body: [`ChannelPayRequest`]
 //!
 //! Response: [`SuccessResponse`](primitives::sentry::SuccessResponse)
+//!
+//! ##### Examples
+//!
+//! Request (json):
+//!
+//! ```
+#![doc = include_str!("../../primitives/examples/channel_pay_request.rs")]
+//! ```
 //!
 //!
 //! #### GET `/v5/channel/:id/get-leaf`
@@ -298,7 +346,7 @@
 //! ##### Examples
 //!
 //! ```
-#![doc = include_str!("../../primitives/examples/create_campaign.rs")]
+#![doc = include_str!("../../primitives/examples/create_campaign_request.rs")]
 //! ```
 //!
 //! #### POST `/v5/campaign/:id` (auth required)
@@ -316,7 +364,7 @@
 //! ##### Examples
 //!
 //! ```
-#![doc = include_str!("../../primitives/examples/modify_campaign.rs")]
+#![doc = include_str!("../../primitives/examples/modify_campaign_request.rs")]
 //! ```
 //!
 //! #### POST `/v5/campaign/:id/events`
@@ -425,6 +473,7 @@
 //! [`ApproveState`]: primitives::validator::ApproveState
 //! [`Accounting`]: crate::db::accounting::Accounting
 //! [`AccountingResponse`]: primitives::sentry::AccountingResponse
+//! [`AllSpendersResponse`]: primitives::sentry::AllSpendersResponse
 //! [`AnalyticsResponse`]: primitives::sentry::AnalyticsResponse
 //! [`AnalyticsQuery`]: primitives::analytics::AnalyticsQuery
 //! [`Auth.uid`]: crate::Auth::uid
@@ -436,12 +485,14 @@
 //! [`Channel.leader`]: primitives::Channel::leader
 //! [`Channel.follower`]: primitives::Channel::follower
 //! [`ChannelId`]: primitives::ChannelId
+//! [`ChannelPayRequest`]: primitives::sentry::ChannelPayRequest
 //! [`check_access()`]: crate::access::check_access
 //! [`Config.msgs_find_limit`]: primitives::Config::msgs_find_limit
 //! [`Event`]: primitives::sentry::Event
 //! [`Heartbeat`]: primitives::validator::Heartbeat
 //! [`MessageTypes`]: primitives::validator::MessageTypes
 //! [`NewState`]: primitives::validator::NewState
+//! [`SpenderResponse`]: primitives::sentry::SpenderResponse
 //! [`SuccessResponse`]: primitives::sentry::SuccessResponse
 //! [`ValidatorId`]: primitives::ValidatorId
 

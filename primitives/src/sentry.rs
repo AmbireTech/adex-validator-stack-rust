@@ -22,9 +22,15 @@ pub use event::{Event, EventType, CLICK, IMPRESSION};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-/// Channel Accounting response.
+/// Channel Accounting response
 ///
-/// A collection of all `Accounting`s for a specific [`Channel`](crate::Channel).
+/// A collection of all `Accounting`s for a specific [`Channel`](`crate::Channel`)
+///
+/// # Examples
+///
+/// ```
+#[doc = include_str!("../examples/accounting_response.rs")]
+/// ```
 pub struct AccountingResponse<S: BalancesState> {
     #[serde(flatten, bound = "S: BalancesState")]
     pub balances: Balances<S>,
@@ -628,12 +634,26 @@ pub struct SuccessResponse {
     pub success: bool,
 }
 
+/// Spender limits for a spender on a `Channel`.
+///
+/// # Examples
+///
+/// ```
+#[doc = include_str!("../examples/spender_response.rs")]
+/// ```
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct SpenderResponse {
     pub spender: Spender,
 }
 
+/// Spender limits for all spenders on a `Channel`.
+///
+/// # Examples
+///
+/// ```
+#[doc = include_str!("../examples/all_spenders_response.rs")]
+/// ```
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct AllSpendersResponse {
@@ -649,6 +669,13 @@ pub struct AllSpendersQuery {
     pub page: u64,
 }
 
+/// Payouts to be performed for the given [`Channel`](`crate::Channel`).
+///
+/// # Examples
+///
+/// ```
+#[doc = include_str!("../examples/channel_pay_request.rs")]
+/// ```
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ChannelPayRequest {
     pub payouts: UnifiedMap,
@@ -667,6 +694,13 @@ pub struct ValidatorMessagesListResponse {
     pub messages: Vec<ValidatorMessage>,
 }
 
+/// Contains all the different validator messages to be created.
+///
+/// # Examples
+///
+/// ```
+#[doc = include_str!("../examples/validator_messages_create_request.rs")]
+/// ```
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ValidatorMessagesCreateRequest {
@@ -862,7 +896,7 @@ pub mod campaign_create {
     /// # Examples
     ///
     /// ```
-    #[doc = include_str!("../examples/create_campaign.rs")]
+    #[doc = include_str!("../examples/create_campaign_request.rs")]
     /// ```
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     #[serde(rename_all = "camelCase")]
@@ -955,7 +989,7 @@ pub mod campaign_modify {
     ///
     /// # Examples:
     /// ```
-    #[doc = include_str!("../examples/modify_campaign.rs")]
+    #[doc = include_str!("../examples/modify_campaign_request.rs")]
     /// ```
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     pub struct ModifyCampaign {

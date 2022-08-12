@@ -613,7 +613,7 @@ pub async fn channel_dummy_deposit<C: Locked + 'static>(
 ///
 pub mod validator_message {
     use crate::{
-        db::validator_message::{get_validator_messages, insert_validator_messages},
+        db::validator_message::{get_validator_messages, insert_validator_message},
         Auth,
     };
     use crate::{
@@ -743,7 +743,7 @@ pub mod validator_message {
             None => Err(ResponseError::Unauthorized),
             _ => {
                 try_join_all(create_request.messages.iter().map(|message| {
-                    insert_validator_messages(&app.pool, &channel, &auth.uid, message)
+                    insert_validator_message(&app.pool, &channel, &auth.uid, message)
                 }))
                 .await?;
 

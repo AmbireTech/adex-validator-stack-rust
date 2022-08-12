@@ -11,7 +11,7 @@ use primitives::{
 use super::{DbPool, PoolError};
 
 /// Inserts a new validator [`MessageTypes`] using the `from` [`ValidatorId`] and `received` at: [`Utc::now()`][Utc]
-pub async fn insert_validator_messages(
+pub async fn insert_validator_message(
     pool: &DbPool,
     channel: &Channel,
     from: &ValidatorId,

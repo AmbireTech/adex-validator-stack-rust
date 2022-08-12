@@ -21,6 +21,12 @@ postgres = ["bytes", "tokio-postgres", "deadpool-postgres"]
 test-util = []
 
 [[example]]
+name = "accounting_response"
+
+[[example]]
+name = "all_spenders_response"
+
+[[example]]
 name = "analytics_query"
 
 [[example]]
@@ -45,11 +51,17 @@ name = "channel_last_approved_response"
 name = "channel_last_approved_query"
 
 [[example]]
-name = "create_campaign"
+name = "channel_pay_request"
+
+[[example]]
+name = "create_campaign_request"
 required-features = ["test-util"]
 
 [[example]]
-name = "modify_campaign"
+name = "modify_campaign_request"
+
+[[example]]
+name = "spender_response"
 
 [[example]]
 name = "validator_messages_create_request"
