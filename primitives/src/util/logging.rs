@@ -58,7 +58,7 @@ where
         self.decorator.with_record(record, values, |decorator| {
             let indent = {
                 let mut history_ref = self.history.borrow_mut();
-                let mut serializer = CompactFormatSerializer::new(decorator, &mut *history_ref);
+                let mut serializer = CompactFormatSerializer::new(decorator, &mut history_ref);
 
                 values.serialize(record, &mut serializer)?;
 

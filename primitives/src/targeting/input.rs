@@ -14,7 +14,7 @@ pub type Map = serde_json::Map<String, serde_json::Value>;
 
 pub mod field;
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum Get<G, V> {
     #[serde(skip_deserializing)]
