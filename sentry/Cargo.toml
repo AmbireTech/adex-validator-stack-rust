@@ -41,6 +41,10 @@ hex = "0.4"
 # CLI
 clap = { version = "3", features = ["cargo"] }
 # Server
+axum = { version = "0.5", features = ["http1", "http2"] }
+axum-server = { version = "0.4", features = ["tls-rustls"] }
+tower = "0.4"
+tower-http = { version = "0.3", features = ["cors"] }
 tokio = { version = "1", features = ["macros", "time", "rt-multi-thread", "signal"] }
 hyper = { version = "0.14", features = ["stream", "runtime", "http1", "http2", "server"] }
 simple-hyper-server-tls = { version = "0.3", features = ["tls-rustls"] }
