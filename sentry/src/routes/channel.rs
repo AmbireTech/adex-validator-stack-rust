@@ -1,14 +1,17 @@
 //! `/v5/channel` routes
 //!
 
-use crate::db::{
-    accounting::{
-        get_accounting, get_all_accountings_for_channel, spend_amount, update_accounting, Side,
+use crate::{
+    application::Qs,
+    db::{
+        accounting::{
+            get_accounting, get_all_accountings_for_channel, spend_amount, update_accounting, Side,
+        },
+        insert_channel, list_channels,
+        spendable::{fetch_spendable, get_all_spendables_for_channel, update_spendable},
+        validator_message::{latest_approve_state, latest_heartbeats, latest_new_state},
+        DbPool,
     },
-    insert_channel, list_channels,
-    spendable::{fetch_spendable, get_all_spendables_for_channel, update_spendable},
-    validator_message::{latest_approve_state, latest_heartbeats, latest_new_state},
-    DbPool,
 };
 use crate::{
     response::{success_response, ResponseError},
@@ -16,14 +19,15 @@ use crate::{
     Application, Auth,
 };
 use adapter::{client::Locked, Adapter, Dummy};
+use axum::{Extension, Json};
 use futures::future::try_join_all;
 use hyper::{Body, Request, Response};
 use primitives::{
     balances::{Balances, CheckedState, UncheckedState},
     sentry::{
-        channel_list::ChannelListQuery, AccountingResponse, AllSpendersQuery, AllSpendersResponse,
-        ChannelPayRequest, LastApproved, LastApprovedQuery, LastApprovedResponse, SpenderResponse,
-        SuccessResponse,
+        channel_list::{ChannelListQuery, ChannelListResponse},
+        AccountingResponse, AllSpendersQuery, AllSpendersResponse, ChannelPayRequest, LastApproved,
+        LastApprovedQuery, LastApprovedResponse, SpenderResponse, SuccessResponse,
     },
     spender::{Spendable, Spender},
     validator::NewState,
@@ -31,7 +35,7 @@ use primitives::{
 };
 use serde::{Deserialize, Serialize};
 use slog::{error, Logger};
-use std::{any::Any, collections::HashMap, str::FromStr};
+use std::{any::Any, collections::HashMap, str::FromStr, sync::Arc};
 
 /// Request body for Channel deposit when using the Dummy adapter.
 ///
@@ -67,6 +71,27 @@ pub async fn channel_list<C: Locked + 'static>(
     .await?;
 
     Ok(success_response(serde_json::to_string(&list_response)?))
+}
+
+pub async fn channel_list_axum<C: Locked + 'static>(
+    Extension(app): Extension<Arc<Application<C>>>,
+    Qs(query): Qs<ChannelListQuery>,
+) -> Result<Json<ChannelListResponse>, ResponseError> {
+    let skip = query
+        .page
+        .checked_mul(app.config.channels_find_limit.into())
+        .ok_or_else(|| ResponseError::BadRequest("Page and/or limit is too large".into()))?;
+
+    let list_response = list_channels(
+        &app.pool,
+        skip,
+        app.config.channels_find_limit,
+        query.validator,
+        &query.chains,
+    )
+    .await?;
+
+    Ok(Json(list_response))
 }
 
 /// GET `/v5/channel/0xXXX.../last-approved` request
@@ -551,6 +576,41 @@ pub async fn channel_payout<C: Locked + 'static>(
 
     // will return an error if one of the updates fails
     spend_amount(app.pool.clone(), channel_context.context.id(), balances).await?;
+
+    Ok(success_response(serde_json::to_string(&SuccessResponse {
+        success: true,
+    })?))
+}
+
+pub async fn channel_dummy_deposit_axum<C: Locked + 'static>(
+    Extension(app): Extension<Arc<Application<C>>>,
+    Extension(auth): Extension<Auth>,
+    Json(request): Json<ChannelDummyDeposit>,
+) -> Result<Response<Body>, ResponseError> {
+    let depositor = auth.uid.to_address();
+
+    // Insert the channel if it does not exist yet
+    let channel_chain = app
+        .config
+        .find_chain_of(request.channel.token)
+        .expect("The Chain of Channel's token was not found in configuration!")
+        .with_channel(request.channel);
+
+    // if this fails, it will cause Bad Request
+    insert_channel(&app.pool, &channel_chain).await?;
+
+    // Convert the UnifiedNum to BigNum with the precision of the token
+    let deposit = request
+        .deposit
+        .to_precision(channel_chain.token.precision.into());
+
+    let dummy_adapter = <dyn Any + Send + Sync>::downcast_ref::<Adapter<Dummy>>(&app.adapter)
+        .expect("Only Dummy adapter is allowed here!");
+
+    // set the deposit in the Dummy adapter's client
+    dummy_adapter
+        .client
+        .set_deposit(&channel_chain, depositor, deposit);
 
     Ok(success_response(serde_json::to_string(&SuccessResponse {
         success: true,

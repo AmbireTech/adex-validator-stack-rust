@@ -14,6 +14,7 @@ use crate::{
     Application, Auth,
 };
 use adapter::{prelude::*, Adapter, Error as AdaptorError};
+use axum::{Extension, Json};
 use deadpool_postgres::PoolError;
 use futures::{future::try_join_all, TryFutureExt};
 use hyper::{Body, Request, Response};
@@ -27,7 +28,10 @@ use primitives::{
     Address, Campaign, CampaignId, ChainOf, Channel, ChannelId, Deposit, UnifiedNum,
 };
 use slog::error;
-use std::cmp::{max, Ordering};
+use std::{
+    cmp::{max, Ordering},
+    sync::Arc,
+};
 use thiserror::Error;
 use tokio_postgres::error::SqlState;
 
@@ -140,6 +144,133 @@ pub async fn fetch_campaign_ids_for_channel(
 
         Ok(all_campaigns)
     }
+}
+
+pub async fn create_campaign_axum<C>(
+    Json(create_campaign): Json<CreateCampaign>,
+    Extension(auth): Extension<Auth>,
+    Extension(app): Extension<Arc<Application<C>>>,
+) -> Result<Json<Campaign>, ResponseError>
+where
+    C: Locked + 'static,
+{
+    let campaign_context = create_campaign
+        // create the actual `Campaign` with a randomly generated `CampaignId` or the set `CampaignId`
+        .into_campaign()
+        // Validate the campaign as soon as a valid JSON was passed.
+        // This will validate the Context - Chain & Token are whitelisted!
+        .validate(&app.config, app.adapter.whoami())
+        .map_err(|err| ResponseError::FailedValidation(err.to_string()))?;
+    let channel_context = campaign_context.of_channel();
+    let campaign = campaign_context.context;
+
+    if auth.uid.to_address() != campaign.creator {
+        return Err(ResponseError::Forbidden(
+            "Request not sent by campaign creator".to_string(),
+        ));
+    }
+
+    // make sure that the Channel is available in the DB
+    // insert Channel
+    insert_channel(&app.pool, &channel_context)
+        .await
+        .map_err(|error| {
+            error!(&app.logger, "{}", &error; "module" => "create_campaign");
+
+            ResponseError::BadRequest("Failed to fetch/create Channel".to_string())
+        })?;
+
+    let total_remaining = {
+        let accounting_spent = get_accounting(
+            app.pool.clone(),
+            campaign.channel.id(),
+            campaign.creator,
+            Side::Spender,
+        )
+        .await?
+        .map(|accounting| accounting.amount)
+        .unwrap_or_default();
+
+        let latest_spendable =
+            update_latest_spendable(&app.adapter, &app.pool, &channel_context, campaign.creator)
+                .await
+                .map_err(|err| ResponseError::BadRequest(err.to_string()))?;
+        // Gets the latest Spendable for this (spender, channelId) pair
+        let total_deposited = latest_spendable.deposit.total;
+
+        total_deposited
+            .checked_sub(&accounting_spent)
+            .ok_or_else(|| {
+                ResponseError::FailedValidation("No more budget remaining".to_string())
+            })?
+    };
+
+    let channel_campaigns = fetch_campaign_ids_for_channel(
+        &app.pool,
+        campaign.channel.id(),
+        app.config.campaigns_find_limit,
+    )
+    .await?;
+
+    let campaigns_remaining_sum = app
+        .campaign_remaining
+        .get_multiple(channel_campaigns.as_slice())
+        .await?
+        .iter()
+        .sum::<Option<UnifiedNum>>()
+        .ok_or(Error::Calculation)?
+        // DO NOT FORGET to add the Campaign being created right now!
+        .checked_add(&campaign.budget)
+        .ok_or(Error::Calculation)?;
+
+    // `new_campaigns_remaining <= total_remaining` should be upheld
+    // `campaign.budget < total_remaining` should also be upheld!
+    if campaigns_remaining_sum > total_remaining || campaign.budget > total_remaining {
+        return Err(ResponseError::BadRequest(
+            "Not enough deposit left for the new campaign's budget".to_string(),
+        ));
+    }
+
+    // If the campaign is being created, the amount spent is 0, therefore remaining = budget
+    let remaining_set = CampaignRemaining::new(app.redis.clone())
+        .set_initial(campaign.id, campaign.budget)
+        .await
+        .map_err(|_| {
+            ResponseError::BadRequest("Couldn't set remaining while creating campaign".to_string())
+        })?;
+
+    // If for some reason the randomly generated `CampaignId` exists in Redis
+    // This should **NOT** happen!
+    if !remaining_set {
+        return Err(ResponseError::Conflict(
+            "The generated CampaignId already exists, please repeat the request".to_string(),
+        ));
+    }
+
+    // Channel insertion can never create a `SqlState::UNIQUE_VIOLATION`
+    // Insert the Campaign too
+    match insert_campaign(&app.pool, &campaign).await {
+        Err(error) => {
+            error!(&app.logger, "{}", &error; "module" => "create_campaign");
+            match error {
+                PoolError::Backend(error) if error.code() == Some(&SqlState::UNIQUE_VIOLATION) => {
+                    Err(ResponseError::Conflict(
+                        "Campaign already exists".to_string(),
+                    ))
+                }
+                _err => Err(ResponseError::BadRequest(
+                    "Error occurred when inserting Campaign in Database; please try again later"
+                        .to_string(),
+                )),
+            }
+        }
+        Ok(false) => Err(ResponseError::BadRequest(
+            "Encountered error while creating Campaign; please try again".to_string(),
+        )),
+        _ => Ok(()),
+    }?;
+
+    Ok(Json(campaign))
 }
 
 /// POST `/v5/campaign`
@@ -593,6 +724,8 @@ pub mod update_campaign {
 
 pub mod insert_events {
 
+    use std::sync::Arc;
+
     use crate::{
         access::{self, check_access},
         analytics,
@@ -603,6 +736,7 @@ pub mod insert_events {
         Application, Auth, Session,
     };
     use adapter::prelude::*;
+    use axum::{Extension, Json};
     use hyper::{Body, Request, Response};
     use primitives::{
         balances::{Balances, CheckedState, OverflowError},
@@ -636,6 +770,29 @@ pub mod insert_events {
         CampaignRemainingNotEnoughForPayout,
         #[error("Campaign ran out of remaining budget to spend")]
         CampaignOutOfBudget,
+    }
+    /// POST `/v5/campaign/:id/events`
+    ///
+    /// Request body (json): [`InsertEventsRequest`]
+    ///
+    /// Response: [`SuccessResponse`]
+    pub async fn handle_route_axum<C: Locked + 'static>(
+        auth: Option<Extension<Auth>>,
+        Extension(session): Extension<Session>,
+        Extension(app): Extension<Arc<Application<C>>>,
+        Extension(campaign_context): Extension<ChainOf<Campaign>>,
+        Json(request): Json<InsertEventsRequest>,
+    ) -> Result<Json<SuccessResponse>, ResponseError> {
+        process_events(
+            &app,
+            auth.map(|extension| extension.0).as_ref(),
+            &session,
+            &campaign_context,
+            request.events,
+        )
+        .await?;
+
+        Ok(Json(SuccessResponse { success: true }))
     }
 
     /// POST `/v5/campaign/:id/events`

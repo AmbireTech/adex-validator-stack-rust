@@ -1,8 +1,11 @@
-use std::error;
+use std::{error, sync::Arc};
 
 use async_trait::async_trait;
-use hyper::header::{AUTHORIZATION, REFERER};
-use hyper::{Body, Request};
+use axum::middleware::Next;
+use hyper::{
+    header::{AUTHORIZATION, REFERER},
+    Body, Request,
+};
 use redis::aio::MultiplexedConnection;
 
 use adapter::{prelude::*, primitives::Session as AdapterSession, Adapter};
@@ -69,6 +72,92 @@ impl<C: Locked + 'static> Middleware<C> for IsAdmin {
         }
         Ok(request)
     }
+}
+
+pub async fn authentication_required<C: Locked + 'static, B>(
+    request: axum::http::Request<B>,
+    next: Next<B>,
+) -> Result<axum::response::Response, ResponseError> {
+    if request.extensions().get::<Auth>().is_some() {
+        Ok(next.run(request).await)
+    } else {
+        Err(ResponseError::Unauthorized)
+    }
+}
+
+pub async fn authenticate<C: Locked + 'static, B>(
+    mut request: axum::http::Request<B>,
+    next: Next<B>,
+) -> Result<axum::response::Response, ResponseError> {
+    let (adapter, redis) = {
+        let app = request
+            .extensions()
+            .get::<Arc<Application<C>>>()
+            .expect("Application should always be present");
+
+        (app.adapter.clone(), app.redis.clone())
+    };
+
+    let referrer = request
+        .headers()
+        .get(REFERER)
+        .and_then(|hv| hv.to_str().ok().map(ToString::to_string));
+
+    let session = Session {
+        ip: get_request_ip(&request),
+        country: None,
+        referrer_header: referrer,
+        os: None,
+    };
+    request.extensions_mut().insert(session);
+
+    let authorization = request.headers().get(AUTHORIZATION);
+
+    let prefix = "Bearer ";
+
+    let token = authorization
+        .and_then(|hv| {
+            hv.to_str()
+                .map(|token_str| token_str.strip_prefix(prefix))
+                .transpose()
+        })
+        .transpose()?;
+
+    if let Some(token) = token {
+        let adapter_session = match redis::cmd("GET")
+            .arg(token)
+            .query_async::<_, Option<String>>(&mut redis.clone())
+            .await?
+            .and_then(|session_str| serde_json::from_str::<AdapterSession>(&session_str).ok())
+        {
+            Some(adapter_session) => adapter_session,
+            None => {
+                // If there was a problem with the Session or the Token, this will error
+                // and a BadRequest response will be returned
+                let adapter_session = adapter.session_from_token(token).await?;
+
+                // save the Adapter Session to Redis for the next request
+                // if serde errors on deserialization this will override the value inside
+                redis::cmd("SET")
+                    .arg(token)
+                    .arg(serde_json::to_string(&adapter_session)?)
+                    .query_async(&mut redis.clone())
+                    .await?;
+
+                adapter_session
+            }
+        };
+
+        let auth = Auth {
+            era: adapter_session.era,
+            uid: ValidatorId::from(adapter_session.uid),
+            chain: adapter_session.chain,
+        };
+
+        request.extensions_mut().insert(auth);
+    }
+
+    Ok(next.run(request).await)
 }
 
 /// Check `Authorization` header for `Bearer` scheme with `Adapter::session_from_token`.
@@ -140,7 +229,7 @@ async fn for_request<C: Locked>(
     Ok(req)
 }
 
-fn get_request_ip(req: &Request<Body>) -> Option<String> {
+fn get_request_ip<B>(req: &Request<B>) -> Option<String> {
     req.headers()
         .get("true-client-ip")
         .or_else(|| req.headers().get("x-forwarded-for"))

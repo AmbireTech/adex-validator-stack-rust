@@ -12,10 +12,12 @@
 //! - Match against the different HTTP methods
 //! - Calls additional [`middleware`](`crate::middleware`)s for the route
 //!
+use std::sync::Arc;
+
 use crate::{
     middleware::{
-        auth::{AuthRequired, IsAdmin},
-        campaign::{CalledByCreator, CampaignLoad},
+        auth::{authentication_required, AuthRequired, IsAdmin},
+        campaign::{campaign_load, CalledByCreator, CampaignLoad},
         channel::ChannelLoad,
         Chain, Middleware,
     },
@@ -35,12 +37,21 @@ use crate::{
     Application, Auth,
 };
 use adapter::{prelude::*, Adapter, Dummy};
+use axum::{
+    middleware::{self, Next},
+    routing::{get, post},
+    Router,
+};
 use hyper::{Body, Method, Request, Response};
 use once_cell::sync::Lazy;
 use primitives::analytics::{query::AllowedKey, AuthenticateAs};
 use regex::Regex;
+use tower::ServiceBuilder;
 
-use super::units_for_slot::post_units_for_slot;
+use super::{
+    channel::{channel_dummy_deposit_axum, channel_list_axum},
+    units_for_slot::post_units_for_slot,
+};
 
 pub(crate) static LAST_APPROVED_BY_CHANNEL_ID: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^/v5/channel/0x([a-zA-Z0-9]{64})/last-approved/?$")
@@ -101,6 +112,35 @@ impl RouteParams {
     pub fn index(&self, i: usize) -> String {
         self.0[i].clone()
     }
+}
+
+async fn if_dummy_adapter<C: Locked + 'static, B>(
+    request: Request<B>,
+    next: Next<B>,
+) -> Result<axum::response::Response, axum::http::StatusCode> {
+    use std::any::Any;
+
+    let app = request
+        .extensions()
+        .get::<Arc<Application<C>>>()
+        .expect("Application should always be present");
+
+    if <dyn Any + Send + Sync>::downcast_ref::<Adapter<Dummy>>(&app.adapter).is_some() {
+        Ok(next.run(request).await)
+    } else {
+        Err(axum::http::StatusCode::NOT_FOUND)
+    }
+}
+
+pub fn channels_router_axum<C: Locked + 'static>() -> Router {
+    Router::new()
+        .route("/list", get(channel_list_axum::<C>))
+        .route(
+            "/dummy-deposit",
+            post(channel_dummy_deposit_axum::<C>)
+                .route_layer(middleware::from_fn(if_dummy_adapter::<C, _>))
+                .route_layer(middleware::from_fn(authentication_required::<C, _>)),
+        )
 }
 
 // TODO AIP#61: Add routes for:
@@ -254,22 +294,44 @@ pub async fn channels_router<C: Locked + 'static>(
     }
     // POST /v5/channel/dummy-deposit
     // We allow the calling of the method only if we are using the Dummy adapter!
-    else if let (Some(caps), &Method::POST, true) = (
+    else if let (Some(_caps), &Method::POST, true) = (
         CHANNEL_DUMMY_ADAPTER_DEPOSIT.captures(&path),
         method,
         <dyn Any + Send + Sync>::downcast_ref::<Adapter<Dummy>>(&app.adapter).is_some(),
     ) {
-        let param = RouteParams(vec![caps
-            .get(1)
-            .map_or("".to_string(), |m| m.as_str().to_string())]);
-        req.extensions_mut().insert(param);
-
         req = Chain::new().chain(AuthRequired).apply(req, app).await?;
 
         channel_dummy_deposit(req, app).await
     } else {
         Err(ResponseError::NotFound)
     }
+}
+
+pub fn campaigns_router_axum<C: Locked + 'static>() -> Router {
+    let campaign_routes = Router::new()
+        // .route(
+        //     "/",
+        // // Campaign update
+        //     post(campaign::insert_events::handle_route_axum::<C>),
+        // )
+        .route(
+            "/events",
+            post(campaign::insert_events::handle_route_axum::<C>),
+        )
+        .layer(
+            // keeps the order from top to bottom!
+            ServiceBuilder::new()
+                // Load the campaign from database based on the CampaignId
+                .layer(middleware::from_fn(campaign_load::<C, _>)),
+        );
+
+    Router::new()
+        .route(
+            "/",
+            // For creating campaigns
+            post(campaign::create_campaign_axum::<C>),
+        )
+        .nest("/:id", campaign_routes)
 }
 
 /// `/v5/campaign` router

@@ -1,9 +1,15 @@
+use std::sync::Arc;
+
 use crate::{db::fetch_campaign, middleware::Middleware};
 use crate::{response::ResponseError, routes::routers::RouteParams, Application, Auth};
 use adapter::client::Locked;
 use async_trait::async_trait;
+use axum::{
+    extract::{Path, RequestParts},
+    middleware::Next,
+};
 use hyper::{Body, Request};
-use primitives::campaign::Campaign;
+use primitives::{campaign::Campaign, CampaignId};
 
 #[derive(Debug)]
 pub struct CampaignLoad;
@@ -54,6 +60,57 @@ impl<C: Locked + 'static> Middleware<C> for CampaignLoad {
     }
 }
 
+pub async fn campaign_load<C: Locked + 'static, B>(
+    request: axum::http::Request<B>,
+    next: Next<B>,
+) -> Result<axum::response::Response, ResponseError>
+where
+    B: Send,
+{
+    let (config, pool) = {
+        let app = request
+            .extensions()
+            .get::<Arc<Application<C>>>()
+            .expect("Application should always be present");
+
+        (app.config.clone(), app.pool.clone())
+    };
+
+    // running extractors requires a `RequestParts`
+    let mut request_parts = RequestParts::new(request);
+
+    let campaign_id = request_parts
+        .extract::<Path<CampaignId>>()
+        .await
+        .map_err(|_| ResponseError::BadRequest("Bad Campaign Id".to_string()))?;
+
+    let campaign = fetch_campaign(pool.clone(), &campaign_id)
+        .await?
+        .ok_or(ResponseError::NotFound)?;
+
+    let campaign_context = config
+        .find_chain_of(campaign.channel.token)
+        .ok_or_else(|| ResponseError::BadRequest("Channel token not whitelisted".to_string()))?
+        .with_campaign(campaign);
+
+    // If this is an authenticated call
+    // Check if the Campaign's Channel context (Chain Id) aligns with the Authentication token Chain id
+    match request_parts.extensions().get::<Auth>() {
+            // If Chain Ids differ, the requester hasn't generated Auth token
+            // to access the Channel in it's Chain Id.
+            Some(auth) if auth.chain.chain_id != campaign_context.chain.chain_id => {
+                return Err(ResponseError::Forbidden("Authentication token is generated for different Chain and differs from the Campaign's Channel Chain".into()))
+            }
+            _ => {},
+        }
+
+    request_parts.extensions_mut().insert(campaign_context);
+
+    let request = request_parts.try_into_request().expect("Body extracted");
+
+    Ok(next.run(request).await)
+}
+
 #[async_trait]
 impl<C: Locked + 'static> Middleware<C> for CalledByCreator {
     async fn call<'a>(
@@ -85,7 +142,17 @@ impl<C: Locked + 'static> Middleware<C> for CalledByCreator {
 
 #[cfg(test)]
 mod test {
+    use adapter::Dummy;
+    use axum::{
+        body::{self, Body, BoxBody, Empty},
+        http::StatusCode,
+        middleware::from_fn,
+        response::Response,
+        routing::get,
+        Extension, Router,
+    };
     use primitives::{test_util::DUMMY_CAMPAIGN, Campaign, ChainOf};
+    use tower::{Service, ServiceExt};
 
     use crate::{
         db::{insert_campaign, insert_channel},
@@ -95,44 +162,59 @@ mod test {
     use super::*;
 
     #[tokio::test]
-    async fn campaign_loading() {
-        let app = setup_dummy_app().await;
+    async fn test_campaign_loading() {
+        let app_guard = setup_dummy_app().await;
+        let app = Arc::new(app_guard.app);
 
-        let build_request = |params: RouteParams| {
+        let build_request = |id: CampaignId| {
             Request::builder()
-                .extension(params)
+                .uri(format!("/{id}"))
+                .extension(app.clone())
                 .body(Body::empty())
                 .expect("Should build Request")
         };
 
         let campaign = DUMMY_CAMPAIGN.clone();
 
-        let campaign_load = CampaignLoad;
+        async fn handle(Extension(_campaign_context): Extension<ChainOf<Campaign>>) -> String {
+            "Ok".into()
+        }
+
+        async fn body_to_string(response: Response<BoxBody>) -> String {
+            String::from_utf8(hyper::body::to_bytes(response).await.unwrap().to_vec()).unwrap()
+        }
+
+        let mut router = Router::new()
+            .route("/:id", get(handle))
+            .layer(from_fn(campaign_load::<Dummy, _>));
 
         // bad CampaignId
         {
-            let route_params = RouteParams(vec!["Bad campaign Id".to_string()]);
+            let mut request = build_request(campaign.id);
+            *request.uri_mut() = "/WrongCampaignId".parse().unwrap();
 
-            let res = campaign_load
-                .call(build_request(route_params), &app)
+            let response = router
+                .call(request)
                 .await
-                .expect_err("Should return error for Bad Campaign");
+                .expect("Should make request to Router");
 
             assert_eq!(
-                ResponseError::BadRequest("Wrong Campaign Id".to_string()),
-                res
+                StatusCode::BAD_REQUEST,
+                // ResponseError::BadRequest("Wrong Campaign Id".to_string()),
+                response.status()
             );
         }
 
-        let route_params = RouteParams(vec![campaign.id.to_string()]);
         // non-existent campaign
         {
-            let res = campaign_load
-                .call(build_request(route_params.clone()), &app)
-                .await
-                .expect_err("Should return error for Not Found");
+            let request = build_request(campaign.id);
 
-            assert!(matches!(res, ResponseError::NotFound));
+            let response = router
+                .call(request)
+                .await
+                .expect("Should make request to Router");
+
+            assert_eq!(response.status(), StatusCode::NOT_FOUND);
         }
 
         // existing Campaign
@@ -151,19 +233,14 @@ mod test {
                 .await
                 .expect("Should insert Campaign"));
 
-            let request = campaign_load
-                .call(build_request(route_params), &app)
-                .await
-                .expect("Should load campaign");
+            let request = build_request(campaign.id);
 
-            assert_eq!(
-                campaign,
-                request
-                    .extensions()
-                    .get::<ChainOf<Campaign>>()
-                    .expect("Should get Campaign with Chain context")
-                    .context
-            );
+            let response = router
+                .call(request)
+                .await
+                .expect("Should make request to Router");
+
+            assert_eq!(response.status(), StatusCode::OK);
         }
     }
 }

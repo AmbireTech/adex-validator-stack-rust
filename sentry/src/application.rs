@@ -1,9 +1,15 @@
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     path::Path,
+    sync::Arc,
 };
 
 use adapter::client::Locked;
+use axum::{
+    extract::{FromRequest, RequestParts},
+    http::StatusCode,
+    middleware, Extension, Router,
+};
 use hyper::{
     service::{make_service_fn, service_fn},
     Error, Server,
@@ -14,11 +20,13 @@ use redis::ConnectionInfo;
 use serde::{Deserialize, Deserializer};
 use simple_hyper_server_tls::{listener_from_pem_files, Protocols, TlsListener};
 use slog::{error, info};
+use tower::ServiceBuilder;
+use tower_http::cors::CorsLayer;
 
 use crate::{
     db::{CampaignRemaining, DbPool},
     middleware::{
-        auth::Authenticate,
+        auth::{authenticate, Authenticate},
         cors::{cors, Cors},
         Middleware,
     },
@@ -26,7 +34,10 @@ use crate::{
     response::{map_response_error, ResponseError},
     routes::{
         get_cfg,
-        routers::{analytics_router, campaigns_router, channels_router},
+        routers::{
+            analytics_router, campaigns_router, campaigns_router_axum, channels_router,
+            channels_router_axum,
+        },
     },
 };
 use adapter::Adapter;
@@ -158,11 +169,45 @@ where
         response.headers_mut().extend(headers);
         response
     }
+
+    pub async fn axum_routing(&self) -> Router {
+        let cors = CorsLayer::new()
+            // "GET,HEAD,PUT,PATCH,POST,DELETE"
+            .allow_methods([
+                Method::GET,
+                Method::HEAD,
+                Method::PUT,
+                Method::PATCH,
+                Method::POST,
+                Method::DELETE,
+            ])
+            // allow requests from any origin
+            // "*"
+            .allow_origin(tower_http::cors::Any);
+
+        let channels = channels_router_axum::<C>();
+
+        let campaigns = campaigns_router_axum::<C>();
+
+        let router = Router::new()
+            .nest("/channel", channels)
+            .nest("/campaign", campaigns);
+
+        Router::new()
+            .nest("/v5", router)
+            .layer(
+                // keeps the order from top to bottom!
+                ServiceBuilder::new()
+                    .layer(cors)
+                    .layer(middleware::from_fn(authenticate::<C, _>)),
+            )
+            .layer(Extension(Arc::new(self.clone())))
+    }
 }
 
 impl<C: Locked + 'static> Application<C> {
     /// Starts the `hyper` `Server`.
-    pub async fn run(self, enable_tls: EnableTls) {
+    pub async fn run2(self, enable_tls: EnableTls) {
         let logger = self.logger.clone();
         let socket_addr = match &enable_tls {
             EnableTls::NoTls(socket_addr) => socket_addr,
@@ -213,6 +258,29 @@ impl<C: Locked + 'static> Application<C> {
                     error!(&logger, "server error: {}", e; "main" => "run");
                 }
             }
+        }
+    }
+
+    pub async fn run(self, enable_tls: EnableTls) {
+        let logger = self.logger.clone();
+        let socket_addr = match &enable_tls {
+            EnableTls::NoTls(socket_addr) => socket_addr,
+            EnableTls::Tls { socket_addr, .. } => socket_addr,
+        };
+
+        info!(&logger, "Listening on socket address: {}!", socket_addr);
+
+        let app = self.axum_routing().await;
+
+        let server = axum::Server::bind(socket_addr)
+            .serve(app.into_make_service())
+            .with_graceful_shutdown(shutdown_signal(logger.clone()));
+
+        tokio::pin!(server);
+
+        while let Err(e) = (&mut server).await {
+            // This is usually caused by trying to connect on HTTP instead of HTTPS
+            error!(&logger, "server error: {}", e; "main" => "run");
         }
     }
 }
@@ -276,6 +344,27 @@ pub struct Auth {
     pub uid: ValidatorId,
     /// The Chain for which this authentication was validated
     pub chain: primitives::Chain,
+}
+
+/// A query string deserialized using `serde_qs` instead of axum's `serde_urlencoded`
+pub struct Qs<T>(pub T);
+
+#[axum::async_trait]
+impl<T, B> FromRequest<B> for Qs<T>
+where
+    T: serde::de::DeserializeOwned,
+    B: Send,
+{
+    type Rejection = (StatusCode, String);
+
+    async fn from_request(req: &mut RequestParts<B>) -> Result<Self, Self::Rejection> {
+        let query = req.uri().query().unwrap_or_default();
+
+        match serde_qs::from_str(query) {
+            Ok(query) => Ok(Self(query)),
+            Err(err) => Err((StatusCode::BAD_REQUEST, err.to_string())),
+        }
+    }
 }
 
 /// A Ctrl+C signal to gracefully shutdown the server
