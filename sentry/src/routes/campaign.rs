@@ -1255,7 +1255,6 @@ mod test {
     };
     use adapter::primitives::Deposit;
     use chrono::{TimeZone, Utc};
-    use hyper::StatusCode;
     use primitives::{
         campaign::validators::Validators,
         config::GANACHE_CONFIG,
@@ -1268,12 +1267,13 @@ mod test {
         ValidatorDesc, ValidatorId,
     };
 
-    #[tokio::test]
     /// Test single campaign creation and modification
     // &
     /// Test with multiple campaigns (because of Budget) and modifications
+    #[tokio::test]
     async fn create_and_modify_with_multiple_campaigns() {
-        let app = setup_dummy_app().await;
+        let app_guard = setup_dummy_app().await;
+        let app = Extension(Arc::new(app_guard.app.clone()));
 
         // Create a new Campaign with different CampaignId
         let dummy_channel = DUMMY_CAMPAIGN.channel;
@@ -1296,45 +1296,29 @@ mod test {
             },
         );
 
-        let build_request = |create_campaign: CreateCampaign| -> Request<Body> {
-            let auth = Auth {
-                era: 0,
-                uid: ValidatorId::from(create_campaign.creator),
-                chain: channel_context.chain.clone(),
-            };
-
-            let body =
-                Body::from(serde_json::to_string(&create_campaign).expect("Should serialize"));
-
-            Request::builder()
-                .extension(auth)
-                .body(body)
-                .expect("Should build Request")
-        };
+        let auth = Extension(Auth {
+            era: 0,
+            uid: IDS[&CREATOR],
+            chain: channel_context.chain.clone(),
+        });
 
         let campaign_context: ChainOf<Campaign> = {
             // erases the CampaignId for the CreateCampaign request
             let mut create = CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
             create.budget = UnifiedNum::from_whole(500);
 
-            let create_response = create_campaign(build_request(create), &app)
+            let create_response = create_campaign_axum(Json(create), auth.clone(), app.clone())
                 .await
-                .expect("Should create campaign");
+                .expect("Should create campaign")
+                .0;
 
-            assert_eq!(StatusCode::OK, create_response.status());
-            let json = hyper::body::to_bytes(create_response.into_body())
-                .await
-                .expect("Should get json");
 
-            let campaign: Campaign =
-                serde_json::from_slice(&json).expect("Should get new Campaign");
-
-            assert_ne!(DUMMY_CAMPAIGN.id, campaign.id);
+            assert_ne!(DUMMY_CAMPAIGN.id, create_response.id);
 
             let campaign_remaining = CampaignRemaining::new(app.redis.clone());
 
             let remaining = campaign_remaining
-                .get_remaining_opt(campaign.id)
+                .get_remaining_opt(create_response.id)
                 .await
                 .expect("Should get remaining from redis")
                 .expect("There should be value for the Campaign");
@@ -1344,7 +1328,7 @@ mod test {
                 UnifiedNum::from(remaining.unsigned_abs())
             );
 
-            channel_context.clone().with(campaign)
+            channel_context.clone().with(create_response)
         };
 
         // modify campaign
@@ -1391,19 +1375,9 @@ mod test {
                 CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
             create_second.budget = UnifiedNum::from_whole(500);
 
-            let create_response = create_campaign(build_request(create_second), &app)
+            create_campaign_axum(Json(create_second), auth.clone(), app.clone())
                 .await
-                .expect("Should create campaign");
-
-            assert_eq!(StatusCode::OK, create_response.status());
-            let json = hyper::body::to_bytes(create_response.into_body())
-                .await
-                .expect("Should get json");
-
-            let second_campaign: Campaign =
-                serde_json::from_slice(&json).expect("Should get new Campaign");
-
-            second_campaign
+                .expect("Should create campaign").0
         };
 
         // No budget left for new campaigns
@@ -1414,7 +1388,7 @@ mod test {
             let mut create = CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
             create.budget = UnifiedNum::from_whole(600);
 
-            let create_err = create_campaign(build_request(create), &app)
+            let create_err = create_campaign_axum(Json(create), auth.clone(), app.clone())
                 .await
                 .expect_err("Should return Error response");
 
@@ -1463,16 +1437,9 @@ mod test {
             let mut create = CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None);
             create.budget = UnifiedNum::from_whole(600);
 
-            let create_response = create_campaign(build_request(create), &app)
+            let _create_response = create_campaign_axum(Json(create), auth.clone(), app.clone())
                 .await
                 .expect("Should return create campaign");
-
-            let json = hyper::body::to_bytes(create_response.into_body())
-                .await
-                .expect("Should get json");
-
-            let _campaign: Campaign =
-                serde_json::from_slice(&json).expect("Should get new Campaign");
         }
 
         // Modify a campaign without enough budget

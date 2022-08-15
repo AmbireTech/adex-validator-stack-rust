@@ -935,7 +935,6 @@ mod test {
     use hyper::StatusCode;
     use primitives::{
         channel::Nonce,
-        sentry::channel_list::ChannelListResponse,
         test_util::{
             ADVERTISER, CREATOR, DUMMY_CAMPAIGN, FOLLOWER, GUARDIAN, IDS, LEADER, LEADER_2,
             PUBLISHER, PUBLISHER_2,
