@@ -455,6 +455,41 @@ pub async fn campaign_list<C: Locked + 'static>(
 /// **Can only be called by the [`Campaign.creator`]!**
 /// To close a campaign, just set it's budget to what it's spent so far (so that remaining == 0)
 /// newBudget = totalSpent, i.e. newBudget = oldBudget - remaining
+pub async fn close_campaign_axum<C: Locked + 'static>(
+    Extension(app): Extension<Arc<Application<C>>>,
+    Extension(auth): Extension<Auth>,
+    Extension(campaign_context): Extension<ChainOf<Campaign>>,
+) -> Result<Json<SuccessResponse>, ResponseError> {
+    let mut campaign = campaign_context.context;
+
+    if auth.uid.to_address() != campaign.creator {
+        Err(ResponseError::Forbidden(
+            "Request not sent by campaign creator".to_string(),
+        ))
+    } else {
+        let old_remaining = app
+            .campaign_remaining
+            .getset_remaining_to_zero(campaign.id)
+            .await
+            .map_err(|e| ResponseError::BadRequest(e.to_string()))?;
+
+        campaign.budget = campaign
+            .budget
+            .checked_sub(&UnifiedNum::from(old_remaining))
+            .ok_or_else(|| {
+                ResponseError::BadRequest("Campaign budget overflow/underflow".to_string())
+            })?;
+        update_campaign(&app.pool, &campaign).await?;
+
+        Ok(Json(SuccessResponse { success: true }))
+    }
+}
+
+/// POST `/v5/campaign/:id/close` (auth required)
+///
+/// **Can only be called by the [`Campaign.creator`]!**
+/// To close a campaign, just set it's budget to what it's spent so far (so that remaining == 0)
+/// newBudget = totalSpent, i.e. newBudget = oldBudget - remaining
 pub async fn close_campaign<C: Locked + 'static>(
     req: Request<Body>,
     app: &Application<C>,
@@ -1313,7 +1348,6 @@ mod test {
                 .expect("Should create campaign")
                 .0;
 
-
             assert_ne!(DUMMY_CAMPAIGN.id, create_response.id);
 
             let campaign_remaining = CampaignRemaining::new(app.redis.clone());
@@ -1378,7 +1412,8 @@ mod test {
 
             create_campaign_axum(Json(create_second), auth.clone(), app.clone())
                 .await
-                .expect("Should create campaign").0
+                .expect("Should create campaign")
+                .0
         };
 
         // No budget left for new campaigns
@@ -1554,12 +1589,15 @@ mod test {
         let campaign =
             CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None).into_campaign();
 
-        let app = setup_dummy_app().await;
+        let app_guard = setup_dummy_app().await;
 
-        let channel_chain = app
+        let channel_chain = app_guard
             .config
             .find_chain_of(DUMMY_CAMPAIGN.channel.token)
             .expect("Channel token should be whitelisted in config!");
+
+        let app = Extension(Arc::new(app_guard.app.clone()));
+
         let channel_context = channel_chain.with_channel(DUMMY_CAMPAIGN.channel);
 
         insert_channel(&app.pool, &channel_context)
@@ -1569,11 +1607,12 @@ mod test {
             .await
             .expect("Should insert dummy campaign");
 
-        let campaign_context = app
-            .config
-            .find_chain_of(campaign.channel.token)
-            .expect("Config should have the Dummy campaign.channel.token")
-            .with(campaign.clone());
+        let campaign_context = Extension(
+            app.config
+                .find_chain_of(campaign.channel.token)
+                .expect("Config should have the Dummy campaign.channel.token")
+                .with(campaign.clone()),
+        );
 
         // Test if remaining is set to 0
         {
@@ -1582,19 +1621,13 @@ mod test {
                 .await
                 .expect("should set");
 
-            let auth = Auth {
+            let auth = Extension(Auth {
                 era: 0,
                 uid: ValidatorId::from(campaign.creator),
                 chain: campaign_context.chain.clone(),
-            };
+            });
 
-            let req = Request::builder()
-                .extension(auth)
-                .extension(campaign_context.clone())
-                .body(Body::empty())
-                .expect("Should build Request");
-
-            close_campaign(req, &app)
+            close_campaign_axum(app.clone(), auth.clone(), campaign_context.clone())
                 .await
                 .expect("Should close campaign");
 
@@ -1618,19 +1651,13 @@ mod test {
 
         // Test if an error is returned when request is not sent by creator
         {
-            let auth = Auth {
+            let auth = Extension(Auth {
                 era: 0,
                 uid: IDS[&LEADER],
                 chain: campaign_context.chain.clone(),
-            };
+            });
 
-            let req = Request::builder()
-                .extension(auth)
-                .extension(campaign_context.clone())
-                .body(Body::empty())
-                .expect("Should build Request");
-
-            let res = close_campaign(req, &app)
+            let res = close_campaign_axum(app.clone(), auth, campaign_context.clone())
                 .await
                 .expect_err("Should return error for Bad Campaign");
 
