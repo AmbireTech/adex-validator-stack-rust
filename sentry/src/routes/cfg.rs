@@ -1,5 +1,7 @@
 //! `GET /cfg` request
 
+use std::sync::Arc;
+
 use adapter::client::Locked;
 use axum::{Extension, Json};
 use hyper::{header::CONTENT_TYPE, Body, Request, Response};
@@ -10,7 +12,7 @@ use crate::{response::ResponseError, Application};
 
 /// `GET /cfg` request
 pub async fn config_axum<C: Locked + 'static>(
-    Extension(app): Extension<Application<C>>,
+    Extension(app): Extension<Arc<Application<C>>>,
 ) -> Json<Config> {
     Json(app.config.clone())
 }

@@ -1,5 +1,6 @@
 //! `/v5/campaign` routes
 use crate::{
+    application::Qs,
     db::{
         accounting::{get_accounting, Side},
         campaign::{
@@ -21,8 +22,10 @@ use hyper::{Body, Request, Response};
 use primitives::{
     campaign_validator::Validator,
     sentry::{
-        campaign_create::CreateCampaign, campaign_list::CampaignListQuery,
-        campaign_modify::ModifyCampaign, SuccessResponse,
+        campaign_create::CreateCampaign,
+        campaign_list::{CampaignListQuery, CampaignListResponse},
+        campaign_modify::ModifyCampaign,
+        SuccessResponse,
     },
     spender::Spendable,
     Address, Campaign, CampaignId, ChainOf, Channel, ChannelId, Deposit, UnifiedNum,
@@ -426,6 +429,29 @@ where
 }
 
 /// GET `/v5/campaign/list`
+pub async fn campaign_list_axum<C: Locked + 'static>(
+    Extension(app): Extension<Arc<Application<C>>>,
+    Qs(query): Qs<CampaignListQuery>,
+) -> Result<Json<CampaignListResponse>, ResponseError> {
+    let limit = app.config.campaigns_find_limit;
+    let skip = query
+        .page
+        .checked_mul(limit.into())
+        .ok_or_else(|| ResponseError::BadRequest("Page and/or limit is too large".into()))?;
+    let list_response = list_campaigns(
+        &app.pool,
+        skip,
+        limit,
+        query.creator,
+        query.validator,
+        &query.active_to_ge,
+    )
+    .await?;
+
+    Ok(Json(list_response))
+}
+
+/// GET `/v5/campaign/list`
 pub async fn campaign_list<C: Locked + 'static>(
     req: Request<Body>,
     app: &Application<C>,
@@ -448,6 +474,41 @@ pub async fn campaign_list<C: Locked + 'static>(
     .await?;
 
     Ok(success_response(serde_json::to_string(&list_response)?))
+}
+
+/// POST `/v5/campaign/:id/close` (auth required)
+///
+/// **Can only be called by the [`Campaign.creator`]!**
+/// To close a campaign, just set it's budget to what it's spent so far (so that remaining == 0)
+/// newBudget = totalSpent, i.e. newBudget = oldBudget - remaining
+pub async fn close_campaign_axum<C: Locked + 'static>(
+    Extension(app): Extension<Arc<Application<C>>>,
+    Extension(auth): Extension<Auth>,
+    Extension(campaign_context): Extension<ChainOf<Campaign>>,
+) -> Result<Json<SuccessResponse>, ResponseError> {
+    let mut campaign = campaign_context.context;
+
+    if auth.uid.to_address() != campaign.creator {
+        Err(ResponseError::Forbidden(
+            "Request not sent by campaign creator".to_string(),
+        ))
+    } else {
+        let old_remaining = app
+            .campaign_remaining
+            .getset_remaining_to_zero(campaign.id)
+            .await
+            .map_err(|e| ResponseError::BadRequest(e.to_string()))?;
+
+        campaign.budget = campaign
+            .budget
+            .checked_sub(&UnifiedNum::from(old_remaining))
+            .ok_or_else(|| {
+                ResponseError::BadRequest("Campaign budget overflow/underflow".to_string())
+            })?;
+        update_campaign(&app.pool, &campaign).await?;
+
+        Ok(Json(SuccessResponse { success: true }))
+    }
 }
 
 /// POST `/v5/campaign/:id/close` (auth required)
@@ -1259,7 +1320,7 @@ mod test {
     use primitives::{
         campaign::validators::Validators,
         config::GANACHE_CONFIG,
-        sentry::campaign_list::{CampaignListResponse, ValidatorParam},
+        sentry::campaign_list::ValidatorParam,
         test_util::{
             CREATOR, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, FOLLOWER,
             GUARDIAN, IDS, LEADER, LEADER_2, PUBLISHER_2,
@@ -1312,7 +1373,6 @@ mod test {
                 .await
                 .expect("Should create campaign")
                 .0;
-
 
             assert_ne!(DUMMY_CAMPAIGN.id, create_response.id);
 
@@ -1378,7 +1438,8 @@ mod test {
 
             create_campaign_axum(Json(create_second), auth.clone(), app.clone())
                 .await
-                .expect("Should create campaign").0
+                .expect("Should create campaign")
+                .0
         };
 
         // No budget left for new campaigns
@@ -1554,12 +1615,15 @@ mod test {
         let campaign =
             CreateCampaign::from_campaign_erased(DUMMY_CAMPAIGN.clone(), None).into_campaign();
 
-        let app = setup_dummy_app().await;
+        let app_guard = setup_dummy_app().await;
 
-        let channel_chain = app
+        let channel_chain = app_guard
             .config
             .find_chain_of(DUMMY_CAMPAIGN.channel.token)
             .expect("Channel token should be whitelisted in config!");
+
+        let app = Extension(Arc::new(app_guard.app.clone()));
+
         let channel_context = channel_chain.with_channel(DUMMY_CAMPAIGN.channel);
 
         insert_channel(&app.pool, &channel_context)
@@ -1569,11 +1633,12 @@ mod test {
             .await
             .expect("Should insert dummy campaign");
 
-        let campaign_context = app
-            .config
-            .find_chain_of(campaign.channel.token)
-            .expect("Config should have the Dummy campaign.channel.token")
-            .with(campaign.clone());
+        let campaign_context = Extension(
+            app.config
+                .find_chain_of(campaign.channel.token)
+                .expect("Config should have the Dummy campaign.channel.token")
+                .with(campaign.clone()),
+        );
 
         // Test if remaining is set to 0
         {
@@ -1582,19 +1647,13 @@ mod test {
                 .await
                 .expect("should set");
 
-            let auth = Auth {
+            let auth = Extension(Auth {
                 era: 0,
                 uid: ValidatorId::from(campaign.creator),
                 chain: campaign_context.chain.clone(),
-            };
+            });
 
-            let req = Request::builder()
-                .extension(auth)
-                .extension(campaign_context.clone())
-                .body(Body::empty())
-                .expect("Should build Request");
-
-            close_campaign(req, &app)
+            close_campaign_axum(app.clone(), auth.clone(), campaign_context.clone())
                 .await
                 .expect("Should close campaign");
 
@@ -1618,19 +1677,13 @@ mod test {
 
         // Test if an error is returned when request is not sent by creator
         {
-            let auth = Auth {
+            let auth = Extension(Auth {
                 era: 0,
                 uid: IDS[&LEADER],
                 chain: campaign_context.chain.clone(),
-            };
+            });
 
-            let req = Request::builder()
-                .extension(auth)
-                .extension(campaign_context.clone())
-                .body(Body::empty())
-                .expect("Should build Request");
-
-            let res = close_campaign(req, &app)
+            let res = close_campaign_axum(app.clone(), auth, campaign_context.clone())
                 .await
                 .expect_err("Should return error for Bad Campaign");
 
@@ -1641,18 +1694,12 @@ mod test {
         }
     }
 
-    async fn res_to_campaign_list_response(res: Response<Body>) -> CampaignListResponse {
-        let json = hyper::body::to_bytes(res.into_body())
-            .await
-            .expect("Should get json");
-
-        serde_json::from_slice(&json).expect("Should deserialize CampaignListResponse")
-    }
-
     #[tokio::test]
     async fn test_campaign_list() {
-        let mut app = setup_dummy_app().await;
-        app.config.campaigns_find_limit = 2;
+        let mut app_guard = setup_dummy_app().await;
+        app_guard.config.campaigns_find_limit = 2;
+        let app = Extension(Arc::new(app_guard.app.clone()));
+
         // Setting up new leader and a channel and campaign which use it on Ganache #1337
         let dummy_leader_2 = ValidatorDesc {
             id: IDS[&LEADER_2],
@@ -1770,14 +1817,6 @@ mod test {
             .await
             .expect("Should insert dummy campaign");
 
-        let build_request = |query: CampaignListQuery| {
-            let query = serde_qs::to_string(&query).expect("should parse query");
-            Request::builder()
-                .uri(format!("http://127.0.0.1/v5/campaign/list?{}", query))
-                .body(Body::empty())
-                .expect("Should build Request")
-        };
-
         // Test for dummy leader
         {
             let query = CampaignListQuery {
@@ -1786,10 +1825,11 @@ mod test {
                 creator: None,
                 validator: Some(ValidatorParam::Leader(DUMMY_VALIDATOR_LEADER.id)),
             };
-            let res = campaign_list(build_request(query), &app)
+
+            let res = campaign_list_axum(app.clone(), Qs(query))
                 .await
-                .expect("should get campaigns");
-            let res = res_to_campaign_list_response(res).await;
+                .expect("should get campaigns")
+                .0;
 
             assert_eq!(
                 res.campaigns,
@@ -1804,10 +1844,10 @@ mod test {
                 creator: None,
                 validator: Some(ValidatorParam::Leader(DUMMY_VALIDATOR_LEADER.id)),
             };
-            let res = campaign_list(build_request(query), &app)
+            let res = campaign_list_axum(app.clone(), Qs(query))
                 .await
-                .expect("should get campaigns");
-            let res = res_to_campaign_list_response(res).await;
+                .expect("should get campaigns")
+                .0;
 
             assert_eq!(
                 res.campaigns,
@@ -1827,10 +1867,10 @@ mod test {
                 creator: None,
                 validator: Some(ValidatorParam::Validator(DUMMY_VALIDATOR_FOLLOWER.id)),
             };
-            let res = campaign_list(build_request(query), &app)
+            let res = campaign_list_axum(app.clone(), Qs(query))
                 .await
-                .expect("should get campaigns");
-            let res = res_to_campaign_list_response(res).await;
+                .expect("should get campaigns")
+                .0;
 
             assert_eq!(
                 res.campaigns,
@@ -1845,10 +1885,10 @@ mod test {
                 creator: None,
                 validator: Some(ValidatorParam::Validator(DUMMY_VALIDATOR_FOLLOWER.id)),
             };
-            let res = campaign_list(build_request(query), &app)
+            let res = campaign_list_axum(app.clone(), Qs(query))
                 .await
-                .expect("should get campaigns");
-            let res = res_to_campaign_list_response(res).await;
+                .expect("should get campaigns")
+                .0;
 
             assert_eq!(
                 res.campaigns,
@@ -1868,10 +1908,10 @@ mod test {
                 creator: None,
                 validator: Some(ValidatorParam::Leader(dummy_leader_2.id)),
             };
-            let res = campaign_list(build_request(query), &app)
+            let res = campaign_list_axum(app.clone(), Qs(query))
                 .await
-                .expect("should get campaigns");
-            let res = res_to_campaign_list_response(res).await;
+                .expect("should get campaigns")
+                .0;
 
             assert_eq!(
                 res.campaigns,
@@ -1892,10 +1932,10 @@ mod test {
                 creator: None,
                 validator: Some(ValidatorParam::Validator(dummy_follower_2.id)),
             };
-            let res = campaign_list(build_request(query), &app)
+            let res = campaign_list_axum(app.clone(), Qs(query))
                 .await
-                .expect("should get campaigns");
-            let res = res_to_campaign_list_response(res).await;
+                .expect("should get campaigns")
+                .0;
 
             assert_eq!(
                 res.campaigns,
@@ -1916,10 +1956,10 @@ mod test {
                 creator: Some(*PUBLISHER_2),
                 validator: None,
             };
-            let res = campaign_list(build_request(query), &app)
+            let res = campaign_list_axum(app.clone(), Qs(query))
                 .await
-                .expect("should get campaigns");
-            let res = res_to_campaign_list_response(res).await;
+                .expect("should get campaigns")
+                .0;
 
             assert_eq!(
                 res.campaigns,
@@ -1937,10 +1977,10 @@ mod test {
                 creator: None,
                 validator: None,
             };
-            let res = campaign_list(build_request(query), &app)
+            let res = campaign_list_axum(app.clone(), Qs(query))
                 .await
-                .expect("should get campaigns");
-            let res = res_to_campaign_list_response(res).await;
+                .expect("should get campaigns")
+                .0;
 
             assert_eq!(
                 res.campaigns,

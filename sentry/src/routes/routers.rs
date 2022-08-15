@@ -337,6 +337,14 @@ pub fn campaigns_router_axum<C: Locked + 'static>() -> Router {
             "/events",
             post(campaign::insert_events::handle_route_axum::<C>),
         )
+        .route(
+            "/close",
+            post(campaign::close_campaign_axum::<C>).route_layer(
+                ServiceBuilder::new()
+                    .layer(middleware::from_fn(authentication_required::<C, _>))
+                    .layer(middleware::from_fn(called_by_creator::<C, _>)),
+            ),
+        )
         .layer(
             // keeps the order from top to bottom!
             ServiceBuilder::new()
@@ -345,6 +353,7 @@ pub fn campaigns_router_axum<C: Locked + 'static>() -> Router {
         );
 
     Router::new()
+        .route("/list", get(campaign::campaign_list_axum::<C>))
         .route(
             "/",
             // For creating campaigns
