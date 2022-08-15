@@ -8,7 +8,9 @@ use adapter::client::Locked;
 use axum::{
     extract::{FromRequest, RequestParts},
     http::StatusCode,
-    middleware, Extension, Router, routing::get,
+    middleware,
+    routing::get,
+    Extension, Router,
 };
 use hyper::{
     service::{make_service_fn, service_fn},
@@ -33,11 +35,11 @@ use crate::{
     platform::PlatformApi,
     response::{map_response_error, ResponseError},
     routes::{
-        get_cfg,
+        get_cfg, get_cfg_axum,
         routers::{
             analytics_router, campaigns_router, campaigns_router_axum, channels_router,
             channels_router_axum,
-        }, get_cfg_axum,
+        },
     },
 };
 use adapter::Adapter;

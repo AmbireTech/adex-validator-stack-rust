@@ -121,14 +121,12 @@ where
     let campaign_context = request
         .extensions()
         .get::<ChainOf<Campaign>>()
-        .expect("We must have a campaign in extensions")
-        .to_owned();
+        .expect("We must have a campaign in extensions");
 
     let auth = request
         .extensions()
         .get::<Auth>()
-        .expect("request should have session")
-        .to_owned();
+        .expect("request should have session");
 
     if auth.uid.to_address() != campaign_context.context.creator {
         return Err(ResponseError::Forbidden(
