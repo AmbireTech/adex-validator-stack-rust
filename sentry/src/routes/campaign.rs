@@ -791,6 +791,7 @@ pub mod insert_events {
         #[error("Campaign ran out of remaining budget to spend")]
         CampaignOutOfBudget,
     }
+
     /// POST `/v5/campaign/:id/events`
     ///
     /// Request body (json): [`InsertEventsRequest`]
@@ -1268,7 +1269,7 @@ mod test {
     };
 
     /// Test single campaign creation and modification
-    // &
+    /// &
     /// Test with multiple campaigns (because of Budget) and modifications
     #[tokio::test]
     async fn create_and_modify_with_multiple_campaigns() {

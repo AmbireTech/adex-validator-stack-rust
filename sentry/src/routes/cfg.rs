@@ -1,8 +1,19 @@
 //! `GET /cfg` request
 
-use crate::{response::ResponseError, Application};
 use adapter::client::Locked;
+use axum::{Extension, Json};
 use hyper::{header::CONTENT_TYPE, Body, Request, Response};
+
+use primitives::Config;
+
+use crate::{response::ResponseError, Application};
+
+/// `GET /cfg` request
+pub async fn config_axum<C: Locked + 'static>(
+    Extension(app): Extension<Application<C>>,
+) -> Json<Config> {
+    Json(app.config.clone())
+}
 
 /// `GET /cfg` request
 pub async fn config<C: Locked + 'static>(

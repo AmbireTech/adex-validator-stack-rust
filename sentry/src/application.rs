@@ -8,7 +8,7 @@ use adapter::client::Locked;
 use axum::{
     extract::{FromRequest, RequestParts},
     http::StatusCode,
-    middleware, Extension, Router,
+    middleware, Extension, Router, routing::get,
 };
 use hyper::{
     service::{make_service_fn, service_fn},
@@ -37,7 +37,7 @@ use crate::{
         routers::{
             analytics_router, campaigns_router, campaigns_router_axum, channels_router,
             channels_router_axum,
-        },
+        }, get_cfg_axum,
     },
 };
 use adapter::Adapter;
@@ -195,6 +195,7 @@ where
 
         Router::new()
             .nest("/v5", router)
+            .route("/cfg", get(get_cfg_axum::<C>))
             .layer(
                 // keeps the order from top to bottom!
                 ServiceBuilder::new()
