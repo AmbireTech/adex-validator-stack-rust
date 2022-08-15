@@ -9,7 +9,7 @@ use axum::{
     middleware::Next,
 };
 use hyper::{Body, Request};
-use primitives::{campaign::Campaign, CampaignId};
+use primitives::{campaign::Campaign, CampaignId, ChainOf};
 
 #[derive(Debug)]
 pub struct CampaignLoad;
@@ -111,6 +111,34 @@ where
     Ok(next.run(request).await)
 }
 
+pub async fn called_by_campaign<C: Locked + 'static, B>(
+    request: axum::http::Request<B>,
+    next: Next<B>,
+) -> Result<axum::response::Response, ResponseError>
+where
+    B: Send,
+{
+    let campaign_context = request
+        .extensions()
+        .get::<ChainOf<Campaign>>()
+        .expect("We must have a campaign in extensions")
+        .to_owned();
+
+    let auth = request
+        .extensions()
+        .get::<Auth>()
+        .expect("request should have session")
+        .to_owned();
+
+    if auth.uid.to_address() != campaign_context.context.creator {
+        return Err(ResponseError::Forbidden(
+            "Request not sent by campaign creator".to_string(),
+        ));
+    }
+
+    Ok(next.run(request).await)
+}
+
 #[async_trait]
 impl<C: Locked + 'static> Middleware<C> for CalledByCreator {
     async fn call<'a>(
@@ -142,17 +170,13 @@ impl<C: Locked + 'static> Middleware<C> for CalledByCreator {
 
 #[cfg(test)]
 mod test {
-    use adapter::Dummy;
     use axum::{
-        body::{self, Body, BoxBody, Empty},
-        http::StatusCode,
-        middleware::from_fn,
-        response::Response,
-        routing::get,
-        Extension, Router,
+        body::Body, http::StatusCode, middleware::from_fn, routing::get, Extension, Router,
     };
+    use tower::Service;
+
+    use adapter::Dummy;
     use primitives::{test_util::DUMMY_CAMPAIGN, Campaign, ChainOf};
-    use tower::{Service, ServiceExt};
 
     use crate::{
         db::{insert_campaign, insert_channel},
@@ -178,10 +202,6 @@ mod test {
 
         async fn handle(Extension(_campaign_context): Extension<ChainOf<Campaign>>) -> String {
             "Ok".into()
-        }
-
-        async fn body_to_string(response: Response<BoxBody>) -> String {
-            String::from_utf8(hyper::body::to_bytes(response).await.unwrap().to_vec()).unwrap()
         }
 
         let mut router = Router::new()

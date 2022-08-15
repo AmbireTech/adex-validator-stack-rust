@@ -676,7 +676,7 @@ pub struct AllSpendersQuery {
 /// ```
 #[doc = include_str!("../examples/channel_pay_request.rs")]
 /// ```
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct ChannelPayRequest {
     pub payouts: UnifiedMap,
 }

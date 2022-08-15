@@ -503,6 +503,26 @@ pub mod update_campaign {
 
     use super::*;
 
+    pub async fn handle_route_axum<C: Locked + 'static>(
+        Json(modify_campaign_fields): Json<ModifyCampaign>,
+        Extension(campaign_being_mutated): Extension<ChainOf<Campaign>>,
+        Extension(app): Extension<Arc<Application<C>>>,
+    ) -> Result<Json<Campaign>, ResponseError> {
+        // modify Campaign
+        let modified_campaign = modify_campaign(
+            app.adapter.clone(),
+            &app.pool,
+            &app.config,
+            &app.campaign_remaining,
+            &campaign_being_mutated,
+            modify_campaign_fields,
+        )
+        .await
+        .map_err(|err| ResponseError::BadRequest(err.to_string()))?;
+
+        Ok(Json(modified_campaign))
+    }
+
     /// POST `/v5/campaign/:id` (auth required)
     ///
     /// Request body (json): [`ModifyCampaign`](`primitives::sentry::campaign_modify::ModifyCampaign`)

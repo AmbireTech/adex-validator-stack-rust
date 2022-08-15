@@ -455,6 +455,112 @@ pub async fn get_accounting_for_channel<C: Locked + 'static>(
     Ok(success_response(serde_json::to_string(&res)?))
 }
 
+pub async fn channel_payout_axum<C: Locked + 'static>(
+    Extension(app): Extension<Arc<Application<C>>>,
+    Extension(channel_context): Extension<ChainOf<Channel>>,
+    Extension(auth): Extension<Auth>,
+    Json(to_pay): Json<ChannelPayRequest>,
+) -> Result<Json<SuccessResponse>, ResponseError> {
+    let spender = auth.uid.to_address();
+
+    // Handling the case where a request with an empty body comes through
+    if to_pay.payouts.is_empty() {
+        return Err(ResponseError::FailedValidation(
+            "Request has empty payouts".to_string(),
+        ));
+    }
+
+    let channel_campaigns = fetch_campaign_ids_for_channel(
+        &app.pool,
+        channel_context.context.id(),
+        app.config.campaigns_find_limit,
+    )
+    .await?;
+
+    let campaigns_remaining_sum = app
+        .campaign_remaining
+        .get_multiple(&channel_campaigns)
+        .await?
+        .iter()
+        .sum::<Option<UnifiedNum>>()
+        .ok_or_else(|| {
+            ResponseError::BadRequest("Couldn't sum remaining amount for all campaigns".to_string())
+        })?;
+
+    // A campaign is closed when its remaining == 0
+    // therefore for all campaigns for a channel to be closed their total remaining sum should be 0
+    if campaigns_remaining_sum > UnifiedNum::from_u64(0) {
+        return Err(ResponseError::FailedValidation(
+            "All campaigns should be closed or have no budget left".to_string(),
+        ));
+    }
+
+    let accounting_spent = get_accounting(
+        app.pool.clone(),
+        channel_context.context.id(),
+        spender,
+        Side::Spender,
+    )
+    .await?
+    .map(|accounting_spent| accounting_spent.amount)
+    .unwrap_or_default();
+    let accounting_earned = get_accounting(
+        app.pool.clone(),
+        channel_context.context.id(),
+        spender,
+        Side::Earner,
+    )
+    .await?
+    .map(|accounting_spent| accounting_spent.amount)
+    .unwrap_or_default();
+    let latest_spendable =
+        fetch_spendable(app.pool.clone(), &spender, &channel_context.context.id())
+            .await
+            .map_err(|err| ResponseError::BadRequest(err.to_string()))?
+            .ok_or_else(|| {
+                ResponseError::BadRequest(
+                    "There is no spendable amount for the spender in this Channel".to_string(),
+                )
+            })?;
+    let total_deposited = latest_spendable.deposit.total;
+
+    let available_for_payout = total_deposited
+        .checked_add(&accounting_earned)
+        .ok_or_else(|| {
+            ResponseError::FailedValidation(
+                "Overflow while calculating available for payout".to_string(),
+            )
+        })?
+        .checked_sub(&accounting_spent)
+        .ok_or_else(|| {
+            ResponseError::FailedValidation(
+                "Underflow while calculating available for payout".to_string(),
+            )
+        })?;
+
+    let total_to_pay = to_pay
+        .payouts
+        .values()
+        .sum::<Option<UnifiedNum>>()
+        .ok_or_else(|| ResponseError::FailedValidation("Payouts amount overflow".to_string()))?;
+
+    if total_to_pay > available_for_payout {
+        return Err(ResponseError::FailedValidation(
+            "The total requested payout amount exceeds the available payout".to_string(),
+        ));
+    }
+
+    let mut balances: Balances<CheckedState> = Balances::new();
+    for (earner, amount) in to_pay.payouts.into_iter() {
+        balances.spend(spender, earner, amount)?;
+    }
+
+    // will return an error if one of the updates fails
+    spend_amount(app.pool.clone(), channel_context.context.id(), balances).await?;
+
+    Ok(Json(SuccessResponse { success: true }))
+}
+
 /// POST `/v5/channel/0xXXX.../pay` request
 ///
 /// Body: [`ChannelPayRequest`]
@@ -920,14 +1026,6 @@ mod test {
         accounting_response
     }
 
-    async fn res_to_channel_list_response(res: Response<Body>) -> ChannelListResponse {
-        let json = hyper::body::to_bytes(res.into_body())
-            .await
-            .expect("Should get json");
-
-        serde_json::from_slice(&json).expect("Should deserialize ChannelListResponse")
-    }
-
     #[tokio::test]
     async fn get_accountings_for_channel() {
         let app = setup_dummy_app().await;
@@ -1148,8 +1246,10 @@ mod test {
 
     #[tokio::test]
     async fn get_channels_list() {
-        let mut app = setup_dummy_app().await;
-        app.config.channels_find_limit = 2;
+        let mut app_guard = setup_dummy_app().await;
+        app_guard.config.channels_find_limit = 2;
+
+        let app = Extension(Arc::new(app_guard.app.clone()));
 
         let channel = Channel {
             leader: IDS[&LEADER],
@@ -1199,15 +1299,6 @@ mod test {
             .await
             .expect("should insert");
 
-        let build_request = |query: ChannelListQuery| {
-            let query = serde_qs::to_string(&query).expect("should parse query");
-            Request::builder()
-                .uri(format!("http://127.0.0.1/v5/channel/list?{}", query))
-                .extension(DUMMY_CAMPAIGN.channel)
-                .body(Body::empty())
-                .expect("Should build Request")
-        };
-
         // Test query page - page 0, page 1
         {
             let query = ChannelListQuery {
@@ -1215,10 +1306,11 @@ mod test {
                 validator: None,
                 chains: vec![],
             };
-            let res = channel_list(build_request(query), &app)
+
+            let channels_list = channel_list_axum(app.clone(), Qs(query))
                 .await
-                .expect("should get channels");
-            let channels_list = res_to_channel_list_response(res).await;
+                .expect("should get channels")
+                .0;
 
             assert_eq!(
                 channels_list.channels,
@@ -1235,10 +1327,11 @@ mod test {
                 validator: None,
                 chains: vec![],
             };
-            let res = channel_list(build_request(query), &app)
+            let channels_list = channel_list_axum(app.clone(), Qs(query))
                 .await
-                .expect("should get channels");
-            let channels_list = res_to_channel_list_response(res).await;
+                .expect("should get channels")
+                .0;
+
             assert_eq!(
                 channels_list.channels,
                 vec![channel_other_leader],
@@ -1253,10 +1346,11 @@ mod test {
                 validator: Some(IDS[&LEADER_2]),
                 chains: vec![],
             };
-            let res = channel_list(build_request(query), &app)
+            let channels_list = channel_list_axum(app.clone(), Qs(query))
                 .await
-                .expect("should get channels");
-            let channels_list = res_to_channel_list_response(res).await;
+                .expect("should get channels")
+                .0;
+
             assert_eq!(
                 channels_list.channels,
                 vec![channel_other_leader],
@@ -1274,10 +1368,9 @@ mod test {
                 validator: Some(IDS[&FOLLOWER]),
                 chains: vec![],
             };
-            let res = channel_list(build_request(query), &app)
+            let channels_list = channel_list_axum(app.clone(), Qs(query))
                 .await
                 .expect("should get channels");
-            let channels_list = res_to_channel_list_response(res).await;
 
             assert_eq!(
                 channels_list.pagination.total_pages, 2,
@@ -1294,10 +1387,10 @@ mod test {
                 validator: Some(IDS[&FOLLOWER]),
                 chains: vec![],
             };
-            let res = channel_list(build_request(query), &app)
+            let channels_list = channel_list_axum(app.clone(), Qs(query))
                 .await
                 .expect("should get channels");
-            let channels_list = res_to_channel_list_response(res).await;
+
             assert_eq!(
                 channels_list.channels,
                 vec![channel_other_leader],
@@ -1311,7 +1404,12 @@ mod test {
 
         // Test query with different chains
         {
-            app.config.channels_find_limit = 10; // no need to test pagination, will ease checking results for this case
+            let limit_app = {
+                let mut limit_app = app_guard.app;
+                limit_app.config.channels_find_limit = 10; // no need to test pagination, will ease checking results for this cause
+
+                Extension(Arc::new(limit_app))
+            };
 
             let query_1 = ChannelListQuery {
                 page: 0,
@@ -1319,10 +1417,10 @@ mod test {
                 chains: vec![ChainId::new(1)],
             };
 
-            let res = channel_list(build_request(query_1), &app)
+            let channels_list = channel_list_axum(limit_app.clone(), Qs(query_1))
                 .await
                 .expect("should get channels");
-            let channels_list = res_to_channel_list_response(res).await;
+
             assert_eq!(
                 channels_list.channels,
                 vec![channel_other_token],
@@ -1335,10 +1433,10 @@ mod test {
                 chains: vec![ChainId::new(1337)],
             };
 
-            let res = channel_list(build_request(query_1337), &app)
+            let channels_list = channel_list_axum(limit_app.clone(), Qs(query_1337))
                 .await
                 .expect("should get channels");
-            let channels_list = res_to_channel_list_response(res).await;
+
             assert_eq!(
                 channels_list.channels,
                 vec![channel, channel_other_leader],
@@ -1351,10 +1449,10 @@ mod test {
                 chains: vec![ChainId::new(1), ChainId::new(1337)],
             };
 
-            let res = channel_list(build_request(query_both_chains), &app)
+            let channels_list = channel_list_axum(limit_app, Qs(query_both_chains))
                 .await
                 .expect("should get channels");
-            let channels_list = res_to_channel_list_response(res).await;
+
             assert_eq!(
                 channels_list.channels,
                 vec![channel, channel_other_token, channel_other_leader],
@@ -1365,12 +1463,15 @@ mod test {
 
     #[tokio::test]
     async fn payouts_for_earners_test() {
-        let app = setup_dummy_app().await;
-        let channel_context = app
-            .config
-            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
-            .expect("Dummy channel Token should be present in config!")
-            .with(DUMMY_CAMPAIGN.channel);
+        let app_guard = setup_dummy_app().await;
+        let app = Extension(Arc::new(app_guard.app.clone()));
+
+        let channel_context = Extension(
+            app.config
+                .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+                .expect("Dummy channel Token should be present in config!")
+                .with(DUMMY_CAMPAIGN.channel),
+        );
 
         insert_channel(&app.pool, &channel_context)
             .await
@@ -1386,32 +1487,26 @@ mod test {
             .await
             .expect("Should set value in redis");
 
-        let auth = Auth {
+        let auth = Extension(Auth {
             era: 0,
             uid: ValidatorId::from(DUMMY_CAMPAIGN.creator),
             chain: channel_context.chain.clone(),
-        };
+        });
 
-        let build_request = |channel_context: &ChainOf<Channel>, payouts: UnifiedMap| {
-            let payouts = ChannelPayRequest { payouts };
-
-            let body = Body::from(serde_json::to_string(&payouts).expect("Should serialize"));
-
-            Request::builder()
-                .extension(channel_context.clone())
-                .extension(auth.clone())
-                .body(body)
-                .expect("Should build Request")
-        };
         let mut payouts = UnifiedMap::default();
         payouts.insert(*PUBLISHER, UnifiedNum::from_u64(500));
+        let to_pay = Json(ChannelPayRequest { payouts });
 
         // Testing before Accounting/Spendable are inserted
         {
-            let err_response =
-                channel_payout(build_request(&channel_context, payouts.clone()), &app)
-                    .await
-                    .expect_err("Should return an error when there is no Accounting/Spendable");
+            let err_response = channel_payout_axum(
+                app.clone(),
+                channel_context.clone(),
+                auth.clone(),
+                to_pay.clone(),
+            )
+            .await
+            .expect_err("Should return an error when there is no Accounting/Spendable");
             assert_eq!(
                 err_response,
                 ResponseError::BadRequest(
@@ -1423,7 +1518,7 @@ mod test {
 
         // Add accounting for spender = 500
         update_accounting(
-            app.pool.clone(),
+            app_guard.pool.clone(),
             channel_context.context.id(),
             auth.uid.to_address(),
             Side::Spender,
@@ -1444,7 +1539,7 @@ mod test {
         // Add accounting for earner = 100
         // available for return will be = 600
         update_accounting(
-            app.pool.clone(),
+            app_guard.pool.clone(),
             channel_context.context.id(),
             auth.uid.to_address(),
             Side::Earner,
@@ -1454,16 +1549,20 @@ mod test {
         .expect("should update");
 
         // Updating spendable so that we have a value for total_deposited
-        update_spendable(app.pool.clone(), &spendable)
+        update_spendable(app_guard.pool.clone(), &spendable)
             .await
             .expect("Should update spendable");
 
-        // Test with no body
+        // Test with empty payouts
         {
+            let to_pay = Json(ChannelPayRequest {
+                payouts: UnifiedMap::default(),
+            });
             let err_response =
-                channel_payout(build_request(&channel_context, UnifiedMap::default()), &app)
+                channel_payout_axum(app.clone(), channel_context.clone(), auth.clone(), to_pay)
                     .await
                     .expect_err("Should return an error when payouts are empty");
+
             assert_eq!(
                 err_response,
                 ResponseError::FailedValidation("Request has empty payouts".to_string()),
@@ -1473,19 +1572,18 @@ mod test {
 
         // make a normal request and get accounting to see if its as expected
         {
-            let res = channel_payout(build_request(&channel_context, payouts.clone()), &app)
-                .await
-                .expect("This request shouldn't result in an error");
+            let success_response = channel_payout_axum(
+                app.clone(),
+                channel_context.clone(),
+                auth.clone(),
+                to_pay.clone(),
+            )
+            .await
+            .expect("This request shouldn't result in an error");
 
-            let json = hyper::body::to_bytes(res.into_body())
-                .await
-                .expect("Should get json");
-
-            let success_response: SuccessResponse =
-                serde_json::from_slice(&json).expect("Should deserialize SuccessResponse");
             assert_eq!(
                 SuccessResponse { success: true },
-                success_response,
+                success_response.0,
                 "Request with JSON body with one address and no errors triggered on purpose"
             );
         }
@@ -1493,7 +1591,7 @@ mod test {
         // Checking if Earner/Spender balances have been updated by looking up the Accounting in the database
         {
             let earner_accounting = get_accounting(
-                app.pool.clone(),
+                app_guard.pool.clone(),
                 channel_context.context.id(),
                 *PUBLISHER,
                 Side::Earner,
@@ -1508,7 +1606,7 @@ mod test {
             );
 
             let spender_accounting = get_accounting(
-                app.pool.clone(),
+                app_guard.pool.clone(),
                 channel_context.context.id(),
                 auth.uid.to_address(),
                 Side::Spender,
@@ -1516,6 +1614,7 @@ mod test {
             .await
             .expect("should get accounting")
             .expect("Should have value, i.e. Some");
+
             assert_eq!(
                 spender_accounting.amount,
                 UnifiedNum::from_u64(1000), // 500 initial + 500 for earners
@@ -1525,12 +1624,19 @@ mod test {
 
         // make a request where "total_to_pay" will exceed available
         {
+            let mut payouts = to_pay.payouts.clone();
             payouts.insert(*CREATOR, UnifiedNum::from_u64(1000));
+            let to_pay_exceed = Json(ChannelPayRequest { payouts });
 
-            let response_error =
-                channel_payout(build_request(&channel_context, payouts.clone()), &app)
-                    .await
-                    .expect_err("Should return an error when total_to_pay > available_for_payout");
+            let response_error = channel_payout_axum(
+                app.clone(),
+                channel_context.clone(),
+                auth.clone(),
+                to_pay_exceed,
+            )
+            .await
+            .expect_err("Should return an error when total_to_pay > available_for_payout");
+
             assert_eq!(
                 ResponseError::FailedValidation(
                     "The total requested payout amount exceeds the available payout".to_string()
@@ -1543,7 +1649,7 @@ mod test {
         // make a request where total - spent + earned will be a negative balance resulting in an error
         {
             update_accounting(
-                app.pool.clone(),
+                app_guard.pool.clone(),
                 channel_context.context.id(),
                 auth.uid.to_address(),
                 Side::Spender,
@@ -1552,10 +1658,15 @@ mod test {
             .await
             .expect("should update"); // total spent: 500 + 1000
 
-            let response_error =
-                channel_payout(build_request(&channel_context, payouts.clone()), &app)
-                    .await
-                    .expect_err("Should return err when available_for_payout is negative");
+            let response_error = channel_payout_axum(
+                app.clone(),
+                channel_context.clone(),
+                auth.clone(),
+                to_pay.clone(),
+            )
+            .await
+            .expect_err("Should return err when available_for_payout is negative");
+
             assert_eq!(
                 ResponseError::FailedValidation(
                     "Underflow while calculating available for payout".to_string()
@@ -1572,10 +1683,10 @@ mod test {
                 .await
                 .expect("Should set value in redis");
 
-            let response_error =
-                channel_payout(build_request(&channel_context, payouts.clone()), &app)
-                    .await
-                    .expect_err("Should return an error when a campaign has remaining funds");
+            let response_error = channel_payout_axum(app, channel_context, auth, to_pay)
+                .await
+                .expect_err("Should return an error when a campaign has remaining funds");
+
             assert_eq!(
                 ResponseError::FailedValidation(
                     "All campaigns should be closed or have no budget left".to_string()

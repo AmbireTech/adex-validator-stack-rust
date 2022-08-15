@@ -74,6 +74,27 @@ impl<C: Locked + 'static> Middleware<C> for IsAdmin {
     }
 }
 
+pub async fn is_admin<C: Locked + 'static, B>(
+    request: axum::http::Request<B>,
+    next: Next<B>,
+) -> Result<axum::response::Response, ResponseError> {
+    let auth = request
+        .extensions()
+        .get::<Auth>()
+        .ok_or(ResponseError::Unauthorized)?;
+
+    let config = &request
+        .extensions()
+        .get::<Arc<Application<C>>>()
+        .expect("Application should always be present")
+        .config;
+
+    if !config.admins.contains(auth.uid.as_address()) {
+        return Err(ResponseError::Unauthorized);
+    }
+    Ok(next.run(request).await)
+}
+
 pub async fn authentication_required<C: Locked + 'static, B>(
     request: axum::http::Request<B>,
     next: Next<B>,

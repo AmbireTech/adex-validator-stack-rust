@@ -17,8 +17,8 @@ use std::sync::Arc;
 use crate::{
     middleware::{
         auth::{authentication_required, AuthRequired, IsAdmin},
-        campaign::{campaign_load, CalledByCreator, CampaignLoad},
-        channel::ChannelLoad,
+        campaign::{called_by_campaign, campaign_load, CalledByCreator, CampaignLoad},
+        channel::{channel_load, ChannelLoad},
         Chain, Middleware,
     },
     response::ResponseError,
@@ -49,7 +49,7 @@ use regex::Regex;
 use tower::ServiceBuilder;
 
 use super::{
-    channel::{channel_dummy_deposit_axum, channel_list_axum},
+    channel::{channel_dummy_deposit_axum, channel_list_axum, channel_payout_axum},
     units_for_slot::post_units_for_slot,
 };
 
@@ -133,8 +133,23 @@ async fn if_dummy_adapter<C: Locked + 'static, B>(
 }
 
 pub fn channels_router_axum<C: Locked + 'static>() -> Router {
+    let channel_routes = Router::new()
+        .route(
+            "/pay",
+            post(channel_payout_axum::<C>)
+                .route_layer(middleware::from_fn(authentication_required::<C, _>)),
+        )
+        .layer(
+            // keeps the order from top to bottom!
+            ServiceBuilder::new()
+                // Load the campaign from database based on the CampaignId
+                .layer(middleware::from_fn(channel_load::<C, _>)),
+        );
+
     Router::new()
         .route("/list", get(channel_list_axum::<C>))
+        .nest("/:id", channel_routes)
+        // Only available if Dummy Adapter is used!
         .route(
             "/dummy-deposit",
             post(channel_dummy_deposit_axum::<C>)
@@ -309,11 +324,15 @@ pub async fn channels_router<C: Locked + 'static>(
 
 pub fn campaigns_router_axum<C: Locked + 'static>() -> Router {
     let campaign_routes = Router::new()
-        // .route(
-        //     "/",
-        // // Campaign update
-        //     post(campaign::insert_events::handle_route_axum::<C>),
-        // )
+        .route(
+            "/",
+            // Campaign update
+            post(campaign::update_campaign::handle_route_axum::<C>).route_layer(
+                ServiceBuilder::new()
+                    .layer(middleware::from_fn(authentication_required::<C, _>))
+                    .layer(middleware::from_fn(called_by_campaign::<C, _>)),
+            ),
+        )
         .route(
             "/events",
             post(campaign::insert_events::handle_route_axum::<C>),
