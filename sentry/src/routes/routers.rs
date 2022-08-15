@@ -17,7 +17,7 @@ use std::sync::Arc;
 use crate::{
     middleware::{
         auth::{authentication_required, AuthRequired, IsAdmin},
-        campaign::{called_by_campaign, campaign_load, CalledByCreator, CampaignLoad},
+        campaign::{called_by_creator, campaign_load, CalledByCreator, CampaignLoad},
         channel::{channel_load, ChannelLoad},
         Chain, Middleware,
     },
@@ -330,7 +330,7 @@ pub fn campaigns_router_axum<C: Locked + 'static>() -> Router {
             post(campaign::update_campaign::handle_route_axum::<C>).route_layer(
                 ServiceBuilder::new()
                     .layer(middleware::from_fn(authentication_required::<C, _>))
-                    .layer(middleware::from_fn(called_by_campaign::<C, _>)),
+                    .layer(middleware::from_fn(called_by_creator::<C, _>)),
             ),
         )
         .route(

@@ -111,7 +111,7 @@ where
     Ok(next.run(request).await)
 }
 
-pub async fn called_by_campaign<C: Locked + 'static, B>(
+pub async fn called_by_creator<C: Locked + 'static, B>(
     request: axum::http::Request<B>,
     next: Next<B>,
 ) -> Result<axum::response::Response, ResponseError>
