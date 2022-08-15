@@ -9,6 +9,9 @@ use hyper::{Body, Request};
 
 use async_trait::async_trait;
 
+#[cfg(test)]
+pub use test_util::*;
+
 pub mod auth;
 pub mod campaign;
 pub mod channel;
@@ -50,5 +53,17 @@ impl<C: Locked + 'static> Chain<C> {
         }
 
         Ok(request)
+    }
+}
+
+#[cfg(test)]
+pub mod test_util {
+    use axum::{body::BoxBody, response::Response};
+
+    /// Extracts the body as a String from the Response.
+    ///
+    /// Used when you want to check the response body or debug a response.
+    pub async fn body_to_string(response: Response<BoxBody>) -> String {
+        String::from_utf8(hyper::body::to_bytes(response).await.unwrap().to_vec()).unwrap()
     }
 }
