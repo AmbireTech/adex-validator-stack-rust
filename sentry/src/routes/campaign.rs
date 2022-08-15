@@ -1,5 +1,6 @@
 //! `/v5/campaign` routes
 use crate::{
+    application::Qs,
     db::{
         accounting::{get_accounting, Side},
         campaign::{
@@ -21,8 +22,10 @@ use hyper::{Body, Request, Response};
 use primitives::{
     campaign_validator::Validator,
     sentry::{
-        campaign_create::CreateCampaign, campaign_list::CampaignListQuery,
-        campaign_modify::ModifyCampaign, SuccessResponse,
+        campaign_create::CreateCampaign,
+        campaign_list::{CampaignListQuery, CampaignListResponse},
+        campaign_modify::ModifyCampaign,
+        SuccessResponse,
     },
     spender::Spendable,
     Address, Campaign, CampaignId, ChainOf, Channel, ChannelId, Deposit, UnifiedNum,
@@ -423,6 +426,29 @@ where
     }?;
 
     Ok(success_response(serde_json::to_string(&campaign)?))
+}
+
+/// GET `/v5/campaign/list`
+pub async fn campaign_list_axum<C: Locked + 'static>(
+    Extension(app): Extension<Arc<Application<C>>>,
+    Qs(query): Qs<CampaignListQuery>,
+) -> Result<Json<CampaignListResponse>, ResponseError> {
+    let limit = app.config.campaigns_find_limit;
+    let skip = query
+        .page
+        .checked_mul(limit.into())
+        .ok_or_else(|| ResponseError::BadRequest("Page and/or limit is too large".into()))?;
+    let list_response = list_campaigns(
+        &app.pool,
+        skip,
+        limit,
+        query.creator,
+        query.validator,
+        &query.active_to_ge,
+    )
+    .await?;
+
+    Ok(Json(list_response))
 }
 
 /// GET `/v5/campaign/list`
@@ -1294,7 +1320,7 @@ mod test {
     use primitives::{
         campaign::validators::Validators,
         config::GANACHE_CONFIG,
-        sentry::campaign_list::{CampaignListResponse, ValidatorParam},
+        sentry::campaign_list::ValidatorParam,
         test_util::{
             CREATOR, DUMMY_CAMPAIGN, DUMMY_VALIDATOR_FOLLOWER, DUMMY_VALIDATOR_LEADER, FOLLOWER,
             GUARDIAN, IDS, LEADER, LEADER_2, PUBLISHER_2,
@@ -1668,18 +1694,12 @@ mod test {
         }
     }
 
-    async fn res_to_campaign_list_response(res: Response<Body>) -> CampaignListResponse {
-        let json = hyper::body::to_bytes(res.into_body())
-            .await
-            .expect("Should get json");
-
-        serde_json::from_slice(&json).expect("Should deserialize CampaignListResponse")
-    }
-
     #[tokio::test]
     async fn test_campaign_list() {
-        let mut app = setup_dummy_app().await;
-        app.config.campaigns_find_limit = 2;
+        let mut app_guard = setup_dummy_app().await;
+        app_guard.config.campaigns_find_limit = 2;
+        let app = Extension(Arc::new(app_guard.app.clone()));
+
         // Setting up new leader and a channel and campaign which use it on Ganache #1337
         let dummy_leader_2 = ValidatorDesc {
             id: IDS[&LEADER_2],
@@ -1797,14 +1817,6 @@ mod test {
             .await
             .expect("Should insert dummy campaign");
 
-        let build_request = |query: CampaignListQuery| {
-            let query = serde_qs::to_string(&query).expect("should parse query");
-            Request::builder()
-                .uri(format!("http://127.0.0.1/v5/campaign/list?{}", query))
-                .body(Body::empty())
-                .expect("Should build Request")
-        };
-
         // Test for dummy leader
         {
             let query = CampaignListQuery {
@@ -1813,10 +1825,11 @@ mod test {
                 creator: None,
                 validator: Some(ValidatorParam::Leader(DUMMY_VALIDATOR_LEADER.id)),
             };
-            let res = campaign_list(build_request(query), &app)
+
+            let res = campaign_list_axum(app.clone(), Qs(query))
                 .await
-                .expect("should get campaigns");
-            let res = res_to_campaign_list_response(res).await;
+                .expect("should get campaigns")
+                .0;
 
             assert_eq!(
                 res.campaigns,
@@ -1831,10 +1844,10 @@ mod test {
                 creator: None,
                 validator: Some(ValidatorParam::Leader(DUMMY_VALIDATOR_LEADER.id)),
             };
-            let res = campaign_list(build_request(query), &app)
+            let res = campaign_list_axum(app.clone(), Qs(query))
                 .await
-                .expect("should get campaigns");
-            let res = res_to_campaign_list_response(res).await;
+                .expect("should get campaigns")
+                .0;
 
             assert_eq!(
                 res.campaigns,
@@ -1854,10 +1867,10 @@ mod test {
                 creator: None,
                 validator: Some(ValidatorParam::Validator(DUMMY_VALIDATOR_FOLLOWER.id)),
             };
-            let res = campaign_list(build_request(query), &app)
+            let res = campaign_list_axum(app.clone(), Qs(query))
                 .await
-                .expect("should get campaigns");
-            let res = res_to_campaign_list_response(res).await;
+                .expect("should get campaigns")
+                .0;
 
             assert_eq!(
                 res.campaigns,
@@ -1872,10 +1885,10 @@ mod test {
                 creator: None,
                 validator: Some(ValidatorParam::Validator(DUMMY_VALIDATOR_FOLLOWER.id)),
             };
-            let res = campaign_list(build_request(query), &app)
+            let res = campaign_list_axum(app.clone(), Qs(query))
                 .await
-                .expect("should get campaigns");
-            let res = res_to_campaign_list_response(res).await;
+                .expect("should get campaigns")
+                .0;
 
             assert_eq!(
                 res.campaigns,
@@ -1895,10 +1908,10 @@ mod test {
                 creator: None,
                 validator: Some(ValidatorParam::Leader(dummy_leader_2.id)),
             };
-            let res = campaign_list(build_request(query), &app)
+            let res = campaign_list_axum(app.clone(), Qs(query))
                 .await
-                .expect("should get campaigns");
-            let res = res_to_campaign_list_response(res).await;
+                .expect("should get campaigns")
+                .0;
 
             assert_eq!(
                 res.campaigns,
@@ -1919,10 +1932,10 @@ mod test {
                 creator: None,
                 validator: Some(ValidatorParam::Validator(dummy_follower_2.id)),
             };
-            let res = campaign_list(build_request(query), &app)
+            let res = campaign_list_axum(app.clone(), Qs(query))
                 .await
-                .expect("should get campaigns");
-            let res = res_to_campaign_list_response(res).await;
+                .expect("should get campaigns")
+                .0;
 
             assert_eq!(
                 res.campaigns,
@@ -1943,10 +1956,10 @@ mod test {
                 creator: Some(*PUBLISHER_2),
                 validator: None,
             };
-            let res = campaign_list(build_request(query), &app)
+            let res = campaign_list_axum(app.clone(), Qs(query))
                 .await
-                .expect("should get campaigns");
-            let res = res_to_campaign_list_response(res).await;
+                .expect("should get campaigns")
+                .0;
 
             assert_eq!(
                 res.campaigns,
@@ -1964,10 +1977,10 @@ mod test {
                 creator: None,
                 validator: None,
             };
-            let res = campaign_list(build_request(query), &app)
+            let res = campaign_list_axum(app.clone(), Qs(query))
                 .await
-                .expect("should get campaigns");
-            let res = res_to_campaign_list_response(res).await;
+                .expect("should get campaigns")
+                .0;
 
             assert_eq!(
                 res.campaigns,
