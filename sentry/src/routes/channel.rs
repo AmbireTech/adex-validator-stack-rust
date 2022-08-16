@@ -19,7 +19,7 @@ use crate::{
     Application, Auth,
 };
 use adapter::{client::Locked, Adapter, Dummy};
-use axum::{Extension, Json, extract::Path};
+use axum::{extract::Path, Extension, Json};
 use futures::future::try_join_all;
 use hyper::{Body, Request, Response};
 use primitives::{
@@ -275,7 +275,9 @@ pub async fn get_spender_limits_axum<C: Locked + 'static>(
 ) -> Result<Json<SpenderResponse>, ResponseError> {
     let channel = &channel_context.context;
 
-    let spender = params.get("addr").ok_or(ResponseError::BadRequest("Invalid spender address".to_string()))?;
+    let spender = params.get("addr").ok_or_else(|| ResponseError::BadRequest(
+        "Invalid spender address".to_string(),
+    ))?;
     let spender = Address::from_str(spender)?;
 
     let latest_spendable = fetch_spendable(app.pool.clone(), &spender, &channel.id()).await?;
@@ -295,12 +297,14 @@ pub async fn get_spender_limits_axum<C: Locked + 'static>(
 
     let new_state = match get_corresponding_new_state(&app.pool, &app.logger, channel).await? {
         Some(new_state) => new_state,
-        None => return Ok(Json(SpenderResponse {
-            spender: Spender {
-                total_deposited: latest_spendable.deposit.total,
-                total_spent: None,
-            },
-        })),
+        None => {
+            return Ok(Json(SpenderResponse {
+                spender: Spender {
+                    total_deposited: latest_spendable.deposit.total,
+                    total_spent: None,
+                },
+            }))
+        }
     };
 
     let total_spent = new_state
@@ -379,7 +383,7 @@ pub async fn get_all_spender_limits<C: Locked + 'static>(
 pub async fn get_all_spender_limits_axum<C: Locked + 'static>(
     Extension(app): Extension<Arc<Application<C>>>,
     Extension(channel_context): Extension<ChainOf<Channel>>,
-    Qs(query): Qs<AllSpendersQuery>
+    Qs(query): Qs<AllSpendersQuery>,
 ) -> Result<Json<AllSpendersResponse>, ResponseError> {
     let channel = channel_context.context;
 
@@ -493,7 +497,9 @@ pub async fn add_spender_leaf_axum<C: Locked + 'static>(
     Extension(app): Extension<Arc<Application<C>>>,
     Extension(channel): Extension<ChainOf<Channel>>,
 ) -> Result<Json<SpenderResponse>, ResponseError> {
-    let spender = params.get("addr").ok_or(ResponseError::BadRequest("Invalid spender address".to_string()))?;
+    let spender = params.get("addr").ok_or_else(|| ResponseError::BadRequest(
+        "Invalid spender address".to_string(),
+    ))?;
     let spender = Address::from_str(spender)?;
 
     update_accounting(
@@ -519,12 +525,14 @@ pub async fn add_spender_leaf_axum<C: Locked + 'static>(
     let new_state =
         match get_corresponding_new_state(&app.pool, &app.logger, &channel.context).await? {
             Some(new_state) => new_state,
-            None => return Ok(Json(SpenderResponse {
-                spender: Spender {
-                    total_deposited: latest_spendable.deposit.total,
-                    total_spent: None,
-                },
-            })),
+            None => {
+                return Ok(Json(SpenderResponse {
+                    spender: Spender {
+                        total_deposited: latest_spendable.deposit.total,
+                        total_spent: None,
+                    },
+                }))
+            }
         };
 
     let total_spent = new_state
