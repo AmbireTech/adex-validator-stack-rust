@@ -19,7 +19,7 @@ use crate::{
     Application, Auth,
 };
 use adapter::{client::Locked, Adapter, Dummy};
-use axum::{Extension, Json};
+use axum::{Extension, Json, extract::Path};
 use futures::future::try_join_all;
 use hyper::{Body, Request, Response};
 use primitives::{
@@ -268,6 +268,57 @@ pub async fn get_spender_limits<C: Locked + 'static>(
     Ok(success_response(serde_json::to_string(&res)?))
 }
 
+pub async fn get_spender_limits_axum<C: Locked + 'static>(
+    Path(params): Path<HashMap<String, String>>,
+    Extension(app): Extension<Arc<Application<C>>>,
+    Extension(channel_context): Extension<ChainOf<Channel>>,
+) -> Result<Json<SpenderResponse>, ResponseError> {
+    let channel = &channel_context.context;
+
+    let spender = params.get("addr").ok_or(ResponseError::BadRequest("Invalid spender address".to_string()))?;
+    let spender = Address::from_str(spender)?;
+
+    let latest_spendable = fetch_spendable(app.pool.clone(), &spender, &channel.id()).await?;
+
+    let latest_spendable = match latest_spendable {
+        Some(spendable) => spendable,
+        None => {
+            create_or_update_spendable_document(
+                &app.adapter,
+                app.pool.clone(),
+                &channel_context,
+                spender,
+            )
+            .await?
+        }
+    };
+
+    let new_state = match get_corresponding_new_state(&app.pool, &app.logger, channel).await? {
+        Some(new_state) => new_state,
+        None => return Ok(Json(SpenderResponse {
+            spender: Spender {
+                total_deposited: latest_spendable.deposit.total,
+                total_spent: None,
+            },
+        })),
+    };
+
+    let total_spent = new_state
+        .balances
+        .spenders
+        .get(&spender)
+        .map(|spent| spent.to_owned());
+
+    // returned output
+    let res = SpenderResponse {
+        spender: Spender {
+            total_deposited: latest_spendable.deposit.total,
+            total_spent,
+        },
+    };
+    Ok(Json(res))
+}
+
 /// GET `/v5/channel/0xXXX.../spender/all` request.
 ///
 /// Response: [`AllSpendersResponse`]
@@ -323,6 +374,56 @@ pub async fn get_all_spender_limits<C: Locked + 'static>(
     };
 
     Ok(success_response(serde_json::to_string(&res)?))
+}
+
+pub async fn get_all_spender_limits_axum<C: Locked + 'static>(
+    Extension(app): Extension<Arc<Application<C>>>,
+    Extension(channel_context): Extension<ChainOf<Channel>>,
+    Qs(query): Qs<AllSpendersQuery>
+) -> Result<Json<AllSpendersResponse>, ResponseError> {
+    let channel = channel_context.context;
+
+    let limit = app.config.spendable_find_limit;
+    let skip = query
+        .page
+        .checked_mul(limit.into())
+        .ok_or_else(|| ResponseError::FailedValidation("Page and/or limit is too large".into()))?;
+
+    let new_state = get_corresponding_new_state(&app.pool, &app.logger, &channel).await?;
+
+    let mut all_spender_limits: HashMap<Address, Spender> = HashMap::new();
+
+    let (all_spendables, pagination) =
+        get_all_spendables_for_channel(app.pool.clone(), &channel.id(), skip, limit.into()).await?;
+
+    // Using for loop to avoid async closures
+    for spendable in all_spendables {
+        let spender = spendable.spender;
+        let total_spent = match new_state {
+            Some(ref new_state) => new_state.balances.spenders.get(&spender).map(|balance| {
+                spendable
+                    .deposit
+                    .total
+                    .checked_sub(balance)
+                    .unwrap_or_default()
+            }),
+            None => None,
+        };
+
+        let spender_info = Spender {
+            total_deposited: spendable.deposit.total,
+            total_spent,
+        };
+
+        all_spender_limits.insert(spender, spender_info);
+    }
+
+    let res = AllSpendersResponse {
+        spenders: all_spender_limits,
+        pagination,
+    };
+
+    Ok(Json(res))
 }
 
 /// POST `/v5/channel/0xXXX.../spender/0xXXX...` request
@@ -382,6 +483,63 @@ pub async fn add_spender_leaf<C: Locked + 'static>(
         },
     };
     Ok(success_response(serde_json::to_string(&res)?))
+}
+
+/// POST `/v5/channel/0xXXX.../spender/0xXXX...` request
+///
+/// Internally to make the validator worker add a spender leaf in `NewState` we'll just update `Accounting`
+pub async fn add_spender_leaf_axum<C: Locked + 'static>(
+    Path(params): Path<HashMap<String, String>>,
+    Extension(app): Extension<Arc<Application<C>>>,
+    Extension(channel): Extension<ChainOf<Channel>>,
+) -> Result<Json<SpenderResponse>, ResponseError> {
+    let spender = params.get("addr").ok_or(ResponseError::BadRequest("Invalid spender address".to_string()))?;
+    let spender = Address::from_str(spender)?;
+
+    update_accounting(
+        app.pool.clone(),
+        channel.context.id(),
+        spender,
+        Side::Spender,
+        UnifiedNum::from_u64(0),
+    )
+    .await?;
+
+    let latest_spendable =
+        fetch_spendable(app.pool.clone(), &spender, &channel.context.id()).await?;
+
+    let latest_spendable = match latest_spendable {
+        Some(spendable) => spendable,
+        None => {
+            create_or_update_spendable_document(&app.adapter, app.pool.clone(), &channel, spender)
+                .await?
+        }
+    };
+
+    let new_state =
+        match get_corresponding_new_state(&app.pool, &app.logger, &channel.context).await? {
+            Some(new_state) => new_state,
+            None => return Ok(Json(SpenderResponse {
+                spender: Spender {
+                    total_deposited: latest_spendable.deposit.total,
+                    total_spent: None,
+                },
+            })),
+        };
+
+    let total_spent = new_state
+        .balances
+        .spenders
+        .get(&spender)
+        .map(|spent| spent.to_owned());
+
+    let res = SpenderResponse {
+        spender: Spender {
+            total_deposited: latest_spendable.deposit.total,
+            total_spent,
+        },
+    };
+    Ok(Json(res))
 }
 
 async fn get_corresponding_new_state(

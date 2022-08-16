@@ -29,6 +29,7 @@ use crate::{
         channel::{
             add_spender_leaf, channel_dummy_deposit, channel_list, channel_payout,
             get_accounting_for_channel, get_all_spender_limits, get_spender_limits, last_approved,
+            get_spender_limits_axum, get_all_spender_limits_axum, add_spender_leaf_axum,
             validator_message::{
                 create_validator_messages, extract_params, list_validator_messages,
             },
@@ -133,12 +134,19 @@ async fn if_dummy_adapter<C: Locked + 'static, B>(
 }
 
 pub fn channels_router_axum<C: Locked + 'static>() -> Router {
+    let spender_routes = Router::new()
+    .route(
+        "/:addr", get(get_spender_limits_axum::<C>).post(add_spender_leaf_axum::<C>).route_layer(middleware::from_fn(authentication_required::<C, _>))
+    )
+    .route("/all", get(get_all_spender_limits_axum::<C>).route_layer(middleware::from_fn(authentication_required::<C, _>)));
+
     let channel_routes = Router::new()
         .route(
             "/pay",
             post(channel_payout_axum::<C>)
                 .route_layer(middleware::from_fn(authentication_required::<C, _>)),
         )
+        .nest("/spender", spender_routes)
         .layer(
             // keeps the order from top to bottom!
             ServiceBuilder::new()
