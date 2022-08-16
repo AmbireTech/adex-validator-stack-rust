@@ -275,9 +275,9 @@ pub async fn get_spender_limits_axum<C: Locked + 'static>(
 ) -> Result<Json<SpenderResponse>, ResponseError> {
     let channel = &channel_context.context;
 
-    let spender = params.get("addr").ok_or_else(|| ResponseError::BadRequest(
-        "Invalid spender address".to_string(),
-    ))?;
+    let spender = params
+        .get("addr")
+        .ok_or_else(|| ResponseError::BadRequest("Invalid spender address".to_string()))?;
     let spender = Address::from_str(spender)?;
 
     let latest_spendable = fetch_spendable(app.pool.clone(), &spender, &channel.id()).await?;
@@ -493,13 +493,13 @@ pub async fn add_spender_leaf<C: Locked + 'static>(
 ///
 /// Internally to make the validator worker add a spender leaf in `NewState` we'll just update `Accounting`
 pub async fn add_spender_leaf_axum<C: Locked + 'static>(
-    Path(params): Path<HashMap<String, String>>,
     Extension(app): Extension<Arc<Application<C>>>,
     Extension(channel): Extension<ChainOf<Channel>>,
+    Path(params): Path<HashMap<String, String>>,
 ) -> Result<Json<SpenderResponse>, ResponseError> {
-    let spender = params.get("addr").ok_or_else(|| ResponseError::BadRequest(
-        "Invalid spender address".to_string(),
-    ))?;
+    let spender = params
+        .get("addr")
+        .ok_or_else(|| ResponseError::BadRequest("Invalid spender address".to_string()))?;
     let spender = Address::from_str(spender)?;
 
     update_accounting(
@@ -1310,7 +1310,9 @@ mod test {
 
     #[tokio::test]
     async fn adds_and_retrieves_spender_leaf() {
-        let app = setup_dummy_app().await;
+        let app_guard = setup_dummy_app().await;
+
+        let app = Extension(Arc::new(app_guard.app.clone()));
 
         let channel_context = app
             .config
@@ -1335,23 +1337,19 @@ mod test {
                 .body(Body::empty())
                 .expect("Should build Request")
         };
-        let add_spender_request = |channel_context: &ChainOf<Channel>| {
-            let param = RouteParams(vec![
-                channel_context.context.id().to_string(),
-                CREATOR.to_string(),
-            ]);
-            Request::builder()
-                .extension(channel_context.clone())
-                .extension(param)
-                .body(Body::empty())
-                .expect("Should build Request")
-        };
+
+        let mut params: HashMap<String, String> = HashMap::new();
+        params.insert("id".to_string(), channel_context.context.id().to_string());
+        params.insert("addr".to_string(), CREATOR.to_string());
 
         // Calling with non existent accounting
-        let res = add_spender_leaf(add_spender_request(&channel_context), &app)
-            .await
-            .expect("Should add");
-        assert_eq!(StatusCode::OK, res.status());
+        let res = add_spender_leaf_axum(
+            app.clone(),
+            Extension(channel_context.clone()),
+            Path(params.clone()),
+        )
+        .await;
+        assert!(res.is_ok());
 
         let res = get_accounting_for_channel(get_accounting_request(&channel_context), &app)
             .await
@@ -1390,10 +1388,13 @@ mod test {
 
         assert_eq!(balances, accounting_response.balances);
 
-        let res = add_spender_leaf(add_spender_request(&channel_context), &app)
-            .await
-            .expect("Should add");
-        assert_eq!(StatusCode::OK, res.status());
+        let res = add_spender_leaf_axum(
+            app.clone(),
+            Extension(channel_context.clone()),
+            Path(params),
+        )
+        .await;
+        assert!(res.is_ok());
 
         let res = get_accounting_for_channel(get_accounting_request(&channel_context), &app)
             .await
