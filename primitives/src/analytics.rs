@@ -103,10 +103,13 @@ pub mod query;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct AnalyticsQuery {
+    /// Default: `100`
     #[serde(default = "default_limit")]
     pub limit: u32,
+    /// Default: [`EventType::Impression`]
     #[serde(default = "default_event_type")]
     pub event_type: EventType,
+    // Default: [`Metric::Count`]
     #[serde(default = "default_metric")]
     pub metric: Metric,
     pub segment_by: Option<AllowedKey>,
@@ -123,6 +126,28 @@ pub struct AnalyticsQuery {
     pub os_name: Option<OperatingSystem>,
     #[serde(default)]
     pub chains: Vec<ChainId>,
+}
+
+impl Default for AnalyticsQuery {
+    fn default() -> Self {
+        Self {
+            limit: default_limit(),
+            event_type: default_event_type(),
+            metric: default_metric(),
+            segment_by: None,
+            time: Time::default(),
+            campaign_id: None,
+            ad_unit: None,
+            ad_slot: None,
+            ad_slot_type: None,
+            advertiser: None,
+            publisher: None,
+            hostname: None,
+            country: None,
+            os_name: None,
+            chains: Vec::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Display, Hash, Eq)]
