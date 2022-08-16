@@ -9,7 +9,7 @@ use hyper::{
 use redis::aio::MultiplexedConnection;
 
 use adapter::{prelude::*, primitives::Session as AdapterSession, Adapter};
-use primitives::ValidatorId;
+use primitives::{analytics::AuthenticateAs, ValidatorId};
 
 use crate::{middleware::Middleware, response::ResponseError, Application, Auth, Session};
 
@@ -177,6 +177,42 @@ pub async fn authenticate<C: Locked + 'static, B>(
 
         request.extensions_mut().insert(auth);
     }
+
+    Ok(next.run(request).await)
+}
+
+pub async fn authenticate_as_advertiser<B>(
+    mut request: axum::http::Request<B>,
+    next: Next<B>,
+) -> Result<axum::response::Response, ResponseError> {
+    let auth_uid = request
+        .extensions()
+        .get::<Auth>()
+        .ok_or(ResponseError::Unauthorized)?
+        .uid;
+
+    request
+        .extensions_mut()
+        .insert(AuthenticateAs::Advertiser(auth_uid))
+        .expect("Should not contain previous value of AuthenticateAs");
+
+    Ok(next.run(request).await)
+}
+
+pub async fn authenticate_as_publisher<B>(
+    mut request: axum::http::Request<B>,
+    next: Next<B>,
+) -> Result<axum::response::Response, ResponseError> {
+    let auth_uid = request
+        .extensions()
+        .get::<Auth>()
+        .ok_or(ResponseError::Unauthorized)?
+        .uid;
+
+    request
+        .extensions_mut()
+        .insert(AuthenticateAs::Publisher(auth_uid))
+        .expect("Should not contain previous value of AuthenticateAs");
 
     Ok(next.run(request).await)
 }
