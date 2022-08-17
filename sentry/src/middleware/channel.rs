@@ -1,9 +1,5 @@
 use std::sync::Arc;
 
-use crate::{
-    db::get_channel_by_id, middleware::Middleware, response::ResponseError,
-    routes::routers::RouteParams, Application, Auth,
-};
 use adapter::client::Locked;
 use axum::{
     extract::{Path, RequestParts},
@@ -15,6 +11,12 @@ use hyper::{Body, Request};
 use primitives::ChannelId;
 
 use async_trait::async_trait;
+use serde::Deserialize;
+
+use crate::{
+    db::get_channel_by_id, middleware::Middleware, response::ResponseError,
+    routes::routers::RouteParams, Application, Auth,
+};
 
 #[derive(Debug)]
 pub struct ChannelLoad;
@@ -70,6 +72,13 @@ fn channel_load_old<C: Locked>(
     .boxed()
 }
 
+/// This struct is required because of routes that have more parameters
+/// apart from the `ChannelId`
+#[derive(Debug, Deserialize)]
+struct ChannelParam {
+    pub id: ChannelId,
+}
+
 pub async fn channel_load<C: Locked + 'static, B>(
     request: axum::http::Request<B>,
     next: Next<B>,
@@ -86,12 +95,12 @@ where
     // running extractors requires a `RequestParts`
     let mut request_parts = RequestParts::new(request);
 
-    let channel_id = request_parts
-        .extract::<Path<ChannelId>>()
+    let channel_param = request_parts
+        .extract::<Path<ChannelParam>>()
         .await
         .map_err(|_| ResponseError::BadRequest("Bad Channel Id".to_string()))?;
 
-    let channel = get_channel_by_id(&app.pool, &channel_id)
+    let channel = get_channel_by_id(&app.pool, &channel_param.id)
         .await?
         .ok_or(ResponseError::NotFound)?;
 
