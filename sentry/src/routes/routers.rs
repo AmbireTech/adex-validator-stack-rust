@@ -30,6 +30,7 @@ use crate::{
             add_spender_leaf, add_spender_leaf_axum, channel_dummy_deposit, channel_list,
             channel_payout, get_accounting_for_channel, get_all_spender_limits,
             get_all_spender_limits_axum, get_spender_limits, get_spender_limits_axum,
+            get_accounting_for_channel_axum,
             last_approved,
             validator_message::{
                 create_validator_messages, extract_params, list_validator_messages,
@@ -152,6 +153,11 @@ pub fn channels_router_axum<C: Locked + 'static>() -> Router {
         .route(
             "/pay",
             post(channel_payout_axum::<C>)
+                .route_layer(middleware::from_fn(authentication_required::<C, _>)),
+        )
+        .route(
+            "/accounting",
+            get(get_accounting_for_channel_axum::<C>)
                 .route_layer(middleware::from_fn(authentication_required::<C, _>)),
         )
         .nest("/spender", spender_routes)
