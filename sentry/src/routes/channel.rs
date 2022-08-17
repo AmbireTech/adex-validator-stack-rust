@@ -166,6 +166,55 @@ pub async fn last_approved<C: Locked + 'static>(
         .unwrap())
 }
 
+pub async fn last_approved_axum<C: Locked + 'static>(
+    Extension(app): Extension<Arc<Application<C>>>,
+    Extension(channel_context): Extension<ChainOf<Channel>>,
+    Qs(query): Qs<LastApprovedQuery>,
+) -> Result<Json<LastApprovedResponse<UncheckedState>>, ResponseError> {
+    // get request Channel
+    let channel = channel_context.context;
+
+    let default_response = Json(LastApprovedResponse::<UncheckedState> {
+        last_approved: None,
+        heartbeats: None,
+    });
+
+    let approve_state = match latest_approve_state(&app.pool, &channel).await? {
+        Some(approve_state) => approve_state,
+        None => return Ok(default_response),
+    };
+
+    let state_root = approve_state.msg.state_root.clone();
+
+    let new_state = latest_new_state(&app.pool, &channel, &state_root).await?;
+    if new_state.is_none() {
+        return Ok(default_response);
+    }
+
+    let validators = vec![channel.leader, channel.follower];
+    let channel_id = channel.id();
+
+    let heartbeats = if query.with_heartbeat.unwrap_or_default() {
+        let result = try_join_all(
+            validators
+                .iter()
+                .map(|validator| latest_heartbeats(&app.pool, &channel_id, validator)),
+        )
+        .await?;
+        Some(result.into_iter().flatten().collect::<Vec<_>>())
+    } else {
+        None
+    };
+
+    Ok(Json(LastApprovedResponse {
+        last_approved: Some(LastApproved {
+            new_state,
+            approve_state: Some(approve_state),
+        }),
+        heartbeats,
+    }))
+}
+
 /// This will make sure to insert/get the `Channel` from DB before attempting to create the `Spendable`
 async fn create_or_update_spendable_document<A: Locked>(
     adapter: &Adapter<A>,
@@ -1220,8 +1269,9 @@ mod test {
 
         // Testing for no accounting yet
         {
-            let res = get_accounting_for_channel_axum(app.clone(), Extension(channel_context.clone()))
-                .await;
+            let res =
+                get_accounting_for_channel_axum(app.clone(), Extension(channel_context.clone()))
+                    .await;
             assert!(res.is_ok());
 
             let accounting_response = res.unwrap();
@@ -1247,8 +1297,9 @@ mod test {
             .await
             .expect("should spend");
 
-            let res = get_accounting_for_channel_axum(app.clone(), Extension(channel_context.clone()))
-                .await;
+            let res =
+                get_accounting_for_channel_axum(app.clone(), Extension(channel_context.clone()))
+                    .await;
             assert!(res.is_ok());
 
             let accounting_response = res.unwrap();
@@ -1282,8 +1333,9 @@ mod test {
                 .await
                 .expect("should spend");
 
-            let res = get_accounting_for_channel_axum(app.clone(), Extension(channel_context.clone()))
-                .await;
+            let res =
+                get_accounting_for_channel_axum(app.clone(), Extension(channel_context.clone()))
+                    .await;
             assert!(res.is_ok());
 
             let accounting_response = res.unwrap();
@@ -1304,8 +1356,9 @@ mod test {
                 .await
                 .expect("should spend");
 
-            let res = get_accounting_for_channel_axum(app.clone(), Extension(channel_context.clone()))
-                .await;
+            let res =
+                get_accounting_for_channel_axum(app.clone(), Extension(channel_context.clone()))
+                    .await;
             let expected = ResponseError::FailedValidation(
                 "Earners sum is not equal to spenders sum for channel".to_string(),
             );
@@ -1345,8 +1398,8 @@ mod test {
         .await;
         assert!(res.is_ok());
 
-        let res = get_accounting_for_channel_axum(app.clone(), Extension(channel_context.clone()))
-            .await;
+        let res =
+            get_accounting_for_channel_axum(app.clone(), Extension(channel_context.clone())).await;
         assert!(res.is_ok());
 
         let accounting_response = res.unwrap();
@@ -1372,8 +1425,8 @@ mod test {
         .await
         .expect("should spend");
 
-        let res = get_accounting_for_channel_axum(app.clone(), Extension(channel_context.clone()))
-            .await;
+        let res =
+            get_accounting_for_channel_axum(app.clone(), Extension(channel_context.clone())).await;
         assert!(res.is_ok());
 
         let accounting_response = res.unwrap();
@@ -1388,8 +1441,8 @@ mod test {
         .await;
         assert!(res.is_ok());
 
-        let res = get_accounting_for_channel_axum(app.clone(), Extension(channel_context.clone()))
-            .await;
+        let res =
+            get_accounting_for_channel_axum(app.clone(), Extension(channel_context.clone())).await;
         assert!(res.is_ok());
 
         let accounting_response = res.unwrap();
