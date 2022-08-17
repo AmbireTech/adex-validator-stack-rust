@@ -192,10 +192,14 @@ pub async fn authenticate_as_advertiser<B>(
         .ok_or(ResponseError::Unauthorized)?
         .uid;
 
-    request
+    let previous = request
         .extensions_mut()
-        .insert(AuthenticateAs::Advertiser(auth_uid))
-        .expect("Should not contain previous value of AuthenticateAs");
+        .insert(AuthenticateAs::Advertiser(auth_uid));
+
+    assert!(
+        previous.is_none(),
+        "Should not contain previous value of AuthenticateAs"
+    );
 
     Ok(next.run(request).await)
 }
@@ -210,10 +214,14 @@ pub async fn authenticate_as_publisher<B>(
         .ok_or(ResponseError::Unauthorized)?
         .uid;
 
-    request
+    let previous = request
         .extensions_mut()
-        .insert(AuthenticateAs::Publisher(auth_uid))
-        .expect("Should not contain previous value of AuthenticateAs");
+        .insert(AuthenticateAs::Publisher(auth_uid));
+
+    assert!(
+        previous.is_none(),
+        "Should not contain previous value of AuthenticateAs"
+    );
 
     Ok(next.run(request).await)
 }
