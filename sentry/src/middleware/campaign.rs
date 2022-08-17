@@ -10,6 +10,14 @@ use axum::{
 };
 use hyper::{Body, Request};
 use primitives::{campaign::Campaign, CampaignId, ChainOf};
+use serde::Deserialize;
+
+/// This struct is required because of routes that have more parameters
+/// apart from the `CampaignId`
+#[derive(Debug, Deserialize)]
+struct CampaignParam {
+    pub id: CampaignId,
+}
 
 #[derive(Debug)]
 pub struct CampaignLoad;
@@ -80,9 +88,10 @@ where
     let mut request_parts = RequestParts::new(request);
 
     let campaign_id = request_parts
-        .extract::<Path<CampaignId>>()
+        .extract::<Path<CampaignParam>>()
         .await
-        .map_err(|_| ResponseError::BadRequest("Bad Campaign Id".to_string()))?;
+        .map_err(|_| ResponseError::BadRequest("Bad Campaign Id".to_string()))?
+        .id;
 
     let campaign = fetch_campaign(pool.clone(), &campaign_id)
         .await?
