@@ -1327,15 +1327,11 @@ mod test {
                 .expect("Should build Request")
         };
 
-        let mut params: HashMap<String, String> = HashMap::new();
-        params.insert("id".to_string(), channel_context.context.id().to_string());
-        params.insert("addr".to_string(), CREATOR.to_string());
-
         // Calling with non existent accounting
         let res = add_spender_leaf_axum(
             app.clone(),
             Extension(channel_context.clone()),
-            Path(params.clone()),
+            Path((channel_context.context.id(), *CREATOR)),
         )
         .await;
         assert!(res.is_ok());
@@ -1380,7 +1376,7 @@ mod test {
         let res = add_spender_leaf_axum(
             app.clone(),
             Extension(channel_context.clone()),
-            Path(params),
+            Path((channel_context.context.id(), *CREATOR)),
         )
         .await;
         assert!(res.is_ok());
