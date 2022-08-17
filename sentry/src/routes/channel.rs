@@ -31,7 +31,7 @@ use primitives::{
     },
     spender::{Spendable, Spender},
     validator::NewState,
-    Address, ChainOf, Channel, Deposit, UnifiedNum,
+    Address, ChainOf, Channel, ChannelId, Deposit, UnifiedNum,
 };
 use serde::{Deserialize, Serialize};
 use slog::{error, Logger};
@@ -269,16 +269,13 @@ pub async fn get_spender_limits<C: Locked + 'static>(
 }
 
 pub async fn get_spender_limits_axum<C: Locked + 'static>(
-    Path(params): Path<HashMap<String, String>>,
+    Path(params): Path<(ChannelId, Address)>,
     Extension(app): Extension<Arc<Application<C>>>,
     Extension(channel_context): Extension<ChainOf<Channel>>,
 ) -> Result<Json<SpenderResponse>, ResponseError> {
     let channel = &channel_context.context;
 
-    let spender = params
-        .get("addr")
-        .ok_or_else(|| ResponseError::BadRequest("Invalid spender address".to_string()))?;
-    let spender = Address::from_str(spender)?;
+    let spender = params.1;
 
     let latest_spendable = fetch_spendable(app.pool.clone(), &spender, &channel.id()).await?;
 
@@ -313,14 +310,12 @@ pub async fn get_spender_limits_axum<C: Locked + 'static>(
         .get(&spender)
         .map(|spent| spent.to_owned());
 
-    // returned output
-    let res = SpenderResponse {
+    Ok(Json(SpenderResponse {
         spender: Spender {
             total_deposited: latest_spendable.deposit.total,
             total_spent,
         },
-    };
-    Ok(Json(res))
+    }))
 }
 
 /// GET `/v5/channel/0xXXX.../spender/all` request.
@@ -422,12 +417,10 @@ pub async fn get_all_spender_limits_axum<C: Locked + 'static>(
         all_spender_limits.insert(spender, spender_info);
     }
 
-    let res = AllSpendersResponse {
+    Ok(Json(AllSpendersResponse {
         spenders: all_spender_limits,
         pagination,
-    };
-
-    Ok(Json(res))
+    }))
 }
 
 /// POST `/v5/channel/0xXXX.../spender/0xXXX...` request
@@ -495,12 +488,9 @@ pub async fn add_spender_leaf<C: Locked + 'static>(
 pub async fn add_spender_leaf_axum<C: Locked + 'static>(
     Extension(app): Extension<Arc<Application<C>>>,
     Extension(channel): Extension<ChainOf<Channel>>,
-    Path(params): Path<HashMap<String, String>>,
+    Path(params): Path<(ChannelId, Address)>,
 ) -> Result<Json<SpenderResponse>, ResponseError> {
-    let spender = params
-        .get("addr")
-        .ok_or_else(|| ResponseError::BadRequest("Invalid spender address".to_string()))?;
-    let spender = Address::from_str(spender)?;
+    let spender = params.1;
 
     update_accounting(
         app.pool.clone(),
@@ -541,13 +531,12 @@ pub async fn add_spender_leaf_axum<C: Locked + 'static>(
         .get(&spender)
         .map(|spent| spent.to_owned());
 
-    let res = SpenderResponse {
+    Ok(Json(SpenderResponse {
         spender: Spender {
             total_deposited: latest_spendable.deposit.total,
             total_spent,
         },
-    };
-    Ok(Json(res))
+    }))
 }
 
 async fn get_corresponding_new_state(
