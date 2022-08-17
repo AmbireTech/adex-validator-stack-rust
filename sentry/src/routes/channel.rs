@@ -905,6 +905,42 @@ pub mod validator_message {
         }))
     }
 
+    /// POST `/v5/channel/0xXXX.../validator-messages`
+    ///
+    /// Full details about the route's API and intend can be found in the [`routes`](crate::routes#post-v5channelidvalidator-messages-auth-required) module
+    ///
+    /// Request body (json): [`ValidatorMessagesCreateRequest`]
+    ///
+    /// Response: [`SuccessResponse`]
+    ///
+    /// # Examples
+    ///
+    /// Request:
+    ///
+    /// ```
+    #[doc = include_str!("../../../primitives/examples/validator_messages_create_request.rs")]
+    /// ```
+    pub async fn create_validator_messages_axum<C: Locked + 'static>(
+        Extension(app): Extension<Arc<Application<C>>>,
+        Extension(auth): Extension<Auth>,
+        Extension(channel_context): Extension<ChainOf<Channel>>,
+        Json(create_request): Json<ValidatorMessagesCreateRequest>,
+    ) -> Result<Json<SuccessResponse>, ResponseError> {
+        let channel = channel_context.context;
+
+        match channel.find_validator(auth.uid) {
+            None => Err(ResponseError::Unauthorized),
+            _ => {
+                try_join_all(create_request.messages.iter().map(|message| {
+                    insert_validator_message(&app.pool, &channel, &auth.uid, message)
+                }))
+                .await?;
+
+                Ok(Json(SuccessResponse { success: true }))
+            }
+        }
+    }
+
     /// GET `/v5/channel/0xXXX.../validator-messages`
     ///
     /// Full details about the route's API and intend can be found in the [`routes`](crate::routes#get-v5channelidvalidator-messages) module
