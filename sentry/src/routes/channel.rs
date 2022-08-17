@@ -166,6 +166,55 @@ pub async fn last_approved<C: Locked + 'static>(
         .unwrap())
 }
 
+pub async fn last_approved_axum<C: Locked + 'static>(
+    Extension(app): Extension<Arc<Application<C>>>,
+    Extension(channel_context): Extension<ChainOf<Channel>>,
+    Qs(query): Qs<LastApprovedQuery>,
+) -> Result<Json<LastApprovedResponse<UncheckedState>>, ResponseError> {
+    // get request Channel
+    let channel = channel_context.context;
+
+    let default_response = Json(LastApprovedResponse::<UncheckedState> {
+        last_approved: None,
+        heartbeats: None,
+    });
+
+    let approve_state = match latest_approve_state(&app.pool, &channel).await? {
+        Some(approve_state) => approve_state,
+        None => return Ok(default_response),
+    };
+
+    let state_root = approve_state.msg.state_root.clone();
+
+    let new_state = latest_new_state(&app.pool, &channel, &state_root).await?;
+    if new_state.is_none() {
+        return Ok(default_response);
+    }
+
+    let validators = vec![channel.leader, channel.follower];
+    let channel_id = channel.id();
+
+    let heartbeats = if query.with_heartbeat.unwrap_or_default() {
+        let result = try_join_all(
+            validators
+                .iter()
+                .map(|validator| latest_heartbeats(&app.pool, &channel_id, validator)),
+        )
+        .await?;
+        Some(result.into_iter().flatten().collect::<Vec<_>>())
+    } else {
+        None
+    };
+
+    Ok(Json(LastApprovedResponse {
+        last_approved: Some(LastApproved {
+            new_state,
+            approve_state: Some(approve_state),
+        }),
+        heartbeats,
+    }))
+}
+
 /// This will make sure to insert/get the `Channel` from DB before attempting to create the `Spendable`
 async fn create_or_update_spendable_document<A: Locked>(
     adapter: &Adapter<A>,
@@ -608,6 +657,40 @@ pub async fn get_accounting_for_channel<C: Locked + 'static>(
 
     let res = AccountingResponse::<CheckedState> { balances };
     Ok(success_response(serde_json::to_string(&res)?))
+}
+
+pub async fn get_accounting_for_channel_axum<C: Locked + 'static>(
+    Extension(app): Extension<Arc<Application<C>>>,
+    Extension(channel_context): Extension<ChainOf<Channel>>,
+) -> Result<Json<AccountingResponse<CheckedState>>, ResponseError> {
+    let channel = channel_context.context;
+
+    let accountings = get_all_accountings_for_channel(app.pool.clone(), channel.id()).await?;
+
+    let mut unchecked_balances: Balances<UncheckedState> = Balances::default();
+
+    for accounting in accountings {
+        match accounting.side {
+            Side::Earner => unchecked_balances
+                .earners
+                .insert(accounting.address, accounting.amount),
+            Side::Spender => unchecked_balances
+                .spenders
+                .insert(accounting.address, accounting.amount),
+        };
+    }
+
+    let balances = match unchecked_balances.check() {
+        Ok(balances) => balances,
+        Err(error) => {
+            error!(&app.logger, "{}", &error; "module" => "channel_accounting");
+            return Err(ResponseError::FailedValidation(
+                "Earners sum is not equal to spenders sum for channel".to_string(),
+            ));
+        }
+    };
+
+    Ok(Json(AccountingResponse::<CheckedState> { balances }))
 }
 
 pub async fn channel_payout_axum<C: Locked + 'static>(
@@ -1087,7 +1170,6 @@ mod test {
         ethereum::test_util::{GANACHE_INFO_1, GANACHE_INFO_1337},
         primitives::Deposit as AdapterDeposit,
     };
-    use hyper::StatusCode;
     use primitives::{
         channel::Nonce,
         test_util::{
@@ -1170,19 +1252,11 @@ mod test {
         assert_eq!(updated_spendable.spender, *CREATOR);
     }
 
-    async fn res_to_accounting_response(res: Response<Body>) -> AccountingResponse<CheckedState> {
-        let json = hyper::body::to_bytes(res.into_body())
-            .await
-            .expect("Should get json");
-
-        let accounting_response: AccountingResponse<CheckedState> =
-            serde_json::from_slice(&json).expect("Should get AccountingResponse");
-        accounting_response
-    }
-
     #[tokio::test]
     async fn get_accountings_for_channel() {
-        let app = setup_dummy_app().await;
+        let app_guard = setup_dummy_app().await;
+
+        let app = Extension(Arc::new(app_guard.app.clone()));
         let channel_context = app
             .config
             .find_chain_of(DUMMY_CAMPAIGN.channel.token)
@@ -1192,20 +1266,16 @@ mod test {
         insert_channel(&app.pool, &channel_context)
             .await
             .expect("should insert channel");
-        let build_request = |channel_context: &ChainOf<Channel>| {
-            Request::builder()
-                .extension(channel_context.clone())
-                .body(Body::empty())
-                .expect("Should build Request")
-        };
+
         // Testing for no accounting yet
         {
-            let res = get_accounting_for_channel(build_request(&channel_context), &app)
-                .await
-                .expect("should get response");
-            assert_eq!(StatusCode::OK, res.status());
+            let res =
+                get_accounting_for_channel_axum(app.clone(), Extension(channel_context.clone()))
+                    .await;
+            assert!(res.is_ok());
 
-            let accounting_response = res_to_accounting_response(res).await;
+            let accounting_response = res.unwrap();
+
             assert_eq!(accounting_response.balances.earners.len(), 0);
             assert_eq!(accounting_response.balances.spenders.len(), 0);
         }
@@ -1227,12 +1297,12 @@ mod test {
             .await
             .expect("should spend");
 
-            let res = get_accounting_for_channel(build_request(&channel_context), &app)
-                .await
-                .expect("should get response");
-            assert_eq!(StatusCode::OK, res.status());
+            let res =
+                get_accounting_for_channel_axum(app.clone(), Extension(channel_context.clone()))
+                    .await;
+            assert!(res.is_ok());
 
-            let accounting_response = res_to_accounting_response(res).await;
+            let accounting_response = res.unwrap();
 
             assert_eq!(balances, accounting_response.balances);
         }
@@ -1263,15 +1333,12 @@ mod test {
                 .await
                 .expect("should spend");
 
-            let res = get_accounting_for_channel(
-                build_request(&channel_context.clone().with(second_channel)),
-                &app,
-            )
-            .await
-            .expect("should get response");
-            assert_eq!(StatusCode::OK, res.status());
+            let res =
+                get_accounting_for_channel_axum(app.clone(), Extension(channel_context.clone()))
+                    .await;
+            assert!(res.is_ok());
 
-            let accounting_response = res_to_accounting_response(res).await;
+            let accounting_response = res.unwrap();
 
             assert_eq!(balances, accounting_response.balances)
         }
@@ -1289,7 +1356,9 @@ mod test {
                 .await
                 .expect("should spend");
 
-            let res = get_accounting_for_channel(build_request(&channel_context), &app).await;
+            let res =
+                get_accounting_for_channel_axum(app.clone(), Extension(channel_context.clone()))
+                    .await;
             let expected = ResponseError::FailedValidation(
                 "Earners sum is not equal to spenders sum for channel".to_string(),
             );
@@ -1320,13 +1389,6 @@ mod test {
             .await
             .expect("should insert channel");
 
-        let get_accounting_request = |channel_context: &ChainOf<Channel>| {
-            Request::builder()
-                .extension(channel_context.clone())
-                .body(Body::empty())
-                .expect("Should build Request")
-        };
-
         // Calling with non existent accounting
         let res = add_spender_leaf_axum(
             app.clone(),
@@ -1336,12 +1398,11 @@ mod test {
         .await;
         assert!(res.is_ok());
 
-        let res = get_accounting_for_channel(get_accounting_request(&channel_context), &app)
-            .await
-            .expect("should get response");
-        assert_eq!(StatusCode::OK, res.status());
+        let res =
+            get_accounting_for_channel_axum(app.clone(), Extension(channel_context.clone())).await;
+        assert!(res.is_ok());
 
-        let accounting_response = res_to_accounting_response(res).await;
+        let accounting_response = res.unwrap();
 
         // Making sure a new entry has been created
         assert_eq!(
@@ -1364,12 +1425,11 @@ mod test {
         .await
         .expect("should spend");
 
-        let res = get_accounting_for_channel(get_accounting_request(&channel_context), &app)
-            .await
-            .expect("should get response");
-        assert_eq!(StatusCode::OK, res.status());
+        let res =
+            get_accounting_for_channel_axum(app.clone(), Extension(channel_context.clone())).await;
+        assert!(res.is_ok());
 
-        let accounting_response = res_to_accounting_response(res).await;
+        let accounting_response = res.unwrap();
 
         assert_eq!(balances, accounting_response.balances);
 
@@ -1381,12 +1441,11 @@ mod test {
         .await;
         assert!(res.is_ok());
 
-        let res = get_accounting_for_channel(get_accounting_request(&channel_context), &app)
-            .await
-            .expect("should get response");
-        assert_eq!(StatusCode::OK, res.status());
+        let res =
+            get_accounting_for_channel_axum(app.clone(), Extension(channel_context.clone())).await;
+        assert!(res.is_ok());
 
-        let accounting_response = res_to_accounting_response(res).await;
+        let accounting_response = res.unwrap();
 
         // Balances shouldn't change
         assert_eq!(
