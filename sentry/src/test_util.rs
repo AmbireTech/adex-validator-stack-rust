@@ -39,6 +39,7 @@ impl ops::Deref for ApplicationGuard {
         &self.app
     }
 }
+
 impl ops::DerefMut for ApplicationGuard {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.app

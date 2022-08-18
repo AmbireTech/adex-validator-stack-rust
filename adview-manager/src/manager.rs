@@ -345,7 +345,7 @@ impl Manager {
             .filter(|x| !(self.options.disabled_video && is_video(&x.0.unit)))
             .collect::<Vec<_>>();
 
-        units_with_price.sort_by(|b, a| match (&a.0.price).cmp(&b.0.price) {
+        units_with_price.sort_by(|b, a| match a.0.price.cmp(&b.0.price) {
             Ordering::Equal => randomized_sort_pos(&a.0.unit, seed.clone())
                 .cmp(&randomized_sort_pos(&b.0.unit, seed.clone())),
             ordering => ordering,

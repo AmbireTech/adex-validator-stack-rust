@@ -1,38 +1,36 @@
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     path::Path,
+    sync::Arc,
 };
 
-use adapter::client::Locked;
-use hyper::{
-    service::{make_service_fn, service_fn},
-    Error, Server,
+use axum::{
+    extract::{FromRequest, RequestParts},
+    http::{Method, StatusCode},
+    middleware,
+    routing::get,
+    Extension, Router,
 };
+use axum_server::{tls_rustls::RustlsConfig, Handle};
 use once_cell::sync::Lazy;
-use primitives::{config::Environment, ValidatorId};
-use redis::ConnectionInfo;
+use redis::{aio::MultiplexedConnection, ConnectionInfo};
 use serde::{Deserialize, Deserializer};
-use simple_hyper_server_tls::{listener_from_pem_files, Protocols, TlsListener};
-use slog::{error, info};
+use slog::{error, info, Logger};
+use tower::ServiceBuilder;
+use tower_http::cors::CorsLayer;
+
+use adapter::{client::Locked, Adapter};
+use primitives::{config::Environment, ValidatorId};
 
 use crate::{
     db::{CampaignRemaining, DbPool},
-    middleware::{
-        auth::Authenticate,
-        cors::{cors, Cors},
-        Middleware,
-    },
+    middleware::auth::authenticate,
     platform::PlatformApi,
-    response::{map_response_error, ResponseError},
     routes::{
         get_cfg,
-        routers::{analytics_router, campaigns_router, channels_router},
+        routers::{analytics_router, campaigns_router, channels_router, units_for_slot_router},
     },
 };
-use adapter::Adapter;
-use hyper::{Body, Method, Request, Response};
-use redis::aio::MultiplexedConnection;
-use slog::Logger;
 
 /// an error used when deserializing a [`EnvConfig`] instance from environment variables
 /// see [`EnvConfig::from_env()`]
@@ -87,9 +85,11 @@ where
 fn default_port() -> u16 {
     DEFAULT_PORT
 }
+
 fn default_ip_addr() -> IpAddr {
     DEFAULT_IP_ADDR
 }
+
 fn default_redis_url() -> ConnectionInfo {
     DEFAULT_REDIS_URL.clone()
 }
@@ -130,38 +130,41 @@ where
         }
     }
 
-    pub async fn handle_routing(&self, req: Request<Body>) -> Response<Body> {
-        let headers = match cors(&req) {
-            Some(Cors::Simple(headers)) => headers,
-            // if we have a Preflight, just return the response directly
-            Some(Cors::Preflight(response)) => return response,
-            None => Default::default(),
-        };
+    pub async fn routing(&self) -> Router {
+        let cors = CorsLayer::new()
+            // "GET,HEAD,PUT,PATCH,POST,DELETE"
+            .allow_methods([
+                Method::GET,
+                Method::HEAD,
+                Method::PUT,
+                Method::PATCH,
+                Method::POST,
+                Method::DELETE,
+            ])
+            // allow requests from any origin
+            // "*"
+            .allow_origin(tower_http::cors::Any);
 
-        let req = match Authenticate.call(req, self).await {
-            Ok(req) => req,
-            Err(error) => return map_response_error(error),
-        };
+        let router = Router::new()
+            .nest("/channel", channels_router::<C>())
+            .nest("/campaign", campaigns_router::<C>())
+            .nest("/analytics", analytics_router::<C>())
+            .nest("/units-for-slot", units_for_slot_router::<C>());
 
-        let mut response = match (req.uri().path(), req.method()) {
-            ("/cfg", &Method::GET) => get_cfg(req, self).await,
-            (route, _) if route.starts_with("/v5/analytics") => analytics_router(req, self).await,
-            // This is important because it prevents us from doing
-            // expensive regex matching for routes without /channel
-            (path, _) if path.starts_with("/v5/channel") => channels_router(req, self).await,
-            (path, _) if path.starts_with("/v5/campaign") => campaigns_router(req, self).await,
-            _ => Err(ResponseError::NotFound),
-        }
-        .unwrap_or_else(map_response_error);
-
-        // extend the headers with the initial headers we have from CORS (if there are some)
-        response.headers_mut().extend(headers);
-        response
+        Router::new()
+            .nest("/v5", router)
+            .route("/cfg", get(get_cfg::<C>))
+            .layer(
+                // keeps the order from top to bottom!
+                ServiceBuilder::new()
+                    .layer(cors)
+                    .layer(middleware::from_fn(authenticate::<C, _>)),
+            )
+            .layer(Extension(Arc::new(self.clone())))
     }
 }
 
 impl<C: Locked + 'static> Application<C> {
-    /// Starts the `hyper` `Server`.
     pub async fn run(self, enable_tls: EnableTls) {
         let logger = self.logger.clone();
         let socket_addr = match &enable_tls {
@@ -170,42 +173,35 @@ impl<C: Locked + 'static> Application<C> {
         };
 
         info!(&logger, "Listening on socket address: {}!", socket_addr);
+        let router = self.routing().await;
+
+        let handle = Handle::new();
+
+        // Spawn a task to shutdown server.
+        tokio::spawn(shutdown_signal(logger.clone(), handle.clone()));
 
         match enable_tls {
             EnableTls::NoTls(socket_addr) => {
-                let make_service = make_service_fn(|_| {
-                    let server = self.clone();
-                    async move {
-                        Ok::<_, Error>(service_fn(move |req| {
-                            let server = server.clone();
-                            async move { Ok::<_, Error>(server.handle_routing(req).await) }
-                        }))
-                    }
-                });
+                let server = axum_server::bind(socket_addr)
+                    .handle(handle)
+                    .serve(router.into_make_service());
 
-                let server = Server::bind(&socket_addr)
-                    .serve(make_service)
-                    .with_graceful_shutdown(shutdown_signal(logger.clone()));
+                tokio::pin!(server);
 
-                if let Err(e) = server.await {
+                while let Err(e) = (&mut server).await {
+                    // This is usually caused by trying to connect on HTTP instead of HTTPS
                     error!(&logger, "server error: {}", e; "main" => "run");
                 }
             }
-            EnableTls::Tls { listener, .. } => {
-                let make_service = make_service_fn(|_| {
-                    let server = self.clone();
-                    async move {
-                        Ok::<_, Error>(service_fn(move |req| {
-                            let server = server.clone();
-                            async move { Ok::<_, Error>(server.handle_routing(req).await) }
-                        }))
-                    }
-                });
 
-                // TODO: Find a way to redirect to HTTPS
-                let server = Server::builder(listener)
-                    .serve(make_service)
-                    .with_graceful_shutdown(shutdown_signal(logger.clone()));
+            EnableTls::Tls {
+                config,
+                socket_addr,
+            } => {
+                let server = axum_server::bind_rustls(socket_addr, config)
+                    .handle(handle)
+                    .serve(router.into_make_service());
+
                 tokio::pin!(server);
 
                 while let Err(e) = (&mut server).await {
@@ -236,21 +232,20 @@ pub enum EnableTls {
     NoTls(SocketAddr),
     Tls {
         socket_addr: SocketAddr,
-        listener: TlsListener,
+        config: RustlsConfig,
     },
 }
 
 impl EnableTls {
-    pub fn new_tls<C: AsRef<Path>, K: AsRef<Path>>(
+    pub async fn new_tls<C: AsRef<Path>, K: AsRef<Path>>(
         certificates: C,
         private_keys: K,
         socket_addr: SocketAddr,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let listener =
-            listener_from_pem_files(certificates, private_keys, Protocols::ALL, &socket_addr)?;
+        let config = RustlsConfig::from_pem_file(certificates, private_keys).await?;
 
         Ok(Self::Tls {
-            listener,
+            config,
             socket_addr,
         })
     }
@@ -278,12 +273,36 @@ pub struct Auth {
     pub chain: primitives::Chain,
 }
 
+/// A query string deserialized using `serde_qs` instead of axum's `serde_urlencoded`
+pub struct Qs<T>(pub T);
+
+#[axum::async_trait]
+impl<T, B> FromRequest<B> for Qs<T>
+where
+    T: serde::de::DeserializeOwned,
+    B: Send,
+{
+    type Rejection = (StatusCode, String);
+
+    async fn from_request(req: &mut RequestParts<B>) -> Result<Self, Self::Rejection> {
+        let query = req.uri().query().unwrap_or_default();
+
+        match serde_qs::from_str(query) {
+            Ok(query) => Ok(Self(query)),
+            Err(err) => Err((StatusCode::BAD_REQUEST, err.to_string())),
+        }
+    }
+}
+
 /// A Ctrl+C signal to gracefully shutdown the server
-async fn shutdown_signal(logger: Logger) {
+async fn shutdown_signal(logger: Logger, handle: Handle) {
     // Wait for the Ctrl+C signal
     tokio::signal::ctrl_c()
         .await
         .expect("failed to install CTRL+C signal handler");
+
+    // Signal the server to shutdown using Handle.
+    handle.shutdown();
 
     info!(&logger, "Received Ctrl+C signal. Shutting down..")
 }

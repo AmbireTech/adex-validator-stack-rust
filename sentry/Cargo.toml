@@ -41,10 +41,12 @@ hex = "0.4"
 # CLI
 clap = { version = "3", features = ["cargo"] }
 # Server
+axum = { version = "0.5", features = ["http1", "http2", "headers"] }
+axum-server = { version = "0.4", features = ["tls-rustls"] }
+tower = "0.4"
+tower-http = { version = "0.3", features = ["cors"] }
 tokio = { version = "1", features = ["macros", "time", "rt-multi-thread", "signal"] }
-hyper = { version = "0.14", features = ["stream", "runtime", "http1", "http2", "server"] }
-simple-hyper-server-tls = { version = "0.3", features = ["tls-rustls"] }
-regex = "1"
+
 # Database
 redis = { version = "0.21", features = ["aio", "tokio-comp"] }
 deadpool = "0.9"
@@ -81,3 +83,6 @@ pretty_assertions = "1"
 
 primitives = { path = "../primitives", features = ["postgres", "test-util"] }
 adapter = { version = "0.2", path = "../adapter", features = ["test-util"] }
+
+# we only require `hyper` for `hyper::body::to_bytes` function
+hyper = { version = "0.14", default-features = false }

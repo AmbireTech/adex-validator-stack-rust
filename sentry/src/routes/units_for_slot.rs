@@ -1,14 +1,24 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::Arc};
 
-use adapter::client::Locked;
+use axum::{
+    body::Body,
+    extract::TypedHeader,
+    headers::UserAgent,
+    http::{
+        header::{HeaderMap, HeaderName, CONTENT_TYPE},
+        Response, StatusCode,
+    },
+    Extension, Json,
+};
 use chrono::Utc;
 use futures::future::try_join_all;
-use hyper::{header::USER_AGENT, Body, Request, Response};
-use hyper::{
-    header::{HeaderName, CONTENT_TYPE},
-    StatusCode,
-};
 use once_cell::sync::Lazy;
+use reqwest::Url;
+use serde::{Deserialize, Serialize};
+use slog::{debug, error, warn, Logger};
+use woothee::{parser::Parser, woothee::VALUE_UNKNOWN};
+
+use adapter::client::Locked;
 use primitives::{
     sentry::IMPRESSION,
     supermarket::units_for_slot::response,
@@ -16,10 +26,6 @@ use primitives::{
     targeting::{eval_with_callback, get_pricing_bounds, input, input::Input, Output},
     AdSlot, AdUnit, Address, Campaign, Config, UnifiedNum, ValidatorId,
 };
-use reqwest::Url;
-use serde::{Deserialize, Serialize};
-use slog::{debug, error, warn, Logger};
-use woothee::{parser::Parser, woothee::VALUE_UNKNOWN};
 
 use crate::{
     db::{
@@ -59,20 +65,16 @@ pub(crate) fn service_unavailable() -> Response<Body> {
 }
 
 pub async fn post_units_for_slot<C>(
-    req: Request<Body>,
-    app: &Application<C>,
+    Extension(app): Extension<Arc<Application<C>>>,
+    Json(request_body): Json<RequestBody>,
+    user_agent: Option<TypedHeader<UserAgent>>,
+    headers: HeaderMap,
 ) -> Result<Response<Body>, ResponseError>
 where
     C: Locked + 'static,
 {
     let logger = &app.logger;
     let config = &app.config;
-
-    let (request_parts, body) = req.into_parts();
-
-    let body_bytes = hyper::body::to_bytes(body).await?;
-
-    let request_body = serde_json::from_slice::<RequestBody>(&body_bytes)?;
 
     let ad_slot = request_body.ad_slot.clone();
 
@@ -134,10 +136,8 @@ where
 
     // For each adUnits apply input
     let ua_parser = Parser::new();
-    let user_agent = request_parts
-        .headers
-        .get(USER_AGENT)
-        .and_then(|h| h.to_str().map(ToString::to_string).ok())
+    let user_agent = user_agent
+        .map(|h| h.as_str().to_string())
         .unwrap_or_default();
     let parsed = ua_parser.parse(&user_agent);
     // WARNING! This will return only the OS type, e.g. `Linux` and not the actual distribution name e.g. `Ubuntu`
@@ -160,8 +160,7 @@ where
         }
     });
 
-    let country = request_parts
-        .headers
+    let country = headers
         .get(CLOUDFLARE_IPCOUNTRY_HEADER.clone())
         .and_then(|h| h.to_str().map(ToString::to_string).ok());
 

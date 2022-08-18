@@ -1,37 +1,40 @@
 //! `/v5/channel` routes
 //!
 
-use crate::db::{
-    accounting::{
-        get_accounting, get_all_accountings_for_channel, spend_amount, update_accounting, Side,
-    },
-    insert_channel, list_channels,
-    spendable::{fetch_spendable, get_all_spendables_for_channel, update_spendable},
-    validator_message::{latest_approve_state, latest_heartbeats, latest_new_state},
-    DbPool,
-};
-use crate::{
-    response::{success_response, ResponseError},
-    routes::{campaign::fetch_campaign_ids_for_channel, routers::RouteParams},
-    Application, Auth,
-};
-use adapter::{client::Locked, Adapter, Dummy};
+use axum::{extract::Path, Extension, Json};
 use futures::future::try_join_all;
-use hyper::{Body, Request, Response};
+use serde::{Deserialize, Serialize};
+use slog::{error, Logger};
+use std::{any::Any, collections::HashMap, sync::Arc};
+
+use adapter::{client::Locked, Adapter, Dummy};
 use primitives::{
     balances::{Balances, CheckedState, UncheckedState},
     sentry::{
-        channel_list::ChannelListQuery, AccountingResponse, AllSpendersQuery, AllSpendersResponse,
-        ChannelPayRequest, LastApproved, LastApprovedQuery, LastApprovedResponse, SpenderResponse,
-        SuccessResponse,
+        channel_list::{ChannelListQuery, ChannelListResponse},
+        AccountingResponse, AllSpendersQuery, AllSpendersResponse, ChannelPayRequest, LastApproved,
+        LastApprovedQuery, LastApprovedResponse, SpenderResponse, SuccessResponse,
     },
     spender::{Spendable, Spender},
     validator::NewState,
-    Address, ChainOf, Channel, Deposit, UnifiedNum,
+    Address, ChainOf, Channel, ChannelId, Deposit, UnifiedNum,
 };
-use serde::{Deserialize, Serialize};
-use slog::{error, Logger};
-use std::{any::Any, collections::HashMap, str::FromStr};
+
+use crate::{
+    application::Qs,
+    db::{
+        accounting::{
+            get_accounting, get_all_accountings_for_channel, spend_amount, update_accounting, Side,
+        },
+        insert_channel, list_channels,
+        spendable::{fetch_spendable, get_all_spendables_for_channel, update_spendable},
+        validator_message::{latest_approve_state, latest_heartbeats, latest_new_state},
+        DbPool,
+    },
+    response::ResponseError,
+    routes::campaign::fetch_campaign_ids_for_channel,
+    Application, Auth,
+};
 
 /// Request body for Channel deposit when using the Dummy adapter.
 ///
@@ -48,10 +51,9 @@ pub struct ChannelDummyDeposit {
 ///
 /// Response: [`ChannelListResponse`](primitives::sentry::channel_list::ChannelListResponse)
 pub async fn channel_list<C: Locked + 'static>(
-    req: Request<Body>,
-    app: &Application<C>,
-) -> Result<Response<Body>, ResponseError> {
-    let query = serde_qs::from_str::<ChannelListQuery>(req.uri().query().unwrap_or(""))?;
+    Extension(app): Extension<Arc<Application<C>>>,
+    Qs(query): Qs<ChannelListQuery>,
+) -> Result<Json<ChannelListResponse>, ResponseError> {
     let skip = query
         .page
         .checked_mul(app.config.channels_find_limit.into())
@@ -66,7 +68,7 @@ pub async fn channel_list<C: Locked + 'static>(
     )
     .await?;
 
-    Ok(success_response(serde_json::to_string(&list_response)?))
+    Ok(Json(list_response))
 }
 
 /// GET `/v5/channel/0xXXX.../last-approved` request
@@ -77,26 +79,17 @@ pub async fn channel_list<C: Locked + 'static>(
 ///
 /// Response: [`LastApprovedResponse`]
 pub async fn last_approved<C: Locked + 'static>(
-    req: Request<Body>,
-    app: &Application<C>,
-) -> Result<Response<Body>, ResponseError> {
+    Extension(app): Extension<Arc<Application<C>>>,
+    Extension(channel_context): Extension<ChainOf<Channel>>,
+    Qs(query): Qs<LastApprovedQuery>,
+) -> Result<Json<LastApprovedResponse<UncheckedState>>, ResponseError> {
     // get request Channel
-    let channel = req
-        .extensions()
-        .get::<ChainOf<Channel>>()
-        .ok_or(ResponseError::NotFound)?
-        .context;
+    let channel = channel_context.context;
 
-    let default_response = Response::builder()
-        .header("Content-type", "application/json")
-        .body(
-            serde_json::to_string(&LastApprovedResponse::<UncheckedState> {
-                last_approved: None,
-                heartbeats: None,
-            })?
-            .into(),
-        )
-        .expect("should build response");
+    let default_response = Json(LastApprovedResponse::<UncheckedState> {
+        last_approved: None,
+        heartbeats: None,
+    });
 
     let approve_state = match latest_approve_state(&app.pool, &channel).await? {
         Some(approve_state) => approve_state,
@@ -110,7 +103,6 @@ pub async fn last_approved<C: Locked + 'static>(
         return Ok(default_response);
     }
 
-    let query = serde_qs::from_str::<LastApprovedQuery>(req.uri().query().unwrap_or(""))?;
     let validators = vec![channel.leader, channel.follower];
     let channel_id = channel.id();
 
@@ -126,19 +118,13 @@ pub async fn last_approved<C: Locked + 'static>(
         None
     };
 
-    Ok(Response::builder()
-        .header("Content-type", "application/json")
-        .body(
-            serde_json::to_string(&LastApprovedResponse {
-                last_approved: Some(LastApproved {
-                    new_state,
-                    approve_state: Some(approve_state),
-                }),
-                heartbeats,
-            })?
-            .into(),
-        )
-        .unwrap())
+    Ok(Json(LastApprovedResponse {
+        last_approved: Some(LastApproved {
+            new_state,
+            approve_state: Some(approve_state),
+        }),
+        heartbeats,
+    }))
 }
 
 /// This will make sure to insert/get the `Channel` from DB before attempting to create the `Spendable`
@@ -174,38 +160,17 @@ async fn create_or_update_spendable_document<A: Locked>(
     Ok(spendable)
 }
 
-fn spender_response_without_leaf(
-    total_deposited: UnifiedNum,
-) -> Result<Response<Body>, ResponseError> {
-    let res = SpenderResponse {
-        spender: Spender {
-            total_deposited,
-            total_spent: None,
-        },
-    };
-    Ok(success_response(serde_json::to_string(&res)?))
-}
-
 /// GET `/v5/channel/0xXXX.../spender/0xXXX...` request
 ///
 /// Response: [`SpenderResponse`]
 pub async fn get_spender_limits<C: Locked + 'static>(
-    req: Request<Body>,
-    app: &Application<C>,
-) -> Result<Response<Body>, ResponseError> {
-    let route_params = req
-        .extensions()
-        .get::<RouteParams>()
-        .expect("request should have route params");
-
-    let channel_context = req
-        .extensions()
-        .get::<ChainOf<Channel>>()
-        .expect("Request should have Channel & Chain/TokenInfo")
-        .to_owned();
+    Path(params): Path<(ChannelId, Address)>,
+    Extension(app): Extension<Arc<Application<C>>>,
+    Extension(channel_context): Extension<ChainOf<Channel>>,
+) -> Result<Json<SpenderResponse>, ResponseError> {
     let channel = &channel_context.context;
 
-    let spender = Address::from_str(&route_params.index(1))?;
+    let spender = params.1;
 
     let latest_spendable = fetch_spendable(app.pool.clone(), &spender, &channel.id()).await?;
 
@@ -224,7 +189,14 @@ pub async fn get_spender_limits<C: Locked + 'static>(
 
     let new_state = match get_corresponding_new_state(&app.pool, &app.logger, channel).await? {
         Some(new_state) => new_state,
-        None => return spender_response_without_leaf(latest_spendable.deposit.total),
+        None => {
+            return Ok(Json(SpenderResponse {
+                spender: Spender {
+                    total_deposited: latest_spendable.deposit.total,
+                    total_spent: None,
+                },
+            }))
+        }
     };
 
     let total_spent = new_state
@@ -233,30 +205,24 @@ pub async fn get_spender_limits<C: Locked + 'static>(
         .get(&spender)
         .map(|spent| spent.to_owned());
 
-    // returned output
-    let res = SpenderResponse {
+    Ok(Json(SpenderResponse {
         spender: Spender {
             total_deposited: latest_spendable.deposit.total,
             total_spent,
         },
-    };
-    Ok(success_response(serde_json::to_string(&res)?))
+    }))
 }
 
 /// GET `/v5/channel/0xXXX.../spender/all` request.
 ///
 /// Response: [`AllSpendersResponse`]
 pub async fn get_all_spender_limits<C: Locked + 'static>(
-    req: Request<Body>,
-    app: &Application<C>,
-) -> Result<Response<Body>, ResponseError> {
-    let channel = req
-        .extensions()
-        .get::<ChainOf<Channel>>()
-        .expect("Request should have Channel")
-        .context;
+    Extension(app): Extension<Arc<Application<C>>>,
+    Extension(channel_context): Extension<ChainOf<Channel>>,
+    Qs(query): Qs<AllSpendersQuery>,
+) -> Result<Json<AllSpendersResponse>, ResponseError> {
+    let channel = channel_context.context;
 
-    let query = serde_qs::from_str::<AllSpendersQuery>(req.uri().query().unwrap_or(""))?;
     let limit = app.config.spendable_find_limit;
     let skip = query
         .page
@@ -292,31 +258,21 @@ pub async fn get_all_spender_limits<C: Locked + 'static>(
         all_spender_limits.insert(spender, spender_info);
     }
 
-    let res = AllSpendersResponse {
+    Ok(Json(AllSpendersResponse {
         spenders: all_spender_limits,
         pagination,
-    };
-
-    Ok(success_response(serde_json::to_string(&res)?))
+    }))
 }
 
 /// POST `/v5/channel/0xXXX.../spender/0xXXX...` request
 ///
 /// Internally to make the validator worker add a spender leaf in `NewState` we'll just update `Accounting`
 pub async fn add_spender_leaf<C: Locked + 'static>(
-    req: Request<Body>,
-    app: &Application<C>,
-) -> Result<Response<Body>, ResponseError> {
-    let route_params = req
-        .extensions()
-        .get::<RouteParams>()
-        .expect("request should have route params");
-    let spender = Address::from_str(&route_params.index(1))?;
-
-    let channel = req
-        .extensions()
-        .get::<ChainOf<Channel>>()
-        .ok_or(ResponseError::NotFound)?;
+    Extension(app): Extension<Arc<Application<C>>>,
+    Extension(channel): Extension<ChainOf<Channel>>,
+    Path(params): Path<(ChannelId, Address)>,
+) -> Result<Json<SpenderResponse>, ResponseError> {
+    let spender = params.1;
 
     update_accounting(
         app.pool.clone(),
@@ -333,7 +289,7 @@ pub async fn add_spender_leaf<C: Locked + 'static>(
     let latest_spendable = match latest_spendable {
         Some(spendable) => spendable,
         None => {
-            create_or_update_spendable_document(&app.adapter, app.pool.clone(), channel, spender)
+            create_or_update_spendable_document(&app.adapter, app.pool.clone(), &channel, spender)
                 .await?
         }
     };
@@ -341,7 +297,14 @@ pub async fn add_spender_leaf<C: Locked + 'static>(
     let new_state =
         match get_corresponding_new_state(&app.pool, &app.logger, &channel.context).await? {
             Some(new_state) => new_state,
-            None => return spender_response_without_leaf(latest_spendable.deposit.total),
+            None => {
+                return Ok(Json(SpenderResponse {
+                    spender: Spender {
+                        total_deposited: latest_spendable.deposit.total,
+                        total_spent: None,
+                    },
+                }))
+            }
         };
 
     let total_spent = new_state
@@ -350,13 +313,12 @@ pub async fn add_spender_leaf<C: Locked + 'static>(
         .get(&spender)
         .map(|spent| spent.to_owned());
 
-    let res = SpenderResponse {
+    Ok(Json(SpenderResponse {
         spender: Spender {
             total_deposited: latest_spendable.deposit.total,
             total_spent,
         },
-    };
-    Ok(success_response(serde_json::to_string(&res)?))
+    }))
 }
 
 async fn get_corresponding_new_state(
@@ -392,14 +354,10 @@ async fn get_corresponding_new_state(
 ///
 /// Response: [`AccountingResponse::<CheckedState>`]
 pub async fn get_accounting_for_channel<C: Locked + 'static>(
-    req: Request<Body>,
-    app: &Application<C>,
-) -> Result<Response<Body>, ResponseError> {
-    let channel = req
-        .extensions()
-        .get::<ChainOf<Channel>>()
-        .ok_or(ResponseError::NotFound)?
-        .context;
+    Extension(app): Extension<Arc<Application<C>>>,
+    Extension(channel_context): Extension<ChainOf<Channel>>,
+) -> Result<Json<AccountingResponse<CheckedState>>, ResponseError> {
+    let channel = channel_context.context;
 
     let accountings = get_all_accountings_for_channel(app.pool.clone(), channel.id()).await?;
 
@@ -426,8 +384,7 @@ pub async fn get_accounting_for_channel<C: Locked + 'static>(
         }
     };
 
-    let res = AccountingResponse::<CheckedState> { balances };
-    Ok(success_response(serde_json::to_string(&res)?))
+    Ok(Json(AccountingResponse::<CheckedState> { balances }))
 }
 
 /// POST `/v5/channel/0xXXX.../pay` request
@@ -436,26 +393,12 @@ pub async fn get_accounting_for_channel<C: Locked + 'static>(
 ///
 /// Response: [`SuccessResponse`]
 pub async fn channel_payout<C: Locked + 'static>(
-    req: Request<Body>,
-    app: &Application<C>,
-) -> Result<Response<Body>, ResponseError> {
-    let channel_context = req
-        .extensions()
-        .get::<ChainOf<Channel>>()
-        .expect("Request should have Channel & Chain/TokenInfo")
-        .to_owned();
-
-    let auth = req
-        .extensions()
-        .get::<Auth>()
-        .ok_or(ResponseError::Unauthorized)?
-        .to_owned();
-
+    Extension(app): Extension<Arc<Application<C>>>,
+    Extension(channel_context): Extension<ChainOf<Channel>>,
+    Extension(auth): Extension<Auth>,
+    Json(to_pay): Json<ChannelPayRequest>,
+) -> Result<Json<SuccessResponse>, ResponseError> {
     let spender = auth.uid.to_address();
-
-    let body = hyper::body::to_bytes(req.into_body()).await?;
-    let to_pay = serde_json::from_slice::<ChannelPayRequest>(&body)
-        .map_err(|e| ResponseError::FailedValidation(e.to_string()))?;
 
     // Handling the case where a request with an empty body comes through
     if to_pay.payouts.is_empty() {
@@ -552,9 +495,7 @@ pub async fn channel_payout<C: Locked + 'static>(
     // will return an error if one of the updates fails
     spend_amount(app.pool.clone(), channel_context.context.id(), balances).await?;
 
-    Ok(success_response(serde_json::to_string(&SuccessResponse {
-        success: true,
-    })?))
+    Ok(Json(SuccessResponse { success: true }))
 }
 
 /// POST `/v5/channel/dummy-deposit` request
@@ -565,20 +506,11 @@ pub async fn channel_payout<C: Locked + 'static>(
 ///
 /// Response: [`SuccessResponse`]
 pub async fn channel_dummy_deposit<C: Locked + 'static>(
-    req: Request<Body>,
-    app: &Application<C>,
-) -> Result<Response<Body>, ResponseError> {
-    let auth = req
-        .extensions()
-        .get::<Auth>()
-        .ok_or(ResponseError::Unauthorized)?
-        .to_owned();
-
+    Extension(app): Extension<Arc<Application<C>>>,
+    Extension(auth): Extension<Auth>,
+    Json(request): Json<ChannelDummyDeposit>,
+) -> Result<Json<SuccessResponse>, ResponseError> {
     let depositor = auth.uid.to_address();
-
-    let body = hyper::body::to_bytes(req.into_body()).await?;
-    let request = serde_json::from_slice::<ChannelDummyDeposit>(&body)
-        .map_err(|e| ResponseError::FailedValidation(e.to_string()))?;
 
     // Insert the channel if it does not exist yet
     let channel_chain = app
@@ -603,62 +535,45 @@ pub async fn channel_dummy_deposit<C: Locked + 'static>(
         .client
         .set_deposit(&channel_chain, depositor, deposit);
 
-    Ok(success_response(serde_json::to_string(&SuccessResponse {
-        success: true,
-    })?))
+    Ok(Json(SuccessResponse { success: true }))
 }
 
 /// [`Channel`] [validator messages](primitives::validator::MessageTypes) routes
 /// starting with `/v5/channel/0xXXX.../validator-messages`
 ///
 pub mod validator_message {
-    use crate::{
-        db::validator_message::{get_validator_messages, insert_validator_message},
-        Auth,
-    };
-    use crate::{
-        response::{success_response, ResponseError},
-        Application,
-    };
-    use adapter::client::Locked;
+    use std::sync::Arc;
+
+    use axum::{extract::Path, Extension, Json};
     use futures::future::try_join_all;
-    use hyper::{Body, Request, Response};
+    use serde::Deserialize;
+
+    use adapter::client::Locked;
     use primitives::{
         sentry::{
             SuccessResponse, ValidatorMessagesCreateRequest, ValidatorMessagesListQuery,
             ValidatorMessagesListResponse,
         },
-        ChainOf, Channel, DomainError, ValidatorId,
+        ChainOf, Channel, ChannelId, ValidatorId,
     };
 
-    pub fn extract_params(
-        from_path: &str,
-    ) -> Result<(Option<ValidatorId>, Vec<String>), DomainError> {
-        // trim the `/` at the beginning & end if there is one or more
-        // and split the rest of the string at the `/`
-        let split: Vec<&str> = from_path.trim_matches('/').split('/').collect();
+    use crate::{
+        application::Qs,
+        db::validator_message::{get_validator_messages, insert_validator_message},
+        response::ResponseError,
+        Application, Auth,
+    };
 
-        if split.len() > 2 {
-            return Err(DomainError::InvalidArgument(
-                "Too many parameters".to_string(),
-            ));
-        }
-
-        let validator_id = split
-            .first()
-            // filter an empty string
-            .filter(|string| !string.is_empty())
-            // then try to map it to ValidatorId
-            .map(|string| string.parse())
-            // Transpose in order to check for an error from the conversion
-            .transpose()?;
-
-        let message_types = split
-            .get(1)
-            .filter(|string| !string.is_empty())
-            .map(|string| string.split('+').map(|s| s.to_string()).collect());
-
-        Ok((validator_id, message_types.unwrap_or_default()))
+    #[derive(Debug, Deserialize)]
+    pub struct MessagesListParams {
+        pub id: ChannelId,
+        // Optional filtering by ValidatorId
+        #[serde(default)]
+        pub address: Option<ValidatorId>,
+        /// List of validator message types separated by `+` (urlencoded):
+        /// e.g. `ApproveState+NewState`
+        #[serde(default)]
+        pub message_types: String,
     }
 
     /// GET `/v5/channel/0xXXX.../validator-messages`
@@ -670,19 +585,29 @@ pub mod validator_message {
     /// Response: [`ValidatorMessagesListResponse`]
     ///
     pub async fn list_validator_messages<C: Locked + 'static>(
-        req: Request<Body>,
-        app: &Application<C>,
-        validator_id: &Option<ValidatorId>,
-        message_types: &[String],
-    ) -> Result<Response<Body>, ResponseError> {
-        let query =
-            serde_qs::from_str::<ValidatorMessagesListQuery>(req.uri().query().unwrap_or(""))?;
+        Extension(app): Extension<Arc<Application<C>>>,
+        Extension(channel_context): Extension<ChainOf<Channel>>,
+        Path(params): Path<MessagesListParams>,
+        Qs(query): Qs<ValidatorMessagesListQuery>,
+    ) -> Result<Json<ValidatorMessagesListResponse>, ResponseError> {
+        let message_types = {
+            // We need to strip the `/` prefix from axum
+            let stripped = params
+                .message_types
+                .strip_prefix('/')
+                .unwrap_or(&params.message_types);
 
-        let channel = req
-            .extensions()
-            .get::<ChainOf<Channel>>()
-            .ok_or(ResponseError::NotFound)?
-            .context;
+            if !stripped.is_empty() {
+                stripped
+                    .split('+')
+                    .map(|s| s.to_string())
+                    .collect::<Vec<_>>()
+            } else {
+                vec![]
+            }
+        };
+
+        let channel = channel_context.context;
 
         let config_limit = app.config.msgs_find_limit as u64;
         let limit = query
@@ -691,15 +616,18 @@ pub mod validator_message {
             .unwrap_or(config_limit)
             .min(config_limit);
 
-        let validator_messages =
-            get_validator_messages(&app.pool, &channel.id(), validator_id, message_types, limit)
-                .await?;
+        let validator_messages = get_validator_messages(
+            &app.pool,
+            &channel.id(),
+            &params.address,
+            &message_types,
+            limit,
+        )
+        .await?;
 
-        let response = ValidatorMessagesListResponse {
+        Ok(Json(ValidatorMessagesListResponse {
             messages: validator_messages,
-        };
-
-        Ok(success_response(serde_json::to_string(&response)?))
+        }))
     }
 
     /// POST `/v5/channel/0xXXX.../validator-messages`
@@ -718,26 +646,12 @@ pub mod validator_message {
     #[doc = include_str!("../../../primitives/examples/validator_messages_create_request.rs")]
     /// ```
     pub async fn create_validator_messages<C: Locked + 'static>(
-        req: Request<Body>,
-        app: &Application<C>,
-    ) -> Result<Response<Body>, ResponseError> {
-        let auth = req
-            .extensions()
-            .get::<Auth>()
-            .ok_or(ResponseError::Unauthorized)?
-            .to_owned();
-
-        let channel = req
-            .extensions()
-            .get::<ChainOf<Channel>>()
-            .ok_or(ResponseError::NotFound)?
-            .context;
-
-        let into_body = req.into_body();
-        let body = hyper::body::to_bytes(into_body).await?;
-
-        let create_request = serde_json::from_slice::<ValidatorMessagesCreateRequest>(&body)
-            .map_err(|_err| ResponseError::BadRequest("Bad Request body json".to_string()))?;
+        Extension(app): Extension<Arc<Application<C>>>,
+        Extension(auth): Extension<Auth>,
+        Extension(channel_context): Extension<ChainOf<Channel>>,
+        Json(create_request): Json<ValidatorMessagesCreateRequest>,
+    ) -> Result<Json<SuccessResponse>, ResponseError> {
+        let channel = channel_context.context;
 
         match channel.find_validator(auth.uid) {
             None => Err(ResponseError::Unauthorized),
@@ -747,9 +661,7 @@ pub mod validator_message {
                 }))
                 .await?;
 
-                Ok(success_response(serde_json::to_string(&SuccessResponse {
-                    success: true,
-                })?))
+                Ok(Json(SuccessResponse { success: true }))
             }
         }
     }
@@ -757,24 +669,25 @@ pub mod validator_message {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::{
-        db::{insert_campaign, insert_channel, CampaignRemaining},
-        test_util::setup_dummy_app,
-    };
+    use std::str::FromStr;
+
     use adapter::{
         ethereum::test_util::{GANACHE_INFO_1, GANACHE_INFO_1337},
         primitives::Deposit as AdapterDeposit,
     };
-    use hyper::StatusCode;
     use primitives::{
         channel::Nonce,
-        sentry::channel_list::ChannelListResponse,
         test_util::{
             ADVERTISER, CREATOR, DUMMY_CAMPAIGN, FOLLOWER, GUARDIAN, IDS, LEADER, LEADER_2,
             PUBLISHER, PUBLISHER_2,
         },
         BigNum, ChainId, Deposit, UnifiedMap, ValidatorId,
+    };
+
+    use super::*;
+    use crate::{
+        db::{insert_campaign, insert_channel, CampaignRemaining},
+        test_util::setup_dummy_app,
     };
 
     #[tokio::test]
@@ -850,27 +763,11 @@ mod test {
         assert_eq!(updated_spendable.spender, *CREATOR);
     }
 
-    async fn res_to_accounting_response(res: Response<Body>) -> AccountingResponse<CheckedState> {
-        let json = hyper::body::to_bytes(res.into_body())
-            .await
-            .expect("Should get json");
-
-        let accounting_response: AccountingResponse<CheckedState> =
-            serde_json::from_slice(&json).expect("Should get AccountingResponse");
-        accounting_response
-    }
-
-    async fn res_to_channel_list_response(res: Response<Body>) -> ChannelListResponse {
-        let json = hyper::body::to_bytes(res.into_body())
-            .await
-            .expect("Should get json");
-
-        serde_json::from_slice(&json).expect("Should deserialize ChannelListResponse")
-    }
-
     #[tokio::test]
     async fn get_accountings_for_channel() {
-        let app = setup_dummy_app().await;
+        let app_guard = setup_dummy_app().await;
+
+        let app = Extension(Arc::new(app_guard.app.clone()));
         let channel_context = app
             .config
             .find_chain_of(DUMMY_CAMPAIGN.channel.token)
@@ -880,20 +777,14 @@ mod test {
         insert_channel(&app.pool, &channel_context)
             .await
             .expect("should insert channel");
-        let build_request = |channel_context: &ChainOf<Channel>| {
-            Request::builder()
-                .extension(channel_context.clone())
-                .body(Body::empty())
-                .expect("Should build Request")
-        };
+
         // Testing for no accounting yet
         {
-            let res = get_accounting_for_channel(build_request(&channel_context), &app)
-                .await
-                .expect("should get response");
-            assert_eq!(StatusCode::OK, res.status());
+            let accounting_response =
+                get_accounting_for_channel(app.clone(), Extension(channel_context.clone()))
+                    .await
+                    .expect("shoul get accounting");
 
-            let accounting_response = res_to_accounting_response(res).await;
             assert_eq!(accounting_response.balances.earners.len(), 0);
             assert_eq!(accounting_response.balances.spenders.len(), 0);
         }
@@ -915,12 +806,10 @@ mod test {
             .await
             .expect("should spend");
 
-            let res = get_accounting_for_channel(build_request(&channel_context), &app)
-                .await
-                .expect("should get response");
-            assert_eq!(StatusCode::OK, res.status());
-
-            let accounting_response = res_to_accounting_response(res).await;
+            let accounting_response =
+                get_accounting_for_channel(app.clone(), Extension(channel_context.clone()))
+                    .await
+                    .expect("should get accounting");
 
             assert_eq!(balances, accounting_response.balances);
         }
@@ -951,15 +840,10 @@ mod test {
                 .await
                 .expect("should spend");
 
-            let res = get_accounting_for_channel(
-                build_request(&channel_context.clone().with(second_channel)),
-                &app,
-            )
-            .await
-            .expect("should get response");
-            assert_eq!(StatusCode::OK, res.status());
-
-            let accounting_response = res_to_accounting_response(res).await;
+            let accounting_response =
+                get_accounting_for_channel(app.clone(), Extension(channel_context.clone()))
+                    .await
+                    .expect("shoul get accounting");
 
             assert_eq!(balances, accounting_response.balances)
         }
@@ -977,7 +861,8 @@ mod test {
                 .await
                 .expect("should spend");
 
-            let res = get_accounting_for_channel(build_request(&channel_context), &app).await;
+            let res =
+                get_accounting_for_channel(app.clone(), Extension(channel_context.clone())).await;
             let expected = ResponseError::FailedValidation(
                 "Earners sum is not equal to spenders sum for channel".to_string(),
             );
@@ -987,7 +872,9 @@ mod test {
 
     #[tokio::test]
     async fn adds_and_retrieves_spender_leaf() {
-        let app = setup_dummy_app().await;
+        let app_guard = setup_dummy_app().await;
+
+        let app = Extension(Arc::new(app_guard.app.clone()));
 
         let channel_context = app
             .config
@@ -1006,36 +893,19 @@ mod test {
             .await
             .expect("should insert channel");
 
-        let get_accounting_request = |channel_context: &ChainOf<Channel>| {
-            Request::builder()
-                .extension(channel_context.clone())
-                .body(Body::empty())
-                .expect("Should build Request")
-        };
-        let add_spender_request = |channel_context: &ChainOf<Channel>| {
-            let param = RouteParams(vec![
-                channel_context.context.id().to_string(),
-                CREATOR.to_string(),
-            ]);
-            Request::builder()
-                .extension(channel_context.clone())
-                .extension(param)
-                .body(Body::empty())
-                .expect("Should build Request")
-        };
-
         // Calling with non existent accounting
-        let res = add_spender_leaf(add_spender_request(&channel_context), &app)
-            .await
-            .expect("Should add");
-        assert_eq!(StatusCode::OK, res.status());
+        let _res = add_spender_leaf(
+            app.clone(),
+            Extension(channel_context.clone()),
+            Path((channel_context.context.id(), *CREATOR)),
+        )
+        .await
+        .expect("should get spender leaf");
 
-        let res = get_accounting_for_channel(get_accounting_request(&channel_context), &app)
-            .await
-            .expect("should get response");
-        assert_eq!(StatusCode::OK, res.status());
-
-        let accounting_response = res_to_accounting_response(res).await;
+        let accounting_response =
+            get_accounting_for_channel(app.clone(), Extension(channel_context.clone()))
+                .await
+                .expect("should get accounting");
 
         // Making sure a new entry has been created
         assert_eq!(
@@ -1058,26 +928,25 @@ mod test {
         .await
         .expect("should spend");
 
-        let res = get_accounting_for_channel(get_accounting_request(&channel_context), &app)
-            .await
-            .expect("should get response");
-        assert_eq!(StatusCode::OK, res.status());
-
-        let accounting_response = res_to_accounting_response(res).await;
+        let accounting_response =
+            get_accounting_for_channel(app.clone(), Extension(channel_context.clone()))
+                .await
+                .expect("should get accounting");
 
         assert_eq!(balances, accounting_response.balances);
 
-        let res = add_spender_leaf(add_spender_request(&channel_context), &app)
-            .await
-            .expect("Should add");
-        assert_eq!(StatusCode::OK, res.status());
+        let res = add_spender_leaf(
+            app.clone(),
+            Extension(channel_context.clone()),
+            Path((channel_context.context.id(), *CREATOR)),
+        )
+        .await;
+        assert!(res.is_ok());
 
-        let res = get_accounting_for_channel(get_accounting_request(&channel_context), &app)
-            .await
-            .expect("should get response");
-        assert_eq!(StatusCode::OK, res.status());
-
-        let accounting_response = res_to_accounting_response(res).await;
+        let accounting_response =
+            get_accounting_for_channel(app.clone(), Extension(channel_context.clone()))
+                .await
+                .expect("should get accounting");
 
         // Balances shouldn't change
         assert_eq!(
@@ -1088,8 +957,10 @@ mod test {
 
     #[tokio::test]
     async fn get_channels_list() {
-        let mut app = setup_dummy_app().await;
-        app.config.channels_find_limit = 2;
+        let mut app_guard = setup_dummy_app().await;
+        app_guard.config.channels_find_limit = 2;
+
+        let app = Extension(Arc::new(app_guard.app.clone()));
 
         let channel = Channel {
             leader: IDS[&LEADER],
@@ -1139,15 +1010,6 @@ mod test {
             .await
             .expect("should insert");
 
-        let build_request = |query: ChannelListQuery| {
-            let query = serde_qs::to_string(&query).expect("should parse query");
-            Request::builder()
-                .uri(format!("http://127.0.0.1/v5/channel/list?{}", query))
-                .extension(DUMMY_CAMPAIGN.channel)
-                .body(Body::empty())
-                .expect("Should build Request")
-        };
-
         // Test query page - page 0, page 1
         {
             let query = ChannelListQuery {
@@ -1155,10 +1017,11 @@ mod test {
                 validator: None,
                 chains: vec![],
             };
-            let res = channel_list(build_request(query), &app)
+
+            let channels_list = channel_list(app.clone(), Qs(query))
                 .await
-                .expect("should get channels");
-            let channels_list = res_to_channel_list_response(res).await;
+                .expect("should get channels")
+                .0;
 
             assert_eq!(
                 channels_list.channels,
@@ -1175,10 +1038,11 @@ mod test {
                 validator: None,
                 chains: vec![],
             };
-            let res = channel_list(build_request(query), &app)
+            let channels_list = channel_list(app.clone(), Qs(query))
                 .await
-                .expect("should get channels");
-            let channels_list = res_to_channel_list_response(res).await;
+                .expect("should get channels")
+                .0;
+
             assert_eq!(
                 channels_list.channels,
                 vec![channel_other_leader],
@@ -1193,10 +1057,11 @@ mod test {
                 validator: Some(IDS[&LEADER_2]),
                 chains: vec![],
             };
-            let res = channel_list(build_request(query), &app)
+            let channels_list = channel_list(app.clone(), Qs(query))
                 .await
-                .expect("should get channels");
-            let channels_list = res_to_channel_list_response(res).await;
+                .expect("should get channels")
+                .0;
+
             assert_eq!(
                 channels_list.channels,
                 vec![channel_other_leader],
@@ -1214,10 +1079,9 @@ mod test {
                 validator: Some(IDS[&FOLLOWER]),
                 chains: vec![],
             };
-            let res = channel_list(build_request(query), &app)
+            let channels_list = channel_list(app.clone(), Qs(query))
                 .await
                 .expect("should get channels");
-            let channels_list = res_to_channel_list_response(res).await;
 
             assert_eq!(
                 channels_list.pagination.total_pages, 2,
@@ -1234,10 +1098,10 @@ mod test {
                 validator: Some(IDS[&FOLLOWER]),
                 chains: vec![],
             };
-            let res = channel_list(build_request(query), &app)
+            let channels_list = channel_list(app.clone(), Qs(query))
                 .await
                 .expect("should get channels");
-            let channels_list = res_to_channel_list_response(res).await;
+
             assert_eq!(
                 channels_list.channels,
                 vec![channel_other_leader],
@@ -1251,7 +1115,12 @@ mod test {
 
         // Test query with different chains
         {
-            app.config.channels_find_limit = 10; // no need to test pagination, will ease checking results for this case
+            let limit_app = {
+                let mut limit_app = app_guard.app;
+                limit_app.config.channels_find_limit = 10; // no need to test pagination, will ease checking results for this cause
+
+                Extension(Arc::new(limit_app))
+            };
 
             let query_1 = ChannelListQuery {
                 page: 0,
@@ -1259,10 +1128,10 @@ mod test {
                 chains: vec![ChainId::new(1)],
             };
 
-            let res = channel_list(build_request(query_1), &app)
+            let channels_list = channel_list(limit_app.clone(), Qs(query_1))
                 .await
                 .expect("should get channels");
-            let channels_list = res_to_channel_list_response(res).await;
+
             assert_eq!(
                 channels_list.channels,
                 vec![channel_other_token],
@@ -1275,10 +1144,10 @@ mod test {
                 chains: vec![ChainId::new(1337)],
             };
 
-            let res = channel_list(build_request(query_1337), &app)
+            let channels_list = channel_list(limit_app.clone(), Qs(query_1337))
                 .await
                 .expect("should get channels");
-            let channels_list = res_to_channel_list_response(res).await;
+
             assert_eq!(
                 channels_list.channels,
                 vec![channel, channel_other_leader],
@@ -1291,10 +1160,10 @@ mod test {
                 chains: vec![ChainId::new(1), ChainId::new(1337)],
             };
 
-            let res = channel_list(build_request(query_both_chains), &app)
+            let channels_list = channel_list(limit_app, Qs(query_both_chains))
                 .await
                 .expect("should get channels");
-            let channels_list = res_to_channel_list_response(res).await;
+
             assert_eq!(
                 channels_list.channels,
                 vec![channel, channel_other_token, channel_other_leader],
@@ -1305,12 +1174,15 @@ mod test {
 
     #[tokio::test]
     async fn payouts_for_earners_test() {
-        let app = setup_dummy_app().await;
-        let channel_context = app
-            .config
-            .find_chain_of(DUMMY_CAMPAIGN.channel.token)
-            .expect("Dummy channel Token should be present in config!")
-            .with(DUMMY_CAMPAIGN.channel);
+        let app_guard = setup_dummy_app().await;
+        let app = Extension(Arc::new(app_guard.app.clone()));
+
+        let channel_context = Extension(
+            app.config
+                .find_chain_of(DUMMY_CAMPAIGN.channel.token)
+                .expect("Dummy channel Token should be present in config!")
+                .with(DUMMY_CAMPAIGN.channel),
+        );
 
         insert_channel(&app.pool, &channel_context)
             .await
@@ -1326,32 +1198,26 @@ mod test {
             .await
             .expect("Should set value in redis");
 
-        let auth = Auth {
+        let auth = Extension(Auth {
             era: 0,
             uid: ValidatorId::from(DUMMY_CAMPAIGN.creator),
             chain: channel_context.chain.clone(),
-        };
+        });
 
-        let build_request = |channel_context: &ChainOf<Channel>, payouts: UnifiedMap| {
-            let payouts = ChannelPayRequest { payouts };
-
-            let body = Body::from(serde_json::to_string(&payouts).expect("Should serialize"));
-
-            Request::builder()
-                .extension(channel_context.clone())
-                .extension(auth.clone())
-                .body(body)
-                .expect("Should build Request")
-        };
         let mut payouts = UnifiedMap::default();
         payouts.insert(*PUBLISHER, UnifiedNum::from_u64(500));
+        let to_pay = Json(ChannelPayRequest { payouts });
 
         // Testing before Accounting/Spendable are inserted
         {
-            let err_response =
-                channel_payout(build_request(&channel_context, payouts.clone()), &app)
-                    .await
-                    .expect_err("Should return an error when there is no Accounting/Spendable");
+            let err_response = channel_payout(
+                app.clone(),
+                channel_context.clone(),
+                auth.clone(),
+                to_pay.clone(),
+            )
+            .await
+            .expect_err("Should return an error when there is no Accounting/Spendable");
             assert_eq!(
                 err_response,
                 ResponseError::BadRequest(
@@ -1363,7 +1229,7 @@ mod test {
 
         // Add accounting for spender = 500
         update_accounting(
-            app.pool.clone(),
+            app_guard.pool.clone(),
             channel_context.context.id(),
             auth.uid.to_address(),
             Side::Spender,
@@ -1384,7 +1250,7 @@ mod test {
         // Add accounting for earner = 100
         // available for return will be = 600
         update_accounting(
-            app.pool.clone(),
+            app_guard.pool.clone(),
             channel_context.context.id(),
             auth.uid.to_address(),
             Side::Earner,
@@ -1394,16 +1260,20 @@ mod test {
         .expect("should update");
 
         // Updating spendable so that we have a value for total_deposited
-        update_spendable(app.pool.clone(), &spendable)
+        update_spendable(app_guard.pool.clone(), &spendable)
             .await
             .expect("Should update spendable");
 
-        // Test with no body
+        // Test with empty payouts
         {
+            let to_pay = Json(ChannelPayRequest {
+                payouts: UnifiedMap::default(),
+            });
             let err_response =
-                channel_payout(build_request(&channel_context, UnifiedMap::default()), &app)
+                channel_payout(app.clone(), channel_context.clone(), auth.clone(), to_pay)
                     .await
                     .expect_err("Should return an error when payouts are empty");
+
             assert_eq!(
                 err_response,
                 ResponseError::FailedValidation("Request has empty payouts".to_string()),
@@ -1413,19 +1283,18 @@ mod test {
 
         // make a normal request and get accounting to see if its as expected
         {
-            let res = channel_payout(build_request(&channel_context, payouts.clone()), &app)
-                .await
-                .expect("This request shouldn't result in an error");
+            let success_response = channel_payout(
+                app.clone(),
+                channel_context.clone(),
+                auth.clone(),
+                to_pay.clone(),
+            )
+            .await
+            .expect("This request shouldn't result in an error");
 
-            let json = hyper::body::to_bytes(res.into_body())
-                .await
-                .expect("Should get json");
-
-            let success_response: SuccessResponse =
-                serde_json::from_slice(&json).expect("Should deserialize SuccessResponse");
             assert_eq!(
                 SuccessResponse { success: true },
-                success_response,
+                success_response.0,
                 "Request with JSON body with one address and no errors triggered on purpose"
             );
         }
@@ -1433,7 +1302,7 @@ mod test {
         // Checking if Earner/Spender balances have been updated by looking up the Accounting in the database
         {
             let earner_accounting = get_accounting(
-                app.pool.clone(),
+                app_guard.pool.clone(),
                 channel_context.context.id(),
                 *PUBLISHER,
                 Side::Earner,
@@ -1448,7 +1317,7 @@ mod test {
             );
 
             let spender_accounting = get_accounting(
-                app.pool.clone(),
+                app_guard.pool.clone(),
                 channel_context.context.id(),
                 auth.uid.to_address(),
                 Side::Spender,
@@ -1456,6 +1325,7 @@ mod test {
             .await
             .expect("should get accounting")
             .expect("Should have value, i.e. Some");
+
             assert_eq!(
                 spender_accounting.amount,
                 UnifiedNum::from_u64(1000), // 500 initial + 500 for earners
@@ -1465,12 +1335,19 @@ mod test {
 
         // make a request where "total_to_pay" will exceed available
         {
+            let mut payouts = to_pay.payouts.clone();
             payouts.insert(*CREATOR, UnifiedNum::from_u64(1000));
+            let to_pay_exceed = Json(ChannelPayRequest { payouts });
 
-            let response_error =
-                channel_payout(build_request(&channel_context, payouts.clone()), &app)
-                    .await
-                    .expect_err("Should return an error when total_to_pay > available_for_payout");
+            let response_error = channel_payout(
+                app.clone(),
+                channel_context.clone(),
+                auth.clone(),
+                to_pay_exceed,
+            )
+            .await
+            .expect_err("Should return an error when total_to_pay > available_for_payout");
+
             assert_eq!(
                 ResponseError::FailedValidation(
                     "The total requested payout amount exceeds the available payout".to_string()
@@ -1483,7 +1360,7 @@ mod test {
         // make a request where total - spent + earned will be a negative balance resulting in an error
         {
             update_accounting(
-                app.pool.clone(),
+                app_guard.pool.clone(),
                 channel_context.context.id(),
                 auth.uid.to_address(),
                 Side::Spender,
@@ -1492,10 +1369,15 @@ mod test {
             .await
             .expect("should update"); // total spent: 500 + 1000
 
-            let response_error =
-                channel_payout(build_request(&channel_context, payouts.clone()), &app)
-                    .await
-                    .expect_err("Should return err when available_for_payout is negative");
+            let response_error = channel_payout(
+                app.clone(),
+                channel_context.clone(),
+                auth.clone(),
+                to_pay.clone(),
+            )
+            .await
+            .expect_err("Should return err when available_for_payout is negative");
+
             assert_eq!(
                 ResponseError::FailedValidation(
                     "Underflow while calculating available for payout".to_string()
@@ -1512,10 +1394,10 @@ mod test {
                 .await
                 .expect("Should set value in redis");
 
-            let response_error =
-                channel_payout(build_request(&channel_context, payouts.clone()), &app)
-                    .await
-                    .expect_err("Should return an error when a campaign has remaining funds");
+            let response_error = channel_payout(app, channel_context, auth, to_pay)
+                .await
+                .expect_err("Should return an error when a campaign has remaining funds");
+
             assert_eq!(
                 ResponseError::FailedValidation(
                     "All campaigns should be closed or have no budget left".to_string()

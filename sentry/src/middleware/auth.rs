@@ -1,97 +1,81 @@
-use std::error;
+use std::sync::Arc;
 
-use async_trait::async_trait;
-use hyper::header::{AUTHORIZATION, REFERER};
-use hyper::{Body, Request};
-use redis::aio::MultiplexedConnection;
+use axum::{
+    http::{
+        header::{AUTHORIZATION, REFERER},
+        Request,
+    },
+    middleware::Next,
+};
 
-use adapter::{prelude::*, primitives::Session as AdapterSession, Adapter};
-use primitives::ValidatorId;
+use adapter::{prelude::*, primitives::Session as AdapterSession};
+use primitives::{analytics::AuthenticateAs, ValidatorId};
 
-use crate::{middleware::Middleware, response::ResponseError, Application, Auth, Session};
+use crate::{response::ResponseError, Application, Auth, Session};
 
-#[derive(Debug)]
-pub struct Authenticate;
+pub async fn is_admin<C: Locked + 'static, B>(
+    request: axum::http::Request<B>,
+    next: Next<B>,
+) -> Result<axum::response::Response, ResponseError> {
+    let auth = request
+        .extensions()
+        .get::<Auth>()
+        .ok_or(ResponseError::Unauthorized)?;
 
-#[async_trait]
-impl<C: Locked + 'static> Middleware<C> for Authenticate {
-    async fn call<'a>(
-        &self,
-        request: Request<Body>,
-        application: &'a Application<C>,
-    ) -> Result<Request<Body>, ResponseError> {
-        for_request(request, &application.adapter, &application.redis.clone())
-            .await
-            .map_err(|error| {
-                slog::error!(&application.logger, "{}", &error; "module" => "middleware-auth");
+    let config = &request
+        .extensions()
+        .get::<Arc<Application<C>>>()
+        .expect("Application should always be present")
+        .config;
 
-                ResponseError::Unauthorized
-            })
+    if !config.admins.contains(auth.uid.as_address()) {
+        return Err(ResponseError::Unauthorized);
+    }
+    Ok(next.run(request).await)
+}
+
+pub async fn authentication_required<C: Locked + 'static, B>(
+    request: axum::http::Request<B>,
+    next: Next<B>,
+) -> Result<axum::response::Response, ResponseError> {
+    if request.extensions().get::<Auth>().is_some() {
+        Ok(next.run(request).await)
+    } else {
+        Err(ResponseError::Unauthorized)
     }
 }
 
-#[derive(Debug)]
-pub struct AuthRequired;
-
-#[async_trait]
-impl<C: Locked + 'static> Middleware<C> for AuthRequired {
-    async fn call<'a>(
-        &self,
-        request: Request<Body>,
-        _application: &'a Application<C>,
-    ) -> Result<Request<Body>, ResponseError> {
-        if request.extensions().get::<Auth>().is_some() {
-            Ok(request)
-        } else {
-            Err(ResponseError::Unauthorized)
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct IsAdmin;
-
-#[async_trait]
-impl<C: Locked + 'static> Middleware<C> for IsAdmin {
-    async fn call<'a>(
-        &self,
-        request: Request<Body>,
-        application: &'a Application<C>,
-    ) -> Result<Request<Body>, ResponseError> {
-        let auth = request
-            .extensions()
-            .get::<Auth>()
-            .expect("request should have session")
-            .to_owned();
-
-        if !application.config.admins.contains(auth.uid.as_address()) {
-            return Err(ResponseError::Unauthorized);
-        }
-        Ok(request)
-    }
-}
-
+/// Creates a [`Session`] and additionally [`Auth`] if a Bearer token was provided.
+///
 /// Check `Authorization` header for `Bearer` scheme with `Adapter::session_from_token`.
 /// If the `Adapter` fails to create an `AdapterSession`, `ResponseError::BadRequest` will be returned.
-async fn for_request<C: Locked>(
-    mut req: Request<Body>,
-    adapter: &Adapter<C>,
-    redis: &MultiplexedConnection,
-) -> Result<Request<Body>, Box<dyn error::Error>> {
-    let referrer = req
+pub async fn authenticate<C: Locked + 'static, B>(
+    mut request: axum::http::Request<B>,
+    next: Next<B>,
+) -> Result<axum::response::Response, ResponseError> {
+    let (adapter, redis) = {
+        let app = request
+            .extensions()
+            .get::<Arc<Application<C>>>()
+            .expect("Application should always be present");
+
+        (app.adapter.clone(), app.redis.clone())
+    };
+
+    let referrer = request
         .headers()
         .get(REFERER)
         .and_then(|hv| hv.to_str().ok().map(ToString::to_string));
 
     let session = Session {
-        ip: get_request_ip(&req),
+        ip: get_request_ip(&request),
         country: None,
         referrer_header: referrer,
         os: None,
     };
-    req.extensions_mut().insert(session);
+    request.extensions_mut().insert(session);
 
-    let authorization = req.headers().get(AUTHORIZATION);
+    let authorization = request.headers().get(AUTHORIZATION);
 
     let prefix = "Bearer ";
 
@@ -134,126 +118,269 @@ async fn for_request<C: Locked>(
             chain: adapter_session.chain,
         };
 
-        req.extensions_mut().insert(auth);
+        request.extensions_mut().insert(auth);
     }
 
-    Ok(req)
+    Ok(next.run(request).await)
 }
 
-fn get_request_ip(req: &Request<Body>) -> Option<String> {
+pub async fn authenticate_as_advertiser<B>(
+    mut request: axum::http::Request<B>,
+    next: Next<B>,
+) -> Result<axum::response::Response, ResponseError> {
+    let auth_uid = request
+        .extensions()
+        .get::<Auth>()
+        .ok_or(ResponseError::Unauthorized)?
+        .uid;
+
+    let previous = request
+        .extensions_mut()
+        .insert(AuthenticateAs::Advertiser(auth_uid));
+
+    assert!(
+        previous.is_none(),
+        "Should not contain previous value of AuthenticateAs"
+    );
+
+    Ok(next.run(request).await)
+}
+
+pub async fn authenticate_as_publisher<B>(
+    mut request: axum::http::Request<B>,
+    next: Next<B>,
+) -> Result<axum::response::Response, ResponseError> {
+    let auth_uid = request
+        .extensions()
+        .get::<Auth>()
+        .ok_or(ResponseError::Unauthorized)?
+        .uid;
+
+    let previous = request
+        .extensions_mut()
+        .insert(AuthenticateAs::Publisher(auth_uid));
+
+    assert!(
+        previous.is_none(),
+        "Should not contain previous value of AuthenticateAs"
+    );
+
+    Ok(next.run(request).await)
+}
+
+/// Get's the Request IP from either `true-client-ip` or `x-forwarded-for`,
+/// splits the IPs separated by `,` (comma) and returns the first one.
+fn get_request_ip<B>(req: &Request<B>) -> Option<String> {
     req.headers()
         .get("true-client-ip")
         .or_else(|| req.headers().get("x-forwarded-for"))
-        .and_then(|hv| hv.to_str().map(ToString::to_string).ok())
-        .and_then(|token| token.split(',').next().map(ToString::to_string))
+        .and_then(|hv| {
+            hv.to_str()
+                // filter out empty headers
+                .map(ToString::to_string)
+                .ok()
+                .filter(|ip| !ip.is_empty())
+        })
+        .and_then(|token| {
+            token
+                .split(',')
+                .next()
+                // filter out empty IP
+                .filter(|ip| !ip.is_empty())
+                .map(ToString::to_string)
+        })
 }
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashMap;
+
+    use axum::{
+        body::Body,
+        http::{Request, StatusCode},
+        middleware::from_fn,
+        routing::get,
+        Extension, Router,
+    };
+    use tower::Service;
+
     use adapter::{
-        dummy::{Dummy, HeaderToken, Options},
+        dummy::{Dummy, HeaderToken},
         ethereum::test_util::GANACHE_1,
-        Adapter,
     };
-    use hyper::Request;
-    use primitives::{
-        config::GANACHE_CONFIG,
-        test_util::IDS,
-        test_util::{DUMMY_AUTH, LEADER},
-    };
+    use primitives::test_util::{DUMMY_AUTH, LEADER};
 
-    use deadpool::managed::Object;
-
-    use crate::{
-        db::redis_pool::{Manager, TESTS_POOL},
-        Session,
-    };
+    use crate::{middleware::body_to_string, test_util::setup_dummy_app, Session};
 
     use super::*;
 
-    async fn setup() -> (Adapter<Dummy>, Object<Manager>) {
-        let connection = TESTS_POOL.get().await.expect("Should return Object");
-        let adapter_options = Options {
-            dummy_identity: IDS[&LEADER],
-            dummy_auth_tokens: DUMMY_AUTH.clone(),
-            dummy_chains: GANACHE_CONFIG.chains.values().cloned().collect(),
-        };
-
-        (Adapter::new(Dummy::init(adapter_options)), connection)
-    }
-
     #[tokio::test]
     async fn no_authentication_or_incorrect_value_should_not_add_session() {
-        let no_auth_req = Request::builder()
-            .body(Body::empty())
-            .expect("should never fail!");
+        let app_guard = setup_dummy_app().await;
+        let app = Arc::new(app_guard.app);
 
-        let (dummy_adapter, database) = setup().await;
-        let no_auth = for_request(no_auth_req, &dummy_adapter, &database)
-            .await
-            .expect("Handling the Request shouldn't have failed");
+        async fn handle() -> String {
+            "Ok".into()
+        }
 
-        assert!(
-            no_auth.extensions().get::<Auth>().is_none(),
-            "There shouldn't be a Session in the extensions"
-        );
+        let mut router = Router::new()
+            .route("/", get(handle))
+            .layer(from_fn(authenticate::<Dummy, _>));
+
+        {
+            let no_auth_req = Request::builder()
+                .extension(app.clone())
+                .body(Body::empty())
+                .expect("should never fail!");
+
+            let no_auth = router
+                .call(no_auth_req)
+                .await
+                .expect("Handling the Request shouldn't have failed");
+
+            assert!(
+                no_auth.extensions().get::<Auth>().is_none(),
+                "There shouldn't be a Auth in the extensions"
+            );
+        }
 
         // there is a Header, but it has wrong format
-        let incorrect_auth_req = Request::builder()
-            .header(AUTHORIZATION, "Wrong Header")
-            .body(Body::empty())
-            .unwrap();
-        let incorrect_auth = for_request(incorrect_auth_req, &dummy_adapter, &database)
-            .await
-            .expect("Handling the Request shouldn't have failed");
-        assert!(
-            incorrect_auth.extensions().get::<Auth>().is_none(),
-            "There shouldn't be a Session in the extensions"
-        );
+        {
+            let incorrect_auth_req = Request::builder()
+                .header(AUTHORIZATION, "Wrong Header")
+                .extension(app.clone())
+                .body(Body::empty())
+                .expect("should never fail!");
+
+            let incorrect_auth = router
+                .call(incorrect_auth_req)
+                .await
+                .expect("Handling the Request shouldn't have failed");
+
+            assert!(
+                incorrect_auth.extensions().get::<Auth>().is_none(),
+                "There shouldn't be an Auth in the extensions"
+            );
+        }
 
         // Token doesn't exist in the Adapter nor in Redis
-        let non_existent_token_req = Request::builder()
-            .header(AUTHORIZATION, "Bearer wrong-token")
-            .body(Body::empty())
-            .unwrap();
-        match for_request(non_existent_token_req, &dummy_adapter, &database).await {
-            Err(error) => {
-                assert_eq!(error.to_string(), "Authentication: Dummy Authentication token format should be in the format: `{Auth Token}:chain_id:{Chain Id}` but 'wrong-token' was provided");
-            }
-            _ => panic!("We shouldn't get a success response nor a different Error than BadRequest for this call"),
-        };
+        {
+            let non_existent_token_req = Request::builder()
+                .header(AUTHORIZATION, "Bearer wrong-token")
+                .extension(app.clone())
+                .body(Body::empty())
+                .unwrap();
+
+            let response = router
+                .call(non_existent_token_req)
+                .await
+                .expect("Handling the Request shouldn't have failed");
+
+            assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+            let response_body =
+                serde_json::from_str::<HashMap<String, String>>(&body_to_string(response).await)
+                    .expect("Should deserialize");
+            assert_eq!("Authentication: Dummy Authentication token format should be in the format: `{Auth Token}:chain_id:{Chain Id}` but 'wrong-token' was provided", response_body["message"])
+        }
     }
 
     #[tokio::test]
     async fn session_from_correct_authentication_token() {
-        let (dummy_adapter, database) = setup().await;
+        let app_guard = setup_dummy_app().await;
+        let app = Arc::new(app_guard.app);
 
         let header_token = HeaderToken {
             token: DUMMY_AUTH[&LEADER].clone(),
             chain_id: GANACHE_1.chain_id,
         };
 
+        async fn handle(
+            Extension(auth): Extension<Auth>,
+            Extension(session): Extension<Session>,
+        ) -> String {
+            assert_eq!(Some("120.0.0.1".to_string()), session.ip);
+            assert_eq!(*LEADER, auth.uid.to_address());
+
+            "Ok".into()
+        }
+
+        let mut router = Router::new()
+            .route("/", get(handle))
+            .layer(from_fn(authenticate::<Dummy, _>));
+
         let auth_header = format!("Bearer {header_token}");
-        let req = Request::builder()
+        let request = Request::builder()
             .header(AUTHORIZATION, auth_header)
+            .header("true-client-ip", "120.0.0.1")
+            .extension(app.clone())
             .body(Body::empty())
             .unwrap();
 
-        let altered_request = for_request(req, &dummy_adapter, &database)
+        // The handle takes care of the assertions for the Extensions for us
+        let response = router
+            .call(request)
             .await
             .expect("Valid requests should succeed");
 
-        let auth = altered_request
-            .extensions()
-            .get::<Auth>()
-            .expect("There should be a Session set inside the request");
+        assert_eq!("Ok", body_to_string(response).await);
+    }
 
-        assert_eq!(*LEADER, auth.uid.to_address());
+    #[test]
+    fn test_get_request_ip_headers() {
+        let build_request = |header: &str, ips: &str| -> Request<Body> {
+            Request::builder()
+                .header(header, ips)
+                .body(Body::empty())
+                .unwrap()
+        };
 
-        let session = altered_request
-            .extensions()
-            .get::<Session>()
-            .expect("There should be a Session set inside the request");
-        assert!(session.ip.is_none());
+        // No set headers
+        {
+            let request = Request::builder().body(Body::empty()).unwrap();
+            let no_headers = get_request_ip(&request);
+            assert_eq!(None, no_headers);
+        }
+
+        // Empty headers
+        {
+            let true_client_ip = build_request("true-client-ip", "");
+            let x_forwarded_for = build_request("x-forwarded-for", "");
+
+            let actual_true_client = get_request_ip(&true_client_ip);
+            let actual_x_forwarded = get_request_ip(&x_forwarded_for);
+
+            assert_eq!(None, actual_true_client);
+            assert_eq!(None, actual_x_forwarded);
+        }
+
+        // Empty IPs `","`
+        {
+            let true_client_ip = build_request("true-client-ip", ",");
+            let x_forwarded_for = build_request("x-forwarded-for", ",");
+
+            let actual_true_client = get_request_ip(&true_client_ip);
+            let actual_x_forwarded = get_request_ip(&x_forwarded_for);
+
+            assert_eq!(None, actual_true_client);
+            assert_eq!(None, actual_x_forwarded);
+        }
+
+        // "true-client-ip" - Single IP
+        {
+            let ips = "120.0.0.1";
+            let true_client_ip = build_request("true-client-ip", ips);
+            let actual_ips = get_request_ip(&true_client_ip);
+
+            assert_eq!(Some(ips.to_string()), actual_ips);
+        }
+
+        // "x-forwarded-for" - Multiple IPs
+        {
+            let ips = "192.168.0.1,120.0.0.1,10.0.0.10";
+            let true_client_ip = build_request("x-forwarded-for", ips);
+            let actual_ips = get_request_ip(&true_client_ip);
+
+            assert_eq!(Some("192.168.0.1".to_string()), actual_ips);
+        }
     }
 }
