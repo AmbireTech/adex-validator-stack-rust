@@ -37,8 +37,8 @@ use crate::{
     routes::{
         get_cfg, get_cfg_axum,
         routers::{
-            analytics_router, campaigns_router, campaigns_router_axum, channels_router,
-            channels_router_axum,
+            analytics_router, analytics_router_axum, campaigns_router, campaigns_router_axum,
+            channels_router, channels_router_axum,
         },
     },
 };
@@ -187,13 +187,10 @@ where
             // "*"
             .allow_origin(tower_http::cors::Any);
 
-        let channels = channels_router_axum::<C>();
-
-        let campaigns = campaigns_router_axum::<C>();
-
         let router = Router::new()
-            .nest("/channel", channels)
-            .nest("/campaign", campaigns);
+            .nest("/channel", channels_router_axum::<C>())
+            .nest("/campaign", campaigns_router_axum::<C>())
+            .nest("/analytics", analytics_router_axum::<C>());
 
         Router::new()
             .nest("/v5", router)
